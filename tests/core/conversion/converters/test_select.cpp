@@ -776,7 +776,7 @@ TEST(Converters, ATenMaskedFillZerosConvertsCorrectly) {
       torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
 
-TEST(Converters, ATenIndexTensorConvertsCorrectly) {
+TEST(Converters, ATenIndexTensorOneIndiceConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%x.1 : Tensor,
             %index : Tensor):
@@ -797,6 +797,125 @@ TEST(Converters, ATenIndexTensorConvertsCorrectly) {
 
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2_trt});
+
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+}
+
+TEST(Converters, ATenIndexTensorFullIndicesConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%x.1 : Tensor,
+            %index0 : Tensor,
+            %index1 : Tensor,
+            %index2 : Tensor):
+        %18 : Tensor?[] = prim::ListConstruct(%index0, %index1, %index2)
+        %19 : Tensor = aten::index(%x.1, %18)
+        return (%19))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in1 = at::randint(1, 10, {5, 10, 4}, {at::kCUDA});
+  auto index0 = at::tensor({0, 1, 2, 3}, {at::kCUDA}).to(torch::kLong);
+  auto index1 = at::tensor({1, 3, 4, 6}, {at::kCUDA}).to(torch::kLong);
+  auto index2 = at::tensor({3, 2, 1, 0}, {at::kCUDA}).to(torch::kLong);
+  auto index0_trt = index0.to(torch::kInt32);
+  auto index1_trt = index1.to(torch::kInt32);
+  auto index2_trt = index2.to(torch::kInt32);
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, index0, index1, index2});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, index0_trt, index1_trt, index2_trt});
+
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+}
+
+TEST(Converters, ATenIndexTensorIdx0Idx1NoneConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%x.1 : Tensor,
+            %index0 : Tensor,
+            %index1 : Tensor):
+        %5 : NoneType = prim::Constant()
+        %18 : Tensor?[] = prim::ListConstruct(%index0, %index1, %5)
+        %19 : Tensor = aten::index(%x.1, %18)
+        return (%19))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in1 = at::randint(1, 10, {5, 10, 4}, {at::kCUDA});
+  auto index0 = at::tensor({0, 1, 2, 3}, {at::kCUDA}).to(torch::kLong);
+  auto index1 = at::tensor({1, 3, 4, 6}, {at::kCUDA}).to(torch::kLong);
+  auto index0_trt = index0.to(torch::kInt32);
+  auto index1_trt = index1.to(torch::kInt32);
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, index0, index1});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, index0_trt, index1_trt});
+  LOG_DEBUG(trt_results);
+
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+}
+
+TEST(Converters, ATenIndexTensorIdx0NoneIdx1ConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%x.1 : Tensor,
+            %index0 : Tensor,
+            %index1 : Tensor):
+        %5 : NoneType = prim::Constant()
+        %18 : Tensor?[] = prim::ListConstruct(%index0, %5, %index1)
+        %19 : Tensor = aten::index(%x.1, %18)
+        return (%19))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in1 = at::randint(1, 10, {5, 10, 4}, {at::kCUDA});
+  auto index0 = at::tensor({0, 1, 2, 3}, {at::kCUDA}).to(torch::kLong);
+  auto index1 = at::tensor({3, 2, 1, 0}, {at::kCUDA}).to(torch::kLong);
+  auto index0_trt = index0.to(torch::kInt32);
+  auto index1_trt = index1.to(torch::kInt32);
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, index0, index1});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, index0_trt, index1_trt});
+
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+}
+
+TEST(Converters, ATenIndexTensorNoneIdx0Idx1ConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%x.1 : Tensor,
+            %index0 : Tensor,
+            %index1 : Tensor):
+        %5 : NoneType = prim::Constant()
+        %18 : Tensor?[] = prim::ListConstruct(%5, %index0, %index1)
+        %19 : Tensor = aten::index(%x.1, %18)
+        return (%19))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in1 = at::randint(1, 10, {5, 10, 4}, {at::kCUDA});
+  auto index0 = at::tensor({0, 1, 2, 3}, {at::kCUDA}).to(torch::kLong);
+  auto index1 = at::tensor({3, 2, 1, 0}, {at::kCUDA}).to(torch::kLong);
+  auto index0_trt = index0.to(torch::kInt32);
+  auto index1_trt = index1.to(torch::kInt32);
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, index0, index1});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, index0_trt, index1_trt});
 
   ASSERT_TRUE(
       torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -865,7 +984,7 @@ TEST(Converters, ScatterValueConvertsCorrectly) {
           %5 : NoneType = prim::Constant()
           %6 : bool = prim::Constant[value=0]()
           %7 : int = prim::Constant[value=4]()
-          %index : Tensor = aten::to(%index.1, %7, %6, %6, %5) 
+          %index : Tensor = aten::to(%index.1, %7, %6, %6, %5)
           %10 : Tensor = aten::scatter(%data, %dim, %index, %value)
           return (%10))IR";
 
@@ -900,7 +1019,7 @@ TEST(Converters, ScatterSrcConvertsCorrectly) {
           %5 : NoneType = prim::Constant()
           %6 : bool = prim::Constant[value=0]()
           %7 : int = prim::Constant[value=4]()
-          %index : Tensor = aten::to(%index.1, %7, %6, %6, %5) 
+          %index : Tensor = aten::to(%index.1, %7, %6, %6, %5)
           %10 : Tensor = aten::scatter(%data, %dim, %index, %src)
           return (%10))IR";
 

@@ -135,12 +135,15 @@ e.g.
 
     torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@f16%contiguous" -p f16
 
+- To include a set of custom operators
 
-To run with custom torch operators
 .. code-block:: shell
-torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts --custom-torch-ops=<path to custom library> "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous" -p f16
+
+    torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts --custom-torch-ops=<path to custom library .so file> "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous" -p f16
 
 
-To run with custom converters
+- To include a set of custom converters
+
 .. code-block:: shell
-torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts --custom-converters=<path to custom library> "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous" -p f16
+
+    torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts --custom-converters=<path to custom library .so file> "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous" -p f16

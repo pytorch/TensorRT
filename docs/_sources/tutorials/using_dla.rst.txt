@@ -33,9 +33,6 @@ Using DLA in a C++ application
     # If a layer fails to run on DLA it will fallback to GPU
     compile_spec.device.allow_gpu_fallback = true;
 
-    # Set the workspace size
-    compile_spec.workspace_size = 1 << 28;
-
 
 Using DLA in a python application
 
@@ -44,7 +41,7 @@ Using DLA in a python application
     compile_spec = {
         "inputs": [torch_tensorrt.Input(self.input.shape)],
         "device": torch_tensorrt.Device("dla:0", allow_gpu_fallback=True),
-        "enalbed_precisions": {torch.half}
+        "enalbed_precisions": {torch.half},
     }
 
     trt_mod = torch_tensorrt.compile(self.scripted_model, compile_spec)

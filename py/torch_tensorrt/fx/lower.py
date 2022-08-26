@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 Input = Sequence[Any]
 
 
-def lower_to_trt(
+def compile(
     module: nn.Module,
     input,
     max_batch_size: int = 2048,
@@ -53,7 +53,7 @@ def lower_to_trt(
         timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.
         save_timing_cache: Update timing cache with current timing cache data if set to True.
         cuda_graph_batch_size: Cuda graph batch size, default to be -1.
-
+        dynamic_batch: batch dimension (dim=0) is dynamic.
     Returns:
         A torch.nn.Module lowered by TensorRT.
     """
@@ -216,28 +216,32 @@ class Lowerer:
             )
         )
 
-    @decorate_method(validate_inference(atol=1e-1, rtol=1e-1))
     def __call__(
         self,
         module: nn.Module,
         inputs: Input,
         additional_inputs: Optional[Input] = None,
     ) -> nn.Module:
-        module.eval()
+        lower_setting = self.lower_pass_manager_builder.lower_setting
+        atol = lower_setting.correctness_atol
+        rtol = lower_setting.correctness_rtol
 
-        if (
-            self.lower_pass_manager_builder.lower_setting.lower_precision
-            == LowerPrecision.FP16
-        ):
-            module.half()
-            inputs = tuple(
-                x.half() if x is not None and x.dtype == torch.float32 else x
-                for x in inputs
+        @validate_inference(atol=atol, rtol=rtol)
+        def do_lower(module: nn.Module, inputs: Input) -> nn.Module:
+            module.eval()
+            if (
+                self.lower_pass_manager_builder.lower_setting.lower_precision
+                == LowerPrecision.FP16
+            ):
+                module.half()
+                inputs = tuple(
+                    x.half() if x is not None and x.dtype == torch.float32 else x
+                    for x in inputs
+                )
+            pm = self.lower_pass_manager_builder.build_trt_lower_pipeline(
+                inputs, additional_inputs
             )
-        pm = self.lower_pass_manager_builder.build_trt_lower_pipeline(
-            inputs, additional_inputs
-        )
+            lower_result = pm(module)
+            return lower_result
 
-        lower_result = pm(module)
-
-        return lower_result
+        return do_lower(module, inputs)

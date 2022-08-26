@@ -37,8 +37,8 @@ endif
 	rm -rf $(SOURCEDIR)/_tmp
 
 html:
-	mkdir -p $(SOURCEDIR)/_notebooks
-	cp -r $(SOURCEDIR)/../notebooks/*.ipynb $(SOURCEDIR)/_notebooks
+#	mkdir -p $(SOURCEDIR)/_notebooks
+#	cp -r $(SOURCEDIR)/../notebooks/*.ipynb $(SOURCEDIR)/_notebooks
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 	mkdir -p $(DESTDIR)
 	cp -r $(BUILDDIR)/html/* $(DESTDIR)

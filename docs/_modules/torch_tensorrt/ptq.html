@@ -6,24 +6,24 @@
 <!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
 <head>
   <meta charset="utf-8">
-
+  
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+  
   <title>torch_tensorrt.ptq &mdash; Torch-TensorRT master documentation</title>
+  
 
+  
+  
+  
+  
 
+  
 
+  
+  
+    
 
-
-
-
-
-
-
-
-
-
-
+  
 
   <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <!-- <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" /> -->
@@ -33,11 +33,11 @@
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
   <!-- Google Analytics -->
-
+  
   <!-- End Google Analytics -->
+  
 
-
-
+  
   <script src="../../_static/js/modernizr.min.js"></script>
 
   <!-- Preload the theme fonts -->
@@ -177,9 +177,9 @@
 
 <body class="pytorch-body">
 
+   
 
-
-
+    
 
     <div class="table-of-contents-link-wrapper">
       <span>Table of Contents</span>
@@ -190,21 +190,21 @@
       <div class="pytorch-side-scroll">
         <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           <div class="pytorch-left-menu-search">
+            
 
-
-
-
-
+            
+              
+              
                 <div class="version">
-                  master (1.2.0a0+ffedb78)
+                  master (1.2.0a0+1cf0476)
                 </div>
+              
+            
+
+            
 
 
-
-
-
-
-
+  
 
 
 <div role="search">
@@ -215,40 +215,33 @@
   </form>
 </div>
 
-
+            
           </div>
 
-
-
-
-
-
-
+          
+            
+            
+              
+            
+            
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../tutorials/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../tutorials/getting_started_with_cpp_api.html">Getting Started with C++</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../tutorials/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/ptq.html">Post Training Quantization (PTQ)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../tutorials/torchtrtc.html">torchtrtc</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../tutorials/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/runtime.html">Deploying Torch-TensorRT Programs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../tutorials/using_dla.html">DLA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Notebooks</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/CitriNet-example.html">Torch-TensorRT Getting Started - CitriNet</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/dynamic-shapes.html">Torch-TensorRT - Using Dynamic Shapes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/EfficientNet-example.html">Torch-TensorRT Getting Started - EfficientNet-B0</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/Hugging-Face-BERT.html">Masked Language Modeling (MLM) with Hugging Face BERT Transformer</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/lenet-getting-started.html">Torch-TensorRT Getting Started - LeNet</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/Resnet50-example.html">Torch-TensorRT Getting Started - ResNet 50</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/ssd-object-detection-demo.html">Object Detection with Torch-TensorRT (SSD)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/vgg-qat.html">Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/notebooks.html">Example notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
 <ul>
@@ -256,6 +249,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../py_api/logging.html">torch_tensorrt.logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../py_api/ptq.html">torch_tensorrt.ptq</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../py_api/fx.html">torch_tensorrt.fx</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
 <ul>
@@ -264,6 +258,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../cli/torchtrtc.html">torchtrtc</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
 <ul>
@@ -276,8 +274,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../indices/supported_ops.html">Operators Supported</a></li>
 </ul>
 
-
-
+            
+          
         </div>
       </div>
     </nav>
@@ -285,7 +283,7 @@
     <div class="pytorch-container">
       <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
         <div class="pytorch-breadcrumbs-wrapper">
-
+          
 
 
 
@@ -304,28 +302,28 @@
 <div role="navigation" aria-label="breadcrumbs navigation">
 
   <ul class="pytorch-breadcrumbs">
-
+    
       <li>
         <a href="../../index.html">
-
+          
             Docs
-
+          
         </a> &gt;
       </li>
 
-
+        
           <li><a href="../index.html">Module code</a> &gt;</li>
-
+        
       <li>torch_tensorrt.ptq</li>
-
-
+    
+    
       <li class="pytorch-breadcrumbs-aside">
-
+        
       </li>
-
+    
   </ul>
 
-
+  
 </div>
         </div>
 
@@ -337,13 +335,13 @@
       <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
         <div class="pytorch-content-left">
 
-
-
+        
+          
           <div class="rst-content">
-
+          
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
-
+              
   <h1>Source code for torch_tensorrt.ptq</h1><div class="highlight"><pre>
 <span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span>
 <span class="kn">import</span> <span class="nn">torch</span>
@@ -377,12 +375,13 @@
 
     <span class="n">batch</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dataset_iterator</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">current_batch_idx</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch_size</span>
-    <span class="c1"># Treat the first element as input and others as targets.</span>
+    <span class="n">inputs_gpu</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
-        <span class="n">batch</span> <span class="o">=</span> <span class="n">batch</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">example</span> <span class="ow">in</span> <span class="n">batch</span><span class="p">:</span>
+            <span class="n">inputs_gpu</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">example</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span><span class="o">.</span><span class="n">data_ptr</span><span class="p">())</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="n">batch</span> <span class="o">=</span> <span class="n">batch</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
-    <span class="k">return</span> <span class="p">[</span><span class="n">batch</span><span class="o">.</span><span class="n">data_ptr</span><span class="p">()]</span></div>
+        <span class="n">inputs_gpu</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">batch</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span><span class="o">.</span><span class="n">data_ptr</span><span class="p">())</span>
+    <span class="k">return</span> <span class="n">inputs_gpu</span></div>
 
 
 <div class="viewcode-block" id="read_calibration_cache"><a class="viewcode-back" href="../../py_api/ptq.html#torch_tensorrt.ptq.read_calibration_cache">[docs]</a><span class="k">def</span> <span class="nf">read_calibration_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -425,46 +424,64 @@
         <span class="n">device</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;device&quot;</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda:0&quot;</span><span class="p">))</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dataloader</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">):</span>
-            <span class="n">log</span><span class="p">(</span><span class="n">Level</span><span class="o">.</span><span class="n">Error</span><span class="p">,</span>
-                <span class="s2">&quot;Dataloader : </span><span class="si">{}</span><span class="s2"> is not a valid instance of torch.utils.data.DataLoader&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">dataloader</span><span class="p">))</span>
+            <span class="n">log</span><span class="p">(</span>
+                <span class="n">Level</span><span class="o">.</span><span class="n">Error</span><span class="p">,</span>
+                <span class="s2">&quot;Dataloader : </span><span class="si">{}</span><span class="s2"> is not a valid instance of torch.utils.data.DataLoader&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">dataloader</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">cache_file</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">use_cache</span><span class="p">:</span>
-                <span class="n">log</span><span class="p">(</span><span class="n">Level</span><span class="o">.</span><span class="n">Debug</span><span class="p">,</span> <span class="s2">&quot;Using existing cache_file </span><span class="si">{}</span><span class="s2"> for calibration&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">cache_file</span><span class="p">))</span>
+                <span class="n">log</span><span class="p">(</span>
+                    <span class="n">Level</span><span class="o">.</span><span class="n">Debug</span><span class="p">,</span>
+                    <span class="s2">&quot;Using existing cache_file </span><span class="si">{}</span><span class="s2"> for calibration&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">cache_file</span><span class="p">),</span>
+                <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">log</span><span class="p">(</span><span class="n">Level</span><span class="o">.</span><span class="n">Debug</span><span class="p">,</span> <span class="s2">&quot;Overwriting existing calibration cache file.&quot;</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">use_cache</span><span class="p">:</span>
-                <span class="n">log</span><span class="p">(</span><span class="n">Level</span><span class="o">.</span><span class="n">Error</span><span class="p">,</span> <span class="s2">&quot;Input cache file is None but use_cache is set to True in INT8 mode.&quot;</span><span class="p">)</span>
+                <span class="n">log</span><span class="p">(</span>
+                    <span class="n">Level</span><span class="o">.</span><span class="n">Error</span><span class="p">,</span>
+                    <span class="s2">&quot;Input cache file is None but use_cache is set to True in INT8 mode.&quot;</span><span class="p">,</span>
+                <span class="p">)</span>
 
         <span class="c1"># Define attributes and member functions for the calibrator class</span>
         <span class="n">attribute_mapping</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s1">&#39;data_loader&#39;</span><span class="p">:</span> <span class="n">dataloader</span><span class="p">,</span>
-            <span class="s1">&#39;current_batch_idx&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-            <span class="s1">&#39;batch_size&#39;</span><span class="p">:</span> <span class="n">dataloader</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span>
-            <span class="s1">&#39;dataset_iterator&#39;</span><span class="p">:</span> <span class="nb">iter</span><span class="p">(</span><span class="n">dataloader</span><span class="p">),</span>
-            <span class="s1">&#39;cache_file&#39;</span><span class="p">:</span> <span class="n">cache_file</span><span class="p">,</span>
-            <span class="s1">&#39;device&#39;</span><span class="p">:</span> <span class="n">device</span><span class="p">,</span>
-            <span class="s1">&#39;use_cache&#39;</span><span class="p">:</span> <span class="n">use_cache</span><span class="p">,</span>
-            <span class="s1">&#39;get_batch_size&#39;</span><span class="p">:</span> <span class="n">get_batch_size</span><span class="p">,</span>
-            <span class="s1">&#39;get_batch&#39;</span><span class="p">:</span> <span class="n">get_cache_mode_batch</span> <span class="k">if</span> <span class="n">use_cache</span> <span class="k">else</span> <span class="n">get_batch</span><span class="p">,</span>
-            <span class="s1">&#39;read_calibration_cache&#39;</span><span class="p">:</span> <span class="n">read_calibration_cache</span><span class="p">,</span>
-            <span class="s1">&#39;write_calibration_cache&#39;</span><span class="p">:</span> <span class="n">write_calibration_cache</span>
+            <span class="s2">&quot;data_loader&quot;</span><span class="p">:</span> <span class="n">dataloader</span><span class="p">,</span>
+            <span class="s2">&quot;current_batch_idx&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;batch_size&quot;</span><span class="p">:</span> <span class="n">dataloader</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span>
+            <span class="s2">&quot;dataset_iterator&quot;</span><span class="p">:</span> <span class="nb">iter</span><span class="p">(</span><span class="n">dataloader</span><span class="p">),</span>
+            <span class="s2">&quot;cache_file&quot;</span><span class="p">:</span> <span class="n">cache_file</span><span class="p">,</span>
+            <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="n">device</span><span class="p">,</span>
+            <span class="s2">&quot;use_cache&quot;</span><span class="p">:</span> <span class="n">use_cache</span><span class="p">,</span>
+            <span class="s2">&quot;get_batch_size&quot;</span><span class="p">:</span> <span class="n">get_batch_size</span><span class="p">,</span>
+            <span class="s2">&quot;get_batch&quot;</span><span class="p">:</span> <span class="n">get_cache_mode_batch</span> <span class="k">if</span> <span class="n">use_cache</span> <span class="k">else</span> <span class="n">get_batch</span><span class="p">,</span>
+            <span class="s2">&quot;read_calibration_cache&quot;</span><span class="p">:</span> <span class="n">read_calibration_cache</span><span class="p">,</span>
+            <span class="s2">&quot;write_calibration_cache&quot;</span><span class="p">:</span> <span class="n">write_calibration_cache</span><span class="p">,</span>
         <span class="p">}</span>
 
         <span class="c1"># Using type metaclass to construct calibrator class based on algorithm type</span>
         <span class="k">if</span> <span class="n">algo_type</span> <span class="o">==</span> <span class="n">CalibrationAlgo</span><span class="o">.</span><span class="n">ENTROPY_CALIBRATION</span><span class="p">:</span>
-            <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="s1">&#39;DataLoaderCalibrator&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8EntropyCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span><span class="p">)()</span>
+            <span class="k">return</span> <span class="nb">type</span><span class="p">(</span>
+                <span class="s2">&quot;DataLoaderCalibrator&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8EntropyCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span>
+            <span class="p">)()</span>
         <span class="k">elif</span> <span class="n">algo_type</span> <span class="o">==</span> <span class="n">CalibrationAlgo</span><span class="o">.</span><span class="n">ENTROPY_CALIBRATION_2</span><span class="p">:</span>
-            <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="s1">&#39;DataLoaderCalibrator&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8MinMaxCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span><span class="p">)()</span>
+            <span class="k">return</span> <span class="nb">type</span><span class="p">(</span>
+                <span class="s2">&quot;DataLoaderCalibrator&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8MinMaxCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span>
+            <span class="p">)()</span>
         <span class="k">elif</span> <span class="n">algo_type</span> <span class="o">==</span> <span class="n">CalibrationAlgo</span><span class="o">.</span><span class="n">LEGACY_CALIBRATION</span><span class="p">:</span>
-            <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="s1">&#39;DataLoaderCalibrator&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8LegacyCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span><span class="p">)()</span>
+            <span class="k">return</span> <span class="nb">type</span><span class="p">(</span>
+                <span class="s2">&quot;DataLoaderCalibrator&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8LegacyCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span>
+            <span class="p">)()</span>
         <span class="k">elif</span> <span class="n">algo_type</span> <span class="o">==</span> <span class="n">CalibrationAlgo</span><span class="o">.</span><span class="n">MINMAX_CALIBRATION</span><span class="p">:</span>
-            <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="s1">&#39;DataLoaderCalibrator&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8MinMaxCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span><span class="p">)()</span>
+            <span class="k">return</span> <span class="nb">type</span><span class="p">(</span>
+                <span class="s2">&quot;DataLoaderCalibrator&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8MinMaxCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span>
+            <span class="p">)()</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">log</span><span class="p">(</span>
                 <span class="n">Level</span><span class="o">.</span><span class="n">Error</span><span class="p">,</span>
-                <span class="s2">&quot;Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION&quot;</span>
+                <span class="s2">&quot;Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION&quot;</span><span class="p">,</span>
             <span class="p">)</span></div>
 
 
@@ -484,46 +501,57 @@
         <span class="n">algo_type</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;algo_type&quot;</span><span class="p">,</span> <span class="n">CalibrationAlgo</span><span class="o">.</span><span class="n">ENTROPY_CALIBRATION_2</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">cache_file</span><span class="p">):</span>
-            <span class="n">log</span><span class="p">(</span><span class="n">Level</span><span class="o">.</span><span class="n">Debug</span><span class="p">,</span> <span class="s2">&quot;Using existing cache_file </span><span class="si">{}</span><span class="s2"> for calibration&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">cache_file</span><span class="p">))</span>
+            <span class="n">log</span><span class="p">(</span>
+                <span class="n">Level</span><span class="o">.</span><span class="n">Debug</span><span class="p">,</span>
+                <span class="s2">&quot;Using existing cache_file </span><span class="si">{}</span><span class="s2"> for calibration&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">cache_file</span><span class="p">),</span>
+            <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">log</span><span class="p">(</span><span class="n">Level</span><span class="o">.</span><span class="n">Error</span><span class="p">,</span> <span class="s2">&quot;Invalid calibration cache file.&quot;</span><span class="p">)</span>
 
         <span class="c1"># Define attributes and member functions for the calibrator class</span>
         <span class="n">attribute_mapping</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s1">&#39;use_cache&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-            <span class="s1">&#39;cache_file&#39;</span><span class="p">:</span> <span class="n">cache_file</span><span class="p">,</span>
-            <span class="s1">&#39;get_batch_size&#39;</span><span class="p">:</span> <span class="n">get_batch_size</span><span class="p">,</span>
-            <span class="s1">&#39;get_batch&#39;</span><span class="p">:</span> <span class="n">get_cache_mode_batch</span><span class="p">,</span>
-            <span class="s1">&#39;read_calibration_cache&#39;</span><span class="p">:</span> <span class="n">read_calibration_cache</span><span class="p">,</span>
-            <span class="s1">&#39;write_calibration_cache&#39;</span><span class="p">:</span> <span class="n">write_calibration_cache</span>
+            <span class="s2">&quot;use_cache&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s2">&quot;cache_file&quot;</span><span class="p">:</span> <span class="n">cache_file</span><span class="p">,</span>
+            <span class="s2">&quot;get_batch_size&quot;</span><span class="p">:</span> <span class="n">get_batch_size</span><span class="p">,</span>
+            <span class="s2">&quot;get_batch&quot;</span><span class="p">:</span> <span class="n">get_cache_mode_batch</span><span class="p">,</span>
+            <span class="s2">&quot;read_calibration_cache&quot;</span><span class="p">:</span> <span class="n">read_calibration_cache</span><span class="p">,</span>
+            <span class="s2">&quot;write_calibration_cache&quot;</span><span class="p">:</span> <span class="n">write_calibration_cache</span><span class="p">,</span>
         <span class="p">}</span>
         <span class="c1"># Using type metaclass to construct calibrator class based on algorithm type</span>
         <span class="k">if</span> <span class="n">algo_type</span> <span class="o">==</span> <span class="n">CalibrationAlgo</span><span class="o">.</span><span class="n">ENTROPY_CALIBRATION</span><span class="p">:</span>
-            <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="s1">&#39;DataLoaderCalibrator&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8EntropyCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span><span class="p">)()</span>
+            <span class="k">return</span> <span class="nb">type</span><span class="p">(</span>
+                <span class="s2">&quot;DataLoaderCalibrator&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8EntropyCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span>
+            <span class="p">)()</span>
         <span class="k">elif</span> <span class="n">algo_type</span> <span class="o">==</span> <span class="n">CalibrationAlgo</span><span class="o">.</span><span class="n">ENTROPY_CALIBRATION_2</span><span class="p">:</span>
-            <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="s1">&#39;DataLoaderCalibrator&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8MinMaxCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span><span class="p">)()</span>
+            <span class="k">return</span> <span class="nb">type</span><span class="p">(</span>
+                <span class="s2">&quot;DataLoaderCalibrator&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8MinMaxCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span>
+            <span class="p">)()</span>
         <span class="k">elif</span> <span class="n">algo_type</span> <span class="o">==</span> <span class="n">CalibrationAlgo</span><span class="o">.</span><span class="n">LEGACY_CALIBRATION</span><span class="p">:</span>
-            <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="s1">&#39;DataLoaderCalibrator&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8LegacyCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span><span class="p">)()</span>
+            <span class="k">return</span> <span class="nb">type</span><span class="p">(</span>
+                <span class="s2">&quot;DataLoaderCalibrator&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8LegacyCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span>
+            <span class="p">)()</span>
         <span class="k">elif</span> <span class="n">algo_type</span> <span class="o">==</span> <span class="n">CalibrationAlgo</span><span class="o">.</span><span class="n">MINMAX_CALIBRATION</span><span class="p">:</span>
-            <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="s1">&#39;DataLoaderCalibrator&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8MinMaxCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span><span class="p">)()</span>
+            <span class="k">return</span> <span class="nb">type</span><span class="p">(</span>
+                <span class="s2">&quot;DataLoaderCalibrator&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8MinMaxCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span>
+            <span class="p">)()</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">log</span><span class="p">(</span>
                 <span class="n">Level</span><span class="o">.</span><span class="n">Error</span><span class="p">,</span>
-                <span class="s2">&quot;Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION&quot;</span>
+                <span class="s2">&quot;Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION&quot;</span><span class="p">,</span>
             <span class="p">)</span></div>
 </pre></div>
 
              </article>
-
+             
             </div>
             <footer>
+  
 
-
-
+  
 
     <hr>
 
-
+  
 
   <div role="contentinfo">
     <p>
@@ -531,11 +559,11 @@
 
     </p>
   </div>
-
+    
       <div>
         Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
       </div>
-
+     
 
 </footer>
 
@@ -545,19 +573,19 @@
         <div class="pytorch-content-right" id="pytorch-content-right">
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
-
+              
             </div>
           </div>
         </div>
       </section>
     </div>
 
+  
 
 
+  
 
-
-
-
+     
        <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
          <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
          <script src="../../_static/jquery.js"></script>
@@ -566,9 +594,9 @@
          <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
          <script src="../../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
          <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+     
 
-
-
+  
 
   <script type="text/javascript" src="../../_static/js/vendor/popper.min.js"></script>
   <script type="text/javascript" src="../../_static/js/vendor/bootstrap.min.js"></script>
@@ -579,7 +607,7 @@
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
   <!-- Begin Footer -->
 

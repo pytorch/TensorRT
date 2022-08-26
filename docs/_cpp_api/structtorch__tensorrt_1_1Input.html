@@ -9,22 +9,22 @@
   <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+  
   <title>Struct Input &mdash; Torch-TensorRT master documentation</title>
+  
 
+  
+  
+  
+  
 
+  
 
+  
+  
+    
 
-
-
-
-
-
-
-
-
-
-
+  
 
   <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!-- <link rel="stylesheet" href="../_static/pygments.css" type="text/css" /> -->
@@ -34,13 +34,13 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Struct CompileSpec" href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html" />
-    <link rel="prev" title="Struct Device" href="structtorch__tensorrt_1_1Device.html" />
+    <link rel="prev" title="Struct GraphInputs" href="structtorch__tensorrt_1_1GraphInputs.html" />
   <!-- Google Analytics -->
-
+  
   <!-- End Google Analytics -->
+  
 
-
-
+  
   <script src="../_static/js/modernizr.min.js"></script>
 
   <!-- Preload the theme fonts -->
@@ -180,9 +180,9 @@
 
 <body class="pytorch-body">
 
+   
 
-
-
+    
 
     <div class="table-of-contents-link-wrapper">
       <span>Table of Contents</span>
@@ -193,21 +193,21 @@
       <div class="pytorch-side-scroll">
         <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           <div class="pytorch-left-menu-search">
+            
 
-
-
-
-
+            
+              
+              
                 <div class="version">
-                  master (1.2.0a0+ffedb78)
+                  master (1.2.0a0+1cf0476)
                 </div>
+              
+            
+
+            
 
 
-
-
-
-
-
+  
 
 
 <div role="search">
@@ -218,40 +218,33 @@
   </form>
 </div>
 
-
+            
           </div>
 
-
-
-
-
-
-
+          
+            
+            
+              
+            
+            
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/getting_started_with_cpp_api.html">Getting Started with C++</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/ptq.html">Post Training Quantization (PTQ)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/torchtrtc.html">torchtrtc</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/runtime.html">Deploying Torch-TensorRT Programs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/using_dla.html">DLA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Notebooks</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../_notebooks/CitriNet-example.html">Torch-TensorRT Getting Started - CitriNet</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../_notebooks/dynamic-shapes.html">Torch-TensorRT - Using Dynamic Shapes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../_notebooks/EfficientNet-example.html">Torch-TensorRT Getting Started - EfficientNet-B0</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../_notebooks/Hugging-Face-BERT.html">Masked Language Modeling (MLM) with Hugging Face BERT Transformer</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../_notebooks/lenet-getting-started.html">Torch-TensorRT Getting Started - LeNet</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../_notebooks/Resnet50-example.html">Torch-TensorRT Getting Started - ResNet 50</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../_notebooks/ssd-object-detection-demo.html">Object Detection with Torch-TensorRT (SSD)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../_notebooks/vgg-qat.html">Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Example notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
 <ul>
@@ -259,6 +252,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../py_api/logging.html">torch_tensorrt.logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../py_api/ptq.html">torch_tensorrt.ptq</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/fx.html">torch_tensorrt.fx</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
 <ul class="current">
@@ -267,6 +261,10 @@
 <li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
 <li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
 <ul>
@@ -279,8 +277,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
 </ul>
 
-
-
+            
+          
         </div>
       </div>
     </nav>
@@ -288,7 +286,7 @@
     <div class="pytorch-container">
       <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
         <div class="pytorch-breadcrumbs-wrapper">
-
+          
 
 
 
@@ -307,32 +305,32 @@
 <div role="navigation" aria-label="breadcrumbs navigation">
 
   <ul class="pytorch-breadcrumbs">
-
+    
       <li>
         <a href="../index.html">
-
+          
             Docs
-
+          
         </a> &gt;
       </li>
 
-
+        
           <li><a href="torch_tensort_cpp.html">Torch-TensorRT C++ API</a> &gt;</li>
-
+        
       <li>Struct Input</li>
-
-
+    
+    
       <li class="pytorch-breadcrumbs-aside">
-
-
+        
+            
             <a href="../_sources/_cpp_api/structtorch__tensorrt_1_1Input.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
-
-
+          
+        
       </li>
-
+    
   </ul>
 
-
+  
 </div>
         </div>
 
@@ -344,30 +342,44 @@
       <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
         <div class="pytorch-content-left">
 
-
-
+        
+          
           <div class="rst-content">
-
+          
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
-
+              
   <section id="struct-input">
 <span id="exhale-struct-structtorch-tensorrt-1-1input"></span><h1>Struct Input<a class="headerlink" href="#struct-input" title="Permalink to this headline">¶</a></h1>
 <ul class="simple">
 <li><p>Defined in <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt-h"><span class="std std-ref">File torch_tensorrt.h</span></a></p></li>
 </ul>
+<section id="inheritance-relationships">
+<h2>Inheritance Relationships<a class="headerlink" href="#inheritance-relationships" title="Permalink to this headline">¶</a></h2>
+<section id="base-type">
+<h3>Base Type<a class="headerlink" href="#base-type" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">public</span> <span class="pre">CustomClassHolder</span></code></p></li>
+</ul>
+</section>
+</section>
 <section id="struct-documentation">
 <h2>Struct Documentation<a class="headerlink" href="#struct-documentation" title="Permalink to this headline">¶</a></h2>
 <dl class="cpp struct">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt5InputE">
-<span class="target" id="structtorch__tensorrt_1_1Input"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">torch_tensorrt</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5InputE" title="Permalink to this definition">¶</a><br /></dt>
+<span class="target" id="structtorch__tensorrt_1_1Input"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">torch_tensorrt</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><span class="n"><span class="pre">CustomClassHolder</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5InputE" title="Permalink to this definition">¶</a><br /></dt>
 <dd><p>A struct to hold an input range (used by TensorRT Optimization profile) </p>
 <p>This struct can either hold a single vector representing an input shape, signifying a static input shape or a set of three input shapes representing the min, optiminal and max input shapes allowed for the engine. </p>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
 <dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt5Input5InputEv">
+<span class="target" id="structtorch__tensorrt_1_1Input_1ae217f6c7c13be354e03d3f9b5b6b5a5e"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEv" title="Permalink to this definition">¶</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEE12TensorFormat">
-<span class="target" id="structtorch__tensorrt_1_1Input_1a2c8216e7e14f7fdad145d53820eafd89"></span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">shape</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">format</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous"><span class="n"><span class="pre">kContiguous</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEE12TensorFormat" title="Permalink to this definition">¶</a><br /></dt>
+<span class="target" id="structtorch__tensorrt_1_1Input_1a0328d70f3daf18b425d459689be2591a"></span><span class="pre">TORCHTRT_API</span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">shape</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">format</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous"><span class="n"><span class="pre">kContiguous</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEE12TensorFormat" title="Permalink to this definition">¶</a><br /></dt>
 <dd><p>Construct a new <a class="reference internal" href="#structtorch__tensorrt_1_1Input"><span class="std std-ref">Input</span></a> spec object for static input size from vector, optional arguments allow the user to configure expected input shape tensor format. dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8) </p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -381,7 +393,7 @@
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEE8DataType12TensorFormat">
-<span class="target" id="structtorch__tensorrt_1_1Input_1a95c05ba3ba477e3915953c1a4c915be6"></span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">shape</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType"><span class="n"><span class="pre">DataType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dtype</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">format</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous"><span class="n"><span class="pre">kContiguous</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">¶</a><br /></dt>
+<span class="target" id="structtorch__tensorrt_1_1Input_1af8b7efdf0e96b4221742a658b214738b"></span><span class="pre">TORCHTRT_API</span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">shape</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType"><span class="n"><span class="pre">DataType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dtype</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">format</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous"><span class="n"><span class="pre">kContiguous</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">¶</a><br /></dt>
 <dd><p>Construct a new <a class="reference internal" href="#structtorch__tensorrt_1_1Input"><span class="std std-ref">Input</span></a> spec object for static input size from vector, optional arguments allow the user to configure expected input shape tensor format. </p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -396,7 +408,7 @@
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEE12TensorFormat">
-<span class="target" id="structtorch__tensorrt_1_1Input_1a983a2859661e1ce26275918f61632695"></span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">shape</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">format</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous"><span class="n"><span class="pre">kContiguous</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEE12TensorFormat" title="Permalink to this definition">¶</a><br /></dt>
+<span class="target" id="structtorch__tensorrt_1_1Input_1a70d54a3caadadab68faad230ff302f23"></span><span class="pre">TORCHTRT_API</span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">shape</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">format</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous"><span class="n"><span class="pre">kContiguous</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEE12TensorFormat" title="Permalink to this definition">¶</a><br /></dt>
 <dd><p>Construct a new <a class="reference internal" href="#structtorch__tensorrt_1_1Input"><span class="std std-ref">Input</span></a> spec object for static input size from c10::ArrayRef (the type produced by tensor.sizes()), vector, optional arguments allow the user to configure expected input shape tensor format dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8) </p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -410,7 +422,7 @@
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat">
-<span class="target" id="structtorch__tensorrt_1_1Input_1a6aa880180a17dc428745f5818e591e24"></span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">shape</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType"><span class="n"><span class="pre">DataType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dtype</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">format</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous"><span class="n"><span class="pre">kContiguous</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">¶</a><br /></dt>
+<span class="target" id="structtorch__tensorrt_1_1Input_1a7069ee5a6db2f840423a923d08d08c6f"></span><span class="pre">TORCHTRT_API</span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">shape</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType"><span class="n"><span class="pre">DataType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dtype</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">format</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous"><span class="n"><span class="pre">kContiguous</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">¶</a><br /></dt>
 <dd><p>Construct a new <a class="reference internal" href="#structtorch__tensorrt_1_1Input"><span class="std std-ref">Input</span></a> spec object for static input size from c10::ArrayRef (the type produced by tensor.sizes()), vector, optional arguments allow the user to configure expected input shape tensor format. </p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -425,7 +437,7 @@
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE12TensorFormat">
-<span class="target" id="structtorch__tensorrt_1_1Input_1a9b45781bf07a911ed809b2dcf806ec65"></span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">min_shape</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">opt_shape</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">max_shape</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">format</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous"><span class="n"><span class="pre">kContiguous</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE12TensorFormat" title="Permalink to this definition">¶</a><br /></dt>
+<span class="target" id="structtorch__tensorrt_1_1Input_1a6f305b4f28ce0a7c76d39ed61dc9a964"></span><span class="pre">TORCHTRT_API</span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">min_shape</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">opt_shape</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">max_shape</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">format</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous"><span class="n"><span class="pre">kContiguous</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE12TensorFormat" title="Permalink to this definition">¶</a><br /></dt>
 <dd><p>Construct a new <a class="reference internal" href="#structtorch__tensorrt_1_1Input"><span class="std std-ref">Input</span></a> spec object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes. dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8) </p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -441,7 +453,7 @@
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE8DataType12TensorFormat">
-<span class="target" id="structtorch__tensorrt_1_1Input_1a898d8d54ffd759748398ae2cd98254d8"></span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">min_shape</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">opt_shape</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">max_shape</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType"><span class="n"><span class="pre">DataType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dtype</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">format</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous"><span class="n"><span class="pre">kContiguous</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">¶</a><br /></dt>
+<span class="target" id="structtorch__tensorrt_1_1Input_1a93370fc5773212005972056184a527a5"></span><span class="pre">TORCHTRT_API</span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">min_shape</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">opt_shape</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">max_shape</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType"><span class="n"><span class="pre">DataType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dtype</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">format</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous"><span class="n"><span class="pre">kContiguous</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">¶</a><br /></dt>
 <dd><p>Construct a new <a class="reference internal" href="#structtorch__tensorrt_1_1Input"><span class="std std-ref">Input</span></a> spec object for a dynamic input size from vectors for minimum shape, optimal shape, and max shape supported sizes optional arguments allow the user to configure expected input shape tensor format. </p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -458,7 +470,7 @@
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE12TensorFormat">
-<span class="target" id="structtorch__tensorrt_1_1Input_1a6c99d70eb1da005fea790f83a0c005cf"></span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">min_shape</span></span>, <span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">opt_shape</span></span>, <span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">max_shape</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">format</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous"><span class="n"><span class="pre">kContiguous</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE12TensorFormat" title="Permalink to this definition">¶</a><br /></dt>
+<span class="target" id="structtorch__tensorrt_1_1Input_1abda696b9f2f689af6f3577e51647ad6f"></span><span class="pre">TORCHTRT_API</span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">min_shape</span></span>, <span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">opt_shape</span></span>, <span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">max_shape</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">format</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous"><span class="n"><span class="pre">kContiguous</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE12TensorFormat" title="Permalink to this definition">¶</a><br /></dt>
 <dd><p>Construct a new <a class="reference internal" href="#structtorch__tensorrt_1_1Input"><span class="std std-ref">Input</span></a> spec object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes. dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8) </p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -474,7 +486,7 @@
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat">
-<span class="target" id="structtorch__tensorrt_1_1Input_1a60447f3c15f82a1ab4f9621a608b7b0a"></span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">min_shape</span></span>, <span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">opt_shape</span></span>, <span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">max_shape</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType"><span class="n"><span class="pre">DataType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dtype</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">format</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous"><span class="n"><span class="pre">kContiguous</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">¶</a><br /></dt>
+<span class="target" id="structtorch__tensorrt_1_1Input_1a59eb3e2d3455017d19c9b498eefbb35e"></span><span class="pre">TORCHTRT_API</span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">min_shape</span></span>, <span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">opt_shape</span></span>, <span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">int64_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">max_shape</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType"><span class="n"><span class="pre">DataType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">dtype</span></span>, <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">format</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat"><span class="n"><span class="pre">TensorFormat</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous"><span class="n"><span class="pre">kContiguous</span></span></a><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">¶</a><br /></dt>
 <dd><p>Construct a new <a class="reference internal" href="#structtorch__tensorrt_1_1Input"><span class="std std-ref">Input</span></a> spec object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes. </p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -491,7 +503,7 @@
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt5Input5InputEN2at6TensorE">
-<span class="target" id="structtorch__tensorrt_1_1Input_1ab22f3643c48f8fea5b4f92566acbfe3d"></span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">at</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">tensor</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN2at6TensorE" title="Permalink to this definition">¶</a><br /></dt>
+<span class="target" id="structtorch__tensorrt_1_1Input_1a3b472eb488183b47f470507860b49f1c"></span><span class="pre">TORCHTRT_API</span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Input</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">at</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Tensor</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">tensor</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN2at6TensorE" title="Permalink to this definition">¶</a><br /></dt>
 <dd><p>Construct a new <a class="reference internal" href="#structtorch__tensorrt_1_1Input"><span class="std std-ref">Input</span></a> spec object using a torch tensor as an example The tensor’s shape, type and layout inform the spec’s values. </p>
 <p>Note: You cannot set dynamic shape through this method, you must use an alternative constructor</p>
 <dl class="field-list simple">
@@ -548,25 +560,25 @@
 
 
              </article>
-
+             
             </div>
             <footer>
-
+  
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-
+      
         <a href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html" class="btn btn-neutral float-right" title="Struct CompileSpec" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
-
-
-        <a href="structtorch__tensorrt_1_1Device.html" class="btn btn-neutral" title="Struct Device" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
-
+      
+      
+        <a href="structtorch__tensorrt_1_1GraphInputs.html" class="btn btn-neutral" title="Struct GraphInputs" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+      
     </div>
+  
 
-
-
+  
 
     <hr>
 
-
+  
 
   <div role="contentinfo">
     <p>
@@ -574,11 +586,11 @@
 
     </p>
   </div>
-
+    
       <div>
         Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
       </div>
-
+     
 
 </footer>
 
@@ -590,6 +602,10 @@
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
 <li><a class="reference internal" href="#">Struct Input</a><ul>
+<li><a class="reference internal" href="#inheritance-relationships">Inheritance Relationships</a><ul>
+<li><a class="reference internal" href="#base-type">Base Type</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#struct-documentation">Struct Documentation</a></li>
 </ul>
 </li>
@@ -601,12 +617,12 @@
       </section>
     </div>
 
+  
 
 
+  
 
-
-
-
+     
        <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
          <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
          <script src="../_static/jquery.js"></script>
@@ -615,9 +631,9 @@
          <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
          <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
          <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+     
 
-
-
+  
 
   <script type="text/javascript" src="../_static/js/vendor/popper.min.js"></script>
   <script type="text/javascript" src="../_static/js/vendor/bootstrap.min.js"></script>
@@ -628,7 +644,7 @@
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
   <!-- Begin Footer -->
 

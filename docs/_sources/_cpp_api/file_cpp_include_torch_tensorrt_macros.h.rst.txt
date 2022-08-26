@@ -33,6 +33,8 @@ Included By
 
 - :ref:`file_cpp_include_torch_tensorrt_logging.h`
 
+- :ref:`file_cpp_include_torch_tensorrt_ptq.h`
+
 - :ref:`file_cpp_include_torch_tensorrt_torch_tensorrt.h`
 
 

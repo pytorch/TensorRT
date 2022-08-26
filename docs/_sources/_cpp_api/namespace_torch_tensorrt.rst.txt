@@ -30,6 +30,8 @@ Classes
 
 - :ref:`exhale_struct_structtorch__tensorrt_1_1Device`
 
+- :ref:`exhale_struct_structtorch__tensorrt_1_1GraphInputs`
+
 - :ref:`exhale_struct_structtorch__tensorrt_1_1Input`
 
 - :ref:`exhale_class_classtorch__tensorrt_1_1DataType`

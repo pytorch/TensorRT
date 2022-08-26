@@ -3,8 +3,16 @@
 Using Torch-TensorRT in Python
 *******************************
 
-Torch-TensorRT Python API accepts a ```torch.nn.Module`` as an input. Under the hood, it uses ``torch.jit.script`` to convert the input module into a
-TorchScript module. To compile your input ```torch.nn.Module`` with Torch-TensorRT, all you need to do is provide the module and inputs
+The Torch-TensorRT Python API supports a number of unique usecases compared to the CLI and C++ APIs which solely support TorchScript compilation.
+
+Torch-TensorRT Python API can accept a ``torch.nn.Module``, ``torch.jit.ScriptModule``, or ``torch.fx.GraphModule`` as an input.
+Depending on what is provided one of the two frontends (TorchScript or FX) will be selected to compile the module. Provided the
+module type is supported, users may explicitly set which frontend they would like to use using the ``ir`` flag for ``compile``.
+If given a ``torch.nn.Module`` and the ``ir`` flag is set to either ``default`` or ``torchscript`` the module will be run through
+``torch.jit.script`` to convert the input module into a  TorchScript module.
+
+
+To compile your input ``torch.nn.Module`` with Torch-TensorRT, all you need to do is provide the module and inputs
 to Torch-TensorRT and you will be returned an optimized TorchScript module to run or add into another PyTorch module. Inputs
 is a list of ``torch_tensorrt.Input`` classes which define input's shape, datatype and memory format. You can also specify settings such as
 operating precision for the engine or target device. After compilation you can save the module just like any other module
@@ -46,6 +54,5 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
     input_data = input_data.to("cuda").half()
     result = trt_ts_module(input_data)
 
-Torch-TensorRT python API also provides ``torch_tensorrt.ts.compile`` which accepts a TorchScript module as input.
-The torchscript module can be obtained via scripting or tracing (refer to :ref:`creating_torchscript_module_in_python`). ``torch_tensorrt.ts.compile`` accepts a Torchscript module
-and a list of ``torch_tensorrt.Input`` classes.
+Torch-TensorRT Python API also provides ``torch_tensorrt.ts.compile`` which accepts a TorchScript module as input and ``torch_tensorrt.fx.compile`` which accepts a FX GraphModule as input.
+

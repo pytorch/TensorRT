@@ -1,3 +1,6 @@
---extra-index-url https://download.pytorch.org/whl/cu116
-torch
+numpy
 pybind11==2.6.2
+--extra-index-url https://download.pytorch.org/whl/cu116
+torch==1.12.1
+--extra-index-url https://pypi.ngc.nvidia.com
+nvidia-tensorrt==8.4.3.1
