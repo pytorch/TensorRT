@@ -267,6 +267,7 @@ auto select_registrations TORCHTRT_UNUSED =
         .pattern(
             {"aten::index.Tensor(Tensor self, Tensor?[] indices) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               // refer to https://github.com/pytorch/pytorch/blob/master/torch/onnx/symbolic_opset9.py#L4627
                auto in = args[0].ITensorOrFreeze(ctx);
                auto ts = args[1].IValue()->toListRef();
 
@@ -471,7 +472,7 @@ auto select_registrations TORCHTRT_UNUSED =
                        }
                      }
                      auto concat_final_shape_layer =
-                         ctx->net->addConcatenation(concat_tensors.data(), concat_tensors.size());
+                         ctx->net->addConcatenation(concat_final_tensors.data(), concat_final_tensors.size());
                      auto unfold_advanced_shuffle_layer = ctx->net->addShuffle(*shuffle_out);
                      unfold_advanced_shuffle_layer->setInput(1, *concat_final_shape_layer->getOutput(0));
                      reshape_output = unfold_advanced_shuffle_layer->getOutput(0);
