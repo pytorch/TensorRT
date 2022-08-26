@@ -303,32 +303,33 @@ commands:
       - run:
           name: Create container
           command: |
-              docker run -it -d --name ngc_build_container -v /home/circleci/project:/workspace  -w /workspace  << parameters.torch-base-image >>
+              docker run -it -d --name ngc_build_container -v /home/circleci/project:/workspace -e BAZEL_VERSION="$(cat /home/circleci/project/.bazelversion)" -w /workspace << parameters.torch-base-image >>
       - run:
           name: Install build deps
           command: |
-            docker exec ngc_build_container bash -c "wget -q https://github.com/bazelbuild/bazel/releases/download/$(cat /workspace/.bazelversion)/bazel-$(cat /workspace/.bazelversion)-linux-x86_64 -O /usr/bin/bazel && chmod a+x /usr/bin/bazel"
-            docker exec ngc_build_container bash -c "mv /workspace/toolchains/docker/WORKSPACE.ngc /workspace/WORKSPACE"
+            docker exec ngc_build_container bash -c "wget https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-linux-x86_64 -O /usr/bin/bazel && chmod a+x /usr/bin/bazel"
+            docker exec ngc_build_container bash -c "mv /workspace/docker/WORKSPACE.ngc /workspace/WORKSPACE"
             docker exec ngc_build_container bash -c "cd /workspace/py && pip install wheel setuptools pybind11==2.6.2"
+            docker exec ngc_build_container bash -c "git config --global --add safe.directory /workspace"
       - when:
-          condition: << parameters.release >>
-          steps:
-            - run:
-                name: Build torch-tensorrt debug build for NGC
-                command: |
-                  docker exec ngc_build_container bash -c "cd /workspace/py && python3 setup.py bdist_wheel --use-cxx11-abi"
-      - unless:
           condition: << parameters.release >>
           steps:
             - run:
                 name: Build torch-tensorrt release build for NGC
                 command: |
                   docker exec ngc_build_container bash -c "cd /workspace/py && python3 setup.py bdist_wheel --use-cxx11-abi --release"
+      - unless:
+          condition: << parameters.release >>
+          steps:
+            - run:
+                name: Build torch-tensorrt debug build for NGC
+                command: |
+                  docker exec ngc_build_container bash -c "cd /workspace/py && python3 setup.py bdist_wheel --use-cxx11-abi"
       - run:
           name: Collect builds
           command: |
             mkdir -p /tmp/dist/builds
-            cp dist/* /tmp/dist/builds
+            cp /home/circleci/project/py/dist/* /tmp/dist/builds
 
   build-cmake:
     description: "Build the torch-tensorrt using CMake"
@@ -1045,7 +1046,7 @@ parameters:
 
   torch-ngc-base-image:
     type: string
-    default: "nvcr.io/ngc/pytorch:22.07-py3"
+    default: "nvcr.io/nvidia/pytorch:22.07-py3"
 
   enable-packaging:
     type: boolean
