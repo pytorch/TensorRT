@@ -56,17 +56,17 @@ new_local_repository(
 http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "80f089939de20e68e3fcad4dfa72a26c8bf91b5e77b11042f671f39ebac35865",
+    sha256 = "5a392132fbff9db1482eae72a30f74b09f53a47edf8305fe9688d4ce7ddb0b6b",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu113/libtorch-cxx11-abi-shared-with-deps-1.12.0%2Bcu113.zip"],
+    urls = ["https://download.pytorch.org/libtorch/cu116/libtorch-cxx11-abi-shared-with-deps-1.12.1%2Bcu116.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "8e35371403f7052d9e9b43bcff383980dbde4df028986dc1dab539953481d55f",
+    sha256 = "5e044cc56a29cd4f3a7198c0fe5b2f0fa8f4c38cd71a0491274b6a914e8f24a7",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu113/libtorch-shared-with-deps-1.12.0%2Bcu113.zip"],
+    urls = ["https://download.pytorch.org/libtorch/cu116/libtorch-shared-with-deps-1.12.1%2Bcu116.zip"],
 )
 
 # Download these tarballs manually from the NVIDIA website
@@ -86,10 +86,10 @@ http_archive(
 http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    sha256 = "8107861af218694130f170e071f49814fa3e27f1386ce7cb6d807ac05a7fcf0e",
-    strip_prefix = "TensorRT-8.4.1.5",
+    sha256 = "8d7c2085c1639dcc73875048c23598a8526ce3089136876e31d90258e49e4f61",
+    strip_prefix = "TensorRT-8.4.3.1",
     urls = [
-        "https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/8.4.1/tars/tensorrt-8.4.1.5.linux.x86_64-gnu.cuda-11.6.cudnn8.4.tar.gz",
+        "https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/8.4.3/tars/tensorrt-8.4.3.1.linux.x86_64-gnu.cuda-11.6.cudnn8.4.tar.gz",
     ],
 )
 

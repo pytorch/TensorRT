@@ -889,10 +889,10 @@ parameters:
   # Nightly platform config
   torch-nightly-build:
     type: string
-    default: "1.13.0.dev20220810+cu113"
+    default: "1.13.0.dev20220825+cu116"
   torch-nightly-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/nightly/cu113"
+    default: "https://download.pytorch.org/whl/nightly/cu116"
   cudnn-nightly-version:
     type: string
     default: "8.4.1"
@@ -901,15 +901,15 @@ parameters:
     default: "8.4.1"
   trt-nightly-version-long:
     type: string
-    default: "8.4.1.5"
+    default: "8.4.3.1"
 
   # Release platform config
   torch-release-build:
     type: string
-    default: "1.12.0+cu113"
+    default: "1.12.1+cu116"
   torch-release-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/cu113"
+    default: "https://download.pytorch.org/whl/cu116"
   cudnn-release-version:
     type: string
     default: "8.4.1"
@@ -918,7 +918,7 @@ parameters:
     default: "8.4.1"
   trt-release-version-long:
     type: string
-    default: "8.4.1.5"
+    default: "8.4.3.1"
 
   # Jetson platform config
   torch-jetson-build:
