@@ -879,7 +879,7 @@ jobs:
             TORCHTRT_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __version__;print(__version__)")
             TRT_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __tensorrt_version__;print(__tensorrt_version__)")
             CUDNN_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __cudnn_version__;print(__cudnn_version__)")
-            python3 -m pip install pybind==2.6.2
+            python3 -m pip install pybind11=2.6.2
             TORCH_VERSION=$(python3 -c "from torch import __version__;print(__version__.split('+')[0])")
             cp ~/project/bazel-bin/libtorchtrt.tar.gz ~/project/py/dist/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-aarch64-linux-jp<< parameters.jetpack-version >>.tar.gz
       - run:
