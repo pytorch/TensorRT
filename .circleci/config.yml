@@ -282,6 +282,56 @@ commands:
             mkdir -p /tmp/dist/builds
             cp dist/* /tmp/dist/builds
 
+  build-py-ngc:
+    description: "Build the torch-tensorrt python release for NGC PyTorch (cxx11-abi)"
+    parameters:
+      release:
+        type: boolean
+        default: false
+      torch-base-image:
+        type: string
+        default: nvcr.io/nvidia/pytorch:latest
+    steps:
+      - run:
+          name: Log into docker
+          command: |
+            docker login --username="\$oauthtoken" --password=$NGC_TOKEN nvcr.io
+      - run:
+          name: Pull image
+          command: |
+            docker pull << parameters.torch-base-image >>
+      - run:
+          name: Create container
+          command: |
+              docker run -it -d --name ngc_build_container -v /home/circleci/project:/workspace -e BAZEL_VERSION="$(cat /home/circleci/project/.bazelversion)" -w /workspace << parameters.torch-base-image >>
+      - run:
+          name: Install build deps
+          command: |
+            export BAZEL_VERSION="$(cat /home/circleci/project/.bazelversion)"
+            docker exec ngc_build_container bash -c "wget https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-linux-x86_64 -O /usr/bin/bazel && chmod a+x /usr/bin/bazel"
+            docker exec ngc_build_container bash -c "mv /workspace/docker/WORKSPACE.ngc /workspace/WORKSPACE"
+            docker exec ngc_build_container bash -c "cd /workspace/py && pip install wheel setuptools pybind11==2.6.2"
+            docker exec ngc_build_container bash -c "git config --global --add safe.directory /workspace"
+      - when:
+          condition: << parameters.release >>
+          steps:
+            - run:
+                name: Build torch-tensorrt release build for NGC
+                command: |
+                  docker exec ngc_build_container bash -c "cd /workspace/py && python3 setup.py bdist_wheel --use-cxx11-abi --release"
+      - unless:
+          condition: << parameters.release >>
+          steps:
+            - run:
+                name: Build torch-tensorrt debug build for NGC
+                command: |
+                  docker exec ngc_build_container bash -c "cd /workspace/py && python3 setup.py bdist_wheel --use-cxx11-abi"
+      - run:
+          name: Collect builds
+          command: |
+            mkdir -p /tmp/dist/builds
+            cp /home/circleci/project/py/dist/* /tmp/dist/builds
+
   build-cmake:
     description: "Build the torch-tensorrt using CMake"
     parameters:
@@ -829,7 +879,7 @@ jobs:
             TORCHTRT_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __version__;print(__version__)")
             TRT_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __tensorrt_version__;print(__tensorrt_version__)")
             CUDNN_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __cudnn_version__;print(__cudnn_version__)")
-            pip3 install -r ~/project/py/requirements.txt
+            python3 -m pip install pybind11==2.6.2
             TORCH_VERSION=$(python3 -c "from torch import __version__;print(__version__.split('+')[0])")
             cp ~/project/bazel-bin/libtorchtrt.tar.gz ~/project/py/dist/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-aarch64-linux-jp<< parameters.jetpack-version >>.tar.gz
       - run:
@@ -881,6 +931,64 @@ jobs:
           path: /tmp/dist/cmake
           destination: x86_64-cmake
 
+  build-x86_64-pyt-ngc:
+    parameters:
+      torch-base-image:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: xlarge
+    steps:
+      - checkout
+      - build-py-ngc:
+          release: false
+          torch-base-image: << parameters.torch-base-image >>
+      - run:
+          name: Move to NGC dir
+          command: |
+            mkdir -p /tmp/dist/ngc
+            cp -r /tmp/dist/builds/* /tmp/dist/ngc
+      - persist_to_workspace:
+          root: /tmp/dist
+          paths:
+            - ngc
+      - store_artifacts:
+          path: /tmp/dist/ngc
+          destination: x86_64-pyt-ngc
+
+  package-x86_64-ngc:
+    parameters:
+      enabled:
+        type: boolean
+        default: false
+      torch-base-image:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: xlarge
+    steps:
+      - when:
+          condition: << parameters.enabled >>
+          steps:
+            - checkout
+            - build-py-ngc:
+                release: true
+                torch-base-image: << parameters.torch-base-image >>
+            - run:
+                name: Collect packages
+                command: |
+                  mkdir -p /tmp/dist/ngc
+                  cp -r ~/project/py/dist/* /tmp/dist/ngc
+            - store_artifacts:
+                path: /tmp/dist/ngc
+                destination: x86_64-ngc-pkgs
+      - unless:
+          condition: << parameters.enabled >>
+          steps:
+            - run:
+                name: Skipped packaging
+                command: echo -e "Packaging stage not enabled"
+
 parameters:
   bazel-version:
     type: string
@@ -923,10 +1031,10 @@ parameters:
   # Jetson platform config
   torch-jetson-build:
     type: string
-    default: "torch-1.13.0a0+340c4120.nv22.06-cp38-cp38-linux_aarch64.whl"
+    default: "torch-1.13.0a0+08820cb0.nv22.07-cp38-cp38-linux_aarch64.whl"
   jetpack-version:
     type: string
-    default: "50"
+    default: "502"
   cudnn-jetson-version:
     type: string
     default: "8.3.2"
@@ -937,7 +1045,15 @@ parameters:
     type: string
     default: "8.4.1.5"
 
+  torch-ngc-base-image:
+    type: string
+    default: "nvcr.io/nvidia/pytorch:22.07-py3"
+
   enable-packaging:
+    type: boolean
+    default: false
+
+  enable-ngc-packaging:
     type: boolean
     default: false
 
@@ -1028,10 +1144,6 @@ workflows:
   release:
     when: << pipeline.parameters.enable-packaging >>
     jobs:
-      - build-aarch64-pyt-jetson:
-          torch-build: << pipeline.parameters.torch-jetson-build >>
-          jetpack-version: << pipeline.parameters.jetpack-version >>
-          python-version: 3.8.10
 
       - build-x86_64-pyt-release:
           torch-build: << pipeline.parameters.torch-release-build >>
@@ -1077,9 +1189,26 @@ workflows:
             - test-py-ts-x86_64-pyt-release
             - test-py-fx-x86_64-pyt-release
 
+  ngc-release:
+    when: << pipeline.parameters.enable-ngc-packaging >>
+    jobs:
+      - build-aarch64-pyt-jetson:
+          torch-build: << pipeline.parameters.torch-jetson-build >>
+          jetpack-version: << pipeline.parameters.jetpack-version >>
+          python-version: 3.8.10
+
+      - build-x86_64-pyt-ngc:
+          torch-base-image: << pipeline.parameters.torch-ngc-base-image >>
+
+      - package-x86_64-ngc:
+          torch-base-image: << pipeline.parameters.torch-ngc-base-image >>
+          enabled: << pipeline.parameters.enable-ngc-packaging >>
+          requires:
+            - build-x86_64-pyt-ngc
+
       - package-jetson:
           name: package-release-aarch64-jetson
-          enabled: << pipeline.parameters.enable-packaging >>
+          enabled: << pipeline.parameters.enable-ngc-packaging >>
           torch-build: << pipeline.parameters.torch-jetson-build >>
           jetpack-version: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.10
