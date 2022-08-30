@@ -57,6 +57,7 @@ struct PartitioningCtx {
   bool shouldNodeRunInTorch(torch::jit::Node* n);
   bool shouldNodeRunInTensorRT(torch::jit::Node* n);
   bool isNodeExecutorKnown(torch::jit::Node* n);
+  std::vector<torch::jit::Node*> getNodesRunInTorch();
 
  private:
   void _load_nodes_into_decision_map(torch::jit::Block* b);

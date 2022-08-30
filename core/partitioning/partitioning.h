@@ -23,7 +23,7 @@ void runShapeAnalysis(PartitioningCtx* ctx, ExampleIValues& ivalues_maps);
 
 void segment_graph(PartitioningCtx* ctx, torch::jit::Block* block);
 
-PartitionedGraph partition(PartitioningCtx* ctx, torch::jit::Block* block, ExampleIValues& example_tensor_map);
+PartitionedGraph Partition(PartitioningCtx* ctx, torch::jit::Block* block, ExampleIValues& example_tensor_map);
 
 } // namespace partitioning
 } // namespace core

@@ -11,11 +11,14 @@ PartitioningCtx::PartitioningCtx(torch::jit::Block* b, PartitioningInfo info)
     : settings(info),
       forced_fallback_ops(info.forced_fallback_operators.begin(), info.forced_fallback_operators.end()) {
   LOG_DEBUG(settings);
-  //_load_nodes_into_decision_map(b);
+  _load_nodes_into_decision_map(b);
 }
 
 void PartitioningCtx::_load_nodes_into_decision_map(torch::jit::Block* b) {
   for (const auto n : b->nodes()) {
+    if (n->kind() == torch::jit::prim::Constant) {
+      continue;
+    }
     node_executor_decision_map[n] = NodeExecutorDecision::kUNKNOWN;
     for (const auto sub_b : n->blocks()) {
       _load_nodes_into_decision_map(sub_b);
@@ -87,6 +90,16 @@ bool PartitioningCtx::isNodeExecutorKnown(torch::jit::Node* n) {
   } else {
     return true;
   }
+}
+
+std::vector<torch::jit::Node*> PartitionCtx::getNodesRunInTorch() {
+  std::vector<torch::jit::Node*> nodes_run_in_torch;
+  for (auto i : node_executor_decision_map) {
+    if (i.second == NodeExecutorDecision::kCONVERT) {
+      nodes_run_in_torch.push_back(i.first);
+    }
+  }
+  return nodes_run_in_torch;
 }
 
 std::ostream& operator<<(std::ostream& os, const NodeExecutorDecision& format) {

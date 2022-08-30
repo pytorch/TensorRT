@@ -228,7 +228,7 @@ GraphAndMapping ConstructFallbackGraph_(
     std::unordered_map<const torch::jit::Value*, torch::jit::IValue> example_tensor_map) {
   auto new_g = std::make_shared<torch::jit::Graph>();
 
-  auto segmented_blocks = partitioning::partition(partitioning_ctx, block, example_tensor_map);
+  auto segmented_blocks = partitioning::Partition(partitioning_ctx, block, example_tensor_map);
 
   // the mapping from lowering graph => fallback global graph
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
