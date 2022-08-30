@@ -92,7 +92,7 @@ bool PartitioningCtx::isNodeExecutorKnown(torch::jit::Node* n) {
   }
 }
 
-std::vector<torch::jit::Node*> PartitionCtx::getNodesRunInTorch() {
+std::vector<torch::jit::Node*> PartitioningCtx::getNodesRunInTorch() {
   std::vector<torch::jit::Node*> nodes_run_in_torch;
   for (auto i : node_executor_decision_map) {
     if (i.second == NodeExecutorDecision::kCONVERT) {

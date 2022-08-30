@@ -1,16 +1,10 @@
-
-
-
-
+#include "core/partitioning/partitioning.h"
 #include <queue>
-
-#include "torch/csrc/jit/passes/constant_pooling.h"
-#include "torch/csrc/jit/passes/dead_code_elimination.h"
-
 #include "core/conversion/conversion.h"
 #include "core/conversion/evaluators/evaluators.h"
-#include "core/partitioning/partitioning.h"
 #include "core/partitioning/partitioningctx/PartitioningCtx.h"
+#include "torch/csrc/jit/passes/constant_pooling.h"
+#include "torch/csrc/jit/passes/dead_code_elimination.h"
 
 namespace torch_tensorrt {
 namespace core {
@@ -34,8 +28,6 @@ bool containNonTensorOutputs(torch::jit::Node* n) {
   }
   return false;
 }
-
-
 
 // Check if the inputs and outputs of the graph are Tensor. If not, then fallback connected nodes
 void SetInputsOutputsConnectedNodes(PartitioningCtx* ctx, torch::jit::Block* block) {
@@ -91,7 +83,7 @@ void SetNonTensorConnectedNodes(PartitioningCtx* ctx, std::vector<torch::jit::No
   // initial_fallback_nodes are the fallback nodes that we have before we run BFS in this function
   std::queue<torch::jit::Node*> q;
   for (auto& node : initial_fallback_nodes) {
-    q.push(node.first);
+    q.push(node);
   }
 
   while (!q.empty()) {
@@ -110,8 +102,7 @@ void SetNonTensorConnectedNodes(PartitioningCtx* ctx, std::vector<torch::jit::No
       if (!isTensor(output)) {
         for (auto use : output->uses()) {
           auto node = use.user;
-          if (node->kind() != torch::jit::prim::Constant &&
-              ctx->shouldNodeRunInTensorRT(node)) {
+          if (node->kind() != torch::jit::prim::Constant && ctx->shouldNodeRunInTensorRT(node)) {
             ctx->setNodeExecutorDecision(node, NodeExecutorDecision::kNON_TENSOR);
             q.push(node);
           }
@@ -146,7 +137,6 @@ std::vector<torch::jit::Node*> TraverseNodesForMinBlockSize(PartitioningCtx* ctx
   }
   return min_block_fallback_nodes;
 }
-
 
 // Set the nodes that fallback because of min_block_size
 void SetMinBlockFallbackNodes(PartitioningCtx* ctx, torch::jit::Block* block) {
@@ -328,7 +318,6 @@ bool checkLoopEvaluatable(torch::jit::Node* n) {
   return compile_to_trt;
 }
 
-
 void SegmentGraph(PartitioningCtx* ctx, torch::jit::Block* block) {
   auto nodes = block->nodes();
 
@@ -428,8 +417,6 @@ void SetNodeExecutorDecision(PartitioningCtx* ctx, torch::jit::Block* block) {
   // We need to traverse the whole graph many times here
   SetMinBlockFallbackNodes(ctx, block);
 }
-
-
 
 PartitionedGraph Partition(PartitioningCtx* ctx, torch::jit::Block* block, ExampleIValues& example_tensor_map) {
   LOG_DEBUG(ctx->settings);
