@@ -1,9 +1,22 @@
 #include "core/util/prelude.h"
 #include "torch/script.h"
+#include "torch/torch.h"
 
 namespace torch_tensorrt {
 namespace tests {
 namespace util {
+
+bool cosineSimEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float threshold = 0.99f){
+
+  torch::Tensor cosine_sim = torch::nn::functional::cosine_similarity(computed_tensor.flatten(), gt_tensor.flatten(), torch::nn::functional::CosineSimilarityFuncOptions().dim(0));
+  std::ostringstream ss;
+  ss << computed_tensor << std::endl << gt_tensor << std::endl;
+  LOG_GRAPH(ss.str());
+  LOG_GRAPH(std::string("Cosine Similarity score: ") + std::to_string(cosine_sim.item<float>()));
+  LOG_GRAPH(std::string("Acceptable Threshold: ") + std::to_string(threshold));
+
+  return cosine_sim.item<float>() >= threshold;
+}
 
 bool almostEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float atol = 1e-8, float rtol = 1e-5) {
   std::ostringstream ss;

@@ -56,21 +56,6 @@ cc_test(
 )
 
 cc_test(
-    name = "test_fallback_graph_output",
-    srcs = ["test_fallback_graph_output.cpp"],
-    data = [
-        ":jit_models",
-    ],
-    deps = [
-        "//tests/util",
-        "@googletest//:gtest_main",
-    ] + select({
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
-    }),
-)
-
-cc_test(
     name = "test_loop_fallback",
     srcs = ["test_loop_fallback.cpp"],
     data = [
@@ -104,7 +89,6 @@ test_suite(
     name = "partitioning_tests",
     tests = [
         ":test_conditionals",
-        ":test_fallback_graph_output",
         ":test_loading_model",
         ":test_loop_fallback",
         ":test_resolve_nontensor_inputs",

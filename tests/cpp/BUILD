@@ -13,12 +13,9 @@ test_suite(
     name = "api_tests",
     tests = [
         ":test_collections",
-        ":test_compiled_modules",
         ":test_default_input_types",
         ":test_example_tensors",
-        ":test_module_fallback",
         ":test_modules_as_engines",
-        ":test_multiple_registered_engines",
         ":test_runtime_thread_safety",
         ":test_serialization",
     ],
@@ -28,12 +25,9 @@ test_suite(
     name = "aarch64_api_tests",
     tests = [
         ":test_collections",
-        ":test_compiled_modules",
         ":test_default_input_types",
         ":test_example_tensors",
-        ":test_module_fallback",
         ":test_modules_as_engines",
-        ":test_multiple_registered_engines",
         ":test_runtime_thread_safety",
         ":test_serialization",
     ],
@@ -73,21 +67,6 @@ cc_test(
 )
 
 cc_test(
-    name = "test_multiple_registered_engines",
-    srcs = ["test_multiple_registered_engines.cpp"],
-    data = [
-        "//tests/modules:jit_models",
-    ],
-    deps = [
-        "//tests/util",
-        "@googletest//:gtest_main",
-    ] + select({
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
-    }),
-)
-
-cc_test(
     name = "test_modules_as_engines",
     timeout = "long",
     srcs = ["test_modules_as_engines.cpp"],
@@ -111,21 +90,6 @@ cc_test(
 )
 
 cc_test(
-    name = "test_module_fallback",
-    srcs = ["test_module_fallback.cpp"],
-    data = [
-        "//tests/modules:jit_models",
-    ],
-    deps = [
-        "//tests/util",
-        "@googletest//:gtest_main",
-    ] + select({
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
-    }),
-)
-
-cc_test(
     name = "test_collections",
     srcs = ["test_collections.cpp"],
     data = [
@@ -138,17 +102,6 @@ cc_test(
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch//:libtorch"],
     }),
-)
-
-cc_test(
-    name = "test_compiled_modules",
-    srcs = ["test_compiled_modules.cpp"],
-    data = [
-        "//tests/modules:jit_models",
-    ],
-    deps = [
-        ":cpp_api_test",
-    ],
 )
 
 cc_test(
