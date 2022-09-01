@@ -41,7 +41,8 @@ TEST_P(CppAPITests, CompiledModuleIsClose) {
   }
 
   for (size_t i = 0; i < trt_results.size(); i++) {
-    ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(jit_results[i], trt_results[i].reshape_as(jit_results[i]), 0.99));
+    ASSERT_TRUE(
+        torch_tensorrt::tests::util::cosineSimEqual(jit_results[i], trt_results[i].reshape_as(jit_results[i]), 0.99));
   }
 }
 
