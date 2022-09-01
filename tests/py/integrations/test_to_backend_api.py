@@ -2,7 +2,7 @@ import unittest
 import torch_tensorrt as torchtrt
 import torch
 import torchvision.models as models
-
+from utils import cosine_similarity, COSINE_THRESHOLD
 
 class TestToBackendLowering(unittest.TestCase):
     def setUp(self):
@@ -31,10 +31,9 @@ class TestToBackendLowering(unittest.TestCase):
 
     def test_to_backend_lowering(self):
         trt_mod = torch._C._jit_to_backend("tensorrt", self.scripted_model, self.spec)
-        same = (
-            (trt_mod.forward(self.input) - self.scripted_model(self.input)).abs().max()
-        )
-        self.assertTrue(same < 2e-3)
+        cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
+        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"TestToBackendLowering TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+
 
 
 if __name__ == "__main__":

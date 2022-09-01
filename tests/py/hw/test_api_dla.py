@@ -2,6 +2,7 @@ import unittest
 import torch_tensorrt as torchtrt
 import torch
 import torchvision.models as models
+from utils import cosine_similarity, COSINE_THRESHOLD
 
 
 class ModelTestCaseOnDLA(unittest.TestCase):
@@ -39,8 +40,8 @@ class TestCompile(ModelTestCaseOnDLA):
         }
 
         trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
-        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-2)
+        cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
+        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"ModelTestCaseOnDLA traced TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
 
     def test_compile_script(self):
         compile_spec = {
@@ -55,8 +56,8 @@ class TestCompile(ModelTestCaseOnDLA):
         }
 
         trt_mod = torchtrt.ts.compile(self.scripted_model, **compile_spec)
-        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-2)
+        cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
+        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"ModelTestCaseOnDLA scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
 
 
 def test_suite():

@@ -435,6 +435,7 @@ commands:
             mkdir -p /tmp/artifacts/test_results
             cd tests/py
             pytest --junitxml=/tmp/artifacts/test_results/api/api_test_results.xml api/
+            pytest --junitxml=/tmp/artifacts/test_results/models/models_test_results.xml models/
             pytest --junitxml=/tmp/artifacts/test_results/integrations/integrations_test_results.xml integrations/
             cd ~/project
 

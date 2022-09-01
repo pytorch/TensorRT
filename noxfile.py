@@ -30,12 +30,14 @@ USE_HOST_DEPS = 0 if not "USE_HOST_DEPS" in os.environ else os.environ["USE_HOST
 if USE_HOST_DEPS:
     print("Using dependencies from host python")
 
+# Set epochs to train VGG model for accuracy tests
+EPOCHS=25
+
 SUPPORTED_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10"]
 
 nox.options.sessions = [
     "l0_api_tests-" + "{}.{}".format(sys.version_info.major, sys.version_info.minor)
 ]
-
 
 def install_deps(session):
     print("Installing deps")
@@ -63,31 +65,6 @@ def install_torch_trt(session):
         session.run("python", "setup.py", "develop")
 
 
-def download_datasets(session):
-    print(
-        "Downloading dataset to path",
-        os.path.join(TOP_DIR, "examples/int8/training/vgg16"),
-    )
-    session.chdir(os.path.join(TOP_DIR, "examples/int8/training/vgg16"))
-    session.run_always(
-        "wget", "https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz", external=True
-    )
-    session.run_always("tar", "-xvzf", "cifar-10-binary.tar.gz", external=True)
-    session.run_always(
-        "mkdir",
-        "-p",
-        os.path.join(TOP_DIR, "tests/accuracy/datasets/data"),
-        external=True,
-    )
-    session.run_always(
-        "cp",
-        "-rpf",
-        os.path.join(TOP_DIR, "examples/int8/training/vgg16/cifar-10-batches-bin"),
-        os.path.join(TOP_DIR, "tests/accuracy/datasets/data/cidar-10-batches-bin"),
-        external=True,
-    )
-
-
 def train_model(session):
     session.chdir(os.path.join(TOP_DIR, "examples/int8/training/vgg16"))
     session.install("-r", "requirements.txt")
@@ -107,14 +84,14 @@ def train_model(session):
             "--ckpt-dir",
             "vgg16_ckpts",
             "--epochs",
-            "25",
+            str(EPOCHS),
             env={"PYTHONPATH": PYT_PATH},
         )
 
         session.run_always(
             "python",
             "export_ckpt.py",
-            "vgg16_ckpts/ckpt_epoch25.pth",
+            "vgg16_ckpts/ckpt_epoch" + str(EPOCHS) + ".pth",
             env={"PYTHONPATH": PYT_PATH},
         )
     else:
@@ -130,10 +107,10 @@ def train_model(session):
             "--ckpt-dir",
             "vgg16_ckpts",
             "--epochs",
-            "25",
+            str(EPOCHS),
         )
 
-        session.run_always("python", "export_ckpt.py", "vgg16_ckpts/ckpt_epoch25.pth")
+        session.run_always("python", "export_ckpt.py", "vgg16_ckpts/ckpt_epoch" + str(EPOCHS) + ".pth")
 
 
 def finetune_model(session):
@@ -156,9 +133,9 @@ def finetune_model(session):
             "--ckpt-dir",
             "vgg16_ckpts",
             "--start-from",
-            "25",
+            str(EPOCHS),
             "--epochs",
-            "26",
+            str(EPOCHS+1),
             env={"PYTHONPATH": PYT_PATH},
         )
 
@@ -166,7 +143,7 @@ def finetune_model(session):
         session.run_always(
             "python",
             "export_qat.py",
-            "vgg16_ckpts/ckpt_epoch26.pth",
+            "vgg16_ckpts/ckpt_epoch" + str(EPOCHS+1) + ".pth",
             env={"PYTHONPATH": PYT_PATH},
         )
     else:
@@ -182,13 +159,13 @@ def finetune_model(session):
             "--ckpt-dir",
             "vgg16_ckpts",
             "--start-from",
-            "25",
+            str(EPOCHS),
             "--epochs",
-            "26",
+            str(EPOCHS+1),
         )
 
         # Export model
-        session.run_always("python", "export_qat.py", "vgg16_ckpts/ckpt_epoch26.pth")
+        session.run_always("python", "export_qat.py", "vgg16_ckpts/ckpt_epoch" + str(EPOCHS+1) + ".pth")
 
 
 def cleanup(session):
@@ -209,8 +186,20 @@ def run_base_tests(session):
     print("Running basic tests")
     session.chdir(os.path.join(TOP_DIR, "tests/py"))
     tests = [
-        "api",
+        "api/test_e2e_behavior.py",
         "integrations/test_to_backend_api.py",
+    ]
+    for test in tests:
+        if USE_HOST_DEPS:
+            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+        else:
+            session.run_always("pytest", test)
+
+def run_model_tests(session):
+    print("Running model tests")
+    session.chdir(os.path.join(TOP_DIR, "tests/py"))
+    tests = [
+        "models",
     ]
     for test in tests:
         if USE_HOST_DEPS:
@@ -268,8 +257,8 @@ def run_trt_compatibility_tests(session):
     copy_model(session)
     session.chdir(os.path.join(TOP_DIR, "tests/py"))
     tests = [
-        "test_trt_intercompatibility.py",
-        "test_ptq_trt_calibrator.py",
+        "integrations/test_trt_intercompatibility.py",
+        #"ptq/test_ptq_trt_calibrator.py",
     ]
     for test in tests:
         if USE_HOST_DEPS:
@@ -282,7 +271,7 @@ def run_dla_tests(session):
     print("Running DLA tests")
     session.chdir(os.path.join(TOP_DIR, "tests/py"))
     tests = [
-        "test_api_dla.py",
+        "hw/test_api_dla.py",
     ]
     for test in tests:
         if USE_HOST_DEPS:
@@ -295,7 +284,7 @@ def run_multi_gpu_tests(session):
     print("Running multi GPU tests")
     session.chdir(os.path.join(TOP_DIR, "tests/py"))
     tests = [
-        "test_multi_gpu.py",
+        "hw/test_multi_gpu.py",
     ]
     for test in tests:
         if USE_HOST_DEPS:
@@ -321,22 +310,18 @@ def run_l0_dla_tests(session):
     run_base_tests(session)
     cleanup(session)
 
-
-def run_l1_accuracy_tests(session):
+def run_l1_model_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
         install_torch_trt(session)
-    download_datasets(session)
-    train_model(session)
-    run_accuracy_tests(session)
+    download_models(session)
+    run_model_tests(session)
     cleanup(session)
-
 
 def run_l1_int8_accuracy_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
         install_torch_trt(session)
-    download_datasets(session)
     train_model(session)
     finetune_model(session)
     run_int8_accuracy_tests(session)
@@ -348,7 +333,6 @@ def run_l2_trt_compatibility_tests(session):
         install_deps(session)
         install_torch_trt(session)
     download_models(session)
-    download_datasets(session)
     train_model(session)
     run_trt_compatibility_tests(session)
     cleanup(session)
@@ -368,18 +352,15 @@ def l0_api_tests(session):
     """When a developer needs to check correctness for a PR or something"""
     run_l0_api_tests(session)
 
-
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l0_dla_tests(session):
     """When a developer needs to check basic api functionality using host dependencies"""
     run_l0_dla_tests(session)
 
-
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
-def l1_accuracy_tests(session):
-    """Checking accuracy performance on various usecases"""
-    run_l1_accuracy_tests(session)
-
+def l1_model_tests(session):
+    """When a developer needs to check correctness for a PR or something"""
+    run_l1_model_tests(session)
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l1_int8_accuracy_tests(session):
@@ -397,13 +378,3 @@ def l2_trt_compatibility_tests(session):
 def l2_multi_gpu_tests(session):
     """Makes sure that Torch-TensorRT can operate on multi-gpu systems"""
     run_l2_multi_gpu_tests(session)
-
-
-@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
-def download_test_models(session):
-    """Grab all the models needed for testing"""
-    try:
-        import torch
-    except ModuleNotFoundError:
-        install_deps(session)
-    download_models(session)
