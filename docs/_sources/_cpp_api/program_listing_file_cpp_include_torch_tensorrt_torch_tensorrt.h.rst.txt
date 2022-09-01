@@ -170,7 +170,7 @@ Program Listing for File torch_tensorrt.h
      Value value;
    };
    
-   struct TORCHTRT_API Input : torch::CustomClassHolder {
+   struct Input : torch::CustomClassHolder {
      std::vector<int64_t> min_shape;
      std::vector<int64_t> opt_shape;
      std::vector<int64_t> max_shape;
@@ -220,7 +220,7 @@ Program Listing for File torch_tensorrt.h
      bool input_is_dynamic;
    };
    
-   struct TORCHTRT_API GraphInputs {
+   struct GraphInputs {
      torch::jit::IValue input_signature; // nested Input, full input spec
      std::vector<Input> inputs; // flatten input spec
    };
@@ -237,9 +237,9 @@ Program Listing for File torch_tensorrt.h
    
      TORCHTRT_API CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes);
    
-     CompileSpec(std::vector<Input> inputs);
+     TORCHTRT_API CompileSpec(std::vector<Input> inputs);
    
-     CompileSpec(torch::jit::IValue input_signature);
+     TORCHTRT_API CompileSpec(torch::jit::IValue input_signature);
      // Defaults should reflect TensorRT defaults for BuilderConfig
    
      GraphInputs graph_inputs;

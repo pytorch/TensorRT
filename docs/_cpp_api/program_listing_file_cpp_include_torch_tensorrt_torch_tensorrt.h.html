@@ -197,7 +197,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+e374eb1)
+                  master (1.2.0a0+a1a4786)
                 </div>
               
             
@@ -508,7 +508,7 @@
 <span class="w">  </span><span class="n">Value</span><span class="w"> </span><span class="n">value</span><span class="p">;</span><span class="w"></span>
 <span class="p">};</span><span class="w"></span>
 
-<span class="k">struct</span><span class="w"> </span><span class="nc">TORCHTRT_API</span><span class="w"> </span><span class="n">Input</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">CustomClassHolder</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">Input</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">CustomClassHolder</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">min_shape</span><span class="p">;</span><span class="w"></span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">opt_shape</span><span class="p">;</span><span class="w"></span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">max_shape</span><span class="p">;</span><span class="w"></span>
@@ -558,7 +558,7 @@
 <span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">input_is_dynamic</span><span class="p">;</span><span class="w"></span>
 <span class="p">};</span><span class="w"></span>
 
-<span class="k">struct</span><span class="w"> </span><span class="nc">TORCHTRT_API</span><span class="w"> </span><span class="n">GraphInputs</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">GraphInputs</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
 <span class="w">  </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">IValue</span><span class="w"> </span><span class="n">input_signature</span><span class="p">;</span><span class="w"> </span><span class="c1">// nested Input, full input spec</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Input</span><span class="o">&gt;</span><span class="w"> </span><span class="n">inputs</span><span class="p">;</span><span class="w"> </span><span class="c1">// flatten input spec</span>
 <span class="p">};</span><span class="w"></span>
@@ -575,9 +575,9 @@
 
 <span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">fixed_sizes</span><span class="p">);</span><span class="w"></span>
 
-<span class="w">  </span><span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Input</span><span class="o">&gt;</span><span class="w"> </span><span class="n">inputs</span><span class="p">);</span><span class="w"></span>
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Input</span><span class="o">&gt;</span><span class="w"> </span><span class="n">inputs</span><span class="p">);</span><span class="w"></span>
 
-<span class="w">  </span><span class="n">CompileSpec</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">IValue</span><span class="w"> </span><span class="n">input_signature</span><span class="p">);</span><span class="w"></span>
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">CompileSpec</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">IValue</span><span class="w"> </span><span class="n">input_signature</span><span class="p">);</span><span class="w"></span>
 <span class="w">  </span><span class="c1">// Defaults should reflect TensorRT defaults for BuilderConfig</span>
 
 <span class="w">  </span><span class="n">GraphInputs</span><span class="w"> </span><span class="n">graph_inputs</span><span class="p">;</span><span class="w"></span>
