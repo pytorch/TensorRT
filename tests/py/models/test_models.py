@@ -10,8 +10,8 @@ from utils import cosine_similarity, COSINE_THRESHOLD
 
 
 class TestModels(unittest.TestCase):
-    def test_resnet50(self):
-        self.model = models.resnet50(pretrained=True).eval().to("cuda")
+    def test_resnet18(self):
+        self.model = models.resnet18(pretrained=True).eval().to("cuda")
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
 
         compile_spec = {
@@ -120,8 +120,8 @@ class TestModels(unittest.TestCase):
                 msg=f"HF BERT base-uncased TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
             )
 
-    def test_resnet50_half(self):
-        self.model = models.resnet50(pretrained=True).eval().to("cuda")
+    def test_resnet18_half(self):
+        self.model = models.resnet18(pretrained=True).eval().to("cuda")
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.scripted_model = torch.jit.script(self.model)
         self.scripted_model.half()
