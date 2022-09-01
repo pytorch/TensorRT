@@ -193,7 +193,7 @@ def run_base_tests(session):
     print("Running basic tests")
     session.chdir(os.path.join(TOP_DIR, "tests/py"))
     tests = [
-        "api/test_e2e_behavior.py",
+        "api",
         "integrations/test_to_backend_api.py",
     ]
     for test in tests:
@@ -371,7 +371,7 @@ def l0_dla_tests(session):
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l1_model_tests(session):
-    """When a developer needs to check correctness for a PR or something"""
+    """When a user needs to test the functionality of standard models compilation and results"""
     run_l1_model_tests(session)
 
 
