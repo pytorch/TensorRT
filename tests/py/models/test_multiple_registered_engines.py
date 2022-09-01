@@ -8,6 +8,7 @@ import custom_models as cm
 from typing import Dict
 from utils import cosine_similarity, COSINE_THRESHOLD
 
+
 class TestModelToEngineToModel(unittest.TestCase):
     def test_multiple_engines(self):
         self.resnet18 = models.resnet18(pretrained=True).eval().to("cuda")
@@ -30,11 +31,22 @@ class TestModelToEngineToModel(unittest.TestCase):
         rn18_trt_mod = torchtrt.compile(self.resnet18, **compile_spec)
         rn50_trt_mod = torchtrt.compile(self.resnet50, **compile_spec)
 
-        cos_sim = cosine_similarity(self.resnet18(self.input1), rn18_trt_mod(self.input1))
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"Resnet18 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        cos_sim = cosine_similarity(
+            self.resnet18(self.input1), rn18_trt_mod(self.input1)
+        )
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"Resnet18 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
-        cos_sim = cosine_similarity(self.resnet50(self.input1), rn50_trt_mod(self.input1))
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"Resnet50 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        cos_sim = cosine_similarity(
+            self.resnet50(self.input1), rn50_trt_mod(self.input1)
+        )
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"Resnet50 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

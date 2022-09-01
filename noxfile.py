@@ -31,13 +31,14 @@ if USE_HOST_DEPS:
     print("Using dependencies from host python")
 
 # Set epochs to train VGG model for accuracy tests
-EPOCHS=25
+EPOCHS = 25
 
 SUPPORTED_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10"]
 
 nox.options.sessions = [
     "l0_api_tests-" + "{}.{}".format(sys.version_info.major, sys.version_info.minor)
 ]
+
 
 def install_deps(session):
     print("Installing deps")
@@ -110,7 +111,9 @@ def train_model(session):
             str(EPOCHS),
         )
 
-        session.run_always("python", "export_ckpt.py", "vgg16_ckpts/ckpt_epoch" + str(EPOCHS) + ".pth")
+        session.run_always(
+            "python", "export_ckpt.py", "vgg16_ckpts/ckpt_epoch" + str(EPOCHS) + ".pth"
+        )
 
 
 def finetune_model(session):
@@ -135,7 +138,7 @@ def finetune_model(session):
             "--start-from",
             str(EPOCHS),
             "--epochs",
-            str(EPOCHS+1),
+            str(EPOCHS + 1),
             env={"PYTHONPATH": PYT_PATH},
         )
 
@@ -143,7 +146,7 @@ def finetune_model(session):
         session.run_always(
             "python",
             "export_qat.py",
-            "vgg16_ckpts/ckpt_epoch" + str(EPOCHS+1) + ".pth",
+            "vgg16_ckpts/ckpt_epoch" + str(EPOCHS + 1) + ".pth",
             env={"PYTHONPATH": PYT_PATH},
         )
     else:
@@ -161,11 +164,15 @@ def finetune_model(session):
             "--start-from",
             str(EPOCHS),
             "--epochs",
-            str(EPOCHS+1),
+            str(EPOCHS + 1),
         )
 
         # Export model
-        session.run_always("python", "export_qat.py", "vgg16_ckpts/ckpt_epoch" + str(EPOCHS+1) + ".pth")
+        session.run_always(
+            "python",
+            "export_qat.py",
+            "vgg16_ckpts/ckpt_epoch" + str(EPOCHS + 1) + ".pth",
+        )
 
 
 def cleanup(session):
@@ -194,6 +201,7 @@ def run_base_tests(session):
             session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
         else:
             session.run_always("pytest", test)
+
 
 def run_model_tests(session):
     print("Running model tests")
@@ -258,7 +266,7 @@ def run_trt_compatibility_tests(session):
     session.chdir(os.path.join(TOP_DIR, "tests/py"))
     tests = [
         "integrations/test_trt_intercompatibility.py",
-        #"ptq/test_ptq_trt_calibrator.py",
+        # "ptq/test_ptq_trt_calibrator.py",
     ]
     for test in tests:
         if USE_HOST_DEPS:
@@ -310,6 +318,7 @@ def run_l0_dla_tests(session):
     run_base_tests(session)
     cleanup(session)
 
+
 def run_l1_model_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
@@ -317,6 +326,7 @@ def run_l1_model_tests(session):
     download_models(session)
     run_model_tests(session)
     cleanup(session)
+
 
 def run_l1_int8_accuracy_tests(session):
     if not USE_HOST_DEPS:
@@ -352,15 +362,18 @@ def l0_api_tests(session):
     """When a developer needs to check correctness for a PR or something"""
     run_l0_api_tests(session)
 
+
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l0_dla_tests(session):
     """When a developer needs to check basic api functionality using host dependencies"""
     run_l0_dla_tests(session)
 
+
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l1_model_tests(session):
     """When a developer needs to check correctness for a PR or something"""
     run_l1_model_tests(session)
+
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l1_int8_accuracy_tests(session):

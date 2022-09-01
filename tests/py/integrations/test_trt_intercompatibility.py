@@ -5,6 +5,7 @@ import torchvision.models as models
 import tensorrt as trt
 from utils import cosine_similarity, COSINE_THRESHOLD
 
+
 class TestPyTorchToTRTEngine(unittest.TestCase):
     def test_pt_to_trt(self):
         self.model = models.resnet18(pretrained=True).eval().to("cuda:0")
@@ -43,7 +44,10 @@ class TestPyTorchToTRTEngine(unittest.TestCase):
                     ).cuda_stream,
                 )
                 cos_sim = cosine_similarity(self.model(self.input), out)
-                self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"TestPyTorchToTRTEngine TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+                self.assertTrue(
+                    cos_sim > COSINE_THRESHOLD,
+                    msg=f"TestPyTorchToTRTEngine TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+                )
 
 
 if __name__ == "__main__":

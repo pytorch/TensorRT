@@ -6,9 +6,9 @@ namespace torch_tensorrt {
 namespace tests {
 namespace util {
 
-bool cosineSimEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float threshold = 0.99f){
-
-  torch::Tensor cosine_sim = torch::nn::functional::cosine_similarity(computed_tensor.flatten(), gt_tensor.flatten(), torch::nn::functional::CosineSimilarityFuncOptions().dim(0));
+bool cosineSimEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float threshold = 0.99f) {
+  torch::Tensor cosine_sim = torch::nn::functional::cosine_similarity(
+      computed_tensor.flatten(), gt_tensor.flatten(), torch::nn::functional::CosineSimilarityFuncOptions().dim(0));
   std::ostringstream ss;
   ss << computed_tensor << std::endl << gt_tensor << std::endl;
   LOG_GRAPH(ss.str());

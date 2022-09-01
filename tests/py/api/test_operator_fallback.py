@@ -6,6 +6,7 @@ import copy
 from typing import Dict
 from utils import cosine_similarity, COSINE_THRESHOLD
 
+
 class TestFallbackModels(unittest.TestCase):
     def test_fallback_resnet18(self):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -25,7 +26,10 @@ class TestFallbackModels(unittest.TestCase):
         }
         trt_mod = torchtrt.compile(self.model, **compile_spec)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"Resnet18 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"Resnet18 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
     def test_fallback_mobilenet_v2(self):
         self.model = models.mobilenet_v2(pretrained=True).eval().to("cuda")
@@ -45,7 +49,10 @@ class TestFallbackModels(unittest.TestCase):
         }
         trt_mod = torchtrt.compile(self.model, **compile_spec)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"Mobilenet V2 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"Mobilenet V2 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
 
 if __name__ == "__main__":

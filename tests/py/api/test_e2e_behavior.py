@@ -5,6 +5,7 @@ import torchvision.models as models
 import copy
 from typing import Dict
 
+
 class TestInputTypeDefaultsFP32Model(unittest.TestCase):
     def test_input_use_default_fp32(self):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")

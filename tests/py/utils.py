@@ -1,6 +1,7 @@
 import torch
 
-COSINE_THRESHOLD=0.99
+COSINE_THRESHOLD = 0.99
+
 
 def cosine_similarity(gt_tensor, pred_tensor):
     gt_tensor = gt_tensor.flatten().to(torch.float32)

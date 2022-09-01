@@ -6,6 +6,7 @@ import copy
 from typing import Dict
 from utils import cosine_similarity, COSINE_THRESHOLD
 
+
 class TestCompile(unittest.TestCase):
     def test_compile_traced(self):
         self.model = models.vgg16(pretrained=True).eval().to("cuda")
@@ -27,7 +28,10 @@ class TestCompile(unittest.TestCase):
 
         trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
     def test_compile_script(self):
         self.model = models.vgg16(pretrained=True).eval().to("cuda")
@@ -41,7 +45,10 @@ class TestCompile(unittest.TestCase):
                 enabled_precisions={torch.float},
             )
             cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
-            self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+            self.assertTrue(
+                cos_sim > COSINE_THRESHOLD,
+                msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+            )
 
     def test_compile_global(self):
         self.model = models.vgg16(pretrained=True).eval().to("cuda")
@@ -54,7 +61,10 @@ class TestCompile(unittest.TestCase):
             enabled_precisions={torch.float},
         )
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
     def test_from_torch_tensor(self):
         self.model = models.vgg16(pretrained=True).eval().to("cuda")
@@ -71,7 +81,10 @@ class TestCompile(unittest.TestCase):
 
         trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
     def test_device(self):
         self.model = models.vgg16(pretrained=True).eval().to("cuda")
@@ -85,7 +98,10 @@ class TestCompile(unittest.TestCase):
 
         trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
     def test_default_device(self):
         self.model = models.vgg16(pretrained=True).eval().to("cuda")
@@ -95,7 +111,11 @@ class TestCompile(unittest.TestCase):
 
         trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
+
 
 class TestCheckMethodOpSupport(unittest.TestCase):
     def test_check_support(self):

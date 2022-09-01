@@ -14,8 +14,8 @@ TEST_P(CppAPITests, ModuleAsEngineIsClose) {
   jit_results.push_back(jit_results_ivalues.toTensor());
   auto trt_results = torch_tensorrt::tests::util::RunModuleForwardAsEngine(mod, inputs);
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::cosineSimEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), threshold));
+  ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(
+      jit_results[0], trt_results[0].reshape_as(jit_results[0]), threshold));
 }
 
 #ifndef DISABLE_TEST_IN_CI

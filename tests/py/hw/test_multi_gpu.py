@@ -37,7 +37,10 @@ class TestMultiGpuSwitching(ModelTestCase):
         torchtrt.set_device(self.target_gpu)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
         torchtrt.set_device(0)
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"TestMultiGpuSwitching traced TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"TestMultiGpuSwitching traced TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
     def test_compile_script(self):
         torchtrt.set_device(0)
@@ -56,8 +59,10 @@ class TestMultiGpuSwitching(ModelTestCase):
         torchtrt.set_device(self.target_gpu)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
         torchtrt.set_device(0)
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"TestMultiGpuSwitching scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
-
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"TestMultiGpuSwitching scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
 
 class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
@@ -91,7 +96,10 @@ class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
         # Changing the device ID deliberately. It should still run on correct device ID by context switching
         torchtrt.set_device(1)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"TestMultiGpuSerializeDeserializeSwitching traced TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"TestMultiGpuSerializeDeserializeSwitching traced TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
     def test_compile_script(self):
         torchtrt.set_device(0)
@@ -110,7 +118,10 @@ class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
         # Changing the device ID deliberately. It should still run on correct device ID by context switching
         torchtrt.set_device(1)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"TestMultiGpuSerializeDeserializeSwitching scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"TestMultiGpuSerializeDeserializeSwitching scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
 
 def test_suite():

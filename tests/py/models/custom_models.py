@@ -1,6 +1,7 @@
 import torch
 from transformers import BertModel, BertTokenizer, BertConfig
 
+
 def BertModule():
     model_name = "bert-base-uncased"
     enc = BertTokenizer.from_pretrained(model_name)

@@ -41,7 +41,10 @@ class TestCompile(ModelTestCaseOnDLA):
 
         trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"ModelTestCaseOnDLA traced TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"ModelTestCaseOnDLA traced TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
     def test_compile_script(self):
         compile_spec = {
@@ -57,7 +60,10 @@ class TestCompile(ModelTestCaseOnDLA):
 
         trt_mod = torchtrt.ts.compile(self.scripted_model, **compile_spec)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"ModelTestCaseOnDLA scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"ModelTestCaseOnDLA scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
 
 def test_suite():

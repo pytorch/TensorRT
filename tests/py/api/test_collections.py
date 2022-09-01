@@ -41,8 +41,13 @@ class TestStandardTensorInput(unittest.TestCase):
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
-        cos_sim = cosine_similarity(self.model(self.input, self.input), trt_mod(self.input, self.input))
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"standard_tensor_input_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        cos_sim = cosine_similarity(
+            self.model(self.input, self.input), trt_mod(self.input, self.input)
+        )
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"standard_tensor_input_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
 
 class TestTupleInput(unittest.TestCase):
@@ -65,8 +70,13 @@ class TestTupleInput(unittest.TestCase):
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
-        cos_sim = cosine_similarity(self.model((self.input, self.input)), trt_mod((self.input, self.input)))
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"tuple_input_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        cos_sim = cosine_similarity(
+            self.model((self.input, self.input)), trt_mod((self.input, self.input))
+        )
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"tuple_input_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
 
 class TestListInput(unittest.TestCase):
@@ -87,8 +97,13 @@ class TestListInput(unittest.TestCase):
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
-        cos_sim = cosine_similarity(self.model([self.input, self.input]), trt_mod([self.input, self.input]))
-        self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"list_input_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+        cos_sim = cosine_similarity(
+            self.model([self.input, self.input]), trt_mod([self.input, self.input])
+        )
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"list_input_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
 
 class TestTupleInputOutput(unittest.TestCase):
@@ -115,7 +130,10 @@ class TestTupleInputOutput(unittest.TestCase):
         pyt_out = self.model((self.input, self.input))
         for (t, p) in zip(trt_out, pyt_out):
             cos_sim = cosine_similarity(t, p)
-            self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"tuple_input_output_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+            self.assertTrue(
+                cos_sim > COSINE_THRESHOLD,
+                msg=f"tuple_input_output_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+            )
 
 
 class TestListInputOutput(unittest.TestCase):
@@ -143,7 +161,10 @@ class TestListInputOutput(unittest.TestCase):
 
         for (t, p) in zip(trt_out, pyt_out):
             cos_sim = cosine_similarity(t, p)
-            self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"list_input_output_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+            self.assertTrue(
+                cos_sim > COSINE_THRESHOLD,
+                msg=f"list_input_output_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+            )
 
 
 class TestListInputTupleOutput(unittest.TestCase):
@@ -170,7 +191,10 @@ class TestListInputTupleOutput(unittest.TestCase):
         pyt_out = self.model((self.input, self.input))
         for (t, p) in zip(trt_out, pyt_out):
             cos_sim = cosine_similarity(t, p)
-            self.assertTrue(cos_sim > COSINE_THRESHOLD, msg=f"list_input_tuple_output_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}")
+            self.assertTrue(
+                cos_sim > COSINE_THRESHOLD,
+                msg=f"list_input_tuple_output_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+            )
 
 
 if __name__ == "__main__":
