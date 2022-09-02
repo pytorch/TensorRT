@@ -1,0 +1,4 @@
+allbumentations
+tqdm
+pillow
+numpy
