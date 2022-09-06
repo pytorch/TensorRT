@@ -226,7 +226,13 @@ def _parse_input_signature(input_signature: Any):
 
 def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
     # TODO: Use deepcopy to support partial compilation of collections
-    compile_spec = compile_spec_
+    compile_spec = {}
+    for k, v in compile_spec_.items():
+        if k != "calibrator":
+            compile_spec[k] = deepcopy(v)
+        else:
+            compile_spec[k] = v
+
     info = _ts_C.CompileSpec()
 
     if len(compile_spec["inputs"]) > 0:
