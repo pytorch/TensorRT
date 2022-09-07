@@ -342,8 +342,6 @@ def run_l2_trt_compatibility_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
         install_torch_trt(session)
-    download_models(session)
-    train_model(session)
     run_trt_compatibility_tests(session)
     cleanup(session)
 
