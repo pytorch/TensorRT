@@ -15,6 +15,7 @@ PartitioningCtx::PartitioningCtx(torch::jit::Block* b, PartitioningInfo info)
 }
 
 void PartitioningCtx::_load_nodes_into_decision_map(torch::jit::Block* b) {
+  original_blocks.push_back(b);
   for (const auto n : b->nodes()) {
     if (n->kind() == torch::jit::prim::Constant) {
       continue;
@@ -26,18 +27,7 @@ void PartitioningCtx::_load_nodes_into_decision_map(torch::jit::Block* b) {
   }
 }
 
-void PartitioningCtx::finalizeNewBlock(
-    SegmentedBlock::SegmentedBlockTarget kind,
-    std::vector<torch::jit::Node*>& nodes) {
-  LOG_DEBUG("Finalizing in progress " << SegmentedBlock::target_to_str(kind) << " block");
-  blocks.emplace_back(blocks.size(), kind, nodes);
-
-  // TODO: Can we not need this?
-  nodes.clear();
-  LOG_DEBUG(blocks.back());
-}
-
-bool PartitioningCtx::setNodeExecutorDecision(torch::jit::Node* n, NodeExecutorDecision decision) {
+void PartitioningCtx::setNodeExecutorDecision(torch::jit::Node* n, NodeExecutorDecision decision) {
   auto iter = node_executor_decision_map.find(n);
   auto prev_decision = NodeExecutorDecision::kUNKNOWN;
   if (iter != node_executor_decision_map.end()) {
@@ -46,8 +36,9 @@ bool PartitioningCtx::setNodeExecutorDecision(torch::jit::Node* n, NodeExecutorD
   LOG_GRAPH("Setting node " << util::node_info(n) << " " << decision << " (previously was " << prev_decision << ")");
 
   // NOTE: This is this way due to partitioning.cpp L#134 I dont know if this is what we should do.
-  auto result = node_executor_decision_map.insert({n, decision});
-  return result.second;
+
+  auto result = node_executor_decision_map[n] = decision;
+  return ;
 }
 
 bool PartitioningCtx::shouldNodeRunInTorch(torch::jit::Node* n) {

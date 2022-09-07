@@ -181,9 +181,9 @@ void getSegmentsOutputByRunning(
   seg_block.register_intypes(input_types);
 }
 
-void runShapeAnalysis(PartitioningCtx* ctx, ExampleIValues& example_tensor_map) {
+void runShapeAnalysis(PartitioningCtx* ctx, torch::jit::Block* block, ExampleIValues& example_tensor_map) {
   // register every segment's input shape, and it's running output IValues
-  for (auto& seg_block : ctx->blocks) {
+  for (auto& seg_block : ctx->partitioned_blocks[block]) {
     torch::jit::ConstantPooling(seg_block.g());
     getSegmentsOutputByRunning(seg_block, example_tensor_map, ctx->settings);
   }

@@ -47,13 +47,13 @@ struct UsageInfo {
 struct PartitioningCtx {
   // TODO: Make the set a part of settings not stand alone
   PartitioningInfo settings;
+  std::vector<torch::jit::Block*> original_blocks;
   NodeExecutorDecisionMap node_executor_decision_map;
-  PartitionedGraph blocks;
+  std::unordered_map<torch::jit::Block*, PartitionedGraph> partitioned_blocks;
   std::unordered_set<std::string> forced_fallback_ops;
 
   PartitioningCtx(torch::jit::Block* b, PartitioningInfo info);
-  bool setNodeExecutorDecision(torch::jit::Node* n, NodeExecutorDecision decision);
-  void finalizeNewBlock(SegmentedBlock::SegmentedBlockTarget kind, std::vector<torch::jit::Node*>& nodes);
+  void setNodeExecutorDecision(torch::jit::Node* n, NodeExecutorDecision decision);
   bool shouldNodeRunInTorch(torch::jit::Node* n);
   bool shouldNodeRunInTensorRT(torch::jit::Node* n);
   bool isNodeExecutorKnown(torch::jit::Node* n);
