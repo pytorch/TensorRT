@@ -15,7 +15,7 @@ cc_library(
     srcs = [
         "partitioning.cpp",
         "shape_analysis.cpp",
-        "stitching.cpp"
+        "stitching.cpp",
     ],
     hdrs = [
         "partitioning.h",

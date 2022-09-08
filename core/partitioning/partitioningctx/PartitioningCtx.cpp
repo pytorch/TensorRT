@@ -15,7 +15,9 @@ PartitioningCtx::PartitioningCtx(torch::jit::Block* b, PartitioningInfo info)
 }
 
 void PartitioningCtx::_load_nodes_into_decision_map(torch::jit::Block* b) {
-  original_blocks.push_back(b);
+  if (!b->owningNode() || b->owningNode()->kind() != torch::jit::prim::Loop) {
+    original_blocks.push_back(b);
+  }
   for (const auto n : b->nodes()) {
     if (n->kind() == torch::jit::prim::Constant) {
       continue;
@@ -33,60 +35,28 @@ void PartitioningCtx::setNodeExecutorDecision(torch::jit::Node* n, NodeExecutorD
   if (iter != node_executor_decision_map.end()) {
     prev_decision = iter->second;
   }
-  LOG_GRAPH("Setting node " << util::node_info(n) << " " << decision << " (previously was " << prev_decision << ")");
+  LOG_DEBUG("Setting node " << util::node_info(n) << " " << decision << " (previously was " << prev_decision << ")");
 
-  // NOTE: This is this way due to partitioning.cpp L#134 I dont know if this is what we should do.
-
-  auto result = node_executor_decision_map[n] = decision;
-  return ;
+  node_executor_decision_map[n] = decision;
+  return;
 }
 
 bool PartitioningCtx::shouldNodeRunInTorch(torch::jit::Node* n) {
   auto iter = node_executor_decision_map.find(n);
-  auto decision = NodeExecutorDecision::kUNKNOWN;
-  if (iter != node_executor_decision_map.end()) {
-    decision = iter->second;
+  if (iter == node_executor_decision_map.end()) {
+    LOG_ERROR("No info about node " << *n << " execution decision status.");
   }
-
-  if (decision == NodeExecutorDecision::kCONVERT || decision == NodeExecutorDecision::kUNKNOWN) {
-    return false;
-  } else {
-    return true;
-  }
+  return iter->second != NodeExecutorDecision::kCONVERT;
 }
 
 bool PartitioningCtx::shouldNodeRunInTensorRT(torch::jit::Node* n) {
-  auto iter = node_executor_decision_map.find(n);
-  auto decision = NodeExecutorDecision::kUNKNOWN;
-  if (iter != node_executor_decision_map.end()) {
-    decision = iter->second;
-  }
-
-  if (decision == NodeExecutorDecision::kCONVERT) {
-    return true;
-  } else {
-    return false;
-  }
-}
-
-bool PartitioningCtx::isNodeExecutorKnown(torch::jit::Node* n) {
-  auto iter = node_executor_decision_map.find(n);
-  auto decision = NodeExecutorDecision::kUNKNOWN;
-  if (iter != node_executor_decision_map.end()) {
-    decision = iter->second;
-  }
-
-  if (decision == NodeExecutorDecision::kUNKNOWN) {
-    return false;
-  } else {
-    return true;
-  }
+  return !shouldNodeRunInTorch(n);
 }
 
 std::vector<torch::jit::Node*> PartitioningCtx::getNodesRunInTorch() {
   std::vector<torch::jit::Node*> nodes_run_in_torch;
   for (auto i : node_executor_decision_map) {
-    if (i.second == NodeExecutorDecision::kCONVERT) {
+    if (i.second != NodeExecutorDecision::kCONVERT) {
       nodes_run_in_torch.push_back(i.first);
     }
   }

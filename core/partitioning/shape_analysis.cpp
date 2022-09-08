@@ -9,7 +9,7 @@ namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
-at::Tensor generateSingleInput(ir::Input& input, c10::optional<at::ScalarType>& type_opt) {
+at::Tensor GenerateSingleInput(ir::Input& input, c10::optional<at::ScalarType>& type_opt) {
   auto cur_shape = input.input_shape;
   std::vector<int64_t> shape;
   shape.insert(shape.begin(), std::begin(cur_shape.d), std::begin(cur_shape.d) + cur_shape.nbDims);
@@ -25,7 +25,7 @@ at::Tensor generateSingleInput(ir::Input& input, c10::optional<at::ScalarType>& 
   return in;
 }
 
-std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomInputs(
+std::unordered_map<const torch::jit::Value*, torch::jit::IValue> GenerateRandomInputs(
     std::unordered_map<const torch::jit::Value*, std::vector<ir::Input>>& inputs,
     std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>>& types) {
   // generate random inputs for running pytorch segments
@@ -38,7 +38,7 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
       c10::TypePtr elementType = c10::TensorType::get();
       auto generic_list = c10::impl::GenericList(elementType);
       for (size_t i = 0; i < input.second.size(); i++) {
-        auto in = generateSingleInput(input.second[i], types[input.first][i]);
+        auto in = GenerateSingleInput(input.second[i], types[input.first][i]);
         generic_list.push_back(in.clone());
       }
       ivalue_map[input.first] = c10::IValue(generic_list);
@@ -46,20 +46,20 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
       // create tuple
       std::vector<torch::jit::IValue> list;
       for (size_t i = 0; i < input.second.size(); i++) {
-        auto in = generateSingleInput(input.second[i], types[input.first][i]);
+        auto in = GenerateSingleInput(input.second[i], types[input.first][i]);
         list.push_back(in.clone());
       }
       auto tuple = c10::ivalue::Tuple::create(list); // create tuple ptr
       ivalue_map[input.first] = c10::IValue(tuple);
     } else {
-      auto in = generateSingleInput(input.second[0], types[input.first][0]);
+      auto in = GenerateSingleInput(input.second[0], types[input.first][0]);
       ivalue_map[input.first] = in.clone();
     }
   }
   return ivalue_map;
 }
 
-void getSegmentsOutputByRunning(
+void GetSegmentsOutputByRunning(
     SegmentedBlock& seg_block,
     std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& ivalues_maps,
     const PartitioningInfo& partitioning_info) {
@@ -181,11 +181,11 @@ void getSegmentsOutputByRunning(
   seg_block.register_intypes(input_types);
 }
 
-void runShapeAnalysis(PartitioningCtx* ctx, torch::jit::Block* block, ExampleIValues& example_tensor_map) {
+void RunShapeAnalysis(PartitioningCtx* ctx, torch::jit::Block* block, ExampleIValues& example_tensor_map) {
   // register every segment's input shape, and it's running output IValues
   for (auto& seg_block : ctx->partitioned_blocks[block]) {
     torch::jit::ConstantPooling(seg_block.g());
-    getSegmentsOutputByRunning(seg_block, example_tensor_map, ctx->settings);
+    GetSegmentsOutputByRunning(seg_block, example_tensor_map, ctx->settings);
   }
   return;
 }

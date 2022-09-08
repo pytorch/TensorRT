@@ -97,7 +97,6 @@ void AddIfBlockToGraph(
   return;
 }
 
-
 GraphAndMapping Stitch(PartitioningCtx* ctx, torch::jit::Block* block) {
   auto new_g = std::make_shared<torch::jit::Graph>();
 
@@ -146,8 +145,7 @@ GraphAndMapping Stitch(PartitioningCtx* ctx, torch::jit::Block* block) {
     }
   }
   return {new_g, old_to_new_g};
-
 }
-}
-}
-}
+} // namespace partitioning
+} // namespace core
+} // namespace torch_tensorrt
