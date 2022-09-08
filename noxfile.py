@@ -269,7 +269,7 @@ def run_trt_compatibility_tests(session):
     session.chdir(os.path.join(TOP_DIR, "tests/py"))
     tests = [
         "integrations/test_trt_intercompatibility.py",
-        #"ptq/test_ptq_trt_calibrator.py",
+        # "ptq/test_ptq_trt_calibrator.py",
     ]
     for test in tests:
         if USE_HOST_DEPS:
