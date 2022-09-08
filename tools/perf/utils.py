@@ -6,9 +6,18 @@ import timm
 
 BENCHMARK_MODELS = {
     "vgg16": {"model": models.vgg16(pretrained=True), "path": "script"},
-    "resnet50": {"model": torch.hub.load("pytorch/vision:v0.9.0", "resnet50", pretrained=True), "path": "script"},
-    "efficientnet_b0": {"model": timm.create_model("efficientnet_b0", pretrained=True), "path": "script"},
-    "vit": {"model": timm.create_model("vit_base_patch16_224", pretrained=True), "path": "script"},
+    "resnet50": {
+        "model": torch.hub.load("pytorch/vision:v0.9.0", "resnet50", pretrained=True),
+        "path": "script",
+    },
+    "efficientnet_b0": {
+        "model": timm.create_model("efficientnet_b0", pretrained=True),
+        "path": "script",
+    },
+    "vit": {
+        "model": timm.create_model("vit_base_patch16_224", pretrained=True),
+        "path": "script",
+    },
     "bert_base_uncased": {"model": cm.BertModule(), "path": "trace"},
 }
 
@@ -32,7 +41,11 @@ def parse_inputs(user_inputs, dtype):
     for input in parsed_inputs:
         input_shape = []
         input_shape_and_dtype = input.split("@")
-        dtype = precision_to_dtype(input_shape_and_dtype[1]) if len(input_shape_and_dtype) == 2 else dtype
+        dtype = (
+            precision_to_dtype(input_shape_and_dtype[1])
+            if len(input_shape_and_dtype) == 2
+            else dtype
+        )
         for input_dim in input_shape_and_dtype[0][1:-1].split(","):
             input_shape.append(int(input_dim))
         torchtrt_inputs.append(torch.randint(0, 5, input_shape, dtype=dtype).cuda())
