@@ -196,7 +196,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+00a1f03)
+                  master (1.2.0a0+1efe4b1)
                 </div>
               
             
@@ -373,7 +373,7 @@
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_batch_idx</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch_size</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_loader</span><span class="o">.</span><span class="n">dataset</span><span class="p">):</span>
         <span class="k">return</span> <span class="kc">None</span>
 
-    <span class="n">batch</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dataset_iterator</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+    <span class="n">batch</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dataset_iterator</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">current_batch_idx</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch_size</span>
     <span class="n">inputs_gpu</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
