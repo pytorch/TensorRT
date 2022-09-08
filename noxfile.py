@@ -268,8 +268,8 @@ def run_trt_compatibility_tests(session):
     copy_model(session)
     session.chdir(os.path.join(TOP_DIR, "tests/py"))
     tests = [
-        "test_trt_intercompatibility.py",
-        "test_ptq_trt_calibrator.py",
+        "integrations/test_trt_intercompatibility.py",
+        # "ptq/test_ptq_trt_calibrator.py",
     ]
     for test in tests:
         if USE_HOST_DEPS:
@@ -295,7 +295,7 @@ def run_multi_gpu_tests(session):
     print("Running multi GPU tests")
     session.chdir(os.path.join(TOP_DIR, "tests/py"))
     tests = [
-        "test_multi_gpu.py",
+        "hw/test_multi_gpu.py",
     ]
     for test in tests:
         if USE_HOST_DEPS:
