@@ -130,6 +130,7 @@ namespace util {
 int64_t volume(const nvinfer1::Dims& d);
 
 bool broadcastable(nvinfer1::Dims a, nvinfer1::Dims b, bool multidirectional = true);
+nvinfer1::Dims broadcastDim(nvinfer1::Dims a, nvinfer1::Dims b);
 nvinfer1::Dims toDimsPad(c10::IntArrayRef l, uint64_t pad_to);
 nvinfer1::Dims toDimsPad(c10::List<int64_t> l, uint64_t pad_to);
 nvinfer1::Dims toDimsTailPad(c10::IntArrayRef l, uint64_t pad_to);

@@ -84,6 +84,7 @@ cc_library(
         "impl/topk.cpp",
         "impl/unary.cpp",
         "impl/unsqueeze.cpp",
+        "impl/index_put.cpp"
     ],
     hdrs = [
         "converters.h",

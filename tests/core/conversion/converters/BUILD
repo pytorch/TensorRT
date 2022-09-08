@@ -139,6 +139,10 @@ converter_test(
     name = "test_squeeze",
 )
 
+converter_test(
+    name = "test_index_put",
+)
+
 test_suite(
     name = "converter_tests",
     tests = [
