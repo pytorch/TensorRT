@@ -43,14 +43,30 @@ void PartitioningCtx::setNodeExecutorDecision(torch::jit::Node* n, NodeExecutorD
 
 bool PartitioningCtx::shouldNodeRunInTorch(torch::jit::Node* n) {
   auto iter = node_executor_decision_map.find(n);
-  if (iter == node_executor_decision_map.end()) {
-    LOG_ERROR("No info about node " << *n << " execution decision status.");
+  auto decision = NodeExecutorDecision::kUNKNOWN;
+
+  if (iter != node_executor_decision_map.end()) {
+    decision = iter->second;
   }
-  return iter->second != NodeExecutorDecision::kCONVERT;
+  if (decision == NodeExecutorDecision::kCONVERT || decision == NodeExecutorDecision::kUNKNOWN) {
+    return false;
+  } else {
+    return true;
+  }
 }
 
 bool PartitioningCtx::shouldNodeRunInTensorRT(torch::jit::Node* n) {
-  return !shouldNodeRunInTorch(n);
+  auto iter = node_executor_decision_map.find(n);
+  auto decision = NodeExecutorDecision::kUNKNOWN;
+  if (iter != node_executor_decision_map.end()) {
+    decision = iter->second;
+  }
+
+  if (decision == NodeExecutorDecision::kCONVERT) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 std::vector<torch::jit::Node*> PartitioningCtx::getNodesRunInTorch() {

@@ -7,8 +7,6 @@
 
 #include "core/ir/ir.h"
 #include "core/partitioning/partitioningctx/PartitioningCtx.h"
-#include "core/partitioning/partitioninginfo/PartitioningInfo.h"
-#include "core/partitioning/segmentedblock/SegmentedBlock.h"
 #include "core/util/prelude.h"
 
 namespace torch_tensorrt {

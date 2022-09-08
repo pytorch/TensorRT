@@ -2,7 +2,6 @@
 #include <queue>
 #include "core/conversion/conversion.h"
 #include "core/conversion/evaluators/evaluators.h"
-#include "core/partitioning/partitioningctx/PartitioningCtx.h"
 #include "torch/csrc/jit/passes/constant_pooling.h"
 #include "torch/csrc/jit/passes/dead_code_elimination.h"
 
@@ -102,8 +101,7 @@ void SetNonTensorConnectedNodes(PartitioningCtx* ctx, std::vector<torch::jit::No
       if (!isTensor(output)) {
         for (auto use : output->uses()) {
           auto node = use.user;
-          if (node->kind() != torch::jit::prim::Constant && node->kind() != torch::jit::prim::Return &&
-              ctx->shouldNodeRunInTensorRT(node)) {
+          if (node->kind() != torch::jit::prim::Constant && ctx->shouldNodeRunInTensorRT(node)) {
             ctx->setNodeExecutorDecision(node, NodeExecutorDecision::kNON_TENSOR);
             q.push(node);
           }
@@ -453,7 +451,6 @@ void Partition(PartitioningCtx* ctx, ExampleIValues& example_tensor_map) {
     // register input/output torch::jit::Value for segmented graphs
     LOG_DEBUG("Registering input/output torch::jit::Value for segmented graphs");
     RegisterSegmentsOutputs(ctx, block);
-
 
     // run shape analysis on each segmented block
     RunShapeAnalysis(ctx, block, example_tensor_map);
