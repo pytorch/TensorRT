@@ -196,7 +196,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+1efe4b1)
+                  master (1.2.0a0+10b9ecd)
                 </div>
               
             
@@ -401,6 +401,13 @@
         <span class="k">return</span> <span class="sa">b</span><span class="s2">&quot;&quot;</span></div>
 
 
+<span class="c1"># deepcopy (which involves pickling) is performed on the compile_spec internally during compilation.</span>
+<span class="c1"># We register this __reduce__ function for pickler to identity the calibrator object returned by DataLoaderCalibrator during deepcopy.</span>
+<span class="c1"># This should be the object&#39;s local name relative to the module https://docs.python.org/3/library/pickle.html#object.__reduce__</span>
+<span class="k">def</span> <span class="nf">__reduce__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
+
+
 <div class="viewcode-block" id="DataLoaderCalibrator"><a class="viewcode-back" href="../../py_api/ptq.html#torch_tensorrt.ptq.DataLoaderCalibrator">[docs]</a><span class="k">class</span> <span class="nc">DataLoaderCalibrator</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Constructs a calibrator class in TensorRT and uses pytorch dataloader to load/preproces</span>
@@ -459,24 +466,27 @@
             <span class="s2">&quot;get_batch&quot;</span><span class="p">:</span> <span class="n">get_cache_mode_batch</span> <span class="k">if</span> <span class="n">use_cache</span> <span class="k">else</span> <span class="n">get_batch</span><span class="p">,</span>
             <span class="s2">&quot;read_calibration_cache&quot;</span><span class="p">:</span> <span class="n">read_calibration_cache</span><span class="p">,</span>
             <span class="s2">&quot;write_calibration_cache&quot;</span><span class="p">:</span> <span class="n">write_calibration_cache</span><span class="p">,</span>
+            <span class="s2">&quot;__reduce__&quot;</span><span class="p">:</span> <span class="n">__reduce__</span><span class="p">,</span>  <span class="c1"># used when you deepcopy the DataLoaderCalibrator object</span>
         <span class="p">}</span>
 
         <span class="c1"># Using type metaclass to construct calibrator class based on algorithm type</span>
         <span class="k">if</span> <span class="n">algo_type</span> <span class="o">==</span> <span class="n">CalibrationAlgo</span><span class="o">.</span><span class="n">ENTROPY_CALIBRATION</span><span class="p">:</span>
             <span class="k">return</span> <span class="nb">type</span><span class="p">(</span>
-                <span class="s2">&quot;DataLoaderCalibrator&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8EntropyCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span>
+                <span class="s2">&quot;Int8EntropyCalibrator&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8EntropyCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span>
             <span class="p">)()</span>
         <span class="k">elif</span> <span class="n">algo_type</span> <span class="o">==</span> <span class="n">CalibrationAlgo</span><span class="o">.</span><span class="n">ENTROPY_CALIBRATION_2</span><span class="p">:</span>
             <span class="k">return</span> <span class="nb">type</span><span class="p">(</span>
-                <span class="s2">&quot;DataLoaderCalibrator&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8MinMaxCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span>
+                <span class="s2">&quot;Int8EntropyCalibrator2&quot;</span><span class="p">,</span>
+                <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8EntropyCalibrator2</span><span class="p">,),</span>
+                <span class="n">attribute_mapping</span><span class="p">,</span>
             <span class="p">)()</span>
         <span class="k">elif</span> <span class="n">algo_type</span> <span class="o">==</span> <span class="n">CalibrationAlgo</span><span class="o">.</span><span class="n">LEGACY_CALIBRATION</span><span class="p">:</span>
             <span class="k">return</span> <span class="nb">type</span><span class="p">(</span>
-                <span class="s2">&quot;DataLoaderCalibrator&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8LegacyCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span>
+                <span class="s2">&quot;Int8LegacyCalibrator&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8LegacyCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span>
             <span class="p">)()</span>
         <span class="k">elif</span> <span class="n">algo_type</span> <span class="o">==</span> <span class="n">CalibrationAlgo</span><span class="o">.</span><span class="n">MINMAX_CALIBRATION</span><span class="p">:</span>
             <span class="k">return</span> <span class="nb">type</span><span class="p">(</span>
-                <span class="s2">&quot;DataLoaderCalibrator&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8MinMaxCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span>
+                <span class="s2">&quot;Int8MinMaxCalibrator&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">IInt8MinMaxCalibrator</span><span class="p">,),</span> <span class="n">attribute_mapping</span>
             <span class="p">)()</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">log</span><span class="p">(</span>
