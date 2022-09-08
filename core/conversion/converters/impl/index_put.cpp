@@ -117,9 +117,7 @@ auto index_put_registrations TORCHTRT_UNUSED =
                 TORCHTRT_CHECK(scatterLayer, "Unable to create scatter nd layer from node: " << *n);
                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], scatterLayer->getOutput(0));
                 LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-
                } else {
-
                 auto gather_layer = ctx->net->addGather(*in, *concate_indices, 0);
                 TORCHTRT_CHECK(gather_layer, "Unable to create gather nd layer from node: " << *n);
                 gather_layer->setMode(nvinfer1::GatherMode::kND);
@@ -135,9 +133,7 @@ auto index_put_registrations TORCHTRT_UNUSED =
                 TORCHTRT_CHECK(scatterLayer, "Unable to create scatter nd layer from node: " << *n);
                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], scatterLayer->getOutput(0));
                 LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-
                }
-               
                return true;
              }});
 } // namespace
