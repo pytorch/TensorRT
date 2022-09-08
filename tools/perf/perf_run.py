@@ -89,8 +89,7 @@ def run_torch_tensorrt(model, input_tensors, params, precision, truncate_long_an
     if precision == "int8":
         compile_settings.update({"calib": params.get("calibration_cache")})
 
-    with torchtrt.logging.debug():
-        model = torchtrt.compile(model, **compile_settings)
+    model = torchtrt.compile(model, **compile_settings)
 
     iters = params.get("iterations", 20)
     # Warm up
@@ -292,8 +291,8 @@ def recordStats(backend, timings, precision, batch_size=1):
         "Batch size": batch_size,
         "Median(FPS)": speed_med,
         "Mean(FPS)": speed_mean,
-        "Median-Latency(ms)": time_med,
-        "Mean-Latency(ms)": time_mean,
+        "Median-Latency(ms)": time_med*1000,
+        "Mean-Latency(ms)": time_mean*1000,
     }
     results.append(stats)
 
