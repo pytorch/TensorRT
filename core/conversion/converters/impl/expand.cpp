@@ -1,6 +1,6 @@
 #include "NvInfer.h"
-#include "core/conversion/converters/converters.h"
 #include "core/conversion/converters/converter_util.h"
+#include "core/conversion/converters/converters.h"
 #include "core/conversion/tensorcontainer/TensorContainer.h"
 #include "core/util/prelude.h"
 #include "core/util/trt_util.h"
@@ -29,12 +29,9 @@ nvinfer1::ITensor* concat(int max_rank, int old_rank, ConversionCtx* ctx, nvinfe
 }
 
 bool add_expand(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* in, nvinfer1::Dims expandedDims) {
-  auto result = add_expand_layer(ctx, in,  expandedDims);
-
+  auto result = add_expand_layer(ctx, in, expandedDims);
   auto out = ctx->AssociateValueAndTensor(n->outputs()[0], result);
-
   LOG_DEBUG("Expand layer output tensor shape: " << out->getDimensions());
-
   return true;
 }
 

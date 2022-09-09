@@ -82,10 +82,7 @@ nvinfer1::ITensor* get_slice_size(
 
 nvinfer1::ITensor* scalar_to_tensor(ConversionCtx* ctx, at::Scalar s);
 
-nvinfer1::ITensor* add_expand_layer(
-    ConversionCtx* ctx,  
-    nvinfer1::ITensor* in, 
-    nvinfer1::Dims expandedDims);
+nvinfer1::ITensor* add_expand_layer(ConversionCtx* ctx, nvinfer1::ITensor* in, nvinfer1::Dims expandedDims);
 } // namespace converters
 } // namespace conversion
 } // namespace core

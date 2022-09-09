@@ -140,7 +140,7 @@ converter_test(
 )
 
 converter_test(
-    name = "test_index_put",
+    name = "test_scatter",
 )
 
 test_suite(

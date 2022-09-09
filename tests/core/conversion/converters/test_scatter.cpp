@@ -4,13 +4,11 @@
 #include "core/compiler.h"
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
+#include "torch/csrc/jit/ir/irparser.h"
 #include "torch/script.h"
 #include "torch_tensorrt/torch_tensorrt.h"
-#include "torch/csrc/jit/ir/irparser.h"
 
-
-TEST(Converter, ATenIndexPutOneDimensionConvertCorrectly){
-
+TEST(Converter, ATenIndexPutOneDimensionConvertCorrectly) {
   const auto graph = R"IR(
     graph(%b.1 : Tensor,
           %a.1 : Tensor,
@@ -44,12 +42,9 @@ TEST(Converter, ATenIndexPutOneDimensionConvertCorrectly){
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in, trt_in1, trt_in2});
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
-  
 }
 
-
-TEST(Converter, ATenIndexPutMultiDimensionConvertCorrectly){
-
+TEST(Converter, ATenIndexPutMultiDimensionConvertCorrectly) {
   const auto graph = R"IR(
     graph(%b.1 : Tensor,
           %a.1 : Tensor,
@@ -73,7 +68,7 @@ TEST(Converter, ATenIndexPutMultiDimensionConvertCorrectly){
   torch::jit::parseIR(graph, g.get());
 
   auto base = torch::zeros({3, 3, 3, 3}, {at::kCUDA}).to(torch::kFloat);
-  auto update = torch::arange(1, 7, {at::kCUDA}).reshape({1,6}).to(torch::kFloat);
+  auto update = torch::arange(1, 7, {at::kCUDA}).reshape({1, 6}).to(torch::kFloat);
 
   std::vector<int> in0;
   std::vector<int> in2;
@@ -89,11 +84,10 @@ TEST(Converter, ATenIndexPutMultiDimensionConvertCorrectly){
     }
   }
 
-  auto index0 = torch::tensor(in0, {at::kCUDA}).reshape({3,6}).to(torch::kInt32);
-  auto index1 = torch::tensor({1,1,1}, {at::kCUDA}).reshape({3,1}).to(torch::kInt32);
-  auto index2 = torch::tensor(in2, {at::kCUDA}).reshape({3,6}).to(torch::kInt32);
-  auto index3 = torch::tensor(in3, {at::kCUDA}).reshape({3,6}).to(torch::kInt32);
-
+  auto index0 = torch::tensor(in0, {at::kCUDA}).reshape({3, 6}).to(torch::kInt32);
+  auto index1 = torch::tensor({1, 1, 1}, {at::kCUDA}).reshape({3, 1}).to(torch::kInt32);
+  auto index2 = torch::tensor(in2, {at::kCUDA}).reshape({3, 6}).to(torch::kInt32);
+  auto index3 = torch::tensor(in3, {at::kCUDA}).reshape({3, 6}).to(torch::kInt32);
 
   auto jit_base = at::clone(base);
   auto jit_update = at::clone(update);
@@ -102,7 +96,8 @@ TEST(Converter, ATenIndexPutMultiDimensionConvertCorrectly){
   auto jit_index2 = at::clone(index2);
   auto jit_index3 = at::clone(index3);
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_base, jit_update, jit_index0, jit_index1, jit_index2, jit_index3});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(
+      g, params, {jit_base, jit_update, jit_index0, jit_index1, jit_index2, jit_index3});
 
   auto trt_base = at::clone(base);
   auto trt_update = at::clone(update);
@@ -111,14 +106,13 @@ TEST(Converter, ATenIndexPutMultiDimensionConvertCorrectly){
   auto trt_index2 = at::clone(index2);
   auto trt_index3 = at::clone(index3);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_base, trt_update, trt_index0, trt_index1, trt_index2, trt_index3});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(
+      g, params, {trt_base, trt_update, trt_index0, trt_index1, trt_index2, trt_index3});
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6)); 
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
-
-TEST(Converter, ATenIndexPutPartDimensionConvertCorrectly){
-
+TEST(Converter, ATenIndexPutPartDimensionConvertCorrectly) {
   const auto graph = R"IR(
     graph(%y.1 : Tensor,
           %mask.1 : Tensor):
@@ -135,7 +129,7 @@ TEST(Converter, ATenIndexPutPartDimensionConvertCorrectly){
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto in = at::randint(1, 2, {10,10}, {at::kCUDA}).to(at::kFloat);
+  auto in = at::randint(1, 2, {10, 10}, {at::kCUDA}).to(at::kFloat);
   auto in1 = torch::arange(0, 6, {at::kCUDA}).to(torch::kInt32);
 
   auto jit_in = at::clone(in);
@@ -151,9 +145,7 @@ TEST(Converter, ATenIndexPutPartDimensionConvertCorrectly){
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
-
-TEST(Converter, ATenIndexPutPartDimensionExpandedConvertCorrectly){
-
+TEST(Converter, ATenIndexPutPartDimensionExpandedConvertCorrectly) {
   const auto graph = R"IR(
     graph(%b.1 : Tensor,
           %a.1 : Tensor,
@@ -174,12 +166,12 @@ TEST(Converter, ATenIndexPutPartDimensionExpandedConvertCorrectly){
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto base = torch::zeros({4,3,2}, {at::kCUDA}).to(torch::kFloat);
-  auto update = torch::tensor({-1,-2}, {at::kCUDA}).to(torch::kFloat);
+  auto base = torch::zeros({4, 3, 2}, {at::kCUDA}).to(torch::kFloat);
+  auto update = torch::tensor({-1, -2}, {at::kCUDA}).to(torch::kFloat);
 
   auto index0 = torch::tensor({0}, {at::kCUDA}).to(torch::kInt32);
-  auto index1 = torch::tensor({0,1,2}, {at::kCUDA}).reshape({3,1}).to(torch::kInt32);
-  auto index2 = torch::tensor({0,1}, {at::kCUDA}).reshape({1,2}).to(torch::kInt32);
+  auto index1 = torch::tensor({0, 1, 2}, {at::kCUDA}).reshape({3, 1}).to(torch::kInt32);
+  auto index2 = torch::tensor({0, 1}, {at::kCUDA}).reshape({1, 2}).to(torch::kInt32);
 
   auto jit_base = at::clone(base);
   auto jit_update = at::clone(update);
@@ -187,7 +179,8 @@ TEST(Converter, ATenIndexPutPartDimensionExpandedConvertCorrectly){
   auto jit_index1 = at::clone(index1);
   auto jit_index2 = at::clone(index2);
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_base, jit_update, jit_index0, jit_index1, jit_index2});
+  auto jit_results =
+      torch_tensorrt::tests::util::RunGraph(g, params, {jit_base, jit_update, jit_index0, jit_index1, jit_index2});
 
   auto trt_base = at::clone(base);
   auto trt_update = at::clone(update);
@@ -195,7 +188,8 @@ TEST(Converter, ATenIndexPutPartDimensionExpandedConvertCorrectly){
   auto trt_index1 = at::clone(index1);
   auto trt_index2 = at::clone(index2);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_base, trt_update, trt_index0, trt_index1, trt_index2});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(
+      g, params, {trt_base, trt_update, trt_index0, trt_index1, trt_index2});
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6)); 
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }

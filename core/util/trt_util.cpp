@@ -6,7 +6,7 @@ namespace torch_tensorrt {
 namespace core {
 namespace util {
 
-nvinfer1::Dims broadcastDim(nvinfer1::Dims a, nvinfer1::Dims b) {
+nvinfer1::Dims broadcast(nvinfer1::Dims a, nvinfer1::Dims b) {
   if (a == b) {
     return a;
   }
@@ -29,14 +29,13 @@ nvinfer1::Dims broadcastDim(nvinfer1::Dims a, nvinfer1::Dims b) {
   for (int i = 0; i < a_dims_eq.nbDims; i++) {
     if (b_dims_eq.d[i] == a_dims_eq.d[i]) {
       result.d[i] = b_dims_eq.d[i];
-    } else if (b_dims_eq.d[i] < a_dims_eq.d[i]){
+    } else if (b_dims_eq.d[i] < a_dims_eq.d[i]) {
       result.d[i] = a_dims_eq.d[i];
-    }else {
+    } else {
       result.d[i] = b_dims_eq.d[i];
     }
   }
   return result;
-
 }
 
 bool broadcastable(nvinfer1::Dims a, nvinfer1::Dims b, bool multidirectional) {

@@ -76,6 +76,7 @@ cc_library(
         "impl/reduce.cpp",
         "impl/reflection_pad.cpp",
         "impl/replication_pad.cpp",
+        "impl/scatter.cpp",
         "impl/select.cpp",
         "impl/shuffle.cpp",
         "impl/softmax.cpp",
@@ -84,7 +85,6 @@ cc_library(
         "impl/topk.cpp",
         "impl/unary.cpp",
         "impl/unsqueeze.cpp",
-        "impl/index_put.cpp"
     ],
     hdrs = [
         "converters.h",

@@ -26,6 +26,7 @@ target_sources(${lib_name}
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/reduce.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/reflection_pad.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/replication_pad.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/impl/scatter.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/select.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/shuffle.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/softmax.cpp"
