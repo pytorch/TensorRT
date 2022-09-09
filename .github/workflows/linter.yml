@@ -39,7 +39,7 @@ jobs:
           pip3 install -r $GITHUB_WORKSPACE/.github/scripts/requirements.txt
           pip3 install -r $GITHUB_WORKSPACE/requirements-dev.txt
       - name: Lint C++
-        run: | 
+        run: |
           cd $GITHUB_WORKSPACE
           python3 $GITHUB_WORKSPACE/.github/scripts/run_cpp_linter.py
         env:

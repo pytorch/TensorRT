@@ -28,7 +28,7 @@ def get_batch(self, names):
     if self.current_batch_idx + self.batch_size > len(self.data_loader.dataset):
         return None
 
-    batch = self.dataset_iterator.next()
+    batch = next(self.dataset_iterator)
     self.current_batch_idx += self.batch_size
     inputs_gpu = []
     if isinstance(batch, list):
@@ -54,6 +54,13 @@ def write_calibration_cache(self, cache):
             f.write(cache)
     else:
         return b""
+
+
+# deepcopy (which involves pickling) is performed on the compile_spec internally during compilation.
+# We register this __reduce__ function for pickler to identity the calibrator object returned by DataLoaderCalibrator during deepcopy.
+# This should be the object's local name relative to the module https://docs.python.org/3/library/pickle.html#object.__reduce__
+def __reduce__(self):
+    return self.__class__.__name__
 
 
 class DataLoaderCalibrator(object):
@@ -114,24 +121,27 @@ class DataLoaderCalibrator(object):
             "get_batch": get_cache_mode_batch if use_cache else get_batch,
             "read_calibration_cache": read_calibration_cache,
             "write_calibration_cache": write_calibration_cache,
+            "__reduce__": __reduce__,  # used when you deepcopy the DataLoaderCalibrator object
         }
 
         # Using type metaclass to construct calibrator class based on algorithm type
         if algo_type == CalibrationAlgo.ENTROPY_CALIBRATION:
             return type(
-                "DataLoaderCalibrator", (_C.IInt8EntropyCalibrator,), attribute_mapping
+                "Int8EntropyCalibrator", (_C.IInt8EntropyCalibrator,), attribute_mapping
             )()
         elif algo_type == CalibrationAlgo.ENTROPY_CALIBRATION_2:
             return type(
-                "DataLoaderCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping
+                "Int8EntropyCalibrator2",
+                (_C.IInt8EntropyCalibrator2,),
+                attribute_mapping,
             )()
         elif algo_type == CalibrationAlgo.LEGACY_CALIBRATION:
             return type(
-                "DataLoaderCalibrator", (_C.IInt8LegacyCalibrator,), attribute_mapping
+                "Int8LegacyCalibrator", (_C.IInt8LegacyCalibrator,), attribute_mapping
             )()
         elif algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
             return type(
-                "DataLoaderCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping
+                "Int8MinMaxCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping
             )()
         else:
             log(

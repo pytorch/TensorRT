@@ -4,6 +4,7 @@ import torch
 import torchvision.models as models
 import copy
 from typing import Dict
+from utils import cosine_similarity, COSINE_THRESHOLD
 
 
 class TestCompile(unittest.TestCase):
@@ -26,8 +27,11 @@ class TestCompile(unittest.TestCase):
         }
 
         trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
-        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-2)
+        cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
     def test_compile_script(self):
         self.model = models.vgg16(pretrained=True).eval().to("cuda")
@@ -40,8 +44,11 @@ class TestCompile(unittest.TestCase):
                 device=torchtrt.Device(gpu_id=0),
                 enabled_precisions={torch.float},
             )
-            same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
-            self.assertTrue(same < 2e-2)
+            cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
+            self.assertTrue(
+                cos_sim > COSINE_THRESHOLD,
+                msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+            )
 
     def test_compile_global(self):
         self.model = models.vgg16(pretrained=True).eval().to("cuda")
@@ -53,21 +60,11 @@ class TestCompile(unittest.TestCase):
             device=torchtrt.Device(gpu_id=0),
             enabled_precisions={torch.float},
         )
-        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-2)
-
-    def test_compile_global_nn_mod(self):
-        self.model = models.vgg16(pretrained=True).eval().to("cuda")
-        self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        with torch.no_grad():
-            trt_mod = torchtrt.compile(
-                self.model,
-                inputs=[self.input],
-                device=torchtrt.Device(gpu_id=0),
-                enabled_precisions={torch.float},
-            )
-            same = (trt_mod(self.input) - self.model(self.input)).abs().max()
-            self.assertTrue(same < 2e-2)
+        cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
     def test_from_torch_tensor(self):
         self.model = models.vgg16(pretrained=True).eval().to("cuda")
@@ -83,8 +80,11 @@ class TestCompile(unittest.TestCase):
         }
 
         trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
-        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-2)
+        cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
     def test_device(self):
         self.model = models.vgg16(pretrained=True).eval().to("cuda")
@@ -97,8 +97,11 @@ class TestCompile(unittest.TestCase):
         }
 
         trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
-        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-2)
+        cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
     def test_default_device(self):
         self.model = models.vgg16(pretrained=True).eval().to("cuda")
@@ -107,51 +110,11 @@ class TestCompile(unittest.TestCase):
         compile_spec = {"inputs": [self.input], "enabled_precisions": {torch.float}}
 
         trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
-        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-2)
-
-    def test_compile_script_from_dict(self):
-        self.model = models.vgg16(pretrained=True).eval().to("cuda")
-        self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        self.traced_model = torch.jit.trace(self.model, [self.input])
-        compile_spec = {
-            "inputs": [torchtrt.Input(shape=self.input.shape)],
-            "device": {
-                "device_type": torchtrt.DeviceType.GPU,
-                "gpu_id": 0,
-            },
-            "enabled_precisions": {torch.float},
-        }
-
-        trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
-        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-2)
-
-
-class TestPTtoTRTtoPT(unittest.TestCase):
-    def test_pt_to_trt_to_pt(self):
-        self.model = models.vgg16(pretrained=True).eval().to("cuda")
-        self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        self.ts_model = torch.jit.trace(self.model, [self.input])
-
-        compile_spec = {
-            "inputs": [torchtrt.Input(self.input.shape)],
-            "device": {
-                "device_type": torchtrt.DeviceType.GPU,
-                "gpu_id": 0,
-                "allow_gpu_fallback": False,
-                "disable_tf32": False,
-            },
-        }
-
-        trt_engine = torchtrt.ts.convert_method_to_trt_engine(
-            self.ts_model, "forward", **compile_spec
+        cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"VGG16 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
-        trt_mod = torchtrt.ts.embed_engine_in_new_module(
-            trt_engine, torchtrt.Device("cuda:0")
-        )
-        same = (trt_mod(self.input) - self.ts_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-3)
 
 
 class TestCheckMethodOpSupport(unittest.TestCase):

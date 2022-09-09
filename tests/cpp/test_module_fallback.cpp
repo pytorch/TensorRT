@@ -30,7 +30,7 @@ TEST(CppAPITest, ResNetModuleFallbacksCorrectly) {
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
   auto trt_mod = torch_tensorrt::ts::compile(mod, cfg);
   auto trt_results = trt_mod.forward(trt_inputs_ivalues).toTensor();
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results, trt_results, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(jit_results, trt_results, 0.99));
 }
 
 TEST(CppAPITest, MobileNetModuleFallbacksCorrectlyWithOneEngine) {
@@ -69,6 +69,6 @@ TEST(CppAPITest, MobileNetModuleFallbacksCorrectlyWithOneEngine) {
   ASSERT_TRUE(trt_count == 1);
 
   auto trt_results = trt_mod.forward(trt_inputs_ivalues).toTensor();
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results, trt_results, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(jit_results, trt_results, 0.99));
 }
 #endif
