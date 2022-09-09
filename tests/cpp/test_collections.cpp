@@ -147,6 +147,8 @@ TEST(CppAPITests, TestCollectionListInput) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toTensor(), trt_out.toTensor(), 1e-5));
 }
 
+#ifndef DISABLE_TEST_IN_CI
+
 TEST(CppAPITests, TestCollectionTupleInputOutput) {
   std::string path = "tests/modules/tuple_input_output_scripted.jit.pt";
 
@@ -318,3 +320,5 @@ TEST(CppAPITests, TestCollectionComplexModel) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
       out.toTuple()->elements()[1].toTensor(), trt_out.toTuple()->elements()[1].toTensor(), 1e-5));
 }
+
+#endif
