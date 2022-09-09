@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+81cded1)
+                  master (1.2.0a0+417efd2)
                 </div>
               
             
@@ -367,35 +367,36 @@ wrapper API that consists of the major steps needed to finish this converison. P
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>def compile<span class="o">(</span>
     module: nn.Module,
     input,
-    max_batch_size: <span class="nv">int</span> <span class="o">=</span> <span class="m">2048</span>,
-    <span class="nv">max_workspace_size</span><span class="o">=</span><span class="m">1</span> <span class="s">&lt;&lt; 25,</span>
-<span class="s">    explicit_batch_dimension=False,</span>
-<span class="s">    lower_precision=LowerPrecision.FP16,</span>
-<span class="s">    verbose_log=False,</span>
-<span class="s">    timing_cache_prefix=&quot;&quot;,</span>
-<span class="s">    save_timing_cache=False,</span>
-<span class="s">    cuda_graph_batch_size=-1,</span>
-<span class="s">    dynamic_batch=True,</span>
-<span class="s">) -&gt; nn.Module:</span>
-<span class="s">    &quot;&quot;&quot;</span>
-<span class="s">    Takes in original module, input and lowering setting, run lowering workflow to turn module</span>
-<span class="s">    into lowered module, or so called TRTModule.</span>
+    <span class="nv">max_batch_size</span><span class="o">=</span><span class="m">2048</span>,
+    <span class="nv">max_workspace_size</span><span class="o">=</span><span class="m">33554432</span>,
+    <span class="nv">explicit_batch_dimension</span><span class="o">=</span>False,
+    <span class="nv">lower_precision</span><span class="o">=</span>LowerPrecision.FP16,
+    <span class="nv">verbose_log</span><span class="o">=</span>False,
+    <span class="nv">timing_cache_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span>,
+    <span class="nv">save_timing_cache</span><span class="o">=</span>False,
+    <span class="nv">cuda_graph_batch_size</span><span class="o">=</span>-1,
+    <span class="nv">dynamic_batch</span><span class="o">=</span>True,
+<span class="o">)</span> -&gt; nn.Module:
 
-<span class="s">    Args:</span>
-<span class="s">        module: Original module for lowering.</span>
-<span class="s">        input: Input for module.</span>
-<span class="s">        max_batch_size: Maximum batch size (must be &gt;= 1 to be set, 0 means not set)</span>
-<span class="s">        max_workspace_size: Maximum size of workspace given to TensorRT.</span>
-<span class="s">        explicit_batch_dimension: Use explicit batch dimension in TensorRT if set True, otherwise use implicit batch dimension.</span>
-<span class="s">        lower_precision: lower_precision config given to TRTModule.</span>
-<span class="s">        verbose_log: Enable verbose log for TensorRT if set True.</span>
-<span class="s">        timing_cache_prefix: Timing cache file name for timing cache used by fx2</span>trt.
-        save_timing_cache: Update timing cache with current timing cache data <span class="k">if</span> <span class="nb">set</span> to True.
-        cuda_graph_batch_size: Cuda graph batch size, default to be -1.
-        dynamic_batch: batch dimension <span class="o">(</span><span class="nv">dim</span><span class="o">=</span><span class="m">0</span><span class="o">)</span> is dynamic.
-    Returns:
-        A torch.nn.Module lowered by TensorRT.
     <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    Takes in original module, input and lowering setting, run lowering workflow to turn module</span>
+<span class="s2">    into lowered module, or so called TRTModule.</span>
+
+<span class="s2">    Args:</span>
+<span class="s2">        module: Original module for lowering.</span>
+<span class="s2">        input: Input for module.</span>
+<span class="s2">        max_batch_size: Maximum batch size (must be &gt;= 1 to be set, 0 means not set)</span>
+<span class="s2">        max_workspace_size: Maximum size of workspace given to TensorRT.</span>
+<span class="s2">        explicit_batch_dimension: Use explicit batch dimension in TensorRT if set True, otherwise use implicit batch dimension.</span>
+<span class="s2">        lower_precision: lower_precision config given to TRTModule.</span>
+<span class="s2">        verbose_log: Enable verbose log for TensorRT if set True.</span>
+<span class="s2">        timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.</span>
+<span class="s2">        save_timing_cache: Update timing cache with current timing cache data if set to True.</span>
+<span class="s2">        cuda_graph_batch_size: Cuda graph batch size, default to be -1.</span>
+<span class="s2">        dynamic_batch: batch dimension (dim=0) is dynamic.</span>
+<span class="s2">    Returns:</span>
+<span class="s2">        A torch.nn.Module lowered by TensorRT.</span>
+<span class="s2">    &quot;&quot;&quot;</span>
 </pre></div>
 </div>
 <p>In this section, we will go through an example to illustrate the major steps that fx path uses.
