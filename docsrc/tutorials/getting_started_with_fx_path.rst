@@ -27,8 +27,8 @@ wrapper API that consists of the major steps needed to finish this converison. P
     def compile(
         module: nn.Module,
         input,
-        max_batch_size: int = 2048,
-        max_workspace_size=1 << 25,
+        max_batch_size=2048,
+        max_workspace_size=33554432,
         explicit_batch_dimension=False,
         lower_precision=LowerPrecision.FP16,
         verbose_log=False,
@@ -37,6 +37,7 @@ wrapper API that consists of the major steps needed to finish this converison. P
         cuda_graph_batch_size=-1,
         dynamic_batch=True,
     ) -> nn.Module:
+    
         """
         Takes in original module, input and lowering setting, run lowering workflow to turn module
         into lowered module, or so called TRTModule.
