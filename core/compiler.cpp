@@ -10,8 +10,8 @@
 #include "ATen/core/jit_type.h"
 
 #include "torch/csrc/jit/frontend/function_schema_parser.h"
-#include "torch/csrc/jit/ir/ir.h"
 #include "torch/csrc/jit/ir/constants.h"
+#include "torch/csrc/jit/ir/ir.h"
 #include "torch/csrc/jit/ir/ir_views.h"
 #include "torch/csrc/jit/passes/graph_fuser.h"
 #include "torch/csrc/jit/passes/loop_unrolling.h"
@@ -33,9 +33,18 @@ void RewriteInputsWithParams(std::shared_ptr<torch::jit::Graph> g, std::vector<t
   auto input_size = g->inputs().size();
   auto param_it = params.rbegin();
   for (int i = input_size - 1; i >= 0; --i) {
-    if (g->inputs()[i]->type() != c10::TensorType::get() && g->inputs()[i]->type()->kind() != torch::jit::TypeKind::TupleType &&
+    if (g->inputs()[i]->type() != c10::TensorType::get() &&
+        g->inputs()[i]->type()->kind() != torch::jit::TypeKind::TupleType &&
         g->inputs()[i]->type()->kind() != torch::jit::TypeKind::ListType && param_it != params.rend()) {
-      auto new_constant = torch::jit::tryInsertConstant(*g, *param_it);
+      auto val = *param_it;
+      if (val.isTensor()) {
+        at::Tensor val_tensor = val.toTensor();
+        if (val_tensor.requires_grad()) {
+          val_tensor.set_requires_grad(false);
+          val = val_tensor;
+        }
+      }
+      auto new_constant = torch::jit::tryInsertConstant(*g, val);
       ++param_it;
       if (new_constant) {
         g->inputs()[i]->replaceAllUsesWith(*new_constant);
