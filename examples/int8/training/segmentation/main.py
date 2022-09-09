@@ -12,7 +12,14 @@ from PIL import Image
 import argparse
 from tqdm import tqdm
 
-from utils import get_loaders, load_checkpoint, save_checkpoint, check_accuracy
+from utils import (
+    get_loaders,
+    load_checkpoint,
+    save_checkpoint,
+    check_accuracy,
+    CustomLoss,
+    compute_dice_score
+)
 
 IMG_HEIGHT = 128
 IMG_WIDTH = 128
@@ -23,45 +30,46 @@ TRAIN_MASK_DIR = "ADEChallengeData2016/annotations/training"
 
 VAL_IMG_DIR = "ADEChallengeData2016/images/validation"
 VAL_MASK_DIR = "ADEChallengeData2016/annotations/validation"
-CHECKPOINT_PREFIX = "seg_model"
+CHECKPOINT_PREFIX = "vgg16_unet"
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def train(loader, model, optimizer, loss_fn, scaler):
     pr_loop = tqdm(loader)
 
+    train_loss = 0.0
+
     for data, target in pr_loop:
         data = data.to(device=DEVICE)
-        target = target.to(device=DEVICE)
-
+        target = target.to(device=DEVICE).unsqueeze(dim=1)
         preds = model(data)
 
-        target = target.sigmoid() * 149
-
-        loss = loss_fn(preds, target.long())
-        loss = loss.mean()
-
-        optimizer.zero_grad()
+        loss = loss_fn(preds, target.float())
+        dice = compute_dice_score(preds, target.float())
+        optimizer.zero_grad()        
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
-
-        pr_loop.set_postfix(loss=loss.item())
-
+        
+        train_loss += loss.item() * data.size(0) 
+        pr_loop.set_postfix(ordered_dict = {"loss": loss.item(), "dice_score": dice.item()})
+    
+    return train_loss, dice
 
 def main():
     parser = argparse.ArgumentParser(description='Training script')
     parser.add_argument('--batch', type=int, default=16, help='Batch size')
     parser.add_argument('--data', type=str, default='', help='Path to dataset root dir')
     parser.add_argument('--epochs', type=int, default=20, help='Number of epochs')
+    parser.add_argument('--interval', type=int, default=5, help='Epoch intervals to save checkpoint')
     parser.add_argument('--lr', type=float, default=1e-2, help='Learning rate')
-    parser.add_argument('--momentum', type=float, default=0.9, help='Momentum for training optimizer')
-    parser.add_argument("--weight-decay", default=5e-4, type=float, help="Weight decay")
     parser.add_argument('--start-from', type=int, default=0, help='Load the checkpoint epoch')
     parser.add_argument('--export', type=str, default='segmentation_model.jit.pt', help='Export as a Torch Script')
     parser.add_argument('--load-model', type=bool, default=True, help='Load a checkpoint')
 
     args = parser.parse_args()
+
+    # Transform for training set
     train_transform = A.Compose(
         [
             A.Resize(height=IMG_HEIGHT, width=IMG_WIDTH),
@@ -77,6 +85,7 @@ def main():
         ],
     )
 
+    # Transform for validation set
     val_transform = A.Compose(
         [
             A.Resize(height=IMG_HEIGHT, width=IMG_WIDTH),
@@ -92,7 +101,7 @@ def main():
     model = VGG16Unet().to(device=DEVICE)
 
     # Multi-class semantic segmentation
-    loss_fn = torch.nn.CrossEntropyLoss()
+    loss_fn = CustomLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     # Pick dataset root directory according as per user input if required
@@ -107,6 +116,8 @@ def main():
         NUM_WORKERS,
         PIN_MEMORY
     )
+
+    check_accuracy(val_loader, model, device=DEVICE)
 
     epochs = 0
     ckpt_file = None
@@ -123,14 +134,14 @@ def main():
         if ckpt_file is not None and os.path.exists(ckpt_file):
             load_checkpoint(torch.load(ckpt_file), model)
         
-    check_accuracy(val_loader, model, device=DEVICE)
-
     scaler = torch.cuda.amp.GradScaler()    
+    checkpoint = dict()
     for epoch in range(epochs, args.epochs):
         print(f"Epoch: {epoch}/{args.epochs}...")
-        train(train_loader, model, optimizer, loss_fn, scaler)
+        train_loss, dice_score = train(train_loader, model, optimizer, loss_fn, scaler)
 
-        if epoch % 5 == 0:
+        if epoch % args.interval == 0:
+            print(f"Training loss at epoch: {epoch} is: {(train_loss/len(train_loader.dataset)):.4f} and Dice Score: {dice_score}")
             checkpoint = {
                 "state_dict": model.state_dict(),
                 "optimizer": optimizer.state_dict(),
@@ -138,9 +149,13 @@ def main():
             save_checkpoint(checkpoint, CHECKPOINT_PREFIX + "_epoch_" + str(epoch) + ".pth.tar")
     save_checkpoint(checkpoint, CHECKPOINT_PREFIX + "_epoch_" + str(args.epochs) + ".pth.tar")
     
+    model.eval()
     # Check accuracy
     check_accuracy(val_loader, model, device=DEVICE)
 
+    if args.export:
+        mod = torch.jit.script(model)
+        torch.jit.save(mod, CHECKPOINT_PREFIX + ".jit.pt")
 
 if __name__ == "__main__":
     main()

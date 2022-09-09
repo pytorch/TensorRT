@@ -19,7 +19,7 @@ def add_conv(in_channels, out_channels, nums = 2):
 
 # [64, 64, 128, 128, 256, 256, 256, 512, 512, 512]
 class VGG16Unet(nn.Module):
-    def __init__(self, pretrained=False, in_channels=3, out_channels=150, features = [(64, 2), (128, 2), (256, 3), (512, 3)]):
+    def __init__(self, pretrained=False, in_channels=3, out_channels=1, features = [(64, 2), (128, 2), (256, 3), (512, 3)]):
         super().__init__()
 
         self.in_channels = in_channels
@@ -48,6 +48,7 @@ class VGG16Unet(nn.Module):
 
         self.bottleneck = add_conv(features[-1][0], features[-1][0]*2, 2)
         self.final_conv = nn.Conv2d(features[0][0], out_channels, kernel_size=1)
+        self.act = nn.Sigmoid()
     
     def forward(self, x):
         skip_connections = []
@@ -70,5 +71,6 @@ class VGG16Unet(nn.Module):
                 skip_conn = skip_connections[k]
                 k += 1
                 x = torch.cat((skip_conn, x), dim=1)
-            
-        return self.final_conv(x)
+        
+        x = self.final_conv(x)
+        return self.act(x)

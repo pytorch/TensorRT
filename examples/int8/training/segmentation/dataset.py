@@ -5,7 +5,8 @@ import numpy as np
 from PIL import Image
 import random
 
-SAMPLE_COUNT=20000
+SAMPLE_COUNT=5000
+NUM_CLASSES = 150
 class SceneParsingDataset(Dataset):
     def __init__(self, image_dir, mask_dir, transform=None, training=True): 
         self.image_dir = image_dir
@@ -14,6 +15,8 @@ class SceneParsingDataset(Dataset):
         imgs = os.listdir(image_dir)
         if training:
             random.shuffle(imgs)
+            # Picking a subset of the training dataset.
+            # ADE20K Dataset has ~20K training samples.
             self.images = imgs[:SAMPLE_COUNT]
         else:
             self.images = imgs
@@ -27,7 +30,8 @@ class SceneParsingDataset(Dataset):
 
         image = np.array(Image.open(image_path).convert("RGB"))
         mask = np.array(Image.open(mask_path).convert("L"), dtype=np.float32)
-        mask[mask == 255.0] = 1.0
+
+        mask = mask / NUM_CLASSES
 
         img = None
         msk = None
@@ -35,5 +39,4 @@ class SceneParsingDataset(Dataset):
             transformed_data = self.transform(image=image, mask=mask)
             img = transformed_data["image"]
             msk = transformed_data["mask"]
-
         return img, msk
