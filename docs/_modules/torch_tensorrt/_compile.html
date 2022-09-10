@@ -196,7 +196,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+417efd2)
+                  master (1.2.0a0+450c869)
                 </div>
               
             
@@ -352,7 +352,6 @@
 <span class="kn">from</span> <span class="nn">enum</span> <span class="kn">import</span> <span class="n">Enum</span>
 
 <span class="kn">import</span> <span class="nn">torch_tensorrt.fx</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt.fx.lower</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.fx.utils</span> <span class="kn">import</span> <span class="n">LowerPrecision</span>
 
 
@@ -485,7 +484,7 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Precision </span><span class="si">{</span><span class="n">enabled_precisions</span><span class="si">}</span><span class="s2"> not supported on FX&quot;</span><span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">lower</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+        <span class="k">return</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
             <span class="n">module</span><span class="p">,</span>
             <span class="n">inputs</span><span class="p">,</span>
             <span class="n">lower_precision</span><span class="o">=</span><span class="n">lower_precision</span><span class="p">,</span>
