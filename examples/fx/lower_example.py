@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, replace
 
 import torch
 import torchvision
-from torch_tensorrt.fx.lower import compile
+from torch_tensorrt.fx import compile
 from torch_tensorrt.fx.utils import LowerPrecision
 
 
