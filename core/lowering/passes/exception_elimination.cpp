@@ -2,6 +2,7 @@
 #include "torch/csrc/jit/jit_log.h"
 #include "torch/csrc/jit/passes/constant_propagation.h"
 #include "torch/csrc/jit/passes/dead_code_elimination.h"
+#include "torch/csrc/jit/passes/remove_exceptions.h"
 #include "torch/csrc/jit/passes/guard_elimination.h"
 #include "torch/csrc/jit/passes/peephole.h"
 #include "torch/csrc/jit/runtime/graph_executor.h"
@@ -21,6 +22,7 @@ struct ExceptionOrPassPatternElimination {
 
   void run() {
     findExceptionOrPassNodes(graph_->block());
+    torch::jit::EliminateExceptions(graph_);
     torch::jit::EliminateDeadCode(graph_);
     LOG_GRAPH("Post exeception or pass elimination: " << *graph_);
   }
