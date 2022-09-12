@@ -37,7 +37,7 @@ wrapper API that consists of the major steps needed to finish this converison. P
         cuda_graph_batch_size=-1,
         dynamic_batch=True,
     ) -> nn.Module:
-    
+
         """
         Takes in original module, input and lowering setting, run lowering workflow to turn module
         into lowered module, or so called TRTModule.
