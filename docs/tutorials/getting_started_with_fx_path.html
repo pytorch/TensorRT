@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+096fd41)
+                  master (1.2.0a0+450c869)
                 </div>
               
             
@@ -363,7 +363,42 @@ $ python py/torch_tensorrt/fx/example/lower_example.py
 <section id="converting-a-pytorch-model-to-tensorrt-engine">
 <h2>Converting a PyTorch Model to TensorRT Engine<a class="headerlink" href="#converting-a-pytorch-model-to-tensorrt-engine" title="Permalink to this headline">¶</a></h2>
 <p>In general, users are welcome to use the <code class="docutils literal notranslate"><span class="pre">compile()</span></code> to finish the conversion from a model to tensorRT engine. It is a
-wrapper API that consists of the major steps needed to finish this converison. Please refer to <code class="docutils literal notranslate"><span class="pre">lower_example.py</span></code> file in <code class="docutils literal notranslate"><span class="pre">examples/fx</span></code>.</p>
+wrapper API that consists of the major steps needed to finish this converison. Please refer to an example usage in <code class="docutils literal notranslate"><span class="pre">lower_example.py</span></code> file under <code class="docutils literal notranslate"><span class="pre">examples/fx</span></code>.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>def compile<span class="o">(</span>
+    module: nn.Module,
+    input,
+    <span class="nv">max_batch_size</span><span class="o">=</span><span class="m">2048</span>,
+    <span class="nv">max_workspace_size</span><span class="o">=</span><span class="m">33554432</span>,
+    <span class="nv">explicit_batch_dimension</span><span class="o">=</span>False,
+    <span class="nv">lower_precision</span><span class="o">=</span>LowerPrecision.FP16,
+    <span class="nv">verbose_log</span><span class="o">=</span>False,
+    <span class="nv">timing_cache_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span>,
+    <span class="nv">save_timing_cache</span><span class="o">=</span>False,
+    <span class="nv">cuda_graph_batch_size</span><span class="o">=</span>-1,
+    <span class="nv">dynamic_batch</span><span class="o">=</span>True,
+<span class="o">)</span> -&gt; nn.Module:
+
+    <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    Takes in original module, input and lowering setting, run lowering workflow to turn module</span>
+<span class="s2">    into lowered module, or so called TRTModule.</span>
+
+<span class="s2">    Args:</span>
+<span class="s2">        module: Original module for lowering.</span>
+<span class="s2">        input: Input for module.</span>
+<span class="s2">        max_batch_size: Maximum batch size (must be &gt;= 1 to be set, 0 means not set)</span>
+<span class="s2">        max_workspace_size: Maximum size of workspace given to TensorRT.</span>
+<span class="s2">        explicit_batch_dimension: Use explicit batch dimension in TensorRT if set True, otherwise use implicit batch dimension.</span>
+<span class="s2">        lower_precision: lower_precision config given to TRTModule.</span>
+<span class="s2">        verbose_log: Enable verbose log for TensorRT if set True.</span>
+<span class="s2">        timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.</span>
+<span class="s2">        save_timing_cache: Update timing cache with current timing cache data if set to True.</span>
+<span class="s2">        cuda_graph_batch_size: Cuda graph batch size, default to be -1.</span>
+<span class="s2">        dynamic_batch: batch dimension (dim=0) is dynamic.</span>
+<span class="s2">    Returns:</span>
+<span class="s2">        A torch.nn.Module lowered by TensorRT.</span>
+<span class="s2">    &quot;&quot;&quot;</span>
+</pre></div>
+</div>
 <p>In this section, we will go through an example to illustrate the major steps that fx path uses.
 Users can refer to <code class="docutils literal notranslate"><span class="pre">fx2trt_example.py</span></code> file in <code class="docutils literal notranslate"><span class="pre">examples/fx</span></code>.</p>
 <ul class="simple">
@@ -394,73 +429,83 @@ This means the model contains dynamic control flow. Please refer to section “D
 2. Inputs, outputs and activations have batch dimension as the major dimension.
 3. All the operators in the model do not modify batch dimension (permute, transpose, split, etc.) or compute over batch dimension (sum, softmax, etc.).</p>
 <p>For examples of the last path, if we have a 3D tensor t shaped as (batch, sequence, dimension), operations such as torch.transpose(0, 2). If any of these three are not satisfied, we’ll need to specify InputTensorSpec as inputs with dynamic range.</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>import deeplearning.trt.fx2trt.converter.converters
-from torch.fx.experimental.fx2trt.fx2trt import InputTensorSpec, TRTInterpreter
-
-<span class="c1"># InputTensorSpec is a dataclass we use to store input information.</span>
-<span class="c1"># There&#39;re two ways we can build input_specs.</span>
-<span class="c1"># Option 1, build it manually.</span>
-<span class="nv">input_specs</span> <span class="o">=</span> <span class="o">[</span>
-  InputTensorSpec<span class="o">(</span><span class="nv">shape</span><span class="o">=(</span><span class="m">1</span>, <span class="m">2</span>, <span class="m">3</span><span class="o">)</span>, <span class="nv">dtype</span><span class="o">=</span>torch.float32<span class="o">)</span>,
-  InputTensorSpec<span class="o">(</span><span class="nv">shape</span><span class="o">=(</span><span class="m">1</span>, <span class="m">4</span>, <span class="m">5</span><span class="o">)</span>, <span class="nv">dtype</span><span class="o">=</span>torch.float32<span class="o">)</span>,
-<span class="o">]</span>
-<span class="c1"># Option 2, build it using sample_inputs where user provide a sample</span>
-<span class="nv">inputs</span> <span class="o">=</span> <span class="o">[</span>
-torch.rand<span class="o">((</span><span class="m">1</span>,2,3<span class="o">)</span>, <span class="nv">dtype</span><span class="o">=</span>torch.float32<span class="o">)</span>,
-torch.rand<span class="o">((</span><span class="m">1</span>,4,5<span class="o">)</span>, <span class="nv">dtype</span><span class="o">=</span>torch.float32<span class="o">)</span>,
-<span class="o">]</span>
-<span class="nv">input_specs</span> <span class="o">=</span> InputTensorSpec.from_tensors<span class="o">(</span>inputs<span class="o">)</span>
-
-<span class="c1"># IMPORTANT: If dynamic shape is needed, we need to build it slightly differently.</span>
-<span class="nv">input_specs</span> <span class="o">=</span> <span class="o">[</span>
-    InputTensorSpec<span class="o">(</span>
-        <span class="nv">shape</span><span class="o">=(</span>-1, <span class="m">2</span>, <span class="m">3</span><span class="o">)</span>,
-        <span class="nv">dtype</span><span class="o">=</span>torch.float32,
-        <span class="c1"># Currently we only support one set of dynamic range. User may set other dimensions but it is not promised to work for any models</span>
-        <span class="c1"># (min_shape, optimize_target_shape, max_shape)</span>
-        <span class="c1"># For more information refer to fx/input_tensor_spec.py</span>
-        <span class="nv">shape_ranges</span> <span class="o">=</span> <span class="o">[</span>
-            <span class="o">((</span><span class="m">1</span>, <span class="m">2</span>, <span class="m">3</span><span class="o">)</span>, <span class="o">(</span><span class="m">4</span>, <span class="m">2</span>, <span class="m">3</span><span class="o">)</span>, <span class="o">(</span><span class="m">100</span>, <span class="m">2</span>, <span class="m">3</span><span class="o">))</span>,
-        <span class="o">]</span>,
-    <span class="o">)</span>,
-    InputTensorSpec<span class="o">(</span><span class="nv">shape</span><span class="o">=(</span><span class="m">1</span>, <span class="m">4</span>, <span class="m">5</span><span class="o">)</span>, <span class="nv">dtype</span><span class="o">=</span>torch.float32<span class="o">)</span>,
-<span class="o">]</span>
-
-<span class="c1"># Build a TRT interpreter. Set explicit_batch_dimension accordingly.</span>
-<span class="nv">interpreter</span> <span class="o">=</span> TRTInterpreter<span class="o">(</span>
-    acc_mod, input_specs, <span class="nv">explicit_batch_dimension</span><span class="o">=</span>True/False
-<span class="o">)</span>
-
-<span class="c1"># The output of TRTInterpreter run() is wrapped as TRTInterpreterResult.</span>
-<span class="c1"># The TRTInterpreterResult contains required parameter to build TRTModule,</span>
-<span class="c1"># and other informational output from TRTInterpreter run.</span>
-class TRTInterpreterResult<span class="o">(</span>NamedTuple<span class="o">)</span>:
-    engine: Any
-    input_names: Sequence<span class="o">[</span>str<span class="o">]</span>
-    output_names: Sequence<span class="o">[</span>str<span class="o">]</span>
-    serialized_cache: bytearray
-
-<span class="c1">#max_batch_size: set accordingly for maximum batch size you will use.</span>
-<span class="c1">#max_workspace_size: set to the maximum size we can afford for temporary buffer</span>
-<span class="c1">#lower_precision: the precision model layers are running on (TensorRT will choose the best perforamnce precision).</span>
-<span class="c1">#sparse_weights: allow the builder to examine weights and use optimized functions when weights have suitable sparsity</span>
-<span class="c1">#force_fp32_output: force output to be fp32</span>
-<span class="c1">#strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric #reasons.</span>
-<span class="c1">#algorithm_selector: set up algorithm selection for certain layer</span>
-<span class="c1">#timing_cache: enable timing cache for TensorRT</span>
-<span class="c1">#profiling_verbosity: TensorRT logging level</span>
-<span class="nv">trt_interpreter_result</span> <span class="o">=</span> interpreter.run<span class="o">(</span>
-    <span class="nv">max_batch_size</span><span class="o">=</span><span class="m">64</span>,
-    <span class="nv">max_workspace_size</span><span class="o">=</span><span class="m">1</span> <span class="s">&lt;&lt; 25,</span>
-<span class="s">    sparse_weights=False,</span>
-<span class="s">    force_fp32</span>_output<span class="o">=</span>False,
-    <span class="nv">strict_type_constraints</span><span class="o">=</span>False,
-    <span class="nv">algorithm_selector</span><span class="o">=</span>None,
-    <span class="nv">timing_cache</span><span class="o">=</span>None,
-    <span class="nv">profiling_verbosity</span><span class="o">=</span>None,
-<span class="o">)</span>
-</pre></div>
-</div>
+<p>c</p>
+<blockquote>
+<div><p>import deeplearning.trt.fx2trt.converter.converters
+from torch.fx.experimental.fx2trt.fx2trt import InputTensorSpec, TRTInterpreter</p>
+<p># InputTensorSpec is a dataclass we use to store input information.
+# There’re two ways we can build input_specs.
+# Option 1, build it manually.
+input_specs = [</p>
+<blockquote>
+<div><p>InputTensorSpec(shape=(1, 2, 3), dtype=torch.float32),
+InputTensorSpec(shape=(1, 4, 5), dtype=torch.float32),</p>
+</div></blockquote>
+<p>]
+# Option 2, build it using sample_inputs where user provide a sample
+inputs = [
+torch.rand((1,2,3), dtype=torch.float32),
+torch.rand((1,4,5), dtype=torch.float32),
+]
+input_specs = InputTensorSpec.from_tensors(inputs)</p>
+<p># IMPORTANT: If dynamic shape is needed, we need to build it slightly differently.
+input_specs = [</p>
+<blockquote>
+<div><dl>
+<dt>InputTensorSpec(</dt><dd><p>shape=(-1, 2, 3),
+dtype=torch.float32,
+# Currently we only support one set of dynamic range. User may set other dimensions but it is not promised to work for any models
+# (min_shape, optimize_target_shape, max_shape)
+# For more information refer to fx/input_tensor_spec.py
+shape_ranges = [</p>
+<blockquote>
+<div><p>((1, 2, 3), (4, 2, 3), (100, 2, 3)),</p>
+</div></blockquote>
+<p>],</p>
+</dd>
+</dl>
+<p>),
+InputTensorSpec(shape=(1, 4, 5), dtype=torch.float32),</p>
+</div></blockquote>
+<p>]</p>
+<p># Build a TRT interpreter. Set explicit_batch_dimension accordingly.
+interpreter = TRTInterpreter(</p>
+<blockquote>
+<div><p>acc_mod, input_specs, explicit_batch_dimension=True/False</p>
+</div></blockquote>
+<p>)</p>
+<p># The output of TRTInterpreter run() is wrapped as TRTInterpreterResult.
+# The TRTInterpreterResult contains required parameter to build TRTModule,
+# and other informational output from TRTInterpreter run.
+class TRTInterpreterResult(NamedTuple):</p>
+<blockquote>
+<div><p>engine: Any
+input_names: Sequence[str]
+output_names: Sequence[str]
+serialized_cache: bytearray</p>
+</div></blockquote>
+<p>#max_batch_size: set accordingly for maximum batch size you will use.
+#max_workspace_size: set to the maximum size we can afford for temporary buffer
+#lower_precision: the precision model layers are running on (TensorRT will choose the best perforamnce precision).
+#sparse_weights: allow the builder to examine weights and use optimized functions when weights have suitable sparsity
+#force_fp32_output: force output to be fp32
+#strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric #reasons.
+#algorithm_selector: set up algorithm selection for certain layer
+#timing_cache: enable timing cache for TensorRT
+#profiling_verbosity: TensorRT logging level
+trt_interpreter_result = interpreter.run(</p>
+<blockquote>
+<div><p>max_batch_size=64,
+max_workspace_size=1 &lt;&lt; 25,
+sparse_weights=False,
+force_fp32_output=False,
+strict_type_constraints=False,
+algorithm_selector=None,
+timing_cache=None,
+profiling_verbosity=None,</p>
+</div></blockquote>
+<p>)</p>
+</div></blockquote>
 <p><em>Common Errors:</em></p>
 <p>RuntimeError: Conversion of function xxx not currently supported!
 - This means we don’t have the support for this xxx operator. Please refer to section “How to add a missing op” below for further instructions.</p>

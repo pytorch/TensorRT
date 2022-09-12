@@ -59,7 +59,7 @@ Build configuration
             }
           ]
         }
-      ]  
+      ]
     }
 
 
