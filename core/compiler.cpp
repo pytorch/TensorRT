@@ -292,20 +292,7 @@ GraphAndMapping ConstructFallbackGraph(
       seg_block.update_graph(temp_g);
       AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
     } else {
-      if (seg_block.raw_nodes()[0]->kind() == torch::jit::prim::If) {
-        auto if_node = seg_block.raw_nodes()[0];
-
-        // convert the 2 blocks in prim::if and get the converted graph with mappings
-        std::vector<GraphAndMapping> graph_and_mappings;
-        for (auto cur_block : if_node->blocks()) {
-          graph_and_mappings.push_back(
-              ConstructFallbackGraph(new_mod, cur_block, example_tensor_map, cfg, static_params, fallback_nodes));
-        }
-        AddIfBlockToGraph(new_g, if_node, graph_and_mappings, old_to_new_g);
-
-      } else {
         AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
-      }
     }
   }
 
