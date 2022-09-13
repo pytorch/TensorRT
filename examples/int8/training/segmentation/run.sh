@@ -5,9 +5,9 @@
 # Download dataset
 
 DATA_DIR="${PWD}/data"
-NUM_EPOCHS=50
+NUM_EPOCHS=25
 
-BATCH=64
+BATCH=32
 
 if [[ ! -d "${DATA_DIR}/ADEChallengeData2016" ]]; then
    mkdir -p ${DATA_DIR}
@@ -21,7 +21,7 @@ fi
 
 
 # Train the model
-CUDA_VISIBLE_DEVICES=1 PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:32 python3 main.py \
+PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:32 python3 main.py \
   --data=${DATA_DIR} \
   --epochs=${NUM_EPOCHS} \
   --batch=${BATCH} \

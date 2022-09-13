@@ -1,12 +1,13 @@
 import os
-import torch
 from torch.utils.data import Dataset
 import numpy as np
 from PIL import Image
 import random
 
-SAMPLE_COUNT=5000
+SAMPLE_COUNT=20000
+VAL_COUNT = 500
 NUM_CLASSES = 150
+
 class SceneParsingDataset(Dataset):
     def __init__(self, image_dir, mask_dir, transform=None, training=True): 
         self.image_dir = image_dir
@@ -19,7 +20,7 @@ class SceneParsingDataset(Dataset):
             # ADE20K Dataset has ~20K training samples.
             self.images = imgs[:SAMPLE_COUNT]
         else:
-            self.images = imgs
+            self.images = imgs[:VAL_COUNT]
 
     def __len__(self):
         return len(self.images)
@@ -29,9 +30,9 @@ class SceneParsingDataset(Dataset):
         mask_path = os.path.join(self.mask_dir, self.images[index].replace(".jpg", ".png"))
 
         image = np.array(Image.open(image_path).convert("RGB"))
-        mask = np.array(Image.open(mask_path).convert("L"), dtype=np.float32)
+        mask = np.array(Image.open(mask_path).convert("L"))
 
-        mask = mask / NUM_CLASSES
+        # mask = mask / NUM_CLASSES
 
         img = None
         msk = None
@@ -39,4 +40,6 @@ class SceneParsingDataset(Dataset):
             transformed_data = self.transform(image=image, mask=mask)
             img = transformed_data["image"]
             msk = transformed_data["mask"]
+
+        msk[msk == 150] = 0
         return img, msk

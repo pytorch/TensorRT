@@ -1,6 +1,5 @@
 import torch
-import torchvision
-from dataset import SceneParsingDataset
+from dataset import NUM_CLASSES, SceneParsingDataset
 
 from torch.utils.data import DataLoader
 
@@ -59,37 +58,42 @@ def load_checkpoint(checkpoint, model):
 
 def compute_dice_score(pred, label):
     pred = (pred > THRESHOLD).float()
-    intersection = torch.sum(pred * label)
-    union = torch.sum(pred) + torch.sum(label)
-    score = (2. * intersection) / (union + EPSILON)
+    pred = torch.argmax(pred, dim=1)
+
+    correct = torch.sum(pred == label)
+    union = torch.sum(pred >= 0) + torch.sum(label)
+
+    score = (2.0 * correct) / (union + EPSILON)
     return score
+
+def get_loss_fn(training = False):
+    if training:
+        loss_fn = torch.nn.CrossEntropyLoss(reduction='mean')
+    else:
+        loss_fn = torch.nn.CrossEntropyLoss()
+    return loss_fn
 
 def check_accuracy(loader, model, device="cuda"):
     eval_loss = 0.0
-    loss_fn = CustomLoss()
+    loss_fn = get_loss_fn()
     dice_score = 0.0
 
     with torch.no_grad():
         for x, y in loader:
             x = x.to(device)
-            y = y.long().to(device).unsqueeze(dim=1)
+            y = y.to(device).long()
 
             pred = model(x)
-            loss = loss_fn(pred, y.float())
+            loss = loss_fn(pred, y)
+
+            # Reduction is set to None
+            loss = loss.mean()
+            
             eval_loss += loss.item() * x.size(0)
 
             dice_coef = compute_dice_score(pred.cpu(), y.cpu()).item()
-            dice_score += dice_coef * x.size(0)
+            # Computed over a batch
+            dice_score += dice_coef
 
-    print(f"Validation Loss: {eval_loss/len(loader.dataset):.4f}")
-    print(f"Dice score: {dice_score/len(loader.dataset):.4f}")
-
-class CustomLoss(torch.nn.Module):
-    def __init__(self):
-        super(CustomLoss, self).__init__()
-        self.bce = torch.nn.BCEWithLogitsLoss(reduction='mean')
-    
-    def forward(self, pred, label):
-        dice_score = compute_dice_score(pred, label)
-        bce_score = self.bce(pred, label)
-        return dice_score + bce_score
+    print(f"Avg Validation Loss: {eval_loss/len(loader.dataset):.4f}")
+    print(f"Avg Dice score: {dice_score/len(loader.dataset):.4f}")

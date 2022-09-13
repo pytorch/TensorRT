@@ -1,9 +1,9 @@
 import os
+import random
 import torch
-import numpy as np
 
 from model import VGG16Unet
-from torchvision.models import segmentation
+from dataset import NUM_CLASSES
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import torch.optim as optim
@@ -17,8 +17,8 @@ from utils import (
     load_checkpoint,
     save_checkpoint,
     check_accuracy,
-    CustomLoss,
-    compute_dice_score
+    compute_dice_score,
+    get_loss_fn
 )
 
 IMG_HEIGHT = 128
@@ -30,9 +30,16 @@ TRAIN_MASK_DIR = "ADEChallengeData2016/annotations/training"
 
 VAL_IMG_DIR = "ADEChallengeData2016/images/validation"
 VAL_MASK_DIR = "ADEChallengeData2016/annotations/validation"
+
+CKPT_DIR = "model_ckpt"
 CHECKPOINT_PREFIX = "vgg16_unet"
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+seed = random.randint(1, 100000)
+random.seed(seed)
+torch.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
 
 def train(loader, model, optimizer, loss_fn, scaler):
     pr_loop = tqdm(loader)
@@ -41,11 +48,14 @@ def train(loader, model, optimizer, loss_fn, scaler):
 
     for data, target in pr_loop:
         data = data.to(device=DEVICE)
-        target = target.to(device=DEVICE).unsqueeze(dim=1)
-        preds = model(data)
 
-        loss = loss_fn(preds, target.float())
-        dice = compute_dice_score(preds, target.float())
+        target = target.to(device=DEVICE).long()
+
+        preds = model(data)
+        loss = loss_fn(preds, target)
+
+        dice = compute_dice_score(preds, target)
+
         optimizer.zero_grad()        
         scaler.scale(loss).backward()
         scaler.step(optimizer)
@@ -101,7 +111,7 @@ def main():
     model = VGG16Unet().to(device=DEVICE)
 
     # Multi-class semantic segmentation
-    loss_fn = CustomLoss()
+    loss_fn = get_loss_fn(training=True)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     # Pick dataset root directory according as per user input if required
@@ -121,8 +131,8 @@ def main():
 
     epochs = 0
     ckpt_file = None
-    if args.load_model == True:
-        for ckpt in os.listdir():
+    if args.load_model == True and os.path.exists(CKPT_DIR):
+        for ckpt in os.listdir(CKPT_DIR):
             if ckpt.startswith(CHECKPOINT_PREFIX):
                 names = ckpt.split('_')
                 if names:
@@ -136,6 +146,9 @@ def main():
         
     scaler = torch.cuda.amp.GradScaler()    
     checkpoint = dict()
+    if not os.path.exists(CKPT_DIR):
+        os.makedirs(CKPT_DIR)
+
     for epoch in range(epochs, args.epochs):
         print(f"Epoch: {epoch}/{args.epochs}...")
         train_loss, dice_score = train(train_loader, model, optimizer, loss_fn, scaler)
@@ -146,8 +159,10 @@ def main():
                 "state_dict": model.state_dict(),
                 "optimizer": optimizer.state_dict(),
             }
-            save_checkpoint(checkpoint, CHECKPOINT_PREFIX + "_epoch_" + str(epoch) + ".pth.tar")
-    save_checkpoint(checkpoint, CHECKPOINT_PREFIX + "_epoch_" + str(args.epochs) + ".pth.tar")
+            ckpt_filename = CHECKPOINT_PREFIX + "_epoch_" + str(epoch) + ".pth.tar"
+            save_checkpoint(checkpoint, os.path.join(CKPT_DIR, ckpt_filename))
+    ckpt_filename = CHECKPOINT_PREFIX + "_epoch_" + str(args.epochs) + ".pth.tar"
+    save_checkpoint(checkpoint, os.path.join(CKPT_DIR, ckpt_filename))
     
     model.eval()
     # Check accuracy
@@ -155,7 +170,7 @@ def main():
 
     if args.export:
         mod = torch.jit.script(model)
-        torch.jit.save(mod, CHECKPOINT_PREFIX + ".jit.pt")
+        torch.jit.save(mod, "vgg16unet.jit.pt")
 
 if __name__ == "__main__":
     main()
