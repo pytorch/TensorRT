@@ -28,8 +28,8 @@ RELEASE = False
 
 CI_RELEASE = False
 
-__version__ = "1.2.0a0"
-__cuda_version__ = "11.3"
+__version__ = "1.2.0"
+__cuda_version__ = "11.6"
 __cudnn_version__ = "8.4"
 __tensorrt_version__ = "8.4"
 
@@ -376,7 +376,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        "torch>=1.12.0+cu113,<1.13.0",
+        "torch>=1.12.0+cu116,<1.13.0",
     ],
     setup_requires=[],
     cmdclass={

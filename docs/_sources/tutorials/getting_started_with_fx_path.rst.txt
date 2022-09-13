@@ -22,7 +22,7 @@ Converting a PyTorch Model to TensorRT Engine
 In general, users are welcome to use the ``compile()`` to finish the conversion from a model to tensorRT engine. It is a
 wrapper API that consists of the major steps needed to finish this converison. Please refer to an example usage in ``lower_example.py`` file under ``examples/fx``.
 
-.. code-block:: shell
+.. code-block:: python
 
     def compile(
         module: nn.Module,
@@ -37,7 +37,7 @@ wrapper API that consists of the major steps needed to finish this converison. P
         cuda_graph_batch_size=-1,
         dynamic_batch=True,
     ) -> nn.Module:
-    
+
         """
         Takes in original module, input and lowering setting, run lowering workflow to turn module
         into lowered module, or so called TRTModule.
@@ -64,7 +64,7 @@ Users can refer to ``fx2trt_example.py`` file in ``examples/fx``.
 * **Step 1: Trace the model with acc_tracer**
 Acc_tracer is a tracer inheritated from FX tracer. It comes with args normalizer to convert all args to kwargs and pass to TRT converters.
 
-.. code-block:: shell
+.. code-block:: python
 
    import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 
@@ -92,10 +92,10 @@ Explicit batch is the default mode and it must be set for dynamic shape. For mos
 
 For examples of the last path, if we have a 3D tensor t shaped as (batch, sequence, dimension), operations such as torch.transpose(0, 2). If any of these three are not satisfied, we’ll need to specify InputTensorSpec as inputs with dynamic range.
 
-c
+.. code-block:: python
 
-    import deeplearning.trt.fx2trt.converter.converters
-    from torch.fx.experimental.fx2trt.fx2trt import InputTensorSpec, TRTInterpreter
+    import torch_tensorrt.fx.converters
+    from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter
 
     # InputTensorSpec is a dataclass we use to store input information.
     # There're two ways we can build input_specs.
@@ -169,7 +169,7 @@ RuntimeError: Conversion of function xxx not currently supported!
 * **Step 3: Run the model**
 One way is using TRTModule, which is basically a PyTorch nn.Module.
 
-.. code-block:: shell
+.. code-block:: python
 
     from torch_tensorrt.fx import TRTModule
     mod = TRTModule(
@@ -192,13 +192,13 @@ Acc tracer is a custom FX symbolic tracer. It does a couple more things compare 
 1. there’re many ops that do similar things in PyTorch ops and builtin ops such like torch.add, builtin.add and torch.Tensor.add. Using acc tracer, we normalize these three ops to a single acc_ops.add. This helps reduce the number of converters we need to write.
 2. acc ops only have kwargs which makes writing converter easier as we don’t need to add additional logic to find arguments in args and kwargs.
 
-FX2TRT
+Torch-TensorRT FX Frontend
 --------
-After symbolic tracing, we have the graph representation of a PyTorch model. fx2trt leverages the power of fx.Interpreter. fx.Interpreter goes through the whole graph node by node and calls the function that node represents. fx2trt overrides the original behavior of calling the function with invoking corresponding converts for each node. Each converter function adds corresponding TensorRT layer(s).
+After symbolic tracing, we have the graph representation of a PyTorch model. The Torch-TensorRT FX Frontend leverages the power of fx.Interpreter. fx.Interpreter goes through the whole graph node by node and calls the function that node represents. fx2trt overrides the original behavior of calling the function with invoking corresponding converts for each node. Each converter function adds corresponding TensorRT layer(s).
 
 Below is an example of a converter function. The decorator is used to register this converter function with the corresponding node. In this example, we register this converter to a fx node whose target is acc_ops.sigmoid.
 
-.. code-block:: shell
+.. code-block:: python
 
     @tensorrt_converter(acc_ops.sigmoid)
     def acc_ops_sigmoid(network, target, args, kwargs, name):

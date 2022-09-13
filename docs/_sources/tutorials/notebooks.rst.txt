@@ -125,10 +125,10 @@ Accelerate Deep Learning Models using Quantization in Torch-TensorRT
 Model Quantization is a popular way of optimization which reduces the size of models thereby
 accelerating inference, also opening up the possibilities of deployments on devices with lower
 computation power such as Jetson. Simply put, quantization is a process of mapping input values
- from a larger set to output values in a smaller set. In this notebook, we illustrate the workflow
- that you can adopt while quantizing a deep learning model in Torch-TensorRT. The notebook takes
- you through an example of Mobilenetv2 for a classification task on a subset of Imagenet Dataset
- called Imagenette which has 10 classes.
+from a larger set to output values in a smaller set. In this notebook, we illustrate the workflow
+that you can adopt while quantizing a deep learning model in Torch-TensorRT. The notebook takes
+you through an example of Mobilenetv2 for a classification task on a subset of Imagenet Dataset
+called Imagenette which has 10 classes.
 
 * `Accelerate Deep Learning Models using Quantization in Torch-TensorRT <https://github.com/pytorch/TensorRT/blob/master/notebooks/qat-ptq-workflow.ipynb>`_
 
