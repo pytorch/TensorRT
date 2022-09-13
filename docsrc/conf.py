@@ -22,7 +22,7 @@ import torch_tensorrt
 # -- Project information -----------------------------------------------------
 
 project = "Torch-TensorRT"
-copyright = "2021, NVIDIA Corporation"
+copyright = "2022, NVIDIA Corporation"
 author = "NVIDIA Corporation"
 
 version = "master (" + torch_tensorrt.__version__ + ")"
@@ -134,7 +134,9 @@ html_theme_options = {
     "globaltoc_includehidden": True,
     "master_doc": True,
     "version_info": {
-        "master": "https://nvidia.github.io/Torch-TensorRT/",
+        "master": "https://pytorch.org/TensorRT/",
+        "v1.2.0": "https://pytorch.org/TensorRT/v1.2.0",
+        "v1.1.1": "https://nvidia.github.io/Torch-TensorRT/v1.1.1",
         "v1.1.0": "https://nvidia.github.io/Torch-TensorRT/v1.1.0/",
         "v1.0.0": "https://nvidia.github.io/Torch-TensorRT/v1.0.0/",
         "v0.4.1": "https://nvidia.github.io/Torch-TensorRT/v0.4.1/",
