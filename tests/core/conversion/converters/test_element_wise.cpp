@@ -312,10 +312,34 @@ TEST(Converters, ATenMaxConvertsCorrectly) {
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
 }
 
+TEST(Converters, ATenMaximumConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : Tensor = aten::maximum(%0, %1)
+        return (%2))IR";
+  pointwise_test_helper(graph, false);
+  pointwise_test_helper(graph, false, false, {3, 4}, {4});
+  pointwise_test_helper(graph, false, false, {4}, {3, 4});
+  pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
+  pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
+}
+
 TEST(Converters, ATenMinConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor, %1 : Tensor):
         %2 : Tensor = aten::min(%0, %1)
+        return (%2))IR";
+  pointwise_test_helper(graph, false);
+  pointwise_test_helper(graph, false, false, {3, 4}, {4});
+  pointwise_test_helper(graph, false, false, {4}, {3, 4});
+  pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
+  pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
+}
+
+TEST(Converters, ATenMinimumConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : Tensor = aten::minimum(%0, %1)
         return (%2))IR";
   pointwise_test_helper(graph, false);
   pointwise_test_helper(graph, false, false, {3, 4}, {4});
