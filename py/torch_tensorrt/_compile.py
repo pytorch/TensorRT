@@ -7,7 +7,6 @@ import torch.fx
 from enum import Enum
 
 import torch_tensorrt.fx
-import torch_tensorrt.fx.lower
 from torch_tensorrt.fx.utils import LowerPrecision
 
 
@@ -140,7 +139,7 @@ def compile(
         else:
             raise ValueError(f"Precision {enabled_precisions} not supported on FX")
 
-        return torch_tensorrt.fx.lower.compile(
+        return torch_tensorrt.fx.compile(
             module,
             inputs,
             lower_precision=lower_precision,

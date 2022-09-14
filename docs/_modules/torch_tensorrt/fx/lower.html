@@ -1,0 +1,897 @@
+
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>torch_tensorrt.fx.lower &mdash; Torch-TensorRT master documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!-- <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" /> -->
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/collapsible-lists/css/tree_view.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <!-- Google Analytics -->
+  
+  <!-- End Google Analytics -->
+  
+
+  
+  <script src="../../../_static/js/modernizr.min.js"></script>
+
+  <!-- Preload the theme fonts -->
+
+<link rel="preload" href="../../../_static/fonts/FreightSans/freight-sans-book.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/FreightSans/freight-sans-medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/IBMPlexMono/IBMPlexMono-Medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/FreightSans/freight-sans-bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/FreightSans/freight-sans-medium-italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/IBMPlexMono/IBMPlexMono-SemiBold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+
+<!-- Preload the katex fonts -->
+
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Math-Italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size1-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size4-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size2-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size3-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Caligraphic-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css" integrity="sha384-vSIIfh2YWi9wW0r9iZe7RJPrKwp6bG+s9QZMoITbCckVJqGCCRhc+ccxNcdpHuYu" crossorigin="anonymous">
+</head>
+
+<div class="container-fluid header-holder tutorials-header" id="header-holder">
+  <div class="container">
+    <div class="header-container">
+      <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+
+      <div class="main-menu">
+        <ul>
+          <li>
+            <a href="https://pytorch.org/get-started">Get Started</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/ecosystem">Ecosystem</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/mobile">Mobile</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/blog/">Blog</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/tutorials">Tutorials</a>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="resource-option with-down-orange-arrow">
+                Docs
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/docs/stable/index.html">
+                  <span class="dropdown-title">PyTorch</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/audio/stable/index.html">
+                  <span class="dropdown-title">torchaudio</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/text/stable/index.html">
+                  <span class="dropdown-title">torchtext</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/vision/stable/index.html">
+                  <span class="dropdown-title">torchvision</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchrec">
+                  <span class="dropdown-title">TorchRec</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/data">
+                  <span class="dropdown-title">TorchData</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/serve/">
+                  <span class="dropdown-title">TorchServe</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchx/">
+                  <span class="dropdown-title">TorchX</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/xla">
+                  <span class="dropdown-title">PyTorch on XLA Devices</span>
+                  <p></p>
+                </a>
+            </div>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="resource-option with-down-arrow">
+                Resources
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/features">
+                  <span class="dropdown-title">About</span>
+                  <p>Learn about PyTorch’s features and capabilities</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/#community-module">
+                  <span class="dropdown-title">Community</span>
+                  <p>Join the PyTorch developer community to contribute, learn, and get your questions answered.</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/resources">
+                  <span class="dropdown-title">Developer Resources</span>
+                  <p>Find resources and get questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://discuss.pytorch.org/" target="_blank">
+                  <span class="dropdown-title">Forums</span>
+                  <p>A place to discuss PyTorch code, issues, install, research</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/hub">
+                  <span class="dropdown-title">Models (Beta)</span>
+                  <p>Discover, publish, and reuse pre-trained models</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+            <a href="https://github.com/pytorch/pytorch">GitHub</a>
+          </li>
+        </ul>
+      </div>
+
+      <a class="main-menu-open-button" href="#" data-behavior="open-mobile-menu"></a>
+    </div>
+  </div>
+</div>
+
+<body class="pytorch-body">
+
+   
+
+    
+
+    <div class="table-of-contents-link-wrapper">
+      <span>Table of Contents</span>
+      <a href="#" class="toggle-table-of-contents" data-behavior="toggle-table-of-contents"></a>
+    </div>
+
+    <nav data-toggle="wy-nav-shift" class="pytorch-left-menu" id="pytorch-left-menu">
+      <div class="pytorch-side-scroll">
+        <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          <div class="pytorch-left-menu-search">
+            
+
+            
+              
+              
+                <div class="version">
+                  master (1.3.0a0+c096f31)
+                </div>
+              
+            
+
+            
+
+
+  
+
+
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search Docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+            
+          </div>
+
+          
+            
+            
+              
+            
+            
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/ptq.html">Post Training Quantization (PTQ)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/notebooks.html">Example notebooks</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/logging.html">torch_tensorrt.logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/ptq.html">torch_tensorrt.ptq</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/fx.html">torch_tensorrt.fx</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../cli/torchtrtc.html">torchtrtc</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/system_overview.html">System Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/writing_converters.html">Writing Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Indices</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <div class="pytorch-container">
+      <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
+        <div class="pytorch-breadcrumbs-wrapper">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="pytorch-breadcrumbs">
+    
+      <li>
+        <a href="../../../index.html">
+          
+            Docs
+          
+        </a> &gt;
+      </li>
+
+        
+          <li><a href="../../index.html">Module code</a> &gt;</li>
+        
+      <li>torch_tensorrt.fx.lower</li>
+    
+    
+      <li class="pytorch-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+</div>
+        </div>
+
+        <div class="pytorch-shortcuts-wrapper" id="pytorch-shortcuts-wrapper">
+          Shortcuts
+        </div>
+      </div>
+
+      <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
+        <div class="pytorch-content-left">
+
+        
+          
+          <div class="rst-content">
+          
+            <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
+             <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
+              
+  <h1>Source code for torch_tensorrt.fx.lower</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">dataclasses</span> <span class="k">as</span> <span class="nn">dc</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span>
+
+<span class="c1"># @manual=//deeplearning/trt/python:py_tensorrt</span>
+<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch.fx</span> <span class="k">as</span> <span class="nn">fx</span>
+<span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
+<span class="kn">from</span> <span class="nn">torch.fx.passes.splitter_base</span> <span class="kn">import</span> <span class="n">SplitResult</span>
+
+<span class="kn">from</span> <span class="nn">.fx2trt</span> <span class="kn">import</span> <span class="n">TRTInterpreter</span><span class="p">,</span> <span class="n">TRTInterpreterResult</span>
+<span class="kn">from</span> <span class="nn">.lower_setting</span> <span class="kn">import</span> <span class="n">LowerSetting</span>
+<span class="kn">from</span> <span class="nn">.passes.lower_pass_manager_builder</span> <span class="kn">import</span> <span class="n">LowerPassManagerBuilder</span>
+<span class="kn">from</span> <span class="nn">.passes.pass_utils</span> <span class="kn">import</span> <span class="n">decorate_method</span><span class="p">,</span> <span class="n">PassFunc</span><span class="p">,</span> <span class="n">validate_inference</span>
+<span class="kn">from</span> <span class="nn">.tools.timing_cache_utils</span> <span class="kn">import</span> <span class="n">TimingCacheManager</span>
+<span class="kn">from</span> <span class="nn">.tools.trt_splitter</span> <span class="kn">import</span> <span class="n">TRTSplitter</span><span class="p">,</span> <span class="n">TRTSplitterSetting</span>
+
+<span class="kn">from</span> <span class="nn">.tracer.acc_tracer</span> <span class="kn">import</span> <span class="n">acc_tracer</span>
+<span class="kn">from</span> <span class="nn">.trt_module</span> <span class="kn">import</span> <span class="n">TRTModule</span>
+<span class="kn">from</span> <span class="nn">.utils</span> <span class="kn">import</span> <span class="n">LowerPrecision</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">Input</span> <span class="o">=</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="compile"><a class="viewcode-back" href="../../../py_api/fx.html#torch_tensorrt.fx.compile">[docs]</a><span class="k">def</span> <span class="nf">compile</span><span class="p">(</span>
+    <span class="n">module</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
+    <span class="nb">input</span><span class="p">,</span>
+    <span class="n">max_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2048</span><span class="p">,</span>
+    <span class="n">max_workspace_size</span><span class="o">=</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">25</span><span class="p">,</span>
+    <span class="n">explicit_batch_dimension</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">lower_precision</span><span class="o">=</span><span class="n">LowerPrecision</span><span class="o">.</span><span class="n">FP16</span><span class="p">,</span>
+    <span class="n">verbose_log</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">timing_cache_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+    <span class="n">save_timing_cache</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">cuda_graph_batch_size</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">dynamic_batch</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Takes in original module, input and lowering setting, run lowering workflow to turn module</span>
+<span class="sd">    into lowered module, or so called TRTModule.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        module: Original module for lowering.</span>
+<span class="sd">        input: Input for module.</span>
+<span class="sd">        max_batch_size: Maximum batch size (must be &gt;= 1 to be set, 0 means not set)</span>
+<span class="sd">        max_workspace_size: Maximum size of workspace given to TensorRT.</span>
+<span class="sd">        explicit_batch_dimension: Use explicit batch dimension in TensorRT if set True, otherwise use implicit batch dimension.</span>
+<span class="sd">        lower_precision: lower_precision config given to TRTModule.</span>
+<span class="sd">        verbose_log: Enable verbose log for TensorRT if set True.</span>
+<span class="sd">        timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.</span>
+<span class="sd">        save_timing_cache: Update timing cache with current timing cache data if set to True.</span>
+<span class="sd">        cuda_graph_batch_size: Cuda graph batch size, default to be -1.</span>
+<span class="sd">        dynamic_batch: batch dimension (dim=0) is dynamic.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        A torch.nn.Module lowered by TensorRT.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">lower_setting</span> <span class="o">=</span> <span class="n">LowerSetting</span><span class="p">(</span>
+        <span class="n">max_batch_size</span><span class="o">=</span><span class="n">max_batch_size</span><span class="p">,</span>
+        <span class="n">max_workspace_size</span><span class="o">=</span><span class="n">max_workspace_size</span><span class="p">,</span>
+        <span class="n">explicit_batch_dimension</span><span class="o">=</span><span class="n">explicit_batch_dimension</span><span class="p">,</span>
+        <span class="n">lower_precision</span><span class="o">=</span><span class="n">lower_precision</span><span class="p">,</span>
+        <span class="n">verbose_log</span><span class="o">=</span><span class="n">verbose_log</span><span class="p">,</span>
+        <span class="n">timing_cache_prefix</span><span class="o">=</span><span class="n">timing_cache_prefix</span><span class="p">,</span>
+        <span class="n">save_timing_cache</span><span class="o">=</span><span class="n">save_timing_cache</span><span class="p">,</span>
+        <span class="n">cuda_graph_batch_size</span><span class="o">=</span><span class="n">cuda_graph_batch_size</span><span class="p">,</span>
+        <span class="n">dynamic_batch</span><span class="o">=</span><span class="n">dynamic_batch</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">lowerer</span> <span class="o">=</span> <span class="n">Lowerer</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">lower_setting</span><span class="o">=</span><span class="n">lower_setting</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">lowerer</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="nb">input</span><span class="p">)</span></div>
+
+
+<span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+<span class="k">class</span> <span class="nc">LowerTrtInterpreter</span><span class="p">:</span>
+    <span class="n">lower_setting</span><span class="p">:</span> <span class="n">LowerSetting</span>
+    <span class="n">timing_cache_manager</span><span class="p">:</span> <span class="n">TimingCacheManager</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">create</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">lower_setting</span><span class="p">):</span>
+        <span class="n">timing_cache_manager</span> <span class="o">=</span> <span class="n">TimingCacheManager</span><span class="p">(</span>
+            <span class="n">lower_setting</span><span class="o">.</span><span class="n">timing_cache_prefix</span><span class="p">,</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">save_timing_cache</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">LowerTrtInterpreter</span><span class="p">(</span><span class="n">lower_setting</span><span class="p">,</span> <span class="n">timing_cache_manager</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mod</span><span class="p">,</span> <span class="nb">input</span><span class="p">,</span> <span class="n">split_name</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TRTInterpreterResult</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">input_specs</span><span class="p">,</span> <span class="s2">&quot;Can&#39;t find input specs for lowering!&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;split_name=</span><span class="si">{</span><span class="n">split_name</span><span class="si">}</span><span class="s2">, input_specs=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">input_specs</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Prepare algorithm selector and timing_cache for TRTInterpreter</span>
+        <span class="n">algo_selector</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">algo_selector</span><span class="p">:</span>
+            <span class="n">algo_selector</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">algo_selector</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">split_name</span><span class="si">}</span><span class="s2">.json&quot;</span><span class="p">)</span>
+        <span class="n">cache_data</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">timing_cache_manager</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">cache_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">timing_cache_manager</span><span class="o">.</span><span class="n">get_timing_cache_trt</span><span class="p">(</span><span class="n">split_name</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot load timing cache for </span><span class="si">{</span><span class="n">split_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">cache_data</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="n">interpreter</span> <span class="o">=</span> <span class="n">TRTInterpreter</span><span class="p">(</span>
+            <span class="n">mod</span><span class="p">,</span>
+            <span class="n">input_specs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">input_specs</span><span class="p">,</span>
+            <span class="n">explicit_batch_dimension</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">explicit_batch_dimension</span><span class="p">,</span>
+            <span class="n">explicit_precision</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">explicit_precision</span><span class="p">,</span>
+            <span class="n">logger_level</span><span class="o">=</span><span class="n">trt</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">VERBOSE</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">verbose_log</span>
+            <span class="k">else</span> <span class="n">trt</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">WARNING</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">interp_result</span><span class="p">:</span> <span class="n">TRTInterpreterResult</span> <span class="o">=</span> <span class="n">interpreter</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="n">max_batch_size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">max_batch_size</span><span class="p">,</span>
+            <span class="n">max_workspace_size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">max_workspace_size</span><span class="p">,</span>
+            <span class="n">lower_precision</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">lower_precision</span><span class="p">,</span>
+            <span class="n">strict_type_constraints</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">strict_type_constraints</span><span class="p">,</span>
+            <span class="n">algorithm_selector</span><span class="o">=</span><span class="n">algo_selector</span><span class="p">,</span>
+            <span class="n">timing_cache</span><span class="o">=</span><span class="n">cache_data</span><span class="p">,</span>
+            <span class="n">profiling_verbosity</span><span class="o">=</span><span class="n">trt</span><span class="o">.</span><span class="n">ProfilingVerbosity</span><span class="o">.</span><span class="n">DETAILED</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">verbose_profile</span>
+            <span class="k">else</span> <span class="n">trt</span><span class="o">.</span><span class="n">ProfilingVerbosity</span><span class="o">.</span><span class="n">LAYER_NAMES_ONLY</span><span class="p">,</span>
+            <span class="n">tactic_sources</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">tactic_sources</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Update timing cache file if needed</span>
+        <span class="n">timing_cache</span> <span class="o">=</span> <span class="n">interp_result</span><span class="o">.</span><span class="n">serialized_cache</span>
+        <span class="k">if</span> <span class="n">timing_cache</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">timing_cache_manager</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">timing_cache_manager</span><span class="o">.</span><span class="n">update_timing_cache</span><span class="p">(</span><span class="n">split_name</span><span class="p">,</span> <span class="n">timing_cache</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">interp_result</span>
+
+
+<span class="k">def</span> <span class="nf">default_split_function</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">:</span> <span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">Input</span><span class="p">,</span> <span class="n">lower_setting</span><span class="p">:</span> <span class="n">LowerSetting</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SplitResult</span><span class="p">:</span>
+    <span class="n">splitter_setting</span> <span class="o">=</span> <span class="n">TRTSplitterSetting</span><span class="p">()</span>
+    <span class="n">splitter_setting</span><span class="o">.</span><span class="n">use_implicit_batch_dim</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">explicit_batch_dimension</span>
+    <span class="n">splitter_setting</span><span class="o">.</span><span class="n">min_acc_module_size</span> <span class="o">=</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">min_acc_module_size</span>
+    <span class="n">splitter</span> <span class="o">=</span> <span class="n">TRTSplitter</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">settings</span><span class="o">=</span><span class="n">splitter_setting</span><span class="p">)</span>
+    <span class="n">splitter</span><span class="o">.</span><span class="n">node_support_preview</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">splitter</span><span class="o">.</span><span class="n">generate_split_results</span><span class="p">()</span>
+
+
+<span class="k">def</span> <span class="nf">create_lower_trt_interpreter</span><span class="p">(</span><span class="n">lower_setting</span><span class="p">:</span> <span class="n">LowerSetting</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LowerTrtInterpreter</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">LowerTrtInterpreter</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">lower_setting</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">default_lower_pass</span><span class="p">(</span>
+    <span class="n">create_trt_interpreter</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">LowerSetting</span><span class="p">],</span> <span class="n">LowerTrtInterpreter</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PassFunc</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">lower_pass</span><span class="p">(</span>
+        <span class="n">mod</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">Input</span><span class="p">,</span> <span class="n">lower_setting</span><span class="p">:</span> <span class="n">LowerSetting</span><span class="p">,</span> <span class="n">module_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a module transformation pass which lowers an `fx.GraphModule` into a</span>
+<span class="sd">        `TRTModule`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">interpreter</span> <span class="o">=</span> <span class="n">create_trt_interpreter</span><span class="p">(</span><span class="n">lower_setting</span><span class="p">)</span>
+        <span class="n">interp_res</span><span class="p">:</span> <span class="n">TRTInterpreterResult</span> <span class="o">=</span> <span class="n">interpreter</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="nb">input</span><span class="p">,</span> <span class="n">module_name</span><span class="p">)</span>
+        <span class="n">trt_module</span> <span class="o">=</span> <span class="n">TRTModule</span><span class="p">(</span>
+            <span class="n">engine</span><span class="o">=</span><span class="n">interp_res</span><span class="o">.</span><span class="n">engine</span><span class="p">,</span>
+            <span class="n">input_names</span><span class="o">=</span><span class="n">interp_res</span><span class="o">.</span><span class="n">input_names</span><span class="p">,</span>
+            <span class="n">output_names</span><span class="o">=</span><span class="n">interp_res</span><span class="o">.</span><span class="n">output_names</span><span class="p">,</span>
+            <span class="n">cuda_graph_batch_size</span><span class="o">=</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">cuda_graph_batch_size</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">trt_module</span>
+
+    <span class="k">return</span> <span class="n">lower_pass</span>
+
+
+<span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">Lowerer</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Lowers a module using fx2trt.</span>
+
+<span class="sd">    This is a composable class to facilitate fx2trt. A normal fx2trt process</span>
+<span class="sd">    composes of the following passes to transform an `fx.GraphModule`:</span>
+
+<span class="sd">        1. trace - use torch.fx to trace the module so we can get the graph</span>
+<span class="sd">            representation of the model.</span>
+<span class="sd">        2. split - the graph module is split into several submodules,</span>
+<span class="sd">            running either via TensorRT, or via regular CUDA.</span>
+
+<span class="sd">    For each split that need to run via TRT, the following passes are</span>
+<span class="sd">    invoked:</span>
+
+<span class="sd">        3. `TRTInterpreter` - build the TRT engine for the submodule that</span>
+<span class="sd">            can be supported through `TRTInterpreter`.</span>
+<span class="sd">        4. Wraps the executable TRT engine into `TRTModule`, which is an `nn.Module`.</span>
+<span class="sd">        5. The converted submodule is then set back onto the top-level module</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">lower_pass_manager_builder</span><span class="p">:</span> <span class="n">LowerPassManagerBuilder</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">create</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">lower_setting</span><span class="p">:</span> <span class="n">LowerSetting</span><span class="p">,</span>
+        <span class="n">interpreter_builder</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="n">create_lower_trt_interpreter</span><span class="p">,</span>
+        <span class="n">split_func</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="n">default_split_function</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Lowerer&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Instantiate a `Lowerer` instance.&quot;&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">lower_pass_manager_builder</span><span class="o">=</span><span class="n">LowerPassManagerBuilder</span><span class="p">(</span>
+                <span class="n">lower_setting</span><span class="o">=</span><span class="n">lower_setting</span><span class="p">,</span>
+                <span class="n">trace_func</span><span class="o">=</span><span class="k">lambda</span> <span class="n">module</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">acc_tracer</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span>
+                    <span class="n">module</span><span class="p">,</span>
+                    <span class="n">inputs</span><span class="p">,</span>  <span class="c1"># type: ignore[arg-type]</span>
+                    <span class="n">ast_rewriter_allow_list</span><span class="o">=</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">ast_rewriter_allow_list</span><span class="p">,</span>
+                    <span class="n">leaf_module_list</span><span class="o">=</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">leaf_module_list</span><span class="p">,</span>
+                <span class="p">),</span>
+                <span class="n">split_func</span><span class="o">=</span><span class="n">split_func</span><span class="p">,</span>
+                <span class="n">lower_func</span><span class="o">=</span><span class="n">default_lower_pass</span><span class="p">(</span><span class="n">interpreter_builder</span><span class="p">),</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">module</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
+        <span class="n">inputs</span><span class="p">:</span> <span class="n">Input</span><span class="p">,</span>
+        <span class="n">additional_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Input</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
+        <span class="n">lower_setting</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_pass_manager_builder</span><span class="o">.</span><span class="n">lower_setting</span>
+        <span class="n">atol</span> <span class="o">=</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">correctness_atol</span>
+        <span class="n">rtol</span> <span class="o">=</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">correctness_rtol</span>
+
+        <span class="nd">@validate_inference</span><span class="p">(</span><span class="n">atol</span><span class="o">=</span><span class="n">atol</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="n">rtol</span><span class="p">)</span>
+        <span class="k">def</span> <span class="nf">do_lower</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">Input</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
+            <span class="n">module</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">lower_pass_manager_builder</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">lower_precision</span>
+                <span class="o">==</span> <span class="n">LowerPrecision</span><span class="o">.</span><span class="n">FP16</span>
+            <span class="p">):</span>
+                <span class="n">module</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>
+                <span class="n">inputs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+                    <span class="n">x</span><span class="o">.</span><span class="n">half</span><span class="p">()</span> <span class="k">if</span> <span class="n">x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">x</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span> <span class="k">else</span> <span class="n">x</span>
+                    <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">inputs</span>
+                <span class="p">)</span>
+            <span class="n">pm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_pass_manager_builder</span><span class="o">.</span><span class="n">build_trt_lower_pipeline</span><span class="p">(</span>
+                <span class="n">inputs</span><span class="p">,</span> <span class="n">additional_inputs</span>
+            <span class="p">)</span>
+            <span class="n">lower_result</span> <span class="o">=</span> <span class="n">pm</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">lower_result</span>
+
+        <span class="k">return</span> <span class="n">do_lower</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
+</pre></div>
+
+             </article>
+             
+            </div>
+            <footer>
+  
+
+  
+
+    <hr>
+
+  
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2022, NVIDIA Corporation.
+
+    </p>
+  </div>
+    
+      <div>
+        Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+      </div>
+     
+
+</footer>
+
+          </div>
+        </div>
+
+        <div class="pytorch-content-right" id="pytorch-content-right">
+          <div class="pytorch-right-menu" id="pytorch-right-menu">
+            <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
+              
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+  
+
+
+  
+
+     
+       <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+         <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+         <script src="../../../_static/jquery.js"></script>
+         <script src="../../../_static/underscore.js"></script>
+         <script src="../../../_static/doctools.js"></script>
+         <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
+         <script src="../../../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
+         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+     
+
+  
+
+  <script type="text/javascript" src="../../../_static/js/vendor/popper.min.js"></script>
+  <script type="text/javascript" src="../../../_static/js/vendor/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/1.5.0/list.min.js"></script>
+  <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+  <!-- Begin Footer -->
+
+  <div class="container-fluid docs-tutorials-resources" id="docs-tutorials-resources">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-4 text-center">
+          <h2>Docs</h2>
+          <p>Access comprehensive developer documentation for PyTorch</p>
+          <a class="with-right-arrow" href="https://pytorch.org/docs/stable/index.html">View Docs</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Tutorials</h2>
+          <p>Get in-depth tutorials for beginners and advanced developers</p>
+          <a class="with-right-arrow" href="https://pytorch.org/tutorials">View Tutorials</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Resources</h2>
+          <p>Find development resources and get your questions answered</p>
+          <a class="with-right-arrow" href="https://pytorch.org/resources">View Resources</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container footer-container">
+      <div class="footer-logo-wrapper">
+        <a href="https://pytorch.org/" class="footer-logo"></a>
+      </div>
+
+      <div class="footer-links-wrapper">
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/">PyTorch</a></li>
+            <li><a href="https://pytorch.org/get-started">Get Started</a></li>
+            <li><a href="https://pytorch.org/features">Features</a></li>
+            <li><a href="https://pytorch.org/ecosystem">Ecosystem</a></li>
+            <li><a href="https://pytorch.org/blog/">Blog</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/blob/master/CONTRIBUTING.md">Contributing</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/resources">Resources</a></li>
+            <li><a href="https://pytorch.org/tutorials">Tutorials</a></li>
+            <li><a href="https://pytorch.org/docs/stable/index.html">Docs</a></li>
+            <li><a href="https://discuss.pytorch.org" target="_blank">Discuss</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/issues" target="_blank">Github Issues</a></li>
+            <li><a href="https://pytorch.org/assets/brand-guidelines/PyTorch-Brand-Guidelines.pdf" target="_blank">Brand Guidelines</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title">Stay up to date</li>
+            <li><a href="https://www.facebook.com/pytorch" target="_blank">Facebook</a></li>
+            <li><a href="https://twitter.com/pytorch" target="_blank">Twitter</a></li>
+            <li><a href="https://www.youtube.com/pytorch" target="_blank">YouTube</a></li>
+            <li><a href="https://www.linkedin.com/company/pytorch" target="_blank">LinkedIn</a></li>
+          </ul>  
+          </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title">PyTorch Podcasts</li>
+            <li><a href="https://open.spotify.com/show/6UzHKeiy368jKfQMKKvJY5" target="_blank">Spotify</a></li>
+            <li><a href="https://podcasts.apple.com/us/podcast/pytorch-developer-podcast/id1566080008" target="_blank">Apple</a></li>
+            <li><a href="https://www.google.com/podcasts?feed=aHR0cHM6Ly9mZWVkcy5zaW1wbGVjYXN0LmNvbS9PQjVGa0lsOA%3D%3D" target="_blank">Google</a></li>
+            <li><a href="https://music.amazon.com/podcasts/7a4e6f0e-26c2-49e9-a478-41bd244197d0/PyTorch-Developer-Podcast?" target="_blank">Amazon</a></li>
+          </ul>
+         </div>
+        </div>
+        
+        <div class="privacy-policy">
+          <ul>
+            <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/terms/" target="_blank">Terms</a></li>
+            <li class="privacy-policy-links">|</li>
+            <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/privacy-policy/" target="_blank">Privacy</a></li>
+          </ul>
+        </div>
+        <div class="copyright">
+        <p>© Copyright The Linux Foundation. The PyTorch Foundation is a project of The Linux Foundation.
+          For web site terms of use, trademark policy and other policies applicable to The PyTorch Foundation please see
+          <a href="www.linuxfoundation.org/policies/">www.linuxfoundation.org/policies/</a>. The PyTorch Foundation supports the PyTorch open source
+          project, which has been established as PyTorch Project a Series of LF Projects, LLC. For policies applicable to the PyTorch Project a Series of LF Projects, LLC,
+          please see <a href="www.lfprojects.org/policies/">www.lfprojects.org/policies/</a>.</p>
+      </div>
+     </div>
+
+  </footer>
+
+  <div class="cookie-banner-wrapper">
+  <div class="container">
+    <p class="gdpr-notice">To analyze traffic and optimize your experience, we serve cookies on this site. By clicking or navigating, you agree to allow our usage of cookies. As the current maintainers of this site, Facebook’s Cookies Policy applies. Learn more, including about available controls: <a href="https://www.facebook.com/policies/cookies/">Cookies Policy</a>.</p>
+    <img class="close-button" src="../../../_static/images/pytorch-x.svg">
+  </div>
+</div>
+
+  <!-- End Footer -->
+
+  <!-- Begin Mobile Menu -->
+
+  <div class="mobile-main-menu">
+    <div class="container-fluid">
+      <div class="container">
+        <div class="mobile-main-menu-header-container">
+          <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+          <a class="main-menu-close-button" href="#" data-behavior="close-mobile-menu"></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-main-menu-links-container">
+      <div class="main-menu">
+        <ul>
+          <li>
+            <a href="https://pytorch.org/get-started">Get Started</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/ecosystem">Ecosystem</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/mobile">Mobile</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/hub">PyTorch Hub</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/blog/">Blog</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/tutorials">Tutorials</a>
+          </li>
+
+          <li class="resources-mobile-menu-title">
+            Docs
+          </li>
+
+          <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/docs/stable/index.html">PyTorch</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/audio/stable/index.html">torchaudio</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/text/stable/index.html">torchtext</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/vision/stable/index.html">torchvision</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/serve/">TorchServe</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/torchx/">TorchX</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/xla">PyTorch on XLA Devices</a>
+            </li>
+          </ul>
+
+          <li class="resources-mobile-menu-title">
+            Resources
+          </li>
+
+          <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/resources">Developer Resources</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/features">About</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/hub">Models (Beta)</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/#community-module">Community</a>
+            </li>
+
+            <li>
+              <a href="https://discuss.pytorch.org/">Forums</a>
+            </li>
+          </ul>
+
+          <li>
+            <a href="https://github.com/pytorch/pytorch">Github</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- End Mobile Menu -->
+
+  <script type="text/javascript" src="../../../_static/js/vendor/anchor.min.js"></script>
+
+  <script type="text/javascript">
+    $(document).ready(function() {
+      mobileMenu.bind();
+      mobileTOC.bind();
+      pytorchAnchors.bind();
+      sideMenus.bind();
+      scrollToAnchor.bind();
+      highlightNavigation.bind();
+      mainMenuDropdown.bind();
+      filterTags.bind();
+
+      // Add class to links that have code blocks, since we cannot create links in code blocks
+      $("article.pytorch-article a span.pre").each(function(e) {
+        $(this).closest("a").addClass("has-code");
+      });
+    })
+  </script>
+</body>
+</html>

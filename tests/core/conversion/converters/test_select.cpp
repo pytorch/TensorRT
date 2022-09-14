@@ -921,6 +921,37 @@ TEST(Converters, ATenIndexTensorNoneIdx0Idx1ConvertsCorrectly) {
       torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
 
+TEST(Converters, ATenIndexTensorIdxsNoneConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%x.1 : Tensor,
+            %index0 : Tensor,
+            %index1 : Tensor,
+            %index2 : Tensor):
+        %5 : NoneType = prim::Constant()
+        %18 : Tensor?[] = prim::ListConstruct(%index0, %index1, %index2, %5)
+        %19 : Tensor = aten::index(%x.1, %18)
+        return (%19))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in1 = at::randint(1, 10, {4, 8, 8, 4}, {at::kCUDA});
+  auto index0 = at::full({4, 13, 1}, 1, {at::kCUDA}).to(torch::kLong);
+  auto index1 = at::full({4, 13, 1}, 2, {at::kCUDA}).to(torch::kLong);
+  auto index2 = at::full({4, 13, 1}, 3, {at::kCUDA}).to(torch::kLong);
+  auto index0_trt = index0.to(torch::kInt32);
+  auto index1_trt = index1.to(torch::kInt32);
+  auto index2_trt = index2.to(torch::kInt32);
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, index0, index1, index2});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, index0_trt, index1_trt, index2_trt});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
 TEST(Converters, ATenUnbindConvertsCorrectly) {
   const auto graph = R"IR(
     graph(%x.1 : Tensor):

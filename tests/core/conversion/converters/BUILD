@@ -72,6 +72,10 @@ converter_test(
 )
 
 converter_test(
+    name = "test_max",
+)
+
+converter_test(
     name = "test_normalize",
 )
 
@@ -156,6 +160,7 @@ test_suite(
         ":test_linear",
         ":test_lstm_cell",
         ":test_matrix_multiply",
+        ":test_max",
         ":test_normalize",
         ":test_pooling",
         ":test_reduce",

@@ -365,7 +365,7 @@ class TensorFormat {
  * signifying a static input shape or a set of three input shapes representing
  * the min, optiminal and max input shapes allowed for the engine.
  */
-struct TORCHTRT_API Input : torch::CustomClassHolder {
+struct Input : torch::CustomClassHolder {
   /// Minimum acceptable input size into the engine
   std::vector<int64_t> min_shape;
   /// Optimal input size into the engine (size optimized for given kernels accept any size in min max range)
@@ -520,7 +520,7 @@ struct TORCHTRT_API Input : torch::CustomClassHolder {
  *
  * This struct can either hold a complex inputs of shape or a flattened one,
  */
-struct TORCHTRT_API GraphInputs {
+struct GraphInputs {
   torch::jit::IValue input_signature; // nested Input, full input spec
   std::vector<Input> inputs; // flatten input spec
 };
@@ -592,14 +592,14 @@ struct CompileSpec {
    *
    * @param inputs
    */
-  CompileSpec(std::vector<Input> inputs);
+  TORCHTRT_API CompileSpec(std::vector<Input> inputs);
 
   /**
    * @brief Construct a new Compile Spec  object from IValue which represents the nesting of input tensors for a module.
    *
    * @param input_signature
    */
-  CompileSpec(torch::jit::IValue input_signature);
+  TORCHTRT_API CompileSpec(torch::jit::IValue input_signature);
   // Defaults should reflect TensorRT defaults for BuilderConfig
 
   /**

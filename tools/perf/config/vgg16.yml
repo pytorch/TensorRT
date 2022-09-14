@@ -8,8 +8,9 @@ input:
     - 224
     - 224
   num_inputs: 1
+  batch_size: 1
 model:
-  filename: models/vgg16_traced.jit.pt
+  filename: models/vgg16_scripted.jit.pt
   name: vgg16
 runtime:
   device: 0

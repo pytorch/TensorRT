@@ -81,9 +81,6 @@ class TestAccuracy(unittest.TestCase):
             device=torch.device("cuda:0"),
         )
 
-        fp32_test_acc = compute_accuracy(self.testing_dataloader, self.model)
-        log(Level.Info, "[Pyt FP32] Test Acc: {:.2f}%".format(100 * fp32_test_acc))
-
         compile_spec = {
             "inputs": [torchtrt.Input([1, 3, 32, 32])],
             "enabled_precisions": {torch.float, torch.int8},
@@ -96,8 +93,11 @@ class TestAccuracy(unittest.TestCase):
                 "allow_gpu_fallback": False,
             },
         }
-
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
+
+        fp32_test_acc = compute_accuracy(self.testing_dataloader, self.model)
+        log(Level.Info, "[Pyt FP32] Test Acc: {:.2f}%".format(100 * fp32_test_acc))
+
         int8_test_acc = compute_accuracy(self.testing_dataloader, trt_mod)
         log(Level.Info, "[TRT INT8] Test Acc: {:.2f}%".format(100 * int8_test_acc))
         acc_diff = fp32_test_acc - int8_test_acc
