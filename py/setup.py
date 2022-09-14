@@ -428,8 +428,6 @@ setup(
             "include/torch_tensorrt/core/util/*.h",
             "include/torch_tensorrt/core/util/logging/*.h",
             "bin/*",
-            "BUILD",
-            "WORKSPACE",
         ],
     },
     exclude_package_data={
