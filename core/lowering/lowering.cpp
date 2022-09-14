@@ -25,7 +25,7 @@ void LowerBlock(torch::jit::Block* b) {
   DropUnusedNodes(b);
 }
 
-void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
+void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, std::vector<torch::jit::IValue>& params, LowerInfo lower_info) {
   torch::jit::EliminateRedundantGuards(g);
   torch::jit::RemoveListMutation(g);
   torch::jit::RemoveTensorMutation(g);
@@ -66,6 +66,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
   passes::SiluToSigmoidMultipication(g);
   passes::RemoveSingleUse0DTensors(g);
   passes::RemoveUnnecessaryCasts(g);
+  passes::RewriteInputsWithParams(g, params);
   LOG_GRAPH(*g);
 }
 
@@ -99,7 +100,7 @@ std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> L
   // In quantization aware trained (QAT) models, weights are passed through quantize and
   // dequantize nodes which should not be folded. So unfreeze_module is set to True for QAT models.
   LOG_GRAPH("Torch-TensorRT.TorchScript Graph Lowering");
-  lowering::LowerGraph(graph_and_ivalues.first, lower_info);
+  lowering::LowerGraph(graph_and_ivalues.first, graph_and_ivalues.second, lower_info);
 
   // Is this necessary?
   // lowering::LowerBlock(g->block());
