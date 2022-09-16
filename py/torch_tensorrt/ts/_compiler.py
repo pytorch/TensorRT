@@ -28,6 +28,7 @@ def compile(
     calibrator=None,
     truncate_long_and_double=False,
     require_full_compilation=False,
+    no_conversion=False,
     min_block_size=3,
     torch_executed_ops=[],
     torch_executed_modules=[],
@@ -91,6 +92,7 @@ def compile(
         truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
+        no_conversion (bool): Do not convert TensorRT convertible segments to TensorRT engines. Embed the convertible segments in the PyTorch graph as function calls
         min_block_size (int): The minimum number of contiguous TensorRT convertable operations in order to run a set of operations in TensorRT
         torch_executed_ops (List[str]): List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
         torch_executed_modules (List[str]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
@@ -130,6 +132,7 @@ def compile(
             "forced_fallback_ops": torch_executed_ops,
             "forced_fallback_modules": torch_executed_modules,
             "min_block_size": min_block_size,
+            "no_conversion": no_conversion,
         },
     }
 

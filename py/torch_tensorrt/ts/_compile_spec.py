@@ -178,6 +178,9 @@ def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> _ts_C.TorchFallback:
     else:
         assert isinstance(fallback_info["enabled"], bool)
         info.enabled = fallback_info["enabled"]
+    if "no_conversion" in fallback_info:
+        assert isinstance(fallback_info["no_conversion"], bool)
+        info.no_conversion = fallback_info["no_conversion"]
     if "min_block_size" in fallback_info:
         assert isinstance(fallback_info["min_block_size"], int)
         info.min_block_size = fallback_info["min_block_size"]
@@ -460,6 +463,7 @@ def TensorRTCompileSpec(
 
     torch_fallback = torch.classes.tensorrt._TorchFallback()
     torch_fallback._set_enabled(parsed_spec.torch_fallback.enabled)
+    torch_fallback._set_no_conversion(parsed_spec.no_conversion)
     torch_fallback._set_min_block_size(parsed_spec.torch_fallback.min_block_size)
     torch_fallback._set_forced_fallback_operators(
         parsed_spec.torch_fallback.forced_fallback_operators

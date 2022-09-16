@@ -22,6 +22,23 @@ size_t count_trt_engines_in_conditionals(std::shared_ptr<torch::jit::Graph> g) {
   return count;
 }
 
+size_t count_trt_engine_functions_in_conditionals(std::shared_ptr<torch::jit::Graph> g) {
+  size_t count = 0;
+  for (auto n : g->nodes()) {
+    if (n->kind() == torch::jit::prim::If) {
+      std::vector<torch::jit::Block*> blocks{n->blocks()[0], n->blocks()[1]};
+      for (auto cur_block : blocks) {
+        for (auto n : cur_block->nodes()) {
+          if (n->kind().toQualString() == std::string("prim::CallMethod")) {
+            ++count;
+          }
+        }
+      }
+    }
+  }
+  return count;
+}
+
 TEST(Partitioning, FallbackOnConditionalsCorrectly) {
   torch::jit::script::Module mod;
   try {
@@ -41,6 +58,28 @@ TEST(Partitioning, FallbackOnConditionalsCorrectly) {
   auto conditional_engines_count = count_trt_engines_in_conditionals(new_g);
 
   ASSERT_TRUE(conditional_engines_count == 2);
+}
+
+TEST(Partitioning, FallbackOnConditionalsCorrectlyNoConversion) {
+  torch::jit::script::Module mod;
+  try {
+    mod = torch::jit::load("external/torch-tensorrt-tests/modules/conditional_scripted.jit.pt");
+  } catch (const c10::Error& e) {
+    std::cerr << "error loading the model\n";
+    return;
+  }
+
+  std::vector<torch_tensorrt::core::ir::Input> inputs{torch_tensorrt::core::ir::Input({3, 3, 16, 16})};
+  auto g = mod.get_method("forward").graph();
+  torch_tensorrt::core::CompileSpec cfg(inputs);
+  cfg.partition_info.enabled = true;
+  cfg.partition_info.no_conversion = true;
+  torch::jit::script::Module new_mod = torch_tensorrt::core::CompileGraph(mod, cfg);
+  auto new_g = new_mod.get_method("forward").graph();
+  std::cout << *new_g << std::endl;
+  auto conditional_engines_count = count_trt_engine_functions_in_conditionals(new_g);
+
+  ASSERT_TRUE(conditional_engines_count == 1);
 }
 
 TEST(Partitioning, FallbackInplaceOPInConditionalsCorrectly) {

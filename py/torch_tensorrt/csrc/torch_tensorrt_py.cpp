@@ -366,6 +366,7 @@ PYBIND11_MODULE(_C, m) {
       .def(py::init<>())
       .def("__str__", &torch_tensorrt::pyapi::TorchFallback::to_str)
       .def_readwrite("enabled", &TorchFallback::enabled)
+      .def_readwrite("no_conversion", &TorchFallback::no_conversion)
       .def_readwrite("min_block_size", &TorchFallback::min_block_size)
       .def_readwrite("forced_fallback_operators", &TorchFallback::forced_fallback_operators)
       .def_readwrite("forced_fallback_modules", &TorchFallback::forced_fallback_modules);

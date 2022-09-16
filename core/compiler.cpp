@@ -168,6 +168,37 @@ void AddSegmentedBlockToGraph(
   return;
 }
 
+void AddSegmentedBlockToGraphAsFunction(
+    torch::jit::script::Module& new_mod,
+    std::shared_ptr<torch::jit::Graph>& g,
+    partitioning::SegmentedBlock& seg,
+    const std::string& function_name) {
+  auto method_self = seg.g()->insertInput(0, "self_1");
+  method_self->setType(new_mod.type());
+  auto engine_method = new_mod._ivalue()->compilation_unit()->create_function(function_name, seg.g());
+  auto schema = util::GenerateGraphSchema(engine_method->name(), seg.g());
+  std::vector<torch::jit::Value*> method_inputs;
+
+  auto self = g->insertInput(0, "self_1");
+  self->setType(new_mod.type());
+  method_inputs.push_back(self);
+
+  new_mod.type()->addMethod(engine_method);
+  engine_method->setSchema(schema);
+  for (size_t idx = 0UL; idx < seg.raw_inputs().size(); ++idx) {
+    auto in_val = g->addInput("input_" + std::to_string(idx));
+    in_val->setType(seg.raw_inputs()[idx]->type());
+    method_inputs.push_back(in_val);
+  }
+  auto function_call = g->create(at::prim::CallMethod, method_inputs, seg.raw_outputs().size());
+  function_call->s_(at::attr::name, function_name);
+  g->appendNode(function_call);
+
+  for (auto out : function_call->outputs()) {
+    g->registerOutput(out);
+  }
+}
+
 typedef std::pair<std::shared_ptr<torch::jit::Graph>, std::unordered_map<torch::jit::Value*, torch::jit::Value*>>
     GraphAndMapping;
 
@@ -245,25 +276,33 @@ GraphAndMapping ConstructFallbackGraph(
     trt_engine_id << reinterpret_cast<const int*>(&seg_block);
 
     if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
-      auto shapes = seg_block.in_shapes();
-      auto types = seg_block.in_types();
-      std::vector<ir::Input> inputs;
-      for (size_t i = 0; i < shapes.size(); i++) {
-        auto in = ir::Input(shapes[i]);
-        in.dtype = util::ScalarTypeToTRTDataType(types[i]);
-        inputs.push_back(in);
+      if (partition_info.no_conversion) {
+        // Embed a method call for each segment which would be converted to a TRT engine in the standard flow
+        auto temp_g = std::make_shared<torch::jit::Graph>();
+        AddSegmentedBlockToGraphAsFunction(
+            new_mod, temp_g, seg_block, "trt_engine_" + trt_engine_id.str());
+        seg_block.update_graph(temp_g);
+      } else {
+        auto shapes = seg_block.in_shapes();
+        auto types = seg_block.in_types();
+        std::vector<ir::Input> inputs;
+        for (size_t i = 0; i < shapes.size(); i++) {
+          auto in = ir::Input(shapes[i]);
+          in.dtype = util::ScalarTypeToTRTDataType(types[i]);
+          inputs.push_back(in);
+        }
+        // update the input ranges for each segments
+        convert_cfg.inputs = ir::associate_specs_with_inputs(seg_block.g(), inputs, static_params);
+
+        // TODO mapping Inputs Ivalue to flatten one here
+        auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, static_params);
+        auto temp_g = std::make_shared<torch::jit::Graph>();
+        auto device_spec = convert_cfg.engine_settings.device;
+        auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
+        AddEngineToGraph(new_mod, temp_g, engine, cuda_device, trt_engine_id.str(), true);
+
+        seg_block.update_graph(temp_g);
       }
-      // update the input ranges for each segments
-      convert_cfg.inputs = ir::associate_specs_with_inputs(seg_block.g(), inputs, static_params);
-
-      // TODO mapping Inputs Ivalue to flatten one here
-      auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, static_params);
-      auto temp_g = std::make_shared<torch::jit::Graph>();
-      auto device_spec = convert_cfg.engine_settings.device;
-      auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
-      AddEngineToGraph(new_mod, temp_g, engine, cuda_device, trt_engine_id.str(), true);
-
-      seg_block.update_graph(temp_g);
       AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
     } else {
       if (seg_block.raw_nodes()[0]->kind() == torch::jit::prim::If) {
@@ -434,7 +473,7 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
       if (cfg.partition_info.enabled &&
           (!(cfg.lower_info.forced_fallback_modules.size() == 0 &&
              cfg.partition_info.forced_fallback_operators.size() == 0 && isBlockConvertible) ||
-           outputIsCollection)) {
+           outputIsCollection || cfg.partition_info.no_conversion)) {
         std::unordered_map<torch::jit::Node*, int> fallback_nodes;
         auto collection_input_ivalues_map =
             partitioning::generateRandomInputs(cfg.convert_info.collection_input_spec_map, first_use_types);

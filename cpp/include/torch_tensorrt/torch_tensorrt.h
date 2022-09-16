@@ -688,6 +688,12 @@ struct CompileSpec {
   bool require_full_compilation = false;
 
   /**
+   * Do not convert TensorRT convertible partitions to engines. Instead embed them in the PyTorch graph as function
+   * calls
+   */
+  bool no_conversion = false;
+
+  /**
    * Minimum number of contiguous supported operators to compile a subgraph to TensorRT
    */
   uint64_t min_block_size = 3;

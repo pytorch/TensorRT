@@ -96,12 +96,14 @@ nvinfer1::DeviceType toTRTDeviceType(DeviceType value);
 
 struct TorchFallback : torch::CustomClassHolder {
   bool enabled;
+  bool no_conversion;
   int64_t min_block_size;
   std::vector<std::string> forced_fallback_operators;
   std::vector<std::string> forced_fallback_modules;
   TorchFallback() : enabled(false), min_block_size(1) {}
 
   ADD_FIELD_GET_SET(enabled, bool);
+  ADD_FIELD_GET_SET(no_conversion, bool);
   ADD_FIELD_GET_SET(min_block_size, int64_t);
   ADD_FIELD_GET_SET(forced_fallback_operators, std::vector<std::string>);
   ADD_FIELD_GET_SET(forced_fallback_modules, std::vector<std::string>);

@@ -315,6 +315,7 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.convert_info.engine_settings.device.allow_gpu_fallback = device.allow_gpu_fallback;
   info.partition_info.enabled = torch_fallback.enabled;
   info.partition_info.min_block_size = torch_fallback.min_block_size;
+  info.partition_info.no_conversion = torch_fallback.no_conversion;
   info.partition_info.forced_fallback_operators = torch_fallback.forced_fallback_operators;
   info.partition_info.truncate_long_and_double = truncate_long_and_double;
   info.lower_info.forced_fallback_modules = torch_fallback.forced_fallback_modules;

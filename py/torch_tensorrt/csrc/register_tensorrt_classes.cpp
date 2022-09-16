@@ -53,6 +53,7 @@ void RegisterTRTCompileSpec() {
 
   ADD_FIELD_GET_SET_REGISTRATION(TRTFallbackTSRegistration, torch_tensorrt::pyapi::TorchFallback, enabled);
   ADD_FIELD_GET_SET_REGISTRATION(TRTFallbackTSRegistration, torch_tensorrt::pyapi::TorchFallback, min_block_size);
+  ADD_FIELD_GET_SET_REGISTRATION(TRTFallbackTSRegistration, torch_tensorrt::pyapi::TorchFallback, no_conversion);
   ADD_FIELD_GET_SET_REGISTRATION(
       TRTFallbackTSRegistration, torch_tensorrt::pyapi::TorchFallback, forced_fallback_operators);
   ADD_FIELD_GET_SET_REGISTRATION(
