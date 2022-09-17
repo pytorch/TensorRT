@@ -279,8 +279,7 @@ GraphAndMapping ConstructFallbackGraph(
       if (partition_info.no_conversion) {
         // Embed a method call for each segment which would be converted to a TRT engine in the standard flow
         auto temp_g = std::make_shared<torch::jit::Graph>();
-        AddSegmentedBlockToGraphAsFunction(
-            new_mod, temp_g, seg_block, "trt_engine_" + trt_engine_id.str());
+        AddSegmentedBlockToGraphAsFunction(new_mod, temp_g, seg_block, "trt_engine_" + trt_engine_id.str());
         seg_block.update_graph(temp_g);
       } else {
         auto shapes = seg_block.in_shapes();
