@@ -73,15 +73,7 @@ RUN pip3 install *.whl && rm -fr /workspace/torch_tensorrt/py/dist/* *.whl
 RUN pip install nvidia-pyindex
 RUN pip install nvidia-tensorrt
 
-# Install torchbench and it's dependencies
-RUN apt install -y git-lfs
-RUN pip3 install torchtext
-RUN git clone https://github.com/pytorch/benchmark.git && \
-    cd benchmark && \
-    pip3 install -r requirements.txt && \
-    python3.8 install.py
-
-# WORKDIR /opt/torch_tensorrt
+WORKDIR /opt/torch_tensorrt
 ENV LD_LIBRARY_PATH /usr/local/lib/python3.8/dist-packages/torch/lib:/usr/local/lib/python3.8/dist-packages/torch_tensorrt/lib:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
 ENV PATH /usr/local/lib/python3.8/dist-packages/torch_tensorrt/bin:${PATH}
 
