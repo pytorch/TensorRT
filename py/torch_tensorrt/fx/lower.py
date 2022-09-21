@@ -86,7 +86,9 @@ class LowerTrtInterpreter:
 
     def __call__(self, mod, input, split_name) -> TRTInterpreterResult:
         assert self.lower_setting.input_specs, "Can't find input specs for lowering!"
-        logger.info(f"{split_name=} {self.lower_setting.input_specs=}")
+        logger.info(
+            f"split_name={split_name}, input_specs={self.lower_setting.input_specs}"
+        )
 
         # Prepare algorithm selector and timing_cache for TRTInterpreter
         algo_selector = None

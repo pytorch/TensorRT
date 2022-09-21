@@ -49,6 +49,21 @@ auto abs_registration TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern
        }
      }});
 
+auto reciprocal_registration TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
+    {"aten::reciprocal(Tensor self) -> Tensor", [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+       auto in = args[0].ITensorOrFreeze(ctx);
+       if (in->getType() == nvinfer1::DataType::kINT32) {
+         // pytorch implicitly casts to float for aten::reciprocal(int)
+         in = castITensor(ctx, in, nvinfer1::DataType::kFLOAT);
+       }
+       auto unary_layer = ctx->net->addUnary(*in, nvinfer1::UnaryOperation::kRECIP);
+       TORCHTRT_CHECK(unary_layer, "Unable to create recip layer from node: " << *n);
+       unary_layer->setName(util::node_info(n).c_str());
+       auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], unary_layer->getOutput(0));
+       LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+       return true;
+     }});
+
 #define convert(unary, trt_type)                                                               \
   auto unary##_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(       \
       {"aten::" #unary "(Tensor self) -> Tensor",                                              \
@@ -74,7 +89,6 @@ convert(sinh, kSINH);
 convert(tan, kTAN);
 convert(atan, kATAN);
 convert(floor, kFLOOR);
-convert(reciprocal, kRECIP);
 convert(log, kLOG);
 convert(ceil, kCEIL);
 convert(sqrt, kSQRT);

@@ -168,7 +168,7 @@ void GetSegmentsOutputByRunning(
       }
       if (cur_ivalue.toTensor().sizes().size() == 0) {
         // handle Scalar types, which has sizes of []
-        input_shapes.push_back(util::toVec(util::toDims(c10::List<long int>({1}))));
+        input_shapes.push_back(util::toVec(util::toDims(c10::List<int64_t>({1}))));
       } else {
         input_shapes.push_back(util::toVec(util::toDims(cur_ivalue.toTensor().sizes())));
       }

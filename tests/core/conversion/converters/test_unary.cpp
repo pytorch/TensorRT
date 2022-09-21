@@ -31,6 +31,22 @@ TEST(Converters, ATenAbsIntConvertsCorrectly) {
   ASSERT_TRUE(torch_tensorrt::tests::util::exactlyEqual(jit_results[0], trt_results[0]));
 }
 
+TEST(Converters, ATenReciprocalIntConvertsCorrectly) {
+  const auto graph = gen_test_graph("reciprocal");
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::tensor({-1, 1, -2, 2, -3, 3}, {at::kCUDA}).to(torch::kInt32);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
+
+  in = at::clone(in);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::exactlyEqual(jit_results[0], trt_results[0]));
+}
+
 #define test_unary(unary, name)                                                                  \
   TEST(Converters, ATen##name##ConvertsCorrectly) {                                              \
     const auto graph = gen_test_graph(#unary);                                                   \

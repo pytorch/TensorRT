@@ -35,7 +35,7 @@ bool unload_library(void* custom_lib) {
   bool success = false;
 #if defined(_WIN32)
   // Returns status non-zero for success
-  success = FreeLibrary(custom_lib) ? true : false;
+  success = FreeLibrary((HMODULE)custom_lib) ? true : false;
 #else
   success = dlclose(custom_lib) ? false : true;
 #endif

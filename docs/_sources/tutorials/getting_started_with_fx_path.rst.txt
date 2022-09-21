@@ -20,7 +20,43 @@ user want to use this tool and we will introduce them here.
 Converting a PyTorch Model to TensorRT Engine
 ---------------------------------------------
 In general, users are welcome to use the ``compile()`` to finish the conversion from a model to tensorRT engine. It is a
-wrapper API that consists of the major steps needed to finish this converison. Please refer to ``lower_example.py`` file in ``examples/fx``.
+wrapper API that consists of the major steps needed to finish this converison. Please refer to an example usage in ``lower_example.py`` file under ``examples/fx``.
+
+.. code-block:: shell
+
+    def compile(
+        module: nn.Module,
+        input,
+        max_batch_size=2048,
+        max_workspace_size=33554432,
+        explicit_batch_dimension=False,
+        lower_precision=LowerPrecision.FP16,
+        verbose_log=False,
+        timing_cache_prefix="",
+        save_timing_cache=False,
+        cuda_graph_batch_size=-1,
+        dynamic_batch=True,
+    ) -> nn.Module:
+
+        """
+        Takes in original module, input and lowering setting, run lowering workflow to turn module
+        into lowered module, or so called TRTModule.
+
+        Args:
+            module: Original module for lowering.
+            input: Input for module.
+            max_batch_size: Maximum batch size (must be >= 1 to be set, 0 means not set)
+            max_workspace_size: Maximum size of workspace given to TensorRT.
+            explicit_batch_dimension: Use explicit batch dimension in TensorRT if set True, otherwise use implicit batch dimension.
+            lower_precision: lower_precision config given to TRTModule.
+            verbose_log: Enable verbose log for TensorRT if set True.
+            timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.
+            save_timing_cache: Update timing cache with current timing cache data if set to True.
+            cuda_graph_batch_size: Cuda graph batch size, default to be -1.
+            dynamic_batch: batch dimension (dim=0) is dynamic.
+        Returns:
+            A torch.nn.Module lowered by TensorRT.
+        """
 
 In this section, we will go through an example to illustrate the major steps that fx path uses.
 Users can refer to ``fx2trt_example.py`` file in ``examples/fx``.
@@ -56,7 +92,7 @@ Explicit batch is the default mode and it must be set for dynamic shape. For mos
 
 For examples of the last path, if we have a 3D tensor t shaped as (batch, sequence, dimension), operations such as torch.transpose(0, 2). If any of these three are not satisfied, we’ll need to specify InputTensorSpec as inputs with dynamic range.
 
-.. code-block:: shell
+c
 
     import deeplearning.trt.fx2trt.converter.converters
     from torch.fx.experimental.fx2trt.fx2trt import InputTensorSpec, TRTInterpreter
