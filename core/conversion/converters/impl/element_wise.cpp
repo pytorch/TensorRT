@@ -828,6 +828,9 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                // Quadrant correction is only needed when (other < 0) (elementwise)
                // In this scenario, the correction is +/- pi, depending on the sign of self (elementwise)
 
+               // Full atan2 Formula is given by:
+               // atan2(self, other) = atan(self / other) - (other < 0) * (2 * (other > 0) + 1) * pi
+
                // Mask of (other < 0)
                auto other_mask = add_elementwise(
                    ctx,
