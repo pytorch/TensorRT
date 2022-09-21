@@ -1,3 +1,4 @@
+#include <math.h>
 #include <torch/torch.h>
 #include "core/conversion/converters/converter_util.h"
 #include "core/conversion/converters/converters.h"
@@ -803,6 +804,90 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], or_op->getOutput(0));
 
                LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+               return true;
+             }})
+        .pattern(
+            {"aten::atan2(Tensor self, Tensor other) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               // Element-wise divide input Tensors, apply atan unary, apply quadrant correction
+               auto self = args[0].ITensorOrFreeze(ctx);
+               auto other = args[1].ITensorOrFreeze(ctx);
+
+               // atan(self / other)
+               auto intermediate_div = add_elementwise(
+                   ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n) + "_intermediate_div");
+               auto atan2_intermediate =
+                   ctx->net->addUnary(*intermediate_div->getOutput(0), nvinfer1::UnaryOperation::kATAN);
+
+               // Constant tensors used for quadrant correction
+               auto ZERO = tensor_to_const(ctx, torch::tensor({0.}));
+               auto ONE = tensor_to_const(ctx, torch::tensor({1.}));
+               auto TWO = tensor_to_const(ctx, torch::tensor({2.}));
+               auto PI = tensor_to_const(ctx, torch::tensor({M_PI}));
+
+               // Quadrant correction is only needed when (other < 0) (elementwise)
+               // In this scenario, the correction is +/- pi, depending on the sign of self (elementwise)
+
+               // Mask of (other < 0)
+               auto other_mask = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kLESS,
+                   other,
+                   ZERO,
+                   util::node_info(n) + "_less_than_zero_other_mask");
+
+               // Mask of (self > 0)
+               auto self_mask = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kGREATER,
+                   self,
+                   ZERO,
+                   util::node_info(n) + "_greater_than_zero_self_mask");
+
+               // Apply 2 * x - 1 to translate mask from {0, 1} to {-1, 1}
+               self_mask = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kPROD,
+                   self_mask->getOutput(0),
+                   TWO,
+                   util::node_info(n) + "_greater_than_zero_times_two_self_mask");
+               self_mask = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kSUB,
+                   self_mask->getOutput(0),
+                   ONE,
+                   util::node_info(n) + "_greater_than_zero_normalized_self_mask");
+
+               // Multiply mask by pi
+               self_mask = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kPROD,
+                   self_mask->getOutput(0),
+                   PI,
+                   util::node_info(n) + "_greater_than_zero_times_pi_self_mask");
+
+               // Take product of masks to generate correction term
+               auto correction_term = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kPROD,
+                   other_mask->getOutput(0),
+                   self_mask->getOutput(0),
+                   util::node_info(n) + "_correction_term");
+
+               // Add correction term to atan(self/other) to obtain atan2(self, other)
+               auto atan2 = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kSUM,
+                   atan2_intermediate->getOutput(0),
+                   correction_term->getOutput(0),
+                   util::node_info(n) + "_corrected_atan2");
+
+               TORCHTRT_CHECK(atan2, "Unable to create atan2 layer from node: " << *n);
+
+               atan2->setName(util::node_info(n).c_str());
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], atan2->getOutput(0));
+
+               LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
                return true;
              }});
 
