@@ -9,7 +9,7 @@ namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
-void AddSegmentedBlockToGraph(
+void addSegmentedBlockToGraph(
     std::shared_ptr<torch::jit::Graph>& g,
     partitioning::SegmentedBlock& seg,
     std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new_g) {
@@ -49,7 +49,7 @@ void AddSegmentedBlockToGraph(
   return;
 }
 
-void AddIfBlockToGraph(
+void addIfBlockToGraph(
     std::shared_ptr<torch::jit::Graph>& new_g,
     torch::jit::Node* if_node,
     const std::vector<GraphAndMapping>& graph_and_mappings,
@@ -97,7 +97,7 @@ void AddIfBlockToGraph(
   return;
 }
 
-GraphAndMapping Stitch(PartitioningCtx* ctx, torch::jit::Block* block) {
+GraphAndMapping stitch(PartitioningCtx* ctx, torch::jit::Block* block) {
   auto new_g = std::make_shared<torch::jit::Graph>();
 
   // the mapping from lowering graph => fallback global graph
@@ -109,7 +109,7 @@ GraphAndMapping Stitch(PartitioningCtx* ctx, torch::jit::Block* block) {
   for (auto seg_block : ctx->partitioned_blocks[block]) {
     LOG_INFO("Block segment:" << seg_block);
     if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
-      AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
+      addSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
     } else {
       if (seg_block.raw_nodes()[0]->kind() == torch::jit::prim::If) {
         auto if_node = seg_block.raw_nodes()[0];
@@ -117,12 +117,12 @@ GraphAndMapping Stitch(PartitioningCtx* ctx, torch::jit::Block* block) {
         // convert the 2 blocks in prim::if and get the converted graph with mappings
         std::vector<GraphAndMapping> graph_and_mappings;
         for (auto cur_block : if_node->blocks()) {
-          graph_and_mappings.push_back(Stitch(ctx, cur_block));
+          graph_and_mappings.push_back(stitch(ctx, cur_block));
         }
-        AddIfBlockToGraph(new_g, if_node, graph_and_mappings, old_to_new_g);
+        addIfBlockToGraph(new_g, if_node, graph_and_mappings, old_to_new_g);
 
       } else {
-        AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
+        addSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
       }
     }
   }

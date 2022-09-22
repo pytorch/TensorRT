@@ -29,7 +29,7 @@ bool containNonTensorOutputs(torch::jit::Node* n) {
 }
 
 // Check if the inputs and outputs of the graph are Tensor. If not, then fallback connected nodes
-void SetInputsOutputsConnectedNodes(PartitioningCtx* ctx, torch::jit::Block* block) {
+void setInputsOutputsConnectedNodes(PartitioningCtx* ctx, torch::jit::Block* block) {
   // fallback nodes that produce entire graph's nonTensor output
   for (auto i : block->outputs()) {
     if (!isTensor(i)) {
@@ -50,7 +50,7 @@ void SetInputsOutputsConnectedNodes(PartitioningCtx* ctx, torch::jit::Block* blo
 // Find and set all explicit fallback nodes (nodes that are unsupported or forced fallback)
 // we use a map to indicate the reason why it's fallback to torch
 // For any node that's not explicitly fallback, we set it to run in TensorRT for now
-void SetExplicitFallbackNodes(PartitioningCtx* ctx, torch::jit::Block* block) {
+void setExplicitFallbackNodes(PartitioningCtx* ctx, torch::jit::Block* block) {
   auto nodes = block->nodes();
   const auto to_compile_sym = c10::Symbol::attr("to_compile");
 
@@ -78,7 +78,7 @@ void SetExplicitFallbackNodes(PartitioningCtx* ctx, torch::jit::Block* block) {
 
 // For a given set of fallback nodes, check their inputs/outputs, if any inputs/outputs of them are NonTensor,
 // then the nodes that produces/consumes those values should also fallback
-void SetNonTensorConnectedNodes(PartitioningCtx* ctx, std::vector<torch::jit::Node*>& initial_fallback_nodes) {
+void setNonTensorConnectedNodes(PartitioningCtx* ctx, std::vector<torch::jit::Node*>& initial_fallback_nodes) {
   // initial_fallback_nodes are the fallback nodes that we have before we run BFS in this function
   std::queue<torch::jit::Node*> q;
   for (auto& node : initial_fallback_nodes) {
@@ -112,7 +112,7 @@ void SetNonTensorConnectedNodes(PartitioningCtx* ctx, std::vector<torch::jit::No
 }
 
 // Sub-function that traverses the entire block and check if TensorRT node sequence satisfy min_block_size
-std::vector<torch::jit::Node*> TraverseNodesForMinBlockSize(PartitioningCtx* ctx, torch::jit::Block* block) {
+std::vector<torch::jit::Node*> traverseNodesForMinBlockSize(PartitioningCtx* ctx, torch::jit::Block* block) {
   auto nodes = block->nodes();
   std::vector<torch::jit::Node*> cur_trt_nodes;
   std::vector<torch::jit::Node*> min_block_fallback_nodes;
@@ -138,9 +138,9 @@ std::vector<torch::jit::Node*> TraverseNodesForMinBlockSize(PartitioningCtx* ctx
 }
 
 // Set the nodes that fallback because of min_block_size
-void SetMinBlockFallbackNodes(PartitioningCtx* ctx, torch::jit::Block* block) {
+void setMinBlockFallbackNodes(PartitioningCtx* ctx, torch::jit::Block* block) {
   // first traverse all the nodes to find the initial nodes that don't meet the min_block_size requirement
-  auto min_block_fallback_nodes = TraverseNodesForMinBlockSize(ctx, block);
+  auto min_block_fallback_nodes = traverseNodesForMinBlockSize(ctx, block);
 
   // keep fallback until all segments meet the min_block_size requirement
   while (!min_block_fallback_nodes.empty()) {
@@ -148,9 +148,9 @@ void SetMinBlockFallbackNodes(PartitioningCtx* ctx, torch::jit::Block* block) {
       ctx->setNodeExecutorDecision(i, NodeExecutorDecision::kMIN_BLOCK_FALLBACK);
     }
     // find the fallback nodes because of dependency with min_block_size caused fallback nodes
-    SetNonTensorConnectedNodes(ctx, min_block_fallback_nodes);
+    setNonTensorConnectedNodes(ctx, min_block_fallback_nodes);
     // keep traverse the graph until there is no node fallback because of min_block_size
-    min_block_fallback_nodes = TraverseNodesForMinBlockSize(ctx, block);
+    min_block_fallback_nodes = traverseNodesForMinBlockSize(ctx, block);
   }
 }
 
@@ -173,7 +173,7 @@ bool isModifyingNodes(torch::jit::Node* node, torch::jit::Value* val) {
   return false;
 }
 
-std::vector<torch::jit::Node*> FindModifyingNodes(
+std::vector<torch::jit::Node*> findModifyingNodes(
     torch::jit::Value* val,
     const std::unordered_set<torch::jit::Node*>& seg_block_nodes) {
   std::vector<torch::jit::Node*> modifying_nodes;
@@ -190,7 +190,7 @@ std::vector<torch::jit::Node*> FindModifyingNodes(
 }
 
 // this function is only used when a TRT segment produces nonTensor values which are used by later TRT segment
-std::vector<torch::jit::Node*> GetDependencyNodes(
+std::vector<torch::jit::Node*> getDependencyNodes(
     const std::vector<torch::jit::Value*>& vals,
     const SegmentedBlock& seg_block) {
   // get all nodes in the segmentedblock
@@ -206,7 +206,7 @@ std::vector<torch::jit::Node*> GetDependencyNodes(
     auto node = cur_val->node();
     if (node->kind() != torch::jit::prim::Constant && !visited.count(node)) {
       visited.insert(node);
-      auto modifying_nodes = FindModifyingNodes(cur_val, seg_block_nodes);
+      auto modifying_nodes = findModifyingNodes(cur_val, seg_block_nodes);
       stk.insert(stk.end(), modifying_nodes.rbegin(), modifying_nodes.rend());
       stk.push_back(node);
       for (auto input : node->inputs()) {
@@ -220,7 +220,7 @@ std::vector<torch::jit::Node*> GetDependencyNodes(
   return stk;
 }
 
-void ResolveTRTNonTensorInputs(PartitioningCtx* ctx, torch::jit::Block* block) {
+void resolveTRTNonTensorInputs(PartitioningCtx* ctx, torch::jit::Block* block) {
   // if a TRT segment has nonTensor Inputs, the nodes that produce this nonTensor Inputs must in another TensorRT engine
   // because we have already found the interface between Torch and TRT in segmentation phase
   // what we do here is just find the dependency nodes of the TRT segments that have nonTensor inputs
@@ -235,7 +235,7 @@ void ResolveTRTNonTensorInputs(PartitioningCtx* ctx, torch::jit::Block* block) {
       }
       if (!inputs_to_resolve.empty()) {
         std::vector<torch::jit::Node*> dependency_nodes =
-            GetDependencyNodes(inputs_to_resolve, cur_partitioned_block[i]);
+            getDependencyNodes(inputs_to_resolve, cur_partitioned_block[i]);
         dependency_nodes.insert(
             dependency_nodes.end(),
             cur_partitioned_block[i].raw_nodes().begin(),
@@ -246,7 +246,7 @@ void ResolveTRTNonTensorInputs(PartitioningCtx* ctx, torch::jit::Block* block) {
   }
 }
 
-void RegisterSegmentsOutputs(PartitioningCtx* ctx, torch::jit::Block* block) {
+void registerSegmentsOutputs(PartitioningCtx* ctx, torch::jit::Block* block) {
   // find the corresponding raw values in original global graph for this segmented block's inputs/outputs
   PartitionedGraph& cur_partitioned_block = ctx->partitioned_blocks[block];
   auto cmp = [](torch::jit::Value* a, torch::jit::Value* b) { return a->unique() < b->unique(); };
@@ -332,32 +332,32 @@ void finalizeNewBlock(
   LOG_DEBUG(g.back());
 }
 
-void SetNodeExecutorLUT(PartitioningCtx* ctx, torch::jit::Block* block) {
+void setNodeExecutorLUT(PartitioningCtx* ctx, torch::jit::Block* block) {
   // First, find all the explicit fallback nodes that should run in Torch:
   // 1. nodes that are unsupported
   // 2. nodes that the user specifies to run in torch
   // 3. nodes that the user specifies the module containing this op to run in torch
   // At the same time, set all the rest nodes to NodeExecutorDecision::kCONVERT
-  SetExplicitFallbackNodes(ctx, block);
+  setExplicitFallbackNodes(ctx, block);
 
   // Second, check if there is nonTensor input/output for the block, if there is, then fallback the nodes that
   // consume/produce this nonTensor value
-  SetInputsOutputsConnectedNodes(ctx, block);
+  setInputsOutputsConnectedNodes(ctx, block);
 
   // Third, for fallback nodes, if it consumes any NonTensor inputs, then the nodes that produce this
   // input should also fallback. Similarly, if it produces any NonTensor outputs, then the nodes
   // that consume this output should also fallback
   auto cur_fallback_nodes = ctx->getNodesRunInTorch();
-  SetNonTensorConnectedNodes(ctx, cur_fallback_nodes);
+  setNonTensorConnectedNodes(ctx, cur_fallback_nodes);
 
   // Finally, check if all current tensorrt blocks satisfy the min_block_size requirement.
   // We need to traverse the whole graph many times here
-  SetMinBlockFallbackNodes(ctx, block);
+  setMinBlockFallbackNodes(ctx, block);
 }
 
-void SegmentGraph(PartitioningCtx* ctx, torch::jit::Block* block) {
+void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block) {
   // Find all the fallback nodes and build execution decision LUT for all nodes
-  SetNodeExecutorLUT(ctx, block);
+  setNodeExecutorLUT(ctx, block);
 
   auto nodes = block->nodes();
 
@@ -436,24 +436,24 @@ void SegmentGraph(PartitioningCtx* ctx, torch::jit::Block* block) {
   return;
 }
 
-void Partition(PartitioningCtx* ctx, ExampleIValues& example_tensor_map) {
+void partition(PartitioningCtx* ctx, ExampleIValues& example_tensor_map) {
   LOG_DEBUG(ctx->settings);
 
   // Go through all the blocks to do the partitioning
   for (torch::jit::Block* block : ctx->original_blocks) {
     // segment lowering global graph into blocks
-    SegmentGraph(ctx, block);
+    segmentGraph(ctx, block);
 
     // It's possible that some TensorRT blocks have nonTensor inputs/output because they are interleaved by Torch blocks
     // resolve nonTensor inputs/outputs
-    ResolveTRTNonTensorInputs(ctx, block);
+    resolveTRTNonTensorInputs(ctx, block);
 
     // register input/output torch::jit::Value for segmented graphs
     LOG_DEBUG("Registering input/output torch::jit::Value for segmented graphs");
-    RegisterSegmentsOutputs(ctx, block);
+    registerSegmentsOutputs(ctx, block);
 
     // run shape analysis on each segmented block
-    RunShapeAnalysis(ctx, block, example_tensor_map);
+    runShapeAnalysis(ctx, block, example_tensor_map);
   }
 }
 

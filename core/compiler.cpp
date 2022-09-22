@@ -138,9 +138,9 @@ partitioning::GraphAndMapping BuildHybridGraph(
 
   auto partitioning_ctx = partitioning::PartitioningCtx(block, partitioning_info);
   auto collection_input_ivalues_map =
-      partitioning::GenerateRandomInputs(partitioning_info.collection_input_spec_map, first_use_types);
+      partitioning::generateRandomInputs(partitioning_info.collection_input_spec_map, first_use_types);
 
-  partitioning::Partition(&partitioning_ctx, collection_input_ivalues_map);
+  partitioning::partition(&partitioning_ctx, collection_input_ivalues_map);
 
   for (auto& partitioned_block : partitioning_ctx.partitioned_blocks) {
     partitioning::PartitionedGraph& segmented_blocks = partitioned_block.second;
@@ -174,7 +174,7 @@ partitioning::GraphAndMapping BuildHybridGraph(
     }
   }
 
-  return partitioning::Stitch(&partitioning_ctx, block);
+  return partitioning::stitch(&partitioning_ctx, block);
 }
 
 void MapInputsAndDetermineDTypes(

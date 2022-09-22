@@ -81,7 +81,7 @@ TEST(Partitioning, SegmentSequentialModelCorrectly) {
   PartitioningInfo partitioning_info;
   partitioning_info.enabled = true;
   PartitioningCtx ctx(g->block(), partitioning_info);
-  SegmentGraph(&ctx, g->block());
+  segmentGraph(&ctx, g->block());
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 2));
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 1));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 1, 2}, {3}, {4}}));
@@ -115,7 +115,7 @@ TEST(Partitioning, SegmentSequentialModelWithMinBlockSizeCorrectly) {
   partitioning_info.enabled = true;
   partitioning_info.min_block_size = 3;
   PartitioningCtx ctx(g->block(), partitioning_info);
-  SegmentGraph(&ctx, g->block());
+  segmentGraph(&ctx, g->block());
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 1));
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 1));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 1, 2}, {3, 4}}));
@@ -153,7 +153,7 @@ TEST(Partitioning, SegmentModelWithMinBlockSizeCausedFallbackCorrectly) {
   partitioning_info.enabled = true;
   partitioning_info.min_block_size = 3;
   PartitioningCtx ctx(g->block(), partitioning_info);
-  SegmentGraph(&ctx, g->block());
+  segmentGraph(&ctx, g->block());
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 1));
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 1));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 1, 2, 3}, {4, 5, 6, 7}}));
@@ -187,7 +187,7 @@ TEST(Partitioning, SegmentSequentialModelWithForcedOPCorrectly) {
   partitioning_info.enabled = true;
   partitioning_info.forced_fallback_operators.push_back("aten::relu");
   PartitioningCtx ctx(g->block(), partitioning_info);
-  SegmentGraph(&ctx, g->block());
+  segmentGraph(&ctx, g->block());
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 3));
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 2));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0}, {1}, {2}, {3}, {4}}));
@@ -221,7 +221,7 @@ TEST(Partitioning, SegmentBranchModelCorrectly) {
   PartitioningInfo partitioning_info;
   partitioning_info.enabled = true;
   PartitioningCtx ctx(g->block(), partitioning_info);
-  SegmentGraph(&ctx, g->block());
+  segmentGraph(&ctx, g->block());
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 2));
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 1));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 1}, {2}, {3, 4, 5, 6}}));
@@ -256,7 +256,7 @@ TEST(Partitioning, SegmentBranchModelWithMinBlockSizeCorrectly) {
   partitioning_info.enabled = true;
   partitioning_info.min_block_size = 3;
   PartitioningCtx ctx(g->block(), partitioning_info);
-  SegmentGraph(&ctx, g->block());
+  segmentGraph(&ctx, g->block());
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 1));
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 1));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 1, 2}, {3, 4, 5, 6}}));
@@ -296,7 +296,7 @@ TEST(Partitioning, SegmentBranchModelWithForcedFallbackOPCorrectly) {
   partitioning_info.forced_fallback_operators.push_back("aten::relu");
   PartitioningCtx ctx(g->block(), partitioning_info);
 
-  SegmentGraph(&ctx, g->block());
+  segmentGraph(&ctx, g->block());
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 3));
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 2));
   ASSERT_TRUE(
