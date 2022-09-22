@@ -191,10 +191,12 @@ TEST(CppAPITests, TestCollectionTupleInputOutput) {
   auto trt_mod = torch_tensorrt::torchscript::compile(mod, compile_settings);
   auto trt_out = trt_mod.forward(complex_inputs);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
-      out.toTuple()->elements()[0].toTensor(), trt_out.toTuple()->elements()[0].toTensor(), 1e-5));
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
-      out.toTuple()->elements()[1].toTensor(), trt_out.toTuple()->elements()[1].toTensor(), 1e-5));
+  //ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
+  //    out.toTuple()->elements()[0].toTensor(), trt_out.toTuple()->elements()[0].toTensor(), 1e-5));
+  ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(out.toTuple()->elements()[0], trt_out.toTuple()->elements()[0], 0.99));
+  ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(out.toTuple()->elements()[1], trt_out.toTuple()->elements()[1], 0.99));
+  //ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
+  //    out.toTuple()->elements()[1].toTensor(), trt_out.toTuple()->elements()[1].toTensor(), 1e-5));
 }
 
 TEST(CppAPITests, TestCollectionListInputOutput) {
