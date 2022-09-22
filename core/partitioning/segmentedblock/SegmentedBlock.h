@@ -5,7 +5,6 @@
 
 #include "NvInfer.h"
 #include "core/ir/ir.h"
-#include "core/partitioning/PartitionInfo.h"
 #include "torch/csrc/jit/ir/ir.h"
 
 namespace torch_tensorrt {

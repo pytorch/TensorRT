@@ -11,23 +11,18 @@ config_setting(
 )
 
 cc_library(
-    name = "partitioning",
+    name = "segmentedblock",
     srcs = [
-        "partitioning.cpp",
-        "shape_analysis.cpp",
-        "stitching.cpp",
+        "SegmentedBlock.cpp",
     ],
     hdrs = [
-        "partitioning.h",
+        "SegmentedBlock.h",
     ],
     deps = [
         "//core/util:prelude",
         "//core/ir",
         "//core/conversion",
         "//core/lowering",
-        "//core/partitioning/partitioningctx",
-        "//core/partitioning/partitioninginfo",
-        "//core/partitioning/segmentedblock",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch//:libtorch"],
@@ -38,7 +33,7 @@ cc_library(
 pkg_tar(
     name = "include",
     srcs = [
-        "partitioning.h",
+        "SegmentedBlock.h",
     ],
-    package_dir = "core/partitioning/",
+    package_dir = "core/partitioning/segmentedblock",
 )

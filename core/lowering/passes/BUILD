@@ -30,6 +30,7 @@ cc_library(
         "silu_to_sigmoid_multiplication.cpp",
         "unpack_addmm.cpp",
         "unpack_batch_norm.cpp",
+        "unpack_hardsigmoid.cpp",
         "unpack_hardswish.cpp",
         "unpack_log_softmax.cpp",
         "unpack_std.cpp",
