@@ -673,8 +673,6 @@ jobs:
 
   test-py-fx-x86_64-linux:
     parameters:
-      channel:
-        type: string
       torch-build:
         type: string
       torch-build-index:
