@@ -1113,7 +1113,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
 
-      - test-core-cpp-x86_64:
+      - test-core-cpp-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-short: << pipeline.parameters.trt-version-short >>
@@ -1122,14 +1122,14 @@ workflows:
           requires:
             - build-x86_64-linux
 
-      - test-py-ts-x86_64:
+      - test-py-ts-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           requires:
             - build-x86_64-linux
 
-      - test-py-fx-x86_64:
+      - test-py-fx-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
