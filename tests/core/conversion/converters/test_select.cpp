@@ -974,7 +974,7 @@ TEST(Converters, ATenUnbindConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   for (size_t i = 0; i < jit_results.size(); i++) {
-    auto trt = trt_results[i].reshape(jit_results[i].sizes());
+    auto trt = trt_results[i];
     ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt, 2e-6));
   }
 }
@@ -1001,7 +1001,7 @@ TEST(Converters, ATenUnbindNegativeAxisConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   for (size_t i = 0; i < jit_results.size(); i++) {
-    auto trt = trt_results[i].reshape(jit_results[i].sizes());
+    auto trt = trt_results[i];
     ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt, 2e-6));
   }
 }

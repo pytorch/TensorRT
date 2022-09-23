@@ -61,6 +61,13 @@ bool add_split(ConversionCtx* ctx, const torch::jit::Node* n, args& args, bool s
     auto gather_layer = ctx->net->addGather(*in, *indicesTensor, axis);
     auto gather_out = gather_layer->getOutput(0);
 
+    if (unbind) { // unbind removes the split dimension
+      auto squeeze_layer = ctx->net->addShuffle(*gather_out);
+      squeeze_layer->setReshapeDimensions(util::squeezeDims(gather_out->getDimensions(), axis));
+      TORCHTRT_CHECK(squeeze_layer, "Unable to create squeeze_layer layer from node: " << *n);
+      gather_out = squeeze_layer->getOutput(0);
+    }
+
     auto tensor_holder = TensorContainer();
     tensor_holder.hold_tensor(gather_out);
     auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
