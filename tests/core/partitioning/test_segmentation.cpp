@@ -6,9 +6,14 @@
 #include "torch/script.h"
 #include "torch_tensorrt/torch_tensorrt.h"
 
+namespace torch_tensorrt {
+namespace core {
+namespace partitioning {
+namespace tests {
+
 bool checkSegmentedBlockNumber(
-    torch_tensorrt::core::partitioning::PartitionedGraph& segmented_blocks,
-    torch_tensorrt::core::partitioning::SegmentedBlock::SegmentedBlockTarget target,
+    PartitionedGraph& segmented_blocks,
+    SegmentedBlock::SegmentedBlockTarget target,
     int target_count) {
   int64_t cnt = 0;
   for (auto& seg_block : segmented_blocks) {
@@ -27,7 +32,7 @@ bool checkSegmentedBlockNumber(
 }
 
 bool checkSegmentedBlockNodesMapping(
-    std::vector<torch_tensorrt::core::partitioning::SegmentedBlock>& segmented_blocks,
+    std::vector<SegmentedBlock>& segmented_blocks,
     std::shared_ptr<torch::jit::Graph> g,
     std::vector<std::vector<int>> nodes_index) {
   std::vector<torch::jit::Node*> graph_nodes;
@@ -71,17 +76,15 @@ TEST(Partitioning, SegmentSequentialModelCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
+  LOG_GRAPH(*g);
 
-  torch_tensorrt::core::partitioning::PartitionInfo partition_info;
-  partition_info.enabled = true;
-  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
-  std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
-      torch_tensorrt::core::partitioning::segment_graph(g->block(), partition_info, fallback_nodes);
-  ASSERT_TRUE(
-      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 2));
-  ASSERT_TRUE(
-      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 1));
-  ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1, 2}, {3}, {4}}));
+  PartitioningInfo partitioning_info;
+  partitioning_info.enabled = true;
+  PartitioningCtx ctx(g->block(), partitioning_info);
+  segmentGraph(&ctx, g->block());
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 2));
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 1));
+  ASSERT_TRUE(checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 1, 2}, {3}, {4}}));
 }
 
 TEST(Partitioning, SegmentSequentialModelWithMinBlockSizeCorrectly) {
@@ -106,18 +109,16 @@ TEST(Partitioning, SegmentSequentialModelWithMinBlockSizeCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
+  LOG_GRAPH(*g);
 
-  torch_tensorrt::core::partitioning::PartitionInfo partition_info;
-  partition_info.enabled = true;
-  partition_info.min_block_size = 3;
-  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
-  std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
-      torch_tensorrt::core::partitioning::segment_graph(g->block(), partition_info, fallback_nodes);
-  ASSERT_TRUE(
-      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 1));
-  ASSERT_TRUE(
-      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 1));
-  ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1, 2}, {3, 4}}));
+  PartitioningInfo partitioning_info;
+  partitioning_info.enabled = true;
+  partitioning_info.min_block_size = 3;
+  PartitioningCtx ctx(g->block(), partitioning_info);
+  segmentGraph(&ctx, g->block());
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 1));
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 1));
+  ASSERT_TRUE(checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 1, 2}, {3, 4}}));
 }
 
 TEST(Partitioning, SegmentModelWithMinBlockSizeCausedFallbackCorrectly) {
@@ -146,18 +147,16 @@ TEST(Partitioning, SegmentModelWithMinBlockSizeCausedFallbackCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
+  LOG_GRAPH(*g);
 
-  torch_tensorrt::core::partitioning::PartitionInfo partition_info;
-  partition_info.enabled = true;
-  partition_info.min_block_size = 3;
-  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
-  std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
-      torch_tensorrt::core::partitioning::segment_graph(g->block(), partition_info, fallback_nodes);
-  ASSERT_TRUE(
-      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 1));
-  ASSERT_TRUE(
-      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 1));
-  ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1, 2, 3}, {4, 5, 6, 7}}));
+  PartitioningInfo partitioning_info;
+  partitioning_info.enabled = true;
+  partitioning_info.min_block_size = 3;
+  PartitioningCtx ctx(g->block(), partitioning_info);
+  segmentGraph(&ctx, g->block());
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 1));
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 1));
+  ASSERT_TRUE(checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 1, 2, 3}, {4, 5, 6, 7}}));
 }
 
 TEST(Partitioning, SegmentSequentialModelWithForcedOPCorrectly) {
@@ -182,18 +181,16 @@ TEST(Partitioning, SegmentSequentialModelWithForcedOPCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
+  LOG_GRAPH(*g);
 
-  torch_tensorrt::core::partitioning::PartitionInfo partition_info;
-  partition_info.enabled = true;
-  partition_info.forced_fallback_operators.push_back("aten::relu");
-  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
-  std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
-      torch_tensorrt::core::partitioning::segment_graph(g->block(), partition_info, fallback_nodes);
-  ASSERT_TRUE(
-      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 3));
-  ASSERT_TRUE(
-      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 2));
-  ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0}, {1}, {2}, {3}, {4}}));
+  PartitioningInfo partitioning_info;
+  partitioning_info.enabled = true;
+  partitioning_info.forced_fallback_operators.push_back("aten::relu");
+  PartitioningCtx ctx(g->block(), partitioning_info);
+  segmentGraph(&ctx, g->block());
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 3));
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 2));
+  ASSERT_TRUE(checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0}, {1}, {2}, {3}, {4}}));
 }
 
 TEST(Partitioning, SegmentBranchModelCorrectly) {
@@ -219,17 +216,15 @@ TEST(Partitioning, SegmentBranchModelCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
+  LOG_GRAPH(*g);
 
-  torch_tensorrt::core::partitioning::PartitionInfo partition_info;
-  partition_info.enabled = true;
-  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
-  std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
-      torch_tensorrt::core::partitioning::segment_graph(g->block(), partition_info, fallback_nodes);
-  ASSERT_TRUE(
-      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 2));
-  ASSERT_TRUE(
-      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 1));
-  ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1}, {2}, {3, 4, 5, 6}}));
+  PartitioningInfo partitioning_info;
+  partitioning_info.enabled = true;
+  PartitioningCtx ctx(g->block(), partitioning_info);
+  segmentGraph(&ctx, g->block());
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 2));
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 1));
+  ASSERT_TRUE(checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 1}, {2}, {3, 4, 5, 6}}));
 }
 
 TEST(Partitioning, SegmentBranchModelWithMinBlockSizeCorrectly) {
@@ -255,18 +250,16 @@ TEST(Partitioning, SegmentBranchModelWithMinBlockSizeCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
+  LOG_GRAPH(*g);
 
-  torch_tensorrt::core::partitioning::PartitionInfo partition_info;
-  partition_info.enabled = true;
-  partition_info.min_block_size = 3;
-  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
-  std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
-      torch_tensorrt::core::partitioning::segment_graph(g->block(), partition_info, fallback_nodes);
-  ASSERT_TRUE(
-      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 1));
-  ASSERT_TRUE(
-      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 1));
-  ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1, 2}, {3, 4, 5, 6}}));
+  PartitioningInfo partitioning_info;
+  partitioning_info.enabled = true;
+  partitioning_info.min_block_size = 3;
+  PartitioningCtx ctx(g->block(), partitioning_info);
+  segmentGraph(&ctx, g->block());
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 1));
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 1));
+  ASSERT_TRUE(checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 1, 2}, {3, 4, 5, 6}}));
 }
 
 TEST(Partitioning, SegmentBranchModelWithForcedFallbackOPCorrectly) {
@@ -296,16 +289,21 @@ TEST(Partitioning, SegmentBranchModelWithForcedFallbackOPCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
+  LOG_GRAPH(*g);
 
-  torch_tensorrt::core::partitioning::PartitionInfo partition_info;
-  partition_info.enabled = true;
-  partition_info.forced_fallback_operators.push_back("aten::relu");
-  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
-  torch_tensorrt::core::partitioning::PartitionedGraph segmented_blocks =
-      torch_tensorrt::core::partitioning::segment_graph(g->block(), partition_info, fallback_nodes);
+  PartitioningInfo partitioning_info;
+  partitioning_info.enabled = true;
+  partitioning_info.forced_fallback_operators.push_back("aten::relu");
+  PartitioningCtx ctx(g->block(), partitioning_info);
+
+  segmentGraph(&ctx, g->block());
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 3));
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 2));
   ASSERT_TRUE(
-      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 3));
-  ASSERT_TRUE(
-      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 2));
-  ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1}, {2}, {3}, {4}, {5, 6}}));
+      checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 1}, {2}, {3}, {4}, {5, 6}}));
 }
+
+} // namespace tests
+} // namespace partitioning
+} // namespace core
+} // namespace torch_tensorrt

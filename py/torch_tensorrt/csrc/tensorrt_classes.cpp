@@ -313,10 +313,10 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.convert_info.engine_settings.device.gpu_id = device.gpu_id;
   info.convert_info.engine_settings.device.dla_core = device.dla_core;
   info.convert_info.engine_settings.device.allow_gpu_fallback = device.allow_gpu_fallback;
-  info.partition_info.enabled = torch_fallback.enabled;
-  info.partition_info.min_block_size = torch_fallback.min_block_size;
-  info.partition_info.forced_fallback_operators = torch_fallback.forced_fallback_operators;
-  info.partition_info.truncate_long_and_double = truncate_long_and_double;
+  info.partitioning_info.enabled = torch_fallback.enabled;
+  info.partitioning_info.min_block_size = torch_fallback.min_block_size;
+  info.partitioning_info.forced_fallback_operators = torch_fallback.forced_fallback_operators;
+  info.partitioning_info.truncate_long_and_double = truncate_long_and_double;
   info.lower_info.forced_fallback_modules = torch_fallback.forced_fallback_modules;
   info.convert_info.engine_settings.truncate_long_and_double = truncate_long_and_double;
 

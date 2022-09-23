@@ -76,6 +76,10 @@ lowering_test(
 )
 
 lowering_test(
+    name = "test_unpack_hardsigmoid",
+)
+
+lowering_test(
     name = "test_unpack_hardswish",
 )
 
@@ -98,6 +102,7 @@ test_suite(
         ":test_remove_detach_pass",
         ":test_remove_dropout_pass",
         ":test_remove_unnecessary_casts",
+        ":test_unpack_hardsigmoid",
         ":test_unpack_hardswish",
         ":test_unpack_reduce_ops",
         ":test_view_to_reshape_pass",

@@ -19,7 +19,7 @@ struct CompileSpec {
   ir::GraphInputs graph_inputs;
   conversion::ConversionInfo convert_info;
   lowering::LowerInfo lower_info;
-  partitioning::PartitionInfo partition_info;
+  partitioning::PartitioningInfo partitioning_info;
 };
 
 bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod, std::string method_name);

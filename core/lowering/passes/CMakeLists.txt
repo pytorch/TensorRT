@@ -17,6 +17,7 @@ target_sources(${lib_name}
             "${CMAKE_CURRENT_SOURCE_DIR}/silu_to_sigmoid_multiplication.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_addmm.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_batch_norm.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/unpack_hardsigmoid.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_hardswish.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_log_softmax.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_std.cpp"
