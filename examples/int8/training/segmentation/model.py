@@ -48,7 +48,6 @@ class VGG16Unet(nn.Module):
 
         self.bottleneck = add_conv(features[-1][0], features[-1][0]*2, 2)
         self.final_conv = nn.Conv2d(features[0][0], out_channels, kernel_size=1)
-        self.act = nn.Softmax(dim=1)
     
     def forward(self, x):
         skip_connections = []
@@ -74,4 +73,3 @@ class VGG16Unet(nn.Module):
         
         x = self.final_conv(x)
         return x
-        # self.act(x)

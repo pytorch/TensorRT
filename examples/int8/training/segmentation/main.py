@@ -54,7 +54,7 @@ def train(loader, model, optimizer, loss_fn, scaler):
         preds = model(data)
         loss = loss_fn(preds, target)
 
-        dice = compute_dice_score(preds, target)
+        # dice = compute_dice_score(preds, target)
 
         optimizer.zero_grad()        
         scaler.scale(loss).backward()
@@ -62,9 +62,10 @@ def train(loader, model, optimizer, loss_fn, scaler):
         scaler.update()
         
         train_loss += loss.item() * data.size(0) 
-        pr_loop.set_postfix(ordered_dict = {"loss": loss.item(), "dice_score": dice.item()})
+        pr_loop.set_postfix(ordered_dict = {"loss": loss.item()})
+        #, "dice_score": dice.item()})
     
-    return train_loss, dice
+    return train_loss#, dice
 
 def main():
     parser = argparse.ArgumentParser(description='Training script')
@@ -111,7 +112,7 @@ def main():
     model = VGG16Unet().to(device=DEVICE)
 
     # Multi-class semantic segmentation
-    loss_fn = get_loss_fn(training=True)
+    loss_fn = get_loss_fn()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     # Pick dataset root directory according as per user input if required
@@ -150,23 +151,26 @@ def main():
         os.makedirs(CKPT_DIR)
 
     for epoch in range(epochs, args.epochs):
-        print(f"Epoch: {epoch}/{args.epochs}...")
-        train_loss, dice_score = train(train_loader, model, optimizer, loss_fn, scaler)
+        print(f"Epoch: {epoch}/{args.epochs} ...")
+        train_loss = train(train_loader, model, optimizer, loss_fn, scaler)
 
         if epoch % args.interval == 0:
-            print(f"Training loss at epoch: {epoch} is: {(train_loss/len(train_loader.dataset)):.4f} and Dice Score: {dice_score}")
+            val_loss, dice_score = check_accuracy(val_loader, model, device=DEVICE)
+            print(f"Train loss: {train_loss/len(train_loader.dataset):.4f} Val loss: {val_loss:.4f} Dice Score: {dice_score:.4f}")
             checkpoint = {
                 "state_dict": model.state_dict(),
                 "optimizer": optimizer.state_dict(),
             }
             ckpt_filename = CHECKPOINT_PREFIX + "_epoch_" + str(epoch) + ".pth.tar"
             save_checkpoint(checkpoint, os.path.join(CKPT_DIR, ckpt_filename))
+
     ckpt_filename = CHECKPOINT_PREFIX + "_epoch_" + str(args.epochs) + ".pth.tar"
     save_checkpoint(checkpoint, os.path.join(CKPT_DIR, ckpt_filename))
     
     model.eval()
     # Check accuracy
-    check_accuracy(val_loader, model, device=DEVICE)
+    val_loss, dice = check_accuracy(val_loader, model, device=DEVICE)
+    print(f"Evaluation loss: {val_loss:.4f} Dice Score: {dice:.4f}")
 
     if args.export:
         mod = torch.jit.script(model)

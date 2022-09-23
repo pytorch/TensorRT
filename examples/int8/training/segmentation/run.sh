@@ -25,4 +25,4 @@ PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:32 python3 main.py \
   --data=${DATA_DIR} \
   --epochs=${NUM_EPOCHS} \
   --batch=${BATCH} \
-  --lr=1e-4
+  --lr=0.001

@@ -57,8 +57,9 @@ def load_checkpoint(checkpoint, model):
     model.load_state_dict(checkpoint["state_dict"])
 
 def compute_dice_score(pred, label):
-    pred = (pred > THRESHOLD).float()
+    pred = torch.nn.functional.softmax(pred, dim=1)
     pred = torch.argmax(pred, dim=1)
+    pred = (pred > THRESHOLD).float()
 
     correct = torch.sum(pred == label)
     union = torch.sum(pred >= 0) + torch.sum(label)
@@ -66,34 +67,34 @@ def compute_dice_score(pred, label):
     score = (2.0 * correct) / (union + EPSILON)
     return score
 
-def get_loss_fn(training = False):
-    if training:
-        loss_fn = torch.nn.CrossEntropyLoss(reduction='mean')
-    else:
-        loss_fn = torch.nn.CrossEntropyLoss()
+def get_loss_fn():
+    loss_fn = torch.nn.CrossEntropyLoss(ignore_index=150)
     return loss_fn
 
 def check_accuracy(loader, model, device="cuda"):
-    eval_loss = 0.0
-    loss_fn = get_loss_fn()
     dice_score = 0.0
+
+    correct = 0
+    pixels = 0
+    val_loss = 0.0
+
+    loss_fn = get_loss_fn()
 
     with torch.no_grad():
         for x, y in loader:
             x = x.to(device)
-            y = y.to(device).long()
+            y = y.to(device)
 
             pred = model(x)
-            loss = loss_fn(pred, y)
+            val_loss += loss_fn(pred, y.long())
 
-            # Reduction is set to None
-            loss = loss.mean()
-            
-            eval_loss += loss.item() * x.size(0)
+            pred = torch.nn.functional.softmax(pred, dim=1)
+            pred = torch.argmax(pred, dim=1)
+            pred = (pred > THRESHOLD).float()
 
-            dice_coef = compute_dice_score(pred.cpu(), y.cpu()).item()
-            # Computed over a batch
-            dice_score += dice_coef
+            correct += (pred == y).sum()
+            pixels += torch.numel(pred)
 
-    print(f"Avg Validation Loss: {eval_loss/len(loader.dataset):.4f}")
-    print(f"Avg Dice score: {dice_score/len(loader.dataset):.4f}")
+            dice_score += 2 * (pred * y).sum() /((pred + y).sum() + EPSILON)
+
+    return val_loss/len(loader.dataset), dice_score/len(loader.dataset)

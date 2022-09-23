@@ -4,8 +4,8 @@ import numpy as np
 from PIL import Image
 import random
 
-SAMPLE_COUNT=20000
-VAL_COUNT = 500
+SAMPLE_COUNT=5000
+VAL_COUNT = 100
 NUM_CLASSES = 150
 
 class SceneParsingDataset(Dataset):
@@ -32,8 +32,6 @@ class SceneParsingDataset(Dataset):
         image = np.array(Image.open(image_path).convert("RGB"))
         mask = np.array(Image.open(mask_path).convert("L"))
 
-        # mask = mask / NUM_CLASSES
-
         img = None
         msk = None
         if not self.transform is None:
@@ -41,5 +39,4 @@ class SceneParsingDataset(Dataset):
             img = transformed_data["image"]
             msk = transformed_data["mask"]
 
-        msk[msk == 150] = 0
         return img, msk
