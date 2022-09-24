@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 THRESHOLD = 0.5
 EPSILON = 1e-7
 
+
 def get_loaders(
     train_dir,
     train_mask_dir,
@@ -15,46 +16,49 @@ def get_loaders(
     train_transform,
     val_transform,
     num_workers=2,
-    pin_memory=True
+    pin_memory=True,
 ):
     train_ds = SceneParsingDataset(
-        image_dir = train_dir,
-        mask_dir = train_mask_dir,
-        transform = train_transform,
+        image_dir=train_dir,
+        mask_dir=train_mask_dir,
+        transform=train_transform,
     )
 
     train_loader = DataLoader(
         train_ds,
-        batch_size = batch_size,
-        num_workers = num_workers,
-        pin_memory = pin_memory,
-        shuffle = True
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        shuffle=True,
     )
 
     val_ds = SceneParsingDataset(
-        image_dir = val_dir,
-        mask_dir = val_mask_dir,
-        transform = val_transform,
+        image_dir=val_dir,
+        mask_dir=val_mask_dir,
+        transform=val_transform,
         training=False,
     )
 
     val_loader = DataLoader(
         val_ds,
-        batch_size = batch_size,
-        num_workers = num_workers,
-        pin_memory = pin_memory,
-        shuffle = False
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        shuffle=False,
     )
 
     return train_loader, val_loader
+
 
 def save_checkpoint(state, CHECKPOINT_NAME):
     print("Saving checkpoint")
     torch.save(state, CHECKPOINT_NAME)
 
+
 def load_checkpoint(checkpoint, model):
     print("Loading model")
     model.load_state_dict(checkpoint["state_dict"])
+
 
 def compute_dice_score(pred, label):
     pred = torch.nn.functional.softmax(pred, dim=1)
@@ -67,9 +71,11 @@ def compute_dice_score(pred, label):
     score = (2.0 * correct) / (union + EPSILON)
     return score
 
+
 def get_loss_fn():
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=150)
     return loss_fn
+
 
 def check_accuracy(loader, model, device="cuda"):
     dice_score = 0.0
@@ -95,6 +101,6 @@ def check_accuracy(loader, model, device="cuda"):
             correct += (pred == y).sum()
             pixels += torch.numel(pred)
 
-            dice_score += 2 * (pred * y).sum() /((pred + y).sum() + EPSILON)
+            dice_score += 2 * (pred * y).sum() / ((pred + y).sum() + EPSILON)
 
-    return val_loss/len(loader.dataset), dice_score/len(loader.dataset)
+    return val_loss / len(loader.dataset), dice_score / len(loader.dataset)
