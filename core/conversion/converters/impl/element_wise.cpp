@@ -1,4 +1,4 @@
-#include <math.h>
+#include <c10/util/MathConstants.h>
 #include <torch/torch.h>
 #include "core/conversion/converters/converter_util.h"
 #include "core/conversion/converters/converters.h"
@@ -823,13 +823,14 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                auto ZERO = tensor_to_const(ctx, torch::tensor({0.}));
                auto ONE = tensor_to_const(ctx, torch::tensor({1.}));
                auto TWO = tensor_to_const(ctx, torch::tensor({2.}));
-               auto PI = tensor_to_const(ctx, torch::tensor({M_PI}));
+               // Using float for PI for TRT compatibility
+               auto PI = tensor_to_const(ctx, torch::tensor({c10::pi<float>}));
 
                // Quadrant correction is only needed when (other < 0) (elementwise)
                // In this scenario, the correction is +/- pi, depending on the sign of self (elementwise)
 
                // Full atan2 Formula is given by:
-               // atan2(self, other) = atan(self / other) - (other < 0) * (2 * (other > 0) + 1) * pi
+               // atan2(self, other) = atan(self / other) - (other < 0) * (2 * (self > 0) - 1) * pi
 
                // Mask of (other < 0)
                auto other_mask = add_elementwise(
