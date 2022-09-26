@@ -27,7 +27,7 @@ You can install the python package using
 
     pip3 install nvidia-pyindex
     pip3 install nvidia-tensorrt
-    pip3 install torch-tensorrt -f https://github.com/pytorch/TensorRT/releases
+    pip3 install torch-tensorrt==<VERSION> -f https://github.com/pytorch/TensorRT/releases/expanded_assets/<VERSION>
 
 .. _bin-dist:
 
