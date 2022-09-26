@@ -12,6 +12,8 @@ bool cosineSimEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tens
   std::ostringstream ss;
   ss << computed_tensor << std::endl << gt_tensor << std::endl;
   ss << "cosine similarity" << std::to_string(cosine_sim.item<float>()) << std::endl;
+  std::cout << "cosine similarity" << std::to_string(cosine_sim.item<float>()) << std::endl;
+  std::cout << "cosine sim" << cosine_sim.item<float>() << std::endl;
   LOG_GRAPH(ss.str());
   LOG_GRAPH(std::string("Cosine Similarity score: ") + std::to_string(cosine_sim.item<float>()));
   LOG_GRAPH(std::string("Acceptable Threshold: ") + std::to_string(threshold));
