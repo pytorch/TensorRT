@@ -823,7 +823,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                auto ZERO = tensor_to_const(ctx, torch::tensor({0.}));
                auto ONE = tensor_to_const(ctx, torch::tensor({1.}));
                auto TWO = tensor_to_const(ctx, torch::tensor({2.}));
-               // Using float for PI for TRT compatibility
+               // Using PI float for TRT compatibility, however double is preferred for PyTorch
                auto PI = tensor_to_const(ctx, torch::tensor({c10::pi<float>}));
 
                // Quadrant correction is only needed when (other < 0) (elementwise)
