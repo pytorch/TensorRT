@@ -830,7 +830,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                // In this scenario, the correction is +/- pi, depending on the sign of self (elementwise)
 
                // Full atan2 Formula is given by:
-               // atan2(self, other) = atan(self / other) - (other < 0) * (2 * (self > 0) - 1) * pi
+               // atan2(self, other) = atan(self / other) - (other < 0) * (2 * (self < 0) - 1) * pi
 
                // Mask of (other < 0)
                auto other_mask = add_elementwise(
@@ -840,10 +840,10 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                    ZERO,
                    util::node_info(n) + "_less_than_zero_other_mask");
 
-               // Mask of (self > 0)
+               // Mask of (self < 0)
                auto self_mask = add_elementwise(
                    ctx,
-                   nvinfer1::ElementWiseOperation::kGREATER,
+                   nvinfer1::ElementWiseOperation::kLESS,
                    self,
                    ZERO,
                    util::node_info(n) + "_greater_than_zero_self_mask");
@@ -881,7 +881,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                // Add correction term to atan(self/other) to obtain atan2(self, other)
                auto atan2 = add_elementwise(
                    ctx,
-                   nvinfer1::ElementWiseOperation::kSUM,
+                   nvinfer1::ElementWiseOperation::kSUB,
                    atan2_intermediate->getOutput(0),
                    correction_term->getOutput(0),
                    util::node_info(n) + "_corrected_atan2");
