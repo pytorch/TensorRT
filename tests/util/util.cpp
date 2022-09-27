@@ -32,8 +32,7 @@ bool almostEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor,
 
   auto diff = computed_tensor_float - gt_tensor_float;
   auto result = diff.abs().max().item<float>();
-  std::cout<<"Difference is"<<diff<<std::endl;
-  std::cout<<"Result is"<<result<<std::endl;
+  std::cout<<"Res is"<<result<<std::endl;
   auto threshold = atol + (rtol * gt_tensor.abs().max().item<float>());
 
   LOG_GRAPH(std::string("Max Difference: ") + std::to_string(result));
