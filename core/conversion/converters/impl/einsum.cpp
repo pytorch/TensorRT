@@ -1,10 +1,7 @@
-#include "NvInfer.h"
 #include "core/conversion/converters/converters.h"
 #include "core/conversion/tensorcontainer/TensorContainer.h"
 #include "core/util/prelude.h"
-#include "torch/torch.h"
 
-#include <ATen/ATen.h>
 #include <vector>
 
 namespace torch_tensorrt {
