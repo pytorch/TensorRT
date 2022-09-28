@@ -192,7 +192,7 @@ TEST(CppAPITests, TestCollectionTupleInputOutput) {
   auto trt_out = trt_mod.forward(complex_inputs);
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
-      out.toTuple()->elements()[0].toTensor(), trt_out.toTuple()->elements()[0].toTensor(), 1e-5));
+      out.toTuple()->elements()[0].toTensor(), trt_out.toTuple()->elements()[0].toTensor(), 0.04));
   //ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(out.toTuple()->elements()[0].toTensor(), trt_out.toTuple()->elements()[0].toTensor(), 0.99));
   //ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(out.toTuple()->elements()[1].toTensor(), trt_out.toTuple()->elements()[1].toTensor(), 0.99));
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
