@@ -52,6 +52,10 @@ converter_test(
 )
 
 converter_test(
+    name = "test_einsum",
+)
+
+converter_test(
     name = "test_element_wise",
 )
 
@@ -152,6 +156,7 @@ test_suite(
         ":test_conv_deconv",
         ":test_copy",
         ":test_cumsum",
+        ":test_einsum",
         ":test_element_wise",
         ":test_expand",
         ":test_instance_norm",
