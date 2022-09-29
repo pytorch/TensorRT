@@ -661,13 +661,12 @@ jobs:
           trt-version-long: << parameters.trt-version-long >>
       - attach_workspace:
           at: /tmp/dist
-      - run:
-          name: "Install torch-tensorrt"
-          command: pip3 install /tmp/dist/x86_64-linux/*
-      # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
+      - run:
+          name: "Install torch-tensorrt"
+          command: pip3 install /tmp/dist/x86_64-linux/*
       - dump-test-env
       - test-ts-py-api
 
@@ -688,13 +687,13 @@ jobs:
           trt-version-long: << parameters.trt-version-long >>
       - attach_workspace:
           at: /tmp/dist/
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install /tmp/dist/x86_64-linux/*
       # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
-      - install-torch-from-index:
-          torch-build:  << parameters.torch-build >>
-          torch-build-index: << parameters.torch-build-index >>
       - dump-test-env
       - test-fx
 
