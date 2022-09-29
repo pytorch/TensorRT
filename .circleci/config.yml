@@ -952,7 +952,7 @@ parameters:
     default: "https://download.pytorch.org/whl/nightly/cu117"
   cudnn-version:
     type: string
-    default: "8.4.1"
+    default: "8.5.0"
   trt-version-short:
     type: string
     default: "8.4.1"
