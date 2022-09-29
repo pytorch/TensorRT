@@ -1,3 +1,4 @@
 torchvision
 timm==v0.4.12
 transformers==4.17.0
+torchdynamo
