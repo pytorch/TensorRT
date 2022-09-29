@@ -11,7 +11,7 @@ namespace converters {
 namespace impl {
 namespace {
 
-auto stack_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
+auto einsum_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
     {"aten::einsum(str equation, Tensor[] tensors) -> (Tensor)",
      [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        // Extract equation and list of tensors
@@ -40,7 +40,7 @@ auto stack_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().patt
          tensors.push_back(itensor);
        }
 
-       // Add Tensor-RT Einsum layer
+       // Add TensorRT Einsum layer
        auto einsum_layer = ctx->net->addEinsum(tensors.data(), tensors.size(), equation.c_str());
        TORCHTRT_CHECK(einsum_layer, "Unable to create einsum layer from node: " << *n);
 
