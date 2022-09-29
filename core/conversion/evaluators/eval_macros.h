@@ -5,7 +5,7 @@
 #define DEFINE_GENERIC_TWO_INPUT_EVALUATOR(name, node_kind, operation, schemas)                        \
   auto name##_registrations TORCHTRT_UNUSED = RegisterNodeEvaluators().evaluator(                      \
       {c10::Symbol::fromQualString(node_kind),                                                         \
-       [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {              \
+       [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {              \
          if (args.at(n->input(0)).IValue()->isInt()) {                                                 \
            auto a = args.at(n->input(0)).unwrapToInt();                                                \
            if (args.at(n->input(1)).IValue()->isInt()) {                                               \
@@ -80,7 +80,7 @@
 #define DEFINE_ARITHMATIC_TWO_INPUT_EVALUATOR(name, node_kind, operation, schemas)                     \
   auto name##_registrations TORCHTRT_UNUSED = RegisterNodeEvaluators().evaluator(                      \
       {c10::Symbol::fromQualString(node_kind),                                                         \
-       [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {              \
+       [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {              \
          if (args.at(n->input(0)).IValue()->isInt()) {                                                 \
            auto a = args.at(n->input(0)).unwrapToInt();                                                \
            if (args.at(n->input(1)).IValue()->isInt()) {                                               \
@@ -127,7 +127,7 @@
 #define DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(node_kind, node_name, operation, type, schemas) \
   auto node_kind##_registrations TORCHTRT_UNUSED = RegisterNodeEvaluators().evaluator(    \
       {c10::Symbol::fromQualString(node_name),                                            \
-       [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> { \
+       [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> { \
          auto a = args.at(n->input(0)).unwrapTo<type>();                                  \
          auto b = args.at(n->input(1)).unwrapTo<type>();                                  \
          return operation;                                                                \

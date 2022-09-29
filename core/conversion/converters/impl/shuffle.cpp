@@ -68,10 +68,14 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
             {"aten::reshape(Tensor self, int[] shape) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto in = args[0].ITensorOrFreeze(ctx);
+               std::cout << "====1====" << std::endl;
                auto in_shape = util::toVec(in->getDimensions());
+               std::cout << "====2====" << std::endl;
                std::vector<int64_t> new_shape;
                if (ctx->input_is_dynamic) {
+                 std::cout << "====3====" << std::endl;
                  new_shape = util::toVec(args[1].unwrapToIntList().vec());
+                 std::cout << "====4====" << std::endl;
                  int nbDynamicDims = 0;
                  for (size_t i = 0; i < new_shape.size(); i++) {
                    if (in_shape[i] == -1)
@@ -82,9 +86,10 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                        "Resize is currently not supported when target shape contains more than one dynamic dimension");
                  }
                } else {
+                 std::cout << "====5====" << std::endl;
                  new_shape = torch::reshape(torch::rand(in_shape), args[1].unwrapToIntList().vec()).sizes().vec();
                }
-
+               std::cout << "====6====" << std::endl;
                auto shuffle = ctx->net->addShuffle(*in);
                TORCHTRT_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
                shuffle->setReshapeDimensions(util::toDims(new_shape));

@@ -24,7 +24,7 @@ auto prim_registrations =
     RegisterNodeEvaluators()
         .evaluator(
             {torch::jit::prim::Constant,
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                if (n->output()->type()->kind() == at::FunctionType::Kind) {
                  return {};
                }
@@ -32,12 +32,12 @@ auto prim_registrations =
              }})
         .evaluator(
             {torch::jit::prim::NumToTensor,
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                return evaluators::scalar_to_tensor(args.at(n->input(0)).IValue()->toScalar());
              }})
         .evaluator(
             {torch::jit::prim::ListUnpack,
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                // Outputs is an IValue which has list of tensors which can be found in ctx->evaluated_value_map
                const torch::jit::IValue* outputs = args.at(n->input()).IValue();
                auto outputVec = outputs->toList().vec();
@@ -45,7 +45,7 @@ auto prim_registrations =
              }})
         .evaluator(
             {torch::jit::prim::ListConstruct,
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                const auto num_inputs = n->inputs().size();
                if (constTypesOnly(args)) {
                  c10::ListTypePtr lt = n->output()->type()->expect<c10::ListType>();
@@ -103,8 +103,14 @@ auto prim_registrations =
                      if (args.at(in).IValue()->isNone()) {
                        auto ival = torch::jit::IValue();
                        list.emplace_back(std::move(ival));
+                     } else if (args.at(in).IValue()->isInt()) {
+                       auto itensor = torch_tensorrt::core::conversion::converters::tensor_to_const(ctx, torch::tensor(args.at(in).unwrapToInt()));
+                       auto tensor_holder = TensorContainer();
+                       tensor_holder.hold_tensor(itensor);
+                       auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                       list.emplace_back(std::move(ival));
                      } else {
-                       list.emplace_back(std::move(args.at(in).unwrapToTensor()));
+                        list.emplace_back(std::move(args.at(in).unwrapToTensor()));
                      }
                    }
                  }
@@ -113,7 +119,7 @@ auto prim_registrations =
              }})
         .evaluator(
             {c10::Symbol::fromQualString("prim::dtype"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto input = args.at(n->input(0));
                if (input.isITensor()) {
                  auto trt_dtype = input.ITensor()->getType();
@@ -136,7 +142,7 @@ auto prim_registrations =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("prim::min"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                if (n->inputs().size() == 1) {
                  auto a = args.at(n->input(0)).unwrapToIntList();
                  int64_t min = std::numeric_limits<int64_t>::max();
@@ -198,7 +204,7 @@ auto prim_registrations =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("prim::max"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                if (n->inputs().size() == 1) {
                  auto a = args.at(n->input(0)).unwrapToIntList();
                  int64_t max = std::numeric_limits<int64_t>::min();
@@ -260,7 +266,7 @@ auto prim_registrations =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("prim::shape"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                LOG_WARNING("There may be undefined behavior using dynamic shape and prim::shape");
                auto tensor_var = args.at(n->input(0));
                if (tensor_var.isITensor()) {
@@ -274,7 +280,7 @@ auto prim_registrations =
              EvalOptions().validSchemas({"prim::shape(Tensor a) -> (int[])"})})
         .evaluator(
             {torch::jit::prim::TupleConstruct,
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                c10::IValue tuple = c10::ivalue::Tuple::create();
                std::vector<c10::IValue> elems;
                for (auto in : n->inputs()) {
@@ -292,7 +298,7 @@ auto prim_registrations =
              }})
         .evaluator(
             {torch::jit::prim::TupleIndex,
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                // Outputs is an IValue which has list of tensors which can be found in ctx->evaluated_value_map
                auto tuple = args.at(n->input(0)).IValue()->toTuple();
                int64_t idx = args.at(n->input(1)).IValue()->toInt();
@@ -302,24 +308,24 @@ auto prim_registrations =
              EvalOptions().validSchemas({"prim::TupleIndex(Any tup, int i) -> (Any)"})})
         .evaluator(
             {torch::jit::prim::TupleUnpack,
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                // Outputs is an IValue which has list of tensors which can be found in ctx->evaluated_value_map
                auto output = args.at(n->input()).IValue()->toTuple();
                return c10::optional<torch::jit::IValue>(std::move(output));
              }})
         .evaluator(
             {c10::Symbol::fromQualString("prim::unchecked_cast"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                return *(args.at(n->input(0)).IValue());
              }})
         .evaluator(
             {c10::Symbol::fromQualString("prim::Uninitialized"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                return c10::IValue::uninitialized();
              }})
         .evaluator(
             {c10::Symbol::fromQualString("prim::RaiseException"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto exception = args.at(n->input(0)).IValue();
                TORCHTRT_THROW_ERROR("Error from TorchScript: " << *exception);
                return {};

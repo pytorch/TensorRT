@@ -68,7 +68,7 @@ c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::
       return {};
     }
   }
-  auto eval = evaluators::EvalNode(n, eval_args);
+  auto eval = evaluators::EvalNode(ctx, n, eval_args);
   return eval;
 }
 
