@@ -92,7 +92,7 @@ Explicit batch is the default mode and it must be set for dynamic shape. For mos
 
 For examples of the last path, if we have a 3D tensor t shaped as (batch, sequence, dimension), operations such as torch.transpose(0, 2). If any of these three are not satisfied, we’ll need to specify InputTensorSpec as inputs with dynamic range.
 
-c
+.. code-block:: shell
 
     import deeplearning.trt.fx2trt.converter.converters
     from torch.fx.experimental.fx2trt.fx2trt import InputTensorSpec, TRTInterpreter
