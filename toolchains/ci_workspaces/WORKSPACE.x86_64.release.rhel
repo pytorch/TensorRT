@@ -41,7 +41,7 @@ local_repository(
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",
-    path = "/usr/local/cuda-11.7",
+    path = "/usr/local/cuda-11.6",
 )
 
 new_local_repository(
@@ -57,16 +57,17 @@ http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu117/libtorch-cxx11-abi-shared-with-deps-1.13.0.dev20220922%2Bcu117.zip"],
+    sha256 = "94573e4c5f84ee70dea00c39dc1afcd4173ef4454f4d7cb428b499cf4c3b86e1",
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu116/libtorch-cxx11-abi-shared-with-deps-1.13.0.dev20220922%2Bcu116.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu117/libtorch-shared-with-deps-1.13.0.dev20220922%2Bcu117.zip"],
+    sha256 = "5748ee06d81934a4bf7654653b34820365b264d16f6b99b56833cfdd3005da71",
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu116/libtorch-shared-with-deps-1.13.0.dev20220922%2Bcu116.zip"],
 )
-
 
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
