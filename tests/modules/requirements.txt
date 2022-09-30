@@ -1,3 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cu116
 torchvision
 timm==v0.4.12
 transformers==4.17.0
