@@ -33,8 +33,6 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
 
   for (auto& input : inputs) {
     if (input.first->type()->kind() == torch::jit::TypeKind::ListType) {
-      // create list
-      std::vector<torch::jit::IValue> list;
       c10::TypePtr elementType = c10::TensorType::get();
       auto generic_list = c10::impl::GenericList(elementType);
       for (size_t i = 0; i < input.second.size(); i++) {

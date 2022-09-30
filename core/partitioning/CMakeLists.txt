@@ -4,6 +4,7 @@ add_library(${lib_name} OBJECT)
 set(CXX_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/partitioning.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/shape_analysis.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/stitching.cpp"
 )
 
 set(HEADER_FILES
