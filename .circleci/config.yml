@@ -1070,10 +1070,10 @@ workflows:
           enabled: << pipeline.parameters.enable-packaging >>
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
-          requires:
-            - test-core-cpp-x86_64-linux
-            - test-py-ts-x86_64-linux
-            - test-py-fx-x86_64-linux
+          #requires:
+            #- test-core-cpp-x86_64-linux
+            #- test-py-ts-x86_64-linux
+            #- test-py-fx-x86_64-linux
 
   ngc-release:
     when: << pipeline.parameters.enable-ngc-packaging >>
