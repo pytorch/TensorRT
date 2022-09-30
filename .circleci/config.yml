@@ -946,13 +946,13 @@ parameters:
   # Nightly platform config
   torch-build:
     type: string
-    default: "1.13.0.dev20220921+cu117"
+    default: "1.13.0.dev20220921+cu116"
   torch-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/nightly/cu117"
+    default: "https://download.pytorch.org/whl/nightly/cu116"
   cudnn-version:
     type: string
-    default: "8.5.0"
+    default: "8.4.1"
   trt-version-short:
     type: string
     default: "8.4.1"
