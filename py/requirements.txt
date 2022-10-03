@@ -1,7 +1,7 @@
 numpy
 pybind11==2.6.2
---extra-index-url https://download.pytorch.org/whl/nightly/cu117
-torch==1.13.0.dev20220921+cu117
-torchvision==0.14.0.dev20220921+cu117
+--extra-index-url https://download.pytorch.org/whl/nightly/cu116
+torch==1.13.0.dev20220921+cu116
+torchvision==0.14.0.dev20220921+cu116
 --extra-index-url https://pypi.ngc.nvidia.com
 nvidia-tensorrt==8.4.3.1
