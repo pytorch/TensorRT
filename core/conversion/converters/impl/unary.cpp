@@ -95,6 +95,8 @@ convert(sqrt, kSQRT);
 convert(exp, kEXP);
 convert(neg, kNEG);
 convert(erf, kERF);
+convert(sign, kSIGN);
+convert(round, kROUND);
 convert(asinh, kASINH);
 convert(acosh, kACOSH);
 convert(atanh, kATANH);
