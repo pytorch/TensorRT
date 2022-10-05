@@ -16,7 +16,11 @@ from ..observer import Observer
 from ..passes.remove_duplicate_output_args import remove_duplicate_output_args
 from .graph_opts import common_subexpression_elimination
 
-from .lower_basic_pass import run_const_fold
+from .lower_basic_pass import (
+    replace_mutable_op,
+    replace_op_with_indices,
+    run_const_fold,
+)
 
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -175,6 +179,14 @@ class LowerPassManagerBuilder:
 
     def _default_lower_pass(self) -> PassManager:
         def lower_func(split_result: SplitResult) -> nn.Module:
+            if self._additional_input:
+                additional_submodule_inputs = generate_inputs_for_submodules(
+                    split_result.split_module,
+                    self._additional_input,
+                    list(split_result.submodule_inputs.keys()),
+                )
+            else:
+                additional_submodule_inputs = None
 
             for submod_name, submod_inputs in split_result.submodule_inputs.items():
                 submod = getattr(split_result.split_module, submod_name)
@@ -185,6 +197,12 @@ class LowerPassManagerBuilder:
                 if not submod_name.startswith(split_result.non_acc_submodule_prefix):
                     _LOGGER.info(f"Now lowering submodule {submod_name}")
                     lowering_start_time = datetime.datetime.now()
+
+                    self.lower_setting.additional_inputs = (
+                        additional_submodule_inputs[submod_name]
+                        if additional_submodule_inputs
+                        else None,
+                    )
 
                     lowered_module = self._lower_func(
                         submod, submod_inputs, self.lower_setting, submod_name
@@ -201,6 +219,9 @@ class LowerPassManagerBuilder:
 
         return PassManager.build_from_passlist([lower_func])
 
+    def _default_replace_mutable_op_pass(self) -> PassManager:
+        return PassManager.build_from_passlist([replace_mutable_op])
+
     def build_trt_lower_pipeline(
         self, input: Input, additional_input: Optional[Input] = None
     ) -> PassManager:
@@ -208,7 +229,25 @@ class LowerPassManagerBuilder:
         self._additional_input = additional_input
         passes = []
 
+        passes.append(self._default_replace_mutable_op_pass())
         passes.append(self._const_fold_pass())
+        passes.append(self.graph_optimization_pass())
+        passes.append(self._split_pass())
+        passes.append(self._trt_lower_pass())
+
+        pm = PassManager.build_from_passlist(passes)
+        return pm
+
+    def build_aten2trt_lower_pipeline(
+        self, input: Input, additional_input: Optional[Input] = None
+    ) -> PassManager:
+        self._input = input
+        self._additional_input = additional_input
+        passes = []
+        passes.append(
+            wrapper(self._trace_func, self._input),
+        )
+        passes.append(self._default_replace_mutable_op_pass())
         passes.append(self.graph_optimization_pass())
         passes.append(self._split_pass())
         passes.append(self._trt_lower_pass())
@@ -223,6 +262,7 @@ class LowerPassManagerBuilder:
         self._additional_input = additional_input
         passes = []
 
+        passes.append(self._default_replace_mutable_op_pass())
         passes.append(self._const_fold_pass())
         passes.append(self.graph_optimization_pass())
         passes.append(self._split_pass())

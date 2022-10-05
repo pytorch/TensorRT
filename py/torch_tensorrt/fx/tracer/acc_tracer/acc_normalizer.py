@@ -176,6 +176,7 @@ def register_acc_op_mapping(
     kwargs_to_move_to_acc_out_ty: Optional[
         List[Union[Tuple[str, str, bool], Tuple[str, str]]]
     ] = None,
+    allow_normalize_from_torch_package=False,
 ):
     """
     Use this decorator to map a non-acc operator to an acc operator.
@@ -199,6 +200,7 @@ def register_acc_op_mapping(
             new_fn_target=new_fn_target,
             arg_replacement_tuples=final_arg_replacement_tuples,  # type: ignore[arg-type]
             kwargs_to_move_to_acc_out_ty=kwargs_to_move_to_acc_out_ty,
+            allow_normalize_from_torch_package=allow_normalize_from_torch_package,
         )
         return new_fn_target
 
@@ -328,9 +330,17 @@ def get_normalized_kwargs(
     return new_kwargs
 
 
-def normalize(mod: torch.fx.GraphModule, expect_nodes_have_shapes: bool = False):
+def normalize(
+    mod: torch.fx.GraphModule,
+    expect_nodes_have_shapes: bool = False,
+    acc_normalization_block_list: Optional[
+        Set[Tuple[str, Union[str, Callable]]]
+    ] = None,
+):
     assert len(_normalization_dict) > 0
     graph = mod.graph
+    if acc_normalization_block_list is None:
+        acc_normalization_block_list = set()
 
     # For "call_module" node we return _base_class_origin if it's a
     # RewrittenModule, otherwise, return its type. For other nodes,
@@ -389,7 +399,12 @@ def normalize(mod: torch.fx.GraphModule, expect_nodes_have_shapes: bool = False)
         if node.op in {"placeholder", "get_attr", "output"}:
             continue
 
-        normalization_info = _normalization_dict.get((node.op, get_target(mod, node)))
+        op_and_target = (node.op, get_target(mod, node))
+
+        if op_and_target in acc_normalization_block_list:
+            continue
+
+        normalization_info = _normalization_dict.get(op_and_target)
 
         # Also check if the torch_packaged version of the op was specified to be normalized.
         if normalization_info is None and node.op == "call_function":

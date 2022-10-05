@@ -728,6 +728,9 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
         }
         self.checkGraphModuleNodes(m, expected_node_occurrence=node_occurrence)
 
+    @unittest.skip(
+        "This is not stable. We can enable the test after it becomes stable."
+    )
     def test_conv_add_standalone_module(self):
         class Standalone(torch.nn.Module):
             def __init__(self):

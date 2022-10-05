@@ -18,6 +18,36 @@ from .pass_utils import log_before_after, validate_inference
 Input = Any
 
 
+def replace_mutable_op(module: torch.fx.GraphModule) -> torch.fx.GraphModule:
+    if not isinstance(module, torch.fx.GraphModule):
+        return module
+
+    # Before any lowering pass, replace mutable ops like torch.fill_
+    # Because fx cannot deal with inplace ops
+    for n in module.graph.nodes:
+        # TODO: add more mutable ops
+        if (n.op == "call_method" and n.target == "fill_") or (
+            n.op == "call_function" and n.target == torch.fill_
+        ):
+            # Replace mutable op only if the modified variable
+            # is used by the rest of the graph
+            # only through this op
+            if set(n.args[0].users.keys()) == {n}:
+                with module.graph.inserting_after(n):
+
+                    # TODO: move this outside?
+                    def fill_with_mul_zero_and_add(*args):
+                        return args[0].mul(0.0).add(args[1])
+
+                    new_node = module.graph.create_node(
+                        "call_function", fill_with_mul_zero_and_add, args=n.args
+                    )
+                    n.replace_all_uses_with(new_node)
+                    module.graph.erase_node(n)
+    module.recompile()
+    return module
+
+
 def run_const_fold(traced_mod: torch.fx.GraphModule) -> torch.fx.GraphModule:
     # Now we do constant folding on traced module. We want to skip pattern like
     # weights -> quant -> dequant -> op during constant folding when the model is
@@ -34,6 +64,44 @@ def run_const_fold(traced_mod: torch.fx.GraphModule) -> torch.fx.GraphModule:
     const_split_mod = split_const_subgraphs(traced_mod, skip_folding_quant_dequant)
     const_split_mod.run_folding()
     return const_split_mod
+
+
+def replace_op_with_indices(module: torch.fx.GraphModule) -> torch.fx.GraphModule:
+    for n in module.graph.nodes:
+        if n.op == "call_function" and n.target in (
+            torch.ops.aten.max_pool2d_with_indices.default,
+            torch.ops.aten.max_pool3d_with_indices.default,
+            torch.ops.aten.native_batch_norm.default,
+        ):
+            if len(n.users) != 1:
+                raise RuntimeError(
+                    f"{n.target} has users={len(n.users)}. We can only handle it with 1 user"
+                )
+            if n.target == torch.ops.aten.max_pool2d_with_indices.default:
+                new_op = torch.ops.aten.max_pool2d
+                new_args = n.args
+            elif n.target == torch.ops.aten.max_pool3d_with_indices.default:
+                new_op = torch.ops.aten.max_pool3d
+                new_args = n.args
+            elif n.target == torch.ops.aten.native_batch_norm.default:
+                new_op = torch.ops.aten.batch_norm
+                new_args = list(n.args)
+                new_args.append(False)
+                new_args = tuple(new_args)
+
+            getitem_node = next(iter(n.users))
+            with module.graph.inserting_after(getitem_node):
+                new_node = module.graph.create_node(
+                    "call_function",
+                    new_op,
+                    args=new_args,
+                    kwargs=n.kwargs,
+                )
+                getitem_node.replace_all_uses_with(new_node)
+                module.graph.erase_node(getitem_node)
+    module.graph.eliminate_dead_code()
+    module.recompile()
+    return module
 
 
 @log_before_after
@@ -195,72 +263,6 @@ def fuse_permute_matmul(gm: torch.fx.GraphModule, input: Input):
     gm.graph.lint()
     gm.recompile()
     return gm
-
-
-try:
-    # @manual=//deeplearning/trt/python:py_tensorrt
-    import tensorrt as trt
-    from torch_tensorrt.fx.converter_registry import tensorrt_converter
-    from torch_tensorrt.fx.converters.converter_utils import (
-        add_binary_elementwise_layer,
-        broadcast,
-        get_trt_tensor,
-        set_layer_name,
-    )
-except Exception as e:
-    warnings.warn(f"Unable to import TensorRT related libraries.: {e}")
-else:
-
-    @tensorrt_converter(trt_transposed_matmul)
-    def trt_transposed_matmul_converter(network, target, args, kwargs, name):
-        lhs, rhs, lhs_transposed, rhs_transposed = args
-
-        if isinstance(lhs, torch.nn.Parameter):
-            lhs = get_trt_tensor(network, lhs, f"{name}_lhs")
-        if isinstance(rhs, torch.nn.Parameter):
-            rhs = get_trt_tensor(network, rhs, f"{name}_rhs")
-        layer = network.add_matrix_multiply(
-            lhs,
-            trt.MatrixOperation.TRANSPOSE
-            if lhs_transposed
-            else trt.MatrixOperation.NONE,
-            rhs,
-            trt.MatrixOperation.TRANSPOSE
-            if rhs_transposed
-            else trt.MatrixOperation.NONE,
-        )
-        set_layer_name(layer, target, name)
-        return layer.get_output(0)
-
-    @tensorrt_converter(trt_transposed_linear)
-    def trt_transposed_linear_converter(network, target, args, kwargs, name):
-        input, weight, bias = args
-
-        weight = get_trt_tensor(network, weight.t(), f"{name}_weight")
-        bias = get_trt_tensor(network, bias.reshape(1, -1), f"{name}_bias")
-
-        input, weight = broadcast(
-            network,
-            input,
-            weight,
-            f"{input.name}_broadcast",
-            f"{weight.name}_broadcast",
-        )
-        layer = network.add_matrix_multiply(
-            input,
-            trt.MatrixOperation.TRANSPOSE,
-            weight,
-            trt.MatrixOperation.NONE,
-        )
-        set_layer_name(layer, target, f"{name}_mm")
-        return add_binary_elementwise_layer(
-            network,
-            layer.get_output(0),
-            bias,
-            trt.ElementWiseOperation.SUM,
-            target,
-            f"{name}_add",
-        )
 
 
 def slice_list(sli: slice, dim: int, size: int):

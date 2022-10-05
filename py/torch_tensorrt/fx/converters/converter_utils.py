@@ -107,6 +107,8 @@ def extend_attr_to_tuple(
     """
     if not isinstance(val, (tuple, list)):
         val = (val,) * num_elem
+    if isinstance(val, list):
+        val = tuple(val)
     return val
 
 

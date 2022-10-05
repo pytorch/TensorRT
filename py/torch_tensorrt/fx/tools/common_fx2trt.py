@@ -12,7 +12,7 @@ from torch.fx.passes import shape_prop
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter, TRTModule
 from torch_tensorrt.fx.passes.pass_utils import chain_passes
-from torch_tensorrt.fx.utils import LowerPrecision
+from torch_tensorrt.fx.utils import LowerPrecision, proxytensor_trace
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -302,3 +302,89 @@ class AccTestCase(TRTTestCase):
         mod = acc_tracer.trace(mod, inputs)
         interp = TRTInterpreter(mod, input_specs, explicit_batch_dimension=True)
         super().run_test(mod, inputs, expected_ops, unexpected_ops, interp, rtol, atol)
+
+
+class DispatchTestCase(TRTTestCase):
+    def run_test(
+        self,
+        mod,
+        inputs,
+        expected_ops,
+        unexpected_ops=None,
+        apply_passes=None,
+        test_explicit_batch_dim=True,
+        test_implicit_batch_dim=True,
+        test_explicit_precision=False,
+        rtol=1e-03,
+        atol=1e-03,
+        precision=LowerPrecision.FP32,
+    ):
+        mod = proxytensor_trace(mod, inputs)
+
+        if apply_passes is not None:
+            pass_tracer = chain_passes(*apply_passes)
+            mod = pass_tracer(mod, inputs)
+
+        if test_implicit_batch_dim:
+            interp = TRTInterpreter(
+                mod,
+                InputTensorSpec.from_tensors(inputs),
+            )
+            super().run_test(
+                mod, inputs, expected_ops, unexpected_ops, interp, rtol, atol, precision
+            )
+
+        if test_explicit_batch_dim:
+            interp = TRTInterpreter(
+                mod,
+                InputTensorSpec.from_tensors(inputs),
+                explicit_batch_dimension=True,
+            )
+            super().run_test(
+                mod, inputs, expected_ops, unexpected_ops, interp, rtol, atol, precision
+            )
+
+        if test_explicit_precision:
+            interp = TRTInterpreter(
+                mod,
+                InputTensorSpec.from_tensors(inputs),
+                explicit_precision=test_explicit_precision,
+            )
+            super().run_test(
+                mod, inputs, expected_ops, unexpected_ops, interp, rtol, atol
+            )
+
+            interp = TRTInterpreter(
+                mod,
+                InputTensorSpec.from_tensors(inputs),
+                explicit_batch_dimension=True,
+                explicit_precision=test_explicit_precision,
+            )
+            super().run_test(
+                mod, inputs, expected_ops, unexpected_ops, interp, rtol, atol, precision
+            )
+
+    def run_test_with_dynamic_shape(
+        self,
+        mod,
+        input_specs,
+        expected_ops,
+        unexpected_ops=None,
+        rtol=1e-03,
+        atol=1e-03,
+    ):
+
+        inputs = InputTensorSpec.create_inputs_from_specs(input_specs)
+
+        mod = proxytensor_trace(mod, inputs)
+        interp = TRTInterpreter(
+            mod,
+            input_specs,
+            explicit_batch_dimension=True,
+        )
+        # Since the lowering is based on optimal shape. We need to test with
+        # different shape(for ex. max shape) for testing dynamic shape
+        inputs_max = InputTensorSpec.create_inputs_from_max_specs(input_specs)
+        super().run_test(
+            mod, inputs_max, expected_ops, unexpected_ops, interp, rtol, atol
+        )
