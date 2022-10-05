@@ -13,6 +13,7 @@ if hasattr(trt, "__version__"):
     from .transformation import *  # noqa: F401 F403
     from .quantization import *  # noqa: F401 F403
     from .acc_ops_converters import *  # noqa: F401 F403
+    from .aten_ops_converters import *  # noqa: F401 F403
 
     TRT_LOGGER = trt.Logger()
     trt.init_libnvinfer_plugins(TRT_LOGGER, "")
