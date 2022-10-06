@@ -299,13 +299,12 @@ TEST(Partitioning, SegmentBranchModelWithForcedFallbackOPCorrectly) {
   segmentGraph(&ctx, g->block());
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 2));
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 1));
-  ASSERT_TRUE(
-      checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 1}, {2, 4}, {3, 5, 6}}));
+  ASSERT_TRUE(checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 1}, {2, 4}, {3, 5, 6}}));
 }
 
 TEST(Partitioning, SegmentModelWithDependencyAwareness) {
   const auto graph = R"IR(
-                graph(%x : Tensor, 
+                graph(%x : Tensor,
                       %y : Tensor):
                   %3 : int = prim::Constant[value=0]()
                   %20 : int = prim::Constant[value=1]()
@@ -328,7 +327,8 @@ TEST(Partitioning, SegmentModelWithDependencyAwareness) {
   segmentGraph(&ctx, g->block());
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 2));
   ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 1));
-  ASSERT_TRUE(checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 2, 4}, {1, 3, 5}, {6, 7}}));
+  ASSERT_TRUE(
+      checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 2, 4}, {1, 3, 5}, {6, 7}}));
 }
 
 } // namespace tests
