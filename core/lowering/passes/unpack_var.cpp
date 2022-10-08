@@ -26,11 +26,16 @@ void UnpackVar(std::shared_ptr<torch::jit::Graph>& graph) {
       %var: Tensor = aten::sub(%sqrdmean, %meansqrd, %1)
       %varout : Tensor = prim::If(%unbiased)
         block0():
-          %shape: int[] = aten::size(%input)
-          %shapet: Tensor = aten::tensor(%shape, %f32_dtype, %none, %false)
-          %dim: int = prim::ListUnpack(%dims)
-          %reduceddims: Tensor = aten::select(%shapet, %0, %dim)
-          %numel: Tensor = aten::prod(%reduceddims, %dim, %keepdim, %none)
+          %originalshape: int[] = aten::size(%input)
+          %originalshapet: Tensor = aten::tensor(%originalshape, %f32_dtype, %none, %false)
+          %originalnumel: Tensor = aten::prod(%originalshapet, %0, %false, %none)
+
+          %resultingshape: int[] = aten::size(%var)
+          %resultingshapet: Tensor = aten::tensor(%resultingshape, %f32_dtype, %none, %false)
+          %resultingnumel: Tensor = aten::prod(%resultingshapet, %0, %false, %none)
+
+          %numel: Tensor = aten::div(%originalnumel, %resultingnumel)
+
           %mul: Tensor = aten::mul(%var, %numel)
           %sub: Tensor = aten::sub(%numel, %1, %1)
           %v: Tensor = aten::div(%mul, %sub)
