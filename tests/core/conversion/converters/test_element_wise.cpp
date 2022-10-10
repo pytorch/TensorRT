@@ -298,6 +298,7 @@ TEST(Converters, ATenFloorDivideWithScalarConvertsCorrectly) {
         %1 : Tensor = aten::floor_divide(%0, %scalar)
         return (%1))IR";
   pointwise_test_helper(graph, true);
+  pointwise_test_helper(graph, true, false, {5}, {5}, false, at::kInt);
 }
 
 TEST(Converters, ATenMaxConvertsCorrectly) {

@@ -196,6 +196,19 @@ nvinfer1::Dims squeezeDims(const nvinfer1::Dims& d, int pos, bool use_zeros) {
   return dims;
 }
 
+nvinfer1::Dims squeezeAllDims(const nvinfer1::Dims& d, bool use_zeros_for_unknown_dims) {
+  nvinfer1::Dims dims;
+  int j = 0;
+  for (int i = 0; i < d.nbDims; i++) {
+    if (d.d[i] != 1) {
+      dims.d[j++] = (use_zeros_for_unknown_dims && d.d[i] == -1) ? 0 : d.d[i];
+    }
+  }
+  dims.nbDims = j;
+
+  return dims;
+}
+
 std::vector<int64_t> toVec(nvinfer1::Dims d) {
   std::vector<int64_t> dims;
   for (int i = 0; i < d.nbDims; i++) {
