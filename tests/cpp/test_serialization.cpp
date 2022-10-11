@@ -42,8 +42,8 @@ TEST_P(CppAPITests, SerializedModuleIsStillCorrect) {
   post_serialized_results.push_back(post_serialized_results_ivalues.toTensor());
 
   for (size_t i = 0; i < pre_serialized_results.size(); i++) {
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
-        post_serialized_results[i], pre_serialized_results[i].reshape_as(post_serialized_results[i]), threshold));
+    ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(
+        post_serialized_results[i], pre_serialized_results[i].reshape_as(post_serialized_results[i])));
   }
 }
 
@@ -72,8 +72,8 @@ TEST_P(CppAPITests, SerializedDynamicModuleIsStillCorrect) {
   post_serialized_results.push_back(post_serialized_results_ivalues.toTensor());
 
   for (size_t i = 0; i < pre_serialized_results.size(); i++) {
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
-        post_serialized_results[i], pre_serialized_results[i].reshape_as(post_serialized_results[i]), threshold));
+    ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(
+        post_serialized_results[i], pre_serialized_results[i].reshape_as(post_serialized_results[i])));
   }
 }
 
@@ -81,5 +81,5 @@ INSTANTIATE_TEST_SUITE_P(
     CompiledModuleForwardIsCloseSuite,
     CppAPITests,
     testing::Values(
-        PathAndInput({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}, 2e-5}),
-        PathAndInput({"tests/modules/pooling_traced.jit.pt", {{1, 3, 10, 10}}, {at::kFloat}, 2e-5})));
+        PathAndInput({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}}),
+        PathAndInput({"tests/modules/pooling_traced.jit.pt", {{1, 3, 10, 10}}, {at::kFloat}})));

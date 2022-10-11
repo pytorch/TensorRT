@@ -11,9 +11,13 @@ namespace torch_tensorrt {
 namespace tests {
 namespace util {
 
-bool cosineSimEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float threshold);
+const float ATOL = 1e-8;
+const float RTOL = 1e-5;
+const float COSINE_THRESHOLD = 0.99f;
 
-bool almostEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float atol = 1e-8, float rtol = 1e-5);
+bool cosineSimEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float threshold = COSINE_THRESHOLD);
+
+bool almostEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float atol = ATOL, float rtol = RTOL);
 
 bool exactlyEqual(const at::Tensor& a, const at::Tensor& b);
 

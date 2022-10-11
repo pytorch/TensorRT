@@ -46,12 +46,6 @@ models = {
         "model": torch.hub.load("pytorch/vision:v0.9.0", "resnet50", pretrained=True),
         "path": "both",
     },
-    "ssd": {
-        "model": torch.hub.load(
-            "NVIDIA/DeepLearningExamples:torchhub", "nvidia_ssd", model_math="fp32"
-        ),
-        "path": "trace",
-    },
     "efficientnet_b0": {
         "model": timm.create_model("efficientnet_b0", pretrained=True),
         "path": "script",
