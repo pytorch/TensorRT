@@ -15,7 +15,7 @@ TEST_P(CppAPITests, ModuleAsEngineIsClose) {
   auto trt_results = torch_tensorrt::tests::util::RunModuleForwardAsEngine(mod, inputs);
 
   ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(
-      jit_results[0], trt_results[0].reshape_as(jit_results[0]), threshold));
+      jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
 #ifndef DISABLE_TEST_IN_CI
@@ -24,8 +24,8 @@ INSTANTIATE_TEST_SUITE_P(
     ModuleAsEngineForwardIsCloseSuite,
     CppAPITests,
     testing::Values(
-        PathAndInput({"tests/modules/resnet18_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}, 0.99}),
-        PathAndInput({"tests/modules/mobilenet_v2_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}, 0.99}),
-        PathAndInput({"tests/modules/efficientnet_b0_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}, 0.99}),
-        PathAndInput({"tests/modules/vit_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}, 0.99})));
+        PathAndInput({"tests/modules/resnet18_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}}),
+        PathAndInput({"tests/modules/mobilenet_v2_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}}),
+        PathAndInput({"tests/modules/efficientnet_b0_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}}),
+        PathAndInput({"tests/modules/vit_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}})));
 #endif
