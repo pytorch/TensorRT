@@ -32,7 +32,7 @@ bool cosineSimEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tens
   std::ostringstream ss;
   ss << computed_tensor << std::endl << gt_tensor << std::endl;
   LOG_DEBUG(ss.str());
-  if (computed_tensor.sum().item<float>() == 0.f || gt_tensor.sum().item<float>() == 0.f){
+  if (computed_tensor.sum().item<float>() == 0.f || gt_tensor.sum().item<float>() == 0.f) {
     return almostEqual(computed_tensor, gt_tensor);
   } else {
     LOG_DEBUG(std::string("Cosine Similarity score: ") + std::to_string(cosine_sim.item<float>()));
