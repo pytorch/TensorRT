@@ -236,4 +236,4 @@ In this example we will collect the arithmetic ops in a TensorRT segment and the
         %6 : Tensor = aten::cat(%0, %7)
         return ()
 
-In some cases this approach may create adjacent sements in the partition which have the same target. As a clean-up step we can consolidate these adjacent segments to further reduce the number of segments in the final partition.
+In some cases this approach may create adjacent segments in the partition which have the same target. As a clean-up step we can consolidate these adjacent segments to further reduce the number of segments in the final partition.
