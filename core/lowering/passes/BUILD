@@ -33,6 +33,7 @@ cc_library(
         "unpack_hardsigmoid.cpp",
         "unpack_hardswish.cpp",
         "unpack_log_softmax.cpp",
+        "unpack_rsqrt.cpp",
         "unpack_std.cpp",
         "unpack_var.cpp",
         "view_to_reshape.cpp",

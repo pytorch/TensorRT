@@ -204,3 +204,45 @@ TEST(LoweringPasses, UnpackStdUnbiasedKeepDimsLowersCorrectly) {
   ASSERT_TRUE(
       torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
 }
+
+TEST(LoweringPasses, UnpackRsqrtLowersCorrectly) {
+  const auto graph = R"IR(
+      graph(%x.1 : Tensor):
+        %2 : Tensor = aten::rsqrt(%x.1)
+        return (%2))IR";
+
+  // Make range [0.01, 1.01] to ensure positives / avoid NaN with negative sqrt
+  auto in = at::rand({2, 3, 5, 7}, {at::kCUDA}) + 0.01;
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+  torch_tensorrt::core::lowering::passes::UnpackRsqrt(g);
+  torch::jit::EliminateCommonSubexpression(g);
+  auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+}
+
+TEST(LoweringPasses, UnpackRsqrtIntLowersCorrectly) {
+  const auto graph = R"IR(
+      graph(%x.1 : Tensor):
+        %2 : Tensor = aten::rsqrt(%x.1)
+        return (%2))IR";
+
+  // Make range of ints [1, 10]
+  auto in = at::randint(1, 11, {2, 3, 5, 7}, {at::kCUDA});
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+  torch_tensorrt::core::lowering::passes::UnpackRsqrt(g);
+  torch::jit::EliminateCommonSubexpression(g);
+  auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+}
