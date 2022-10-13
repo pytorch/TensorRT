@@ -41,7 +41,7 @@ local_repository(
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",
-    path = "/usr/local/cuda-11.3/",
+    path = "/usr/local/cuda-11.6/",
 )
 
 new_local_repository(
@@ -56,17 +56,17 @@ new_local_repository(
 http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "80f089939de20e68e3fcad4dfa72a26c8bf91b5e77b11042f671f39ebac35865",
+    sha256 = "486106ddc5b5ad532f030f447940a571b924da821b9534d25c0cef5503cdfaea",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu113/libtorch-cxx11-abi-shared-with-deps-1.12.0%2Bcu113.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu116/libtorch-cxx11-abi-shared-with-deps-1.13.0.dev20220921%2Bcu116.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "8e35371403f7052d9e9b43bcff383980dbde4df028986dc1dab539953481d55f",
+    sha256 = "b304ebf26effcbbefcec99134bcfb0127c499306343fbe2e2cd127213448a4a6",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu113/libtorch-shared-with-deps-1.12.0%2Bcu113.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu116/libtorch-shared-with-deps-1.13.0.dev20220921%2Bcu116.zip"],
 )
 
 # Download these tarballs manually from the NVIDIA website
@@ -76,8 +76,8 @@ http_archive(
 http_archive(
     name = "cudnn",
     build_file = "@//third_party/cudnn/archive:BUILD",
-    sha256 = "7f3fbe6201708de409532a32d647af6b4bdb10d7f045d557270549e286487289",
-    strip_prefix = "cudnn-linux-x86_64-8.4.1.114_cuda11.4-archive",
+    sha256 = "ec96d2376d81fca42bdd3d4c3d705a99b29a065bab57f920561c763e29c67d01",
+    strip_prefix = "cudnn-linux-x86_64-8.4.1.50_cuda11.6-archive",
     urls = [
         "https://developer.nvidia.com/compute/cudnn/secure/8.4.1/local_installers/11.6/cudnn-linux-x86_64-8.4.1.50_cuda11.6-archive.tar.xz",
     ],
@@ -86,10 +86,10 @@ http_archive(
 http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    sha256 = "8107861af218694130f170e071f49814fa3e27f1386ce7cb6d807ac05a7fcf0e",
-    strip_prefix = "TensorRT-8.4.1.5",
+    sha256 = "8d7c2085c1639dcc73875048c23598a8526ce3089136876e31d90258e49e4f61",
+    strip_prefix = "TensorRT-8.4.3.1",
     urls = [
-        "https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/8.4.1/tars/tensorrt-8.4.1.5.linux.x86_64-gnu.cuda-11.6.cudnn8.4.tar.gz",
+        "https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/8.4.3/tars/tensorrt-8.4.3.1.linux.x86_64-gnu.cuda-11.6.cudnn8.4.tar.gz",
     ],
 )
 

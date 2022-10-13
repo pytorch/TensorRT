@@ -75,7 +75,7 @@ class TRTEntropyCalibrator(trt.IInt8EntropyCalibrator2):
         ):
             return None
 
-        batch = self.dataset_iterator.next()
+        batch = next(self.dataset_iterator)
         self.current_batch_idx += self.batch_size
         # Treat the first element as input and others as targets.
         if isinstance(batch, list):

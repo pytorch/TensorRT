@@ -166,10 +166,13 @@ class InputTensorSpec(NamedTuple):
 
         return input_specs
 
-    def to_random_tensor(self):
+    def to_random_tensor(self, id=1):
         shape = tuple(self.shape)
         if len(get_dynamic_dims(shape)):
-            shape = tuple(self.shape_ranges[0][1])
+            # id=0 -> min shape
+            # id=1 -> optimal shape
+            # id=2 -> max shape
+            shape = tuple(self.shape_ranges[0][id])
         elif not self.has_batch_dim:
             shape = (1,) + tuple(shape)
 
@@ -178,8 +181,15 @@ class InputTensorSpec(NamedTuple):
     @staticmethod
     def create_inputs_from_specs(input_specs: Iterable["InputTensorSpec"]):
         inputs = []
-
         for spec in input_specs:
             inputs.append(spec.to_random_tensor())
+
+        return inputs
+
+    @staticmethod
+    def create_inputs_from_max_specs(input_specs: Iterable["InputTensorSpec"]):
+        inputs = []
+        for spec in input_specs:
+            inputs.append(spec.to_random_tensor(2))
 
         return inputs

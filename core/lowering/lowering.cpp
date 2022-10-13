@@ -41,6 +41,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, std::vector<torch::jit::I
     passes::MarkNodesForFallback(g, true);
   }
   passes::UnpackHardSwish(g);
+  passes::UnpackHardSigmoid(g);
   passes::EliminateExceptionOrPassPattern(g);
   passes::ReduceToOperation(g);
   passes::ReduceGelu(g);
@@ -59,6 +60,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, std::vector<torch::jit::I
   passes::UnpackAddMM(g);
   // passes::UnpackBatchNorm(g);
   passes::UnpackLogSoftmax(g);
+  passes::UnpackRsqrt(g);
   passes::UnpackStd(g);
   passes::UnpackVar(g);
   passes::RemoveNOPs(g);

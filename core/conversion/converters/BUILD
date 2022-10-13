@@ -62,6 +62,7 @@ cc_library(
         "impl/constant_pad.cpp",
         "impl/conv_deconv.cpp",
         "impl/cumsum.cpp",
+        "impl/einsum.cpp",
         "impl/element_wise.cpp",
         "impl/expand.cpp",
         "impl/interpolate.cpp",

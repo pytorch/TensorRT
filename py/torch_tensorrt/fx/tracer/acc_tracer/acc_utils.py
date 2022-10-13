@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import torch
 import torch.fx
 from torch.fx.graph_module import GraphModule
-from torch.fx.immutable_collections import immutable_list
+from torch.fx.immutable_collections import immutable_dict, immutable_list
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes import graph_drawer
 from torch.fx.passes.shape_prop import TensorMetadata
@@ -171,7 +171,7 @@ def get_unique_attr_name_in_module(mod_traced: torch.fx.GraphModule, name: str) 
 
 def map_tensor_metadata(a: Any, fn: Callable):
     """
-    Map some `fn` to `a`, where `a` is either a TensorMetadata, or else a tuple/list
+    Map some `fn` to `a`, where `a` is either a TensorMetadata, or else a tuple/list/dict
     recursively containing TensorMetadata.
     """
     if isinstance(a, int):
@@ -180,6 +180,10 @@ def map_tensor_metadata(a: Any, fn: Callable):
         return fn(a)
     elif isinstance(a, tuple):
         return tuple(map_tensor_metadata(elem, fn) for elem in a)
+    elif isinstance(a, dict):
+        return immutable_dict(
+            {name: map_tensor_metadata(elem, fn) for name, elem in a.items()}
+        )
     assert isinstance(
         a, list
     ), f"Only supporting tuple/list/TensorMetadata, but found {type(a)}"

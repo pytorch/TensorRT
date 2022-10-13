@@ -3,45 +3,30 @@
 #include <iostream>
 #include <vector>
 
-#include "core/ir/ir.h"
-#include "core/partitioning/PartitionInfo.h"
-#include "core/partitioning/SegmentedBlock.h"
-#include "core/partitioning/shape_analysis.h"
-#include "core/util/prelude.h"
 #include "torch/csrc/jit/ir/ir.h"
+
+#include "core/ir/ir.h"
+#include "core/partitioning/partitioningctx/PartitioningCtx.h"
+#include "core/util/prelude.h"
 
 namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
-typedef std::vector<SegmentedBlock> PartitionedGraph;
+typedef std::unordered_map<const torch::jit::Value*, torch::jit::IValue> ExampleIValues;
 
-enum FallbackNodeType {
-  /// Node is not supported by TensorRT
-  kUNSUPPORTED,
-  /// Node is explicitly forced to fallback to Pytorch due to operator fallback
-  kOPERATOR_FALLBACK,
-  /// Node is explicitly forced to fallback to Pytorch due to module fallback
-  kMODULE_FALLBACK,
-  /// This node is in a TRT segment which does not satisfy min_block_size
-  /// and hence is forced to fallback.
-  kMIN_BLOCK_FALLBACK,
-  /// This node produces/consumes non-tensor inputs
-  kNON_TENSOR,
-};
+typedef std::pair<std::shared_ptr<torch::jit::Graph>, std::unordered_map<torch::jit::Value*, torch::jit::Value*>>
+    GraphAndMapping;
 
-PartitionedGraph segment_graph(
-    torch::jit::Block* block,
-    const PartitionInfo& partition_info,
-    std::unordered_map<torch::jit::Node*, int>& fallback_nodes);
+ExampleIValues generateRandomInputs(ir::CollectionInputSpecMap& input_ranges, ir::CollectionTypeMap& input_types);
 
-PartitionedGraph Partition(
-    torch::jit::Block* block,
-    std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& example_tensor_map,
-    const PartitionInfo& partition_info,
-    std::unordered_map<torch::jit::Node*, int>& fallback_nodes);
+void runShapeAnalysis(PartitioningCtx* ctx, torch::jit::Block* block, ExampleIValues& ivalues_maps);
 
-std::ostream& operator<<(std::ostream& os, const PartitionedGraph& g);
+void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block);
+
+GraphAndMapping stitch(PartitioningCtx* ctx, torch::jit::Block* block);
+
+void partition(PartitioningCtx* ctx, ExampleIValues& example_tensor_map);
 
 } // namespace partitioning
 } // namespace core

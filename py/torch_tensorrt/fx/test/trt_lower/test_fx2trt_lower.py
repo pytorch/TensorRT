@@ -7,6 +7,7 @@ import torch
 import torch.fx as fx
 import torch.nn as nn
 from torch_tensorrt.fx.lower import Lowerer, LowerSetting
+from torch_tensorrt.fx.passes.lower_basic_pass import replace_mutable_op
 
 logger = logging.getLogger(__name__)
 
@@ -53,3 +54,51 @@ class Fx2trtLowerTests(unittest.TestCase):
 
         lower = Lowerer.create(LowerSetting())
         lower(TestModule(), [torch.randn([2, 2])])
+
+    def test_replace_mutable_op(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x, y):
+                xf = x.fill_(100)
+                yf = y.fill_(200)
+                c = torch.cat([xf, yf], dim=1)
+                return c
+
+        lower = Lowerer.create(LowerSetting())
+        mod_traced = fx.symbolic_trace(TestModule())
+        lower(mod_traced, [torch.randn(3, 4), torch.randn(3, 4)])
+
+    def test_replace_mutable_op_dont_apply(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                s = x + 1
+                t = s.fill_(5)
+                p = s + t
+                return p
+
+        mod_traced = fx.symbolic_trace(TestModule())
+        old_code = mod_traced.code
+
+        transformed = replace_mutable_op(mod_traced)
+        new_code = transformed.code
+
+        # s.fill_ shouldn't have been replaced
+        # because s is used later
+        self.assertEqual(old_code, new_code)
+
+    def test_replace_mutable_op_do_apply(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                s = x + 1
+                t = s.fill_(5)  # s not used afterwards
+                p = x + t
+                return p
+
+        mod_traced = fx.symbolic_trace(TestModule())
+        old_code = mod_traced.code
+
+        transformed = replace_mutable_op(mod_traced)
+        new_code = transformed.code
+
+        # s.fill_ should have been replaced
+        # because s is not used afterwards
+        self.assertNotEqual(old_code, new_code)

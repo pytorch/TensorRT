@@ -4,6 +4,12 @@ from typing import List
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
+from functorch import make_fx
+from functorch.experimental import functionalize
+from torch_tensorrt.fx.passes.lower_basic_pass import (
+    replace_op_with_indices,
+    run_const_fold,
+)
 
 from .types import Shape, TRTDataType
 
@@ -82,3 +88,19 @@ def get_dynamic_dims(shape: Shape) -> List[int]:
             dynamic_dims.append(i)
 
     return dynamic_dims
+
+
+def proxytensor_trace(mod, inputs):
+
+    mod.eval()
+
+    def f(*inp):
+        return mod(*inp)
+
+    mod = make_fx(functionalize(f))(*inputs)
+
+    # Remove const operation. For ex, nn.Linear has transpose operation on weight
+    mod.graph.eliminate_dead_code()
+    mod = run_const_fold(mod)
+    mod = replace_op_with_indices(mod)
+    return mod

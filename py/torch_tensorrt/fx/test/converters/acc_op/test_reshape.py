@@ -77,6 +77,62 @@ class TestReshapeConverter(AccTestCase):
             TestModule(target_shape), input_specs, expected_ops={acc_ops.reshape}
         )
 
+    def test_reshape_with_dynamic_shape_size(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x, y):
+                shape_y = y.shape
+                t = shape_y[1]
+                return torch.reshape(x, [-1, t, 3])
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, 5, 6),
+                dtype=torch.float32,
+                shape_ranges=[((1, 5, 6), (2, 5, 6), (3, 5, 6))],
+            ),
+            InputTensorSpec(
+                shape=(-1, 5),
+                dtype=torch.float32,
+                shape_ranges=[((1, 5), (1, 5), (3, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.reshape}
+        )
+
+    def test_reshape_with_dynamic_shape_mul(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x, y, z):
+                t = 8000
+                a = torch.reshape(x, [-1, t, 64])
+                b = torch.reshape(y, [-1, t, 64])
+                c = torch.reshape(z, [-1, t, 64])
+                d = a + b + c
+                return d
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, 42, 512),
+                dtype=torch.float32,
+                shape_ranges=[((1, 42, 512), (1000, 42, 512), (1000, 42, 512))],
+            ),
+            InputTensorSpec(
+                shape=(-1, 42, 512),
+                dtype=torch.float32,
+                shape_ranges=[((1, 42, 512), (1000, 42, 512), (1000, 42, 512))],
+            ),
+            InputTensorSpec(
+                shape=(-1, 42, 512),
+                dtype=torch.float32,
+                shape_ranges=[((1, 42, 512), (1000, 42, 512), (1000, 42, 512))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.reshape}
+        )
+
 
 if __name__ == "__main__":
     run_tests()

@@ -1,0 +1,17 @@
+.. _exhale_struct_structtorch__tensorrt_1_1GraphInputs:
+
+Struct GraphInputs
+==================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_torch_tensorrt.h`
+
+
+Struct Documentation
+--------------------
+
+
+.. doxygenstruct:: torch_tensorrt::GraphInputs
+   :project: Torch-TensorRT
+   :members:
+   :protected-members:
+   :undoc-members:

@@ -19,6 +19,81 @@ commands:
             sudo wget -q https://github.com/bazelbuild/bazel/releases/download/<< parameters.version >>/bazel-<< parameters.version >>-linux-<< parameters.platform >> -O /usr/bin/bazel
             sudo chmod a+x /usr/bin/bazel
 
+  install-cmake:
+    description: Install CMake.
+    parameters:
+        cache:
+            default: true
+            description: Whether or not to cache the installation.
+            type: boolean
+        cache-key:
+            default: v1
+            description: String to use in cache key. Typically overridden when needed to bust cache.
+            type: string
+        install-dir:
+            default: $HOME/cmake
+            description: The path to install CMake to.
+            type: string
+        version:
+            default: 3.18.2
+            description: The version of CMake to install.
+            type: string
+    steps:
+        - when:
+            condition:
+                equal:
+                    - << parameters.cache >>
+                    - true
+            steps:
+                - run:
+                    command: mkdir -pv << parameters.install-dir >>
+                    name: Prep cache restore
+                - restore_cache:
+                    keys:
+                        - cmake-<< parameters.cache-key >>-<< parameters.version >>
+        - run:
+            command: |
+                echo 'export PATH="<< parameters.install-dir >>/bin:$PATH"' >> $BASH_ENV
+            name: Add CMake to PATH
+        - run:
+            command: |
+                if which cmake; then
+                  if cmake --version | grep "<< parameters.version >>"; then
+                    echo "CMake is already installed."
+                    exit 0
+                  else
+                    echo "CMake is already installed but it is the wrong version."
+                  fi
+                fi
+
+                rm -rf << parameters.install-dir >>/*
+                echo "Installing the requested version of CMake."
+                baseUrl="https://github.com/Kitware/CMake/releases/download/"
+                url="${baseUrl}/v<< parameters.version >>/cmake-<< parameters.version >>-Linux-x86_64.tar.gz"
+                curl -sSL -o /tmp/cmake.tar.gz $url
+                tar -C << parameters.install-dir >> --strip-components 1 -zxf /tmp/cmake.tar.gz
+            name: Install CMake
+        - run:
+            command: rm -rf << parameters.install-dir >>/{doc,man}
+            name: Remove unnecessary files
+        - run:
+            command: |
+                ls -l << parameters.install-dir >>/bin
+                echo $PATH
+                cmake --version
+            name: Verify CMake installation
+        - when:
+            condition:
+                equal:
+                    - << parameters.cache >>
+                    - true
+            steps:
+                - save_cache:
+                    key: cmake-<< parameters.cache-key >>-<< parameters.version >>
+                    paths:
+                        - << parameters.install-dir >>
+
+
   install-cuda:
     description: "Install CUDA"
     parameters:
@@ -207,6 +282,80 @@ commands:
             mkdir -p /tmp/dist/builds
             cp dist/* /tmp/dist/builds
 
+  build-py-ngc:
+    description: "Build the torch-tensorrt python release for NGC PyTorch (cxx11-abi)"
+    parameters:
+      release:
+        type: boolean
+        default: false
+      torch-base-image:
+        type: string
+        default: nvcr.io/nvidia/pytorch:latest
+    steps:
+      - run:
+          name: Log into docker
+          command: |
+            docker login --username="\$oauthtoken" --password=$NGC_TOKEN nvcr.io
+      - run:
+          name: Pull image
+          command: |
+            docker pull << parameters.torch-base-image >>
+      - run:
+          name: Create container
+          command: |
+              docker run -it -d --name ngc_build_container -v /home/circleci/project:/workspace -e BAZEL_VERSION="$(cat /home/circleci/project/.bazelversion)" -w /workspace << parameters.torch-base-image >>
+      - run:
+          name: Install build deps
+          command: |
+            export BAZEL_VERSION="$(cat /home/circleci/project/.bazelversion)"
+            docker exec ngc_build_container bash -c "wget https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-linux-x86_64 -O /usr/bin/bazel && chmod a+x /usr/bin/bazel"
+            docker exec ngc_build_container bash -c "mv /workspace/docker/WORKSPACE.ngc /workspace/WORKSPACE"
+            docker exec ngc_build_container bash -c "cd /workspace/py && pip install wheel setuptools pybind11==2.6.2"
+            docker exec ngc_build_container bash -c "git config --global --add safe.directory /workspace"
+      - when:
+          condition: << parameters.release >>
+          steps:
+            - run:
+                name: Build torch-tensorrt release build for NGC
+                command: |
+                  docker exec ngc_build_container bash -c "cd /workspace/py && python3 setup.py bdist_wheel --use-cxx11-abi --release"
+      - unless:
+          condition: << parameters.release >>
+          steps:
+            - run:
+                name: Build torch-tensorrt debug build for NGC
+                command: |
+                  docker exec ngc_build_container bash -c "cd /workspace/py && python3 setup.py bdist_wheel --use-cxx11-abi"
+      - run:
+          name: Collect builds
+          command: |
+            mkdir -p /tmp/dist/builds
+            cp /home/circleci/project/py/dist/* /tmp/dist/builds
+
+  build-cmake:
+    description: "Build the torch-tensorrt using CMake"
+    parameters:
+      platform:
+        type: string
+        default: "x86_64"
+    steps:
+      - run:
+          name: Build torch-tensorrt library with CMake
+          command: |
+            mkdir build
+            export PATH=$PATH:/usr/local/cuda/bin
+            ~/cmake/bin/cmake -S. -Bbuild \
+              -DCMAKE_MODULE_PATH=cmake/Module \
+              -DTorch_DIR=/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch/share/cmake/Torch \
+              -DTensorRT_ROOT=/usr \
+              -DCMAKE_BUILD_TYPE=Debug
+            cmake --build build -- -j12
+            mkdir -p /tmp/dist/builds
+            cp -r build/bin /tmp/dist/builds
+            cp -r build/lib /tmp/dist/builds
+            cp -r cpp/include /tmp/dist/builds
+
+
   dump-test-env:
     description: "Dump the test env to console"
     steps:
@@ -286,6 +435,7 @@ commands:
             mkdir -p /tmp/artifacts/test_results
             cd tests/py
             pytest --junitxml=/tmp/artifacts/test_results/api/api_test_results.xml api/
+            pytest --junitxml=/tmp/artifacts/test_results/models/models_test_results.xml models/
             pytest --junitxml=/tmp/artifacts/test_results/integrations/integrations_test_results.xml integrations/
             cd ~/project
 
@@ -338,7 +488,7 @@ commands:
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
-  build-aarch64-pyt-jetson:
+  build-aarch64-jetson:
     parameters:
       torch-build:
         type: string
@@ -409,9 +559,9 @@ jobs:
             - jetson
       - store_artifacts:
           path: /tmp/dist/jetson
-          destination: aarch64-pyt-jetson
+          destination: aarch64-jetson
 
-  build-x86_64-pyt-release:
+  build-x86_64-linux:
     parameters:
       torch-build:
         type: string
@@ -428,8 +578,8 @@ jobs:
       - create-env:
           os: "ubuntu2004"
           platform: "x86_64"
-          cudnn-version: << pipeline.parameters.cudnn-release-version >>
-          trt-version-short:  << pipeline.parameters.trt-release-version-short >>
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+          trt-version-short:  << pipeline.parameters.trt-version-short >>
           bazel-version: << pipeline.parameters.bazel-version >>
           bazel-platform: "x86_64"
       - install-torch-from-index:
@@ -444,64 +594,19 @@ jobs:
           steps:
             - build-py
       - run:
-          name: Move to release dir
+          name: Move to build dir
           command: |
-            mkdir -p /tmp/dist/release
-            cp -r /tmp/dist/builds/* /tmp/dist/release
+            mkdir -p /tmp/dist/x86_64-linux
+            cp -r /tmp/dist/builds/* /tmp/dist/x86_64-linux
       - persist_to_workspace:
           root: /tmp/dist
           paths:
-            - release
+            - x86_64-linux
       - store_artifacts:
-          path: /tmp/dist/release
-          destination: x86_64-pyt-release
+          path: /tmp/dist/x86_64-linux
+          destination: x86_64-linux
 
-  build-x86_64-pyt-nightly:
-    parameters:
-      torch-build:
-        type: string
-      torch-build-index:
-        type: string
-      cxx11-abi:
-        type: boolean
-        default: false
-    machine:
-      image: ubuntu-2004-cuda-11.4:202110-01
-    resource_class: xlarge
-    steps:
-      - checkout
-      - create-env:
-          os: "ubuntu2004"
-          platform: "x86_64"
-          cudnn-version: << pipeline.parameters.cudnn-nightly-version >>
-          trt-version-short:  << pipeline.parameters.trt-nightly-version-short >>
-          bazel-version: << pipeline.parameters.bazel-version >>
-          bazel-platform: "x86_64"
-      - install-torch-from-index:
-          torch-build:  << parameters.torch-build >>
-          torch-build-index: << parameters.torch-build-index >>
-      - when:
-          condition: << parameters.cxx11-abi >>
-          steps:
-            - build-py-cxx11-abi
-      - unless:
-          condition: << parameters.cxx11-abi >>
-          steps:
-            - build-py
-      - run:
-          name: Move to nightly dir
-          command: |
-            mkdir -p /tmp/dist/nightly
-            cp -r /tmp/dist/builds/* /tmp/dist/nightly
-      - persist_to_workspace:
-          root: /tmp/dist
-          paths:
-            - nightly
-      - store_artifacts:
-          path: /tmp/dist/nightly
-          destination: x86_64-pyt-nightly
-
-  test-core-cpp-x86_64:
+  test-core-cpp-x86_64-linux:
     parameters:
       torch-build:
         type: string
@@ -512,8 +617,6 @@ jobs:
       trt-version-long:
         type: string
       cudnn-version:
-        type: string
-      channel:
         type: string
     machine:
       image: ubuntu-2004-cuda-11.4:202110-01
@@ -537,14 +640,12 @@ jobs:
           at: /tmp/dist
       - run:
           name: "Install torch-tensorrt"
-          command: pip3 install /tmp/dist/<< parameters.channel >>/*
+          command: pip3 install /tmp/dist/x86_64-linux/*
       - dump-test-env
       - test-ts-core
 
-  test-py-ts-x86_64:
+  test-py-ts-x86_64-linux:
     parameters:
-      channel:
-        type: string
       torch-build:
         type: string
       torch-build-index:
@@ -560,20 +661,17 @@ jobs:
           trt-version-long: << parameters.trt-version-long >>
       - attach_workspace:
           at: /tmp/dist
-      - run:
-          name: "Install torch-tensorrt"
-          command: pip3 install /tmp/dist/<< parameters.channel >>/*
-      # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
+      - run:
+          name: "Install torch-tensorrt"
+          command: pip3 install --pre /tmp/dist/x86_64-linux/*
       - dump-test-env
       - test-ts-py-api
 
-  test-py-fx-x86_64:
+  test-py-fx-x86_64-linux:
     parameters:
-      channel:
-        type: string
       torch-build:
         type: string
       torch-build-index:
@@ -589,17 +687,17 @@ jobs:
           trt-version-long: << parameters.trt-version-long >>
       - attach_workspace:
           at: /tmp/dist/
-      - run:
-          name: "Install torch-tensorrt"
-          command: pip3 install /tmp/dist/<< parameters.channel >>/*
-      # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
+      - run:
+          name: "Install torch-tensorrt"
+          command: pip3 install --pre /tmp/dist/x86_64-linux/*
+      # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - dump-test-env
       - test-fx
 
-  package-x86_64:
+  package-x86_64-linux:
     parameters:
       enabled:
         type: boolean
@@ -620,7 +718,7 @@ jobs:
                 name: "Build packaging container"
                 command: |
                   cd ~/project/py/
-                  docker build -t torch_tensorrt_release_env --build-arg trt_version=<< pipeline.parameters.trt-release-version-short >> -f ci/Dockerfile.ci .
+                  docker build -t torch_tensorrt_release_env --build-arg trt_version=<< pipeline.parameters.trt-version-short >> -f ci/Dockerfile.ci .
             - run:
                 name: Build Python packages and pre-cxx11-abi tarball
                 command: |
@@ -630,9 +728,9 @@ jobs:
             - create-env:
                 os: "ubuntu2004"
                 platform: "x86_64"
-                cudnn-version: << pipeline.parameters.cudnn-release-version >>
-                trt-version-short:  << pipeline.parameters.trt-release-version-short >>
-                bazel-version: "5.1.1"
+                cudnn-version: << pipeline.parameters.cudnn-version >>
+                trt-version-short:  << pipeline.parameters.trt-version-short >>
+                bazel-version: << pipeline.parameters.bazel-version >>
                 bazel-platform: "x86_64"
             - run:
                 name: Build cxx11-abi tarball
@@ -652,11 +750,11 @@ jobs:
             - run:
                 name: Collect packages
                 command: |
-                  mkdir -p /tmp/dist/release
-                  cp -r ~/project/py/dist/* /tmp/dist/release
+                  mkdir -p /tmp/dist/x86_64-linux
+                  cp -r ~/project/py/dist/* /tmp/dist/x86_64-linux
             - store_artifacts:
-                path: /tmp/dist/release
-                destination: x86_64-release-pkgs
+                path: /tmp/dist/x86_64-linux
+                destination: x86_64-linux-pkgs
       - unless:
           condition: << parameters.enabled >>
           steps:
@@ -664,7 +762,7 @@ jobs:
                 name: Skipped packaging
                 command: echo -e "Packaging stage not enabled"
 
-  package-jetson:
+  package-aarch64-jetson:
     parameters:
       enabled:
         type: boolean
@@ -703,7 +801,7 @@ jobs:
           platform: "sbsa"
           cudnn-version: << pipeline.parameters.cudnn-jetson-version >>
           trt-version-short:  << pipeline.parameters.trt-jetson-version-short >>
-          bazel-version: "5.1.1"
+          bazel-version: << pipeline.parameters.bazel-version >>
           bazel-platform: "arm64"
       - run:
           name: Set python version
@@ -730,7 +828,7 @@ jobs:
             TORCHTRT_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __version__;print(__version__)")
             TRT_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __tensorrt_version__;print(__tensorrt_version__)")
             CUDNN_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __cudnn_version__;print(__cudnn_version__)")
-            pip3 install -r ~/project/py/requirements.txt
+            python3 -m pip install pybind11==2.6.2
             TORCH_VERSION=$(python3 -c "from torch import __version__;print(__version__.split('+')[0])")
             cp ~/project/bazel-bin/libtorchtrt.tar.gz ~/project/py/dist/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-aarch64-linux-jp<< parameters.jetpack-version >>.tar.gz
       - run:
@@ -740,8 +838,105 @@ jobs:
             cp -r ~/project/py/dist/* /tmp/dist/jetson
       - store_artifacts:
           path: /tmp/dist/jetson
-          destination: aarch64-release-pkgs
+          destination: aarch64-jetson-pkgs
 
+  build-x86_64-linux-cmake:
+    parameters:
+      cudnn-version:
+        type: string
+      trt-version-short:
+        type: string
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: xlarge
+    steps:
+      - checkout
+      - create-env:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          cudnn-version: << parameters.cudnn-version >>
+          trt-version-short:  << parameters.trt-version-short >>
+          bazel-platform: "x86_64"
+      - install-cmake:
+          version: 3.24.1
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
+      - build-cmake
+      - run:
+          name: Move to cmake build dir
+          command: |
+            mkdir -p /tmp/dist/cmake
+            cp -r /tmp/dist/builds/* /tmp/dist/cmake
+      - persist_to_workspace:
+          root: /tmp/dist
+          paths:
+            - cmake
+      - store_artifacts:
+          path: /tmp/dist/cmake
+          destination: x86_64-cmake
+
+  build-x86_64-linux-ngc:
+    parameters:
+      torch-base-image:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: xlarge
+    steps:
+      - checkout
+      - build-py-ngc:
+          release: false
+          torch-base-image: << parameters.torch-base-image >>
+      - run:
+          name: Move to NGC dir
+          command: |
+            mkdir -p /tmp/dist/ngc
+            cp -r /tmp/dist/builds/* /tmp/dist/ngc
+      - persist_to_workspace:
+          root: /tmp/dist
+          paths:
+            - ngc
+      - store_artifacts:
+          path: /tmp/dist/ngc
+          destination: x86_64-pyt-ngc
+
+  package-x86_64-linux-ngc:
+    parameters:
+      enabled:
+        type: boolean
+        default: false
+      torch-base-image:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: xlarge
+    steps:
+      - when:
+          condition: << parameters.enabled >>
+          steps:
+            - checkout
+            - build-py-ngc:
+                release: true
+                torch-base-image: << parameters.torch-base-image >>
+            - run:
+                name: Collect packages
+                command: |
+                  mkdir -p /tmp/dist/ngc
+                  cp -r ~/project/py/dist/* /tmp/dist/ngc
+            - store_artifacts:
+                path: /tmp/dist/ngc
+                destination: x86_64-ngc-pkgs
+      - unless:
+          condition: << parameters.enabled >>
+          steps:
+            - run:
+                name: Skipped packaging
+                command: echo -e "Packaging stage not enabled"
 
 parameters:
   bazel-version:
@@ -749,46 +944,29 @@ parameters:
     default: "5.2.0"
 
   # Nightly platform config
-  torch-nightly-build:
+  torch-build:
     type: string
-    default: "1.13.0.dev20220810+cu113"
-  torch-nightly-build-index:
+    default: "1.13.0.dev20220921+cu116"
+  torch-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/nightly/cu113"
-  cudnn-nightly-version:
-    type: string
-    default: "8.4.1"
-  trt-nightly-version-short:
+    default: "https://download.pytorch.org/whl/nightly/cu116"
+  cudnn-version:
     type: string
     default: "8.4.1"
-  trt-nightly-version-long:
-    type: string
-    default: "8.4.1.5"
-
-  # Release platform config
-  torch-release-build:
-    type: string
-    default: "1.12.0+cu113"
-  torch-release-build-index:
-    type: string
-    default: "https://download.pytorch.org/whl/cu113"
-  cudnn-release-version:
+  trt-version-short:
     type: string
     default: "8.4.1"
-  trt-release-version-short:
+  trt-version-long:
     type: string
-    default: "8.4.1"
-  trt-release-version-long:
-    type: string
-    default: "8.4.1.5"
+    default: "8.4.3.1"
 
   # Jetson platform config
   torch-jetson-build:
     type: string
-    default: "torch-1.13.0a0+340c4120.nv22.06-cp38-cp38-linux_aarch64.whl"
+    default: "torch-1.13.0a0+08820cb0.nv22.07-cp38-cp38-linux_aarch64.whl"
   jetpack-version:
     type: string
-    default: "50"
+    default: "502"
   cudnn-jetson-version:
     type: string
     default: "8.3.2"
@@ -799,7 +977,15 @@ parameters:
     type: string
     default: "8.4.1.5"
 
+  torch-ngc-base-image:
+    type: string
+    default: "nvcr.io/nvidia/pytorch:22.07-py3"
+
   enable-packaging:
+    type: boolean
+    default: false
+
+  enable-ngc-packaging:
     type: boolean
     default: false
 
@@ -816,135 +1002,99 @@ workflows:
                 - master
                 - release/**/*
     jobs:
-      - build-aarch64-pyt-jetson:
+      - build-aarch64-jetson:
           torch-build: << pipeline.parameters.torch-jetson-build >>
           jetpack-version: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.10
 
+      - build-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
 
-      - build-x86_64-pyt-release:
-          torch-build: << pipeline.parameters.torch-release-build >>
-          torch-build-index: << pipeline.parameters.torch-release-build-index >>
-
-      - test-core-cpp-x86_64:
-          name: test-core-cpp-x86_64-pyt-release
-          channel: "release"
-          torch-build: << pipeline.parameters.torch-release-build >>
-          torch-build-index: << pipeline.parameters.torch-release-build-index >>
-          trt-version-short: << pipeline.parameters.trt-release-version-short >>
-          trt-version-long: << pipeline.parameters.trt-release-version-long >>
-          cudnn-version: << pipeline.parameters.cudnn-release-version >>
+      - test-core-cpp-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-short: << pipeline.parameters.trt-version-short >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          cudnn-version: << pipeline.parameters.cudnn-version >>
           requires:
-            - build-x86_64-pyt-release
+            - build-x86_64-linux
 
-      - test-py-ts-x86_64:
-          name: test-py-ts-x86_64-pyt-release
-          channel: "release"
-          torch-build: << pipeline.parameters.torch-release-build >>
-          torch-build-index: << pipeline.parameters.torch-release-build-index >>
-          trt-version-long: << pipeline.parameters.trt-release-version-long >>
+      - test-py-ts-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
           requires:
-            - build-x86_64-pyt-release
+            - build-x86_64-linux
 
-      - test-py-fx-x86_64:
-          name: test-py-fx-x86_64-pyt-release
-          channel: "release"
-          torch-build: << pipeline.parameters.torch-release-build >>
-          torch-build-index: << pipeline.parameters.torch-release-build-index >>
-          trt-version-long: << pipeline.parameters.trt-release-version-long >>
+      - test-py-fx-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
           requires:
-            - build-x86_64-pyt-release
-
-
-      - build-x86_64-pyt-nightly:
-          torch-build: << pipeline.parameters.torch-nightly-build >>
-          torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
-
-      - test-core-cpp-x86_64:
-          name: test-core-cpp-x86_64-pyt-nightly
-          channel: "nightly"
-          torch-build: << pipeline.parameters.torch-nightly-build >>
-          torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
-          trt-version-short: << pipeline.parameters.trt-nightly-version-short >>
-          trt-version-long: << pipeline.parameters.trt-nightly-version-long >>
-          cudnn-version: << pipeline.parameters.cudnn-nightly-version >>
-          requires:
-            - build-x86_64-pyt-nightly
-
-      - test-py-ts-x86_64:
-          name: test-py-ts-x86_64-pyt-nightly
-          channel: "nightly"
-          torch-build: << pipeline.parameters.torch-nightly-build >>
-          torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
-          trt-version-long: << pipeline.parameters.trt-nightly-version-long >>
-          requires:
-            - build-x86_64-pyt-nightly
-
-      - test-py-fx-x86_64:
-          name: test-py-fx-x86_64-pyt-nightly
-          channel: "nightly"
-          torch-build: << pipeline.parameters.torch-nightly-build >>
-          torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
-          trt-version-long: << pipeline.parameters.trt-nightly-version-long >>
-          requires:
-            - build-x86_64-pyt-nightly
+            - build-x86_64-linux
 
   release:
     when: << pipeline.parameters.enable-packaging >>
     jobs:
-      - build-aarch64-pyt-jetson:
+
+      - build-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+
+      - test-core-cpp-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-short: << pipeline.parameters.trt-version-short >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+          requires:
+            - build-x86_64-linux
+
+      - test-py-ts-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          requires:
+            - build-x86_64-linux
+
+      - test-py-fx-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          requires:
+            - build-x86_64-linux
+
+
+      - package-x86_64-linux:
+          enabled: << pipeline.parameters.enable-packaging >>
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          #requires:
+            #- test-core-cpp-x86_64-linux
+            #- test-py-ts-x86_64-linux
+            #- test-py-fx-x86_64-linux
+
+  ngc-release:
+    when: << pipeline.parameters.enable-ngc-packaging >>
+    jobs:
+      - build-aarch64-jetson:
           torch-build: << pipeline.parameters.torch-jetson-build >>
           jetpack-version: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.10
 
-      - build-x86_64-pyt-release:
-          torch-build: << pipeline.parameters.torch-release-build >>
-          torch-build-index: << pipeline.parameters.torch-release-build-index >>
+      - build-x86_64-linux-ngc:
+          torch-base-image: << pipeline.parameters.torch-ngc-base-image >>
 
-
-      - test-core-cpp-x86_64:
-          name: test-core-cpp-x86_64-pyt-release
-          channel: "release"
-          torch-build: << pipeline.parameters.torch-release-build >>
-          torch-build-index: << pipeline.parameters.torch-release-build-index >>
-          trt-version-short: << pipeline.parameters.trt-release-version-short >>
-          trt-version-long: << pipeline.parameters.trt-release-version-long >>
-          cudnn-version: << pipeline.parameters.cudnn-release-version >>
+      - package-x86_64-linux-ngc:
+          torch-base-image: << pipeline.parameters.torch-ngc-base-image >>
+          enabled: << pipeline.parameters.enable-ngc-packaging >>
           requires:
-            - build-x86_64-pyt-release
+            - build-x86_64-linux-ngc
 
-      - test-py-ts-x86_64:
-          name: test-py-ts-x86_64-pyt-release
-          channel: "release"
-          torch-build: << pipeline.parameters.torch-release-build >>
-          torch-build-index: << pipeline.parameters.torch-release-build-index >>
-          trt-version-long: << pipeline.parameters.trt-release-version-long >>
-          requires:
-            - build-x86_64-pyt-release
-
-      - test-py-fx-x86_64:
-          name: test-py-fx-x86_64-pyt-release
-          channel: "release"
-          torch-build: << pipeline.parameters.torch-release-build >>
-          torch-build-index: << pipeline.parameters.torch-release-build-index >>
-          trt-version-long: << pipeline.parameters.trt-release-version-long >>
-          requires:
-            - build-x86_64-pyt-release
-
-
-      - package-x86_64:
-          name: package-release-x86_64
-          enabled: << pipeline.parameters.enable-packaging >>
-          torch-build: << pipeline.parameters.torch-release-build >>
-          torch-build-index: << pipeline.parameters.torch-release-build-index >>
-          requires:
-            - test-core-cpp-x86_64-pyt-release
-            - test-py-ts-x86_64-pyt-release
-            - test-py-fx-x86_64-pyt-release
-
-      - package-jetson:
+      - package-aarch64-jetson:
           name: package-release-aarch64-jetson
-          enabled: << pipeline.parameters.enable-packaging >>
+          enabled: << pipeline.parameters.enable-ngc-packaging >>
           torch-build: << pipeline.parameters.torch-jetson-build >>
           jetpack-version: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.10
@@ -953,75 +1103,40 @@ workflows:
 
   on-push:
     jobs:
-      - build-aarch64-pyt-jetson:
+      - build-aarch64-jetson:
           torch-build: << pipeline.parameters.torch-jetson-build >>
           jetpack-version: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.10
 
+      - build-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
 
-      - build-x86_64-pyt-release:
-          torch-build: << pipeline.parameters.torch-release-build >>
-          torch-build-index: << pipeline.parameters.torch-release-build-index >>
-
-      - test-core-cpp-x86_64:
-          name: test-core-cpp-x86_64-pyt-release
-          channel: "release"
-          torch-build: << pipeline.parameters.torch-release-build >>
-          torch-build-index: << pipeline.parameters.torch-release-build-index >>
-          trt-version-short: << pipeline.parameters.trt-release-version-short >>
-          trt-version-long: << pipeline.parameters.trt-release-version-long >>
-          cudnn-version: << pipeline.parameters.cudnn-release-version >>
+      - test-core-cpp-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-short: << pipeline.parameters.trt-version-short >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          cudnn-version: << pipeline.parameters.cudnn-version >>
           requires:
-            - build-x86_64-pyt-release
+            - build-x86_64-linux
 
-      - test-py-ts-x86_64:
-          name: test-py-ts-x86_64-pyt-release
-          channel: "release"
-          torch-build: << pipeline.parameters.torch-release-build >>
-          torch-build-index: << pipeline.parameters.torch-release-build-index >>
-          trt-version-long: << pipeline.parameters.trt-release-version-long >>
+      - test-py-ts-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
           requires:
-            - build-x86_64-pyt-release
+            - build-x86_64-linux
 
-      - test-py-fx-x86_64:
-          name: test-py-fx-x86_64-pyt-release
-          channel: "release"
-          torch-build: << pipeline.parameters.torch-release-build >>
-          torch-build-index: << pipeline.parameters.torch-release-build-index >>
-          trt-version-long: << pipeline.parameters.trt-release-version-long >>
+      - test-py-fx-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
           requires:
-            - build-x86_64-pyt-release
+            - build-x86_64-linux
 
-
-      - build-x86_64-pyt-nightly:
-          torch-build: << pipeline.parameters.torch-nightly-build >>
-          torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
-
-      - test-core-cpp-x86_64:
-          name: test-core-cpp-x86_64-pyt-nightly
-          channel: "nightly"
-          torch-build: << pipeline.parameters.torch-nightly-build >>
-          torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
-          trt-version-short: << pipeline.parameters.trt-nightly-version-short >>
-          trt-version-long: << pipeline.parameters.trt-nightly-version-long >>
-          cudnn-version: << pipeline.parameters.cudnn-nightly-version >>
-          requires:
-            - build-x86_64-pyt-nightly
-
-      - test-py-ts-x86_64:
-          name: test-py-ts-x86_64-pyt-nightly
-          channel: "nightly"
-          torch-build: << pipeline.parameters.torch-nightly-build >>
-          torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
-          trt-version-long: << pipeline.parameters.trt-nightly-version-long >>
-          requires:
-            - build-x86_64-pyt-nightly
-
-      - test-py-fx-x86_64:
-          name: test-py-fx-x86_64-pyt-nightly
-          channel: "nightly"
-          torch-build: << pipeline.parameters.torch-nightly-build >>
-          torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
-          trt-version-long: << pipeline.parameters.trt-nightly-version-long >>
-          requires:
-            - build-x86_64-pyt-nightly
+      - build-x86_64-linux-cmake:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-short: << pipeline.parameters.trt-version-short >>
+          cudnn-version: << pipeline.parameters.cudnn-version >>

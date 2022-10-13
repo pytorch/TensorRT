@@ -10,7 +10,7 @@ TEST(CppAPITest, CanRunMultipleEngines) {
   torch::jit::script::Module mod1;
   torch::jit::script::Module mod2;
   try {
-    mod1 = torch::jit::load("tests/modules/resnet50_traced.jit.pt");
+    mod1 = torch::jit::load("tests/modules/resnet18_traced.jit.pt");
     mod2 = torch::jit::load("tests/modules/resnet18_traced.jit.pt");
   } catch (const c10::Error& e) {
     std::cerr << "error loading the model\n";
@@ -57,12 +57,12 @@ TEST(CppAPITest, CanRunMultipleEngines) {
 
   for (size_t i = 0; i < trt1_results.size(); i++) {
     ASSERT_TRUE(
-        torch_tensorrt::tests::util::almostEqual(jit1_results[i], trt1_results[i].reshape_as(jit1_results[i]), 2e-5));
+        torch_tensorrt::tests::util::cosineSimEqual(jit1_results[i], trt1_results[i].reshape_as(jit1_results[i])));
   }
 
   for (size_t i = 0; i < trt2_results.size(); i++) {
     ASSERT_TRUE(
-        torch_tensorrt::tests::util::almostEqual(jit2_results[i], trt2_results[i].reshape_as(jit2_results[i]), 2e-5));
+        torch_tensorrt::tests::util::cosineSimEqual(jit2_results[i], trt2_results[i].reshape_as(jit2_results[i])));
   }
 }
 #endif

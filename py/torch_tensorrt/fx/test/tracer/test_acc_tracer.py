@@ -1,7 +1,8 @@
 # Owner(s): ["oncall: fx"]
 import logging
+import operator
 import unittest
-from typing import Callable, List
+from typing import Callable, Dict, List, NamedTuple
 
 import numpy as np
 import torch
@@ -1829,6 +1830,55 @@ class AccTracerTest(unittest.TestCase):
         res = traced(a)
         self.assertEqual(ref, res)
 
+    def test_getattr_named_tuple(self):
+        """
+        Test that call_function getattr on namedtuples is
+        traced correctly.
+        """
+
+        class TestNamedTuple(NamedTuple):
+            foo: torch.Tensor
+            bar: torch.Tensor
+
+        class TestModule(nn.Module):
+            def forward(self, a: TestNamedTuple):
+                return a.foo + a.bar
+
+        m = TestModule()
+        a = TestNamedTuple(torch.randn(2, 2), torch.randn(2, 2))
+        traced = acc_tracer.trace(m, [a])
+
+        ph_a = getitem_1 = getitem_2 = add = None
+        for node in traced.graph.nodes:
+            if node.op == "placeholder":
+                self.assertEqual(node.target, "a")
+                ph_a = node
+
+            elif node.op == "call_function" and node.target == acc_ops.getitem:
+                if getitem_1:
+                    getitem_2 = node
+                    self.assertEqual(getitem_2.kwargs["idx"], 1)
+                else:
+                    getitem_1 = node
+                    self.assertEqual(getitem_1.kwargs["idx"], 0)
+
+                self.assertEqual(node.kwargs["input"], ph_a)
+
+            elif node.op == "call_function" and node.target == acc_ops.add:
+                self.assertEqual(node.kwargs["input"], getitem_1)
+                self.assertEqual(node.kwargs["other"], getitem_2)
+                add = node
+
+            elif node.op == "output":
+                self.assertEqual(node.args[0], add)
+
+            else:
+                self.fail(f"Unexpected node: {node.format_node()}")
+
+        ref = m(a)
+        res = traced(a)
+        self.assertTrue(torch.equal(ref, res))
+
     def test_flatten(self):
         """
         Test that torch.flatten is traced correctly.
@@ -2171,10 +2221,57 @@ class AccTracerTest(unittest.TestCase):
                 self.fail(f"Unexpected node: {node.format_node()}")
 
         # Check the tensor ranks are correct given the input is a list.
-        self.assertTrue(isinstance(ph.meta["tensor_rank"], list))
+        self.assertIsInstance(ph.meta["tensor_rank"], list)
         self.assertEqual(len(ph.meta["tensor_rank"]), 2)
         self.assertEqual(getitem_0.meta["tensor_rank"], ph.meta["tensor_rank"][0])
         self.assertEqual(getitem_1.meta["tensor_rank"], ph.meta["tensor_rank"][1])
+
+        self.assertTrue(torch.equal(m(input), traced(input)))
+
+    def test_dict_input(self):
+        """
+        Test that dict inputs are traced correctly.
+        """
+
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, a: Dict[str, torch.Tensor]) -> torch.Tensor:
+                return a["foo"] + a["bar"]
+
+        m = TestModule()
+        input = {"foo": torch.randn(2, 3), "bar": torch.randn(2, 3)}
+        traced = acc_tracer.trace(m, [input])
+
+        ph = getitem_0 = getitem_1 = add = None
+        for node in traced.graph.nodes:
+            if node.op == "placeholder":
+                self.assertEqual(str(node.target), "a")
+                ph = node
+            elif node.op == "call_function" and node.target == acc_ops.getitem:
+                self.assertTrue(
+                    node.kwargs["idx"] == "foo" or node.kwargs["idx"] == "bar"
+                )
+                if node.kwargs["idx"] == "foo":
+                    getitem_0 = node
+                else:
+                    getitem_1 = node
+            elif node.op == "call_function":
+                self.assertEqual(node.target, acc_ops.add)
+                self.assertEqual(node.kwargs["input"], getitem_0)
+                self.assertEqual(node.kwargs["other"], getitem_1)
+                add = node
+            elif node.op == "output":
+                self.assertEqual(add, node.args[0])
+            else:
+                self.fail(f"Unexpected node: {node.format_node()}")
+
+        # Check the tensor ranks are correct given the input is a dict.
+        self.assertIsInstance(ph.meta["tensor_rank"], dict)
+        self.assertEqual(len(ph.meta["tensor_rank"]), 2)
+        self.assertEqual(getitem_0.meta["tensor_rank"], ph.meta["tensor_rank"]["foo"])
+        self.assertEqual(getitem_1.meta["tensor_rank"], ph.meta["tensor_rank"]["bar"])
 
         self.assertTrue(torch.equal(m(input), traced(input)))
 
@@ -2454,6 +2551,21 @@ class AccTracerTest(unittest.TestCase):
             self.assertIsNotNone(getitem)
         self.assertTrue(torch.equal(m(x), traced(x)))
 
+    def test_acc_normalization_block_list(self):
+        class TestModule(nn.Module):
+            def forward(self, x: List[torch.Tensor]) -> torch.Tensor:
+                return x[0] + x[1]
+
+        m = TestModule()
+        x = [torch.randn(1), torch.randn(1)]
+        traced = acc_tracer.trace(
+            m, [x], acc_normalization_block_list={("call_function", operator.getitem)}
+        )
+        for node in traced.graph.nodes:
+            if "getitem" in node.name:
+                # Make sure we didn't convert to the acc version
+                self.assertEqual(node.target, operator.getitem)
+
     def test_all_acc_ops_registered(self):
         self.assertEqual(
             acc_normalizer._acc_ops,
@@ -2466,8 +2578,9 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.flatten,
                 acc_ops.adaptive_avg_pool2d,
                 acc_ops.adaptive_avg_pool3d,
-                acc_ops.avg_pool2d,
                 acc_ops.avg_pool1d,
+                acc_ops.avg_pool2d,
+                acc_ops.avg_pool3d,
                 acc_ops.add,
                 acc_ops.min_full_reduce,
                 acc_ops.min_dim_reduce,
@@ -2580,5 +2693,6 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.as_strided,
                 acc_ops.var,
                 acc_ops.grid_sample,
+                acc_ops.xl_weight,
             },
         )

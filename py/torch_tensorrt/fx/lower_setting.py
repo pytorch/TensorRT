@@ -36,6 +36,7 @@ class LowerSettingBasic:
     ast_rewriter_allow_list: Optional[Set[Type[nn.Module]]] = None
     leaf_module_list: Optional[Set[Type[nn.Module]]] = None
     verbose_profile: bool = False
+    is_aten: bool = False
 
 
 @dc.dataclass
@@ -70,6 +71,8 @@ class LowerSetting(LowerSettingBasic):
     dynamic_batch: enable the dynamic shape in TRT with dim=-1 for the 1st dimension.
     tactic_sources: tactic sources for TensorRT kernel selection. Default to None,
     meaning all possible tactic sources.
+    correctness_atol: absolute tolerance for correctness check
+    correctness_rtol: relative tolerance for correctness check
     """
 
     input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
@@ -90,3 +93,5 @@ class LowerSetting(LowerSettingBasic):
     opt_profile_replica: int = 1
     dynamic_batch: bool = True
     tactic_sources: Optional[int] = None
+    correctness_atol: float = 0.1
+    correctness_rtol: float = 0.1

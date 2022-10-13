@@ -28,8 +28,8 @@ RELEASE = False
 
 CI_RELEASE = False
 
-__version__ = "1.2.0a0"
-__cuda_version__ = "11.3"
+__version__ = "1.3.0a0"
+__cuda_version__ = "11.6"
 __cudnn_version__ = "8.4"
 __tensorrt_version__ = "8.4"
 
@@ -72,12 +72,18 @@ if platform.uname().processor == "aarch64":
         elif version == "4.6":
             JETPACK_VERSION = "4.6"
         elif version == "5.0":
-            JETPACK_VERSION = "4.6"
+            JETPACK_VERSION = "5.0"
+
     if not JETPACK_VERSION:
         warnings.warn(
-            "Assuming jetpack version to be 4.6 or greater, if not use the --jetpack-version option"
+            "Assuming jetpack version to be 5.0, if not use the --jetpack-version option"
         )
-        JETPACK_VERSION = "4.6"
+        JETPACK_VERSION = "5.0"
+
+    if not CXX11_ABI:
+        warnings.warn(
+            "Jetson platform detected but did not see --use-cxx11-abi option, if using a pytorch distribution provided by NVIDIA include this flag"
+        )
 
 
 def which(program):
@@ -128,7 +134,10 @@ def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=F
         print("Jetpack version: 4.5")
     elif JETPACK_VERSION == "4.6":
         cmd.append("--platforms=//toolchains:jetpack_4.6")
-        print("Jetpack version: >=4.6")
+        print("Jetpack version: 4.6")
+    elif JETPACK_VERSION == "5.0":
+        cmd.append("--platforms=//toolchains:jetpack_5.0")
+        print("Jetpack version: 5.0")
 
     if CI_RELEASE:
         cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
@@ -367,7 +376,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        "torch>=1.12.0+cu113,<1.13.0",
+        "torch>=1.13.0.dev0,<1.14.0",
     ],
     setup_requires=[],
     cmdclass={
@@ -413,6 +422,9 @@ setup(
             "include/torch_tensorrt/core/lowering/*.h",
             "include/torch_tensorrt/core/lowering/passes/*.h",
             "include/torch_tensorrt/core/partitioning/*.h",
+            "include/torch_tensorrt/core/partitioning/segmentedblock/*.h",
+            "include/torch_tensorrt/core/partitioning/partitioninginfo/*.h",
+            "include/torch_tensorrt/core/partitioning/partitioningctx/*.h",
             "include/torch_tensorrt/core/plugins/*.h",
             "include/torch_tensorrt/core/plugins/impl/*.h",
             "include/torch_tensorrt/core/runtime/*.h",

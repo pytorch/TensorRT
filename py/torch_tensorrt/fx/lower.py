@@ -12,20 +12,21 @@ from torch.fx.passes.splitter_base import SplitResult
 from .fx2trt import TRTInterpreter, TRTInterpreterResult
 from .lower_setting import LowerSetting
 from .passes.lower_pass_manager_builder import LowerPassManagerBuilder
-from .passes.pass_utils import decorate_method, PassFunc, validate_inference
+from .passes.pass_utils import PassFunc, validate_inference
 from .tools.timing_cache_utils import TimingCacheManager
 from .tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 
 from .tracer.acc_tracer import acc_tracer
 from .trt_module import TRTModule
-from .utils import LowerPrecision
+from .utils import LowerPrecision, proxytensor_trace
+
 
 logger = logging.getLogger(__name__)
 
 Input = Sequence[Any]
 
 
-def lower_to_trt(
+def compile(
     module: nn.Module,
     input,
     max_batch_size: int = 2048,
@@ -37,6 +38,7 @@ def lower_to_trt(
     save_timing_cache=False,
     cuda_graph_batch_size=-1,
     dynamic_batch=True,
+    is_aten=False,
 ) -> nn.Module:
     """
     Takes in original module, input and lowering setting, run lowering workflow to turn module
@@ -53,7 +55,7 @@ def lower_to_trt(
         timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.
         save_timing_cache: Update timing cache with current timing cache data if set to True.
         cuda_graph_batch_size: Cuda graph batch size, default to be -1.
-
+        dynamic_batch: batch dimension (dim=0) is dynamic.
     Returns:
         A torch.nn.Module lowered by TensorRT.
     """
@@ -67,6 +69,7 @@ def lower_to_trt(
         save_timing_cache=save_timing_cache,
         cuda_graph_batch_size=cuda_graph_batch_size,
         dynamic_batch=dynamic_batch,
+        is_aten=is_aten,
     )
     lowerer = Lowerer.create(lower_setting=lower_setting)
     return lowerer(module, input)
@@ -86,7 +89,9 @@ class LowerTrtInterpreter:
 
     def __call__(self, mod, input, split_name) -> TRTInterpreterResult:
         assert self.lower_setting.input_specs, "Can't find input specs for lowering!"
-        logger.info(f"{split_name=} {self.lower_setting.input_specs=}")
+        logger.info(
+            f"split_name={split_name}, input_specs={self.lower_setting.input_specs}"
+        )
 
         # Prepare algorithm selector and timing_cache for TRTInterpreter
         algo_selector = None
@@ -96,6 +101,7 @@ class LowerTrtInterpreter:
         if self.timing_cache_manager:
             try:
                 cache_data = self.timing_cache_manager.get_timing_cache_trt(split_name)
+                logger.info("Timing cache is used!")
             except Exception as e:
                 logger.warning(f"Cannot load timing cache for {split_name}: {str(e)}")
                 cache_data = None
@@ -201,43 +207,65 @@ class Lowerer:
         split_func: Callable = default_split_function,
     ) -> "Lowerer":
         """Instantiate a `Lowerer` instance."""
-
-        return cls(
-            lower_pass_manager_builder=LowerPassManagerBuilder(
-                lower_setting=lower_setting,
-                trace_func=lambda module, inputs: acc_tracer.trace(
-                    module,
-                    inputs,  # type: ignore[arg-type]
-                    ast_rewriter_allow_list=lower_setting.ast_rewriter_allow_list,
-                    leaf_module_list=lower_setting.leaf_module_list,
-                ),
-                split_func=split_func,
-                lower_func=default_lower_pass(interpreter_builder),
+        if not lower_setting.is_aten:
+            return cls(
+                lower_pass_manager_builder=LowerPassManagerBuilder(
+                    lower_setting=lower_setting,
+                    trace_func=lambda module, inputs: acc_tracer.trace(
+                        module,
+                        inputs,  # type: ignore[arg-type]
+                        ast_rewriter_allow_list=lower_setting.ast_rewriter_allow_list,
+                        leaf_module_list=lower_setting.leaf_module_list,
+                    ),
+                    split_func=split_func,
+                    lower_func=default_lower_pass(interpreter_builder),
+                )
             )
-        )
+        # proxytensor_trace
+        else:
+            return cls(
+                lower_pass_manager_builder=LowerPassManagerBuilder(
+                    lower_setting=lower_setting,
+                    trace_func=lambda module, inputs: proxytensor_trace(module, inputs),
+                    split_func=split_func,
+                    lower_func=default_lower_pass(interpreter_builder),
+                )
+            )
 
-    @decorate_method(validate_inference(atol=1e-1, rtol=1e-1))
     def __call__(
         self,
         module: nn.Module,
         inputs: Input,
         additional_inputs: Optional[Input] = None,
     ) -> nn.Module:
-        module.eval()
+        lower_setting = self.lower_pass_manager_builder.lower_setting
+        atol = lower_setting.correctness_atol
+        rtol = lower_setting.correctness_rtol
 
-        if (
-            self.lower_pass_manager_builder.lower_setting.lower_precision
-            == LowerPrecision.FP16
-        ):
-            module.half()
-            inputs = tuple(
-                x.half() if x is not None and x.dtype == torch.float32 else x
-                for x in inputs
-            )
-        pm = self.lower_pass_manager_builder.build_trt_lower_pipeline(
-            inputs, additional_inputs
+        @validate_inference(
+            atol=atol,
+            rtol=rtol,
         )
+        def do_lower(module: nn.Module, inputs: Input) -> nn.Module:
+            module.eval()
+            if (
+                self.lower_pass_manager_builder.lower_setting.lower_precision
+                == LowerPrecision.FP16
+            ):
+                module.half()
+                inputs = tuple(
+                    x.half() if x is not None and x.dtype == torch.float32 else x
+                    for x in inputs
+                )
+            if lower_setting.is_aten:
+                pm = self.lower_pass_manager_builder.build_aten2trt_lower_pipeline(
+                    inputs, additional_inputs
+                )
+            else:
+                pm = self.lower_pass_manager_builder.build_trt_lower_pipeline(
+                    inputs, additional_inputs
+                )
+            lower_result = pm(module)
+            return lower_result
 
-        lower_result = pm(module)
-
-        return lower_result
+        return do_lower(module, inputs)

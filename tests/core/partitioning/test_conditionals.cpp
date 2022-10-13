@@ -34,7 +34,7 @@ TEST(Partitioning, FallbackOnConditionalsCorrectly) {
   std::vector<torch_tensorrt::core::ir::Input> inputs{torch_tensorrt::core::ir::Input({3, 3, 16, 16})};
   auto g = mod.get_method("forward").graph();
   torch_tensorrt::core::CompileSpec cfg(inputs);
-  cfg.partition_info.enabled = true;
+  cfg.partitioning_info.enabled = true;
   torch::jit::script::Module new_mod = torch_tensorrt::core::CompileGraph(mod, cfg);
   auto new_g = new_mod.get_method("forward").graph();
 
@@ -65,11 +65,11 @@ TEST(Partitioning, FallbackInplaceOPInConditionalsCorrectly) {
       torch_tensorrt::core::ir::Input({4, 4}), torch_tensorrt::core::ir::Input({4, 4})};
   auto g = mod.get_method("forward").graph();
   torch_tensorrt::core::CompileSpec cfg(inputs);
-  cfg.partition_info.enabled = true;
-  cfg.partition_info.forced_fallback_operators.push_back("prim::ListConstruct");
+  cfg.partitioning_info.enabled = true;
+  cfg.partitioning_info.forced_fallback_operators.push_back("prim::ListConstruct");
 
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
   auto trt_mod = torch_tensorrt::core::CompileGraph(mod, cfg);
   auto trt_results = trt_mod.forward(trt_inputs_ivalues).toTensor();
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results, trt_results, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(jit_results, trt_results));
 }

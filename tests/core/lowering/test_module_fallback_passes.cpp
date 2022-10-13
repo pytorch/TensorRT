@@ -100,7 +100,7 @@ TEST(Lowering, LowerAndPartitionSimpleModuleFallbackCorrectly) {
 
   std::vector<torch_tensorrt::core::ir::Input> input_ranges{torch_tensorrt::core::ir::Input({1, 1, 16, 16})};
   torch_tensorrt::core::CompileSpec cfg(input_ranges);
-  cfg.partition_info.enabled = true;
+  cfg.partitioning_info.enabled = true;
   cfg.lower_info.forced_fallback_modules.push_back("ModuleFallbackSub");
 
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
@@ -124,5 +124,5 @@ TEST(Lowering, LowerAndPartitionSimpleModuleFallbackCorrectly) {
   }
 
   auto trt_results = trt_mod.forward(trt_inputs_ivalues).toTensor();
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results, trt_results, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(jit_results, trt_results, 0.99));
 }
