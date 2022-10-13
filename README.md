@@ -122,6 +122,12 @@ These are the following dependencies used to verify the testcases. Torch-TensorR
 
 Releases: https://github.com/pytorch/TensorRT/releases
 
+```
+pip install nvidia-pyindex
+pip install nvidia-tensorrt==8.4.3.1
+pip install torch-tensorrt==1.2.0 --find-links https://github.com/pytorch/TensorRT/releases/expanded_assets/v1.2.0
+```
+
 ## Compiling Torch-TensorRT
 
 ### Installing Dependencies
