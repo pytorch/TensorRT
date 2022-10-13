@@ -28,7 +28,7 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
 
 torch::jit::script::Module CompileGraph(const torch::jit::script::Module& module, CompileSpec cfg);
 
-torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine, runtime::CudaDevice cuda_device);
+torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine, runtime::CUDADevice cuda_device);
 
 void set_device(const int gpu_id);
 

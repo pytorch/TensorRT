@@ -13,7 +13,7 @@ config_setting(
 cc_library(
     name = "runtime",
     srcs = [
-        "CudaDevice.cpp",
+        "CUDADevice.cpp",
         "DeviceList.cpp",
         "TRTEngine.cpp",
         "execute_engine.cpp",
@@ -22,6 +22,8 @@ cc_library(
     ],
     hdrs = [
         "runtime.h",
+        "CUDADevice.h",
+        "TRTEngine.h"
     ],
     deps = [
         "@tensorrt//:nvinfer",
@@ -36,6 +38,10 @@ cc_library(
 
 pkg_tar(
     name = "include",
-    srcs = ["runtime.h"],
+    srcs = [
+        "runtime.h",
+        "CUDADevice.h",
+        "TRTEngine.h"
+    ],
     package_dir = "core/runtime/",
 )

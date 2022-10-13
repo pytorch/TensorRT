@@ -16,7 +16,7 @@ std::string slugify(std::string s) {
   return s;
 }
 
-TRTEngine::TRTEngine(std::string serialized_engine, CudaDevice cuda_device) {
+TRTEngine::TRTEngine(std::string serialized_engine, CUDADevice cuda_device) {
   std::string _name = "deserialized_trt";
   new (this) TRTEngine(_name, serialized_engine, cuda_device);
 }
@@ -33,11 +33,11 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info) {
   std::string _name = serialized_info[NAME_IDX];
   std::string engine_info = serialized_info[ENGINE_IDX];
 
-  CudaDevice cuda_device(serialized_info[DEVICE_IDX]);
+  CUDADevice cuda_device(serialized_info[DEVICE_IDX]);
   new (this) TRTEngine(_name, engine_info, cuda_device);
 }
 
-TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDevice cuda_device) {
+TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CUDADevice cuda_device) {
   auto most_compatible_device = get_most_compatible_device(cuda_device);
   TORCHTRT_CHECK(most_compatible_device, "No compatible device was found for instantiating TensorRT engine");
   device_info = most_compatible_device.value();
@@ -83,6 +83,14 @@ TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDe
   num_io = std::make_pair(inputs, outputs);
 
   LOG_DEBUG(*this);
+}
+
+void TRTEngine::set_paths() {
+  execution_profile_path = profile_path + "/" + name + "_execution_profile.trace";
+  device_profile_path = profile_path + "/" + name + "_device_config_profile.trace";
+  input_profile_path = profile_path + "/" + name + "_input_profile.trace";
+  output_profile_path =  profile_path + "/" + name + "_output_profile.trace";
+  enqueue_profile_path =  profile_path + "/" + name + "_enqueue_profile.trace";
 }
 
 TRTEngine& TRTEngine::operator=(const TRTEngine& other) {

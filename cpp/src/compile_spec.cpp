@@ -13,7 +13,7 @@ nvinfer1::DataType toTRTDataType(DataType value);
 nvinfer1::TensorFormat toTRTTensorFormat(TensorFormat value);
 torchtrt::core::ir::Input to_internal_input(Input& i);
 std::vector<torchtrt::core::ir::Input> to_vec_internal_inputs(std::vector<Input>& external);
-torchtrt::core::runtime::CudaDevice to_internal_cuda_device(Device device);
+torchtrt::core::runtime::CUDADevice to_internal_cuda_device(Device device);
 
 namespace torchscript {
 CompileSpec::CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes) {

@@ -374,12 +374,13 @@ auto expand_registrations TORCHTRT_UNUSED =
 
                // Collapse repeated dimension back into desired dimension
                std::vector<int64_t> collapse_shape_vec;
-               for (int k = 0; k < repeat_shape_dims.nbDims; k++) {
+               for (int64_t k = 0; k < repeat_shape_dims.nbDims; k++) {
                  if (k == dim) {
-                   int64_t collapse_dim = repeat_shape_dims.d[k] * repeat_shape_dims.d[++k];
+                   int64_t collapse_dim = repeat_shape_dims.d[k] * repeat_shape_dims.d[k+1];
                    // Set dim size to -1 if repeat is being done on dynamic dim
                    collapse_dim = std::max(collapse_dim, (int64_t)-1);
                    collapse_shape_vec.push_back(collapse_dim);
+                   k++;
                  } else {
                    collapse_shape_vec.push_back(repeat_shape_dims.d[k]);
                  }

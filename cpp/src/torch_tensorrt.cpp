@@ -7,7 +7,7 @@
 
 namespace torch_tensorrt {
 // Defined in types.cpp
-torch_tensorrt::core::runtime::CudaDevice to_internal_cuda_device(Device device);
+torch_tensorrt::core::runtime::CUDADevice to_internal_cuda_device(Device device);
 namespace torchscript {
 // Defined in compile_spec.cpp
 torch_tensorrt::core::CompileSpec to_internal_compile_spec(CompileSpec external);

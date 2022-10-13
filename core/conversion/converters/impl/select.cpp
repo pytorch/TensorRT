@@ -280,7 +280,7 @@ auto select_registrations TORCHTRT_UNUSED =
 
                std::vector<nvinfer1::ITensor*> tensors;
                std::vector<int32_t> adv_idx_indices;
-               for (auto i = 0; i < ts.size(); i++) {
+               for (size_t i = 0; i < ts.size(); i++) {
                  auto t = ts[i];
                  if (t.isTensor()) {
                    auto torch_tensor = t.toTensor().to(torch::kInt32);

@@ -31,7 +31,7 @@ void AddEngineToGraph(
     torch::jit::script::Module mod,
     std::shared_ptr<torch::jit::Graph>& g,
     const std::string& serialized_engine,
-    runtime::CudaDevice& device_info,
+    runtime::CUDADevice& device_info,
     std::string engine_id = "",
     bool fallback = false) {
   auto engine_ptr = c10::make_intrusive<runtime::TRTEngine>(
@@ -166,7 +166,7 @@ partitioning::GraphAndMapping BuildHybridGraph(
         auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_info, static_params);
         auto temp_g = std::make_shared<torch::jit::Graph>();
         auto device_spec = convert_info.engine_settings.device;
-        auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
+        auto cuda_device = runtime::CUDADevice(device_spec.gpu_id, device_spec.device_type);
         AddEngineToGraph(new_mod, temp_g, engine, cuda_device, trt_engine_id.str(), true);
 
         seg_block.update_graph(temp_g);
@@ -283,7 +283,7 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
   torch::jit::Module new_mod(mod._ivalue()->name() + "_trt");
 
   auto device_spec = cfg.convert_info.engine_settings.device;
-  auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
+  auto cuda_device = runtime::CUDADevice(device_spec.gpu_id, device_spec.device_type);
 
   for (const torch::jit::Method& method : mod.get_methods()) {
     if (method.name().compare("forward") == 0) {
@@ -342,7 +342,7 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
   return new_mod;
 }
 
-torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine, runtime::CudaDevice cuda_device) {
+torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine, runtime::CUDADevice cuda_device) {
   std::ostringstream engine_id;
   engine_id << reinterpret_cast<const int*>(&engine);
   torch::jit::script::Module new_mod("tensorrt_engine_mod_" + engine_id.str());

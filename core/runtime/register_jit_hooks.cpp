@@ -18,6 +18,9 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         // TODO: .def("__call__", &TRTEngine::Run)
         // TODO: .def("run", &TRTEngine::Run)
         .def("__str__", &TRTEngine::to_str)
+        .def("__repr__", &TRTEngine::to_str)
+        .def_readwrite("debug", &TRTEngine::debug)
+        .def_readwrite("profile_path", &TRTEngine::profile_path)
         .def_pickle(
             [](const c10::intrusive_ptr<TRTEngine>& self) -> std::vector<std::string> {
               // Serialize TensorRT engine

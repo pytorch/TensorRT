@@ -7,7 +7,7 @@ namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
-c10::optional<CudaDevice> get_most_compatible_device(const CudaDevice& target_device) {
+c10::optional<CUDADevice> get_most_compatible_device(const CUDADevice& target_device) {
   LOG_DEBUG("Target Device: " << target_device);
   auto device_options = find_compatible_devices(target_device);
   if (device_options.size() == 0) {
@@ -16,7 +16,7 @@ c10::optional<CudaDevice> get_most_compatible_device(const CudaDevice& target_de
     return {device_options[0]};
   }
 
-  CudaDevice best_match;
+  CUDADevice best_match;
   std::stringstream dev_list;
   dev_list << "[" << std::endl;
   for (auto device : device_options) {
@@ -41,11 +41,11 @@ c10::optional<CudaDevice> get_most_compatible_device(const CudaDevice& target_de
   }
 }
 
-std::vector<CudaDevice> find_compatible_devices(const CudaDevice& target_device) {
+std::vector<CUDADevice> find_compatible_devices(const CUDADevice& target_device) {
   auto dla_supported = get_dla_supported_SMs();
   auto device_list = get_available_device_list().get_devices();
 
-  std::vector<CudaDevice> compatible_devices;
+  std::vector<CUDADevice> compatible_devices;
 
   for (auto device : device_list) {
     auto poss_dev_cc = device.second.getSMCapability();
@@ -69,13 +69,13 @@ std::vector<CudaDevice> find_compatible_devices(const CudaDevice& target_device)
   return compatible_devices;
 }
 
-void set_cuda_device(CudaDevice& cuda_device) {
+void set_cuda_device(CUDADevice& cuda_device) {
   TORCHTRT_CHECK(
       (cudaSetDevice(cuda_device.id) == cudaSuccess), "Unable to set device: " << cuda_device << "as active device");
   LOG_DEBUG("Setting " << cuda_device << " as active device");
 }
 
-CudaDevice get_current_device() {
+CUDADevice get_current_device() {
   int device = -1;
   TORCHTRT_CHECK(
       (cudaGetDevice(reinterpret_cast<int*>(&device)) == cudaSuccess),
@@ -83,7 +83,7 @@ CudaDevice get_current_device() {
 
   int64_t device_id = static_cast<int64_t>(device);
 
-  return CudaDevice(device_id, nvinfer1::DeviceType::kGPU);
+  return CUDADevice(device_id, nvinfer1::DeviceType::kGPU);
 }
 
 namespace {
