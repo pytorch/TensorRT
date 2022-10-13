@@ -339,6 +339,9 @@ PYBIND11_MODULE(_C, m) {
       .value("GRAPH", core::util::logging::LogLevel::kGRAPH)
       .export_values();
 
+  py::module rt_sub_mod = m.def_submodule("rt");
+  rt_sub_mod.attr("ABI_VERSION") = py::string_(core::runtime::ABI_VERSION);
+
   py::module ts_sub_mod = m.def_submodule("ts");
   py::class_<CompileSpec>(ts_sub_mod, "CompileSpec")
       .def(py::init<>())

@@ -111,6 +111,10 @@ class Device(object):
         internal_dev.allow_gpu_fallback = self.allow_gpu_fallback
         return internal_dev
 
+    def _to_internal_cuda_device_str(self) -> str:
+        internal_dev = self._to_internal()
+        return internal_dev.to_str()
+
     @classmethod
     def _from_torch_device(cls, torch_dev: torch.device):
         if torch_dev.type != "cuda":
