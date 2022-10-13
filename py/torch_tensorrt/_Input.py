@@ -279,3 +279,18 @@ class Input(object):
             else torch.channels_last
         )
         return cls(shape=t.shape, dtype=t.dtype, format=frmt)
+
+    def example_tensor(self, optimization_profile_field: str = None):
+        if optimization_profile_field is not None:
+            try:
+                assert any([optimization_profile_field == field_name for field_name in ["min_shape", "opt_shape", "max_shape"]])
+            except:
+                raise ValueError("Invalid field name, expected one of min_shape, opt_shape, max_shape")
+
+        if optimization_profile_field is not None and self.shape_mode == Input._ShapeMode.STATIC:
+            raise ValueError("Specified a optimization profile field but the input is static")
+
+        if self.shape_mode == Input._ShapeMode.STATIC:
+            return torch.randn(self.shape).to(dtype=self.dtype)
+        else:
+            return torch.randn(self.shape[optimization_profile_field]).to(dtype=self.dtype)
