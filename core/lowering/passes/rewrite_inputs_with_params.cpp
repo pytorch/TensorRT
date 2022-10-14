@@ -1,12 +1,10 @@
-#include "torch/csrc/jit/ir/constants.h"
 #include "core/util/prelude.h"
-
+#include "torch/csrc/jit/ir/constants.h"
 
 namespace torch_tensorrt {
 namespace core {
 namespace lowering {
 namespace passes {
-
 
 void RewriteInputsWithParams(std::shared_ptr<torch::jit::Graph>& g, std::vector<torch::jit::IValue>& params) {
   auto input_size = g->inputs().size();
@@ -33,6 +31,7 @@ void RewriteInputsWithParams(std::shared_ptr<torch::jit::Graph>& g, std::vector<
       }
     }
   }
+  LOG_GRAPH("After RewriteInputsWithParams: " << *g);
 }
 
 } // namespace passes
