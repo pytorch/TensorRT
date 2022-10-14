@@ -25,7 +25,7 @@ TEST(LoweringPasses, RewriteInputsWithParamsCorrectly) {
   torch::jit::IValue param0 = torch::jit::IValue(0);
   std::vector<torch::jit::IValue> params{param0};
   torch_tensorrt::core::lowering::passes::RewriteInputsWithParams(sg, params);
-  
+
   auto tg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(target_graph, &*tg);
 
