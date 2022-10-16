@@ -1,3 +1,4 @@
+#include <queue>
 #include "ATen/ATen.h"
 #include "torch/csrc/jit/api/module.h"
 #include "torch/csrc/jit/passes/constant_pooling.h"
@@ -55,6 +56,26 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
     }
   }
   return ivalue_map;
+}
+
+torch::jit::Node* getUpstreamCastNode(torch::jit::Value* val) {
+  std::queue<torch::jit::Value*> q;
+  q.push(val);
+  std::unordered_set<torch::jit::Node*> visited;
+  while (!q.empty()) {
+    auto cur_val = q.front();
+    q.pop();
+    auto node = cur_val->node();
+    if (node->kind().toQualString() == std::string("aten::to")) {
+      return node;
+    }
+    if (node->kind() != torch::jit::prim::Constant && !visited.count(node)) {
+      visited.insert(node);
+      for (auto input : node->inputs()) {
+        q.push(input);
+      }
+    }
+  }
 }
 
 void getSegmentsOutputByRunning(
@@ -142,16 +163,56 @@ void getSegmentsOutputByRunning(
     ivalues_maps[output] = jit_results[idx++];
   }
 
+  // auto int64 <=> int32 conversion
+  if (seg_block.target() == SegmentedBlock::kTorch) {
+    // Firstly, check if there is Int64 input
+    for (size_t i = 0; i < seg_block.inputs().size(); ++i) {
+      if (ivalues_maps[seg_block.raw_inputs()[i]].isTensor()) {
+        auto cur_ivalue = ivalues_maps[seg_block.raw_inputs()[i]];
+        at::ScalarType t = cur_ivalue.toTensor().scalar_type();
+        if (t == at::kLong) {
+          // we add a cast operation to cast the type to Int64
+          auto inner_g = seg_block.g();
+          torch::jit::Node* cast_node = getUpstreamCastNode(seg_block.raw_inputs()[i]);
+          std::unordered_map<torch::jit::Value*, torch::jit::Value*> value_map;
+          value_map.insert({cast_node->inputs()[0], seg_block.inputs()[i]});
+          auto env = [&](torch::jit::Value* v) { return util::getOrAddInputForValue(v, inner_g, value_map); };
+          auto new_cast_node = inner_g->prependNode(inner_g->createClone(cast_node, env));
+          seg_block.inputs()[i]->replaceAllUsesAfterNodeWith(new_cast_node, new_cast_node->outputs()[0]);
+        }
+      }
+    }
+    // TODO: This part might be necessary for some model, now checkint to verify
+    //    for (size_t i = 0; i < seg_block.outputs().size(); ++i) {
+    //      if (ivalues_maps[seg_block.raw_outputs()[i]].isTensor()) {
+    //        auto cur_ivalue = ivalues_maps[seg_block.raw_outputs()[i]];
+    //        at::ScalarType t = cur_ivalue.toTensor().scalar_type();
+    //        if (t == at::kLong) {
+    //          auto inner_g = seg_block.g();
+    //          torch::jit::Node* cast_node = getUpstreamCastNode(seg_block.raw_outputs()[i]);
+    //          std::unordered_map<torch::jit::Value*, torch::jit::Value*> value_map;
+    //          value_map.insert({cast_node->inputs()[0], seg_block.outputs()[i]});
+    //          auto const_val = inner_g->insertConstant(3);
+    //          value_map.insert({cast_node->inputs()[1], const_val});
+    //          auto env = [&](torch::jit::Value* v) { return util::getOrAddInputForValue(v, inner_g, value_map); };
+    //          auto new_cast_node = inner_g->appendNode(inner_g->createClone(cast_node, env));
+    //
+    //        }
+    //      }
+    //    }
+  }
+
   // set input shape for each segmented block so we wil use it in conversion process
   std::vector<ir::Input> input_shapes;
   std::vector<at::ScalarType> input_types;
-  for (auto& i : seg_block.raw_inputs()) {
-    if (ivalues_maps[i].isTensor()) {
+  for (size_t i = 0; i < seg_block.inputs().size(); ++i) {
+    if (ivalues_maps[seg_block.raw_inputs()[i]].isTensor()) {
       // set the input_shape and data_type
       // we can use a temp value here instead of replacing the values in ivalues_map since we only use ivalues_map for
       // shape inference
-      auto cur_ivalue = ivalues_maps[i];
+      auto cur_ivalue = ivalues_maps[seg_block.raw_inputs()[i]];
       at::ScalarType t = cur_ivalue.toTensor().scalar_type();
+
       if (!partitioning_info.truncate_long_and_double && (t == at::kLong || t == at::kDouble)) {
         TORCHTRT_THROW_ERROR(
             "Unable to process subgraph input type of at::kLong/at::kDouble, try to compile model with truncate_long_and_double enabled");
