@@ -142,26 +142,6 @@ auto aten_registrations TORCHTRT_UNUSED =
                return out_tensor;
              }})
         .evaluator(
-            {c10::Symbol::fromQualString("aten::new_zeros"),
-             // aten::new_zeros(Tensor self, int[] size, *, ScalarType? dtype=None, Layout? layout=None,
-             // Device? device=None, bool? pin_memory=None) -> (Tensor)
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-               auto options = torch::TensorOptions().layout(torch::kStrided).device(torch::kCUDA);
-
-               // Unpack tensor input
-               auto input_dtype = args.at(n->input(0)).unwrapToTensor().dtype().toScalarType();
-
-               // If dtype is not specified, use those from self
-               if (!args.at(n->input(2)).isNone() && !args.at(n->input(2)).IValue()->isNone()) {
-                 options = options.dtype(c10::ScalarType(args.at(n->input(2)).unwrapToInt()));
-               } else {
-                 options = options.dtype(input_dtype);
-               }
-
-               auto out_tensor = torch::zeros(args.at(n->input(1)).unwrapToIntList().vec(), options);
-               return out_tensor;
-             }})
-        .evaluator(
             {c10::Symbol::fromQualString("aten::ones"),
              // aten::ones(int[] size, *, int? dtype=None, int? layout=None,
              // Device? device=None, bool? pin_memory=None) -> (Tensor)
