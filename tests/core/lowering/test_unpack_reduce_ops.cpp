@@ -205,6 +205,51 @@ TEST(LoweringPasses, UnpackStdUnbiasedKeepDimsLowersCorrectly) {
       torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
 }
 
+TEST(Evaluators, NewZerosEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph(%x.1 : Tensor):
+        %2 : None = prim::Constant()
+        %3 : int[] = aten::size(%x.1)
+        %5 : Tensor = aten::new_zeros(%x.1, %3, %2, %2, %2, %2)
+        return (%5))IR";
+
+  auto in = at::randint(-10, 10, {2, 4, 6, 8}, {at::kCUDA});
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+  torch_tensorrt::core::lowering::passes::UnpackNewZeros(g);
+  torch::jit::EliminateCommonSubexpression(g);
+  auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+}
+
+TEST(Evaluators, NewZerosDataTypeEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph(%x.1 : Tensor):
+        %2 : int = prim::Constant[value=5]()
+        %3 : None = prim::Constant()
+        %4 : int[] = aten::size(%x.1)
+        %5 : Tensor = aten::new_zeros(%x.1, %4, %2, %3, %3, %3)
+        return (%5))IR";
+
+  auto in = at::rand({1, 3, 5, 7}, {at::kCUDA});
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+  torch_tensorrt::core::lowering::passes::UnpackNewZeros(g);
+  torch::jit::EliminateCommonSubexpression(g);
+  auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+}
+
 TEST(LoweringPasses, UnpackRsqrtLowersCorrectly) {
   const auto graph = R"IR(
       graph(%x.1 : Tensor):
