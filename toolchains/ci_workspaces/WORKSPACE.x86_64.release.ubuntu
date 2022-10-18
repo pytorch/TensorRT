@@ -58,7 +58,7 @@ http_archive(
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
     sha256 = "94573e4c5f84ee70dea00c39dc1afcd4173ef4454f4d7cb428b499cf4c3b86e1",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu116/libtorch-cxx11-abi-shared-with-deps-1.13.0.dev20220922%2Bcu116.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu116/libtorch-cxx11-abi-shared-with-deps-1.13.0.dev20221018%2Bcu116.zip"],
 )
 
 http_archive(
@@ -66,7 +66,7 @@ http_archive(
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
     sha256 = "5748ee06d81934a4bf7654653b34820365b264d16f6b99b56833cfdd3005da71",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu116/libtorch-shared-with-deps-1.13.0.dev20220922%2Bcu116.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu116/libtorch-shared-with-deps-1.13.0.dev20221018%2Bcu116.zip"],
 )
 
 ####################################################################################

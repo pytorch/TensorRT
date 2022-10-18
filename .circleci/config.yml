@@ -139,7 +139,7 @@ commands:
         default: "8.2.1"
       trt-version-short:
         type: string
-        default: "8.2.4"
+        default: "8.4.3"
       bazel-version:
         type: string
         default: "5.2.0"
@@ -176,7 +176,7 @@ commands:
       parameters:
         trt-version-long:
           type: string
-          default: "8.2.4.2"
+          default: "8.4.3.1"
       steps:
         - run:
             name: Set up python environment
@@ -194,10 +194,10 @@ commands:
     parameters:
       torch-build:
         type: string
-        default: "1.11.0+cu113"
+        default: "1.14.0.dev20221018+cu116"
       torch-build-index:
         type: string
-        default: "https://download.pytorch.org/whl/cu113"
+        default: "https://download.pytorch.org/whl/nightly/cu116"
     steps:
       - run:
           name: Install Torch
@@ -946,7 +946,7 @@ parameters:
   # Nightly platform config
   torch-build:
     type: string
-    default: "1.13.0.dev20220921+cu116"
+    default: "1.14.0.dev20221018+cu116"
   torch-build-index:
     type: string
     default: "https://download.pytorch.org/whl/nightly/cu116"
@@ -955,7 +955,7 @@ parameters:
     default: "8.4.1"
   trt-version-short:
     type: string
-    default: "8.4.1"
+    default: "8.4.3"
   trt-version-long:
     type: string
     default: "8.4.3.1"
