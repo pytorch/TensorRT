@@ -60,6 +60,7 @@ struct PartitioningCtx {
   bool shouldNodeRunInTorch(torch::jit::Node* n);
   bool shouldNodeRunInTensorRT(torch::jit::Node* n);
   std::vector<torch::jit::Node*> getNodesRunInTorch();
+  std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>> input_types_map;
 
  private:
   void _load_nodes_into_decision_map(torch::jit::Block* b);

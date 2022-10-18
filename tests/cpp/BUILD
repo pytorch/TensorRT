@@ -17,6 +17,7 @@ test_suite(
         ":test_default_input_types",
         ":test_example_tensors",
         ":test_module_fallback",
+        ":test_dynamic_fallback",
         ":test_modules_as_engines",
         ":test_multiple_registered_engines",
         ":test_runtime_thread_safety",
@@ -32,6 +33,7 @@ test_suite(
         ":test_default_input_types",
         ":test_example_tensors",
         ":test_module_fallback",
+        ":test_dynamic_fallback",
         ":test_modules_as_engines",
         ":test_multiple_registered_engines",
         ":test_runtime_thread_safety",
@@ -113,6 +115,21 @@ cc_test(
 cc_test(
     name = "test_module_fallback",
     srcs = ["test_module_fallback.cpp"],
+    data = [
+        "//tests/modules:jit_models",
+    ],
+    deps = [
+        "//tests/util",
+        "@googletest//:gtest_main",
+    ] + select({
+        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@libtorch//:libtorch"],
+    }),
+)
+
+cc_test(
+    name = "test_dynamic_fallback",
+    srcs = ["test_dynamic_fallback.cpp"],
     data = [
         "//tests/modules:jit_models",
     ],

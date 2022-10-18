@@ -436,7 +436,7 @@ void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block) {
   return;
 }
 
-void partition(PartitioningCtx* ctx, ExampleIValues& example_tensor_map) {
+void partition(PartitioningCtx* ctx) {
   LOG_DEBUG(ctx->settings);
 
   // Go through all the blocks to do the partitioning
@@ -453,7 +453,17 @@ void partition(PartitioningCtx* ctx, ExampleIValues& example_tensor_map) {
     registerSegmentsOutputs(ctx, block);
 
     // run shape analysis on each segmented block
-    runShapeAnalysis(ctx, block, example_tensor_map);
+    auto min_input_ivalues_map =
+        partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, "min");
+    auto opt_input_ivalues_map =
+        partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, "opt");
+    auto max_input_ivalues_map =
+        partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, "max");
+
+    runShapeAnalysis(ctx, block, min_input_ivalues_map, "min");
+    runShapeAnalysis(ctx, block, opt_input_ivalues_map, "opt");
+    runShapeAnalysis(ctx, block, max_input_ivalues_map, "max");
+
   }
 }
 

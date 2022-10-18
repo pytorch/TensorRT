@@ -35,6 +35,7 @@ struct SegmentedBlock {
   SegmentedBlock(BlockID id, SegmentedBlockTarget blk_target, const std::vector<torch::jit::Node*>& nodes);
 
   torch::jit::Value* getOrAddInputForValue(torch::jit::Value* v);
+  std::vector<ir::Input> construct_inputs_spec() const;
   torch::jit::Node* cloneNode(torch::jit::Node* node);
   void appendNode(torch::jit::Node* n) {
     cloneNode(n);
@@ -72,18 +73,25 @@ struct SegmentedBlock {
   bool contain_raw_value(torch::jit::Value* input) const {
     return old_to_new_.count(input);
   }
-  void register_inshapes(std::vector<ir::Input>& in_shapes) {
-    in_shapes_ = in_shapes;
+  void register_inshapes(std::vector<std::vector<int64_t>>& in_shapes, const std::string& shape_mode) {
+    if (shape_mode.compare("min") == 0){
+      min_shapes_ = in_shapes;
+    } else if(shape_mode.compare("opt") == 0){
+      opt_shapes_ = in_shapes;
+    } else{
+      max_shapes_ = in_shapes;
+    }
   }
-  const std::vector<ir::Input>& in_shapes() const {
-    return in_shapes_;
-  }
+  // const std::vector<ir::Input>& in_shapes() const {
+  //   return in_shapes_;
+  // }
   void register_intypes(std::vector<at::ScalarType>& in_types) {
     in_types_ = in_types;
   }
   const std::vector<at::ScalarType>& in_types() const {
     return in_types_;
   }
+
   void update_id(BlockID new_id) {
     id_ = new_id;
   }
@@ -99,7 +107,9 @@ struct SegmentedBlock {
  private:
   BlockID id_;
   SegmentedBlockTarget target_;
-  std::vector<ir::Input> in_shapes_;
+  std::vector<std::vector<int64_t>> min_shapes_;
+  std::vector<std::vector<int64_t>> opt_shapes_;
+  std::vector<std::vector<int64_t>> max_shapes_;
   std::vector<at::ScalarType> in_types_;
   std::vector<torch::jit::Value*> inputs_;
   std::vector<torch::jit::Value*> outputs_;

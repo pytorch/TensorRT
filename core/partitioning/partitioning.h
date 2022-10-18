@@ -13,20 +13,20 @@ namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
-typedef std::unordered_map<const torch::jit::Value*, torch::jit::IValue> ExampleIValues;
+typedef std::unordered_map<const torch::jit::Value*, c10::IValue> ExampleIValues;
 
 typedef std::pair<std::shared_ptr<torch::jit::Graph>, std::unordered_map<torch::jit::Value*, torch::jit::Value*>>
     GraphAndMapping;
 
-ExampleIValues generateRandomInputs(ir::CollectionInputSpecMap& input_ranges, ir::CollectionTypeMap& input_types);
+ExampleIValues generateRandomInputs(ir::CollectionInputSpecMap& input_ranges, ir::CollectionTypeMap& input_types, const std::string& shape_mode = std::string("opt"));
 
-void runShapeAnalysis(PartitioningCtx* ctx, torch::jit::Block* block, ExampleIValues& ivalues_maps);
+void runShapeAnalysis(PartitioningCtx* ctx, torch::jit::Block* block, ExampleIValues& ivalues_maps, const std::string& shape_mode);
 
 void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block);
 
 GraphAndMapping stitch(PartitioningCtx* ctx, torch::jit::Block* block);
 
-void partition(PartitioningCtx* ctx, ExampleIValues& example_tensor_map);
+void partition(PartitioningCtx* ctx);
 
 } // namespace partitioning
 } // namespace core
