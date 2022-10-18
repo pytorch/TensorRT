@@ -739,6 +739,34 @@ TEST(Converters, ATenSplitAndAddConvertsCorrectly) {
   }
 }
 
+TEST(Converters, ATenSplitNegativeDimsConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+          %2 : int = prim::Constant[value=1]()
+          %n1 : int = prim::Constant[value=-1]()
+          %3 : Tensor[] = aten::split(%x.1, %2, %n1)
+          %4 : Tensor, %5 : Tensor, %6 : Tensor, %7 : Tensor = prim::ListUnpack(%3)
+          return (%4, %5, %6, %7))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {1, 3, 4, 4}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
+
+  for (size_t i = 0; i < jit_results.size(); i++) {
+    auto trt = trt_results[i].reshape(jit_results[i].sizes());
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt, 2e-6));
+  }
+}
+
 TEST(Converters, ATenMaskedFillZerosConvertsCorrectly) {
   const auto graph = R"IR(
     graph(%x.1 : Tensor):
