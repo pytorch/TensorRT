@@ -9,6 +9,7 @@
 #include "torch/csrc/jit/passes/lower_graph.h"
 #include "torch/csrc/jit/passes/lower_tuples.h"
 #include "torch/csrc/jit/passes/peephole.h"
+#include "torch/csrc/jit/passes/remove_exceptions.h"
 #include "torch/csrc/jit/passes/remove_mutation.h"
 
 #include "core/lowering/lowering.h"
@@ -33,6 +34,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
   torch::jit::InlineFunctionalGraphs(g);
   torch::jit::PeepholeOptimize(g, false);
   torch::jit::FuseLinear(g);
+  torch::jit::EliminateExceptions(g);
   if (!lower_info.disable_cse) {
     torch::jit::EliminateCommonSubexpression(g);
   }
