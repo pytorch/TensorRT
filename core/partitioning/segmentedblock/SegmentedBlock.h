@@ -82,9 +82,9 @@ struct SegmentedBlock {
       max_shapes_ = in_shapes;
     }
   }
-  // const std::vector<ir::Input>& in_shapes() const {
-  //   return in_shapes_;
-  // }
+  const std::vector<ir::Input>& in_shapes() const {
+    return opt_shapes_;
+  }
   void register_intypes(std::vector<at::ScalarType>& in_types) {
     in_types_ = in_types;
   }
