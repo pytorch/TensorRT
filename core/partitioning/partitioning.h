@@ -13,7 +13,7 @@ namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
-typedef std::unordered_map<const torch::jit::Value*, c10::IValue> ExampleIValues;
+typedef std::unordered_map<const torch::jit::Value*, torch::jit::IValue> ExampleIValues;
 
 typedef std::pair<std::shared_ptr<torch::jit::Graph>, std::unordered_map<torch::jit::Value*, torch::jit::Value*>>
     GraphAndMapping;
