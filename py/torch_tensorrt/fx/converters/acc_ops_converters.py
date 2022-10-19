@@ -37,6 +37,14 @@ def trt_transposed_matmul_converter(network, target, args, kwargs, name):
         lhs = get_trt_tensor(network, lhs, f"{name}_lhs")
     if isinstance(rhs, torch.nn.Parameter):
         rhs = get_trt_tensor(network, rhs, f"{name}_rhs")
+
+    lhs, rhs = broadcast(
+        network,
+        lhs,
+        rhs,
+        f"{lhs.name}_broadcast",
+        f"{rhs.name}_broadcast",
+    )
     layer = network.add_matrix_multiply(
         lhs,
         trt.MatrixOperation.TRANSPOSE if lhs_transposed else trt.MatrixOperation.NONE,
