@@ -9,12 +9,15 @@ namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
-at::Tensor generateSingleInput(ir::Input& input, c10::optional<at::ScalarType>& type_opt, const std::string& shape_mode) {
+at::Tensor generateSingleInput(
+    ir::Input& input,
+    c10::optional<at::ScalarType>& type_opt,
+    const std::string& shape_mode) {
   nvinfer1::Dims input_shape = input.input_shape;
-  if (input.input_is_dynamic){
-    if (shape_mode.compare("min") == 0){
+  if (input.input_is_dynamic) {
+    if (shape_mode.compare("min") == 0) {
       input_shape = input.min;
-    } else if(shape_mode.compare("opt") == 0){
+    } else if (shape_mode.compare("opt") == 0) {
       input_shape = input.opt;
     } else {
       input_shape = input.max;
@@ -188,7 +191,11 @@ void getSegmentsOutputByRunning(
   seg_block.register_intypes(input_types);
 }
 
-void runShapeAnalysis(PartitioningCtx* ctx, torch::jit::Block* block, ExampleIValues& example_tensor_map, const std::string& shape_mode) {
+void runShapeAnalysis(
+    PartitioningCtx* ctx,
+    torch::jit::Block* block,
+    ExampleIValues& example_tensor_map,
+    const std::string& shape_mode) {
   // register every segment's input shape, and it's running output IValues
   for (auto& seg_block : ctx->partitioned_blocks[block]) {
     torch::jit::ConstantPooling(seg_block.g());

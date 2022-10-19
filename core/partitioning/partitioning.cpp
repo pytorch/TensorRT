@@ -436,6 +436,20 @@ void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block) {
   return;
 }
 
+bool isInputDynamic(PartitioningCtx* ctx) {
+  // Check if inputs have dynamic shapes
+  bool input_is_dynamic = true;
+  auto inputs_map = ctx->settings.collection_input_spec_map;
+  for (auto inputs : inputs_map) {
+    for (auto input : inputs.second) {
+      if (!input.input_is_dynamic) {
+        input_is_dynamic = false;
+      }
+    }
+  }
+  return input_is_dynamic;
+}
+
 void partition(PartitioningCtx* ctx) {
   LOG_DEBUG(ctx->settings);
 
@@ -446,24 +460,33 @@ void partition(PartitioningCtx* ctx) {
 
     // It's possible that some TensorRT blocks have nonTensor inputs/output because they are interleaved by Torch blocks
     // resolve nonTensor inputs/outputs
+    LOG_DEBUG("Resolving non-tensor inputs for segmented blocks");
     resolveTRTNonTensorInputs(ctx, block);
 
     // register input/output torch::jit::Value for segmented graphs
     LOG_DEBUG("Registering input/output torch::jit::Value for segmented graphs");
     registerSegmentsOutputs(ctx, block);
 
-    // run shape analysis on each segmented block
-    auto min_input_ivalues_map =
-        partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, "min");
-    auto opt_input_ivalues_map =
-        partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, "opt");
-    auto max_input_ivalues_map =
-        partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, "max");
+    // Incase of dynamic shape inputs, run shape analysis on each segmented block for min/opt/max ranges and register
+    // output shapes for each block accordingly
+    if (isInputDynamic(ctx)) {
+      LOG_DEBUG("Performing shape analysis for segmented blocks using min/opt/max shapes for inputs");
+      auto min_input_ivalues_map =
+          partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, "min");
+      auto opt_input_ivalues_map =
+          partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, "opt");
+      auto max_input_ivalues_map =
+          partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, "max");
 
-    runShapeAnalysis(ctx, block, min_input_ivalues_map, "min");
-    runShapeAnalysis(ctx, block, opt_input_ivalues_map, "opt");
-    runShapeAnalysis(ctx, block, max_input_ivalues_map, "max");
-
+      runShapeAnalysis(ctx, block, min_input_ivalues_map, "min");
+      runShapeAnalysis(ctx, block, opt_input_ivalues_map, "opt");
+      runShapeAnalysis(ctx, block, max_input_ivalues_map, "max");
+    } else {
+      LOG_DEBUG("Performing shape analysis for segmented blocks using static shapes for inputs");
+      auto opt_input_ivalues_map =
+          partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, "opt");
+      runShapeAnalysis(ctx, block, opt_input_ivalues_map, "opt");
+    }
   }
 }
 

@@ -74,11 +74,11 @@ struct SegmentedBlock {
     return old_to_new_.count(input);
   }
   void register_inshapes(std::vector<std::vector<int64_t>>& in_shapes, const std::string& shape_mode) {
-    if (shape_mode.compare("min") == 0){
+    if (shape_mode.compare("min") == 0) {
       min_shapes_ = in_shapes;
-    } else if(shape_mode.compare("opt") == 0){
+    } else if (shape_mode.compare("opt") == 0) {
       opt_shapes_ = in_shapes;
-    } else{
+    } else {
       max_shapes_ = in_shapes;
     }
   }

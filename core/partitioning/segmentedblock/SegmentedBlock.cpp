@@ -59,16 +59,14 @@ torch::jit::Value* SegmentedBlock::getOrAddInputForValue(torch::jit::Value* old_
 
 std::vector<ir::Input> SegmentedBlock::construct_inputs_spec() const {
   std::vector<ir::Input> inputs;
-  if (min_shapes_.size() == opt_shapes_.size() && opt_shapes_.size() == max_shapes_.size()){
-    LOG_DEBUG("====== IS DYNAMIC ====");
-    for (uint64_t i=0; i < opt_shapes_.size(); i++){
+  if (min_shapes_.size() == opt_shapes_.size() && opt_shapes_.size() == max_shapes_.size()) {
+    for (uint64_t i = 0; i < opt_shapes_.size(); i++) {
       auto in = ir::Input(min_shapes_[i], opt_shapes_[i], max_shapes_[i]);
       in.dtype = util::ScalarTypeToTRTDataType(in_types_[i]);
       inputs.push_back(in);
     }
   } else {
-    LOG_DEBUG("====== IS STATIC ====");
-    for (uint64_t i=0; i < opt_shapes_.size(); i++){
+    for (uint64_t i = 0; i < opt_shapes_.size(); i++) {
       auto in = ir::Input(opt_shapes_[i]);
       in.dtype = util::ScalarTypeToTRTDataType(in_types_[i]);
       inputs.push_back(in);
