@@ -205,7 +205,7 @@ TEST(LoweringPasses, UnpackStdUnbiasedKeepDimsLowersCorrectly) {
       torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
 }
 
-TEST(Evaluators, NewZerosEvaluatesCorrectly) {
+TEST(LoweringPasses, NewZerosLowersCorrectly) {
   const auto graph = R"IR(
       graph(%x.1 : Tensor):
         %2 : None = prim::Constant()
@@ -227,7 +227,7 @@ TEST(Evaluators, NewZerosEvaluatesCorrectly) {
       torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
 }
 
-TEST(Evaluators, NewZerosDataTypeEvaluatesCorrectly) {
+TEST(LoweringPasses, NewZerosDataTypeLowersCorrectly) {
   const auto graph = R"IR(
       graph(%x.1 : Tensor):
         %2 : int = prim::Constant[value=5]()
