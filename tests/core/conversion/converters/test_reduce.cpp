@@ -465,7 +465,8 @@ TEST(Converters, UnpackStdUnbiasedKeepDimsLowersCorrectly) {
         %5 : bool = prim::Constant[value=0]() # test_zeros.py:10:65
         %4 : bool = prim::Constant[value=1]() # test_zeros.py:10:50
         %3 : int = prim::Constant[value=0]() # test_zeros.py:10:39
-        %6 : int[] = prim::ListConstruct(%3)
+        %one : int = prim::Constant[value=1]()
+        %6 : int[] = prim::ListConstruct(%3, %one)
         %7 : Tensor = aten::std(%x.1, %6, %4, %5) # test_zeros.py:10:26
         return (%7))IR";
 

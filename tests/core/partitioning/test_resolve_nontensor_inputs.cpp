@@ -87,7 +87,7 @@ TEST(Partitioning, ResolveNonTensorInputsForIFBlockCorrectly) {
   auto jit_results = mod.forward({jit_in0, jit_in1});
   auto trt_results = new_mod.forward({trt_in0, trt_in1});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results.toTensor(), trt_results.toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(jit_results.toTensor(), trt_results.toTensor()));
 }
 
 TEST(Partitioning, ResolveNonTensorInputsCorrectly) {

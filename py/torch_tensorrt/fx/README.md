@@ -5,7 +5,7 @@ FX2TRT is merged as FX module in Torch-TensorRT
 
 * Method 1. Follow the instrucions for Torch-TensorRT
 * Method 2. To install FX path only (Python path) and avoid the C++ build for torchscript path
-`
+```
     $ conda create --name python_env python=3.8
     $ conda activate python_env
     # Recommend to install PyTorch 1.12 and later
@@ -18,4 +18,4 @@ FX2TRT is merged as FX module in Torch-TensorRT
     $ pyton -c "import torch_tensorrt.fx"
     # Test an example by
     $ python py/torch_tensorrt/fx/example/lower_example.py
-`
+```

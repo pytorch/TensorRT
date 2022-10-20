@@ -17,17 +17,23 @@ namespace {
 
 bool add_split(ConversionCtx* ctx, const torch::jit::Node* n, args& args, bool split_list, bool unbind) {
   auto in = args[0].ITensor();
-  auto numOutputs = 1, numRemainder = 0, axis = 0;
+  auto numOutputs = 1, numRemainder = 0;
   std::vector<int64_t> sizes;
 
+  // Precompute axis along which to apply split, ensuring negative dimensions are re-indexed
+  auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
+  auto input_axis = unbind ? args[1].unwrapToInt() : args[2].unwrapToInt();
+  auto axis = input_axis < 0 ? input_axis + maxDim : input_axis;
+
+  // Ensure input axis is valid for input tensor
+  TORCHTRT_CHECK(
+      (axis >= 0) && (axis < maxDim),
+      "Expected input axis to fall in range [-" << maxDim << ", " << (maxDim - 1) << "], got " << input_axis);
+
   if (unbind) {
-    axis = args[1].unwrapToInt();
-    auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
-    axis = axis < 0 ? axis + maxDim : axis;
     numOutputs = in->getDimensions().d[axis];
     sizes.insert(sizes.end(), numOutputs, 1);
   } else {
-    axis = args[2].unwrapToInt();
     auto inDimSize = in->getDimensions().d[axis];
     if (split_list) {
       sizes = args[1].unwrapToIntList().vec();
@@ -274,7 +280,8 @@ auto select_registrations TORCHTRT_UNUSED =
         .pattern(
             {"aten::index.Tensor(Tensor self, Tensor?[] indices) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               // refer to https://github.com/pytorch/pytorch/blob/master/torch/onnx/symbolic_opset9.py#L4627
+               // refer to
+               // https://github.com/pytorch/pytorch/blob/974ad8fa6cc63b89234beb5ebff54c2d42711932/torch/onnx/symbolic_opset9.py#L4627
                auto in = args[0].ITensorOrFreeze(ctx);
                auto ts = args[1].IValue()->toListRef();
 
