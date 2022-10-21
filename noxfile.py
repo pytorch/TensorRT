@@ -5,7 +5,7 @@ import sys
 
 # Use system installed Python packages
 PYT_PATH = (
-    "/opt/conda/lib/python3.8/site-packages"
+    "/usr/local/lib/python3.8/dist-packages"
     if not "PYT_PATH" in os.environ
     else os.environ["PYT_PATH"]
 )
@@ -202,6 +202,81 @@ def run_base_tests(session):
         else:
             session.run_always("pytest", test)
 
+def run_fx_core_tests(session):
+    print("Running FX core tests")
+    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
+    tests = [
+        "core",
+        "converters",
+        "lower",
+    ]
+    for test in tests:
+        if USE_HOST_DEPS:
+            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+        else:
+            session.run_always("pytest", test)
+
+def run_fx_converter_tests(session):
+    print("Running FX converter tests")
+    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
+    tests = [
+        "converters",
+    ]
+    for test in tests:
+        if USE_HOST_DEPS:
+            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+        else:
+            session.run_always("pytest", test)
+
+def run_fx_lower_tests(session):
+    print("Running FX lower tests")
+    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
+    tests = [
+        "passes",
+        "lower",
+    ]
+    for test in tests:
+        if USE_HOST_DEPS:
+            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+        else:
+            session.run_always("pytest", test)
+
+def run_fx_quant_tests(session):
+    print("Running FX Quant tests")
+    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
+    tests = [
+        "quant",
+    ]
+    for test in tests:
+        if USE_HOST_DEPS:
+            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+        else:
+            session.run_always("pytest", test)
+
+def run_fx_tracer_tests(session):
+    print("Running FX Tracer tests")
+    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
+    tests = [
+        "tracer",
+    ]
+    for test in tests:
+        if USE_HOST_DEPS:
+            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+        else:
+            session.run_always("pytest", test)
+
+def run_fx_tools_tests(session):
+    print("Running FX tools tests")
+    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
+    tests = [
+        "tools",
+    ]
+    for test in tests:
+        if USE_HOST_DEPS:
+            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+        else:
+            session.run_always("pytest", test)
+
 
 def run_model_tests(session):
     print("Running model tests")
@@ -309,6 +384,35 @@ def run_l0_api_tests(session):
     run_base_tests(session)
     cleanup(session)
 
+def run_l0_fx_tests(session):
+    if not USE_HOST_DEPS:
+        install_deps(session)
+        install_torch_trt(session)
+    run_fx_core_tests(session)
+    run_fx_converter_tests(session)
+    run_fx_lower_tests(session)
+    cleanup(session)
+
+def run_l0_fx_core_tests(session):
+    if not USE_HOST_DEPS:
+        install_deps(session)
+        install_torch_trt(session)
+    run_fx_core_tests(session)
+    cleanup(session)
+
+def run_l0_fx_converter_tests(session):
+    if not USE_HOST_DEPS:
+        install_deps(session)
+        install_torch_trt(session)
+    run_fx_converter_tests(session)
+    cleanup(session)
+
+def run_l0_fx_lower_tests(session):
+    if not USE_HOST_DEPS:
+        install_deps(session)
+        install_torch_trt(session)
+    run_fx_lower_tests(session)
+    cleanup(session)
 
 def run_l0_dla_tests(session):
     if not USE_HOST_DEPS:
@@ -327,7 +431,6 @@ def run_l1_model_tests(session):
     run_model_tests(session)
     cleanup(session)
 
-
 def run_l1_int8_accuracy_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
@@ -337,6 +440,14 @@ def run_l1_int8_accuracy_tests(session):
     run_int8_accuracy_tests(session)
     cleanup(session)
 
+def run_l1_fx_tests(session):
+    if not USE_HOST_DEPS:
+        install_deps(session)
+        install_torch_trt(session)
+    run_fx_quant_tests(session)
+    run_fx_tracer_tests(session)
+    run_fx_tools_tests(session)
+    cleanup(session)
 
 def run_l2_trt_compatibility_tests(session):
     if not USE_HOST_DEPS:
@@ -360,6 +471,25 @@ def l0_api_tests(session):
     """When a developer needs to check correctness for a PR or something"""
     run_l0_api_tests(session)
 
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+def l0_fx_tests(session):
+    """When a developer needs to check correctness for a PR or something"""
+    run_l0_fx_tests(session)
+
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+def l0_fx_core_tests(session):
+    """When a developer needs to check correctness for a PR or something"""
+    run_l0_fx_core_tests(session)
+
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+def l0_fx_converter_tests(session):
+    """When a developer needs to check correctness for a PR or something"""
+    run_l0_fx_converter_tests(session)
+
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+def l0_fx_lower_tests(session):
+    """When a developer needs to check correctness for a PR or something"""
+    run_l0_fx_lower_tests(session)
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l0_dla_tests(session):
@@ -372,6 +502,10 @@ def l1_model_tests(session):
     """When a user needs to test the functionality of standard models compilation and results"""
     run_l1_model_tests(session)
 
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+def l1_fx_tests(session):
+    """When a user needs to test the functionality of standard models compilation and results"""
+    run_l1_fx_tests(session)
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l1_int8_accuracy_tests(session):
