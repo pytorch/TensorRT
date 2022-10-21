@@ -12,6 +12,7 @@ class TestClampConverter(AccTestCase):
             param("min", min=0.5),
             param("max", max=0.5),
             param("minBiggerThanMax", min=1, max=0),
+            param("float32Boundary", min=-3.4028234663852886e38),
         ]
     )
     def test_clamp(
