@@ -33,7 +33,7 @@ git_repository(
 # This is currently used in pytorch NGC container CI testing.
 local_repository(
     name = "torch_tensorrt",
-    path = "/opt/conda/lib/python3.8/site-packages/torch_tensorrt"
+    path = "/usr/local/lib/python3.8/dist-packages/torch_tensorrt"
 )
 
 # CUDA should be installed on the system locally
