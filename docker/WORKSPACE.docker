@@ -31,6 +31,12 @@ git_repository(
     shallow_since = "1570114335 -0400",
 )
 
+# External dependency for torch_tensorrt if you already have precompiled binaries.
+local_repository(
+    name = "torch_tensorrt",
+    path = "/usr/local/lib/python3.8/dist-packages/torch_tensorrt",
+)
+
 # CUDA should be installed on the system locally
 new_local_repository(
     name = "cuda",

@@ -4,9 +4,7 @@ FROM ${BASE_IMG} as base
 
 # Install basic dependencies
 RUN apt-get update
-RUN apt install -y build-essential
-RUN apt-get install -y manpages-dev
-RUN apt install -y wget zlib1g software-properties-common
+RUN apt install -y build-essential manpages-dev wget zlib1g software-properties-common git
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt install -y python3.8 python3.8-distutils python3.8-dev
 RUN wget https://bootstrap.pypa.io/get-pip.py
@@ -32,19 +30,23 @@ RUN apt-get update
 
 RUN apt-get install -y libnvinfer8=8.4.3* libnvinfer-plugin8=8.4.3* libnvinfer-dev=8.4.3* libnvinfer-plugin-dev=8.4.3* libnvonnxparsers8=8.4.3-1* libnvonnxparsers-dev=8.4.3-1* libnvparsers8=8.4.3-1*  libnvparsers-dev=8.4.3-1*
 
+# Setup Bazel
+ARG BAZEL_VERSION=5.2.0
+RUN wget -q https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-x86_64 -O /usr/bin/bazel \
+ && chmod a+x /usr/bin/bazel
+
+# Remove cuda symlink to avoid bazel circle symlink errors
+RUN rm /usr/local/cuda-11.7/cuda-11.7
+
 # Build Torch-TensorRT in an auxillary container
 FROM base as torch-tensorrt-builder-base
 
 ARG ARCH="x86_64"
 ARG TARGETARCH="amd64"
-ARG BAZEL_VERSION=5.2.0
 
 RUN apt-get install -y python3-setuptools
 RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub
-RUN  apt-get update && apt-get install -y wget && apt-get install -y git
-
-RUN wget -q https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-x86_64 -O /usr/bin/bazel \
- && chmod a+x /usr/bin/bazel
+RUN  apt-get update
 
 RUN apt-get update && apt-get install -y --no-install-recommends locales ninja-build && rm -rf /var/lib/apt/lists/* && locale-gen en_US.UTF-8
 
@@ -53,9 +55,6 @@ FROM torch-tensorrt-builder-base as torch-tensorrt-builder
 COPY . /workspace/torch_tensorrt/src
 WORKDIR /workspace/torch_tensorrt/src
 RUN cp ./docker/WORKSPACE.docker WORKSPACE
-
-# Remove cuda symlink to avoid bazel circle symlink errors
-RUN rm /usr/local/cuda-11.7/cuda-11.7
 
 # This script builds both libtorchtrt bin/lib/include tarball and the Python wheel, in dist/
 RUN ./docker/dist-build.sh
