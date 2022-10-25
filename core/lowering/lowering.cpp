@@ -70,6 +70,10 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, std::vector<torch::jit::I
   passes::SiluToSigmoidMultipication(g);
   passes::RemoveSingleUse0DTensors(g);
   passes::RemoveUnnecessaryCasts(g);
+  passes::UnpackAndCastMaskedFill(g);
+  passes::UnpackAndCastNumToTensor(g);
+  passes::UnpackAndCastFull(g);
+  passes::ReplaceScalarImplicit(g);
   passes::RewriteInputsWithParams(g, params);
   LOG_GRAPH(*g);
 }

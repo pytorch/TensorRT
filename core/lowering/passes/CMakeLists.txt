@@ -1,5 +1,6 @@
 target_sources(${lib_name}
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/convNd_to_convolution.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/device_casting.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/exception_elimination.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/fuse_addmm_branches.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/linear_to_addmm.cpp"
