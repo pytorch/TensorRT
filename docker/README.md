@@ -17,14 +17,20 @@ This `Dockerfile` installs `pre-cxx11-abi` versions of Pytorch and builds Torch-
 
 Install nvidia-docker by following https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker
 
-### Build Container
+### Instructions
 
 > From root of Torch-TensorRT repo
 
+Build:
 ```
-# Build:
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t torch_tensorrt:latest .
+```
 
-# Run:
+Run:
+```
 nvidia-docker run --gpus all -it --shm-size=8gb --env="DISPLAY" --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" --name=torch_tensorrt --ipc=host --net=host torch_tensorrt:latest
 ```
+
+### Notes
+
+We also ship Torch-TensorRT in <a href="https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch">Pytorch NGC containers </a>. Release notes for these containers can be found <a href="https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/index.html">here</a>. Check out `release/ngc/22.XX` branch of Torch-TensorRT for source code that gets shipped with `22.XX` version of Pytorch NGC container.
