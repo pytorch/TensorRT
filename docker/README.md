@@ -1,8 +1,21 @@
 # Building a Torch-TensorRT container
 
-### Install Docker and NVIDIA Container Toolkit
+Use `Dockerfile` to build a container which provides the exact development environment that our master branch is usually tested against.
+`Dockerfile` currently uses the following library versions to build Torch-TensorRT.
 
-https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html
+| Library  | Version |
+| ------------- | ------------- |
+| CUDA  | 11.7.1  |
+| CUDNN  | 8.4.1  |
+| TensorRT  | 8.4.3.1  |
+| Pytorch  | 1.13.0.dev20221006+cu117  |
+| torchvision  | 0.15.0.dev20221006+cu117  |
+
+This `Dockerfile` installs `pre-cxx11-abi` versions of Pytorch and builds Torch-TRT using `pre-cxx11-abi` libtorch as well.
+
+### Dependencies
+
+Install nvidia-docker by following https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker
 
 ### Build Container
 
@@ -10,10 +23,8 @@ https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.
 
 ```
 # Build:
-DOCKER_BUILDKIT=1 docker build --build-arg BASE={TensorRT Base Container Version} -f docker/Dockerfile -t torch_tensorrt1.0:latest .
+DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t torch_tensorrt:latest .
 
 # Run:
-docker run --gpus all -it \
-	--shm-size=8gb --env="DISPLAY" --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
-	--name=torch_tensorrt1.0 --ipc=host --net=host torch_tensorrt1.0:latest
+nvidia-docker run --gpus all -it --shm-size=8gb --env="DISPLAY" --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" --name=torch_tensorrt --ipc=host --net=host torch_tensorrt:latest
 ```
