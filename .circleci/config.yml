@@ -105,7 +105,13 @@ commands:
         default: "x86_64"
       cuda-pkg-name:
         type: string
-        default: "cuda-toolkit-11-4"
+        default: "cuda-toolkit-11-7"
+      cuda-pkg-version:
+        type: string
+        default: "11-7"
+      cuda-version:
+        type: string
+        default: "11.7.1"
     steps:
       - run:
           name: Install CUDA
@@ -114,12 +120,12 @@ commands:
 
             wget https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/cuda-<< parameters.os >>.pin
             sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
-
-            sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/3bf863cc.pub
-            sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/ /"
+            wget https://developer.download.nvidia.com/compute/cuda/<< parameters.cuda-version >>/local_installers/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-515.65.01-1_amd64.deb
+            sudo dpkg -i cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-515.65.01-1_amd64.deb
+            sudo cp /var/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local/cuda-*-keyring.gpg /usr/share/keyrings/
             sudo apt-get update
+            sudo apt-get install -y cuda
 
-            sudo apt-get install -y << parameters.cuda-pkg-name >>
       - run:
           when: on_fail
           name: Dump apt sources
@@ -139,7 +145,7 @@ commands:
         default: "8.2.1"
       trt-version-short:
         type: string
-        default: "8.2.4"
+        default: "8.4.2"
       bazel-version:
         type: string
         default: "5.2.0"
@@ -176,7 +182,7 @@ commands:
       parameters:
         trt-version-long:
           type: string
-          default: "8.2.4.2"
+          default: "8.4.3.1"
       steps:
         - run:
             name: Set up python environment
@@ -194,10 +200,10 @@ commands:
     parameters:
       torch-build:
         type: string
-        default: "1.11.0+cu113"
+        default: "1.13.0.dev20221006+cu117"
       torch-build-index:
         type: string
-        default: "https://download.pytorch.org/whl/cu113"
+        default: "https://download.pytorch.org/whl/cu117"
     steps:
       - run:
           name: Install Torch
