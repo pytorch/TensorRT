@@ -146,6 +146,24 @@ bool Var::isITensor() const {
   }
 }
 
+bool Var::isITensorList() const {
+  LOG_DEBUG("===== TYPE NAME: " << type_name());
+  if (type_ == Type::kITensor) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool Var::unwrapToITensorList() {
+  TORCHTRT_CHECK(
+      isIValue(), "Requested unwrapping of arg assuming it was an IValue, however arg type is " << type_name());
+  LOG_DEBUG("===== TYPE NAME: " << type_name());
+  auto ivalue = ptr_.ivalue;
+  return false;
+  // return ptr_.ivalue->to<nvinfer1::ITensor*>();
+}
+
 bool Var::isIValue() const {
   if (type_ == Type::kIValue) {
     return true;
