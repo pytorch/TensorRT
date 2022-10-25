@@ -60,10 +60,10 @@ TEST(Partitioning, ResolveNonTensorInputsForIFBlockCorrectly) {
   inputs.push_back(torch_tensorrt::core::ir::Input({3, 4}));
   inputs.push_back(torch_tensorrt::core::ir::Input({3, 4}));
   torch_tensorrt::core::CompileSpec cfg(inputs);
-  cfg.partition_info.enabled = true;
-  cfg.partition_info.forced_fallback_operators.push_back("aten::sub");
+  cfg.partitioning_info.enabled = true;
+  cfg.partitioning_info.forced_fallback_operators.push_back("aten::sub");
   cfg.convert_info.engine_settings.truncate_long_and_double = true;
-  cfg.partition_info.truncate_long_and_double = true;
+  cfg.partitioning_info.truncate_long_and_double = true;
 
   torch::jit::script::Module mod(c10::QualifiedName("module"));
 
@@ -87,7 +87,7 @@ TEST(Partitioning, ResolveNonTensorInputsForIFBlockCorrectly) {
   auto jit_results = mod.forward({jit_in0, jit_in1});
   auto trt_results = new_mod.forward({trt_in0, trt_in1});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results.toTensor(), trt_results.toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(jit_results.toTensor(), trt_results.toTensor()));
 }
 
 TEST(Partitioning, ResolveNonTensorInputsCorrectly) {
@@ -109,8 +109,8 @@ TEST(Partitioning, ResolveNonTensorInputsCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  torch_tensorrt::core::partitioning::PartitionInfo partition_info;
-  partition_info.enabled = true;
+  torch_tensorrt::core::partitioning::PartitioningInfo partitioning_info;
+  partitioning_info.enabled = true;
   std::vector<torch_tensorrt::core::ir::Input> inputs;
   inputs.push_back(torch_tensorrt::core::ir::Input({1, 3, 16, 16}));
   inputs.push_back(torch_tensorrt::core::ir::Input({16, 3, 3, 3}));
@@ -123,9 +123,10 @@ TEST(Partitioning, ResolveNonTensorInputsCorrectly) {
     input_types.insert({g->inputs()[i], {{at::kFloat}}});
   }
   auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
-  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
+  torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
+  torch_tensorrt::core::partitioning::partition(&ctx, input_ivalues_map);
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
-      torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info, fallback_nodes);
+      ctx.partitioned_blocks.begin()->second;
 
   int torch_block_cnt = 0, trt_block_cnt = 0;
   for (const auto& segmented_block : segmented_blocks) {
@@ -168,8 +169,8 @@ TEST(Partitioning, ResolveTensorListInputsInTrtCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  torch_tensorrt::core::partitioning::PartitionInfo partition_info;
-  partition_info.enabled = true;
+  torch_tensorrt::core::partitioning::PartitioningInfo partitioning_info;
+  partitioning_info.enabled = true;
   std::vector<torch_tensorrt::core::ir::Input> inputs;
   inputs.push_back(torch_tensorrt::core::ir::Input({1, 3, 16, 16}));
   inputs.push_back(torch_tensorrt::core::ir::Input({16, 6, 3, 3}));
@@ -182,9 +183,11 @@ TEST(Partitioning, ResolveTensorListInputsInTrtCorrectly) {
     input_types.insert({g->inputs()[i], {{at::kFloat}}});
   }
   auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
-  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
+  torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
+
+  torch_tensorrt::core::partitioning::partition(&ctx, input_ivalues_map);
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
-      torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info, fallback_nodes);
+      ctx.partitioned_blocks.begin()->second;
 
   int torch_block_cnt = 0, trt_block_cnt = 0;
   for (const auto& segmented_block : segmented_blocks) {
@@ -244,7 +247,7 @@ TEST(Partitioning, ConvertForTensorListInputsInFallbackCorrectly) {
   std::vector<torch_tensorrt::core::ir::Input> inputs;
   inputs.push_back(torch_tensorrt::core::ir::Input({1, 3, 16, 16}));
   torch_tensorrt::core::CompileSpec cfg(inputs);
-  cfg.partition_info.enabled = true;
+  cfg.partitioning_info.enabled = true;
   torch::jit::script::Module mod(c10::QualifiedName("module"));
 
   auto self = g->insertInput(0, "self_1");
@@ -361,8 +364,8 @@ TEST(Partitioning, ResolveOnlyNeccessaryNonTensorInputs) {
   g->registerOutput(get_ins_node->output());
   g->registerOutput(get_outs_node->output());
 
-  torch_tensorrt::core::partitioning::PartitionInfo partition_info;
-  partition_info.enabled = true;
+  torch_tensorrt::core::partitioning::PartitioningInfo partitioning_info;
+  partitioning_info.enabled = true;
   std::vector<torch_tensorrt::core::ir::Input> inputs;
   inputs.push_back(torch_tensorrt::core::ir::Input({4, 4}));
   inputs.push_back(torch_tensorrt::core::ir::Input({4, 4}));
@@ -374,9 +377,9 @@ TEST(Partitioning, ResolveOnlyNeccessaryNonTensorInputs) {
     input_types.insert({g->inputs()[i], {{at::kFloat}}});
   }
   auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
-  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
-  auto segmented_blocks =
-      torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info, fallback_nodes);
+  torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
+  torch_tensorrt::core::partitioning::partition(&ctx, input_ivalues_map);
+  auto segmented_blocks = ctx.partitioned_blocks.begin()->second;
 
   int torch_block_cnt = 0, trt_block_cnt = 0;
   for (const auto& segmented_block : segmented_blocks) {

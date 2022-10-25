@@ -25,12 +25,12 @@ TEST(Partitioning, CheckLoopFallbackEvalCompilesCorrectly) {
 
   std::vector<torch_tensorrt::core::ir::Input> input_ranges{torch_tensorrt::core::ir::Input({1, 10})};
   torch_tensorrt::core::CompileSpec cfg(input_ranges);
-  cfg.partition_info.enabled = true;
+  cfg.partitioning_info.enabled = true;
 
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
   auto trt_mod = torch_tensorrt::core::CompileGraph(mod, cfg);
   auto trt_results = trt_mod.forward(trt_inputs_ivalues).toTensor();
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results, trt_results, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(jit_results, trt_results));
 }
 
 TEST(Partitioning, CheckLoopFallbackNoEvalCompilesCorrectly) {
@@ -53,10 +53,10 @@ TEST(Partitioning, CheckLoopFallbackNoEvalCompilesCorrectly) {
 
   std::vector<torch_tensorrt::core::ir::Input> input_ranges{torch_tensorrt::core::ir::Input({1, 10})};
   torch_tensorrt::core::CompileSpec cfg(input_ranges);
-  cfg.partition_info.enabled = true;
+  cfg.partitioning_info.enabled = true;
 
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
   auto trt_mod = torch_tensorrt::core::CompileGraph(mod, cfg);
   auto trt_results = trt_mod.forward(trt_inputs_ivalues).toTensor();
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results, trt_results, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(jit_results, trt_results));
 }

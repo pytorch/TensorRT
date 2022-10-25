@@ -5,7 +5,7 @@
 cd /workspace/project/py
 
 export CXX=g++
-export CUDA_HOME=/usr/local/cuda-11.3
+export CUDA_HOME=/usr/local/cuda-11.6
 PROJECT_DIR=/workspace/project
 
 cp -r $CUDA_HOME /usr/local/cuda

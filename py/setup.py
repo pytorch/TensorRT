@@ -376,7 +376,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        "torch>=1.12.0+cu113,<1.13.0",
+        "torch>=1.13.0.dev0,<1.14.0",
     ],
     setup_requires=[],
     cmdclass={
@@ -422,6 +422,9 @@ setup(
             "include/torch_tensorrt/core/lowering/*.h",
             "include/torch_tensorrt/core/lowering/passes/*.h",
             "include/torch_tensorrt/core/partitioning/*.h",
+            "include/torch_tensorrt/core/partitioning/segmentedblock/*.h",
+            "include/torch_tensorrt/core/partitioning/partitioninginfo/*.h",
+            "include/torch_tensorrt/core/partitioning/partitioningctx/*.h",
             "include/torch_tensorrt/core/plugins/*.h",
             "include/torch_tensorrt/core/plugins/impl/*.h",
             "include/torch_tensorrt/core/runtime/*.h",

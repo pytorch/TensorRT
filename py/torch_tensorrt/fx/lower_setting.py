@@ -36,6 +36,7 @@ class LowerSettingBasic:
     ast_rewriter_allow_list: Optional[Set[Type[nn.Module]]] = None
     leaf_module_list: Optional[Set[Type[nn.Module]]] = None
     verbose_profile: bool = False
+    is_aten: bool = False
 
 
 @dc.dataclass

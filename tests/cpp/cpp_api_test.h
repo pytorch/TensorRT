@@ -6,7 +6,7 @@
 #include "torch/script.h"
 #include "torch_tensorrt/torch_tensorrt.h"
 
-using PathAndInput = std::tuple<std::string, std::vector<std::vector<int64_t>>, std::vector<c10::ScalarType>, float>;
+using PathAndInput = std::tuple<std::string, std::vector<std::vector<int64_t>>, std::vector<c10::ScalarType>>;
 
 class CppAPITests : public testing::TestWithParam<PathAndInput> {
  public:
@@ -22,7 +22,6 @@ class CppAPITests : public testing::TestWithParam<PathAndInput> {
     }
     input_shapes = std::get<1>(params);
     input_types = std::get<2>(params);
-    threshold = std::get<3>(params);
   }
 
   void TearDown() {
@@ -34,5 +33,4 @@ class CppAPITests : public testing::TestWithParam<PathAndInput> {
   torch::jit::script::Module mod;
   std::vector<std::vector<int64_t>> input_shapes;
   std::vector<c10::ScalarType> input_types;
-  float threshold;
 };

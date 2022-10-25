@@ -1,10 +1,10 @@
 import logging
 import tempfile
 from functools import wraps
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Optional
 
 import torch
-from torch import fx, nn
+from torch import fx
 from torch.fx.passes.shape_prop import ShapeProp
 
 # Create an alias for module input type to avoid littering pyre-ignore for Any
@@ -13,6 +13,72 @@ Input = Any
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 PassFunc = Callable[[fx.GraphModule, Input], fx.GraphModule]
+
+RELAX_ACCURACY_FAILURE: bool = False
+FINAL_CHECK_ATOL_MULTIPLIER: float = 10
+FINAL_CHECK_RTOL_MULTIPLIER: float = 10
+
+
+class RelaxAccuracyCheckMode:
+    """
+    Basically a context manager that controls a global variable that controls
+    the accuracy check mode. Use it like
+    with RelaxAccuracyCheckMode(True):
+        fx2trt()
+    """
+
+    def __init__(
+        self,
+        mode: bool,
+        final_atol_multiplier: Optional[float] = None,
+        final_rtol_multiplier: Optional[float] = None,
+    ):
+        """
+        Arguments:
+        mode: whether we relax the immediate accuracy check failure or not. If yes, we will do an extra
+        accruacy check by raising the tolerance by the multipler times and only raise error if that fails.
+        This is to avoid catastrophic errors.
+        final_atol_multiplier [optional]: set FINAL_CHECK_ATOL_MULTIPLIER if specifier.
+        final_rtol_multiplier [optional]: set FINAL_CHECK_RTOL_MULTIPLIER if specifier.
+        """
+        global RELAX_ACCURACY_FAILURE
+        global FINAL_CHECK_ATOL_MULTIPLIER
+        global FINAL_CHECK_RTOL_MULTIPLIER
+        self._old_mode = (
+            RELAX_ACCURACY_FAILURE,
+            FINAL_CHECK_ATOL_MULTIPLIER,
+            FINAL_CHECK_RTOL_MULTIPLIER,
+        )
+        RELAX_ACCURACY_FAILURE = mode
+        FINAL_CHECK_ATOL_MULTIPLIER = (
+            final_atol_multiplier
+            if final_atol_multiplier
+            else FINAL_CHECK_ATOL_MULTIPLIER
+        )
+        FINAL_CHECK_RTOL_MULTIPLIER = (
+            final_rtol_multiplier
+            if final_rtol_multiplier
+            else FINAL_CHECK_RTOL_MULTIPLIER
+        )
+        _LOGGER.info(
+            f"Set new relaxed accuracy check mode: {RELAX_ACCURACY_FAILURE=}, {FINAL_CHECK_ATOL_MULTIPLIER=}, {FINAL_CHECK_RTOL_MULTIPLIER=}"
+        )
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, type, value, traceback):
+        global RELAX_ACCURACY_FAILURE
+        global FINAL_CHECK_ATOL_MULTIPLIER
+        global FINAL_CHECK_RTOL_MULTIPLIER
+        (
+            RELAX_ACCURACY_FAILURE,
+            FINAL_CHECK_ATOL_MULTIPLIER,
+            FINAL_CHECK_RTOL_MULTIPLIER,
+        ) = self._old_mode
+        _LOGGER.info(
+            f"Restored old relaxed accuracy check mode: {RELAX_ACCURACY_FAILURE=}, {FINAL_CHECK_ATOL_MULTIPLIER=}, {FINAL_CHECK_RTOL_MULTIPLIER=}"
+        )
 
 
 def chain_passes(*passes: PassFunc) -> PassFunc:
@@ -32,11 +98,11 @@ def chain_passes(*passes: PassFunc) -> PassFunc:
 
 # (TODO(shirongwu): Add exception notification for fblearner flow when available, notify oncall
 # on pass that failed accuracy check.
-def validate_inference(rtol=None, atol=None, suppress_accuracy_check_failure=False):
+def validate_inference(rtol=None, atol=None):
     def _validate_inference(pass_: PassFunc) -> PassFunc:
         """
         Wraps a pass function to validate that its inference results before and
-        after the pass run should be `allclose`.
+        after the pass run should be `close`.
         """
 
         @wraps(pass_)
@@ -52,32 +118,41 @@ def validate_inference(rtol=None, atol=None, suppress_accuracy_check_failure=Fal
 
             tensor_res_0 = _collect_tensors(res0)
             tensor_res_1 = _collect_tensors(res1)
+            relax_accuracy_check_failure = RELAX_ACCURACY_FAILURE
 
             for kk, (x, y) in enumerate(zip(tensor_res_0, tensor_res_1)):
-                kwargs = {"equal_nan": True}
+                kwargs2 = {"equal_nan": True}
                 if rtol:
-                    kwargs["rtol"] = rtol
+                    kwargs2["rtol"] = rtol
                 if atol:
-                    kwargs["atol"] = atol
+                    kwargs2["atol"] = atol
+                kwargs2[
+                    "msg"
+                ] = (
+                    lambda msg: f"Pass {pass_} failed correctness check due at output {kk}:\n{msg}"
+                )
                 # If tensors are on different devices, make sure to compare
                 # their copies that are on the same device.
                 if x.get_device() != y.get_device():
                     x = x.cpu()
                     y = y.cpu()
-                accuracy_check = torch.allclose(x, y, **kwargs)
-                if not accuracy_check:
-                    _LOGGER.error(
-                        f"Pass {pass_} failed correctness check, get original model output as {x} and processed model output as {y} for output {kk}."
-                    )
-                    if suppress_accuracy_check_failure:
-                        _LOGGER.error(
-                            f"Pass {pass_} failed correctness check due to output {kk}."
+                try:
+                    torch.testing.assert_close(x, y, **kwargs2)
+                except Exception as e:
+                    if relax_accuracy_check_failure:
+                        _LOGGER.error(f"{e}")
+                        kwargs2["rtol"] *= FINAL_CHECK_RTOL_MULTIPLIER
+                        kwargs2["atol"] *= FINAL_CHECK_ATOL_MULTIPLIER
+                        new_atol = kwargs2["atol"]
+                        new_rtol = kwargs2["rtol"]
+                        _LOGGER.info(
+                            f"Do a sanity check to see whether things are completely wrong with {new_atol=}, {new_rtol=}"
                         )
+                        torch.testing.assert_close(x, y, **kwargs2)
                         return processed_module
                     else:
-                        raise RuntimeError(
-                            f"Pass {pass_} failed correctness check due to output {kk}"
-                        )
+                        raise e
+
             return processed_module
 
         return pass_with_validation

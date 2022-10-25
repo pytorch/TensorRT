@@ -137,6 +137,7 @@ nvinfer1::Dims toDimsTailPad(c10::List<int64_t> l, uint64_t pad_to);
 nvinfer1::Dims unpadDims(const nvinfer1::Dims& d);
 nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos, int val = 1, bool use_zeros = true);
 nvinfer1::Dims squeezeDims(const nvinfer1::Dims& d, int pos, bool use_zeros = true);
+nvinfer1::Dims squeezeAllDims(const nvinfer1::Dims& d, bool use_zeros_for_unknown_dims = true);
 nvinfer1::Dims toDims(c10::IntArrayRef l);
 nvinfer1::Dims toDims(c10::List<int64_t> l);
 nvinfer1::DimsHW toDimsHW(c10::List<int64_t> l);

@@ -6,7 +6,18 @@ import logging
 import textwrap
 import warnings
 from types import FunctionType
-from typing import Any, Dict, Iterable, Optional, Sequence, Set, Tuple, Type
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+    Union,
+)
 
 import torch
 import torch.jit as jit
@@ -516,6 +527,9 @@ def trace(
     use_acc_normalization: bool = True,
     ast_rewriter_allow_list: Optional[Set[Type[nn.Module]]] = None,
     leaf_module_list: Optional[Set[Type[nn.Module]]] = None,
+    acc_normalization_block_list: Optional[
+        Set[Tuple[str, Union[str, Callable]]]
+    ] = None,
 ) -> torch.fx.GraphModule:
     """
     Performs tracing and arg normalization specialized for accelerator lowering.
@@ -559,6 +573,11 @@ def trace(
         leaf_module_list (Optional[Set[nn.Module]]): Optional leaf module list where
                                             modules will not be traced into.
 
+        acc_normalization_block_list (Optional[Set[Tuple[str, Union[str, Callable]]]]):
+                                    Optional set of (op, target) pairs to not apply acc
+                                    normalization to. Just like the register_acc_op decarators,
+                                    the target can either be a string (e.g. for op == "call_method")
+                                    or a callable (e.g. for op == "call_function").
     """
     if mod.training:
         warnings.warn(
@@ -595,7 +614,9 @@ def trace(
     # Normalize to acc-specialized wrappers for consistency across op naming and
     # ensuring all kwarg usage.
     if use_acc_normalization:
-        acc_normalizer.normalize(traced)
+        acc_normalizer.normalize(
+            traced, acc_normalization_block_list=acc_normalization_block_list
+        )
 
     traced.recompile()
 
