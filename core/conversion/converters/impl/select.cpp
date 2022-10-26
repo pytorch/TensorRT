@@ -724,6 +724,23 @@ auto select_registrations TORCHTRT_UNUSED =
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
                LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
                return true;
+             }})
+        .pattern(
+            {"aten::where.self(Tensor condition, Tensor self, Tensor other) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto condition = args[0].ITensorOrFreeze(ctx);
+               auto x = args[1].ITensorOrFreeze(ctx);
+               auto y = args[2].ITensorOrFreeze(ctx);
+
+               auto layer = ctx->net->addSelect(*condition, *x, *y);
+
+               TORCHTRT_CHECK(layer, "Unable to create select layer for aten::where.self");
+
+               layer->setName(util::node_info(n).c_str());
+
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
              }});
 
 } // namespace
