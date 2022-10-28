@@ -227,9 +227,9 @@ def run_fx_converter_tests(session):
     skip_tests = "-k not conv3d"
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+            session.run_always("pytest", test, skip_tests, env={"PYTHONPATH": PYT_PATH})
         else:
-            session.run_always("pytest", test)
+            session.run_always("pytest", test, skip_tests)
 
 def run_fx_lower_tests(session):
     print("Running FX lower tests")
