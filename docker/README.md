@@ -1,15 +1,7 @@
 # Building a Torch-TensorRT container
 
 Use `Dockerfile` to build a container which provides the exact development environment that our master branch is usually tested against.
-`Dockerfile` currently uses the following library versions to build Torch-TensorRT.
-
-| Library  | Version |
-| ------------- | ------------- |
-| CUDA  | 11.7.1  |
-| CUDNN  | 8.4.1  |
-| TensorRT  | 8.4.3.1  |
-| Pytorch  | 1.13.0.dev20221006+cu117  |
-| torchvision  | 0.15.0.dev20221006+cu117  |
+`Dockerfile` currently uses the exact libraries listed in <a href="https://github.com/pytorch/TensorRT#dependencies">dependencies</a> to build Torch-TensorRT.
 
 This `Dockerfile` installs `pre-cxx11-abi` versions of Pytorch and builds Torch-TRT using `pre-cxx11-abi` libtorch as well.
 Note: To install `cxx11_abi` version of Torch-TensorRT, enable `USE_CXX11=1` flag so that `dist-build.sh` can build it accordingly.
