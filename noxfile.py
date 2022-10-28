@@ -207,8 +207,6 @@ def run_fx_core_tests(session):
     session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
     tests = [
         "core",
-        "converters",
-        "lower",
     ]
     for test in tests:
         if USE_HOST_DEPS:
