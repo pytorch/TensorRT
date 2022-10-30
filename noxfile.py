@@ -230,11 +230,15 @@ def run_fx_converter_tests(session):
             session.run_always("pytest", test, skip_tests)
 
 def run_fx_lower_tests(session):
-    print("Running FX lower tests")
+    print("Running FX passes and trt_lower tests")
     session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
     tests = [
-        "passes",
-        "lower",
+        "passes/test_multi_fuse_trt.py",
+        # "passes/test_fuse_permute_linear_trt.py",
+        "passes/test_remove_duplicate_output_args.py",
+        "passes/test_fuse_permute_matmul_trt.py",
+        #"passes/test_graph_opts.py"
+        "trt_lower",
     ]
     for test in tests:
         if USE_HOST_DEPS:
