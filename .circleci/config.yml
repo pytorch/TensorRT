@@ -183,7 +183,6 @@ commands:
         default: "x86_64"
     steps:
       - uninstall-cuda
-      - uninstall-cublas
       - install-cuda:
           os: << parameters.os >>
           platform: << parameters.platform >>
