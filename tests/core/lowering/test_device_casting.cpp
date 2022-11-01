@@ -23,7 +23,7 @@ TEST(LoweringPasses, UnpackAndCastMaskedFillLowersCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in, in2, in3});
-  torch_tensorrt::core::lowering::passes::UnpackAndCastMaskedFill(g);
+  torch_tensorrt::core::lowering::passes::UnpackAndCastMaskedFill(g, "cuda:0");
   torch::jit::EliminateCommonSubexpression(g);
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in, in2, in3});
 
@@ -43,7 +43,7 @@ TEST(LoweringPasses, UnpackAndCastNumToTensorLowersIntCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
-  torch_tensorrt::core::lowering::passes::UnpackAndCastNumToTensor(g);
+  torch_tensorrt::core::lowering::passes::UnpackAndCastNumToTensor(g, "cuda:0");
   torch::jit::EliminateCommonSubexpression(g);
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
@@ -63,7 +63,7 @@ TEST(LoweringPasses, UnpackAndCastNumToTensorLowersFloatCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
-  torch_tensorrt::core::lowering::passes::UnpackAndCastNumToTensor(g);
+  torch_tensorrt::core::lowering::passes::UnpackAndCastNumToTensor(g, "cuda:0");
   torch::jit::EliminateCommonSubexpression(g);
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
@@ -86,7 +86,7 @@ TEST(LoweringPasses, UnpackAndCastFullIntLowersCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
-  torch_tensorrt::core::lowering::passes::UnpackAndCastFull(g);
+  torch_tensorrt::core::lowering::passes::UnpackAndCastFull(g, "cuda:0");
   torch::jit::EliminateCommonSubexpression(g);
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
@@ -110,7 +110,7 @@ TEST(LoweringPasses, UnpackAndCastFullFloatLowersCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
-  torch_tensorrt::core::lowering::passes::UnpackAndCastFull(g);
+  torch_tensorrt::core::lowering::passes::UnpackAndCastFull(g, "cuda:0");
   torch::jit::EliminateCommonSubexpression(g);
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
@@ -124,7 +124,7 @@ TEST(LoweringPasses, ReplaceScalarImplicitLowersCorrectly) {
         %5 : int = prim::Constant[value=0]()
         %false : bool = prim::Constant[value=0]()
         %none : NoneType = prim::Constant()
-        %cuda : Device = prim::Constant[value="cuda"]()
+        %cuda : Device = prim::Constant[value="cuda:0"]()
         %3 : int = aten::size(%x.1, %5)
         %y.2 : Tensor = prim::NumToTensor(%3)
         %y.1 : Tensor = aten::to(%y.2, %cuda, %none, %false, %false)
@@ -162,7 +162,7 @@ TEST(LoweringPasses, ReplaceScalarImplicitIntNumToTensorLowersCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
-  torch_tensorrt::core::lowering::passes::UnpackAndCastNumToTensor(g);
+  torch_tensorrt::core::lowering::passes::UnpackAndCastNumToTensor(g, "cuda:0");
   torch_tensorrt::core::lowering::passes::ReplaceScalarImplicit(g);
   torch::jit::EliminateCommonSubexpression(g);
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});

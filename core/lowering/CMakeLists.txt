@@ -15,6 +15,8 @@ set(HEADER_FILES
 target_sources(${lib_name}
     PRIVATE
         ${CXX_SRCS}
+    PUBLIC
+        $<TARGET_OBJECTS:core_ir>
         $<TARGET_OBJECTS:core_util>
 )
 
@@ -25,8 +27,9 @@ target_include_directories(${lib_name}
 
 target_link_libraries(${lib_name}
     PUBLIC
+        TensorRT::nvinfer
         torch
-    PRIVATE
+        core_ir
         core_util
 )
 

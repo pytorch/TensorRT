@@ -80,23 +80,22 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   } else {
     // Target device is current device
     target_device += std::to_string(curr_device.id);
+  }
 
-    // For each input, ensure its current device is the desired target device
-    for (size_t i = 0; i < inputs.size(); i++) {
-      at::Tensor* in = &inputs[i];
-      std::string current_tensor_device = in->device().str();
+  // For each input, ensure its current device is the desired target device
+  for (size_t i = 0; i < inputs.size(); i++) {
+    at::Tensor* in = &inputs[i];
+    std::string current_tensor_device = in->device().str();
 
-      // If current device string does not match target device, display warning and move tensor accordingly
-      if (current_tensor_device != target_device) {
-        LOG_WARNING(
-            "Input " << i << " of engine " << compiled_engine->name << " was found to be on " << current_tensor_device
-                     << " but should be on " << target_device
-                     << ". This tensor is being moved manually by the runtime but "
-                     << "for performance considerations, ensure your inputs are all on GPU "
-                     << "and open an issue here (https://github.com/pytorch/TensorRT/issues) if this "
-                     << "warning persists.");
-        *in = in->to(torch::Device(target_device));
-      }
+    // If current device string does not match target device, display warning and move tensor accordingly
+    if (current_tensor_device != target_device) {
+      LOG_WARNING(
+          "Input " << i << " of engine " << compiled_engine->name << " was found to be on " << current_tensor_device
+                   << " but should be on " << target_device << ". This tensor is being moved by the runtime but "
+                   << "for performance considerations, ensure your inputs are all on GPU "
+                   << "and open an issue here (https://github.com/pytorch/TensorRT/issues) if this "
+                   << "warning persists.");
+      *in = in->to(torch::Device(target_device));
     }
   }
 
