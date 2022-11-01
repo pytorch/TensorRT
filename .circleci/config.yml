@@ -103,6 +103,9 @@ commands:
       platform:
         type: string
         default: "x86_64"
+      architecture:
+        type: string
+        default: "amd64"
       cuda-pkg-name:
         type: string
         default: "cuda-toolkit-11-7"
@@ -117,10 +120,9 @@ commands:
           name: Install CUDA
           command: |
             cd ~
-
             wget https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/cuda-<< parameters.os >>.pin
             sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
-            wget https://developer.download.nvidia.com/compute/cuda/<< parameters.cuda-version >>/local_installers/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-515.65.01-1_amd64.deb
+            wget https://developer.download.nvidia.com/compute/cuda/<< parameters.cuda-version >>/local_installers/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-515.65.01-1_<< parameters.architecture >>.deb
             sudo dpkg -i cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-515.65.01-1_amd64.deb
             sudo cp /var/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local/cuda-*-keyring.gpg /usr/share/keyrings/
             sudo apt-get update
@@ -153,6 +155,11 @@ commands:
         type: string
         default: "x86_64"
     steps:
+      - install-cuda:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          architecture: "amd64"
+          cuda-pkg-name: "cuda-toolkit-11-7"
       - run:
           name: Install cudnn + tensorrt
           command: |
@@ -177,6 +184,7 @@ commands:
           platform: << parameters.bazel-platform >>
           version: << parameters.bazel-version >>
 
+
   create-py-env:
       description: "Install python dependencies"
       parameters:
@@ -193,10 +201,9 @@ commands:
               pip3 install tabulate
               pip3 install nvidia-tensorrt==<< parameters.trt-version-long >>
               pip3 install pytest parameterized expecttest nox
-            # install torch_tensorrt
 
   install-torch-from-index:
-    description: "Install python dependencies"
+    description: "Install Pytorch"
     parameters:
       torch-build:
         type: string
@@ -521,7 +528,8 @@ jobs:
       - install-cuda:
           os: "ubuntu2004"
           platform: "sbsa"
-          cuda-pkg-name: "cuda-toolkit-11-4"
+          architecture: "arm64"
+          cuda-pkg-name: "cuda-toolkit-11-7"
       - run:
           name: Install openblas
           command: sudo apt install libopenblas-dev
