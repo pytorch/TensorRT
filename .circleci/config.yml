@@ -142,6 +142,18 @@ commands:
       platform:
         type: string
         default: "x86_64"
+      architecture:
+        type: string
+        default: "amd64"
+      cuda-pkg-name:
+        type: string
+        default: "cuda-toolkit-11-7"
+      cuda-pkg-version:
+        type: string
+        default: "11-7"
+      cuda-version:
+        type: string
+        default: "11.7.1"
       cudnn-version:
         type: string
         default: "8.2.1"
@@ -156,10 +168,12 @@ commands:
         default: "x86_64"
     steps:
       - install-cuda:
-          os: "ubuntu2004"
-          platform: "x86_64"
-          architecture: "amd64"
-          cuda-pkg-name: "cuda-toolkit-11-7"
+          os: << parameters.os >>
+          platform: << parameters.platform >>
+          architecture: << parameters.architecture >>
+          cuda-pkg-name: << parameters.cuda-pkg-name >>
+          cuda-pkg-version: << parameters.cuda-pkg-version >>
+          cuda-version: << parameters.cuda-version >>
       - run:
           name: Install cudnn + tensorrt
           command: |
@@ -518,18 +532,6 @@ jobs:
     resource_class: arm.xlarge
     steps:
       - checkout
-      #- run:
-      #    name: Upgrade base
-      #    command: |
-      #      sudo apt clean
-      #      sudo apt update
-      #      sudo apt upgrade
-      #      sudo apt install software-properties-common
-      - install-cuda:
-          os: "ubuntu2004"
-          platform: "sbsa"
-          architecture: "arm64"
-          cuda-pkg-name: "cuda-toolkit-11-7"
       - run:
           name: Install openblas
           command: sudo apt install libopenblas-dev
@@ -540,6 +542,10 @@ jobs:
           trt-version-short:  << pipeline.parameters.trt-jetson-version-short >>
           bazel-version: << pipeline.parameters.bazel-version >>
           bazel-platform: "arm64"
+          install-cuda:
+              os: "ubuntu2004"
+              platform: "sbsa"
+              architecture: "arm64"
       - run:
           name: Set python version
           command: |
@@ -796,17 +802,10 @@ jobs:
     resource_class: arm.xlarge
     steps:
       - checkout
-      #- run:
-      #    name: Upgrade base
-      #    command: |
-      #      sudo apt clean
-      #      sudo apt update
-      #      sudo apt upgrade
-      #      sudo apt install software-properties-common
       - install-cuda:
           os: "ubuntu2004"
           platform: "sbsa"
-          cuda-pkg-name: "cuda-toolkit-11-4"
+          architecture: "arm64"
       - run:
           name: Install openblas
           command: sudo apt install libopenblas-dev
