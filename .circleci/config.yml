@@ -403,15 +403,6 @@ commands:
     description: "Dump the test env to console"
     steps:
       - run:
-          name: GPU Config
-          command: |
-            sudo rmmod nvidia_drm
-            sudo rmmod nvidia_modeset
-            sudo rmmod nvidia_uvm
-            sudo rmmod nvidia
-            nvidia-smi
-
-      - run:
           name: Test torch
           command: |
             python3 -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"
@@ -997,7 +988,7 @@ parameters:
   # Jetson platform config
   torch-jetson-build:
     type: string
-    default: "torch-1.13.0a0+08820cb0.nv22.09-cp38-cp38-linux_aarch64.whl"
+    default: "torch-1.13.0a0+d0d6b1f2.nv22.09-cp38-cp38-linux_aarch64.whl"
   jetpack-version:
     type: string
     default: "502"
