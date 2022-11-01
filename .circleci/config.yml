@@ -683,6 +683,8 @@ jobs:
     resource_class: gpu.nvidia.large
     steps:
       - checkout
+      - uninstall-cuda
+      - install-cuda
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
       - attach_workspace:
@@ -966,10 +968,10 @@ parameters:
   # Nightly platform config
   torch-build:
     type: string
-    default: "1.13.0.dev20220921+cu116"
+    default: "1.13.0.dev20221006+cu117"
   torch-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/nightly/cu116"
+    default: "https://download.pytorch.org/whl/nightly/cu117"
   cudnn-version:
     type: string
     default: "8.4.1"
