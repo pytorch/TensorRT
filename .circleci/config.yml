@@ -98,8 +98,8 @@ commands:
       - run: 
           name: "Uninstall CUDA-11.4"
           command: |
-            sudo /usr/local/cuda-11.4/bin/cuda-uninstaller 
-            sudo /usr/bin/nvidia-uninstall
+            sudo apt-get --purge remove "*cublas*" "cuda*" "nsight*"
+            sudo apt-get --purge remove "*nvidia*"
 
   install-cuda:
     description: "Install CUDA"
