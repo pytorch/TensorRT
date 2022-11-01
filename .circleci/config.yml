@@ -96,10 +96,10 @@ commands:
     description: "Uninstall CUDA-11.4"
     steps:
       - run: 
-        name: "Uninstall CUDA-11.4"
-        command: |
-          sudo /usr/local/cuda-11.4/bin/cuda-uninstaller 
-          sudo /usr/bin/nvidia-uninstall
+          name: "Uninstall CUDA-11.4"
+          command: |
+            sudo /usr/local/cuda-11.4/bin/cuda-uninstaller 
+            sudo /usr/bin/nvidia-uninstall
 
   install-cuda:
     description: "Install CUDA"
