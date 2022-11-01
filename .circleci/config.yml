@@ -156,7 +156,7 @@ commands:
         default: "11.7.1"
       cudnn-version:
         type: string
-        default: "8.2.1"
+        default: "8.4.1"
       trt-version-short:
         type: string
         default: "8.4.2"
