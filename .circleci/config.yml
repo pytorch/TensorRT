@@ -92,7 +92,7 @@ commands:
                     key: cmake-<< parameters.cache-key >>-<< parameters.version >>
                     paths:
                         - << parameters.install-dir >>
-  uninstall-cuda-11.4:
+  uninstall-cuda:
     description: "Uninstall CUDA-11.4"
     steps:
       - run: 
@@ -174,7 +174,7 @@ commands:
         type: string
         default: "x86_64"
     steps:
-      - uninstall-cuda-11.4
+      - uninstall-cuda
       - install-cuda:
           os: << parameters.os >>
           platform: << parameters.platform >>
