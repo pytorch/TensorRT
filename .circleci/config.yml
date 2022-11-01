@@ -101,13 +101,39 @@ commands:
             sudo apt-get --purge remove "cuda*" "nsight*"
             sudo apt-get --purge remove "*nvidia*"
 
-  uninstall-cublas:
-    description: "Uninstall CUBLAS"
+  install-cudnn:
+    description: "Install CUDNN 8.5.0"
+    parameters:
+      os:
+        type: string
+        default: "ubuntu2004"
+      platform:
+        type: string
+        default: "x86_64"
+      cudnn-version:
+        type: string
+        default: "8.5.0.96"
+      cuda-version:
+        type: string
+        default: "cuda11.7"
     steps:
       - run:
-          name: "Uninstall CUDA-11.4"
+          name: Install CUDNN
           command: |
-            sudo apt-get --purge remove "*cublas*"
+            cd ~
+            wget https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/cuda-<< parameters.os >>.pin
+            sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
+            sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/3bf863cc.pub
+            sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/ /"
+            sudo apt-get update
+
+            sudo apt-get install libcudnn8=<< parameters.cudnn-version >>-1+<< parameters.cuda-version >>
+            sudo apt-get install libcudnn8-dev=<< parameters.cudnn-version >>-1+<< parameters.cuda-version >>
+
+      - run:
+          when: on_fail
+          name: Dump apt sources
+          command: cat /etc/apt/sources.list
 
   install-cuda:
     description: "Install CUDA"
@@ -169,12 +195,15 @@ commands:
       cuda-version:
         type: string
         default: "11.7.1"
+      cuda-string-version:
+        type: string
+        default: "cuda11.7"
       cudnn-version:
         type: string
-        default: "8.5.0"
+        default: "8.5.0.96"
       trt-version-short:
         type: string
-        default: "8.4.2"
+        default: "8.4.3"
       bazel-version:
         type: string
         default: "5.2.0"
@@ -190,21 +219,15 @@ commands:
           cuda-pkg-name: << parameters.cuda-pkg-name >>
           cuda-pkg-version: << parameters.cuda-pkg-version >>
           cuda-version: << parameters.cuda-version >>
+      - install-cudnn:
+          os: << parameters.os >>
+          platform: << parameters.platform >>
+          cudnn-version: << parameters.cudnn-version >>
+          cuda-version: << parameters.cuda-string-version >>
       - run:
-          name: Install cudnn + tensorrt
+          name: Install Tensorrt
           command: |
             cd ~
-
-            wget https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/cuda-<< parameters.os >>.pin
-            sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
-            sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/7fa2af80.pub
-            sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 536F8F1DE80F6A35
-            sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
-            sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/ /"
-            sudo apt-get update
-            sudo apt-get install libcudnn8=<< parameters.cudnn-version >>*
-            sudo apt-get install libcudnn8-dev=<< parameters.cudnn-version >>*
-
             sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/3bf863cc.pub
             sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/ /"
             sudo apt-get update
@@ -721,6 +744,10 @@ jobs:
           torch-build-index: << parameters.torch-build-index >>
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
+      - install-cudnn
+      - run:
+          name: "Set LD_LIBRARY_PATH path to include the installed CUDNN"
+          command: export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install --pre /tmp/dist/x86_64-linux/*
@@ -977,7 +1004,7 @@ parameters:
     default: "https://download.pytorch.org/whl/nightly/cu117"
   cudnn-version:
     type: string
-    default: "8.5.0"
+    default: "8.5.0.96"
   trt-version-short:
     type: string
     default: "8.4.1"
