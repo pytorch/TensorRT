@@ -844,8 +844,8 @@ TEST(Converters, ATenMaskedFillMixedTypesIntFloatConvertsCorrectly) {
   torch::jit::parseIR(graph, &*g);
 
   // Input is an integer tensor, filled with a float --> expecting integer tensor out
-  auto in1 = at::rand({2, 3, 5, 7}, {at::kCUDA}).to(torch::kInt32);
-  auto in2 = (2 * at::rand({2, 3, 5, 7}, {at::kCUDA})).to(torch::kBool);
+  auto in1 = at::rand({1, 3, 5, 7}, {at::kCUDA}).to(torch::kInt32);
+  auto in2 = (2 * at::rand({1, 3, 5, 7}, {at::kCUDA})).to(torch::kBool);
 
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, in2});
