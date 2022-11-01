@@ -173,7 +173,6 @@ commands:
           cuda-pkg-name: << parameters.cuda-pkg-name >>
           cuda-pkg-version: << parameters.cuda-pkg-version >>
           cuda-version: << parameters.cuda-version >>
-
       - run:
           name: Install cudnn + tensorrt
           command: |
