@@ -95,7 +95,7 @@ commands:
   uninstall-cuda:
     description: "Uninstall CUDA-11.4"
     steps:
-      - run: 
+      - run:
           name: "Uninstall CUDA-11.4"
           command: |
             sudo apt-get --purge remove "cuda*" "nsight*"
@@ -104,7 +104,7 @@ commands:
   uninstall-cublas:
     description: "Uninstall CUBLAS"
     steps:
-      - run: 
+      - run:
           name: "Uninstall CUDA-11.4"
           command: |
             sudo apt-get --purge remove "*cublas*"
@@ -714,13 +714,13 @@ jobs:
     resource_class: gpu.nvidia.large
     steps:
       - checkout
-      - create-py-env:
-          trt-version-long: << parameters.trt-version-long >>
       - attach_workspace:
           at: /tmp/dist/
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
+      - create-py-env:
+          trt-version-long: << parameters.trt-version-long >>
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install --pre /tmp/dist/x86_64-linux/*
