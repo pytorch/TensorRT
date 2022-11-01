@@ -168,12 +168,11 @@ commands:
         default: "x86_64"
     steps:
       - install-cuda:
-          os: << parameters.os >>
-          platform: << parameters.platform >>
-          architecture: << parameters.architecture >>
-          cuda-pkg-name: << parameters.cuda-pkg-name >>
-          cuda-pkg-version: << parameters.cuda-pkg-version >>
-          cuda-version: << parameters.cuda-version >>
+          os: "ubuntu2004"
+          platform: "x86_64"
+          architecture: "amd64"
+          cuda-pkg-name: "cuda-toolkit-11-7"
+
       - run:
           name: Install cudnn + tensorrt
           command: |
