@@ -93,7 +93,6 @@ commands:
                     paths:
                         - << parameters.install-dir >>
 
-
   install-cuda:
     description: "Install CUDA"
     parameters:
@@ -168,10 +167,12 @@ commands:
         default: "x86_64"
     steps:
       - install-cuda:
-          os: "ubuntu2004"
-          platform: "x86_64"
-          architecture: "amd64"
-          cuda-pkg-name: "cuda-toolkit-11-7"
+          os: << parameters.os >>
+          platform: << parameters.platform >>
+          architecture: << parameters.architecture >>
+          cuda-pkg-name: << parameters.cuda-pkg-name >>
+          cuda-pkg-version: << parameters.cuda-pkg-version >>
+          cuda-version: << parameters.cuda-version >>
 
       - run:
           name: Install cudnn + tensorrt
