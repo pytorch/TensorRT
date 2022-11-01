@@ -171,7 +171,7 @@ commands:
         default: "11.7.1"
       cudnn-version:
         type: string
-        default: "8.4.1"
+        default: "8.5.0"
       trt-version-short:
         type: string
         default: "8.4.2"
@@ -405,6 +405,10 @@ commands:
       - run:
           name: GPU Config
           command: |
+            sudo rmmod nvidia_drm
+            sudo rmmod nvidia_modeset
+            sudo rmmod nvidia_uvm
+            sudo rmmod nvidia
             nvidia-smi
 
       - run:
@@ -982,7 +986,7 @@ parameters:
     default: "https://download.pytorch.org/whl/nightly/cu117"
   cudnn-version:
     type: string
-    default: "8.4.1"
+    default: "8.5.0"
   trt-version-short:
     type: string
     default: "8.4.1"
@@ -993,7 +997,7 @@ parameters:
   # Jetson platform config
   torch-jetson-build:
     type: string
-    default: "torch-1.13.0a0+08820cb0.nv22.07-cp38-cp38-linux_aarch64.whl"
+    default: "torch-1.13.0a0+08820cb0.nv22.09-cp38-cp38-linux_aarch64.whl"
   jetpack-version:
     type: string
     default: "502"
