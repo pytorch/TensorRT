@@ -102,14 +102,19 @@ std::string TRTEngine::to_str() const {
   for (uint64_t i = 0; i < num_io.first; i++) {
     ss << "    id: " << i << std::endl;
     ss << "      shape: " << exec_ctx->getTensorShape(std::string("input_" + str(i)).c_str()) << std::endl;
-    ss << "      dtype: " << util::TRTDataTypeToScalarType(exec_ctx->getEngine().getTensorDataType(std::string("input_" + str(i)).c_str())) << std::endl;
+    ss << "      dtype: "
+       << util::TRTDataTypeToScalarType(exec_ctx->getEngine().getTensorDataType(std::string("input_" + str(i)).c_str()))
+       << std::endl;
   }
   ss << "  ]" << std::endl;
   ss << "  Outputs: [" << std::endl;
   for (uint64_t o = 0; o < num_io.second; o++) {
     ss << "    id: " << o << std::endl;
     ss << "      shape: " << exec_ctx->getTensorShape(std::string("output_" + str(o)).c_str()) << std::endl;
-    ss << "      dtype: " << util::TRTDataTypeToScalarType(exec_ctx->getEngine().getTensorDataType(std::string("output_" + str(o)).c_str())) << std::endl;
+    ss << "      dtype: "
+       << util::TRTDataTypeToScalarType(
+              exec_ctx->getEngine().getTensorDataType(std::string("output_" + str(o)).c_str()))
+       << std::endl;
   }
   ss << "  ]" << std::endl;
   ss << "  Device: " << device_info << std::endl;

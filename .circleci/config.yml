@@ -252,7 +252,7 @@ commands:
               pip3 install wheel setuptools
               pip3 install nvidia-pyindex
               pip3 install tabulate
-              pip3 install nvidia-tensorrt==<< parameters.trt-version-long >>
+              pip3 install tensorrt==<< parameters.trt-version-long >>
               pip3 install pytest parameterized expecttest nox
 
   install-torch-from-index:

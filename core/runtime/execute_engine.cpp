@@ -87,7 +87,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         "Expected input tensors to have type " << expected_type << ", found type " << inputs[pyt_idx].dtype());
     auto dims = core::util::toDimsPad(inputs[pyt_idx].sizes(), 1);
     auto shape = core::util::toVec(dims);
-    LOG_DEBUG("Input Name: " <<name << " Shape: " << dims);
+    LOG_DEBUG("Input Name: " << name << " Shape: " << dims);
     compiled_engine->exec_ctx->setInputShape(name, dims);
     compiled_engine->exec_ctx->setTensorAddress(name, inputs[pyt_idx].view(shape).contiguous().data_ptr());
   }
