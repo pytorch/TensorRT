@@ -1007,7 +1007,7 @@ parameters:
     default: "8.5.0.96"
   trt-version-short:
     type: string
-    default: "8.4.1"
+    default: "8.5.1"
   trt-version-long:
     type: string
     default: "8.5.1.7"
