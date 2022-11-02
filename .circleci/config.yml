@@ -1021,7 +1021,7 @@ parameters:
     default: "502"
   cudnn-jetson-version:
     type: string
-    default: "8.3.2"
+    default: "8.5.0.96"
   trt-jetson-version-short:
     type: string
     default: "8.4.1"
@@ -1031,7 +1031,7 @@ parameters:
 
   torch-ngc-base-image:
     type: string
-    default: "nvcr.io/nvidia/pytorch:22.07-py3"
+    default: "nvcr.io/nvidia/pytorch:22.09-py3"
 
   enable-packaging:
     type: boolean
