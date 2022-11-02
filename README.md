@@ -116,7 +116,7 @@ These are the following dependencies used to verify the testcases. Torch-TensorR
 - Libtorch 1.13.0 (built with CUDA 11.7)
 - CUDA 11.7
 - cuDNN 8.4.1
-- TensorRT 8.4.3.1
+- TensorRT 8.5.1.7
 
 ## Prebuilt Binaries and Wheel files
 
