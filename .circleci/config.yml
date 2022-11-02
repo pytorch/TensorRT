@@ -203,7 +203,7 @@ commands:
         default: "8.5.0.96"
       trt-version-short:
         type: string
-        default: "8.4.3"
+        default: "8.5.1"
       bazel-version:
         type: string
         default: "5.2.0"
@@ -243,7 +243,7 @@ commands:
       parameters:
         trt-version-long:
           type: string
-          default: "8.4.3.1"
+          default: "8.5.1.7"
       steps:
         - run:
             name: Set up python environment
@@ -1010,7 +1010,7 @@ parameters:
     default: "8.4.1"
   trt-version-long:
     type: string
-    default: "8.4.3.1"
+    default: "8.5.1.7"
 
   # Jetson platform config
   torch-jetson-build:

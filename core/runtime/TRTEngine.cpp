@@ -56,8 +56,8 @@ TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDe
   uint64_t inputs = 0;
   uint64_t outputs = 0;
 
-  for (int64_t x = 0; x < cuda_engine->getNbBindings(); x++) {
-    std::string bind_name = cuda_engine->getBindingName(x);
+  for (int64_t x = 0; x < cuda_engine->getNbIOTensors(); x++) {
+    std::string bind_name = cuda_engine->getIOTensorName(x);
     LOG_DEBUG("Binding name: " << bind_name);
     auto delim = bind_name.find(".");
     if (delim == std::string::npos) {
@@ -72,7 +72,7 @@ TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDe
     std::string idx_s = bind_name.substr(delim + 1);
     uint64_t idx = static_cast<uint64_t>(std::stoi(idx_s));
 
-    if (cuda_engine->bindingIsInput(x)) {
+    if (cuda_engine->getTensorIOMode(bind_name.c_str()) == nvinfer1::TensorIOMode::kINPUT) {
       inputs++;
       in_binding_map[x] = idx;
     } else {
@@ -101,15 +101,15 @@ std::string TRTEngine::to_str() const {
   ss << "  Inputs: [" << std::endl;
   for (uint64_t i = 0; i < num_io.first; i++) {
     ss << "    id: " << i << std::endl;
-    ss << "      shape: " << exec_ctx->getBindingDimensions(i) << std::endl;
-    ss << "      dtype: " << util::TRTDataTypeToScalarType(exec_ctx->getEngine().getBindingDataType(i)) << std::endl;
+    ss << "      shape: " << exec_ctx->getTensorShape(std::string("input_" + str(i)).c_str()) << std::endl;
+    ss << "      dtype: " << util::TRTDataTypeToScalarType(exec_ctx->getEngine().getTensorDataType(std::string("input_" + str(i)).c_str())) << std::endl;
   }
   ss << "  ]" << std::endl;
   ss << "  Outputs: [" << std::endl;
   for (uint64_t o = 0; o < num_io.second; o++) {
     ss << "    id: " << o << std::endl;
-    ss << "      shape: " << exec_ctx->getBindingDimensions(o) << std::endl;
-    ss << "      dtype: " << util::TRTDataTypeToScalarType(exec_ctx->getEngine().getBindingDataType(o)) << std::endl;
+    ss << "      shape: " << exec_ctx->getTensorShape(std::string("output_" + str(o)).c_str()) << std::endl;
+    ss << "      dtype: " << util::TRTDataTypeToScalarType(exec_ctx->getEngine().getTensorDataType(std::string("output_" + str(o)).c_str())) << std::endl;
   }
   ss << "  ]" << std::endl;
   ss << "  Device: " << device_info << std::endl;
