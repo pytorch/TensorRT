@@ -18,6 +18,13 @@ auto einsum_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pat
        auto equation = args[0].unwrapToString();
        auto in = args[1].IValue()->toListRef();
 
+       TORCHTRT_CHECK(
+           in.size() <= 2,
+           "TensorRT currently supports up to 2 input tensors "
+               << "to einsum but operation had " << in.size()
+               << " input tensors, please specify torch_executed_ops=[aten::einsum] "
+               << "at compilation time to avoid this error.");
+
        std::vector<nvinfer1::ITensor*> tensors;
 
        // Populate vector of ITensor pointers
