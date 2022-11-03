@@ -3,7 +3,23 @@
 namespace torch_tensorrt {
 namespace core {
 namespace runtime {
+
+const std::string BINDING_DELIM = "%";
 namespace {
+
+std::string serialize_bindings(const std::vector<std::string>& bindings) {
+  std::stringstream ss;
+  for (size_t i = 0; i < bindings.size() - 1; i++) {
+    ss << bindings[i] << BINDING_DELIM;
+  }
+  ss << bindings[bindings.size() - 1];
+
+  std::string serialized_binding_info = ss.str();
+
+  LOG_DEBUG("Serialized binding Info: " << serialized_binding_info);
+
+  return serialized_binding_info;
+}
 
 // TODO: Implement a call method
 // c10::List<at::Tensor> TRTEngine::Run(c10::List<at::Tensor> inputs) {
@@ -36,6 +52,9 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
               serialize_info[NAME_IDX] = self->name;
               serialize_info[DEVICE_IDX] = self->device_info.serialize();
               serialize_info[ENGINE_IDX] = trt_engine;
+              serialize_info[INPUT_BINDING_NAMES_IDX] = serialize_bindings(self->in_binding_names);
+              serialize_info[OUTPUT_BINDING_NAMES_IDX] = serialize_bindings(self->out_binding_names);
+
               return serialize_info;
             },
             [](std::vector<std::string> seralized_info) -> c10::intrusive_ptr<TRTEngine> {

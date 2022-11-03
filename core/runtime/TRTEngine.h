@@ -29,8 +29,11 @@ struct TRTEngine : torch::CustomClassHolder {
   std::string enqueue_profile_path;
   std::string profile_path = "/tmp";
 
-  std::unordered_map<uint64_t, uint64_t> in_binding_map;
-  std::unordered_map<uint64_t, uint64_t> out_binding_map;
+  std::unordered_map<uint64_t, uint64_t> in_binding_map; // TRT IDX -> PYT IDX
+  std::unordered_map<uint64_t, uint64_t> out_binding_map; // TRT IDX -> PYT IDX
+
+  std::vector<std::string> in_binding_names; // ITO: PYT IDX
+  std::vector<std::string> out_binding_names; // ITO: PYT IDX
 
 #ifndef NDEBUG
   bool debug = true;
@@ -39,9 +42,18 @@ struct TRTEngine : torch::CustomClassHolder {
 #endif
 
   ~TRTEngine() = default;
-  TRTEngine(std::string serialized_engine, CUDADevice cuda_device);
+  TRTEngine(
+      std::string serialized_engine,
+      CUDADevice cuda_device,
+      const std::vector<std::string>& in_binding_names,
+      const std::vector<std::string>& out_binding_names);
   TRTEngine(std::vector<std::string> serialized_info);
-  TRTEngine(std::string mod_name, std::string serialized_engine, CUDADevice cuda_device);
+  TRTEngine(
+      std::string mod_name,
+      std::string serialized_engine,
+      CUDADevice cuda_device,
+      const std::vector<std::string>& in_binding_names,
+      const std::vector<std::string>& out_binding_names);
   TRTEngine& operator=(const TRTEngine& other);
   std::string to_str() const;
   void set_paths();
@@ -50,6 +62,6 @@ struct TRTEngine : torch::CustomClassHolder {
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);
 };
 
-} // namespace torch_tensorrt
-} // namespace core
 } // namespace runtime
+} // namespace core
+} // namespace torch_tensorrt

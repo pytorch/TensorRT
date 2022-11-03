@@ -59,10 +59,12 @@ CUDADevice select_cuda_device(const CUDADevice& engine_device) {
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
   LOG_DEBUG("Attempting to run engine (ID: " << compiled_engine->name << ")");
+  compiled_engine->debug = false;
 
   std::unique_ptr<torch::autograd::profiler::RecordProfile> execution_profiler_guard;
   if (compiled_engine->debug) {
-    execution_profiler_guard.reset(new torch::autograd::profiler::RecordProfile(compiled_engine->execution_profile_path));
+    execution_profiler_guard.reset(
+        new torch::autograd::profiler::RecordProfile(compiled_engine->execution_profile_path));
   }
 
   {
@@ -113,10 +115,10 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       compiled_engine->exec_ctx->setBindingDimensions(i, dims);
       gpu_handles.push_back(contig_inputs.back().data_ptr());
     }
-  TORCHTRT_CHECK(
-      compiled_engine->exec_ctx->allInputDimensionsSpecified(), "Not enough inputs provided (torch.ops.tensorrt.execute_engine)");
+    TORCHTRT_CHECK(
+        compiled_engine->exec_ctx->allInputDimensionsSpecified(),
+        "Not enough inputs provided (torch.ops.tensorrt.execute_engine)");
   }
-
 
   std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
   {

@@ -5,18 +5,25 @@
 #include <utility>
 #include "ATen/core/function_schema.h"
 #include "NvInfer.h"
-#include "core/util/prelude.h"
-#include "torch/custom_class.h"
 #include "core/runtime/CUDADevice.h"
 #include "core/runtime/TRTEngine.h"
+#include "core/util/prelude.h"
+#include "torch/custom_class.h"
 
 namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
 using EngineID = int64_t;
-const std::string ABI_VERSION = "3";
-typedef enum { ABI_TARGET_IDX = 0, NAME_IDX, DEVICE_IDX, ENGINE_IDX } SerializedInfoIndex;
+const std::string ABI_VERSION = "4";
+typedef enum {
+  ABI_TARGET_IDX = 0,
+  NAME_IDX,
+  DEVICE_IDX,
+  ENGINE_IDX,
+  INPUT_BINDING_NAMES_IDX,
+  OUTPUT_BINDING_NAMES_IDX
+} SerializedInfoIndex;
 
 c10::optional<CUDADevice> get_most_compatible_device(const CUDADevice& target_device);
 std::vector<CUDADevice> find_compatible_devices(const CUDADevice& target_device);
