@@ -424,7 +424,7 @@ def run_l0_fx_lower_tests(session):
         install_deps(session)
         install_torch_trt(session)
     run_fx_lower_tests(session)
-    cleanup(session
+    cleanup(session)
 
 def run_l0_dla_tests(session):
     if not USE_HOST_DEPS:
