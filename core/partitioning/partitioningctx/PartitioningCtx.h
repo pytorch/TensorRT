@@ -47,6 +47,9 @@ struct UsageInfo {
 struct PartitioningCtx {
   // TODO: Make the set a part of settings not stand alone
   PartitioningInfo settings;
+  std::unordered_map<const torch::jit::Value*, torch::jit::IValue> min_input_ivalues_map;
+  std::unordered_map<const torch::jit::Value*, torch::jit::IValue> opt_input_ivalues_map;
+  std::unordered_map<const torch::jit::Value*, torch::jit::IValue> max_input_ivalues_map;
   // records all the original blocks topologically in the module
   std::vector<torch::jit::Block*> original_blocks;
   // mapping: node=> execution status

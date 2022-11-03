@@ -123,8 +123,11 @@ TEST(Partitioning, ResolveNonTensorInputsCorrectly) {
     input_types.insert({g->inputs()[i], {{at::kFloat}}});
   }
 
+  partitioning_info.collection_input_spec_map = inputs_map;
   torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
   ctx.input_types_map = input_types;
+
+  torch_tensorrt::core::partitioning::populateInputIValues(&ctx);
   torch_tensorrt::core::partitioning::partition(&ctx);
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
       ctx.partitioned_blocks.begin()->second;
@@ -184,8 +187,10 @@ TEST(Partitioning, ResolveTensorListInputsInTrtCorrectly) {
     input_types.insert({g->inputs()[i], {{at::kFloat}}});
   }
 
+  partitioning_info.collection_input_spec_map = inputs_map;
   torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
   ctx.input_types_map = input_types;
+  torch_tensorrt::core::partitioning::populateInputIValues(&ctx);
   torch_tensorrt::core::partitioning::partition(&ctx);
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
       ctx.partitioned_blocks.begin()->second;
@@ -263,7 +268,7 @@ TEST(Partitioning, ConvertForTensorListInputsInFallbackCorrectly) {
   int count = count_trt_engines(fallback_g);
   ASSERT_TRUE(count == 1);
 }
-
+//
 TEST(Partitioning, ResolveOnlyNeccessaryNonTensorInputs) {
   /* parseIR does not support "= aten::_set_item" so we will build this graph manually
     const auto graph = R"IR(
@@ -377,9 +382,10 @@ TEST(Partitioning, ResolveOnlyNeccessaryNonTensorInputs) {
     inputs_map.insert({g->inputs()[i], {inputs[i]}});
     input_types.insert({g->inputs()[i], {{at::kFloat}}});
   }
-  // auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
+  partitioning_info.collection_input_spec_map = inputs_map;
   torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
   ctx.input_types_map = input_types;
+  torch_tensorrt::core::partitioning::populateInputIValues(&ctx);
   torch_tensorrt::core::partitioning::partition(&ctx);
   auto segmented_blocks = ctx.partitioned_blocks.begin()->second;
 

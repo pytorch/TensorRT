@@ -21,13 +21,15 @@ typedef std::pair<std::shared_ptr<torch::jit::Graph>, std::unordered_map<torch::
 ExampleIValues generateRandomInputs(
     ir::CollectionInputSpecMap& input_ranges,
     ir::CollectionTypeMap& input_types,
-    const std::string& shape_mode = std::string("opt"));
+    const ir::ShapeMode& shape_mode = ir::ShapeMode::kOPT);
+
+void populateInputIValues(PartitioningCtx* ctx);
 
 void runShapeAnalysis(
     PartitioningCtx* ctx,
     torch::jit::Block* block,
     ExampleIValues& ivalues_maps,
-    const std::string& shape_mode);
+    const ir::ShapeMode& shape_mode);
 
 void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block);
 

@@ -127,6 +127,8 @@ bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod, std::stri
   return conversion::VerifyConverterSupportForBlock(g->block());
 }
 
+
+
 partitioning::GraphAndMapping BuildHybridGraph(
     torch::jit::script::Module& new_mod,
     torch::jit::Block* block,
@@ -138,6 +140,11 @@ partitioning::GraphAndMapping BuildHybridGraph(
 
   auto partitioning_ctx = partitioning::PartitioningCtx(block, partitioning_info);
   partitioning_ctx.input_types_map = first_use_types;
+
+  // Generate a dictionary of input torch::jit::Value's to their min, opt, max tensors and store in ctx
+  // TODO: Combine this within partition call
+  partitioning::populateInputIValues(&partitioning_ctx);
+
   partitioning::partition(&partitioning_ctx);
 
   for (auto& partitioned_block : partitioning_ctx.partitioned_blocks) {

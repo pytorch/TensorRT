@@ -12,12 +12,12 @@ namespace partitioning {
 at::Tensor generateSingleInput(
     ir::Input& input,
     c10::optional<at::ScalarType>& type_opt,
-    const std::string& shape_mode) {
+    const ir::ShapeMode& shape_mode) {
   nvinfer1::Dims input_shape = input.input_shape;
   if (input.input_is_dynamic) {
-    if (shape_mode.compare("min") == 0) {
+    if (shape_mode == ir::ShapeMode::kMIN) {
       input_shape = input.min;
-    } else if (shape_mode.compare("opt") == 0) {
+    } else if (shape_mode == ir::ShapeMode::kOPT) {
       input_shape = input.opt;
     } else {
       input_shape = input.max;
@@ -38,7 +38,7 @@ at::Tensor generateSingleInput(
 std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomInputs(
     std::unordered_map<const torch::jit::Value*, std::vector<ir::Input>>& inputs,
     std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>>& types,
-    const std::string& shape_mode) {
+    const ir::ShapeMode& shape_mode) {
   // generate random inputs for running pytorch segments
   std::unordered_map<const torch::jit::Value*, torch::jit::IValue> ivalue_map;
 
@@ -72,7 +72,7 @@ void getSegmentsOutputByRunning(
     SegmentedBlock& seg_block,
     std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& ivalues_maps,
     const PartitioningInfo& partitioning_info,
-    const std::string& shape_mode) {
+    const ir::ShapeMode& shape_mode) {
   // create a module to run the graph
   auto g = seg_block.g();
   auto copy_g = g->copy();
@@ -195,7 +195,7 @@ void runShapeAnalysis(
     PartitioningCtx* ctx,
     torch::jit::Block* block,
     ExampleIValues& example_tensor_map,
-    const std::string& shape_mode) {
+    const ir::ShapeMode& shape_mode) {
   // register every segment's input shape, and it's running output IValues
   for (auto& seg_block : ctx->partitioned_blocks[block]) {
     torch::jit::ConstantPooling(seg_block.g());

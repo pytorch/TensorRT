@@ -66,10 +66,12 @@ TEST(Partitioning, InferSequentialModelSegmentedBlockShapeCorrectly) {
     inputs_map.insert({g->inputs()[i], {inputs[i]}});
     input_types.insert({g->inputs()[i], {{at::kFloat}}});
   }
-
+  // Store a map of torch::jit::Value to ir::Input
+  partitioning_info.collection_input_spec_map = inputs_map;
   torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
   ctx.input_types_map = input_types;
-  ctx.settings.collection_input_spec_map = inputs_map;
+
+  torch_tensorrt::core::partitioning::populateInputIValues(&ctx);
   torch_tensorrt::core::partitioning::partition(&ctx);
   auto segmented_blocks = ctx.partitioned_blocks.begin()->second;
 
@@ -120,9 +122,12 @@ TEST(Partitioning, InferBranchModelSegmentedBlockShapeCorrectly) {
     input_types.insert({g->inputs()[i], {{at::kFloat}}});
   }
 
+  // Store a map of torch::jit::Value to ir::Input
+  partitioning_info.collection_input_spec_map = inputs_map;
   torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
   ctx.input_types_map = input_types;
-  ctx.settings.collection_input_spec_map = inputs_map;
+
+  torch_tensorrt::core::partitioning::populateInputIValues(&ctx);
   torch_tensorrt::core::partitioning::partition(&ctx);
   auto segmented_blocks = ctx.partitioned_blocks.begin()->second;
 

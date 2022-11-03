@@ -73,10 +73,10 @@ struct SegmentedBlock {
   bool contain_raw_value(torch::jit::Value* input) const {
     return old_to_new_.count(input);
   }
-  void register_inshapes(std::vector<std::vector<int64_t>>& in_shapes, const std::string& shape_mode) {
-    if (shape_mode.compare("min") == 0) {
+  void register_inshapes(std::vector<std::vector<int64_t>>& in_shapes, const ir::ShapeMode& shape_mode) {
+    if (shape_mode == ir::ShapeMode::kMIN) {
       min_shapes_ = in_shapes;
-    } else if (shape_mode.compare("opt") == 0) {
+    } else if (shape_mode == ir::ShapeMode::kOPT) {
       opt_shapes_ = in_shapes;
     } else {
       max_shapes_ = in_shapes;

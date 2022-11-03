@@ -450,6 +450,20 @@ bool isInputDynamic(PartitioningCtx* ctx) {
   return input_is_dynamic;
 }
 
+void populateInputIValues(PartitioningCtx* ctx){
+  if (isInputDynamic(ctx)) {
+    ctx->min_input_ivalues_map =
+        partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kMIN);
+    ctx->opt_input_ivalues_map =
+        partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kOPT);
+    ctx->max_input_ivalues_map =
+        partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kMAX);
+  } else {
+    ctx->opt_input_ivalues_map =
+        partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kOPT);
+  }
+}
+
 void partition(PartitioningCtx* ctx) {
   LOG_DEBUG(ctx->settings);
 
@@ -471,21 +485,12 @@ void partition(PartitioningCtx* ctx) {
     // output shapes for each block accordingly
     if (isInputDynamic(ctx)) {
       LOG_DEBUG("Performing shape analysis for segmented blocks using min/opt/max shapes for inputs");
-      auto min_input_ivalues_map =
-          partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, "min");
-      auto opt_input_ivalues_map =
-          partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, "opt");
-      auto max_input_ivalues_map =
-          partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, "max");
-
-      runShapeAnalysis(ctx, block, min_input_ivalues_map, "min");
-      runShapeAnalysis(ctx, block, opt_input_ivalues_map, "opt");
-      runShapeAnalysis(ctx, block, max_input_ivalues_map, "max");
+      runShapeAnalysis(ctx, block, ctx->min_input_ivalues_map, ir::ShapeMode::kMIN);
+      runShapeAnalysis(ctx, block, ctx->opt_input_ivalues_map, ir::ShapeMode::kOPT);
+      runShapeAnalysis(ctx, block, ctx->max_input_ivalues_map, ir::ShapeMode::kMAX);
     } else {
       LOG_DEBUG("Performing shape analysis for segmented blocks using static shapes for inputs");
-      auto opt_input_ivalues_map =
-          partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, "opt");
-      runShapeAnalysis(ctx, block, opt_input_ivalues_map, "opt");
+      runShapeAnalysis(ctx, block, ctx->opt_input_ivalues_map, ir::ShapeMode::kOPT);
     }
   }
 }

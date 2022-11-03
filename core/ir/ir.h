@@ -11,6 +11,12 @@ namespace torch_tensorrt {
 namespace core {
 namespace ir {
 
+enum class ShapeMode {
+    kMIN,
+    kOPT,
+    kMAX,
+};
+
 struct Input : torch::CustomClassHolder {
   Input(){};
   Input(
