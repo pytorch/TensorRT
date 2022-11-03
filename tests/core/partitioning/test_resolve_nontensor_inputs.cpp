@@ -122,9 +122,10 @@ TEST(Partitioning, ResolveNonTensorInputsCorrectly) {
     inputs_map.insert({g->inputs()[i], {inputs[i]}});
     input_types.insert({g->inputs()[i], {{at::kFloat}}});
   }
-  auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
+
   torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
-  torch_tensorrt::core::partitioning::partition(&ctx, input_ivalues_map);
+  ctx.input_types_map = input_types;
+  torch_tensorrt::core::partitioning::partition(&ctx);
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
       ctx.partitioned_blocks.begin()->second;
 
@@ -182,10 +183,10 @@ TEST(Partitioning, ResolveTensorListInputsInTrtCorrectly) {
     inputs_map.insert({g->inputs()[i], {inputs[i]}});
     input_types.insert({g->inputs()[i], {{at::kFloat}}});
   }
-  auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
-  torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
 
-  torch_tensorrt::core::partitioning::partition(&ctx, input_ivalues_map);
+  torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
+  ctx.input_types_map = input_types;
+  torch_tensorrt::core::partitioning::partition(&ctx);
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
       ctx.partitioned_blocks.begin()->second;
 
@@ -376,9 +377,10 @@ TEST(Partitioning, ResolveOnlyNeccessaryNonTensorInputs) {
     inputs_map.insert({g->inputs()[i], {inputs[i]}});
     input_types.insert({g->inputs()[i], {{at::kFloat}}});
   }
-  auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
+  // auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
   torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
-  torch_tensorrt::core::partitioning::partition(&ctx, input_ivalues_map);
+  ctx.input_types_map = input_types;
+  torch_tensorrt::core::partitioning::partition(&ctx);
   auto segmented_blocks = ctx.partitioned_blocks.begin()->second;
 
   int torch_block_cnt = 0, trt_block_cnt = 0;
