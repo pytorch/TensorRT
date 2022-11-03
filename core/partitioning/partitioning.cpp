@@ -450,17 +450,17 @@ bool isInputDynamic(PartitioningCtx* ctx) {
   return input_is_dynamic;
 }
 
-void populateInputIValues(PartitioningCtx* ctx){
+void populateInputIValues(PartitioningCtx* ctx) {
   if (isInputDynamic(ctx)) {
-    ctx->min_input_ivalues_map =
-        partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kMIN);
-    ctx->opt_input_ivalues_map =
-        partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kOPT);
-    ctx->max_input_ivalues_map =
-        partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kMAX);
+    ctx->min_input_ivalues_map = partitioning::generateRandomInputs(
+        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kMIN);
+    ctx->opt_input_ivalues_map = partitioning::generateRandomInputs(
+        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kOPT);
+    ctx->max_input_ivalues_map = partitioning::generateRandomInputs(
+        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kMAX);
   } else {
-    ctx->opt_input_ivalues_map =
-        partitioning::generateRandomInputs(ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kOPT);
+    ctx->opt_input_ivalues_map = partitioning::generateRandomInputs(
+        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kOPT);
   }
 }
 

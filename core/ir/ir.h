@@ -12,9 +12,9 @@ namespace core {
 namespace ir {
 
 enum class ShapeMode {
-    kMIN,
-    kOPT,
-    kMAX,
+  kMIN,
+  kOPT,
+  kMAX,
 };
 
 struct Input : torch::CustomClassHolder {

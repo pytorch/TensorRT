@@ -127,8 +127,6 @@ bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod, std::stri
   return conversion::VerifyConverterSupportForBlock(g->block());
 }
 
-
-
 partitioning::GraphAndMapping BuildHybridGraph(
     torch::jit::script::Module& new_mod,
     torch::jit::Block* block,
