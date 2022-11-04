@@ -4,10 +4,13 @@
 #include <memory>
 #include <mutex>
 #include <utility>
+
 #include "ATen/core/function_schema.h"
 #include "NvInfer.h"
-#include "core/util/prelude.h"
 #include "torch/custom_class.h"
+
+#include "core/runtime/TRTEngineProfiler.h"
+#include "core/util/prelude.h"
 
 namespace torch_tensorrt {
 namespace core {
@@ -20,14 +23,8 @@ struct TRTEngine : torch::CustomClassHolder {
   std::shared_ptr<nvinfer1::IExecutionContext> exec_ctx;
   std::pair<uint64_t, uint64_t> num_io;
   std::string name;
-  std::mutex mu;
   CUDADevice device_info;
 
-  std::string device_profile_path;
-  std::string input_profile_path;
-  std::string output_profile_path;
-  std::string enqueue_profile_path;
-  std::string trt_engine_profile_path;
   std::string profile_path_prefix = std::experimental::filesystem::temp_directory_path();
 
   std::unordered_map<uint64_t, uint64_t> in_binding_map; // TRT IDX -> PYT IDX
@@ -35,12 +32,6 @@ struct TRTEngine : torch::CustomClassHolder {
 
   std::vector<std::string> in_binding_names; // ITO: PYT IDX
   std::vector<std::string> out_binding_names; // ITO: PYT IDX
-
-#ifndef NDEBUG
-  bool profile_execution = true;
-#else
-  bool profile_execution = false;
-#endif
 
   ~TRTEngine() = default;
   TRTEngine(
@@ -57,10 +48,29 @@ struct TRTEngine : torch::CustomClassHolder {
       const std::vector<std::string>& out_binding_names);
   TRTEngine& operator=(const TRTEngine& other);
   std::string to_str() const;
-  void set_profiling_paths();
+  void enable_profiling();
+  void disable_profiling();
+  std::string get_engine_layer_info();
+  void dump_engine_layer_info_to_file(const std::string& path);
+  void dump_engine_layer_info();
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
+  std::string BINDING_DELIM = "%";
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);
+
+  void set_profiling_paths();
+#ifndef NDEBUG
+  bool profile_execution = true;
+#else
+  bool profile_execution = false;
+#endif
+  std::string device_profile_path;
+  std::string input_profile_path;
+  std::string output_profile_path;
+  std::string enqueue_profile_path;
+  std::string trt_engine_profile_path;
+  std::mutex mu;
+  std::unique_ptr<TRTEngineProfiler> trt_engine_profiler;
 };
 
 } // namespace runtime

@@ -47,8 +47,8 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info) {
           << ")");
   std::string _name = serialized_info[NAME_IDX];
   std::string engine_info = serialized_info[ENGINE_IDX];
-  std::vector<std::string> in_bindings = split(serialized_info[INPUT_BINDING_NAMES_IDX], '%');
-  std::vector<std::string> out_bindings = split(serialized_info[OUTPUT_BINDING_NAMES_IDX], '%');
+  std::vector<std::string> in_bindings = split(serialized_info[INPUT_BINDING_NAMES_IDX], BINDING_DELIM[0]);
+  std::vector<std::string> out_bindings = split(serialized_info[OUTPUT_BINDING_NAMES_IDX], BINDING_DELIM[0]);
 
   CUDADevice cuda_device(serialized_info[DEVICE_IDX]);
 
@@ -169,6 +169,38 @@ void TRTEngine::set_profiling_paths() {
   trt_engine_profile_path =
       std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_engine_exectuion_profile.trace"}
           .string();
+}
+
+void TRTEngine::enable_profiling() {
+  profile_execution = true;
+  trt_engine_profiler = std::make_unique<TRTEngineProfiler>(name);
+  exec_ctx->setProfiler(trt_engine_profiler.get());
+}
+
+void TRTEngine::disable_profiling() {
+  profile_execution = false;
+  exec_ctx = make_trt(cuda_engine->createExecutionContext());
+  TORCHTRT_CHECK((exec_ctx.get() != nullptr), "Unable to recreate TensorRT execution context");
+}
+
+std::string TRTEngine::get_engine_layer_info() {
+  auto inspector = cuda_engine->createEngineInspector();
+  return inspector->getEngineInformation(nvinfer1::LayerInformationFormat::kJSON);
+}
+
+void TRTEngine::dump_engine_layer_info_to_file(const std::string& path) {
+  auto inspector = cuda_engine->createEngineInspector();
+  std::ofstream f(path);
+  f << std::string(inspector->getEngineInformation(nvinfer1::LayerInformationFormat::kJSON));
+  f.close();
+  return;
+}
+
+void TRTEngine::dump_engine_layer_info() {
+  std::string layer_info_file =
+      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_engine_layer_information.json"}.string();
+  dump_engine_layer_info_to_file(layer_info_file);
+  return;
 }
 
 TRTEngine& TRTEngine::operator=(const TRTEngine& other) {

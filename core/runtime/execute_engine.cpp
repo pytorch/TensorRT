@@ -70,8 +70,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     ss << "  Input packing profile: " << compiled_engine->input_profile_path << std::endl;
     ss << "  Output packing profile: " << compiled_engine->output_profile_path << std::endl;
     ss << "  TRT enqueue profile: " << compiled_engine->enqueue_profile_path << std::endl;
-    // ss << "  Engine execution profile (TensorRT format): " << compiled_engine->trt_engine_profile_path << std::endl;
-    LOG_DEBUG(ss.str());
+    ss << "  Engine execution profile: " << compiled_engine->trt_engine_profile_path << std::endl;
+    LOG_INFO(ss.str());
   }
 
   {

@@ -178,6 +178,10 @@ core::runtime::CUDADevice Device::toInternalRuntimeDevice() {
   return core::runtime::CUDADevice(gpu_id, toTRTDeviceType(device_type));
 }
 
+std::string Device::toSerializedRuntimeDevice() {
+  return this->toInternalRuntimeDevice().serialize();
+}
+
 std::string Device::to_str() {
   std::stringstream ss;
   std::string fallback = allow_gpu_fallback ? "True" : "False";

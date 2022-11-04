@@ -30,7 +30,8 @@ c10::impl::GenericDict TensorRTBackend::compile(c10::IValue mod_val, c10::impl::
     auto device_spec = convert_cfg.engine_settings.device;
     auto device = core::runtime::CUDADevice(device_spec.gpu_id, device_spec.device_type);
     auto serialized_engine = core::ConvertGraphToTRTEngine(mod_, method_name, cfg);
-    auto engine_handle = c10::make_intrusive<core::runtime::TRTEngine>(it->key(), serialized_engine, device);
+    auto engine_handle = c10::make_intrusive<core::runtime::TRTEngine>(
+        it->key(), serialized_engine, device, std::vector<std::string>(), std::vector<std::string>());
     handles.insert(method_name, at::IValue(engine_handle));
   }
 

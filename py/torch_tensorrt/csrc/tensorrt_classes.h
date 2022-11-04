@@ -88,6 +88,7 @@ struct Device : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(allow_gpu_fallback, bool);
 
   core::runtime::CUDADevice toInternalRuntimeDevice();
+  std::string toSerializedRuntimeDevice();
   std::string to_str();
 };
 

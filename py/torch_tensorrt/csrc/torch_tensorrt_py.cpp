@@ -166,8 +166,13 @@ bool CheckMethodOperatorSupport(const torch::jit::Module& module, const std::str
   return core::CheckMethodOperatorSupport(module, method_name);
 }
 
-torch::jit::Module EmbedEngineInNewModule(const py::bytes& engine, Device& device) {
-  return core::EmbedEngineInNewModule(engine, device.toInternalRuntimeDevice());
+torch::jit::Module EmbedEngineInNewModule(
+    const py::bytes& engine,
+    Device& device,
+    const std::vector<std::string>& input_binding_names,
+    const std::vector<std::string>& output_binding_names) {
+  return core::EmbedEngineInNewModule(
+      engine, device.toInternalRuntimeDevice(), input_binding_names, output_binding_names);
 }
 
 std::string get_build_info() {
@@ -308,6 +313,7 @@ PYBIND11_MODULE(_C, m) {
   py::class_<Device>(m, "Device")
       .def(py::init<>())
       .def("__str__", &torch_tensorrt::pyapi::Device::to_str)
+      .def("_to_serialized_runtime_device", &torch_tensorrt::pyapi::Device::toSerializedRuntimeDevice)
       .def_readwrite("device_type", &Device::device_type)
       .def_readwrite("gpu_id", &Device::gpu_id)
       .def_readwrite("dla_core", &Device::dla_core)
@@ -340,7 +346,7 @@ PYBIND11_MODULE(_C, m) {
       .export_values();
 
   py::module rt_sub_mod = m.def_submodule("rt");
-  rt_sub_mod.attr("ABI_VERSION") = py::string_(core::runtime::ABI_VERSION);
+  rt_sub_mod.attr("ABI_VERSION") = std::string(core::runtime::ABI_VERSION);
 
   py::module ts_sub_mod = m.def_submodule("ts");
   py::class_<CompileSpec>(ts_sub_mod, "CompileSpec")
