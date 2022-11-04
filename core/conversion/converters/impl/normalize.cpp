@@ -134,7 +134,7 @@ auto normalize_registrations TORCHTRT_UNUSED =
                auto self = args[0].ITensorOrFreeze(ctx);
                TORCHTRT_CHECK(
                    args[1].IValue()->isNone(),
-                   "aten::linalg_norm converter does not yet support non-None 'ord' arguments.");
+                   "aten::linalg_norm converter does not yet support non-None 'ord' arguments. Add aten::linalg_norm to torch_executed_ops to force it to fallback.");
                auto keep_dims = args[3].unwrapToBool();
                auto self_nb_dims = self->getDimensions().nbDims;
 
