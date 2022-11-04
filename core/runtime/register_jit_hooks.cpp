@@ -16,7 +16,7 @@ std::string serialize_bindings(const std::vector<std::string>& bindings) {
 
   std::string serialized_binding_info = ss.str();
 
-  LOG_DEBUG("Serialized binding Info: " << serialized_binding_info);
+  LOG_DEBUG("Serialized Binding Info: " << serialized_binding_info);
 
   return serialized_binding_info;
 }
@@ -46,7 +46,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
               auto trt_engine = std::string((const char*)serialized_trt_engine->data(), serialized_trt_engine->size());
 
               std::vector<std::string> serialize_info;
-              serialize_info.resize(ENGINE_IDX + 1);
+              serialize_info.resize(SERIALIZATION_LEN);
 
               serialize_info[ABI_TARGET_IDX] = ABI_VERSION;
               serialize_info[NAME_IDX] = self->name;

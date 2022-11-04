@@ -22,7 +22,8 @@ typedef enum {
   DEVICE_IDX,
   ENGINE_IDX,
   INPUT_BINDING_NAMES_IDX,
-  OUTPUT_BINDING_NAMES_IDX
+  OUTPUT_BINDING_NAMES_IDX,
+  SERIALIZATION_LEN, // NEVER USED FOR DATA, USED TO DETERMINE LENGTH OF SERIALIZED INFO
 } SerializedInfoIndex;
 
 c10::optional<CUDADevice> get_most_compatible_device(const CUDADevice& target_device);

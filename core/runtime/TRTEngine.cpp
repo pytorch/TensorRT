@@ -38,7 +38,7 @@ TRTEngine::TRTEngine(
 
 TRTEngine::TRTEngine(std::vector<std::string> serialized_info) {
   TORCHTRT_CHECK(
-      serialized_info.size() == ENGINE_IDX + 1,
+      serialized_info.size() == SERIALIZATION_LEN,
       "Program to be deserialized targets an incompatible Torch-TensorRT ABI");
   TORCHTRT_CHECK(
       serialized_info[ABI_TARGET_IDX] == ABI_VERSION,
@@ -48,7 +48,7 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info) {
   std::string _name = serialized_info[NAME_IDX];
   std::string engine_info = serialized_info[ENGINE_IDX];
   std::vector<std::string> in_bindings = split(serialized_info[INPUT_BINDING_NAMES_IDX], '%');
-  std::vector<std::string> out_bindings = split(serialized_info[INPUT_BINDING_NAMES_IDX], '%');
+  std::vector<std::string> out_bindings = split(serialized_info[OUTPUT_BINDING_NAMES_IDX], '%');
 
   CUDADevice cuda_device(serialized_info[DEVICE_IDX]);
 
@@ -122,7 +122,7 @@ TRTEngine::TRTEngine(
     }
   } else {
     uint64_t inputs = _in_binding_names.size();
-    in_binding_names.reserve(inputs);
+    in_binding_names.resize(inputs);
     for (size_t pyt_idx = 0; pyt_idx < inputs; pyt_idx++) {
       auto binding_name = _in_binding_names[pyt_idx];
       auto trt_idx = cuda_engine->getBindingIndex(binding_name.c_str());
@@ -131,14 +131,14 @@ TRTEngine::TRTEngine(
           cuda_engine->bindingIsInput(trt_idx),
           "Binding " << binding_name << " specified as input but found as output in TensorRT engine");
       LOG_DEBUG(
-          "Input binding name: " << binding_name << "(trt: " << trt_idx << ","
-                                 << "pyt: " << pyt_idx << ")");
+          "Input binding name: " << binding_name << " (trt binding idx: " << trt_idx << ", "
+                                 << "pyt arg idx: " << pyt_idx << ")");
       in_binding_map[trt_idx] = pyt_idx;
       in_binding_names[pyt_idx] = _in_binding_names[pyt_idx];
     }
 
     uint64_t outputs = _out_binding_names.size();
-    out_binding_names.reserve(inputs);
+    out_binding_names.resize(outputs);
     for (size_t pyt_idx = 0; pyt_idx < outputs; pyt_idx++) {
       auto binding_name = _out_binding_names[pyt_idx];
       auto trt_idx = cuda_engine->getBindingIndex(binding_name.c_str());
@@ -147,10 +147,10 @@ TRTEngine::TRTEngine(
           !cuda_engine->bindingIsInput(trt_idx),
           "Binding " << binding_name << " specified as output but found as input in TensorRT engine");
       LOG_DEBUG(
-          "Output binding name: " << binding_name << "(trt: " << trt_idx << ","
-                                  << "pyt: " << pyt_idx << ")");
+          "Output binding name: " << binding_name << " (trt binding idx: " << trt_idx << ", "
+                                  << "pyt return idx: " << pyt_idx << ")");
       out_binding_map[trt_idx] = pyt_idx;
-      out_binding_names[pyt_idx] = _out_binding_names[pyt_idx];
+      out_binding_names[pyt_idx] = binding_name;
     }
     num_io = std::make_pair(inputs, outputs);
   }
