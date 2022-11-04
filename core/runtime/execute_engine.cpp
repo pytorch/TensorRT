@@ -3,6 +3,7 @@
 #include "torch/csrc/jit/runtime/custom_operator.h"
 #include "torch/torch.h"
 
+#include "core/runtime/TRTEngineProfiler.h"
 #include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
 
@@ -59,18 +60,25 @@ CUDADevice select_cuda_device(const CUDADevice& engine_device) {
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
   LOG_DEBUG("Attempting to run engine (ID: " << compiled_engine->name << ")");
-  compiled_engine->debug = false;
+  // compiled_engine->debug = false;
 
-  std::unique_ptr<torch::autograd::profiler::RecordProfile> execution_profiler_guard;
-  if (compiled_engine->debug) {
-    execution_profiler_guard.reset(
-        new torch::autograd::profiler::RecordProfile(compiled_engine->execution_profile_path));
+  if (compiled_engine->profile_execution) {
+    std::stringstream ss;
+    ss << "Execution profiling is enabled, find results here:" << std::endl;
+    compiled_engine->set_profiling_paths();
+    ss << "  Device selection profile: " << compiled_engine->device_profile_path << std::endl;
+    ss << "  Input packing profile: " << compiled_engine->input_profile_path << std::endl;
+    ss << "  Output packing profile: " << compiled_engine->output_profile_path << std::endl;
+    ss << "  TRT enqueue profile: " << compiled_engine->enqueue_profile_path << std::endl;
+    // ss << "  Engine execution profile (TensorRT format): " << compiled_engine->trt_engine_profile_path << std::endl;
+    LOG_DEBUG(ss.str());
   }
 
   {
     std::unique_ptr<torch::autograd::profiler::RecordProfile> device_profiler_guard;
-    if (compiled_engine->debug) {
-      device_profiler_guard.reset(new torch::autograd::profiler::RecordProfile(compiled_engine->device_profile_path));
+    if (compiled_engine->profile_execution) {
+      device_profiler_guard =
+          std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->device_profile_path);
     }
 
     CUDADevice curr_device = get_current_device();
@@ -93,8 +101,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   std::vector<at::Tensor> contig_inputs{};
   {
     std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
-    if (compiled_engine->debug) {
-      input_profiler_guard.reset(new torch::autograd::profiler::RecordProfile(compiled_engine->input_profile_path));
+    if (compiled_engine->profile_execution) {
+      input_profiler_guard =
+          std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
     }
 
     contig_inputs.reserve(inputs.size());
@@ -123,8 +132,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
   {
     std::unique_ptr<torch::autograd::profiler::RecordProfile> output_profiler_guard;
-    if (compiled_engine->debug) {
-      output_profiler_guard.reset(new torch::autograd::profiler::RecordProfile(compiled_engine->output_profile_path));
+    if (compiled_engine->profile_execution) {
+      output_profiler_guard =
+          std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->output_profile_path);
     }
 
     for (size_t o = inputs.size(); o < (compiled_engine->num_io.first + compiled_engine->num_io.second); o++) {
@@ -140,15 +150,25 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
   {
     std::unique_ptr<torch::autograd::profiler::RecordProfile> enqueue_profiler_guard;
-    if (compiled_engine->debug) {
-      enqueue_profiler_guard.reset(new torch::autograd::profiler::RecordProfile(compiled_engine->enqueue_profile_path));
+    if (compiled_engine->profile_execution) {
+      enqueue_profiler_guard =
+          std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->enqueue_profile_path);
     }
 
     c10::cuda::CUDAStream stream = c10::cuda::getCurrentCUDAStream(inputs[0].device().index());
 
     // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
     std::unique_lock<std::mutex> lock(compiled_engine->mu);
+    std::unique_ptr<TRTEngineProfiler> trt_engine_profiler;
+    if (compiled_engine->profile_execution) {
+      trt_engine_profiler = std::make_unique<TRTEngineProfiler>(compiled_engine->name);
+      compiled_engine->exec_ctx->setProfiler(trt_engine_profiler.get());
+    }
     compiled_engine->exec_ctx->enqueueV2(gpu_handles.data(), stream, nullptr);
+    if (compiled_engine->profile_execution) {
+      LOG_INFO(std::endl << *trt_engine_profiler);
+      dump_trace(compiled_engine->trt_engine_profile_path, *trt_engine_profiler);
+    }
   }
 
   return outputs;

@@ -1,4 +1,5 @@
 #pragma once
+#include <experimental/filesystem>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -22,12 +23,12 @@ struct TRTEngine : torch::CustomClassHolder {
   std::mutex mu;
   CUDADevice device_info;
 
-  std::string execution_profile_path;
   std::string device_profile_path;
   std::string input_profile_path;
   std::string output_profile_path;
   std::string enqueue_profile_path;
-  std::string profile_path = "/tmp";
+  std::string trt_engine_profile_path;
+  std::string profile_path_prefix = std::experimental::filesystem::temp_directory_path();
 
   std::unordered_map<uint64_t, uint64_t> in_binding_map; // TRT IDX -> PYT IDX
   std::unordered_map<uint64_t, uint64_t> out_binding_map; // TRT IDX -> PYT IDX
@@ -36,9 +37,9 @@ struct TRTEngine : torch::CustomClassHolder {
   std::vector<std::string> out_binding_names; // ITO: PYT IDX
 
 #ifndef NDEBUG
-  bool debug = true;
+  bool profile_execution = true;
 #else
-  bool debug = false;
+  bool profile_execution = false;
 #endif
 
   ~TRTEngine() = default;
@@ -56,7 +57,7 @@ struct TRTEngine : torch::CustomClassHolder {
       const std::vector<std::string>& out_binding_names);
   TRTEngine& operator=(const TRTEngine& other);
   std::string to_str() const;
-  void set_paths();
+  void set_profiling_paths();
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);

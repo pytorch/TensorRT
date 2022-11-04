@@ -112,7 +112,6 @@ TRTEngine::TRTEngine(
     out_binding_names.resize(outputs);
 
     for (int64_t x = 0; x < cuda_engine->getNbBindings(); x++) {
-      std::cout << x << std::endl;
       std::string bind_name = cuda_engine->getBindingName(x);
       if (cuda_engine->bindingIsInput(x)) {
         in_binding_names[in_binding_map.at(x)] = bind_name;
@@ -158,12 +157,18 @@ TRTEngine::TRTEngine(
   LOG_DEBUG(*this);
 }
 
-void TRTEngine::set_paths() {
-  execution_profile_path = profile_path + "/" + name + "_execution_profile.trace";
-  device_profile_path = profile_path + "/" + name + "_device_config_profile.trace";
-  input_profile_path = profile_path + "/" + name + "_input_profile.trace";
-  output_profile_path = profile_path + "/" + name + "_output_profile.trace";
-  enqueue_profile_path = profile_path + "/" + name + "_enqueue_profile.trace";
+void TRTEngine::set_profiling_paths() {
+  device_profile_path =
+      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_device_config_profile.trace"}.string();
+  input_profile_path =
+      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_input_profile.trace"}.string();
+  output_profile_path =
+      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_output_profile.trace"}.string();
+  enqueue_profile_path =
+      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_enqueue_profile.trace"}.string();
+  trt_engine_profile_path =
+      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_engine_exectuion_profile.trace"}
+          .string();
 }
 
 TRTEngine& TRTEngine::operator=(const TRTEngine& other) {
