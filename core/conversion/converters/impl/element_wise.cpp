@@ -326,15 +326,27 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                } else if (rounding_mode == "trunc") {
                  // trunc = floor(abs(div)) * sign(div)
                  auto tmp_div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, "tmp_div");
-                 auto abs = ctx->net->addUnary(*tmp_div->getOutput(0), nvinfer1::UnaryOperation::kABS);
-                 auto floor = ctx->net->addUnary(*abs->getOutput(0), nvinfer1::UnaryOperation::kFLOOR);
+                 auto abs = add_abs(ctx, n, tmp_div->getOutput(0), util::node_info(n) + "_absolute_val");
+
+                 // In this case, we allow the floor unary on non-TRT Unary types, as it is needed for this
+                 // specific function. Floor applied to non-float types equates to identity
+                 nvinfer1::ITensor* floor;
+
+                 if ((abs->getType() == nvinfer1::DataType::kINT32) || (abs->getType() == nvinfer1::DataType::kBOOL)) {
+                   LOG_DEBUG(
+                       "Tensor is of unsupported type " << abs->getType()
+                                                        << " for IUnaryLayer::kFLOOR. Using identity instead.");
+                   floor = abs;
+                 } else {
+                   auto floor_layer = ctx->net->addUnary(*abs, nvinfer1::UnaryOperation::kFLOOR);
+                   TORCHTRT_CHECK(floor_layer, "Unable to create floor layer from node: " << *n);
+                   floor_layer->setName((util::node_info(n) + "_floor").c_str());
+                   floor = floor_layer->getOutput(0);
+                 }
+
                  auto sign = ctx->net->addUnary(*tmp_div->getOutput(0), nvinfer1::UnaryOperation::kSIGN);
                  div = add_elementwise(
-                     ctx,
-                     nvinfer1::ElementWiseOperation::kPROD,
-                     floor->getOutput(0),
-                     sign->getOutput(0),
-                     util::node_info(n));
+                     ctx, nvinfer1::ElementWiseOperation::kPROD, floor, sign->getOutput(0), util::node_info(n));
                } else {
                  div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
                }
