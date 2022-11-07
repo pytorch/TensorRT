@@ -202,6 +202,7 @@ def run_base_tests(session):
         else:
             session.run_always("pytest", test)
 
+
 def run_fx_core_tests(session):
     print("Running FX core tests")
     session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
@@ -213,6 +214,7 @@ def run_fx_core_tests(session):
             session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
         else:
             session.run_always("pytest", test)
+
 
 def run_fx_converter_tests(session):
     print("Running FX converter tests")
@@ -229,6 +231,7 @@ def run_fx_converter_tests(session):
         else:
             session.run_always("pytest", test, skip_tests)
 
+
 def run_fx_lower_tests(session):
     print("Running FX passes and trt_lower tests")
     session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
@@ -237,7 +240,7 @@ def run_fx_lower_tests(session):
         # "passes/test_fuse_permute_linear_trt.py",
         "passes/test_remove_duplicate_output_args.py",
         "passes/test_fuse_permute_matmul_trt.py",
-        #"passes/test_graph_opts.py"
+        # "passes/test_graph_opts.py"
         "trt_lower",
     ]
     for test in tests:
@@ -245,6 +248,7 @@ def run_fx_lower_tests(session):
             session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
         else:
             session.run_always("pytest", test)
+
 
 def run_fx_quant_tests(session):
     print("Running FX Quant tests")
@@ -261,6 +265,7 @@ def run_fx_quant_tests(session):
         else:
             session.run_always("pytest", test, skip_tests)
 
+
 def run_fx_tracer_tests(session):
     print("Running FX Tracer tests")
     session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
@@ -269,13 +274,14 @@ def run_fx_tracer_tests(session):
     tests = [
         "tracer/test_acc_shape_prop.py",
         "tracer/test_acc_tracer.py",
-        #"tracer/test_dispatch_tracer.py"
+        # "tracer/test_dispatch_tracer.py"
     ]
     for test in tests:
         if USE_HOST_DEPS:
             session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
         else:
             session.run_always("pytest", test)
+
 
 def run_fx_tools_tests(session):
     print("Running FX tools tests")
@@ -396,6 +402,7 @@ def run_l0_api_tests(session):
     run_base_tests(session)
     cleanup(session)
 
+
 def run_l0_fx_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
@@ -405,12 +412,14 @@ def run_l0_fx_tests(session):
     run_fx_lower_tests(session)
     cleanup(session)
 
+
 def run_l0_fx_core_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
         install_torch_trt(session)
     run_fx_core_tests(session)
     cleanup(session)
+
 
 def run_l0_fx_converter_tests(session):
     if not USE_HOST_DEPS:
@@ -419,12 +428,14 @@ def run_l0_fx_converter_tests(session):
     run_fx_converter_tests(session)
     cleanup(session)
 
+
 def run_l0_fx_lower_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
         install_torch_trt(session)
     run_fx_lower_tests(session)
     cleanup(session)
+
 
 def run_l0_dla_tests(session):
     if not USE_HOST_DEPS:
@@ -443,6 +454,7 @@ def run_l1_model_tests(session):
     run_model_tests(session)
     cleanup(session)
 
+
 def run_l1_int8_accuracy_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
@@ -452,6 +464,7 @@ def run_l1_int8_accuracy_tests(session):
     run_int8_accuracy_tests(session)
     cleanup(session)
 
+
 def run_l1_fx_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
@@ -460,6 +473,7 @@ def run_l1_fx_tests(session):
     run_fx_tracer_tests(session)
     run_fx_tools_tests(session)
     cleanup(session)
+
 
 def run_l2_trt_compatibility_tests(session):
     if not USE_HOST_DEPS:
@@ -483,25 +497,30 @@ def l0_api_tests(session):
     """When a developer needs to check correctness for a PR or something"""
     run_l0_api_tests(session)
 
+
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l0_fx_tests(session):
     """When a developer needs to check correctness for a PR or something"""
     run_l0_fx_tests(session)
+
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l0_fx_core_tests(session):
     """When a developer needs to check correctness for a PR or something"""
     run_l0_fx_core_tests(session)
 
+
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l0_fx_converter_tests(session):
     """When a developer needs to check correctness for a PR or something"""
     run_l0_fx_converter_tests(session)
 
+
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l0_fx_lower_tests(session):
     """When a developer needs to check correctness for a PR or something"""
     run_l0_fx_lower_tests(session)
+
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l0_dla_tests(session):
@@ -514,10 +533,12 @@ def l1_model_tests(session):
     """When a user needs to test the functionality of standard models compilation and results"""
     run_l1_model_tests(session)
 
+
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l1_fx_tests(session):
     """When a user needs to test the functionality of standard models compilation and results"""
     run_l1_fx_tests(session)
+
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l1_int8_accuracy_tests(session):
