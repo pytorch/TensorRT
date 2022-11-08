@@ -80,16 +80,22 @@ torch::jit::Node* getUpstreamCastNode(torch::jit::Value* val) {
 }
 
 torch::jit::Node* createCastNode(SegmentedBlock& seg_block, size_t index, bool is_input) {
-  torch::jit::Node* cast_node = getUpstreamCastNode(seg_block.raw_inputs()[index]);
+  auto cast_raw_value = is_input ? seg_block.raw_inputs()[index] : seg_block.raw_outputs()[index];
+  auto cast_subgraph_value = is_input ? seg_block.outputs()[index] : seg_block.outputs()[index];
+  torch::jit::Node* cast_node = getUpstreamCastNode(cast_raw_value);
   auto g = seg_block.g();
   // if we can find upstream aten::to node, we use it's parameters for creating new cast node
   if (cast_node) {
     std::unordered_map<torch::jit::Value*, torch::jit::Value*> value_map;
-    value_map.insert({cast_node->inputs()[0], g->inputs()[index]});
+    value_map.insert({cast_node->inputs()[0], cast_subgraph_value});
     if (!is_input) {
       // if this value is output, we need to cast it to int32
       auto const_val = g->insertConstant(3);
-      value_map.insert({cast_node->inputs()[1], const_val});
+      if (cast_node->inputs()[1]->node()->output()->type()->kind() == torch::jit::TypeKind::DeviceObjType) {
+        value_map.insert({cast_node->inputs()[2], const_val});
+      } else {
+        value_map.insert({cast_node->inputs()[1], const_val});
+      }
     }
     auto env = [&](torch::jit::Value* v) { return util::getOrAddInputForValue(v, g, value_map); };
     cast_node = g->createClone(cast_node, env);
@@ -100,16 +106,7 @@ torch::jit::Node* createCastNode(SegmentedBlock& seg_block, size_t index, bool i
     auto const_zero = g->insertConstant(0);
     const_zero->setType(torch::jit::BoolType::get());
     auto none_val = g->insertNode(g->createNone())->output();
-    cast_node = g->create(torch::jit::aten::to, {g->inputs()[index], const_type, const_zero, const_zero, none_val});
-
-    //    auto cast_node = g->prependNode(g->create(torch::jit::aten::to, {g->inputs()[i], const_type, const_zero,
-    //    const_zero, none_val})); seg_block.inputs()[i]->replaceAllUsesAfterNodeWith(cast_node,
-    //    cast_node->outputs()[0]); LOG_DEBUG(seg_block << " in shape analysis");
-  }
-  if (is_input) {
-    g->prependNode(cast_node);
-  } else {
-    g->appendNode(cast_node);
+    cast_node = g->create(torch::jit::aten::to, {cast_subgraph_value, const_type, const_zero, const_zero, none_val});
   }
   return cast_node;
 }
@@ -209,6 +206,7 @@ void getSegmentsOutputByRunning(
         if (t == at::kLong) {
           // we add a cast operation to cast the type to Int64
           auto cast_node = createCastNode(seg_block, i, true);
+          seg_block.g()->prependNode(cast_node);
           seg_block.inputs()[i]->replaceAllUsesAfterNodeWith(cast_node, cast_node->outputs()[0]);
         }
       }
@@ -219,6 +217,7 @@ void getSegmentsOutputByRunning(
         at::ScalarType t = cur_ivalue.toTensor().scalar_type();
         if (t == at::kLong) {
           auto cast_node = createCastNode(seg_block, i, false);
+          seg_block.g()->appendNode(cast_node);
           seg_block.g()->block()->replaceOutput(i, cast_node->outputs()[0]);
         }
       }
