@@ -20,6 +20,7 @@ target_sources(${lib_name}
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_hardsigmoid.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_hardswish.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_log_softmax.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/unpack_rsqrt.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_std.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_var.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/view_to_reshape.cpp"

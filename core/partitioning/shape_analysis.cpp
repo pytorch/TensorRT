@@ -24,13 +24,20 @@ at::Tensor generateSingleInput(
     }
   }
 
+  // Initialize min and max ranges for random number selection
+  int LoValIncl = 0;
+  int HiValExcl = 2;
+
   auto type = at::kFloat;
   if (type_opt) {
     type = type_opt.value();
   } else {
     LOG_WARNING("Input type for doing shape analysis could not be determined, defaulting to F32");
   }
-  auto in = at::randint(5, util::toVec(input_shape), {at::kCUDA}).to(type);
+
+  // Make the value range for input tensor a uniform (float) distribution
+  // over [LoValIncl, HiValExcl), then cast to the desired dtype
+  auto in = ((HiValExcl - LoValIncl) * at::rand(util::toVec(input_shape), {at::kCUDA}) + LoValIncl).to(type);
 
   return in;
 }
@@ -114,6 +121,8 @@ void getSegmentsOutputByRunning(
       jit_inputs_ivalues.push_back(ivalues_maps[input].toInt());
     } else if (input->type()->isSubtypeOf(torch::jit::BoolType::get())) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toBool());
+    } else if (input->type()->isSubtypeOf(torch::jit::FloatType::get())) {
+      jit_inputs_ivalues.push_back(ivalues_maps[input].toDouble());
     } else if (input->type()->kind() == torch::jit::TypeKind::ListType) {
       // create list
       jit_inputs_ivalues.push_back(ivalues_maps[input].toList());

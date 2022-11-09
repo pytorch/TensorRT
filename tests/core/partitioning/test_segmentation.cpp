@@ -297,10 +297,38 @@ TEST(Partitioning, SegmentBranchModelWithForcedFallbackOPCorrectly) {
   PartitioningCtx ctx(g->block(), partitioning_info);
 
   segmentGraph(&ctx, g->block());
-  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 3));
-  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 2));
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 2));
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 1));
+  ASSERT_TRUE(checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 1}, {2, 4}, {3, 5, 6}}));
+}
+
+TEST(Partitioning, SegmentModelWithDependencyAwareness) {
+  const auto graph = R"IR(
+                graph(%x : Tensor,
+                      %y : Tensor):
+                  %3 : int = prim::Constant[value=0]()
+                  %20 : int = prim::Constant[value=1]()
+                  %add : Tensor = aten::add(%x, %y, %20)
+                  %x_lgamma : Tensor = aten::lgamma(%x)
+                  %mul : Tensor = aten::mul(%x, %y)
+                  %y_lgamma : Tensor = aten::lgamma(%y)
+                  %div : Tensor = aten::div(%x, %y)
+                  %div_lgamma : Tensor = aten::lgamma(%div)
+                  %27 : Tensor[] = prim::ListConstruct(%x_lgamma, %y_lgamma, %div_lgamma, %add, %mul)
+                  %12 : Tensor = aten::cat(%27, %3)
+                  return (%12))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  PartitioningInfo partitioning_info;
+  partitioning_info.enabled = true;
+  PartitioningCtx ctx(g->block(), partitioning_info);
+  segmentGraph(&ctx, g->block());
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTensorRT, 2));
+  ASSERT_TRUE(checkSegmentedBlockNumber(ctx.partitioned_blocks.begin()->second, SegmentedBlock::kTorch, 1));
   ASSERT_TRUE(
-      checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 1}, {2}, {3}, {4}, {5, 6}}));
+      checkSegmentedBlockNodesMapping(ctx.partitioned_blocks.begin()->second, g, {{0, 2, 4}, {1, 3, 5}, {6, 7}}));
 }
 
 } // namespace tests
