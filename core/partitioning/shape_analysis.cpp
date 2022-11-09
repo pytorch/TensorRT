@@ -66,7 +66,9 @@ torch::jit::Node* getUpstreamCastNode(torch::jit::Value* val) {
     auto cur_val = q.front();
     q.pop();
     auto node = cur_val->node();
-    if (node->kind().toQualString() == std::string("aten::to")) {
+    if ((node->kind().toQualString() == std::string("aten::to")) &&
+        ((node->inputs()[1]->node()->output()->type()->kind() == torch::jit::TypeKind::IntType) ||
+         (node->inputs()[2]->node()->output()->type()->kind() == torch::jit::TypeKind::IntType))) {
       return node;
     }
     if (node->kind() != torch::jit::prim::Constant && !visited.count(node)) {
@@ -81,7 +83,7 @@ torch::jit::Node* getUpstreamCastNode(torch::jit::Value* val) {
 
 torch::jit::Node* createCastNode(SegmentedBlock& seg_block, size_t index, bool is_input) {
   auto cast_raw_value = is_input ? seg_block.raw_inputs()[index] : seg_block.raw_outputs()[index];
-  auto cast_subgraph_value = is_input ? seg_block.outputs()[index] : seg_block.outputs()[index];
+  auto cast_subgraph_value = is_input ? seg_block.inputs()[index] : seg_block.outputs()[index];
   torch::jit::Node* cast_node = getUpstreamCastNode(cast_raw_value);
   auto g = seg_block.g();
   // if we can find upstream aten::to node, we use it's parameters for creating new cast node

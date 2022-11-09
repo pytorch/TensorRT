@@ -12,8 +12,8 @@ bool checkInsertedCastNodeNumber(torch_tensorrt::core::partitioning::SegmentedBl
       cnt++;
     }
   }
-  std::cout << "Found count of " << cnt << " inserted aten::to nodes, (looking for " << target_count << " aten::to nodes)"
-            << std::endl;
+  std::cout << "Found count of " << cnt << " inserted aten::to nodes, (looking for " << target_count
+            << " aten::to nodes)" << std::endl;
 
   return target_count == cnt;
 }
@@ -61,7 +61,6 @@ TEST(Partitioning, ExplicitNodeAutoConversionCorrectly) {
     LOG_DEBUG(seg_block << " cur seg block");
   }
   ASSERT_TRUE(checkInsertedCastNodeNumber(segmented_blocks[1], 2));
-
 }
 
 TEST(Partitioning, ImplicitAutoConversionCorrectly) {
@@ -105,5 +104,3 @@ TEST(Partitioning, ImplicitAutoConversionCorrectly) {
   }
   ASSERT_TRUE(checkInsertedCastNodeNumber(segmented_blocks[1], 2));
 }
-
-
