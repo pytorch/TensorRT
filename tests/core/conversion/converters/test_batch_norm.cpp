@@ -137,3 +137,33 @@ TEST(Converters, ATenBatchNormShouldUnpackConvertsCorrectly) {
   ASSERT_TRUE(
       torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
+
+TEST(Converters, ATenBatchNormHalfConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%input : Tensor, %running_var : Half(32, strides=[1], requires_grad=0, device=cuda:0), %running_mean : Half(32, strides=[1], requires_grad=0, device=cuda:0)):
+        %5 : bool = prim::Constant[value=0]()
+        %4 : float = prim::Constant[value=0.01]()
+        %3 : float = prim::Constant[value=0.001]()
+        %2 : bool = prim::Constant[value=1]()
+        %8 : Tensor = aten::batch_norm(%input, %running_var, %running_mean, %running_mean, %running_var, %5, %4, %3, %2)
+        return (%8))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, &*g);
+
+  auto in = at::randn({2, 32, 5, 5}, {at::kCUDA}).to(at::kHalf);
+  auto mean = at::ones({32}, {at::kCUDA}).to(at::kHalf);
+  auto var = at::zeros({32}, {at::kCUDA}).to(at::kHalf);
+
+  auto trt_in = at::clone(in);
+  auto trt_mean = at::clone(mean);
+  auto trt_var = at::clone(var);
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {mean, var});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_mean, trt_var});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in}, {nvinfer1::DataType::kHALF});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
