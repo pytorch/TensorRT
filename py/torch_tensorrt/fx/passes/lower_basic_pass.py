@@ -1,10 +1,13 @@
 import copy
+import logging
 import operator
 import warnings
-from typing import Any
+from typing import Any, Optional
 
 import torch
 import torch.fx
+import torch.fx as fx
+import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch.fx.experimental.const_fold import split_const_subgraphs
 
 from ..observer import observable
@@ -12,6 +15,8 @@ from ..observer import observable
 from ..tracer.acc_tracer import acc_ops
 from ..tracer.acc_tracer.acc_utils import get_attr
 from .pass_utils import log_before_after, validate_inference
+
+_LOGGER = logging.getLogger(__name__)
 
 # Create an alias for module input type to avoid littering pyre-ignore for Any
 # throughout the file.
@@ -460,3 +465,146 @@ def transform_setitem(gm: torch.fx.GraphModule, input: Input):
     gm.graph.lint()
     gm.recompile()
     return gm
+
+
+def fix_reshape_batch_dim(mod: fx.GraphModule) -> fx.GraphModule:
+    """\
+    TRT cannot reason about shape patterns like x.reshape(y.size(0), -1, 256),
+    since the dynamic shape of the reshape comes from the dynamic shape of
+    another node (y). The compilation will fail with various memory related
+    errors, depending on the size of the input tensor.
+
+    This pass fixes the issue by finding this reshape pattern, checking that:
+
+        x.size(0) == y.size(0)
+
+    And then replaces reshape's batch size from y.size(0) to x.size(0).
+    """
+
+    def get_reshape_batch_size_as_node(maybe_reshape: fx.Node) -> Optional[fx.Node]:
+        """\
+        Try to find the reshape op's batch size as an input node.
+
+        Match below graph structure and return `node_y`:
+            node_x.reshape({"acc_out_ty": {"shape": (node_y, ...)}})
+        """
+        if (
+            maybe_reshape.op != "call_function"
+            or maybe_reshape.target != acc_ops.reshape
+        ):
+            return None
+        shape = getattr(maybe_reshape.kwargs["acc_out_ty"], "shape", None)
+        if not shape:
+            return None
+        batch_size = shape[0]
+        if isinstance(batch_size, fx.Node):
+            return batch_size
+        return None
+
+    def get_reshape_batch_size_inferred_source(
+        batch_size_node: fx.Node,
+    ) -> Optional[fx.Node]:
+        """\
+        Given a node representing the batch size used for reshape op, we want
+        to know if it is coming from below pattern:
+
+            batch_size_node = src.size()[0]
+
+        or in IR graph:
+
+            src -> size(input=_) -> getitem(input=_, idx=0)
+                                        ^ ~~~  batch_size_node
+
+        If so, return `src`. Otherwise, return `None`.
+        """
+        if (
+            batch_size_node.op != "call_function"
+            or batch_size_node.target != acc_ops.getitem
+            or batch_size_node.kwargs["idx"] != 0
+        ):
+            return None
+        maybe_size: fx.Node = batch_size_node.all_input_nodes[0]
+        if maybe_size.op != "call_function" or maybe_size.target != acc_ops.size:
+            return None
+        return maybe_size.all_input_nodes[0]
+
+    maybe_reshape: fx.Node
+    for maybe_reshape in mod.graph.nodes:
+        reshape_batch_size: Optional[fx.Node] = get_reshape_batch_size_as_node(
+            maybe_reshape
+        )
+        if not reshape_batch_size:
+            continue
+        reshape_batch_size_inferred_source: Optional[
+            fx.Node
+        ] = get_reshape_batch_size_inferred_source(reshape_batch_size)
+        if not reshape_batch_size_inferred_source:
+            continue
+
+        reshape_input: fx.Node = maybe_reshape.kwargs["input"]
+        if reshape_input == reshape_batch_size_inferred_source:
+            continue
+
+        if not _is_batch_size_equal(reshape_input, reshape_batch_size_inferred_source):
+            continue
+
+        _LOGGER.info(
+            f"{fix_reshape_batch_dim}: Found bad pattern:  y.reshape((x, ...)). Reshape node: {maybe_reshape}"
+        )
+
+        # Step 1: create a node to compute batch size, using the tensor which
+        # is being reshaped: reshape_input.size()[0]. This batch size is now
+        # derived from reshape_input, the same node as the reshape op's input.
+        with mod.graph.inserting_before(maybe_reshape):
+            reshape_batch_size_2: fx.Node = maybe_reshape.graph.call_function(
+                acc_ops.getitem,
+                kwargs={
+                    "idx": 0,
+                    "input": maybe_reshape.graph.call_function(
+                        acc_ops.size,
+                        kwargs={
+                            "input": reshape_input,
+                        },
+                    ),
+                },
+            )
+
+        # Step 2: update `maybe_reshape`'s shape argument to be
+        # (reshape_batch_size_2, *DONT_CARE_JUST_COPY_OVER)
+        maybe_reshape.kwargs = {
+            **maybe_reshape.kwargs,
+            "acc_out_ty": acc_utils.build_raw_tensor_meta(
+                shape=(
+                    reshape_batch_size_2,
+                    *(maybe_reshape.kwargs["acc_out_ty"].shape[1:]),
+                )
+            ),
+        }
+
+    mod.graph.eliminate_dead_code()
+    mod.recompile()
+    return mod
+
+
+def _is_batch_size_equal(x: fx.Node, y: fx.Node) -> bool:
+    """\
+    Check that x.size(0) == y.size(0)
+    """
+    x_size, y_size = _get_shape(x), _get_shape(y)
+    return (
+        x_size
+        and y_size
+        # now both are non-empty
+        and x_size[0] == y_size[0]
+    )
+
+
+def _get_shape(node: fx.Node) -> Optional[torch.Size]:
+    if (
+        not getattr(node, "meta", None)
+        or not node.meta.get("tensor_meta", None)
+        or not getattr(node.meta["tensor_meta"], "shape", None)
+    ):
+        # shape info not available
+        return None
+    return node.meta["tensor_meta"].shape

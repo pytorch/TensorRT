@@ -17,17 +17,23 @@ namespace {
 
 bool add_split(ConversionCtx* ctx, const torch::jit::Node* n, args& args, bool split_list, bool unbind) {
   auto in = args[0].ITensor();
-  auto numOutputs = 1, numRemainder = 0, axis = 0;
+  auto numOutputs = 1, numRemainder = 0;
   std::vector<int64_t> sizes;
 
+  // Precompute axis along which to apply split, ensuring negative dimensions are re-indexed
+  auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
+  auto input_axis = unbind ? args[1].unwrapToInt() : args[2].unwrapToInt();
+  auto axis = input_axis < 0 ? input_axis + maxDim : input_axis;
+
+  // Ensure input axis is valid for input tensor
+  TORCHTRT_CHECK(
+      (axis >= 0) && (axis < maxDim),
+      "Expected input axis to fall in range [-" << maxDim << ", " << (maxDim - 1) << "], got " << input_axis);
+
   if (unbind) {
-    axis = args[1].unwrapToInt();
-    auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
-    axis = axis < 0 ? axis + maxDim : axis;
     numOutputs = in->getDimensions().d[axis];
     sizes.insert(sizes.end(), numOutputs, 1);
   } else {
-    axis = args[2].unwrapToInt();
     auto inDimSize = in->getDimensions().d[axis];
     if (split_list) {
       sizes = args[1].unwrapToIntList().vec();
@@ -274,7 +280,8 @@ auto select_registrations TORCHTRT_UNUSED =
         .pattern(
             {"aten::index.Tensor(Tensor self, Tensor?[] indices) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               // refer to https://github.com/pytorch/pytorch/blob/master/torch/onnx/symbolic_opset9.py#L4627
+               // refer to
+               // https://github.com/pytorch/pytorch/blob/974ad8fa6cc63b89234beb5ebff54c2d42711932/torch/onnx/symbolic_opset9.py#L4627
                auto in = args[0].ITensorOrFreeze(ctx);
                auto ts = args[1].IValue()->toListRef();
 
@@ -655,8 +662,15 @@ auto select_registrations TORCHTRT_UNUSED =
                auto self = args[0].ITensorOrFreeze(ctx);
                auto mask = args[1].ITensorOrFreeze(ctx);
                mask = addPadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
-               auto val = args[2].unwrapToScalar().to<float>();
-               auto val_t = tensor_to_const(ctx, torch::full(util::toVec(self->getDimensions()), val));
+               auto val = args[2].unwrapToScalar();
+
+               // Tensor type to use for initializing constant tensor used in Select
+               // value should inherit its type from self
+               auto val_t_dtype = util::TRTDataTypeToScalarType(self->getType());
+
+               // Initialize contant tensor for fill with the inherited data type
+               auto val_t = tensor_to_const(
+                   ctx, torch::full(util::toVec(self->getDimensions()), val, {torch::dtype(val_t_dtype)}));
 
                TORCHTRT_CHECK(
                    util::broadcastable(self->getDimensions(), mask->getDimensions(), /*multidirectional=*/false),
@@ -711,6 +725,23 @@ auto select_registrations TORCHTRT_UNUSED =
                layer->setAxis(dim);
 
                TORCHTRT_CHECK(layer, "Unable to create layer for aten::scatter.src");
+
+               layer->setName(util::node_info(n).c_str());
+
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }})
+        .pattern(
+            {"aten::where.self(Tensor condition, Tensor self, Tensor other) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto condition = args[0].ITensorOrFreeze(ctx);
+               auto x = args[1].ITensorOrFreeze(ctx);
+               auto y = args[2].ITensorOrFreeze(ctx);
+
+               auto layer = ctx->net->addSelect(*condition, *x, *y);
+
+               TORCHTRT_CHECK(layer, "Unable to create select layer for aten::where.self");
 
                layer->setName(util::node_info(n).c_str());
 

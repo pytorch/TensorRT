@@ -94,6 +94,14 @@ struct SegmentedBlock {
     return target_;
   }
 
+  bool do_not_merge(void) const {
+    return do_not_merge_;
+  }
+
+  void do_not_merge(bool x) {
+    do_not_merge_ = x;
+  }
+
   friend std::ostream& operator<<(std::ostream& os, const SegmentedBlock& b);
 
  private:
@@ -106,6 +114,7 @@ struct SegmentedBlock {
   std::vector<torch::jit::Node*> nodes_;
   std::shared_ptr<torch::jit::Graph> g_;
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_;
+  bool do_not_merge_ = false;
 };
 
 std::ostream& operator<<(std::ostream& os, const SegmentedBlock::SegmentedBlockTarget& t);

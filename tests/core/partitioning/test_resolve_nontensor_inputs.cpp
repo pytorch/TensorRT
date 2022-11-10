@@ -204,7 +204,7 @@ TEST(Partitioning, ResolveTensorListInputsInTrtCorrectly) {
       }));
     }
   }
-  ASSERT_TRUE(trt_block_cnt == 2 && torch_block_cnt == 2);
+  ASSERT_TRUE(trt_block_cnt == 1 && torch_block_cnt == 1);
 }
 
 TEST(Partitioning, ConvertForTensorListInputsInFallbackCorrectly) {

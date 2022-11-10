@@ -12,16 +12,24 @@ namespace partitioning {
 at::Tensor generateSingleInput(ir::Input& input, c10::optional<at::ScalarType>& type_opt) {
   auto cur_shape = input.input_shape;
   std::vector<int64_t> shape;
+
+  // Initialize min and max ranges for random number selection
+  int LoValIncl = 0;
+  int HiValExcl = 2;
+
   shape.insert(shape.begin(), std::begin(cur_shape.d), std::begin(cur_shape.d) + cur_shape.nbDims);
-  // auto type_opt = types[input.first][i];
+
   auto type = at::kFloat;
   if (type_opt) {
     type = type_opt.value();
   } else {
     LOG_WARNING("Input type for doing shape analysis could not be determined, defaulting to F32");
   }
-  auto in = at::randint(5, shape, {at::kCUDA}).to(type);
-  // ivalue_map[input.first] = in.clone();
+
+  // Make the value range for input tensor a uniform (float) distribution
+  // over [LoValIncl, HiValExcl), then cast to the desired dtype
+  auto in = ((HiValExcl - LoValIncl) * at::rand(shape, {at::kCUDA}) + LoValIncl).to(type);
+
   return in;
 }
 
