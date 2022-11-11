@@ -13,8 +13,8 @@ config_setting(
 cc_library(
     name = "runtime",
     srcs = [
-        "CUDADevice.cpp",
         "DeviceList.cpp",
+        "RTDevice.cpp",
         "TRTEngine.cpp",
         "TRTEngineProfiler.cpp",
         "execute_engine.cpp",
@@ -22,7 +22,7 @@ cc_library(
         "runtime.cpp",
     ],
     hdrs = [
-        "CUDADevice.h",
+        "RTDevice.h",
         "TRTEngine.h",
         "TRTEngineProfiler.h",
         "runtime.h",
@@ -44,7 +44,7 @@ cc_library(
 pkg_tar(
     name = "include",
     srcs = [
-        "CUDADevice.h",
+        "RTDevice.h",
         "TRTEngine.h",
         "TRTEngineProfiler.h",
         "runtime.h",

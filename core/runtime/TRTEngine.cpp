@@ -3,6 +3,7 @@
 #include <cuda_runtime.h>
 #include "NvInfer.h"
 #include "torch/csrc/jit/frontend/function_schema_parser.h"
+#include "torch/cuda.h"
 
 #include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
@@ -29,7 +30,7 @@ std::vector<std::string> split(const std::string& str, char delim) {
 
 TRTEngine::TRTEngine(
     std::string serialized_engine,
-    CUDADevice cuda_device,
+    RTDevice cuda_device,
     const std::vector<std::string>& _in_binding_names,
     const std::vector<std::string>& _out_binding_names) {
   std::string _name = "deserialized_trt";
@@ -50,7 +51,7 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info) {
   std::vector<std::string> in_bindings = split(serialized_info[INPUT_BINDING_NAMES_IDX], BINDING_DELIM);
   std::vector<std::string> out_bindings = split(serialized_info[OUTPUT_BINDING_NAMES_IDX], BINDING_DELIM);
 
-  CUDADevice cuda_device(serialized_info[DEVICE_IDX]);
+  RTDevice cuda_device(serialized_info[DEVICE_IDX]);
 
   new (this) TRTEngine(_name, engine_info, cuda_device, in_bindings, out_bindings);
 }
@@ -58,7 +59,7 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info) {
 TRTEngine::TRTEngine(
     std::string mod_name,
     std::string serialized_engine,
-    CUDADevice cuda_device,
+    RTDevice cuda_device,
     const std::vector<std::string>& _in_binding_names,
     const std::vector<std::string>& _out_binding_names) {
   auto most_compatible_device = get_most_compatible_device(cuda_device);
@@ -178,6 +179,7 @@ void TRTEngine::enable_profiling() {
 }
 
 void TRTEngine::disable_profiling() {
+  torch::cuda::synchronize(device_info.id);
   profile_execution = false;
   exec_ctx = make_trt(cuda_engine->createExecutionContext());
   TORCHTRT_CHECK((exec_ctx.get() != nullptr), "Unable to recreate TensorRT execution context");

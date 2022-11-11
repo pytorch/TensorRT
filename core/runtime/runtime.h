@@ -5,7 +5,7 @@
 #include <utility>
 #include "ATen/core/function_schema.h"
 #include "NvInfer.h"
-#include "core/runtime/CUDADevice.h"
+#include "core/runtime/RTDevice.h"
 #include "core/runtime/TRTEngine.h"
 #include "core/util/prelude.h"
 #include "torch/custom_class.h"
@@ -26,13 +26,13 @@ typedef enum {
   SERIALIZATION_LEN, // NEVER USED FOR DATA, USED TO DETERMINE LENGTH OF SERIALIZED INFO
 } SerializedInfoIndex;
 
-c10::optional<CUDADevice> get_most_compatible_device(const CUDADevice& target_device);
-std::vector<CUDADevice> find_compatible_devices(const CUDADevice& target_device);
+c10::optional<RTDevice> get_most_compatible_device(const RTDevice& target_device);
+std::vector<RTDevice> find_compatible_devices(const RTDevice& target_device);
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine);
 
 class DeviceList {
-  using DeviceMap = std::unordered_map<int, CUDADevice>;
+  using DeviceMap = std::unordered_map<int, RTDevice>;
   DeviceMap device_list;
 
  public:
@@ -40,8 +40,8 @@ class DeviceList {
   DeviceList();
 
  public:
-  void insert(int device_id, CUDADevice cuda_device);
-  CUDADevice find(int device_id);
+  void insert(int device_id, RTDevice cuda_device);
+  RTDevice find(int device_id);
   DeviceMap get_devices();
   std::string dump_list();
 };

@@ -7,7 +7,7 @@
 
 namespace torch_tensorrt {
 // Defined in types.cpp
-torch_tensorrt::core::runtime::CUDADevice to_internal_cuda_device(Device device);
+torch_tensorrt::core::runtime::RTDevice to_internal_rt_device(Device device);
 namespace torchscript {
 // Defined in compile_spec.cpp
 torch_tensorrt::core::CompileSpec to_internal_compile_spec(CompileSpec external);
@@ -39,7 +39,7 @@ torch::jit::Module embed_engine_in_new_module(
     const std::vector<std::string>& input_binding_names,
     const std::vector<std::string>& output_binding_names) {
   return torch_tensorrt::core::EmbedEngineInNewModule(
-      engine, to_internal_cuda_device(device), input_binding_names, output_binding_names);
+      engine, to_internal_rt_device(device), input_binding_names, output_binding_names);
 }
 
 } // namespace torchscript

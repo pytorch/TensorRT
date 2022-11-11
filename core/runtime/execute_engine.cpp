@@ -12,7 +12,7 @@ namespace core {
 namespace runtime {
 
 // Checks if the context switch requred for device ID
-bool is_switch_required(const CUDADevice& curr_device, const CUDADevice& engine_device) {
+bool is_switch_required(const RTDevice& curr_device, const RTDevice& engine_device) {
   // If SM capability is not the same as configured then switch
   if ((curr_device.major != engine_device.major) || (curr_device.minor != engine_device.minor)) {
     LOG_WARNING(
@@ -43,7 +43,7 @@ bool is_switch_required(const CUDADevice& curr_device, const CUDADevice& engine_
   return false;
 }
 
-CUDADevice select_cuda_device(const CUDADevice& engine_device) {
+RTDevice select_cuda_device(const RTDevice& engine_device) {
   auto new_target_device_opt = get_most_compatible_device(engine_device);
 
   // REVIEW: THIS DOES NOT LIST DLA PROBABLY, WHICH WE SHOULD
@@ -81,12 +81,12 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
           std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->device_profile_path);
     }
 
-    CUDADevice curr_device = get_current_device();
+    RTDevice curr_device = get_current_device();
     LOG_DEBUG("Current Device: " << curr_device);
 
     if (is_switch_required(curr_device, compiled_engine->device_info)) {
       // Scan through available CUDA devices and set the CUDA device context correctly
-      CUDADevice device = select_cuda_device(compiled_engine->device_info);
+      RTDevice device = select_cuda_device(compiled_engine->device_info);
       set_cuda_device(device);
 
       std::string target_device = "cuda:" + std::to_string(device.id);

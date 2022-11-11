@@ -2,7 +2,7 @@ set(lib_name "core_runtime")
 add_library(${lib_name} OBJECT)
 
 set(CXX_SRCS
-    "${CMAKE_CURRENT_SOURCE_DIR}/CUDADevice.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/RTDevice.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/DeviceList.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/execute_engine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngine.cpp"
@@ -13,7 +13,7 @@ set(CXX_SRCS
 
 set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/runtime.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/CUDADevice.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/RTDevice.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngine.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngineProfiler.h"
 )

@@ -15,7 +15,7 @@ DeviceList::DeviceList() {
   }
 
   for (int i = 0; i < num_devices; i++) {
-    device_list[i] = CUDADevice(i, nvinfer1::DeviceType::kGPU);
+    device_list[i] = RTDevice(i, nvinfer1::DeviceType::kGPU);
   }
 
   // REVIEW: DO WE CARE ABOUT DLA?
@@ -23,11 +23,11 @@ DeviceList::DeviceList() {
   LOG_DEBUG("Runtime:\n Available CUDA Devices: \n" << this->dump_list());
 }
 
-void DeviceList::insert(int device_id, CUDADevice cuda_device) {
+void DeviceList::insert(int device_id, RTDevice cuda_device) {
   device_list[device_id] = cuda_device;
 }
 
-CUDADevice DeviceList::find(int device_id) {
+RTDevice DeviceList::find(int device_id) {
   return device_list[device_id];
 }
 

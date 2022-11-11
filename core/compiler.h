@@ -30,7 +30,7 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& module
 
 torch::jit::script::Module EmbedEngineInNewModule(
     const std::string& engine,
-    runtime::CUDADevice cuda_device,
+    runtime::RTDevice cuda_device,
     const std::vector<std::string>& input_binding_names,
     const std::vector<std::string>& output_binding_names);
 

@@ -23,7 +23,7 @@ struct TRTEngine : torch::CustomClassHolder {
   std::shared_ptr<nvinfer1::IExecutionContext> exec_ctx;
   std::pair<uint64_t, uint64_t> num_io;
   std::string name;
-  CUDADevice device_info;
+  RTDevice device_info;
 
   std::string profile_path_prefix = std::experimental::filesystem::temp_directory_path();
 
@@ -36,14 +36,14 @@ struct TRTEngine : torch::CustomClassHolder {
   ~TRTEngine() = default;
   TRTEngine(
       std::string serialized_engine,
-      CUDADevice cuda_device,
+      RTDevice cuda_device,
       const std::vector<std::string>& in_binding_names,
       const std::vector<std::string>& out_binding_names);
   TRTEngine(std::vector<std::string> serialized_info);
   TRTEngine(
       std::string mod_name,
       std::string serialized_engine,
-      CUDADevice cuda_device,
+      RTDevice cuda_device,
       const std::vector<std::string>& in_binding_names,
       const std::vector<std::string>& out_binding_names);
   TRTEngine& operator=(const TRTEngine& other);

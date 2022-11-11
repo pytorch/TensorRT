@@ -80,15 +80,15 @@ struct Device : torch::CustomClassHolder {
         allow_gpu_fallback(false) // allow_gpu_fallback
   {}
 
-  Device(const core::runtime::CUDADevice& internal_dev);
+  Device(const core::runtime::RTDevice& internal_dev);
 
   ADD_ENUM_GET_SET(device_type, DeviceType, static_cast<int64_t>(DeviceType::kDLA));
   ADD_FIELD_GET_SET(gpu_id, int64_t);
   ADD_FIELD_GET_SET(dla_core, int64_t);
   ADD_FIELD_GET_SET(allow_gpu_fallback, bool);
 
-  core::runtime::CUDADevice toInternalRuntimeDevice();
-  std::string toSerializedRuntimeDevice();
+  core::runtime::RTDevice toInternalRTDevice();
+  std::string toSerializedRTDevice();
   std::string to_str();
 };
 

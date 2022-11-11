@@ -171,8 +171,7 @@ torch::jit::Module EmbedEngineInNewModule(
     Device& device,
     const std::vector<std::string>& input_binding_names,
     const std::vector<std::string>& output_binding_names) {
-  return core::EmbedEngineInNewModule(
-      engine, device.toInternalRuntimeDevice(), input_binding_names, output_binding_names);
+  return core::EmbedEngineInNewModule(engine, device.toInternalRTDevice(), input_binding_names, output_binding_names);
 }
 
 std::string get_build_info() {
@@ -313,7 +312,7 @@ PYBIND11_MODULE(_C, m) {
   py::class_<Device>(m, "Device")
       .def(py::init<>())
       .def("__str__", &torch_tensorrt::pyapi::Device::to_str)
-      .def("_to_serialized_runtime_device", &torch_tensorrt::pyapi::Device::toSerializedRuntimeDevice)
+      .def("_to_serialized_rt_device", &torch_tensorrt::pyapi::Device::toSerializedRTDevice)
       .def_readwrite("device_type", &Device::device_type)
       .def_readwrite("gpu_id", &Device::gpu_id)
       .def_readwrite("dla_core", &Device::dla_core)

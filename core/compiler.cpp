@@ -31,7 +31,7 @@ void AddEngineToGraph(
     torch::jit::script::Module mod,
     std::shared_ptr<torch::jit::Graph>& g,
     const std::string& serialized_engine,
-    runtime::CUDADevice& device_info,
+    runtime::RTDevice& device_info,
     const std::vector<std::string>& input_binding_names,
     const std::vector<std::string>& output_binding_names,
     std::string engine_id = "",
@@ -172,7 +172,7 @@ partitioning::GraphAndMapping BuildHybridGraph(
         auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_info, static_params);
         auto temp_g = std::make_shared<torch::jit::Graph>();
         auto device_spec = convert_info.engine_settings.device;
-        auto cuda_device = runtime::CUDADevice(device_spec.gpu_id, device_spec.device_type);
+        auto cuda_device = runtime::RTDevice(device_spec.gpu_id, device_spec.device_type);
         AddEngineToGraph(
             new_mod,
             temp_g,
@@ -297,7 +297,7 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
   torch::jit::Module new_mod(mod._ivalue()->name() + "_trt");
 
   auto device_spec = cfg.convert_info.engine_settings.device;
-  auto cuda_device = runtime::CUDADevice(device_spec.gpu_id, device_spec.device_type);
+  auto cuda_device = runtime::RTDevice(device_spec.gpu_id, device_spec.device_type);
 
   for (const torch::jit::Method& method : mod.get_methods()) {
     if (method.name().compare("forward") == 0) {
@@ -358,7 +358,7 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
 
 torch::jit::script::Module EmbedEngineInNewModule(
     const std::string& engine,
-    runtime::CUDADevice cuda_device,
+    runtime::RTDevice cuda_device,
     const std::vector<std::string>& input_binding_names,
     const std::vector<std::string>& output_binding_names) {
   std::ostringstream engine_id;
