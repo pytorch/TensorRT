@@ -1,5 +1,5 @@
 from operator import truediv
-from typing import Any, List, Sequence
+from typing import Any, List, Sequence, Tuple
 
 import torch
 from torch_tensorrt import _C
@@ -16,9 +16,12 @@ class TRTModule(torch.nn.Module):
         output_names: List[str],
     ):
         super(TRTModule, self).__init__()
+        self.input_names = input_names
+        self.output_names = output_names
+        self.engine_name = engine_name
         self.engine = torch.classes.tensorrt.Engine(
             [
-                _C.rt.ABI_VERSION,
+                torch.ops.tensorrt.ABI_VERSION(),
                 engine_name,
                 device_info._to_serialized_runtime_device(),
                 serialized_engine,
@@ -28,10 +31,23 @@ class TRTModule(torch.nn.Module):
         )
 
     def forward(self, *inputs):
+        assert len(inputs) == len(
+            self.input_names
+        ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(inputs)}."
+
+        types = [issubclass(type(i), torch.Tensor) for i in inputs]
+
         try:
-            assert all([i.issubclass(torch.Tensor) for i in inputs])
+            assert all(types)
         except:
-            raise RuntimeError("TRTModule expects a flattened list of tensors as input")
+
+            def is_non_tensor(i: Tuple[Any, bool]) -> bool:
+                return not i[1]
+
+            non_tensors = [i[0] for i in filter(zip(inputs, types), is_non_tensor)]
+            raise RuntimeError(
+                f"TRTModule expects a flattened list of tensors as input, found non tensors: {non_tensors}"
+            )
 
         outputs = torch.ops.tensorrt.execute_engine(list(inputs), self.engine)
 
@@ -56,4 +72,5 @@ class TRTModule(torch.nn.Module):
 
     @staticmethod
     def _pack_binding_names(binding_names: List[str]) -> str:
-        return torch.classes.tensorrt.Engine.BINDING_DELIM.join(binding_names)
+        delim = torch.ops.tensorrt.SERIALIZED_ENGINE_BINDING_DELIM()[0]
+        return delim.join(binding_names)

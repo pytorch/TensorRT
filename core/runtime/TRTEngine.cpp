@@ -47,8 +47,8 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info) {
           << ")");
   std::string _name = serialized_info[NAME_IDX];
   std::string engine_info = serialized_info[ENGINE_IDX];
-  std::vector<std::string> in_bindings = split(serialized_info[INPUT_BINDING_NAMES_IDX], BINDING_DELIM[0]);
-  std::vector<std::string> out_bindings = split(serialized_info[OUTPUT_BINDING_NAMES_IDX], BINDING_DELIM[0]);
+  std::vector<std::string> in_bindings = split(serialized_info[INPUT_BINDING_NAMES_IDX], BINDING_DELIM);
+  std::vector<std::string> out_bindings = split(serialized_info[OUTPUT_BINDING_NAMES_IDX], BINDING_DELIM);
 
   CUDADevice cuda_device(serialized_info[DEVICE_IDX]);
 

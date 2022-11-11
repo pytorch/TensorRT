@@ -3,14 +3,12 @@
 namespace torch_tensorrt {
 namespace core {
 namespace runtime {
-
-const std::string BINDING_DELIM = "%";
 namespace {
 
 std::string serialize_bindings(const std::vector<std::string>& bindings) {
   std::stringstream ss;
   for (size_t i = 0; i < bindings.size() - 1; i++) {
-    ss << bindings[i] << BINDING_DELIM;
+    ss << bindings[i] << TRTEngine::BINDING_DELIM;
   }
   ss << bindings[bindings.size() - 1];
 
@@ -35,7 +33,6 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         // TODO: .def("run", &TRTEngine::Run)
         .def("__str__", &TRTEngine::to_str)
         .def("__repr__", &TRTEngine::to_str)
-        .def_readonly("BINDING_DELIM", &TRTEngine::BINDING_DELIM)
         .def("enable_profiling", &TRTEngine::enable_profiling)
         .def("disable_profiling", &TRTEngine::disable_profiling)
         .def_readwrite("profile_path_prefix", &TRTEngine::profile_path_prefix)
@@ -68,6 +65,8 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
 
 TORCH_LIBRARY(tensorrt, m) {
   m.def("execute_engine", execute_engine);
+  m.def("SERIALIZED_ENGINE_BINDING_DELIM", []() -> std::string { return std::string(1, TRTEngine::BINDING_DELIM); });
+  m.def("ABI_VERSION", []() -> std::string { return ABI_VERSION; });
 }
 
 } // namespace

@@ -54,7 +54,7 @@ struct TRTEngine : torch::CustomClassHolder {
   void dump_engine_layer_info_to_file(const std::string& path);
   void dump_engine_layer_info();
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
-  std::string BINDING_DELIM = "%";
+  static const char BINDING_DELIM = '%';
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);
 
