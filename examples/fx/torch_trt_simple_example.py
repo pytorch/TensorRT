@@ -70,6 +70,18 @@ def test_torch_tensorrt(model, inputs):
         > 0.99
     )
 
+    scripted_fx_module = torch.jit.trace(trt_fx_module, example_inputs=inputs_fx)
+    scripted_fx_module.save("/tmp/scripted_fx_module.ts")
+    scripted_fx_module = torch.jit.load("/tmp/scripted_fx_module.ts")
+
+    result_fp16 = scripted_fx_module(*inputs_fx)
+    assert (
+        torch.nn.functional.cosine_similarity(
+            ref_fp16.flatten(), result_fp16.flatten(), dim=0
+        )
+        > 0.99
+    )
+
 
 if __name__ == "__main__":
     model = torchvision.models.resnet18(pretrained=True).cuda().eval()

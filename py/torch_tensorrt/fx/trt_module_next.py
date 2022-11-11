@@ -23,7 +23,7 @@ class TRTModule(torch.nn.Module):
             [
                 torch.ops.tensorrt.ABI_VERSION(),
                 engine_name,
-                device_info._to_serialized_runtime_device(),
+                device_info._to_serialized_rt_device(),
                 serialized_engine,
                 TRTModule._pack_binding_names(input_names),
                 TRTModule._pack_binding_names(output_names),
@@ -33,7 +33,7 @@ class TRTModule(torch.nn.Module):
     def forward(self, *inputs):
         assert len(inputs) == len(
             self.input_names
-        ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(inputs)}."
+        ), f"Wrong number of inputs, expected {len(self.input_names)} got {len(inputs)}."
 
         types = [issubclass(type(i), torch.Tensor) for i in inputs]
 
