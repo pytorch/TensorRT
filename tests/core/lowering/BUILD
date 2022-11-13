@@ -87,6 +87,10 @@ lowering_test(
     name = "test_unpack_reduce_ops",
 )
 
+lowering_test(
+    name = "test_rewrite_inputs_with_params",
+)
+
 test_suite(
     name = "lowering_tests",
     tests = [
@@ -102,6 +106,7 @@ test_suite(
         ":test_remove_detach_pass",
         ":test_remove_dropout_pass",
         ":test_remove_unnecessary_casts",
+        ":test_rewrite_inputs_with_params",
         ":test_unpack_hardsigmoid",
         ":test_unpack_hardswish",
         ":test_unpack_reduce_ops",
