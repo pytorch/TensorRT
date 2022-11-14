@@ -553,6 +553,7 @@ void partition(PartitioningCtx* ctx, ExampleIValues& example_tensor_map) {
     registerSegmentsOutputs(ctx, block);
 
     // run shape analysis on each segmented block
+    LOG_DEBUG("Running shape analysis for segmented graphs");
     runShapeAnalysis(ctx, block, example_tensor_map);
   }
 }
