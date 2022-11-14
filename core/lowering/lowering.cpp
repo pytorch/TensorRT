@@ -70,6 +70,10 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, std::vector<torch::jit::I
   passes::SiluToSigmoidMultipication(g);
   passes::RemoveSingleUse0DTensors(g);
   passes::RemoveUnnecessaryCasts(g);
+  passes::UnpackAndCastMaskedFill(g, lower_info.getGPUDeviceString());
+  passes::UnpackAndCastNumToTensor(g, lower_info.getGPUDeviceString());
+  passes::UnpackAndCastFull(g, lower_info.getGPUDeviceString());
+  passes::ReplaceScalarImplicit(g);
   passes::RewriteInputsWithParams(g, params);
   LOG_GRAPH(*g);
 }

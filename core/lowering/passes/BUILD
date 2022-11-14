@@ -14,6 +14,7 @@ cc_library(
     name = "passes",
     srcs = [
         "convNd_to_convolution.cpp",
+        "device_casting.cpp",
         "exception_elimination.cpp",
         "fuse_addmm_branches.cpp",
         "linear_to_addmm.cpp",
