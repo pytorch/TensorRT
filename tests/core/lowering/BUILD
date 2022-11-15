@@ -32,6 +32,10 @@ lowering_test(
 )
 
 lowering_test(
+    name = "test_device_casting",
+)
+
+lowering_test(
     name = "test_exception_elimination_pass",
 )
 
@@ -87,10 +91,15 @@ lowering_test(
     name = "test_unpack_reduce_ops",
 )
 
+lowering_test(
+    name = "test_rewrite_inputs_with_params",
+)
+
 test_suite(
     name = "lowering_tests",
     tests = [
         ":test_conv1d_pass",
+        ":test_device_casting",
         ":test_exception_elimination_pass",
         ":test_linear_to_addmm",
         ":test_module_fallback_passes",
@@ -102,6 +111,7 @@ test_suite(
         ":test_remove_detach_pass",
         ":test_remove_dropout_pass",
         ":test_remove_unnecessary_casts",
+        ":test_rewrite_inputs_with_params",
         ":test_unpack_hardsigmoid",
         ":test_unpack_hardswish",
         ":test_unpack_reduce_ops",
