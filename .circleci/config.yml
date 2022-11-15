@@ -515,6 +515,10 @@ commands:
           pushd converters/
           pytest --junitxml=/tmp/artifacts/test_results/fx/converters/test_results.xml
           popd
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
   
   test-fx_passes:
     description: "Test the fx passes"
@@ -527,6 +531,10 @@ commands:
           list_passes=$(ls | grep -v test_setitem*)
           pytest $list_passes --junitxml=/tmp/artifacts/test_results/fx/passes/test_results.xml
           popd
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
   
   test-fx_tools:
     description: "Test the fx tools"
@@ -538,6 +546,10 @@ commands:
           pushd tools
           pytest --junitxml=/tmp/artifacts/test_results/fx/tools/test_results.xml
           popd
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
   
   test-fx_trt_lower:
     description: "Test the fx TRT lowering"
@@ -549,6 +561,10 @@ commands:
           pushd trt_lower
           pytest --junitxml=/tmp/artifacts/test_results/fx/trt_lower/test_results.xml
           popd
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
 
   test-fx_tracer:
     description: "Test the fx tracer"
@@ -561,6 +577,10 @@ commands:
           list_tracer=$(ls | grep -v test_dispatch_*)
           pytest $list_tracer --junitxml=/tmp/artifacts/test_results/fx/tracer/test_results.xml
           popd
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
 
   test-fx:
     description: "Test the fx backend"
@@ -569,7 +589,6 @@ commands:
           name: Run fx tests
           command: |
             mkdir -p /tmp/artifacts/test_results
-            
       - test-fx_converters
       - test-fx_passes
       - test-fx_tools
