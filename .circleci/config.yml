@@ -517,8 +517,8 @@ commands:
             # cd py/torch_tensorrt/fx/test
             # pytest $(find . -name '*.py' | grep -v test_dispatch* | grep -v test_setitem*)
             cd py/torch_tensorrt/fx/test
-            pushd converters/acc_op
-            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/acc_op/test_results.xml
+            pushd converters/
+            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/test_results.xml
             popd
             pushd passes
             list_passes=$(ls | grep -v test_setitem*)
