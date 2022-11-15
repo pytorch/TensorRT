@@ -1112,39 +1112,8 @@ workflows:
             #- test-py-ts-x86_64-linux
             #- test-py-fx-x86_64-linux
 
-  ngc-release:
-    when: << pipeline.parameters.enable-ngc-packaging >>
-    jobs:
-      - build-aarch64-jetson:
-          torch-build: << pipeline.parameters.torch-jetson-build >>
-          jetpack-version: << pipeline.parameters.jetpack-version >>
-          python-version: 3.8.10
-
-      - build-x86_64-linux-ngc:
-          torch-base-image: << pipeline.parameters.torch-ngc-base-image >>
-
-      - package-x86_64-linux-ngc:
-          torch-base-image: << pipeline.parameters.torch-ngc-base-image >>
-          enabled: << pipeline.parameters.enable-ngc-packaging >>
-          requires:
-            - build-x86_64-linux-ngc
-
-      - package-aarch64-jetson:
-          name: package-release-aarch64-jetson
-          enabled: << pipeline.parameters.enable-ngc-packaging >>
-          torch-build: << pipeline.parameters.torch-jetson-build >>
-          jetpack-version: << pipeline.parameters.jetpack-version >>
-          python-version: 3.8.10
-          requires:
-            - build-aarch64-pyt-jetson
-
   on-push:
     jobs:
-      - build-aarch64-jetson:
-          torch-build: << pipeline.parameters.torch-jetson-build >>
-          jetpack-version: << pipeline.parameters.jetpack-version >>
-          python-version: 3.8.10
-
       - build-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
