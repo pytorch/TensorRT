@@ -1044,11 +1044,6 @@ workflows:
                 - master
                 - release/**/*
     jobs:
-      - build-aarch64-jetson:
-          torch-build: << pipeline.parameters.torch-jetson-build >>
-          jetpack-version: << pipeline.parameters.jetpack-version >>
-          python-version: 3.8.10
-
       - build-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
