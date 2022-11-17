@@ -11,6 +11,12 @@ namespace torch_tensorrt {
 namespace core {
 namespace ir {
 
+enum class ShapeMode {
+  kMIN,
+  kOPT,
+  kMAX,
+};
+
 struct Device {
   nvinfer1::DeviceType device_type;
   int64_t gpu_id;

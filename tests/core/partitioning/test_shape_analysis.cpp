@@ -15,7 +15,7 @@ bool checkSegmentedBlockInputShape(
     if (cur_block_in_shapes.size() != in_shape[i].size())
       return false;
     for (size_t j = 0; j < cur_block_in_shapes.size(); ++j) {
-      auto cur_input_shape = torch_tensorrt::core::util::toVec(cur_block_in_shapes[j].input_shape);
+      auto cur_input_shape = cur_block_in_shapes[j];
       for (size_t k = 0; k < cur_input_shape.size(); ++k) {
         if (cur_input_shape[k] != in_shape[i][j][k])
           return false;
@@ -61,14 +61,18 @@ TEST(Partitioning, InferSequentialModelSegmentedBlockShapeCorrectly) {
 
   std::unordered_map<const torch::jit::Value*, std::vector<torch_tensorrt::core::ir::Input>> inputs_map;
   std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>> input_types;
+
   for (size_t i = 0; i < g->inputs().size(); ++i) {
     inputs_map.insert({g->inputs()[i], {inputs[i]}});
     input_types.insert({g->inputs()[i], {{at::kFloat}}});
   }
-  auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
-
+  // Store a map of torch::jit::Value to ir::Input
+  partitioning_info.collection_input_spec_map = inputs_map;
   torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
-  torch_tensorrt::core::partitioning::partition(&ctx, input_ivalues_map);
+  ctx.input_types_map = input_types;
+
+  torch_tensorrt::core::partitioning::populateInputIValues(&ctx);
+  torch_tensorrt::core::partitioning::partition(&ctx);
   auto segmented_blocks = ctx.partitioned_blocks.begin()->second;
 
   ASSERT_TRUE(checkSegmentedBlockInputShape(
@@ -117,10 +121,14 @@ TEST(Partitioning, InferBranchModelSegmentedBlockShapeCorrectly) {
     inputs_map.insert({g->inputs()[i], {inputs[i]}});
     input_types.insert({g->inputs()[i], {{at::kFloat}}});
   }
-  auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
 
+  // Store a map of torch::jit::Value to ir::Input
+  partitioning_info.collection_input_spec_map = inputs_map;
   torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
-  torch_tensorrt::core::partitioning::partition(&ctx, input_ivalues_map);
+  ctx.input_types_map = input_types;
+
+  torch_tensorrt::core::partitioning::populateInputIValues(&ctx);
+  torch_tensorrt::core::partitioning::partition(&ctx);
   auto segmented_blocks = ctx.partitioned_blocks.begin()->second;
 
   ASSERT_TRUE(checkSegmentedBlockInputShape(

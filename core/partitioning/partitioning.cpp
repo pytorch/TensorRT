@@ -536,7 +536,35 @@ void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block) {
   return;
 }
 
-void partition(PartitioningCtx* ctx, ExampleIValues& example_tensor_map) {
+bool isInputDynamic(PartitioningCtx* ctx) {
+  // Check if inputs have dynamic shapes
+  bool input_is_dynamic = true;
+  auto inputs_map = ctx->settings.collection_input_spec_map;
+  for (auto inputs : inputs_map) {
+    for (auto input : inputs.second) {
+      if (!input.input_is_dynamic) {
+        input_is_dynamic = false;
+      }
+    }
+  }
+  return input_is_dynamic;
+}
+
+void populateInputIValues(PartitioningCtx* ctx) {
+  if (isInputDynamic(ctx)) {
+    ctx->min_input_ivalues_map = partitioning::generateRandomInputs(
+        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kMIN);
+    ctx->opt_input_ivalues_map = partitioning::generateRandomInputs(
+        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kOPT);
+    ctx->max_input_ivalues_map = partitioning::generateRandomInputs(
+        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kMAX);
+  } else {
+    ctx->opt_input_ivalues_map = partitioning::generateRandomInputs(
+        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kOPT);
+  }
+}
+
+void partition(PartitioningCtx* ctx) {
   LOG_DEBUG(ctx->settings);
 
   // Go through all the blocks to do the partitioning
@@ -546,15 +574,24 @@ void partition(PartitioningCtx* ctx, ExampleIValues& example_tensor_map) {
 
     // It's possible that some TensorRT blocks have nonTensor inputs/output because they are interleaved by Torch blocks
     // resolve nonTensor inputs/outputs
+    LOG_DEBUG("Resolving non-tensor inputs for segmented blocks");
     resolveTRTNonTensorInputs(ctx, block);
 
     // register input/output torch::jit::Value for segmented graphs
     LOG_DEBUG("Registering input/output torch::jit::Value for segmented graphs");
     registerSegmentsOutputs(ctx, block);
 
-    // run shape analysis on each segmented block
-    LOG_DEBUG("Running shape analysis for segmented graphs");
-    runShapeAnalysis(ctx, block, example_tensor_map);
+    // Incase of dynamic shape inputs, run shape analysis on each segmented block for min/opt/max ranges and register
+    // output shapes for each block accordingly
+    if (isInputDynamic(ctx)) {
+      LOG_DEBUG("Performing shape analysis for segmented blocks using min/opt/max shapes for inputs");
+      runShapeAnalysis(ctx, block, ctx->min_input_ivalues_map, ir::ShapeMode::kMIN);
+      runShapeAnalysis(ctx, block, ctx->opt_input_ivalues_map, ir::ShapeMode::kOPT);
+      runShapeAnalysis(ctx, block, ctx->max_input_ivalues_map, ir::ShapeMode::kMAX);
+    } else {
+      LOG_DEBUG("Performing shape analysis for segmented blocks using static shapes for inputs");
+      runShapeAnalysis(ctx, block, ctx->opt_input_ivalues_map, ir::ShapeMode::kOPT);
+    }
   }
 }
 

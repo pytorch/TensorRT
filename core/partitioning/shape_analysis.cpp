@@ -10,15 +10,24 @@ namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
-at::Tensor generateSingleInput(ir::Input& input, c10::optional<at::ScalarType>& type_opt) {
-  auto cur_shape = input.input_shape;
-  std::vector<int64_t> shape;
+at::Tensor generateSingleInput(
+    ir::Input& input,
+    c10::optional<at::ScalarType>& type_opt,
+    const ir::ShapeMode& shape_mode) {
+  nvinfer1::Dims input_shape = input.input_shape;
+  if (input.input_is_dynamic) {
+    if (shape_mode == ir::ShapeMode::kMIN) {
+      input_shape = input.min;
+    } else if (shape_mode == ir::ShapeMode::kOPT) {
+      input_shape = input.opt;
+    } else {
+      input_shape = input.max;
+    }
+  }
 
   // Initialize min and max ranges for random number selection
   int LoValIncl = 0;
   int HiValExcl = 2;
-
-  shape.insert(shape.begin(), std::begin(cur_shape.d), std::begin(cur_shape.d) + cur_shape.nbDims);
 
   auto type = at::kFloat;
   if (type_opt) {
@@ -29,14 +38,15 @@ at::Tensor generateSingleInput(ir::Input& input, c10::optional<at::ScalarType>& 
 
   // Make the value range for input tensor a uniform (float) distribution
   // over [LoValIncl, HiValExcl), then cast to the desired dtype
-  auto in = ((HiValExcl - LoValIncl) * at::rand(shape, {at::kCUDA}) + LoValIncl).to(type);
+  auto in = ((HiValExcl - LoValIncl) * at::rand(util::toVec(input_shape), {at::kCUDA}) + LoValIncl).to(type);
 
   return in;
 }
 
 std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomInputs(
     std::unordered_map<const torch::jit::Value*, std::vector<ir::Input>>& inputs,
-    std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>>& types) {
+    std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>>& types,
+    const ir::ShapeMode& shape_mode) {
   // generate random inputs for running pytorch segments
   std::unordered_map<const torch::jit::Value*, torch::jit::IValue> ivalue_map;
 
@@ -45,7 +55,7 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
       c10::TypePtr elementType = c10::TensorType::get();
       auto generic_list = c10::impl::GenericList(elementType);
       for (size_t i = 0; i < input.second.size(); i++) {
-        auto in = generateSingleInput(input.second[i], types[input.first][i]);
+        auto in = generateSingleInput(input.second[i], types[input.first][i], shape_mode);
         generic_list.push_back(in.clone());
       }
       ivalue_map[input.first] = c10::IValue(generic_list);
@@ -53,13 +63,13 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
       // create tuple
       std::vector<torch::jit::IValue> list;
       for (size_t i = 0; i < input.second.size(); i++) {
-        auto in = generateSingleInput(input.second[i], types[input.first][i]);
+        auto in = generateSingleInput(input.second[i], types[input.first][i], shape_mode);
         list.push_back(in.clone());
       }
       auto tuple = c10::ivalue::Tuple::create(list); // create tuple ptr
       ivalue_map[input.first] = c10::IValue(tuple);
     } else {
-      auto in = generateSingleInput(input.second[0], types[input.first][0]);
+      auto in = generateSingleInput(input.second[0], types[input.first][0], shape_mode);
       ivalue_map[input.first] = in.clone();
     }
   }
@@ -124,7 +134,8 @@ torch::jit::Node* createCastNode(SegmentedBlock& seg_block, size_t index, bool i
 void getSegmentsOutputByRunning(
     SegmentedBlock& seg_block,
     std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& ivalues_maps,
-    const PartitioningInfo& partitioning_info) {
+    const PartitioningInfo& partitioning_info,
+    const ir::ShapeMode& shape_mode) {
   // create a module to run the graph
   auto g = seg_block.g();
   auto copy_g = g->copy();
@@ -235,7 +246,7 @@ void getSegmentsOutputByRunning(
   }
 
   // set input shape for each segmented block so we wil use it in conversion process
-  std::vector<ir::Input> input_shapes;
+  std::vector<std::vector<int64_t>> input_shapes;
   std::vector<at::ScalarType> input_types;
   for (size_t i = 0; i < seg_block.inputs().size(); ++i) {
     if (ivalues_maps[seg_block.raw_inputs()[i]].isTensor()) {
@@ -270,15 +281,19 @@ void getSegmentsOutputByRunning(
     // TODO: tuple and list inputs in subgraph
   }
 
-  seg_block.register_inshapes(input_shapes);
+  seg_block.register_inshapes(input_shapes, shape_mode);
   seg_block.register_intypes(input_types);
 }
 
-void runShapeAnalysis(PartitioningCtx* ctx, torch::jit::Block* block, ExampleIValues& example_tensor_map) {
+void runShapeAnalysis(
+    PartitioningCtx* ctx,
+    torch::jit::Block* block,
+    ExampleIValues& example_tensor_map,
+    const ir::ShapeMode& shape_mode) {
   // register every segment's input shape, and it's running output IValues
   for (auto& seg_block : ctx->partitioned_blocks[block]) {
     torch::jit::ConstantPooling(seg_block.g());
-    getSegmentsOutputByRunning(seg_block, example_tensor_map, ctx->settings);
+    getSegmentsOutputByRunning(seg_block, example_tensor_map, ctx->settings, shape_mode);
   }
   return;
 }

@@ -137,10 +137,13 @@ partitioning::GraphAndMapping BuildHybridGraph(
   auto partitioning_info = cfg.partitioning_info;
 
   auto partitioning_ctx = partitioning::PartitioningCtx(block, partitioning_info);
-  auto collection_input_ivalues_map =
-      partitioning::generateRandomInputs(partitioning_info.collection_input_spec_map, first_use_types);
+  partitioning_ctx.input_types_map = first_use_types;
 
-  partitioning::partition(&partitioning_ctx, collection_input_ivalues_map);
+  // Generate a dictionary of input torch::jit::Value's to their min, opt, max tensors and store in ctx
+  // TODO: Combine this within partition call
+  partitioning::populateInputIValues(&partitioning_ctx);
+
+  partitioning::partition(&partitioning_ctx);
 
   for (auto& partitioned_block : partitioning_ctx.partitioned_blocks) {
     partitioning::PartitionedGraph& segmented_blocks = partitioned_block.second;
@@ -151,14 +154,7 @@ partitioning::GraphAndMapping BuildHybridGraph(
       trt_engine_id << reinterpret_cast<const int*>(&seg_block);
 
       if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
-        auto shapes = seg_block.in_shapes();
-        auto types = seg_block.in_types();
-        std::vector<ir::Input> inputs;
-        for (size_t i = 0; i < shapes.size(); i++) {
-          auto in = ir::Input(shapes[i]);
-          in.dtype = util::ScalarTypeToTRTDataType(types[i]);
-          inputs.push_back(in);
-        }
+        auto inputs = seg_block.construct_inputs_spec();
         // update the input ranges for each segments
         convert_info.inputs = ir::associate_specs_with_inputs(seg_block.g(), inputs, static_params);
 
