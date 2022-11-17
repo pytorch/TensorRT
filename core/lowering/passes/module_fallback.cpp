@@ -19,9 +19,10 @@ std::string unmangle_cls_name(const std::string& name) {
 
   std::size_t mangle_pos = unmangled.find("___torch_mangle_");
   if (mangle_pos != std::string::npos) {
-    unmangled.erase(mangle_pos, 21);
+    std::size_t dot_pos = unmangled.find(".", mangle_pos);
+    TORCH_CHECK(dot_pos != std::string::npos, "Expected to find '.' after '___torch_mangle_' in name: ", unmangled);
+    unmangled.erase(mangle_pos, dot_pos - mangle_pos + 1);
   }
-
   return unmangled;
 }
 
