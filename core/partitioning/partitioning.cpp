@@ -111,10 +111,34 @@ void setNonTensorConnectedNodes(PartitioningCtx* ctx, std::vector<torch::jit::No
   }
 }
 
+std::set<torch::jit::Node*> getDependentNodes(torch::jit::Node* n) {
+  std::set<torch::jit::Node*> dependent_nodes;
+  for (auto val : n->outputs()) {
+    for (auto use : val->uses()) {
+      dependent_nodes.insert(use.user);
+    }
+  }
+  if (const auto* schema = n->maybeSchema()) {
+    for (size_t i = 0; i < n->inputs().size(); ++i) {
+      const at::AliasInfo* formal = schema->arguments()[i].alias_info();
+      if (formal && formal->isWrite()) {
+        for (auto use : n->inputs()[i]->uses()) {
+          torch::jit::Node* use_node = use.user;
+          if (use_node->isAfter(n)) {
+            dependent_nodes.insert(use_node);
+          }
+        }
+      }
+    }
+  }
+  return dependent_nodes;
+}
+
 // Sub-function that traverses the entire block and check if TensorRT node sequence satisfy min_block_size
 std::vector<torch::jit::Node*> traverseNodesForMinBlockSize(PartitioningCtx* ctx, torch::jit::Block* block) {
   auto nodes = block->nodes();
   std::vector<torch::jit::Node*> cur_trt_nodes;
+  std::unordered_set<torch::jit::Node*> cur_trt_nodes_uses;
   std::vector<torch::jit::Node*> min_block_fallback_nodes;
   for (const auto n : nodes) {
     if (n->kind() == torch::jit::prim::Constant) {
@@ -124,11 +148,16 @@ std::vector<torch::jit::Node*> traverseNodesForMinBlockSize(PartitioningCtx* ctx
     // check if current node fallback or not
     if (!ctx->shouldNodeRunInTorch(n)) {
       cur_trt_nodes.push_back(n);
+      auto dependent_nodes = getDependentNodes(n);
+      cur_trt_nodes_uses.insert(dependent_nodes.begin(), dependent_nodes.end());
     } else {
-      if (cur_trt_nodes.size() < ctx->settings.min_block_size) {
-        min_block_fallback_nodes.insert(min_block_fallback_nodes.end(), cur_trt_nodes.begin(), cur_trt_nodes.end());
+      if (cur_trt_nodes_uses.count(n)) {
+        if (cur_trt_nodes.size() < ctx->settings.min_block_size) {
+          min_block_fallback_nodes.insert(min_block_fallback_nodes.end(), cur_trt_nodes.begin(), cur_trt_nodes.end());
+        }
+        cur_trt_nodes.clear();
+        cur_trt_nodes_uses.clear();
       }
-      cur_trt_nodes.clear();
     }
   }
   if (cur_trt_nodes.size() < ctx->settings.min_block_size) {
@@ -355,6 +384,59 @@ void setNodeExecutorLUT(PartitioningCtx* ctx, torch::jit::Block* block) {
   setMinBlockFallbackNodes(ctx, block);
 }
 
+void merge_adjacent_segments_list_in_new_partition(
+    PartitionedGraph& original_partition,
+    PartitionedGraph& new_partition,
+    SegmentedBlock::SegmentedBlockTarget& segment_kind,
+    std::vector<size_t>& same_type_segment_idx) {
+  TORCHTRT_CHECK(!same_type_segment_idx.empty(), "Unable to merge empty segment list");
+  if (same_type_segment_idx.size() == 1) {
+    new_partition.push_back(original_partition[same_type_segment_idx[0]]);
+  } else {
+    auto first_idx = same_type_segment_idx[0];
+    for (size_t i = 1; i < same_type_segment_idx.size(); ++i) {
+      TORCHTRT_CHECK(
+          same_type_segment_idx[i] == (first_idx + i),
+          "Unable to merge non-sequential segments: " << same_type_segment_idx);
+    }
+    LOG_DEBUG(
+        "Merging adjacent " << SegmentedBlock::target_to_str(segment_kind) << " segments: " << same_type_segment_idx);
+    std::vector<torch::jit::Node*> nodes;
+    for (auto segment_to_merge : same_type_segment_idx) {
+      const auto& merge_nodes = original_partition[segment_to_merge].raw_nodes();
+      nodes.insert(nodes.end(), merge_nodes.begin(), merge_nodes.end());
+    }
+    new_partition.emplace_back(segment_kind, nodes);
+  }
+}
+
+PartitionedGraph merge_adjacent_segments_of_same_type(PartitionedGraph& original_partition) {
+  PartitionedGraph new_partition;
+  SegmentedBlock::SegmentedBlockTarget segment_kind = SegmentedBlock::SegmentedBlockTarget::kTorch;
+  std::vector<size_t> same_type_segment_idx;
+  for (size_t i = 0UL; i < original_partition.size(); ++i) {
+    auto& segment = original_partition[i];
+    if (same_type_segment_idx.empty()) {
+      segment_kind = segment.target();
+    } else if (segment_kind != segment.target() || segment.do_not_merge()) {
+      merge_adjacent_segments_list_in_new_partition(
+          original_partition, new_partition, segment_kind, same_type_segment_idx);
+      same_type_segment_idx.clear();
+      segment_kind = segment.target();
+    }
+    if (segment.do_not_merge()) {
+      new_partition.push_back(segment);
+    } else {
+      same_type_segment_idx.push_back(i);
+    }
+  }
+  if (!same_type_segment_idx.empty()) {
+    merge_adjacent_segments_list_in_new_partition(
+        original_partition, new_partition, segment_kind, same_type_segment_idx);
+  }
+  return new_partition;
+}
+
 void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block) {
   // Find all the fallback nodes and build execution decision LUT for all nodes
   setNodeExecutorLUT(ctx, block);
@@ -365,34 +447,45 @@ void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block) {
   PartitionedGraph segmented_blocks;
 
   std::vector<torch::jit::Node*> in_prog_trt_blk_nodes, in_prog_pyt_blk_nodes;
+  std::unordered_set<torch::jit::Node*> cur_trt_nodes_uses;
+  std::unordered_set<torch::jit::Node*> cur_pyt_nodes_uses;
   for (const auto n : nodes) {
     // Skip constant nodes as they are resources for both kinds of modules
     if (n->kind() == torch::jit::prim::Constant) {
       continue;
     }
+    auto dependent_nodes = getDependentNodes(n);
     // the outputs of trt subgraph shouldn't be collections
     if (ctx->shouldNodeRunInTensorRT(n)) {
       in_prog_trt_blk_nodes.push_back(n);
+      cur_trt_nodes_uses.insert(dependent_nodes.begin(), dependent_nodes.end());
 
-      // If there is an active PyTorch block and we have passed the threshold for a valid TRT
-      // block then segment and reset the active PyTorch block
-      if (in_prog_trt_blk_nodes.size() >= ctx->settings.min_block_size && !in_prog_pyt_blk_nodes.empty()) {
+      // If we hit a TRT node that is dependent on nodes in the active PyTorch block, finalize the block to materialize
+      // those dependencies in the graph
+      if (cur_pyt_nodes_uses.count(n)) {
         finalizeNewBlock(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
+        cur_pyt_nodes_uses.clear();
       }
     } else {
-      // If there is an active TRT block that is valid segment and reset the active TRT block
-      // otherwise add it to the active PyTorch block and reset
-      if (in_prog_trt_blk_nodes.size() >= ctx->settings.min_block_size) {
-        finalizeNewBlock(segmented_blocks, SegmentedBlock::kTensorRT, in_prog_trt_blk_nodes);
-      } else {
-        LOG_DEBUG(
-            "In progress TRT block does not meet minimum block size requirements ("
-            << in_prog_trt_blk_nodes.size() << ", expected at least " << ctx->settings.min_block_size
-            << "), therefore folding into in progress PyTorch block");
-        in_prog_pyt_blk_nodes.insert(
-            in_prog_pyt_blk_nodes.end(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
+      // The current node is dependent on the active TRT block, finalize it to materialize those dependencies in the
+      // graph or add them to the active PyTorch block
+      if (cur_trt_nodes_uses.count(n)) {
+        // If there is an active TRT block that is valid segment and reset the active TRT block
+        // otherwise add it to the active PyTorch block and reset
+        if (in_prog_trt_blk_nodes.size() >= ctx->settings.min_block_size) {
+          finalizeNewBlock(segmented_blocks, SegmentedBlock::kTensorRT, in_prog_trt_blk_nodes);
+        } else {
+          LOG_DEBUG(
+              "In progress TRT block does not meet minimum block size requirements ("
+              << in_prog_trt_blk_nodes.size() << ", expected at least " << ctx->settings.min_block_size
+              << "), therefore folding into in progress PyTorch block");
+          in_prog_pyt_blk_nodes.insert(
+              in_prog_pyt_blk_nodes.end(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
+          cur_pyt_nodes_uses.insert(cur_trt_nodes_uses.begin(), cur_trt_nodes_uses.end());
+        }
+        in_prog_trt_blk_nodes.clear();
+        cur_trt_nodes_uses.clear();
       }
-      in_prog_trt_blk_nodes.clear();
       // if there is a prim::If then this if node will be encapsulated in a SegmentedBlock
       // we shouldn't inject node for this block in dependency analysis process
       if (n->kind() == torch::jit::prim::If) {
@@ -400,23 +493,29 @@ void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block) {
             "Hit a conditional statement, finializing in progress PYT block and creating a new one for the conditional");
         if (!in_prog_pyt_blk_nodes.empty()) {
           finalizeNewBlock(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
+          cur_pyt_nodes_uses.clear();
         }
         auto cond_node = std::vector<torch::jit::Node*>{n};
         finalizeNewBlock(segmented_blocks, SegmentedBlock::kTorch, cond_node);
+        segmented_blocks.back().do_not_merge(true);
         continue;
       } else if (n->kind() == torch::jit::prim::Loop) {
         if (!in_prog_pyt_blk_nodes.empty()) {
           finalizeNewBlock(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
+          cur_pyt_nodes_uses.clear();
         }
         if (checkLoopEvaluatable(n)) {
           in_prog_trt_blk_nodes.push_back(n);
+          cur_trt_nodes_uses.insert(dependent_nodes.begin(), dependent_nodes.end());
         } else {
           auto loop_node = std::vector<torch::jit::Node*>{n};
           finalizeNewBlock(segmented_blocks, SegmentedBlock::kTorch, loop_node);
+          segmented_blocks.back().do_not_merge(true);
         }
         continue;
       }
       in_prog_pyt_blk_nodes.push_back(n);
+      cur_pyt_nodes_uses.insert(dependent_nodes.begin(), dependent_nodes.end());
     }
   }
 
@@ -432,11 +531,40 @@ void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block) {
     finalizeNewBlock(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
   }
 
+  segmented_blocks = merge_adjacent_segments_of_same_type(segmented_blocks);
   ctx->partitioned_blocks.insert({block, segmented_blocks});
   return;
 }
 
-void partition(PartitioningCtx* ctx, ExampleIValues& example_tensor_map) {
+bool isInputDynamic(PartitioningCtx* ctx) {
+  // Check if inputs have dynamic shapes
+  bool input_is_dynamic = true;
+  auto inputs_map = ctx->settings.collection_input_spec_map;
+  for (auto inputs : inputs_map) {
+    for (auto input : inputs.second) {
+      if (!input.input_is_dynamic) {
+        input_is_dynamic = false;
+      }
+    }
+  }
+  return input_is_dynamic;
+}
+
+void populateInputIValues(PartitioningCtx* ctx) {
+  if (isInputDynamic(ctx)) {
+    ctx->min_input_ivalues_map = partitioning::generateRandomInputs(
+        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kMIN);
+    ctx->opt_input_ivalues_map = partitioning::generateRandomInputs(
+        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kOPT);
+    ctx->max_input_ivalues_map = partitioning::generateRandomInputs(
+        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kMAX);
+  } else {
+    ctx->opt_input_ivalues_map = partitioning::generateRandomInputs(
+        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kOPT);
+  }
+}
+
+void partition(PartitioningCtx* ctx) {
   LOG_DEBUG(ctx->settings);
 
   // Go through all the blocks to do the partitioning
@@ -446,14 +574,24 @@ void partition(PartitioningCtx* ctx, ExampleIValues& example_tensor_map) {
 
     // It's possible that some TensorRT blocks have nonTensor inputs/output because they are interleaved by Torch blocks
     // resolve nonTensor inputs/outputs
+    LOG_DEBUG("Resolving non-tensor inputs for segmented blocks");
     resolveTRTNonTensorInputs(ctx, block);
 
     // register input/output torch::jit::Value for segmented graphs
     LOG_DEBUG("Registering input/output torch::jit::Value for segmented graphs");
     registerSegmentsOutputs(ctx, block);
 
-    // run shape analysis on each segmented block
-    runShapeAnalysis(ctx, block, example_tensor_map);
+    // Incase of dynamic shape inputs, run shape analysis on each segmented block for min/opt/max ranges and register
+    // output shapes for each block accordingly
+    if (isInputDynamic(ctx)) {
+      LOG_DEBUG("Performing shape analysis for segmented blocks using min/opt/max shapes for inputs");
+      runShapeAnalysis(ctx, block, ctx->min_input_ivalues_map, ir::ShapeMode::kMIN);
+      runShapeAnalysis(ctx, block, ctx->opt_input_ivalues_map, ir::ShapeMode::kOPT);
+      runShapeAnalysis(ctx, block, ctx->max_input_ivalues_map, ir::ShapeMode::kMAX);
+    } else {
+      LOG_DEBUG("Performing shape analysis for segmented blocks using static shapes for inputs");
+      runShapeAnalysis(ctx, block, ctx->opt_input_ivalues_map, ir::ShapeMode::kOPT);
+    }
   }
 }
 

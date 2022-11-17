@@ -24,6 +24,7 @@ cc_library(
     deps = [
         "//core/lowering/passes",
         "//core/util:prelude",
+        "//core/ir",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch//:libtorch"],

@@ -1,5 +1,6 @@
 target_sources(${lib_name}
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/convNd_to_convolution.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/device_casting.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/exception_elimination.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/fuse_addmm_branches.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/linear_to_addmm.cpp"
@@ -24,6 +25,7 @@ target_sources(${lib_name}
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_std.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_var.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/view_to_reshape.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/rewrite_inputs_with_params.cpp"
 )
 
 set(HEADER_FILES

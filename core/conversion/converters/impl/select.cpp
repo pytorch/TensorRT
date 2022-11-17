@@ -662,8 +662,15 @@ auto select_registrations TORCHTRT_UNUSED =
                auto self = args[0].ITensorOrFreeze(ctx);
                auto mask = args[1].ITensorOrFreeze(ctx);
                mask = addPadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
-               auto val = args[2].unwrapToScalar().to<float>();
-               auto val_t = tensor_to_const(ctx, torch::full(util::toVec(self->getDimensions()), val));
+               auto val = args[2].unwrapToScalar();
+
+               // Tensor type to use for initializing constant tensor used in Select
+               // value should inherit its type from self
+               auto val_t_dtype = util::TRTDataTypeToScalarType(self->getType());
+
+               // Initialize contant tensor for fill with the inherited data type
+               auto val_t = tensor_to_const(
+                   ctx, torch::full(util::toVec(self->getDimensions()), val, {torch::dtype(val_t_dtype)}));
 
                TORCHTRT_CHECK(
                    util::broadcastable(self->getDimensions(), mask->getDimensions(), /*multidirectional=*/false),
