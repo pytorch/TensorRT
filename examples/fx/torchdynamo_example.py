@@ -3,11 +3,11 @@ from copy import deepcopy
 from dataclasses import dataclass, field, replace
 
 import torch
-import torchdynamo
+import torch._dynamo as torchdynamo
 import torchvision
 from torch_tensorrt.fx.lower import compile
 from torch_tensorrt.fx.utils import LowerPrecision
-from torchdynamo.optimizations import backends
+from torch._dynamo.optimizations import backends
 
 """
 The purpose of this example is to demostrate the lowering flow to TRT and Torchdynamo

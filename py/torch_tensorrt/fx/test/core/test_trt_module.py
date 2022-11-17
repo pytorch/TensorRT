@@ -27,7 +27,7 @@ class TestTRTModule(TestCase):
         torch.save(trt_mod, "trt.pt")
         reload_trt_mod = torch.load("trt.pt")
 
-        torch.testing.assert_allclose(
+        torch.testing.assert_close(
             reload_trt_mod(inputs[0].cuda()).cpu(), ref_output, rtol=1e-04, atol=1e-04
         )
         os.remove(f"{os.getcwd()}/trt.pt")
@@ -49,7 +49,7 @@ class TestTRTModule(TestCase):
         new_trt_mod = TRTModule()
         new_trt_mod.load_state_dict(st)
 
-        torch.testing.assert_allclose(
+        torch.testing.assert_close(
             new_trt_mod(inputs[0].cuda()).cpu(), ref_output, rtol=1e-04, atol=1e-04
         )
 
