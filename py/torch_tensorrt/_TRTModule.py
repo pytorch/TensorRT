@@ -92,7 +92,6 @@ class TRTModule(torch.nn.Module):
         self.name = state[0]
         if state[1] is not None:
             serialized_engine_info = state[1][0]
-            print(serialized_engine_info)
             import base64
 
             serialized_engine = base64.b64decode(serialized_engine_info[3])
