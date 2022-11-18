@@ -1,3 +1,5 @@
+#include <codecvt>
+
 #include "core/runtime/runtime.h"
 
 namespace torch_tensorrt {
@@ -17,6 +19,49 @@ std::string serialize_bindings(const std::vector<std::string>& bindings) {
   LOG_DEBUG("Serialized Binding Info: " << serialized_binding_info);
 
   return serialized_binding_info;
+}
+
+static const std::string sym_table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"; //=
+std::string base64_encode(const std::string& in) {
+  std::string out;
+  int64_t val = 0, valb = -6;
+  for (unsigned char c : in) {
+    val = (val << 8) + c;
+    valb += 8;
+    while (valb >= 0) {
+      out.push_back(sym_table[(val >> valb) & 0x3F]);
+      valb -= 6;
+    }
+  }
+  if (valb > -6) {
+    out.push_back(sym_table[((val << 8) >> (valb + 8)) & 0x3F]);
+  };
+  while (out.size() % 4) {
+    out.push_back('=');
+  }
+  return out;
+}
+
+std::string base64_decode(const std::string& in) {
+  std::string out;
+  std::vector<int> T(256, -1);
+  for (int i = 0; i < 64; i++) {
+    T[sym_table[i]] = i;
+  }
+
+  int64_t val = 0, valb = -8;
+  for (unsigned char c : in) {
+    if (T[c] == -1) {
+      break;
+    }
+    val = (val << 6) + T[c];
+    valb += 6;
+    if (valb >= 0) {
+      out.push_back(char((val >> valb) & 0xFF));
+      valb -= 8;
+    }
+  }
+  return out;
 }
 
 // TODO: Implement a call method
@@ -53,14 +98,15 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
               serialize_info[ABI_TARGET_IDX] = ABI_VERSION;
               serialize_info[NAME_IDX] = self->name;
               serialize_info[DEVICE_IDX] = self->device_info.serialize();
-              serialize_info[ENGINE_IDX] = trt_engine;
+              serialize_info[ENGINE_IDX] = base64_encode(trt_engine);
               serialize_info[INPUT_BINDING_NAMES_IDX] = serialize_bindings(self->in_binding_names);
               serialize_info[OUTPUT_BINDING_NAMES_IDX] = serialize_bindings(self->out_binding_names);
 
               return serialize_info;
             },
-            [](std::vector<std::string> seralized_info) -> c10::intrusive_ptr<TRTEngine> {
-              return c10::make_intrusive<TRTEngine>(std::move(seralized_info));
+            [](std::vector<std::string> serialized_info) -> c10::intrusive_ptr<TRTEngine> {
+              serialized_info[ENGINE_IDX] = base64_decode(serialized_info[ENGINE_IDX]);
+              return c10::make_intrusive<TRTEngine>(std::move(serialized_info));
             });
 
 TORCH_LIBRARY(tensorrt, m) {
