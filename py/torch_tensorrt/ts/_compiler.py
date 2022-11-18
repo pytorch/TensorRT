@@ -244,7 +244,10 @@ def convert_method_to_trt_engine(
 
 
 def embed_engine_in_new_module(
-    serialized_engine: bytes, device=Device._current_device()
+    serialized_engine: bytes,
+    device: Device = Device._current_device(),
+    input_binding_names: List[str] = [],
+    output_binding_names: List[str] = [],
 ) -> torch.jit.ScriptModule:
     """Takes a pre-built serialized TensorRT engine and embeds it within a TorchScript module
 
@@ -253,7 +256,7 @@ def embed_engine_in_new_module(
 
         forward(Tensor[]) -> Tensor[]
 
-    TensorRT bindings must have names with the following format:
+    TensorRT bindings either be explicitly specified using ``[in/out]put_binding_names`` or have names with the following format:
       - [symbol].[index in input / output array]
       ex.
       - [x.0, x.1, x.2] -> [y.0]
@@ -265,11 +268,17 @@ def embed_engine_in_new_module(
 
     Keyword Arguments:
         device (Union(torch_tensorrt.Device, torch.device, dict)): Target device to run engine on. Must be compatible with engine provided. Default: Current active device
-
+        input_binding_names (List[str]): List of names of TensorRT bindings in order to be passed to the encompassing PyTorch module
+        output_binding_names (List[str]): List of names of TensorRT bindings in order that should be returned from the encompassing PyTorch module
     Returns:
         torch.jit.ScriptModule: New TorchScript module with engine embedded
     """
-    cpp_mod = _C.embed_engine_in_new_module(serialized_engine, _parse_device(device))
+    cpp_mod = _C.embed_engine_in_new_module(
+        serialized_engine,
+        _parse_device(device),
+        input_binding_names,
+        output_binding_names,
+    )
     return torch.jit._recursive.wrap_cpp_module(cpp_mod)
 
 
