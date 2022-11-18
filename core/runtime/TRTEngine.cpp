@@ -29,37 +29,24 @@ std::vector<std::string> split(const std::string& str, char delim) {
 }
 
 TRTEngine::TRTEngine(
-    std::string serialized_engine,
-    RTDevice cuda_device,
+    const std::string& serialized_engine,
+    const RTDevice& cuda_device,
     const std::vector<std::string>& _in_binding_names,
-    const std::vector<std::string>& _out_binding_names) {
-  std::string _name = "deserialized_trt";
-  new (this) TRTEngine(_name, serialized_engine, cuda_device, _in_binding_names, _out_binding_names);
-}
+    const std::vector<std::string>& _out_binding_names)
+    : TRTEngine("deserialized_trt", serialized_engine, cuda_device, _in_binding_names, _out_binding_names) {}
 
-TRTEngine::TRTEngine(std::vector<std::string> serialized_info) {
-  TORCHTRT_CHECK(
-      serialized_info.size() == SERIALIZATION_LEN,
-      "Program to be deserialized targets an incompatible Torch-TensorRT ABI");
-  TORCHTRT_CHECK(
-      serialized_info[ABI_TARGET_IDX] == ABI_VERSION,
-      "Program to be deserialized targets a different Torch-TensorRT ABI Version ("
-          << serialized_info[ABI_TARGET_IDX] << ") than the Torch-TensorRT Runtime ABI Version (" << ABI_VERSION
-          << ")");
-  std::string _name = serialized_info[NAME_IDX];
-  std::string engine_info = serialized_info[ENGINE_IDX];
-  std::vector<std::string> in_bindings = split(serialized_info[INPUT_BINDING_NAMES_IDX], BINDING_DELIM);
-  std::vector<std::string> out_bindings = split(serialized_info[OUTPUT_BINDING_NAMES_IDX], BINDING_DELIM);
-
-  RTDevice cuda_device(serialized_info[DEVICE_IDX]);
-
-  new (this) TRTEngine(_name, engine_info, cuda_device, in_bindings, out_bindings);
-}
+TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
+    : TRTEngine(
+          serialized_info[NAME_IDX],
+          serialized_info[ENGINE_IDX],
+          RTDevice(serialized_info[DEVICE_IDX]),
+          split(serialized_info[INPUT_BINDING_NAMES_IDX], BINDING_DELIM),
+          split(serialized_info[OUTPUT_BINDING_NAMES_IDX], BINDING_DELIM)) {}
 
 TRTEngine::TRTEngine(
-    std::string mod_name,
-    std::string serialized_engine,
-    RTDevice cuda_device,
+    const std::string& mod_name,
+    const std::string& serialized_engine,
+    const RTDevice& cuda_device,
     const std::vector<std::string>& _in_binding_names,
     const std::vector<std::string>& _out_binding_names) {
   auto most_compatible_device = get_most_compatible_device(cuda_device);
@@ -156,6 +143,17 @@ TRTEngine::TRTEngine(
   }
 
   LOG_DEBUG(*this);
+}
+
+void TRTEngine::verify_serialization_fmt(const std::vector<std::string>& serialized_info) {
+  TORCHTRT_CHECK(
+      serialized_info.size() == SERIALIZATION_LEN,
+      "Program to be deserialized targets an incompatible Torch-TensorRT ABI");
+  TORCHTRT_CHECK(
+      serialized_info[ABI_TARGET_IDX] == ABI_VERSION,
+      "Program to be deserialized targets a different Torch-TensorRT ABI Version ("
+          << serialized_info[ABI_TARGET_IDX] << ") than the Torch-TensorRT Runtime ABI Version (" << ABI_VERSION
+          << ")");
 }
 
 void TRTEngine::set_profiling_paths() {

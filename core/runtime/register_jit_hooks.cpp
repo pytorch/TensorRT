@@ -106,7 +106,8 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
             },
             [](std::vector<std::string> serialized_info) -> c10::intrusive_ptr<TRTEngine> {
               serialized_info[ENGINE_IDX] = base64_decode(serialized_info[ENGINE_IDX]);
-              return c10::make_intrusive<TRTEngine>(std::move(serialized_info));
+              TRTEngine::verify_serialization_fmt(serialized_info);
+              return c10::make_intrusive<TRTEngine>(serialized_info);
             });
 
 TORCH_LIBRARY(tensorrt, m) {

@@ -27,27 +27,28 @@ struct TRTEngine : torch::CustomClassHolder {
 
   std::string profile_path_prefix = std::experimental::filesystem::temp_directory_path();
 
-  std::unordered_map<uint64_t, uint64_t> in_binding_map; // TRT IDX -> PYT IDX
-  std::unordered_map<uint64_t, uint64_t> out_binding_map; // TRT IDX -> PYT IDX
+  std::unordered_map<uint64_t, uint64_t> in_binding_map = {}; // TRT IDX -> PYT IDX
+  std::unordered_map<uint64_t, uint64_t> out_binding_map = {}; // TRT IDX -> PYT IDX
 
-  std::vector<std::string> in_binding_names; // ITO: PYT IDX
-  std::vector<std::string> out_binding_names; // ITO: PYT IDX
+  std::vector<std::string> in_binding_names = {}; // ITO: PYT IDX
+  std::vector<std::string> out_binding_names = {}; // ITO: PYT IDX
 
   ~TRTEngine() = default;
   TRTEngine(
-      std::string serialized_engine,
-      RTDevice cuda_device,
+      const std::string& serialized_engine,
+      const RTDevice& cuda_device,
       const std::vector<std::string>& in_binding_names,
       const std::vector<std::string>& out_binding_names);
   TRTEngine(std::vector<std::string> serialized_info);
   TRTEngine(
-      std::string mod_name,
-      std::string serialized_engine,
-      RTDevice cuda_device,
+      const std::string& mod_name,
+      const std::string& serialized_engine,
+      const RTDevice& cuda_device,
       const std::vector<std::string>& in_binding_names,
       const std::vector<std::string>& out_binding_names);
   TRTEngine& operator=(const TRTEngine& other);
   std::string to_str() const;
+  static void verify_serialization_fmt(const std::vector<std::string>& serialized_info);
   void enable_profiling();
   void disable_profiling();
   std::string get_engine_layer_info();
