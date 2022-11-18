@@ -11,7 +11,7 @@ bool checkSegmentedBlockInputShape(
   if (segmented_blocks.size() != in_shape.size())
     return false;
   for (size_t i = 0; i < segmented_blocks.size(); ++i) {
-    auto cur_block_in_shapes = segmented_blocks[i].in_shapes();
+    auto cur_block_in_shapes = segmented_blocks[i].in_opt_shapes();
     if (cur_block_in_shapes.size() != in_shape[i].size())
       return false;
     for (size_t j = 0; j < cur_block_in_shapes.size(); ++j) {
