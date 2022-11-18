@@ -14,6 +14,7 @@ cc_library(
     name = "passes",
     srcs = [
         "convNd_to_convolution.cpp",
+        "device_casting.cpp",
         "exception_elimination.cpp",
         "fuse_addmm_branches.cpp",
         "linear_to_addmm.cpp",
@@ -27,6 +28,7 @@ cc_library(
         "remove_dropout.cpp",
         "remove_nops.cpp",
         "remove_unnecessary_casts.cpp",
+        "rewrite_inputs_with_params.cpp",
         "silu_to_sigmoid_multiplication.cpp",
         "unpack_addmm.cpp",
         "unpack_batch_norm.cpp",

@@ -5,7 +5,7 @@ import sys
 
 # Use system installed Python packages
 PYT_PATH = (
-    "/opt/conda/lib/python3.8/site-packages"
+    "/usr/local/lib/python3.8/dist-packages"
     if not "PYT_PATH" in os.environ
     else os.environ["PYT_PATH"]
 )
@@ -203,6 +203,99 @@ def run_base_tests(session):
             session.run_always("pytest", test)
 
 
+def run_fx_core_tests(session):
+    print("Running FX core tests")
+    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
+    tests = [
+        "core",
+    ]
+    for test in tests:
+        if USE_HOST_DEPS:
+            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+        else:
+            session.run_always("pytest", test)
+
+
+def run_fx_converter_tests(session):
+    print("Running FX converter tests")
+    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
+    tests = [
+        "converters",
+    ]
+    # Skipping this test as it fails inside NGC container with the following error.
+    # Error Code 4: Internal Error (Could not find any implementation for node conv due to insufficient workspace. See verbose log for requested sizes.)
+    skip_tests = "-k not conv3d"
+    for test in tests:
+        if USE_HOST_DEPS:
+            session.run_always("pytest", test, skip_tests, env={"PYTHONPATH": PYT_PATH})
+        else:
+            session.run_always("pytest", test, skip_tests)
+
+
+def run_fx_lower_tests(session):
+    print("Running FX passes and trt_lower tests")
+    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
+    tests = [
+        "passes/test_multi_fuse_trt.py",
+        # "passes/test_fuse_permute_linear_trt.py",
+        "passes/test_remove_duplicate_output_args.py",
+        "passes/test_fuse_permute_matmul_trt.py",
+        # "passes/test_graph_opts.py"
+        "trt_lower",
+    ]
+    for test in tests:
+        if USE_HOST_DEPS:
+            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+        else:
+            session.run_always("pytest", test)
+
+
+def run_fx_quant_tests(session):
+    print("Running FX Quant tests")
+    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
+    tests = [
+        "quant",
+    ]
+    # Skipping this test as it fails inside NGC container with the following error.
+    # ImportError: cannot import name 'ObservationType' from 'torch.ao.quantization.backend_config.observation_type'
+    skip_tests = "-k not conv_add_standalone_module"
+    for test in tests:
+        if USE_HOST_DEPS:
+            session.run_always("pytest", test, skip_tests, env={"PYTHONPATH": PYT_PATH})
+        else:
+            session.run_always("pytest", test, skip_tests)
+
+
+def run_fx_tracer_tests(session):
+    print("Running FX Tracer tests")
+    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
+    # skipping a test since it depends on torchdynamo
+    # Enable this test once NGC moves to latest pytorch which has dynamo integrated.
+    tests = [
+        "tracer/test_acc_shape_prop.py",
+        "tracer/test_acc_tracer.py",
+        # "tracer/test_dispatch_tracer.py"
+    ]
+    for test in tests:
+        if USE_HOST_DEPS:
+            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+        else:
+            session.run_always("pytest", test)
+
+
+def run_fx_tools_tests(session):
+    print("Running FX tools tests")
+    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
+    tests = [
+        "tools",
+    ]
+    for test in tests:
+        if USE_HOST_DEPS:
+            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+        else:
+            session.run_always("pytest", test)
+
+
 def run_model_tests(session):
     print("Running model tests")
     session.chdir(os.path.join(TOP_DIR, "tests/py"))
@@ -310,6 +403,40 @@ def run_l0_api_tests(session):
     cleanup(session)
 
 
+def run_l0_fx_tests(session):
+    if not USE_HOST_DEPS:
+        install_deps(session)
+        install_torch_trt(session)
+    run_fx_core_tests(session)
+    run_fx_converter_tests(session)
+    run_fx_lower_tests(session)
+    cleanup(session)
+
+
+def run_l0_fx_core_tests(session):
+    if not USE_HOST_DEPS:
+        install_deps(session)
+        install_torch_trt(session)
+    run_fx_core_tests(session)
+    cleanup(session)
+
+
+def run_l0_fx_converter_tests(session):
+    if not USE_HOST_DEPS:
+        install_deps(session)
+        install_torch_trt(session)
+    run_fx_converter_tests(session)
+    cleanup(session)
+
+
+def run_l0_fx_lower_tests(session):
+    if not USE_HOST_DEPS:
+        install_deps(session)
+        install_torch_trt(session)
+    run_fx_lower_tests(session)
+    cleanup(session)
+
+
 def run_l0_dla_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
@@ -338,6 +465,16 @@ def run_l1_int8_accuracy_tests(session):
     cleanup(session)
 
 
+def run_l1_fx_tests(session):
+    if not USE_HOST_DEPS:
+        install_deps(session)
+        install_torch_trt(session)
+    run_fx_quant_tests(session)
+    run_fx_tracer_tests(session)
+    run_fx_tools_tests(session)
+    cleanup(session)
+
+
 def run_l2_trt_compatibility_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
@@ -362,6 +499,30 @@ def l0_api_tests(session):
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+def l0_fx_tests(session):
+    """When a developer needs to check correctness for a PR or something"""
+    run_l0_fx_tests(session)
+
+
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+def l0_fx_core_tests(session):
+    """When a developer needs to check correctness for a PR or something"""
+    run_l0_fx_core_tests(session)
+
+
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+def l0_fx_converter_tests(session):
+    """When a developer needs to check correctness for a PR or something"""
+    run_l0_fx_converter_tests(session)
+
+
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+def l0_fx_lower_tests(session):
+    """When a developer needs to check correctness for a PR or something"""
+    run_l0_fx_lower_tests(session)
+
+
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l0_dla_tests(session):
     """When a developer needs to check basic api functionality using host dependencies"""
     run_l0_dla_tests(session)
@@ -371,6 +532,12 @@ def l0_dla_tests(session):
 def l1_model_tests(session):
     """When a user needs to test the functionality of standard models compilation and results"""
     run_l1_model_tests(session)
+
+
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+def l1_fx_tests(session):
+    """When a user needs to test the functionality of standard models compilation and results"""
+    run_l1_fx_tests(session)
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)

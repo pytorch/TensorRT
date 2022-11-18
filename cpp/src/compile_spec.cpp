@@ -110,6 +110,7 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.convert_info.engine_settings.debug = external.debug;
   internal.convert_info.engine_settings.truncate_long_and_double = external.truncate_long_and_double;
   internal.convert_info.engine_settings.device.allow_gpu_fallback = external.device.allow_gpu_fallback;
+  internal.lower_info.target_device.allow_gpu_fallback = external.device.allow_gpu_fallback;
 
   TORCHTRT_CHECK(
       !(external.require_full_compilation && (external.torch_executed_ops.size() > 0)),
@@ -130,10 +131,12 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   switch (external.device.device_type) {
     case Device::DeviceType::kDLA:
       internal.convert_info.engine_settings.device.device_type = nvinfer1::DeviceType::kDLA;
+      internal.lower_info.target_device.device_type = nvinfer1::DeviceType::kDLA;
       break;
     case Device::DeviceType::kGPU:
     default:
       internal.convert_info.engine_settings.device.device_type = nvinfer1::DeviceType::kGPU;
+      internal.lower_info.target_device.device_type = nvinfer1::DeviceType::kGPU;
   }
 
   switch (external.capability) {
@@ -150,6 +153,8 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
 
   internal.convert_info.engine_settings.device.gpu_id = external.device.gpu_id;
   internal.convert_info.engine_settings.device.dla_core = external.device.dla_core;
+  internal.lower_info.target_device.gpu_id = external.device.gpu_id;
+  internal.lower_info.target_device.dla_core = external.device.dla_core;
   internal.convert_info.engine_settings.num_avg_timing_iters = external.num_avg_timing_iters;
   internal.convert_info.engine_settings.workspace_size = external.workspace_size;
   internal.convert_info.engine_settings.dla_sram_size = external.dla_sram_size;

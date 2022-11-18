@@ -17,6 +17,7 @@ from ..passes.remove_duplicate_output_args import remove_duplicate_output_args
 from .graph_opts import common_subexpression_elimination
 
 from .lower_basic_pass import (
+    fix_reshape_batch_dim,
     replace_mutable_op,
     replace_op_with_indices,
     run_const_fold,
@@ -112,6 +113,7 @@ class LowerPassManagerBuilder:
         passes.append(
             inplace_wrapper(lambda m: FUSE_PASSES_POST_OBSERVER.observe(m, self._input))
         )
+        passes.append(fix_reshape_batch_dim)
 
         return PassManager.build_from_passlist(passes)
 

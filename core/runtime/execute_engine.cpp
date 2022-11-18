@@ -43,7 +43,7 @@ bool is_switch_required(const RTDevice& curr_device, const RTDevice& engine_devi
   return false;
 }
 
-RTDevice select_cuda_device(const RTDevice& engine_device) {
+RTDevice select_rt_device(const RTDevice& engine_device) {
   auto new_target_device_opt = get_most_compatible_device(engine_device);
 
   // REVIEW: THIS DOES NOT LIST DLA PROBABLY, WHICH WE SHOULD
@@ -87,13 +87,34 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     if (is_switch_required(curr_device, compiled_engine->device_info)) {
       // Scan through available CUDA devices and set the CUDA device context correctly
       RTDevice device = select_cuda_device(compiled_engine->device_info);
-      set_cuda_device(device);
+      set_rt_device(device);
 
       std::string target_device = "cuda:" + std::to_string(device.id);
 
       for (auto& in : inputs) {
         in = in.to(torch::Device(target_device));
       }
+    }
+  }
+  else {
+    // Target device is current device
+    target_device += std::to_string(curr_device.id);
+  }
+
+  // For each input, ensure its current device is the desired target device
+  for (size_t i = 0; i < inputs.size(); i++) {
+    at::Tensor* in = &inputs[i];
+    std::string current_tensor_device = in->device().str();
+
+    // If current device string does not match target device, display warning and move tensor accordingly
+    if (current_tensor_device != target_device) {
+      LOG_WARNING(
+          "Input " << i << " of engine " << compiled_engine->name << " was found to be on " << current_tensor_device
+                   << " but should be on " << target_device << ". This tensor is being moved by the runtime but "
+                   << "for performance considerations, ensure your inputs are all on GPU "
+                   << "and open an issue here (https://github.com/pytorch/TensorRT/issues) if this "
+                   << "warning persists.");
+      *in = in->to(torch::Device(target_device));
     }
   }
 
