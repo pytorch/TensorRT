@@ -156,7 +156,7 @@ def convert_method_to_trt_engine(
     dla_global_dram_size=536870912,
     truncate_long_and_double=False,
     calibrator=None,
-) -> str:
+) -> bytearray:
     """Convert a TorchScript module method to a serialized TensorRT engine
 
     Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings
@@ -216,7 +216,7 @@ def convert_method_to_trt_engine(
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
 
     Returns:
-        bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
+        bytearray: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
     if isinstance(module, torch.jit.ScriptFunction):
         raise TypeError(
@@ -238,9 +238,17 @@ def convert_method_to_trt_engine(
         "truncate_long_and_double": truncate_long_and_double,
     }
 
-    return _C.convert_graph_to_trt_engine(
+    engine_str = _C.convert_graph_to_trt_engine(
         module._c, method_name, _parse_compile_spec(compile_spec)
     )
+
+    import io
+
+    with io.BytesIO() as engine_bytes:
+        engine_bytes.write(engine_str)
+        engine_bytearray = engine_bytes.getvalue()
+
+    return engine_bytearray
 
 
 def embed_engine_in_new_module(

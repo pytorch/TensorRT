@@ -198,7 +198,7 @@ void TRTEngine::dump_engine_layer_info_to_file(const std::string& path) {
 
 void TRTEngine::dump_engine_layer_info() {
   std::string layer_info_file =
-      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_engine_layer_information.json"}.string();
+      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_layer_information.json"}.string();
   dump_engine_layer_info_to_file(layer_info_file);
   return;
 }

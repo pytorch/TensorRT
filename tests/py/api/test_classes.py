@@ -102,7 +102,7 @@ class TestInput(unittest.TestCase):
         }
 
         example_tensor = torch.randn(shape).half()
-        i = torchtrt.Input._from_tensor(example_tensor)
+        i = torchtrt.Input.from_tensor(example_tensor)
         self.assertTrue(self._verify_correctness(i, target))
 
     def test_static_shape(self):
@@ -204,6 +204,106 @@ class TestInput(unittest.TestCase):
             max_shape=tensor_shape(max_shape),
         )
         self.assertTrue(self._verify_correctness(i, target))
+
+
+class TestTRTModule(unittest.TestCase):
+    @staticmethod
+    def _get_trt_mod():
+        class Test(torch.nn.Module):
+            def __init__(self):
+                super(Test, self).__init__()
+                self.fc1 = torch.nn.Linear(10, 5)
+                self.fc2 = torch.nn.Linear(5, 5)
+
+            def forward(self, x):
+                out = self.fc2(self.fc1(x))
+                return out
+
+        mod = torch.jit.script(Test())
+        test_mod_engine_str = torchtrt.ts.convert_method_to_trt_engine(
+            mod, "forward", inputs=[torchtrt.Input((2, 10))]
+        )
+        return torchtrt.TRTModule(
+            engine_name="test_engine",
+            serialized_engine=test_mod_engine_str,
+            input_binding_names=["input_0"],
+            output_binding_names=["output_0"],
+        )
+
+    def test_detect_invalid_input_binding(self):
+        class Test(torch.nn.Module):
+            def __init__(self):
+                super(Test, self).__init__()
+                self.fc1 = torch.nn.Linear(10, 5)
+                self.fc2 = torch.nn.Linear(5, 5)
+
+            def forward(self, x):
+                out = self.fc2(self.fc1(x))
+                return out
+
+        mod = torch.jit.script(Test())
+        test_mod_engine_str = torchtrt.ts.convert_method_to_trt_engine(
+            mod, "forward", inputs=[torchtrt.Input((2, 10))]
+        )
+        with self.assertRaises(RuntimeError):
+            torchtrt.TRTModule(
+                engine_name="test_engine",
+                serialized_engine=test_mod_engine_str,
+                input_binding_names=["x.1"],
+                output_binding_names=["output_0"],
+            )
+
+    def test_detect_invalid_output_binding(self):
+        class Test(torch.nn.Module):
+            def __init__(self):
+                super(Test, self).__init__()
+                self.fc1 = torch.nn.Linear(10, 5)
+                self.fc2 = torch.nn.Linear(5, 5)
+
+            def forward(self, x):
+                out = self.fc2(self.fc1(x))
+                return out
+
+        mod = torch.jit.script(Test())
+        test_mod_engine_str = torchtrt.ts.convert_method_to_trt_engine(
+            mod, "forward", inputs=[torchtrt.Input((2, 10))]
+        )
+        with self.assertRaises(RuntimeError):
+            torchtrt.TRTModule(
+                name="test_engine",
+                serialized_engine=test_mod_engine_str,
+                input_binding_names=["input_0"],
+                output_binding_names=["z.1"],
+            )
+
+    def test_set_get_profile_path_prefix(self):
+        trt_mod = TestTRTModule._get_trt_mod()
+        trt_mod.engine.profile_path_prefix = "/tmp/"
+        self.assertTrue(trt_mod.engine.profile_path_prefix == "/tmp/")
+
+    def test_get_layer_info(self):
+        """
+        {
+            "Layers": [
+                "reshape_before_%26 : Tensor = aten::matmul(%x.1, %25)",
+                "%26 : Tensor = aten::matmul(%x.1, %25) + [Freeze Tensor %27 : Tensor = trt::const(%10) ] + (Unnamed Layer* 4) [Shuffle] + unsqueeze_node_after_[Freeze Tensor %27 : Tensor = trt::const(%10) ] + (Unnamed Layer* 4) [Shuffle]_(Unnamed Layer* 4) [Shuffle]_output + %28 : Tensor = aten::add(%27, %26, %24)",
+                "%31 : Tensor = aten::matmul(%28, %30) + [Freeze Tensor %32 : Tensor = trt::const(%12) ] + (Unnamed Layer* 10) [Shuffle] + unsqueeze_node_after_[Freeze Tensor %32 : Tensor = trt::const(%12) ] + (Unnamed Layer* 10) [Shuffle]_(Unnamed Layer* 10) [Shuffle]_output + %33 : Tensor = aten::add(%32, %31, %29)",
+                "copied_squeeze_after_%33 : Tensor = aten::add(%32, %31, %29)"
+            ],
+            "Bindings": [
+                "input_0",
+                "output_0"
+            ]
+        }
+        """
+
+        import json
+
+        trt_mod = TestTRTModule._get_trt_mod()
+        trt_json = json.loads(trt_mod.get_layer_info())
+        [self.assertTrue(k in trt_json.keys()) for k in ["Layers", "Bindings"]]
+        self.assertTrue(len(trt_json["Layers"]) == 4)
+        self.assertTrue(len(trt_json["Bindings"]) == 2)
 
 
 if __name__ == "__main__":

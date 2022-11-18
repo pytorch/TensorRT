@@ -95,7 +95,7 @@ class TRTSplitter(splitter_base._SplitterBase):
                 engine_str = engine_bytes.getvalue()
 
             return TRTModuleNext(
-                engine_name=str(type(mod)) + "_engine",
+                name=str(type(mod)),
                 serialized_engine=engine_str,
                 input_binding_names=interpreter_result.input_names,
                 output_binding_names=interpreter_result.output_names,
