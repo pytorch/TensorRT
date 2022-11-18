@@ -2,20 +2,20 @@ set(lib_name "core_runtime")
 add_library(${lib_name} OBJECT)
 
 set(CXX_SRCS
-    "${CMAKE_CURRENT_SOURCE_DIR}/RTDevice.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/DeviceList.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/execute_engine.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/RTDevice.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngine.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngineProfiler.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngineProfiler.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/execute_engine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/register_jit_hooks.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/runtime.cpp"
 )
 
 set(HEADER_FILES
-    "${CMAKE_CURRENT_SOURCE_DIR}/runtime.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/RTDevice.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngine.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngineProfiler.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/runtime.h"
 )
 
 target_sources(${lib_name}
@@ -33,6 +33,7 @@ target_link_libraries(${lib_name}
         TensorRT::nvinfer
         torch
         core_util
+        stdc++fs
 )
 
 # Install
