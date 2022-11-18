@@ -51,10 +51,11 @@ TEST(Partitioning, ExplicitNodeAutoConversionCorrectly) {
   inputs_map.insert({g->inputs()[1], {inputs[1]}});
   input_types.insert({g->inputs()[1], {{at::kInt}}});
 
-  auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
-
+  partitioning_info.collection_input_spec_map = inputs_map;
   torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
-  torch_tensorrt::core::partitioning::partition(&ctx, input_ivalues_map);
+  ctx.input_types_map = input_types;
+  torch_tensorrt::core::partitioning::populateInputIValues(&ctx);
+  torch_tensorrt::core::partitioning::partition(&ctx);
   auto segmented_blocks = ctx.partitioned_blocks.begin()->second;
 
   for (auto& seg_block : segmented_blocks) {
@@ -93,10 +94,12 @@ TEST(Partitioning, ImplicitAutoConversionCorrectly) {
   inputs_map.insert({g->inputs()[0], {inputs[0]}});
   input_types.insert({g->inputs()[0], {{at::kFloat}}});
 
-  auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
-
+  partitioning_info.collection_input_spec_map = inputs_map;
   torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
-  torch_tensorrt::core::partitioning::partition(&ctx, input_ivalues_map);
+  ctx.input_types_map = input_types;
+
+  torch_tensorrt::core::partitioning::populateInputIValues(&ctx);
+  torch_tensorrt::core::partitioning::partition(&ctx);
   auto segmented_blocks = ctx.partitioned_blocks.begin()->second;
 
   for (auto& seg_block : segmented_blocks) {
