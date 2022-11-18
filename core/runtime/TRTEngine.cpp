@@ -52,7 +52,7 @@ TRTEngine::TRTEngine(
   auto most_compatible_device = get_most_compatible_device(cuda_device);
   TORCHTRT_CHECK(most_compatible_device, "No compatible device was found for instantiating TensorRT engine");
   device_info = most_compatible_device.value();
-  set_cuda_device(device_info);
+  set_rt_device(device_info);
 
   rt = make_trt(nvinfer1::createInferRuntime(util::logging::get_logger()));
 

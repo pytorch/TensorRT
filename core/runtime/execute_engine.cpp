@@ -60,7 +60,6 @@ RTDevice select_rt_device(const RTDevice& engine_device) {
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
   LOG_DEBUG("Attempting to run engine (ID: " << compiled_engine->name << ")");
-  // compiled_engine->debug = false;
 
   if (compiled_engine->profile_execution) {
     std::stringstream ss;
@@ -84,37 +83,40 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     RTDevice curr_device = get_current_device();
     LOG_DEBUG("Current Device: " << curr_device);
 
+    // Generic Target Device Prefix
+    std::string target_device = "cuda:";
+
     if (is_switch_required(curr_device, compiled_engine->device_info)) {
       // Scan through available CUDA devices and set the CUDA device context correctly
-      RTDevice device = select_cuda_device(compiled_engine->device_info);
+      RTDevice device = select_rt_device(compiled_engine->device_info);
       set_rt_device(device);
 
-      std::string target_device = "cuda:" + std::to_string(device.id);
+      // Target device is new device
+      target_device += std::to_string(device.id);
 
       for (auto& in : inputs) {
         in = in.to(torch::Device(target_device));
       }
+    } else {
+      // Target device is current device
+      target_device += std::to_string(curr_device.id);
     }
-  }
-  else {
-    // Target device is current device
-    target_device += std::to_string(curr_device.id);
-  }
 
-  // For each input, ensure its current device is the desired target device
-  for (size_t i = 0; i < inputs.size(); i++) {
-    at::Tensor* in = &inputs[i];
-    std::string current_tensor_device = in->device().str();
+    // For each input, ensure its current device is the desired target device
+    for (size_t i = 0; i < inputs.size(); i++) {
+      at::Tensor* in = &inputs[i];
+      std::string current_tensor_device = in->device().str();
 
-    // If current device string does not match target device, display warning and move tensor accordingly
-    if (current_tensor_device != target_device) {
-      LOG_WARNING(
-          "Input " << i << " of engine " << compiled_engine->name << " was found to be on " << current_tensor_device
-                   << " but should be on " << target_device << ". This tensor is being moved by the runtime but "
-                   << "for performance considerations, ensure your inputs are all on GPU "
-                   << "and open an issue here (https://github.com/pytorch/TensorRT/issues) if this "
-                   << "warning persists.");
-      *in = in->to(torch::Device(target_device));
+      // If current device string does not match target device, display warning and move tensor accordingly
+      if (current_tensor_device != target_device) {
+        LOG_WARNING(
+            "Input " << i << " of engine " << compiled_engine->name << " was found to be on " << current_tensor_device
+                     << " but should be on " << target_device << ". This tensor is being moved by the runtime but "
+                     << "for performance considerations, ensure your inputs are all on GPU "
+                     << "and open an issue here (https://github.com/pytorch/TensorRT/issues) if this "
+                     << "warning persists.");
+        *in = in->to(torch::Device(target_device));
+      }
     }
   }
 

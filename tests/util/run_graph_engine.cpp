@@ -56,7 +56,7 @@ std::vector<core::ir::Input> toInputsDynamic(std::vector<at::Tensor> ten, bool d
 
 std::vector<at::Tensor> RunEngine(std::string& eng, std::vector<at::Tensor> inputs) {
   LOG_DEBUG("Running TRT version");
-  auto cuda_device = core::runtime::CUDADevice(0, nvinfer1::DeviceType::kGPU);
+  auto cuda_device = core::runtime::RTDevice(0, nvinfer1::DeviceType::kGPU);
   auto engine_ptr = c10::make_intrusive<torch_tensorrt::core::runtime::TRTEngine>(
       "test_engine", eng, cuda_device, std::vector<std::string>(), std::vector<std::string>());
   auto outputs = torch_tensorrt::core::runtime::execute_engine(inputs, engine_ptr);

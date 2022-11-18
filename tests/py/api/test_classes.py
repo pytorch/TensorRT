@@ -224,7 +224,7 @@ class TestTRTModule(unittest.TestCase):
             mod, "forward", inputs=[torchtrt.Input((2, 10))]
         )
         return torchtrt.TRTModule(
-            engine_name="test_engine",
+            name="test",
             serialized_engine=test_mod_engine_str,
             input_binding_names=["input_0"],
             output_binding_names=["output_0"],
@@ -247,7 +247,7 @@ class TestTRTModule(unittest.TestCase):
         )
         with self.assertRaises(RuntimeError):
             torchtrt.TRTModule(
-                engine_name="test_engine",
+                name="test",
                 serialized_engine=test_mod_engine_str,
                 input_binding_names=["x.1"],
                 output_binding_names=["output_0"],
@@ -270,7 +270,7 @@ class TestTRTModule(unittest.TestCase):
         )
         with self.assertRaises(RuntimeError):
             torchtrt.TRTModule(
-                name="test_engine",
+                name="test",
                 serialized_engine=test_mod_engine_str,
                 input_binding_names=["input_0"],
                 output_binding_names=["z.1"],

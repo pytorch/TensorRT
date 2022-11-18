@@ -69,7 +69,7 @@ std::vector<RTDevice> find_compatible_devices(const RTDevice& target_device) {
   return compatible_devices;
 }
 
-void set_cuda_device(RTDevice& cuda_device) {
+void set_rt_device(RTDevice& cuda_device) {
   TORCHTRT_CHECK(
       (cudaSetDevice(cuda_device.id) == cudaSuccess), "Unable to set device: " << cuda_device << "as active device");
   LOG_DEBUG("Setting " << cuda_device << " as active device");

@@ -24,10 +24,6 @@ struct RTDevice {
   friend std::ostream& operator<<(std::ostream& os, const RTDevice& device);
 };
 
-void set_cuda_device(RTDevice& cuda_device);
-// Gets the current active GPU (DLA will not show up through this)
-RTDevice get_current_device();
-
 } // namespace runtime
 } // namespace core
 } // namespace torch_tensorrt
