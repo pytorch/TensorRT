@@ -100,8 +100,8 @@ class TRTSplitter(splitter_base._SplitterBase):
                 engine_str = engine_bytes.getvalue()
 
             return TRTModuleNext(
+                engine_str,
                 name=str(type(mod)),
-                serialized_engine=engine_str,
                 input_binding_names=interpreter_result.input_names,
                 output_binding_names=interpreter_result.output_names,
                 target_device=Device(f"cuda:{torch.cuda.current_device()}"),

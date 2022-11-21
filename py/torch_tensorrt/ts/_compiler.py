@@ -140,7 +140,7 @@ def compile(
 
 def convert_method_to_trt_engine(
     module: torch.jit.ScriptModule,
-    method_name: str,
+    method_name: str = "forward",
     inputs=[],
     device=Device._current_device(),
     disable_tf32=False,
@@ -290,7 +290,9 @@ def embed_engine_in_new_module(
     return torch.jit._recursive.wrap_cpp_module(cpp_mod)
 
 
-def check_method_op_support(module: torch.jit.ScriptModule, method_name: str) -> bool:
+def check_method_op_support(
+    module: torch.jit.ScriptModule, method_name: str = "forward"
+) -> bool:
     """Checks to see if a method is fully supported by torch_tensorrt
 
     Checks if a method of a TorchScript module can be compiled by torch_tensorrt, if not, a list of operators

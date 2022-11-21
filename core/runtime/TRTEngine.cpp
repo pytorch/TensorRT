@@ -145,6 +145,12 @@ TRTEngine::TRTEngine(
   LOG_DEBUG(*this);
 }
 
+TRTEngine::~TRTEngine() {
+  exec_ctx.reset();
+  cuda_engine.reset();
+  rt.reset();
+}
+
 void TRTEngine::disable_profiling() {
   torch::cuda::synchronize(device_info.id);
   profile_execution = false;

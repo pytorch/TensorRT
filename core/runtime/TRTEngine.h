@@ -33,7 +33,7 @@ struct TRTEngine : torch::CustomClassHolder {
   std::vector<std::string> in_binding_names = {}; // ITO: PYT IDX
   std::vector<std::string> out_binding_names = {}; // ITO: PYT IDX
 
-  ~TRTEngine() = default;
+  ~TRTEngine();
   TRTEngine(
       const std::string& serialized_engine,
       const RTDevice& cuda_device,

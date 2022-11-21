@@ -31,8 +31,8 @@ class TRTModuleNext(torch.nn.Module):
 
     def __init__(
         self,
+        serialized_engine: bytearray,
         name: str = "",
-        serialized_engine: bytearray = bytearray(),
         input_binding_names: List[str] = [],
         output_binding_names: List[str] = [],
         target_device: Device = Device._current_device(),
@@ -41,6 +41,11 @@ class TRTModuleNext(torch.nn.Module):
 
         Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it.
+
+        If binding names are not provided, it is assumed that the engine binding names follow the following convention:
+
+            - [symbol].[index in input / output array]
+                - ex. [x.0, x.1, x.2] -> [y.0]
 
         Args:
             name (str): Name for module
@@ -51,15 +56,15 @@ class TRTModuleNext(torch.nn.Module):
 
         Example:
 
-            ..code-block:: python
+            ..code-block:: py
 
                 with io.BytesIO() as engine_bytes:
                     engine_bytes.write(trt_engine.serialize())
                     engine_str = engine_bytes.getvalue()
 
                 trt_module = TRTModule(
-                    engine_name="my_engine",
-                    serialized_engine=engine_str,
+                    engine_str,
+                    engine_name="my_module",
                     input_names=["x"],
                     output_names=["output"],
                 )
@@ -69,6 +74,10 @@ class TRTModuleNext(torch.nn.Module):
             "TRTModuleNext should be considered experimental stability, APIs are subject to change. Note: TRTModuleNext only supports engines built with explict batch"
         )
         super(TRTModuleNext, self).__init__()
+
+        if not isinstance(serialized_engine, bytearray):
+            ValueError("Expected serialized engine as bytearray")
+
         self.input_binding_names = input_binding_names
         self.output_binding_names = output_binding_names
         self.name = name

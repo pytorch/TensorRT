@@ -185,8 +185,8 @@ def default_lower_pass(
                 engine_str = engine_bytes.getvalue()
 
             trt_module = TRTModuleNext(
+                engine_str,
                 name=module_name,
-                serialized_engine=engine_str,
                 input_binding_names=interp_res.input_names,
                 output_binding_names=interp_res.output_names,
                 target_device=Device(f"cuda:{torch.cuda.current_device()}"),
