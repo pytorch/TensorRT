@@ -508,9 +508,9 @@ commands:
   test-fx_converters:
     description: "Test the fx converters"
     steps:
-      - run: 
+      - run:
           name: Run FX converter tests
-          command: | 
+          command: |
             cd py/torch_tensorrt/fx/test
             pushd converters/
             pytest --junitxml=/tmp/artifacts/test_results/fx/converters/test_results.xml
@@ -520,13 +520,13 @@ commands:
           path: /tmp/artifacts
       - store_artifacts:
           path: /tmp/testlogs
-  
+
   test-fx_passes:
     description: "Test the fx passes"
     steps:
-      - run: 
+      - run:
           name: Run FX passes
-          command: | 
+          command: |
             cd py/torch_tensorrt/fx/test
             pushd passes
             list_passes=$(ls | grep -v test_setitem*)
@@ -536,13 +536,13 @@ commands:
           path: /tmp/artifacts
       - store_artifacts:
           path: /tmp/testlogs
-  
+
   test-fx_tools:
     description: "Test the fx tools"
     steps:
-      - run: 
+      - run:
           name: Run FX tools
-          command: | 
+          command: |
             cd py/torch_tensorrt/fx/test
             pushd tools
             pytest --junitxml=/tmp/artifacts/test_results/fx/tools/test_results.xml
@@ -551,13 +551,13 @@ commands:
           path: /tmp/artifacts
       - store_artifacts:
           path: /tmp/testlogs
-  
+
   test-fx_trt_lower:
     description: "Test the fx TRT lowering"
     steps:
-      - run: 
+      - run:
           name: Run FX TRT lowering
-          command: | 
+          command: |
             cd py/torch_tensorrt/fx/test
             pushd trt_lower
             pytest --junitxml=/tmp/artifacts/test_results/fx/trt_lower/test_results.xml
@@ -570,9 +570,9 @@ commands:
   test-fx_tracer:
     description: "Test the fx tracer"
     steps:
-      - run: 
+      - run:
           name: Run FX tracer
-          command: | 
+          command: |
             cd py/torch_tensorrt/fx/test
             pushd tracer
             list_tracer=$(ls | grep -v test_dispatch_*)
