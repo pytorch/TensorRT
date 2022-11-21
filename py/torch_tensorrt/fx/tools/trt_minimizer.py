@@ -48,10 +48,15 @@ def lower_mod_default(
 
 class TensorRTMinizerSetting(net_min_base._MinimizerSettingBase):
     def __init__(
-        self, explicit_batch_dimension: Any = True, use_experiemental_rt: bool = False
+        self, explicit_batch_dimension: Any = True, use_experimental_rt: bool = False
     ):
+        if use_experimental_rt and not explicit_batch_dimension:
+            raise ValueError(
+                "The experimental unifed runtime only supports explicit batch. Please make sure to set explicit_batch_dimension=True when use_experimental_rt=True"
+            )
+
         self.explicit_batch_dimension = explicit_batch_dimension
-        self.use_experimental_rt = use_experiemental_rt
+        self.use_experimental_rt = use_experimental_rt
         super(TensorRTMinizerSetting, self).__init__()
 
 

@@ -52,6 +52,11 @@ class TRTSplitterSetting(splitter_base._SplitterSettingBase):
         self.exclude_support_node_name: set = set()
         self.use_experimental_rt: bool = False
 
+        if self.use_experimental_rt and self.use_implicit_batch_dim:
+            raise ValueError(
+                "The experimental unifed runtime only supports explicit batch. Please make sure to set use_implicit_batch_dim=False when use_experimental_rt=True"
+            )
+
 
 class TRTSplitter(splitter_base._SplitterBase):
     def __init__(

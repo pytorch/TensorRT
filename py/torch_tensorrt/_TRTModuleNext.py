@@ -158,6 +158,8 @@ class TRTModuleNext(torch.nn.Module):
     def enable_profiling(self, profiling_results_dir: str = None):
         """Enable the profiler to collect latency information about the execution of the engine
 
+        Traces can be visualized using https://ui.perfetto.dev/ or compatible alternatives
+
         Keyword Arguments:
             profiling_results_dir (str): Absolute path to the directory to sort results of profiling.
         """
