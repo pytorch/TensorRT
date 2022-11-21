@@ -106,13 +106,14 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   // Github issue: https://github.com/pytorch/TensorRT/issues/1445
   bool is_kernel_size_one = true;
   bool is_3d_kernel = w.kernel_shape.nbDims == 3;
-  for (int64_t i=0; i < w.kernel_shape.nbDims; i++){
-    if (w.kernel_shape.d[i] != 1.0f){
+  for (int64_t i = 0; i < w.kernel_shape.nbDims; i++) {
+    if (w.kernel_shape.d[i] != 1.0f) {
       is_kernel_size_one = false;
     }
   }
   if (is_kernel_size_one && is_3d_kernel) {
-    LOG_WARNING("Conv3d layer with kernel size = 1 configuration incurs a failure with TensorRT tactic optimizer in some cases. \
+    LOG_WARNING(
+        "Conv3d layer with kernel size = 1 configuration incurs a failure with TensorRT tactic optimizer in some cases. \
     Github issue: https://github.com/pytorch/TensorRT/issues/1445. Other conv variants do not have this issue.");
   }
   auto dims = in->getDimensions();
