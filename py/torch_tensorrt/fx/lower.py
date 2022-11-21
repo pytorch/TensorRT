@@ -63,6 +63,11 @@ def compile(
     Returns:
         A torch.nn.Module lowered by TensorRT.
     """
+    if use_experimental_fx_rt and not explicit_batch_dimension:
+        raise ValueError(
+            "The experimental unifed runtime only supports explicit batch. Please make sure to set explicit_batch_dimension=True when use_experimental_fx_rt=True"
+        )
+
     lower_setting = LowerSetting(
         max_batch_size=max_batch_size,
         max_workspace_size=max_workspace_size,
@@ -172,7 +177,7 @@ def default_lower_pass(
         interp_res: TRTInterpreterResult = interpreter(mod, input, module_name)
         if lower_setting.use_experimental_rt:
             import io
-            from torch_tensorrt._TRTModule import TRTModule as TRTModuleNext
+            from torch_tensorrt._TRTModuleNext import TRTModuleNext
             from torch_tensorrt._Device import Device
 
             with io.BytesIO() as engine_bytes:

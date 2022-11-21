@@ -206,7 +206,7 @@ class TestInput(unittest.TestCase):
         self.assertTrue(self._verify_correctness(i, target))
 
 
-class TestTRTModule(unittest.TestCase):
+class TestTRTModuleNext(unittest.TestCase):
     @staticmethod
     def _get_trt_mod():
         class Test(torch.nn.Module):
@@ -223,7 +223,7 @@ class TestTRTModule(unittest.TestCase):
         test_mod_engine_str = torchtrt.ts.convert_method_to_trt_engine(
             mod, "forward", inputs=[torchtrt.Input((2, 10))]
         )
-        return torchtrt.TRTModule(
+        return torchtrt.TRTModuleNext(
             name="test",
             serialized_engine=test_mod_engine_str,
             input_binding_names=["input_0"],
@@ -246,7 +246,7 @@ class TestTRTModule(unittest.TestCase):
             mod, "forward", inputs=[torchtrt.Input((2, 10))]
         )
         with self.assertRaises(RuntimeError):
-            torchtrt.TRTModule(
+            torchtrt.TRTModuleNext(
                 name="test",
                 serialized_engine=test_mod_engine_str,
                 input_binding_names=["x.1"],
@@ -269,7 +269,7 @@ class TestTRTModule(unittest.TestCase):
             mod, "forward", inputs=[torchtrt.Input((2, 10))]
         )
         with self.assertRaises(RuntimeError):
-            torchtrt.TRTModule(
+            torchtrt.TRTModuleNext(
                 name="test",
                 serialized_engine=test_mod_engine_str,
                 input_binding_names=["input_0"],
@@ -277,7 +277,7 @@ class TestTRTModule(unittest.TestCase):
             )
 
     def test_set_get_profile_path_prefix(self):
-        trt_mod = TestTRTModule._get_trt_mod()
+        trt_mod = TestTRTModuleNext._get_trt_mod()
         trt_mod.engine.profile_path_prefix = "/tmp/"
         self.assertTrue(trt_mod.engine.profile_path_prefix == "/tmp/")
 
@@ -299,7 +299,7 @@ class TestTRTModule(unittest.TestCase):
 
         import json
 
-        trt_mod = TestTRTModule._get_trt_mod()
+        trt_mod = TestTRTModuleNext._get_trt_mod()
         trt_json = json.loads(trt_mod.get_layer_info())
         [self.assertTrue(k in trt_json.keys()) for k in ["Layers", "Bindings"]]
         self.assertTrue(len(trt_json["Layers"]) == 4)

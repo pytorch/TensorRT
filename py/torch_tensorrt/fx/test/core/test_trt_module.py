@@ -9,7 +9,7 @@ import torch.fx
 import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 from torch.testing._internal.common_utils import run_tests, TestCase
 from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter, TRTModule
-from torch_tensorrt import TRTModule as TRTModuleNext
+from torch_tensorrt import TRTModuleNext
 from torch_tensorrt import Device
 from torch_tensorrt.fx.utils import LowerPrecision
 
@@ -69,7 +69,11 @@ class TestTRTModuleNext(TestCase):
 
         mod = acc_tracer.trace(mod, inputs)
 
-        interp = TRTInterpreter(mod, input_specs=InputTensorSpec.from_tensors(inputs))
+        interp = TRTInterpreter(
+            mod,
+            input_specs=InputTensorSpec.from_tensors(inputs),
+            explicit_batch_dimension=True,
+        )
         interp_res = interp.run(lower_precision=LowerPrecision.FP32)
 
         with io.BytesIO() as engine_bytes:
@@ -105,7 +109,11 @@ class TestTRTModuleNext(TestCase):
         ref_output = mod(*inputs)
 
         mod = acc_tracer.trace(mod, inputs)
-        interp = TRTInterpreter(mod, input_specs=InputTensorSpec.from_tensors(inputs))
+        interp = TRTInterpreter(
+            mod,
+            input_specs=InputTensorSpec.from_tensors(inputs),
+            explicit_batch_dimension=True,
+        )
         interp_res = interp.run(lower_precision=LowerPrecision.FP32)
 
         with io.BytesIO() as engine_bytes:
@@ -121,7 +129,6 @@ class TestTRTModuleNext(TestCase):
         )
 
         st = trt_mod.state_dict()
-        print(st)
 
         new_trt_mod = TRTModuleNext()
         new_trt_mod.load_state_dict(st)

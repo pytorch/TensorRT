@@ -1,3 +1,4 @@
+import logging
 from operator import truediv
 from typing import Any, List, Sequence, Tuple
 
@@ -5,9 +6,11 @@ import torch
 from torch_tensorrt import _C
 from torch_tensorrt._Device import Device
 
+logger = logging.getLogger(__name__)
 
-class TRTModule(torch.nn.Module):
-    """TRTModule is a PyTorch module which encompasses an arbitrary TensorRT Engine.
+
+class TRTModuleNext(torch.nn.Module):
+    """TRTModuleNext is a PyTorch module which encompasses an arbitrary TensorRT Engine.
 
     This module is backed by the Torch-TensorRT runtime and is fully compatibile with both
     FX / Python deployments (just ``import torch_tensorrt`` as part of the application) as
@@ -16,6 +19,8 @@ class TRTModule(torch.nn.Module):
 
     The forward function is simpily forward(*args: torch.Tensor) -> Tuple[torch.Tensor] where
     the internal implementation is ``return Tuple(torch.ops.tensorrt.execute_engine(list(inputs), self.engine))``
+
+    > Note: TRTModuleNext only supports engines built with explict batch
 
     Attributes:
         name (str): Name of module (for easier debugging)
@@ -32,7 +37,7 @@ class TRTModule(torch.nn.Module):
         output_binding_names: List[str] = [],
         target_device: Device = Device._current_device(),
     ):
-        """__init__ method for torch_tensorrt.TRTModule
+        """__init__ method for torch_tensorrt.TRTModuleNext
 
         Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it.
@@ -46,7 +51,7 @@ class TRTModule(torch.nn.Module):
 
         Example:
 
-            ..code-block::python
+            ..code-block:: python
 
                 with io.BytesIO() as engine_bytes:
                     engine_bytes.write(trt_engine.serialize())
@@ -60,8 +65,10 @@ class TRTModule(torch.nn.Module):
                 )
 
         """
-
-        super(TRTModule, self).__init__()
+        logger.warning(
+            "TRTModuleNext should be considered experimental stability, APIs are subject to change. Note: TRTModuleNext only supports engines built with explict batch"
+        )
+        super(TRTModuleNext, self).__init__()
         self.input_binding_names = input_binding_names
         self.output_binding_names = output_binding_names
         self.name = name
@@ -73,8 +80,8 @@ class TRTModule(torch.nn.Module):
                     self.name + "_engine" if self.name != "" else "tensorrt_engine",
                     target_device._to_serialized_rt_device(),
                     serialized_engine,
-                    TRTModule._pack_binding_names(self.input_binding_names),
-                    TRTModule._pack_binding_names(self.output_binding_names),
+                    TRTModuleNext._pack_binding_names(self.input_binding_names),
+                    TRTModuleNext._pack_binding_names(self.output_binding_names),
                 ]
             )
         else:
@@ -138,7 +145,7 @@ class TRTModule(torch.nn.Module):
 
             non_tensors = [i[0] for i in filter(zip(inputs, types), is_non_tensor)]
             raise RuntimeError(
-                f"TRTModule expects a flattened list of tensors as input, found non tensors: {non_tensors}"
+                f"TRTModuleNext expects a flattened list of tensors as input, found non tensors: {non_tensors}"
             )
 
         outputs = torch.ops.tensorrt.execute_engine(list(inputs), self.engine)

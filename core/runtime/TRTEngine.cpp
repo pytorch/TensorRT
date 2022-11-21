@@ -145,47 +145,11 @@ TRTEngine::TRTEngine(
   LOG_DEBUG(*this);
 }
 
-void TRTEngine::verify_serialization_fmt(const std::vector<std::string>& serialized_info) {
-  TORCHTRT_CHECK(
-      serialized_info.size() == SERIALIZATION_LEN,
-      "Program to be deserialized targets an incompatible Torch-TensorRT ABI");
-  TORCHTRT_CHECK(
-      serialized_info[ABI_TARGET_IDX] == ABI_VERSION,
-      "Program to be deserialized targets a different Torch-TensorRT ABI Version ("
-          << serialized_info[ABI_TARGET_IDX] << ") than the Torch-TensorRT Runtime ABI Version (" << ABI_VERSION
-          << ")");
-}
-
-void TRTEngine::set_profiling_paths() {
-  device_profile_path =
-      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_device_config_profile.trace"}.string();
-  input_profile_path =
-      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_input_profile.trace"}.string();
-  output_profile_path =
-      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_output_profile.trace"}.string();
-  enqueue_profile_path =
-      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_enqueue_profile.trace"}.string();
-  trt_engine_profile_path =
-      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_engine_exectuion_profile.trace"}
-          .string();
-}
-
-void TRTEngine::enable_profiling() {
-  profile_execution = true;
-  trt_engine_profiler = std::make_unique<TRTEngineProfiler>(name);
-  exec_ctx->setProfiler(trt_engine_profiler.get());
-}
-
 void TRTEngine::disable_profiling() {
   torch::cuda::synchronize(device_info.id);
   profile_execution = false;
   exec_ctx = make_trt(cuda_engine->createExecutionContext());
   TORCHTRT_CHECK((exec_ctx.get() != nullptr), "Unable to recreate TensorRT execution context");
-}
-
-std::string TRTEngine::get_engine_layer_info() {
-  auto inspector = cuda_engine->createEngineInspector();
-  return inspector->getEngineInformation(nvinfer1::LayerInformationFormat::kJSON);
 }
 
 void TRTEngine::dump_engine_layer_info_to_file(const std::string& path) {
@@ -203,13 +167,29 @@ void TRTEngine::dump_engine_layer_info() {
   return;
 }
 
-TRTEngine& TRTEngine::operator=(const TRTEngine& other) {
-  rt = other.rt;
-  cuda_engine = other.cuda_engine;
-  device_info = other.device_info;
-  exec_ctx = other.exec_ctx;
-  num_io = other.num_io;
-  return (*this);
+void TRTEngine::enable_profiling() {
+  profile_execution = true;
+  trt_engine_profiler = std::make_unique<TRTEngineProfiler>(name);
+  exec_ctx->setProfiler(trt_engine_profiler.get());
+}
+
+std::string TRTEngine::get_engine_layer_info() {
+  auto inspector = cuda_engine->createEngineInspector();
+  return inspector->getEngineInformation(nvinfer1::LayerInformationFormat::kJSON);
+}
+
+void TRTEngine::set_profiling_paths() {
+  device_profile_path =
+      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_device_config_profile.trace"}.string();
+  input_profile_path =
+      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_input_profile.trace"}.string();
+  output_profile_path =
+      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_output_profile.trace"}.string();
+  enqueue_profile_path =
+      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_enqueue_profile.trace"}.string();
+  trt_engine_profile_path =
+      std::experimental::filesystem::path{profile_path_prefix + "/" + name + "_engine_exectuion_profile.trace"}
+          .string();
 }
 
 std::string TRTEngine::to_str() const {
@@ -244,6 +224,26 @@ std::string TRTEngine::to_str() const {
 std::ostream& operator<<(std::ostream& os, const TRTEngine& engine) {
   os << engine.to_str();
   return os;
+}
+
+TRTEngine& TRTEngine::operator=(const TRTEngine& other) {
+  rt = other.rt;
+  cuda_engine = other.cuda_engine;
+  device_info = other.device_info;
+  exec_ctx = other.exec_ctx;
+  num_io = other.num_io;
+  return (*this);
+}
+
+void TRTEngine::verify_serialization_fmt(const std::vector<std::string>& serialized_info) {
+  TORCHTRT_CHECK(
+      serialized_info.size() == SERIALIZATION_LEN,
+      "Program to be deserialized targets an incompatible Torch-TensorRT ABI");
+  TORCHTRT_CHECK(
+      serialized_info[ABI_TARGET_IDX] == ABI_VERSION,
+      "Program to be deserialized targets a different Torch-TensorRT ABI Version ("
+          << serialized_info[ABI_TARGET_IDX] << ") than the Torch-TensorRT Runtime ABI Version (" << ABI_VERSION
+          << ")");
 }
 
 } // namespace runtime

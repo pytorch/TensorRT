@@ -87,7 +87,7 @@ class TRTSplitter(splitter_base._SplitterBase):
         interpreter_result = interp.run(*inputs)
         if self.settings.use_experimental_rt:
             import io
-            from torch_tensorrt._TRTModule import TRTModule as TRTModuleNext
+            from torch_tensorrt._TRTModuleNext import TRTModuleNext
             from torch_tensorrt._Device import Device
 
             with io.BytesIO() as engine_bytes:

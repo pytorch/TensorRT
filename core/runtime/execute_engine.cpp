@@ -70,7 +70,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     ss << "  Output packing profile: " << compiled_engine->output_profile_path << std::endl;
     ss << "  TRT enqueue profile: " << compiled_engine->enqueue_profile_path << std::endl;
     ss << "  Engine execution profile: " << compiled_engine->trt_engine_profile_path << std::endl;
-    LOG_INFO(ss.str());
+    auto log_info = ss.str();
+    LOG_INFO("" << log_info);
   }
 
   {
@@ -191,6 +192,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     if (compiled_engine->profile_execution) {
       LOG_INFO(std::endl << *trt_engine_profiler);
       dump_trace(compiled_engine->trt_engine_profile_path, *trt_engine_profiler);
+      compiled_engine->dump_engine_layer_info();
     }
   }
 
