@@ -90,6 +90,7 @@ from torch_tensorrt._enums import *
 from torch_tensorrt import logging
 from torch_tensorrt._Input import Input
 from torch_tensorrt._Device import Device
+from torch_tensorrt._TRTModuleNext import TRTModuleNext
 
 from torch_tensorrt import fx
 

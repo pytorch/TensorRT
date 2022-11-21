@@ -159,6 +159,7 @@ cc_test(
 
 cc_test(
     name = "test_compiled_modules",
+    timeout = "long",
     srcs = ["test_compiled_modules.cpp"],
     data = [
         "//tests/modules:jit_models",
