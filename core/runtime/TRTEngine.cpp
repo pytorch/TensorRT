@@ -85,11 +85,9 @@ TRTEngine::TRTEngine(
 
     if (cuda_engine->getTensorIOMode(bind_name.c_str()) == nvinfer1::TensorIOMode::kINPUT) {
       inputs++;
-      in_binding_map[x] = idx;
       LOG_DEBUG("TRT Binding: " << x << ": PYT Input: " << idx);
     } else {
       outputs++;
-      out_binding_map[x] = idx;
       LOG_DEBUG("TRT Binding: " << x << ": PYT Output: " << idx);
     }
   }
@@ -97,13 +95,12 @@ TRTEngine::TRTEngine(
   num_io = std::make_pair(inputs, outputs);
   in_binding_names.resize(inputs);
   out_binding_names.resize(outputs);
-
   for (int64_t x = 0; x < cuda_engine->getNbIOTensors(); x++) {
     std::string bind_name = cuda_engine->getIOTensorName(x);
     if (cuda_engine->getTensorIOMode(bind_name.c_str()) == nvinfer1::TensorIOMode::kINPUT) {
-      in_binding_names[in_binding_map.at(x)] = bind_name;
+      in_binding_names.push_back(bind_name);
     } else {
-      out_binding_names[out_binding_map.at(x)] = bind_name;
+      out_binding_names.push_back(bind_name);
     }
   }
   //   } else {
@@ -140,15 +137,19 @@ TRTEngine::TRTEngine(
   // >>>>>>> master
   //     }
   num_io = std::make_pair(inputs, outputs);
+#ifndef NDEBUG
+  this->enable_profiling();
+#endif
   // }
-
   LOG_DEBUG(*this);
+
 }
 
 TRTEngine::~TRTEngine() {
+  rt.reset();
+  trt_engine_profiler.reset();
   exec_ctx.reset();
   cuda_engine.reset();
-  rt.reset();
 }
 
 void TRTEngine::disable_profiling() {
@@ -159,7 +160,7 @@ void TRTEngine::disable_profiling() {
 }
 
 void TRTEngine::dump_engine_layer_info_to_file(const std::string& path) {
-  auto inspector = cuda_engine->createEngineInspector();
+  auto inspector = make_trt(cuda_engine->createEngineInspector());
   std::ofstream f(path);
   f << std::string(inspector->getEngineInformation(nvinfer1::LayerInformationFormat::kJSON));
   f.close();

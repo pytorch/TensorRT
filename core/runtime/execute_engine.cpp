@@ -128,21 +128,20 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
           std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
     }
     for (size_t i = 0; i < inputs.size(); i++) {
-      uint64_t pyt_idx = compiled_engine->in_binding_map[i];
-      const char* name = compiled_engine->exec_ctx->getEngine().getIOTensorName(i);
+      std::string name = compiled_engine->exec_ctx->getEngine().getIOTensorName(i);
       TORCHTRT_CHECK(
-          inputs[pyt_idx].is_cuda(),
-          "Expected input tensors to have device cuda, found device " << inputs[pyt_idx].device());
+          inputs[i].is_cuda(),
+          "Expected input tensors to have device cuda, found device " << inputs[i].device());
       auto expected_type =
-          util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name));
+          util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
       TORCHTRT_CHECK(
-          inputs[pyt_idx].dtype() == expected_type,
-          "Expected input tensors to have type " << expected_type << ", found type " << inputs[pyt_idx].dtype());
-      auto dims = core::util::toDimsPad(inputs[pyt_idx].sizes(), 1);
+          inputs[i].dtype() == expected_type,
+          "Expected input tensors to have type " << expected_type << ", found type " << inputs[i].dtype());
+      auto dims = core::util::toDimsPad(inputs[i].sizes(), 1);
       auto shape = core::util::toVec(dims);
       LOG_DEBUG("Input Name: " << name << " Shape: " << dims);
-      compiled_engine->exec_ctx->setInputShape(name, dims);
-      compiled_engine->exec_ctx->setTensorAddress(name, inputs[pyt_idx].view(shape).contiguous().data_ptr());
+      compiled_engine->exec_ctx->setInputShape(name.c_str(), dims);
+      compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputs[i].view(shape).contiguous().data_ptr());
     }
 
     TORCHTRT_CHECK(
@@ -158,37 +157,31 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     }
 
     for (size_t o = inputs.size(); o < (compiled_engine->num_io.first + compiled_engine->num_io.second); o++) {
-      uint64_t pyt_idx = compiled_engine->out_binding_map[o];
-      const char* name = compiled_engine->exec_ctx->getEngine().getIOTensorName(o);
-      auto out_shape = compiled_engine->exec_ctx->getTensorShape(name);
+      uint64_t pyt_idx = o - inputs.size();
+      std::string name = compiled_engine->exec_ctx->getEngine().getIOTensorName(o);
+      auto out_shape = compiled_engine->exec_ctx->getTensorShape(name.c_str());
       LOG_DEBUG("Output Name: " << name << " Shape: " << out_shape);
       auto dims = core::util::toVec(out_shape);
-      auto type = util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name));
+      auto type = util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
       outputs[pyt_idx] = std::move(at::empty(dims, {at::kCUDA}).to(type).contiguous());
-      compiled_engine->exec_ctx->setTensorAddress(name, outputs[pyt_idx].data_ptr());
+      compiled_engine->exec_ctx->setTensorAddress(name.c_str(), outputs[pyt_idx].data_ptr());
     }
   }
-
+  
   {
     std::unique_ptr<torch::autograd::profiler::RecordProfile> enqueue_profiler_guard;
     if (compiled_engine->profile_execution) {
       enqueue_profiler_guard =
           std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->enqueue_profile_path);
     }
-
     c10::cuda::CUDAStream stream = c10::cuda::getCurrentCUDAStream(inputs[0].device().index());
 
     // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
     std::unique_lock<std::mutex> lock(compiled_engine->mu);
-    std::unique_ptr<TRTEngineProfiler> trt_engine_profiler;
-    if (compiled_engine->profile_execution) {
-      trt_engine_profiler = std::make_unique<TRTEngineProfiler>(compiled_engine->name);
-      compiled_engine->exec_ctx->setProfiler(trt_engine_profiler.get());
-    }
     compiled_engine->exec_ctx->enqueueV3(stream);
     if (compiled_engine->profile_execution) {
-      LOG_INFO(std::endl << *trt_engine_profiler);
-      dump_trace(compiled_engine->trt_engine_profile_path, *trt_engine_profiler);
+      LOG_INFO(std::endl << *compiled_engine->trt_engine_profiler);
+      dump_trace(compiled_engine->trt_engine_profile_path, *compiled_engine->trt_engine_profiler);
       compiled_engine->dump_engine_layer_info();
     }
   }
