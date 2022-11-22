@@ -140,7 +140,7 @@ def compile(
 
 def convert_method_to_trt_engine(
     module: torch.jit.ScriptModule,
-    method_name: str,
+    method_name: str = "forward",
     inputs=[],
     device=Device._current_device(),
     disable_tf32=False,
@@ -156,7 +156,7 @@ def convert_method_to_trt_engine(
     dla_global_dram_size=536870912,
     truncate_long_and_double=False,
     calibrator=None,
-) -> str:
+) -> bytearray:
     """Convert a TorchScript module method to a serialized TensorRT engine
 
     Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings
@@ -216,7 +216,7 @@ def convert_method_to_trt_engine(
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
 
     Returns:
-        bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
+        bytearray: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
     if isinstance(module, torch.jit.ScriptFunction):
         raise TypeError(
@@ -238,13 +238,24 @@ def convert_method_to_trt_engine(
         "truncate_long_and_double": truncate_long_and_double,
     }
 
-    return _C.convert_graph_to_trt_engine(
+    engine_str = _C.convert_graph_to_trt_engine(
         module._c, method_name, _parse_compile_spec(compile_spec)
     )
 
+    import io
+
+    with io.BytesIO() as engine_bytes:
+        engine_bytes.write(engine_str)
+        engine_bytearray = engine_bytes.getvalue()
+
+    return engine_bytearray
+
 
 def embed_engine_in_new_module(
-    serialized_engine: bytes, device=Device._current_device()
+    serialized_engine: bytes,
+    device: Device = Device._current_device(),
+    input_binding_names: List[str] = [],
+    output_binding_names: List[str] = [],
 ) -> torch.jit.ScriptModule:
     """Takes a pre-built serialized TensorRT engine and embeds it within a TorchScript module
 
@@ -253,7 +264,7 @@ def embed_engine_in_new_module(
 
         forward(Tensor[]) -> Tensor[]
 
-    TensorRT bindings must have names with the following format:
+    TensorRT bindings either be explicitly specified using ``[in/out]put_binding_names`` or have names with the following format:
       - [symbol].[index in input / output array]
       ex.
       - [x.0, x.1, x.2] -> [y.0]
@@ -265,15 +276,23 @@ def embed_engine_in_new_module(
 
     Keyword Arguments:
         device (Union(torch_tensorrt.Device, torch.device, dict)): Target device to run engine on. Must be compatible with engine provided. Default: Current active device
-
+        input_binding_names (List[str]): List of names of TensorRT bindings in order to be passed to the encompassing PyTorch module
+        output_binding_names (List[str]): List of names of TensorRT bindings in order that should be returned from the encompassing PyTorch module
     Returns:
         torch.jit.ScriptModule: New TorchScript module with engine embedded
     """
-    cpp_mod = _C.embed_engine_in_new_module(serialized_engine, _parse_device(device))
+    cpp_mod = _C.embed_engine_in_new_module(
+        serialized_engine,
+        _parse_device(device),
+        input_binding_names,
+        output_binding_names,
+    )
     return torch.jit._recursive.wrap_cpp_module(cpp_mod)
 
 
-def check_method_op_support(module: torch.jit.ScriptModule, method_name: str) -> bool:
+def check_method_op_support(
+    module: torch.jit.ScriptModule, method_name: str = "forward"
+) -> bool:
     """Checks to see if a method is fully supported by torch_tensorrt
 
     Checks if a method of a TorchScript module can be compiled by torch_tensorrt, if not, a list of operators

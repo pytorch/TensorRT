@@ -9,19 +9,12 @@
 #include "torch/csrc/jit/ir/ir.h"
 
 #include <cuda_runtime.h>
+#include "core/ir/ir.h"
 #include "core/util/prelude.h"
 
 namespace torch_tensorrt {
 namespace core {
 namespace conversion {
-
-struct Device {
-  nvinfer1::DeviceType device_type;
-  int64_t gpu_id;
-  int64_t dla_core;
-  bool allow_gpu_fallback;
-  Device() : device_type(nvinfer1::DeviceType::kGPU), gpu_id(0), dla_core(0), allow_gpu_fallback(false) {}
-};
 
 struct BuilderSettings {
   std::set<nvinfer1::DataType> enabled_precisions = {};
@@ -30,7 +23,7 @@ struct BuilderSettings {
   bool refit = false;
   bool debug = false;
   bool truncate_long_and_double = false;
-  Device device;
+  ir::Device device;
   nvinfer1::EngineCapability capability = TRT_ENGINE_CAPABILITY_STANDARD;
   nvinfer1::IInt8Calibrator* calibrator = nullptr;
   uint64_t num_avg_timing_iters = 1;

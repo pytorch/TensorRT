@@ -156,6 +156,38 @@ nvinfer1::ILayer* add_elementwise(
   return ele;
 }
 
+nvinfer1::ITensor* add_abs(
+    ConversionCtx* ctx,
+    const torch::jit::Node* n,
+    nvinfer1::ITensor* self,
+    const std::string& name) {
+  nvinfer1::ILayer* absolute_value_layer;
+
+  // Check if TRT Unary ops support the input type
+  bool unary_supported_input = (self->getType() == nvinfer1::DataType::kFLOAT) ||
+      (self->getType() == nvinfer1::DataType::kHALF) || (self->getType() == nvinfer1::DataType::kINT8);
+  if (unary_supported_input) {
+    absolute_value_layer = ctx->net->addUnary(*self, nvinfer1::UnaryOperation::kABS);
+    TORCHTRT_CHECK(absolute_value_layer, "Unable to create abs layer from node: " << *n);
+    absolute_value_layer->setName(name.c_str());
+  } else {
+    LOG_GRAPH(
+        "Tensor is of unsupported type "
+        << self->getType() << " for IUnaryLayer::kABS. Using backup implementation via IElementWise (max(x, -x)");
+    // For types not supported by kABS, use an elementwise implementation abs(x) = max(x, -1 * x)
+    at::Tensor neg_one = torch::full({1}, -1).to(util::TRTDataTypeToScalarType(self->getType()));
+    auto neg_one_const = tensor_to_const(ctx, neg_one);
+    auto neg_layer = add_elementwise(
+        ctx, nvinfer1::ElementWiseOperation::kPROD, self, neg_one_const, util::node_info(n) + std::string("_Negation"));
+    TORCHTRT_CHECK(neg_layer, "Unable to create prod layer from node: " << *n);
+    absolute_value_layer =
+        add_elementwise(ctx, nvinfer1::ElementWiseOperation::kMAX, self, neg_layer->getOutput(0), name);
+    TORCHTRT_CHECK(absolute_value_layer, "Unable to create max layer from node: " << *n);
+  }
+
+  return absolute_value_layer->getOutput(0);
+}
+
 nvinfer1::ITensor* applyIdentityOp(ConversionCtx* ctx, nvinfer1::ITensor* tensor, const std::string& tensor_name) {
   auto id_layer = ctx->net->addIdentity(*tensor);
   auto id_out_tensor = id_layer->getOutput(0);

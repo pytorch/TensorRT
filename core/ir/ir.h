@@ -11,6 +11,20 @@ namespace torch_tensorrt {
 namespace core {
 namespace ir {
 
+enum class ShapeMode {
+  kMIN,
+  kOPT,
+  kMAX,
+};
+
+struct Device {
+  nvinfer1::DeviceType device_type;
+  int64_t gpu_id;
+  int64_t dla_core;
+  bool allow_gpu_fallback;
+  Device() : device_type(nvinfer1::DeviceType::kGPU), gpu_id(0), dla_core(0), allow_gpu_fallback(false) {}
+};
+
 struct Input : torch::CustomClassHolder {
   Input(){};
   Input(

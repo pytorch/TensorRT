@@ -1,3 +1,4 @@
+import io
 import logging
 import tempfile
 from functools import wraps
@@ -233,15 +234,23 @@ def log_before_after(pass_: PassFunc) -> PassFunc:
     def pass_with_before_after_log(
         module: fx.GraphModule, input: Input
     ) -> fx.GraphModule:
+        before_io = io.StringIO()
+        after_io = io.StringIO()
         with tempfile.NamedTemporaryFile(
             mode="w",
             encoding="utf-8",
             delete=False,
         ) as f:
-            _LOGGER.info(f"== Log pass {pass_} before/after graph to {f.name}")
             print(f"[{pass_}] Before:\n{module.graph}", file=f)
+            print(module.graph, file=before_io)
+
             module = pass_(module, input)
             print(f"[{pass_}] After:\n{module.graph}", file=f)
+            print(module.graph, file=after_io)
+            t = before_io.getvalue() == after_io.getvalue()
+            _LOGGER.info(
+                f"== Log pass {pass_} before/after graph to {f.name}, before/after are the same = {t}"
+            )
             return module
 
     return pass_with_before_after_log

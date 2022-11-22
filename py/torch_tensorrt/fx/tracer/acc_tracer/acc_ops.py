@@ -582,7 +582,9 @@ def stack_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
 
 @register_acc_op_properties(AccOpProperty.pointwise)
 @register_acc_op_mapping(op_and_target=("call_function", torch.clamp))
+@register_acc_op_mapping(op_and_target=("call_function", torch.clip))
 @register_acc_op_mapping(op_and_target=("call_method", "clamp"))
+@register_acc_op_mapping(op_and_target=("call_method", "clip"))
 @register_acc_op
 def clamp(*, input, min=None, max=None):
     return torch.clamp(input=input, min=min, max=max)
@@ -817,6 +819,10 @@ def matmul(*, input, other):
 )
 @register_custom_acc_mapper_fn(
     op_and_target=("call_method", "detach"), arg_replacement_tuples=[("input", "input")]
+)
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_function", torch.detach),
+    arg_replacement_tuples=[("input", "input")],
 )
 def dropout_mapper(node: torch.fx.Node, mod: nn.Module):
     """

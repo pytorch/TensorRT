@@ -2,6 +2,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import division
 
+import time
 import timeit
 import numpy as np
 import torch.backends.cudnn as cudnn
@@ -103,7 +104,10 @@ def run_torch_tensorrt(
     if precision == "int8":
         compile_settings.update({"calib": params.get("calibration_cache")})
 
+    start_compile = time.time_ns()
     model = torchtrt.compile(model, **compile_settings)
+    end_compile = time.time_ns()
+    compile_time_ms = (end_compile - start_compile) / 1e6
 
     iters = params.get("iterations", 20)
     # Warm up
@@ -123,7 +127,7 @@ def run_torch_tensorrt(
             meas_time = end_time - start_time
             timings.append(meas_time)
 
-    recordStats("Torch-TensorRT", timings, precision, batch_size)
+    recordStats("Torch-TensorRT", timings, precision, batch_size, compile_time_ms)
 
 
 # Runs inference using FX2TRT backend
@@ -136,6 +140,7 @@ def run_fx2trt(model, input_tensors, params, precision, batch_size):
         model.half()
         input_tensors = [tensor.half() for tensor in input_tensors]
     # Run lowering eager mode benchmark
+    start_compile = time.time_ns()
     model = compile(
         model,
         input_tensors,
@@ -143,6 +148,8 @@ def run_fx2trt(model, input_tensors, params, precision, batch_size):
         lower_precision=precision,
         verbose_log=False,
     )
+    end_compile = time.time_ns()
+    compile_time_ms = (end_compile - start_compile) / 1e6
 
     iters = params.get("iterations", 20)
     # Warm up
@@ -162,7 +169,7 @@ def run_fx2trt(model, input_tensors, params, precision, batch_size):
             meas_time = end_time - start_time
             timings.append(meas_time)
 
-    recordStats("FX-TensorRT", timings, precision, batch_size)
+    recordStats("FX-TensorRT", timings, precision, batch_size, compile_time_ms)
 
 
 def torch_dtype_from_trt(dtype):
@@ -331,7 +338,7 @@ def run(
 
 
 # Generate report
-def recordStats(backend, timings, precision, batch_size=1):
+def recordStats(backend, timings, precision, batch_size=1, compile_time_ms=None):
     times = np.array(timings)
     steps = len(times)
     speeds = batch_size / times
@@ -350,6 +357,7 @@ def recordStats(backend, timings, precision, batch_size=1):
         "Mean(FPS)": speed_mean,
         "Median-Latency(ms)": time_med * 1000,
         "Mean-Latency(ms)": time_mean * 1000,
+        "Compile Time(ms)": compile_time_ms,
     }
     results.append(stats)
 
