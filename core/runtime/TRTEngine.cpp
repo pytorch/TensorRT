@@ -142,10 +142,14 @@ TRTEngine::TRTEngine(
     num_io = std::make_pair(inputs, outputs);
   }
 
+  #ifndef NDEBUG
+    this->enable_profiling();
+  #endif
   LOG_DEBUG(*this);
 }
 
 TRTEngine::~TRTEngine() {
+  trt_engine_profiler.reset();
   exec_ctx.reset();
   cuda_engine.reset();
   rt.reset();
@@ -154,6 +158,7 @@ TRTEngine::~TRTEngine() {
 void TRTEngine::disable_profiling() {
   torch::cuda::synchronize(device_info.id);
   profile_execution = false;
+  trt_engine_profiler.reset();
   exec_ctx = make_trt(cuda_engine->createExecutionContext());
   TORCHTRT_CHECK((exec_ctx.get() != nullptr), "Unable to recreate TensorRT execution context");
 }

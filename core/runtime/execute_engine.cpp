@@ -171,7 +171,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       gpu_handles.push_back(outputs[pyt_idx].data_ptr());
     }
   }
-
+  std::cout << "========== 3 ===============" << std::endl;
   {
     std::unique_ptr<torch::autograd::profiler::RecordProfile> enqueue_profiler_guard;
     if (compiled_engine->profile_execution) {
@@ -183,19 +183,19 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
     // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
     std::unique_lock<std::mutex> lock(compiled_engine->mu);
-    std::unique_ptr<TRTEngineProfiler> trt_engine_profiler;
-    if (compiled_engine->profile_execution) {
-      trt_engine_profiler = std::make_unique<TRTEngineProfiler>(compiled_engine->name);
-      compiled_engine->exec_ctx->setProfiler(trt_engine_profiler.get());
-    }
+    // std::unique_ptr<TRTEngineProfiler> trt_engine_profiler;
+    // if (compiled_engine->profile_execution) {
+    //   trt_engine_profiler = std::make_unique<TRTEngineProfiler>(compiled_engine->name);
+    //   compiled_engine->exec_ctx->setProfiler(trt_engine_profiler.get());
+    // }
     compiled_engine->exec_ctx->enqueueV2(gpu_handles.data(), stream, nullptr);
     if (compiled_engine->profile_execution) {
-      LOG_INFO(std::endl << *trt_engine_profiler);
-      dump_trace(compiled_engine->trt_engine_profile_path, *trt_engine_profiler);
+      LOG_INFO(std::endl << *compiled_engine->trt_engine_profiler);
+      dump_trace(compiled_engine->trt_engine_profile_path, *compiled_engine->trt_engine_profiler);
       compiled_engine->dump_engine_layer_info();
     }
   }
-
+  std::cout << "========== 4 ===============" << std::endl;
   return outputs;
 }
 
