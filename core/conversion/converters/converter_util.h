@@ -35,11 +35,19 @@ nvinfer1::ITensor* addUnpadding(
     bool trailing = true,
     bool use_zeros = true);
 
+// TODO: Change add_elementwise schema to output nvinfer1::ITensor* instead of nvinfer1::ILayer*,
+// for consistency with other utils. Need to change schema and usage in all calling contexts
 nvinfer1::ILayer* add_elementwise(
     ConversionCtx* ctx,
     nvinfer1::ElementWiseOperation op,
     nvinfer1::ITensor* self,
     nvinfer1::ITensor* other,
+    const std::string& name);
+
+nvinfer1::ITensor* add_abs(
+    ConversionCtx* ctx,
+    const torch::jit::Node* n,
+    nvinfer1::ITensor* self,
     const std::string& name);
 
 // Apply an identity operation on a tensor. Used in the case where an input is an output to a network.

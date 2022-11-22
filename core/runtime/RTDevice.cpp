@@ -11,10 +11,10 @@ const std::string DEVICE_INFO_DELIM = "%";
 
 typedef enum { ID_IDX = 0, SM_MAJOR_IDX, SM_MINOR_IDX, DEVICE_TYPE_IDX, DEVICE_NAME_IDX } SerializedDeviceInfoIndex;
 
-CudaDevice::CudaDevice() : id{-1}, major{-1}, minor{-1}, device_type{nvinfer1::DeviceType::kGPU} {}
+RTDevice::RTDevice() : id{-1}, major{-1}, minor{-1}, device_type{nvinfer1::DeviceType::kGPU} {}
 
-CudaDevice::CudaDevice(int64_t gpu_id, nvinfer1::DeviceType device_type) {
-  CudaDevice cuda_device;
+RTDevice::RTDevice(int64_t gpu_id, nvinfer1::DeviceType device_type) {
+  RTDevice cuda_device;
   cudaDeviceProp device_prop;
 
   // Device ID
@@ -41,7 +41,7 @@ CudaDevice::CudaDevice(int64_t gpu_id, nvinfer1::DeviceType device_type) {
 // NOTE: Serialization Format for Device Info:
 // id%major%minor%(enum)device_type%device_name
 
-CudaDevice::CudaDevice(std::string device_info) {
+RTDevice::RTDevice(std::string device_info) {
   LOG_DEBUG("Deserializing Device Info: " << device_info);
 
   std::vector<std::string> tokens;
@@ -66,7 +66,7 @@ CudaDevice::CudaDevice(std::string device_info) {
   LOG_DEBUG("Deserialized Device Info: " << *this);
 }
 
-CudaDevice& CudaDevice::operator=(const CudaDevice& other) {
+RTDevice& RTDevice::operator=(const RTDevice& other) {
   id = other.id;
   major = other.major;
   minor = other.minor;
@@ -75,7 +75,7 @@ CudaDevice& CudaDevice::operator=(const CudaDevice& other) {
   return (*this);
 }
 
-std::string CudaDevice::serialize() {
+std::string RTDevice::serialize() {
   std::vector<std::string> content;
   content.resize(DEVICE_NAME_IDX + 1);
 
@@ -98,13 +98,13 @@ std::string CudaDevice::serialize() {
   return serialized_device_info;
 }
 
-std::string CudaDevice::getSMCapability() const {
+std::string RTDevice::getSMCapability() const {
   std::stringstream ss;
   ss << major << "." << minor;
   return ss.str();
 }
 
-std::ostream& operator<<(std::ostream& os, const CudaDevice& device) {
+std::ostream& operator<<(std::ostream& os, const RTDevice& device) {
   os << "Device(ID: " << device.id << ", Name: " << device.device_name << ", SM Capability: " << device.major << '.'
      << device.minor << ", Type: " << device.device_type << ')';
   return os;

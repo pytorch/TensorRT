@@ -4,6 +4,7 @@
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
+#include "torch/torch.h"
 
 void pointwise_test_helper(
     std::string graph_ir,
@@ -233,6 +234,29 @@ TEST(Converters, ATenDivRoundingNoneConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4}, true);
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3}, true);
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3}, true);
+}
+
+TEST(Converters, ATenDivRoundingTruncWithIntsConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %trunc : str = prim::Constant[value="trunc"]()
+        %out : Tensor = aten::div(%0, %1, %trunc)
+        return (%out))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  // Avoid divide-by-zero issues by making denominator >= 1
+  auto in_0 = at::randint(-5, 5, {4, 1, 7, 8}, {at::kCUDA}).to(torch::kInt32);
+  auto in_1 = at::randint(1, 10, {4, 1, 7, 8}, {at::kCUDA}).to(torch::kInt32);
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in_0, in_1});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in_0, in_1});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::exactlyEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
 TEST(Converters, ATenPowTensorConvertsCorrectly) {
