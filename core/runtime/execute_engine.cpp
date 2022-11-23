@@ -130,8 +130,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     for (size_t i = 0; i < inputs.size(); i++) {
       std::string name = compiled_engine->exec_ctx->getEngine().getIOTensorName(i);
       TORCHTRT_CHECK(
-          inputs[i].is_cuda(),
-          "Expected input tensors to have device cuda, found device " << inputs[i].device());
+          inputs[i].is_cuda(), "Expected input tensors to have device cuda, found device " << inputs[i].device());
       auto expected_type =
           util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
       TORCHTRT_CHECK(
@@ -168,7 +167,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     }
   }
 <<<<<<< HEAD
-  
+
 =======
 >>>>>>> master
   {

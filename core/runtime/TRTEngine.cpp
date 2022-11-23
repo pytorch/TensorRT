@@ -110,12 +110,13 @@ TRTEngine::TRTEngine(
       auto binding_name = _in_binding_names[pyt_idx];
       // auto trt_idx = cuda_engine->getBindingIndex(binding_name.c_str());
       std::string engine_binded_name = cuda_engine->getIOTensorName(pyt_idx);
-      TORCHTRT_CHECK((binding_name == engine_binded_name), "Could not find a TensorRT engine binding for input named " << binding_name);
+      TORCHTRT_CHECK(
+          (binding_name == engine_binded_name),
+          "Could not find a TensorRT engine binding for input named " << binding_name);
       TORCHTRT_CHECK(
           (cuda_engine->getTensorIOMode(binding_name.c_str()) == nvinfer1::TensorIOMode::kINPUT),
           "Binding " << binding_name << " specified as input but found as output in TensorRT engine");
-      LOG_DEBUG(
-          "Input binding name: " << binding_name << "pyt arg idx: " << pyt_idx << ")");
+      LOG_DEBUG("Input binding name: " << binding_name << "pyt arg idx: " << pyt_idx << ")");
       // in_binding_map[trt_idx] = pyt_idx;
       in_binding_names[pyt_idx] = _in_binding_names[pyt_idx];
     }
@@ -126,23 +127,23 @@ TRTEngine::TRTEngine(
       auto binding_name = _out_binding_names[pyt_idx];
       // auto trt_idx = cuda_engine->getBindingIndex(binding_name.c_str());
       std::string engine_binded_name = cuda_engine->getIOTensorName(inputs_size + pyt_idx);
-      TORCHTRT_CHECK((binding_name == engine_binded_name), "Could not find a TensorRT engine binding for output named " << binding_name);
+      TORCHTRT_CHECK(
+          (binding_name == engine_binded_name),
+          "Could not find a TensorRT engine binding for output named " << binding_name);
       TORCHTRT_CHECK(
           !(cuda_engine->getTensorIOMode(binding_name.c_str()) == nvinfer1::TensorIOMode::kINPUT),
           "Binding " << binding_name << " specified as output but found as input in TensorRT engine");
-      LOG_DEBUG(
-          "Output binding name: " << binding_name << "pyt return idx: " << inputs_size + pyt_idx << ")");
+      LOG_DEBUG("Output binding name: " << binding_name << "pyt return idx: " << inputs_size + pyt_idx << ")");
       // out_binding_map[trt_idx] = pyt_idx;
       out_binding_names[pyt_idx] = binding_name;
     }
     num_io = std::make_pair(inputs_size, outputs);
-    }
-    
+  }
+
 #ifndef NDEBUG
   this->enable_profiling();
 #endif
   LOG_DEBUG(*this);
-
 }
 
 TRTEngine::~TRTEngine() {
