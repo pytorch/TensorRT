@@ -68,8 +68,8 @@ TRTEngine::TRTEngine(
     uint64_t inputs = 0;
     uint64_t outputs = 0;
 
-    for (int64_t x = 0; x < cuda_engine->getNbIOTensors(); x++) {
-      std::string bind_name = cuda_engine->getIOTensorName(x);
+    for (int64_t trt_idx = 0; trt_idx < cuda_engine->getNbIOTensors(); trt_idx++) {
+      std::string bind_name = cuda_engine->getIOTensorName(trt_idx);
       LOG_DEBUG("Binding name: " << bind_name);
       auto delim = bind_name.find(".");
       if (delim == std::string::npos) {
@@ -81,14 +81,16 @@ TRTEngine::TRTEngine(
                 << "\nEnsure module was compiled with Torch-TensorRT.ts or follows Torch-TensorRT Runtime conventions");
       }
       std::string idx_s = bind_name.substr(delim + 1);
-      uint64_t idx = static_cast<uint64_t>(std::stoi(idx_s));
+      uint64_t pyt_idx = static_cast<uint64_t>(std::stoi(idx_s));
 
       if (cuda_engine->getTensorIOMode(bind_name.c_str()) == nvinfer1::TensorIOMode::kINPUT) {
         inputs++;
-        LOG_DEBUG("TRT Binding: " << x << ": PYT Input: " << idx);
+        in_binding_map[trt_idx] = pyt_idx;
+        LOG_DEBUG("TRT Binding index: " << trt_idx << "corresponds to PYT Input index: " << pyt_idx);
       } else {
         outputs++;
-        LOG_DEBUG("TRT Binding: " << x << ": PYT Output: " << idx);
+        out_binding_map[trt_idx] = pyt_idx;
+        LOG_DEBUG("TRT Binding index: " << trt_idx << "corresponds to PYT Output: " << pyt_idx);
       }
     }
 
@@ -108,7 +110,7 @@ TRTEngine::TRTEngine(
     in_binding_names.resize(inputs_size);
     for (size_t pyt_idx = 0; pyt_idx < inputs_size; pyt_idx++) {
       auto binding_name = _in_binding_names[pyt_idx];
-      // auto trt_idx = cuda_engine->getBindingIndex(binding_name.c_str());
+      auto trt_idx = cuda_engine->getBindingIndex(binding_name.c_str());
       std::string engine_binded_name = cuda_engine->getIOTensorName(pyt_idx);
       TORCHTRT_CHECK(
           (binding_name == engine_binded_name),
@@ -117,7 +119,7 @@ TRTEngine::TRTEngine(
           (cuda_engine->getTensorIOMode(binding_name.c_str()) == nvinfer1::TensorIOMode::kINPUT),
           "Binding " << binding_name << " specified as input but found as output in TensorRT engine");
       LOG_DEBUG("Input binding name: " << binding_name << "pyt arg idx: " << pyt_idx << ")");
-      // in_binding_map[trt_idx] = pyt_idx;
+      in_binding_map[trt_idx] = pyt_idx;
       in_binding_names[pyt_idx] = _in_binding_names[pyt_idx];
     }
 
@@ -125,7 +127,7 @@ TRTEngine::TRTEngine(
     out_binding_names.resize(outputs);
     for (size_t pyt_idx = 0; pyt_idx < outputs; pyt_idx++) {
       auto binding_name = _out_binding_names[pyt_idx];
-      // auto trt_idx = cuda_engine->getBindingIndex(binding_name.c_str());
+      auto trt_idx = cuda_engine->getBindingIndex(binding_name.c_str());
       std::string engine_binded_name = cuda_engine->getIOTensorName(inputs_size + pyt_idx);
       TORCHTRT_CHECK(
           (binding_name == engine_binded_name),
@@ -134,7 +136,7 @@ TRTEngine::TRTEngine(
           !(cuda_engine->getTensorIOMode(binding_name.c_str()) == nvinfer1::TensorIOMode::kINPUT),
           "Binding " << binding_name << " specified as output but found as input in TensorRT engine");
       LOG_DEBUG("Output binding name: " << binding_name << "pyt return idx: " << inputs_size + pyt_idx << ")");
-      // out_binding_map[trt_idx] = pyt_idx;
+      out_binding_map[trt_idx] = pyt_idx;
       out_binding_names[pyt_idx] = binding_name;
     }
     num_io = std::make_pair(inputs_size, outputs);

@@ -156,7 +156,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     }
 
     for (size_t o = inputs.size(); o < (compiled_engine->num_io.first + compiled_engine->num_io.second); o++) {
-      uint64_t pyt_idx = o - inputs.size();
+      uint64_t pyt_idx = compiled_engine->out_binding_map[o];
       std::string name = compiled_engine->exec_ctx->getEngine().getIOTensorName(o);
       auto out_shape = compiled_engine->exec_ctx->getTensorShape(name.c_str());
       LOG_DEBUG("Output Name: " << name << " Shape: " << out_shape);
