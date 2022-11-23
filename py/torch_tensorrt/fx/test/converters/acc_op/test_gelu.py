@@ -57,6 +57,39 @@ class TestGELU(AccTestCase):
             TestModule(), input_specs, expected_ops={acc_ops.gelu}
         )
 
+    def test_gelu_module(self):
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.gelu = torch.nn.GELU()
+
+            def forward(self, x):
+                return self.gelu(x)
+
+        inputs = [torch.randn(3, 10, 20)]
+        self.run_test(
+            TestModule(),
+            inputs,
+            expected_ops={acc_ops.gelu},
+            test_implicit_batch_dim=False,
+        )
+
+    def test_gelu_module_throw(self):
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.gelu = torch.nn.GELU(approximate="tanh")
+
+            def forward(self, x):
+                return self.gelu(x)
+
+        inputs = [torch.randn(3, 10, 20)]
+        self.run_test_with_assert_error(
+            TestModule(),
+            inputs,
+            expect_error=RuntimeError,
+        )
+
 
 if __name__ == "__main__":
     run_tests()

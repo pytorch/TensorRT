@@ -31,6 +31,7 @@ Input = Sequence[Any]
 def compile(
     module: nn.Module,
     input,
+    min_acc_module_size: int = 10,
     max_batch_size: int = 2048,
     max_workspace_size=1 << 25,
     explicit_batch_dimension=False,
@@ -51,6 +52,7 @@ def compile(
         module: Original module for lowering.
         input: Input for module.
         max_batch_size: Maximum batch size (must be >= 1 to be set, 0 means not set)
+        min_acc_module_size: Minimal number of nodes for an accelerated submodule
         max_workspace_size: Maximum size of workspace given to TensorRT.
         explicit_batch_dimension: Use explicit batch dimension in TensorRT if set True, otherwise use implicit batch dimension.
         lower_precision: lower_precision config given to TRTModule.
@@ -70,6 +72,7 @@ def compile(
 
     lower_setting = LowerSetting(
         max_batch_size=max_batch_size,
+        min_acc_module_size=min_acc_module_size,
         max_workspace_size=max_workspace_size,
         explicit_batch_dimension=explicit_batch_dimension,
         lower_precision=lower_precision,
@@ -268,6 +271,7 @@ class Lowerer:
         module: nn.Module,
         inputs: Input,
         additional_inputs: Optional[Input] = None,
+        fp16_conversion_fn: Optional[Callable[[Input], Input]] = None,
     ) -> nn.Module:
         lower_setting = self.lower_pass_manager_builder.lower_setting
         atol = lower_setting.correctness_atol
@@ -284,9 +288,26 @@ class Lowerer:
                 == LowerPrecision.FP16
             ):
                 module.half()
-                inputs = tuple(
-                    x.half() if x is not None and x.dtype == torch.float32 else x
-                    for x in inputs
+                # A custom conversion function can be passed to the lowerer to
+                # handle inputs with custom types. By default, just handle
+                # tensors and NoneType.
+                if fp16_conversion_fn is None:
+                    conversion_fn = (
+                        lambda x: x.half()
+                        if x is not None and x.dtype == torch.float32
+                        else x
+                    )
+                else:
+                    conversion_fn = fp16_conversion_fn
+
+                inputs = tuple(conversion_fn(x) for x in inputs)
+            if lower_setting.is_aten:
+                pm = self.lower_pass_manager_builder.build_aten2trt_lower_pipeline(
+                    inputs, additional_inputs
+                )
+            else:
+                pm = self.lower_pass_manager_builder.build_trt_lower_pipeline(
+                    inputs, additional_inputs
                 )
             if lower_setting.is_aten:
                 pm = self.lower_pass_manager_builder.build_aten2trt_lower_pipeline(

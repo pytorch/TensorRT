@@ -287,6 +287,7 @@ class AccRewritingTracer(Tracer):
         torch.nn.intrinsic.quantized.ConvReLU2d,
         jit.ScriptModule,
         jit.RecursiveScriptModule,
+        torch.nn.modules.activation.MultiheadAttention,
     }
 
     def is_leaf_module(self, m: nn.Module, mod_qual_name: str) -> bool:
