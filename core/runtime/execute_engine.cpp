@@ -166,10 +166,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       compiled_engine->exec_ctx->setTensorAddress(name.c_str(), outputs[pyt_idx].data_ptr());
     }
   }
-<<<<<<< HEAD
 
-=======
->>>>>>> master
   {
     std::unique_ptr<torch::autograd::profiler::RecordProfile> enqueue_profiler_guard;
     if (compiled_engine->profile_execution) {
@@ -180,11 +177,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
     // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
     std::unique_lock<std::mutex> lock(compiled_engine->mu);
-<<<<<<< HEAD
     compiled_engine->exec_ctx->enqueueV3(stream);
-=======
-    compiled_engine->exec_ctx->enqueueV2(gpu_handles.data(), stream, nullptr);
->>>>>>> master
     if (compiled_engine->profile_execution) {
       LOG_INFO(std::endl << *compiled_engine->trt_engine_profiler);
       dump_trace(compiled_engine->trt_engine_profile_path, *compiled_engine->trt_engine_profiler);
