@@ -24,7 +24,7 @@ target_sources(${lib_name}
 
 target_link_libraries(${lib_name}
     PUBLIC
-        torch
+        "${TORCH_LIBRARIES}"
         TensorRT::nvinfer
         core
 )
@@ -71,7 +71,7 @@ target_sources(${torchtrt_lib_name}
 target_link_libraries(${torchtrt_lib_name}
     PUBLIC
         TensorRT::TensorRT
-        torch
+        "${TORCH_LIBRARIES}"
     PRIVATE
         torch_tensorrt
         core
@@ -111,7 +111,7 @@ target_sources(${runtime_lib_name}
 target_link_libraries(${runtime_lib_name}
     PUBLIC
         TensorRT::TensorRT
-        torch
+        "${TORCH_LIBRARIES}"
     PRIVATE
         core_runtime
         core_plugins
