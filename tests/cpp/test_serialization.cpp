@@ -15,7 +15,7 @@ std::vector<torch_tensorrt::Input> toInputRangesDynamic(std::vector<std::vector<
     a.push_back(torch_tensorrt::Input(min_range, opt, max_range));
   }
 
-  return std::move(a);
+  return a;
 }
 
 TEST_P(CppAPITests, SerializedModuleIsStillCorrect) {
