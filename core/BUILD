@@ -33,8 +33,8 @@ cc_library(
         "//core/util/logging",
         "@tensorrt//:nvinfer",
     ] + select({
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch", "@libtorch_pre_cxx11_abi//:c10_cuda"],
-        "//conditions:default": ["@libtorch//:libtorch", "@libtorch//:c10_cuda"],
+        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@libtorch//:libtorch"],
     }),
     alwayslink = True,
 )
