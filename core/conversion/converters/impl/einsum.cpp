@@ -12,7 +12,7 @@ namespace impl {
 namespace {
 
 auto einsum_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
-    {"aten::einsum(str equation, Tensor[] tensors,  *, int[]? path=None) -> (Tensor)",
+    {"aten::einsum(str equation, Tensor[] tensors, *, int[]? path=None) -> (Tensor)",
      [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        // Extract equation and list of tensors
        auto equation = args[0].unwrapToString();
