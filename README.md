@@ -1,6 +1,7 @@
 # Torch-TensorRT
 
 [![Documentation](https://img.shields.io/badge/docs-master-brightgreen)](https://nvidia.github.io/Torch-TensorRT/)
+[![CircleCI](https://circleci.com/gh/pytorch/TensorRT.svg?style=svg)](https://app.circleci.com/pipelines/github/https://circleci.com/gh/pytorch/TensorRT)
 
 > Ahead of Time (AOT) compiling for PyTorch JIT and FX
 
