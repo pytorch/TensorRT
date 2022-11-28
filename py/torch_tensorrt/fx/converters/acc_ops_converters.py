@@ -2854,8 +2854,12 @@ def add_clamp(network, input, val, op, name):
     else:
         acc_ops_clamp_shape = (1,) * len(input.shape)  # broadcast all dimensions
         acc_ops_clamp_tensor = (
-            val
-            * torch.ones(acc_ops_clamp_shape, dtype=torch_dtype_from_trt(input.dtype))
+            (
+                val
+                * torch.ones(
+                    acc_ops_clamp_shape, dtype=torch_dtype_from_trt(input.dtype)
+                )
+            )
             .cpu()
             .numpy()
         )

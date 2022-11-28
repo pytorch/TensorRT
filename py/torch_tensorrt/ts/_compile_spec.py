@@ -210,7 +210,7 @@ def _parse_input_signature(input_signature: Any):
         input_signature, torch.Tensor
     ):
         i = (
-            Input._from_tensor(input_signature)
+            Input.from_tensor(input_signature)
             if isinstance(input_signature, torch.Tensor)
             else input_signature
         )
@@ -243,7 +243,7 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
             )
 
         inputs = [
-            Input._from_tensor(i) if isinstance(i, torch.Tensor) else i
+            Input.from_tensor(i) if isinstance(i, torch.Tensor) else i
             for i in compile_spec["inputs"]
         ]
         info.inputs = [i._to_internal() for i in inputs]

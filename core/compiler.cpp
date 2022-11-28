@@ -31,11 +31,17 @@ void AddEngineToGraph(
     torch::jit::script::Module mod,
     std::shared_ptr<torch::jit::Graph>& g,
     const std::string& serialized_engine,
-    runtime::CudaDevice& device_info,
+    runtime::RTDevice& device_info,
+    const std::vector<std::string>& input_binding_names,
+    const std::vector<std::string>& output_binding_names,
     std::string engine_id = "",
     bool fallback = false) {
   auto engine_ptr = c10::make_intrusive<runtime::TRTEngine>(
-      mod._ivalue()->name() + "_engine_" + engine_id, serialized_engine, device_info);
+      mod._ivalue()->name() + "_engine_" + engine_id,
+      serialized_engine,
+      device_info,
+      input_binding_names,
+      output_binding_names);
   // Get required metadata about the engine out
   auto num_io = engine_ptr->num_io;
   auto name = engine_ptr->name;
@@ -137,10 +143,13 @@ partitioning::GraphAndMapping BuildHybridGraph(
   auto partitioning_info = cfg.partitioning_info;
 
   auto partitioning_ctx = partitioning::PartitioningCtx(block, partitioning_info);
-  auto collection_input_ivalues_map =
-      partitioning::generateRandomInputs(partitioning_info.collection_input_spec_map, first_use_types);
+  partitioning_ctx.input_types_map = first_use_types;
 
-  partitioning::partition(&partitioning_ctx, collection_input_ivalues_map);
+  // Generate a dictionary of input torch::jit::Value's to their min, opt, max tensors and store in ctx
+  // TODO: Combine this within partition call
+  partitioning::populateInputIValues(&partitioning_ctx);
+
+  partitioning::partition(&partitioning_ctx);
 
   for (auto& partitioned_block : partitioning_ctx.partitioned_blocks) {
     partitioning::PartitionedGraph& segmented_blocks = partitioned_block.second;
@@ -151,14 +160,7 @@ partitioning::GraphAndMapping BuildHybridGraph(
       trt_engine_id << reinterpret_cast<const int*>(&seg_block);
 
       if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
-        auto shapes = seg_block.in_shapes();
-        auto types = seg_block.in_types();
-        std::vector<ir::Input> inputs;
-        for (size_t i = 0; i < shapes.size(); i++) {
-          auto in = ir::Input(shapes[i]);
-          in.dtype = util::ScalarTypeToTRTDataType(types[i]);
-          inputs.push_back(in);
-        }
+        auto inputs = seg_block.construct_inputs_spec();
         // update the input ranges for each segments
         convert_info.inputs = ir::associate_specs_with_inputs(seg_block.g(), inputs, static_params);
 
@@ -166,8 +168,16 @@ partitioning::GraphAndMapping BuildHybridGraph(
         auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_info, static_params);
         auto temp_g = std::make_shared<torch::jit::Graph>();
         auto device_spec = convert_info.engine_settings.device;
-        auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
-        AddEngineToGraph(new_mod, temp_g, engine, cuda_device, trt_engine_id.str(), true);
+        auto cuda_device = runtime::RTDevice(device_spec.gpu_id, device_spec.device_type);
+        AddEngineToGraph(
+            new_mod,
+            temp_g,
+            engine,
+            cuda_device,
+            std::vector<std::string>(),
+            std::vector<std::string>(),
+            trt_engine_id.str(),
+            true);
 
         seg_block.update_graph(temp_g);
       }
@@ -283,7 +293,7 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
   torch::jit::Module new_mod(mod._ivalue()->name() + "_trt");
 
   auto device_spec = cfg.convert_info.engine_settings.device;
-  auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
+  auto cuda_device = runtime::RTDevice(device_spec.gpu_id, device_spec.device_type);
 
   for (const torch::jit::Method& method : mod.get_methods()) {
     if (method.name().compare("forward") == 0) {
@@ -331,7 +341,7 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
             "Not all operations in graph are supported by the compiler");
         // TODO find the right
         auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
-        AddEngineToGraph(new_mod, new_g, engine, cuda_device);
+        AddEngineToGraph(new_mod, new_g, engine, cuda_device, std::vector<std::string>(), std::vector<std::string>());
       }
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
       auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
@@ -342,12 +352,16 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
   return new_mod;
 }
 
-torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine, runtime::CudaDevice cuda_device) {
+torch::jit::script::Module EmbedEngineInNewModule(
+    const std::string& engine,
+    runtime::RTDevice cuda_device,
+    const std::vector<std::string>& input_binding_names,
+    const std::vector<std::string>& output_binding_names) {
   std::ostringstream engine_id;
   engine_id << reinterpret_cast<const int*>(&engine);
   torch::jit::script::Module new_mod("tensorrt_engine_mod_" + engine_id.str());
   auto new_g = std::make_shared<torch::jit::Graph>();
-  AddEngineToGraph(new_mod, new_g, engine, cuda_device);
+  AddEngineToGraph(new_mod, new_g, engine, cuda_device, input_binding_names, output_binding_names);
   auto new_method = new_mod._ivalue()->compilation_unit()->create_function("forward", new_g);
   auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
   new_mod.type()->addMethod(new_method);

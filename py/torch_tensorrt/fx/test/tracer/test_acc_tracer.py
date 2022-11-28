@@ -2566,6 +2566,31 @@ class AccTracerTest(unittest.TestCase):
                 # Make sure we didn't convert to the acc version
                 self.assertEqual(node.target, operator.getitem)
 
+    def test_detach(self):
+        class TestModule(nn.Module):
+            def forward(self, x: torch.Tensor) -> torch.Tensor:
+                return torch.detach(x)
+
+        m = TestModule()
+        sample_inputs = [torch.randn(8)]
+        traced = acc_tracer.trace(m, sample_inputs)
+
+        placeholder = output = None
+        for node in traced.graph.nodes:
+            if node.op == "placeholder":
+                assert placeholder is None
+                placeholder = node
+            elif node.op == "output":
+                assert output is None
+                output = node
+            else:
+                raise RuntimeError(f"Unexpected Node {node.format_node()}")
+
+        self.assertIsNotNone(placeholder)
+        self.assertIsNotNone(output)
+
+        self.assertTrue(torch.equal(m(*sample_inputs), traced(*sample_inputs)))
+
     def test_all_acc_ops_registered(self):
         self.assertEqual(
             acc_normalizer._acc_ops,

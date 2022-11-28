@@ -9,7 +9,6 @@
 
 "component: build system":
   - "narendasan"
-  - "andi4191"
 
 "component: conversion":
   - "narendasan"
@@ -29,7 +28,6 @@
   - "peri044"
 
 "component: execution":
-  - "andi4191"
   - "narendasan"
 
 "component: lowering":
@@ -48,15 +46,12 @@
   - "peri044"
 
 "component: runtime":
-  - "andi4191"
   - "narendasan"
 
 "component: tests":
-  - "andi4191"
   - "narendasan"
 
 "component: torchtrtc":
-  - "andi4191"
   - "narendasan"
 
 "component: dependencies":
@@ -74,16 +69,13 @@
   - "tanayvarshney"
 
 "infrastructre":
-  - "andi4191"
   - "narendasan"
 
 "component: packaging":
   - "narendasan"
-  - "andi4191"
   - "peri044"
 
 "channel: NGC":
-  - "andi4191"
   - "peri044"
 
 "channel: linux-x86":
@@ -91,7 +83,6 @@
   - "peri044"
 
 "channel: linux-sbsa":
-  - "andi4191"
   - "bowang007"
 
 "channel: windows":
@@ -102,16 +93,13 @@
   - "bowang007"
 
 "component: tooling":
-  - "andi4191"
   - "narendasan"
 
 "performance":
-  - "andi4191"
   - "peri044"
   - "bowang007"
 
 "channel: docker":
-  - "andi4191"
   - "narendasan"
 
 "ux":

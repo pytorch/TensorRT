@@ -75,3 +75,132 @@ ATEN_INTERPOLATE_TESTS(
               %5 : Tensor = aten::norm(%x.1, %3, %2, %4)
               return (%5))IR",
     std::vector<int64_t>({3, 4, 3}));
+
+TEST(Converters, ATenFrobeniusNorm) {
+  const auto graph = R"IR(
+      graph(%x : Tensor):
+        %0 : int = prim::Constant[value=0]()
+        %keep : bool = prim::Constant[value=0]()
+        %dims : int[] = prim::ListConstruct(%0)
+        %out : Tensor = aten::frobenius_norm(%x, %dims, %keep)
+        return (%out))IR";
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto x = at::randn({5, 5, 5}, {at::kCUDA});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {x});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {x});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
+}
+
+TEST(Converters, ATenFrobeniusNormKeep) {
+  const auto graph = R"IR(
+      graph(%x : Tensor):
+        %1 : int = prim::Constant[value=-1]()
+        %keep : bool = prim::Constant[value=1]()
+        %dims : int[] = prim::ListConstruct(%1)
+        %out : Tensor = aten::frobenius_norm(%x, %dims, %keep)
+        return (%out))IR";
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto x = at::randn({5, 5, 5}, {at::kCUDA});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {x});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {x});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
+}
+
+TEST(Converters, ATenFrobeniusNormMatrix) {
+  const auto graph = R"IR(
+      graph(%x : Tensor):
+        %0 : int = prim::Constant[value=0]()
+        %1 : int = prim::Constant[value=-1]()
+        %keep : bool = prim::Constant[value=0]()
+        %dims : int[] = prim::ListConstruct(%0, %1)
+        %out : Tensor = aten::frobenius_norm(%x, %dims, %keep)
+        return (%out))IR";
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto x = at::randn({3, 5, 7, 11, 13}, {at::kCUDA});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {x});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {x});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
+}
+
+TEST(Converters, ATenLinAlgNorm_None) {
+  const auto graph = R"IR(
+    graph(%x : Tensor):
+      %none : NoneType = prim::Constant()
+      %keep : bool = prim::Constant[value=0]()
+      %out : Tensor = aten::linalg_norm(%x, %none, %none, %keep, %none)
+      return (%out))IR";
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+  auto x = at::randn({5, 5, 5}, {at::kCUDA});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {x});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {x});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
+}
+
+TEST(Converters, ATenLinAlgNorm_1D) {
+  const auto graph = R"IR(
+    graph(%x : Tensor):
+      %1 : int = prim::Constant[value=1]()
+      %none : NoneType = prim::Constant()
+      %keep : bool = prim::Constant[value=0]()
+      %dims : int[] = prim::ListConstruct(%1)
+      %out : Tensor = aten::linalg_norm(%x, %none, %dims, %keep, %none)
+      return (%out))IR";
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto x = at::randn({5, 5, 5}, {at::kCUDA});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {x});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {x});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
+}
+
+TEST(Converters, ATenLinAlgNorm_2D) {
+  const auto graph = R"IR(
+    graph(%x : Tensor):
+      %0 : int = prim::Constant[value=0]()
+      %1 : int = prim::Constant[value=-1]()
+      %none : NoneType = prim::Constant()
+      %keep : bool = prim::Constant[value=1]()
+      %dims : int[] = prim::ListConstruct(%0, %1)
+      %float : int = prim::Constant[value=6]()
+      %out : Tensor = aten::linalg_norm(%x, %none, %dims, %keep, %float)
+      return (%out))IR";
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto x = at::randn({5, 5, 5}, {at::kCUDA}).to(at::kHalf);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {x});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {x});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
+}

@@ -299,7 +299,7 @@ int main(int argc, char** argv) {
   }
 
   std::vector<torchtrt::Input> ranges;
-  for (const auto spec : args::get(input_shapes)) {
+  for (const auto& spec : args::get(input_shapes)) {
     ranges.push_back(torchtrtc::parserutil::parse_input(spec));
     std::stringstream ss;
     ss << "Parsed Input: " << ranges.back();
@@ -343,17 +343,17 @@ int main(int argc, char** argv) {
 
     compile_settings.min_block_size = min_block_size;
 
-    for (const auto _op : args::get(torch_executed_ops)) {
+    for (const auto& _op : args::get(torch_executed_ops)) {
       compile_settings.torch_executed_ops.push_back(_op);
     }
 
-    for (const auto _mod : args::get(torch_executed_mods)) {
+    for (const auto& _mod : args::get(torch_executed_mods)) {
       compile_settings.torch_executed_modules.push_back(_mod);
     }
   }
 
   if (enabled_precisions) {
-    for (const auto precision : args::get(enabled_precisions)) {
+    for (const auto& precision : args::get(enabled_precisions)) {
       auto dtype = torchtrtc::parserutil::parse_dtype(precision);
       if (dtype == torchtrt::DataType::kFloat) {
         compile_settings.enabled_precisions.insert(torch::kF32);

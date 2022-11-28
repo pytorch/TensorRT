@@ -162,7 +162,7 @@ class ProxytensorTracerTest(unittest.TestCase):
         inputs = [torch.ones(32, 3, 224, 224)]
         inputs = [i.cuda().half() for i in inputs]
         torchdynamo.reset()
-        dynamo_aten_mod = torchdynamo.optimize(backends.fx2trt_aten_compiler_fp16)(mod)
+        dynamo_aten_mod = torchdynamo.optimize(backends.fx2trt_compiler_fp16)(mod)
         dynamo_aten_output = dynamo_aten_mod(*inputs)
 
         torchdynamo.reset()
