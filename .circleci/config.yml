@@ -946,7 +946,7 @@ parameters:
   # Nightly platform config
   torch-build:
     type: string
-    default: "1.14.0.dev20221117+cu116"
+    default: "1.13.0.dev20220921+cu116"
   torch-build-index:
     type: string
     default: "https://download.pytorch.org/whl/nightly/cu116"
