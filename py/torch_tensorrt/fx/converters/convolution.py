@@ -144,12 +144,14 @@ def conv3d(network, submod, args, kwargs, layer_name):
     kernel_size_one = True
     if len(kernel.shape) == 5:
         for filter_size in kernel.shape[2:]:
-            if filter_size !=1:
+            if filter_size != 1:
                 kernel_size_one = False
     if kernel_size_one:
-        warnings.warn("Conv3d layer with kernel size = 1 configuration incurs a failure with TensorRT tactic optimizer in some cases. \
-        Github issue: https://github.com/pytorch/TensorRT/issues/1445. Other conv variants do not have this issue.")
-        
+        warnings.warn(
+            "Conv3d layer with kernel size = 1 configuration incurs a failure with TensorRT tactic optimizer in some cases. \
+        Github issue: https://github.com/pytorch/TensorRT/issues/1445. Other conv variants do not have this issue."
+        )
+
     if not isinstance(input_val, trt.tensorrt.ITensor):
         raise RuntimeError(
             f"Conv3d received input {input_val} that is not part "

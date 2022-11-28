@@ -142,9 +142,9 @@ TRTEngine::TRTEngine(
     num_io = std::make_pair(inputs, outputs);
   }
 
-  #ifndef NDEBUG
-    this->enable_profiling();
-  #endif
+#ifndef NDEBUG
+  this->enable_profiling();
+#endif
   LOG_DEBUG(*this);
 }
 
