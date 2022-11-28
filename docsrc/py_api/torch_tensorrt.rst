@@ -37,6 +37,10 @@ Classes
    :members:
    :special-members: __init__
 
+.. autoclass:: TRTModuleNext
+   :members:
+   :special-members: __init__
+
 Enums
 -------
 

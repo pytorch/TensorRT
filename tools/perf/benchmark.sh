@@ -62,3 +62,11 @@ do
                      --truncate \
                      --report "bert_base_perf_bs${bs}.txt"
 done
+
+# Collect and concatenate all results
+echo "Concatenating all results"
+(echo "Output of All Model Runs"; echo) >> all_outputs.txt;
+
+for i in $(ls *_bs*.txt);
+  do (echo $i; cat $i; echo; echo) >> all_outputs.txt;
+done

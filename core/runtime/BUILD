@@ -13,15 +13,22 @@ config_setting(
 cc_library(
     name = "runtime",
     srcs = [
-        "CudaDevice.cpp",
         "DeviceList.cpp",
+        "RTDevice.cpp",
         "TRTEngine.cpp",
+        "TRTEngineProfiler.cpp",
         "execute_engine.cpp",
         "register_jit_hooks.cpp",
         "runtime.cpp",
     ],
     hdrs = [
+        "RTDevice.h",
+        "TRTEngine.h",
+        "TRTEngineProfiler.h",
         "runtime.h",
+    ],
+    linkopts = [
+        "-lstdc++fs",
     ],
     deps = [
         "@tensorrt//:nvinfer",
@@ -36,6 +43,11 @@ cc_library(
 
 pkg_tar(
     name = "include",
-    srcs = ["runtime.h"],
+    srcs = [
+        "RTDevice.h",
+        "TRTEngine.h",
+        "TRTEngineProfiler.h",
+        "runtime.h",
+    ],
     package_dir = "core/runtime/",
 )

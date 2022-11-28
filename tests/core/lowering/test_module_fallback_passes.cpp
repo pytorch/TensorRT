@@ -126,3 +126,17 @@ TEST(Lowering, LowerAndPartitionSimpleModuleFallbackCorrectly) {
   auto trt_results = trt_mod.forward(trt_inputs_ivalues).toTensor();
   ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(jit_results, trt_results, 0.99));
 }
+
+TEST(Lowering, UnmangleClsName) {
+  EXPECT_EQ(
+      "foo.Bar", torch_tensorrt::core::lowering::passes::unmangle_cls_name("__torch__.foo.___torch_mangle_605.Bar"));
+  EXPECT_EQ(
+      "torch.nn.modules.conv.Conv2d",
+      torch_tensorrt::core::lowering::passes::unmangle_cls_name(
+          "__torch__.torch.nn.modules.conv.___torch_mangle_5697.Conv2d"));
+  EXPECT_EQ(
+      "custom_models.ModuleFallbackMain",
+      torch_tensorrt::core::lowering::passes::unmangle_cls_name("__torch__.custom_models.ModuleFallbackMain"));
+  EXPECT_THROW(
+      torch_tensorrt::core::lowering::passes::unmangle_cls_name("__torch__.foo.___torch_mangle_605"), std::exception);
+}

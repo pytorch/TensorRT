@@ -1,5 +1,7 @@
 import dataclasses as dc
 import logging
+import dataclasses as dc
+import logging
 from typing import Any, Callable, Optional, Sequence
 
 # @manual=//deeplearning/trt/python:py_tensorrt
@@ -40,6 +42,7 @@ def compile(
     cuda_graph_batch_size=-1,
     dynamic_batch=True,
     is_aten=False,
+    use_experimental_fx_rt=False,
 ) -> nn.Module:
     """
     Takes in original module, input and lowering setting, run lowering workflow to turn module
@@ -58,9 +61,15 @@ def compile(
         save_timing_cache: Update timing cache with current timing cache data if set to True.
         cuda_graph_batch_size: Cuda graph batch size, default to be -1.
         dynamic_batch: batch dimension (dim=0) is dynamic.
+        use_experimental_fx_rt: Uses the next generation TRTModule which supports both Python and TorchScript based execution (including in C++).
     Returns:
         A torch.nn.Module lowered by TensorRT.
     """
+    if use_experimental_fx_rt and not explicit_batch_dimension:
+        raise ValueError(
+            "The experimental unifed runtime only supports explicit batch. Please make sure to set explicit_batch_dimension=True when use_experimental_fx_rt=True"
+        )
+
     lower_setting = LowerSetting(
         max_batch_size=max_batch_size,
         min_acc_module_size=min_acc_module_size,
@@ -73,6 +82,7 @@ def compile(
         cuda_graph_batch_size=cuda_graph_batch_size,
         dynamic_batch=dynamic_batch,
         is_aten=is_aten,
+        use_experimental_rt=use_experimental_fx_rt,
     )
     lowerer = Lowerer.create(lower_setting=lower_setting)
     return lowerer(module, input)
@@ -146,6 +156,7 @@ def default_split_function(
     splitter_setting = TRTSplitterSetting()
     splitter_setting.use_implicit_batch_dim = not lower_setting.explicit_batch_dimension
     splitter_setting.min_acc_module_size = lower_setting.min_acc_module_size
+    splitter_setting.use_experimental_rt = lower_setting.use_experimental_rt
     splitter = TRTSplitter(model, inputs, settings=splitter_setting)
     splitter.node_support_preview()
     return splitter.generate_split_results()
@@ -167,13 +178,33 @@ def default_lower_pass(
         """
         interpreter = create_trt_interpreter(lower_setting)
         interp_res: TRTInterpreterResult = interpreter(mod, input, module_name)
-        trt_module = TRTModule(
-            engine=interp_res.engine,
-            input_names=interp_res.input_names,
-            output_names=interp_res.output_names,
-            cuda_graph_batch_size=lower_setting.cuda_graph_batch_size,
-        )
-        return trt_module
+        if lower_setting.use_experimental_rt:
+            import io
+            from torch_tensorrt._TRTModuleNext import TRTModuleNext
+            from torch_tensorrt._Device import Device
+
+            with io.BytesIO() as engine_bytes:
+                engine_bytes.write(interp_res.engine.serialize())
+                engine_str = engine_bytes.getvalue()
+
+            trt_module = TRTModuleNext(
+                engine_str,
+                name=module_name,
+                input_binding_names=interp_res.input_names,
+                output_binding_names=interp_res.output_names,
+                target_device=Device(f"cuda:{torch.cuda.current_device()}"),
+                # cuda_graph_batch_size=lower_setting.cuda_graph_batch_size, # NOTE: Not sure what this is supposed to do
+            )
+            return trt_module
+
+        else:
+            trt_module = TRTModule(
+                engine=interp_res.engine,
+                input_names=interp_res.input_names,
+                output_names=interp_res.output_names,
+                cuda_graph_batch_size=lower_setting.cuda_graph_batch_size,
+            )
+            return trt_module
 
     return lower_pass
 

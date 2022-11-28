@@ -40,7 +40,7 @@ nvinfer1::DataType toTRTDataType(DataType value) {
   }
 }
 
-Device::Device(const core::runtime::CudaDevice& internal_dev) {
+Device::Device(const core::runtime::RTDevice& internal_dev) {
   device_type = DeviceType::kGPU;
   gpu_id = internal_dev.id;
   dla_core = -1;
@@ -174,8 +174,12 @@ nvinfer1::DeviceType toTRTDeviceType(DeviceType value) {
   }
 }
 
-core::runtime::CudaDevice Device::toInternalRuntimeDevice() {
-  return core::runtime::CudaDevice(gpu_id, toTRTDeviceType(device_type));
+core::runtime::RTDevice Device::toInternalRTDevice() {
+  return core::runtime::RTDevice(gpu_id, toTRTDeviceType(device_type));
+}
+
+std::string Device::toSerializedRTDevice() {
+  return this->toInternalRTDevice().serialize();
 }
 
 std::string Device::to_str() {

@@ -367,7 +367,7 @@ commands:
       - run:
           name: Test torch
           command: |
-            python3 -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"
+            python3 -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count()); print(torch.__version__)"
 
       - run:
           name: Get torch-tensorrt version information
@@ -946,7 +946,7 @@ parameters:
   # Nightly platform config
   torch-build:
     type: string
-    default: "1.13.0.dev20220921+cu116"
+    default: "1.14.0.dev20221114+cu116"
   torch-build-index:
     type: string
     default: "https://download.pytorch.org/whl/nightly/cu116"

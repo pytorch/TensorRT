@@ -376,7 +376,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        "torch>=1.13.0.dev0,<1.14.0",
+        "torch>=1.14.0.dev0",
     ],
     setup_requires=[],
     cmdclass={
@@ -405,7 +405,7 @@ setup(
         "Topic :: Software Development",
         "Topic :: Software Development :: Libraries",
     ],
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     include_package_data=True,
     package_data={
         "torch_tensorrt": [
