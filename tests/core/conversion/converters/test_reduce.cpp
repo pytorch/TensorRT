@@ -5,6 +5,7 @@
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
 #include "torch/csrc/jit/passes/common_subexpression_elimination.h"
+#include "torch/torch.h"
 
 namespace {
 std::string gen_basic_graph(const std::string& op) {
@@ -159,6 +160,19 @@ TEST(Converters, ATenSumDimNegOneIndexKeepDimsConvertsCorrectly) {
       %5 : Tensor = aten::sum(%0, %2, %3, %4)
       return (%5))IR";
   auto in = at::randint(-5, 5, {4, 4, 4}, at::kCUDA);
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenSumDimNegOneIndexKeepDimsBoolTensorConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=-1]()
+      %2 : int[] = prim::ListConstruct(%1)
+      %3 : bool = prim::Constant[value=1]()
+      %4 : None = prim::Constant()
+      %5 : Tensor = aten::sum(%0, %2, %3, %4)
+      return (%5))IR";
+  auto in = at::randint(0, 2, {4, 4, 4}, at::kCUDA).to(torch::kBool);
   test_body(graph, in);
 }
 
