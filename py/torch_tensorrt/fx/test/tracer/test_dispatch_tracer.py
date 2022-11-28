@@ -2,16 +2,16 @@ import copy
 import unittest
 
 import torch
-import torchdynamo
+import torch._dynamo as torchdynamo
 import torchvision
 from functorch.experimental import functionalize
+from torch._dynamo.optimizations import backends
+from torch._dynamo.optimizations.normalize import normalize_ir
 
 from torch.library import Library
 from torch_tensorrt.fx.lower import compile
 from torch_tensorrt.fx.tracer.dispatch_tracer.tracer import make_fx
 from torch_tensorrt.fx.utils import LowerPrecision, proxytensor_trace
-from torchdynamo.optimizations import backends
-from torchdynamo.optimizations.normalize import normalize_ir
 
 torch.manual_seed(0)
 
