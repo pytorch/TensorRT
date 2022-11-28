@@ -215,7 +215,7 @@
               
               
                 <div class="version">
-                  master (1.3.0a0+8ed2ae7)
+                  master (1.3.0a0+97b6708)
                 </div>
               
             
@@ -547,6 +547,20 @@ Note: All three of min_shape, opt_shape, max_shape must be provided, there must 
 </dl>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.Input.example_tensor">
+<span class="sig-name descname"><span class="pre">example_tensor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">optimization_profile_field</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">torch.Tensor</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_Input.html#Input.example_tensor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.Input.example_tensor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get an example tensor of the shape specified by the Input object</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>optimization_profile_field</strong> (<em>Optional</em><em>(</em><em>str</em><em>)</em>) – Name of the field to use for shape in the case the Input is dynamically shaped</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A PyTorch Tensor</p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py attribute">
 <dt class="sig sig-object py" id="torch_tensorrt.Input.format">
 <span class="sig-name descname"><span class="pre">format</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;TensorFormat.contiguous:</span> <span class="pre">0&gt;</span></em><a class="headerlink" href="#torch_tensorrt.Input.format" title="Permalink to this definition">¶</a></dt>
@@ -554,6 +568,35 @@ Note: All three of min_shape, opt_shape, max_shape must be provided, there must 
 <dl class="field-list simple">
 <dt class="field-odd">Type</dt>
 <dd class="field-odd"><p>The expected format of the input tensor (default</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.Input.from_tensor">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_tensor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">torch.Tensor</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#torch_tensorrt.Input" title="torch_tensorrt._Input.Input"><span class="pre">torch_tensorrt._Input.Input</span></a></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_Input.html#Input.from_tensor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.Input.from_tensor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Produce a Input which contains the information of the given PyTorch tensor.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>tensor</strong> (<em>torch.Tensor</em>) – A PyTorch tensor.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A Input object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.Input.from_tensors">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_tensors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">torch.Tensor</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.Input" title="torch_tensorrt._Input.Input"><span class="pre">torch_tensorrt._Input.Input</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_Input.html#Input.from_tensors"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.Input.from_tensors" title="Permalink to this definition">¶</a></dt>
+<dd><p>Produce a list of Inputs which contain
+the information of all the given PyTorch tensors.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>tensors</strong> (<em>Iterable</em><em>[</em><em>torch.Tensor</em><em>]</em>) – A list of PyTorch tensors.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A list of Inputs.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -651,6 +694,165 @@ Note: All three of min_shape, opt_shape, max_shape must be provided, there must 
 <dt class="sig sig-object py" id="torch_tensorrt.Device.gpu_id">
 <span class="sig-name descname"><span class="pre">gpu_id</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">-1</span></em><a class="headerlink" href="#torch_tensorrt.Device.gpu_id" title="Permalink to this definition">¶</a></dt>
 <dd><p>(int) Device ID for target GPU</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.TRTModuleNext">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">TRTModuleNext</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">serialized_engine</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bytearray</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">bytearray(b'')</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_binding_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_binding_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.Device" title="torch_tensorrt._Device.Device"><span class="pre">torch_tensorrt._Device.Device</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_TRTModuleNext.html#TRTModuleNext"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.TRTModuleNext" title="Permalink to this definition">¶</a></dt>
+<dd><p>TRTModuleNext is a PyTorch module which encompasses an arbitrary TensorRT Engine.</p>
+<p>This module is backed by the Torch-TensorRT runtime and is fully compatibile with both
+FX / Python deployments (just <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">torch_tensorrt</span></code> as part of the application) as
+well as TorchScript / C++ deployments since TRTModule can be passed to <code class="docutils literal notranslate"><span class="pre">torch.jit.trace</span></code>
+and then saved.</p>
+<p>The forward function is simpily forward(<a href="#id3"><span class="problematic" id="id4">*</span></a>args: torch.Tensor) -&gt; Tuple[torch.Tensor] where
+the internal implementation is <code class="docutils literal notranslate"><span class="pre">return</span> <span class="pre">Tuple(torch.ops.tensorrt.execute_engine(list(inputs),</span> <span class="pre">self.engine))</span></code></p>
+<p>&gt; Note: TRTModuleNext only supports engines built with explict batch</p>
+<dl class="field-list simple">
+<dt class="field-odd">Variables</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>) – Name of module (for easier debugging)</p></li>
+<li><p><strong>engine</strong> (<em>torch.classess.tensorrt.Engine</em>) – Torch-TensorRT TensorRT Engine instance, manages [de]serialization, device configuration, profiling</p></li>
+<li><p><strong>input_binding_names</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – List of input TensorRT engine binding names in the order they would be passed to the TRT modules</p></li>
+<li><p><strong>output_binding_names</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – List of output TensorRT engine binding names in the order they should be returned</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.TRTModuleNext.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">serialized_engine</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bytearray</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">bytearray(b'')</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_binding_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_binding_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.Device" title="torch_tensorrt._Device.Device"><span class="pre">torch_tensorrt._Device.Device</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_TRTModuleNext.html#TRTModuleNext.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.TRTModuleNext.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>__init__ method for torch_tensorrt.TRTModuleNext</p>
+<p>Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
+a PyTorch <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code> around it.</p>
+<p>If binding names are not provided, it is assumed that the engine binding names follow the following convention:</p>
+<blockquote>
+<div><ul class="simple">
+<li><dl class="simple">
+<dt>[symbol].[index in input / output array]</dt><dd><ul>
+<li><p>ex. [x.0, x.1, x.2] -&gt; [y.0]</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>) – Name for module</p></li>
+<li><p><strong>serialized_engine</strong> (<em>bytearray</em>) – Serialized TensorRT engine in the form of a bytearray</p></li>
+<li><p><strong>input_binding_names</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – List of input TensorRT engine binding names in the order they would be passed to the TRT modules</p></li>
+<li><p><strong>output_binding_names</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – List of output TensorRT engine binding names in the order they should be returned</p></li>
+<li><p><strong>target_device</strong> – (torch_tensorrt.Device): Device to instantiate TensorRT engine on. Must be a compatible device i.e. same GPU model / compute capability as was used to build the engine</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<p>..code-block:: py</p>
+<blockquote>
+<div><dl class="simple">
+<dt>with io.BytesIO() as engine_bytes:</dt><dd><p>engine_bytes.write(trt_engine.serialize())
+engine_str = engine_bytes.getvalue()</p>
+</dd>
+<dt>trt_module = TRTModule(</dt><dd><p>engine_str,
+engine_name=”my_module”,
+input_names=[“x”],
+output_names=[“output”],</p>
+</dd>
+</dl>
+<p>)</p>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.TRTModuleNext.disable_profiling">
+<span class="sig-name descname"><span class="pre">disable_profiling</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_TRTModuleNext.html#TRTModuleNext.disable_profiling"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.TRTModuleNext.disable_profiling" title="Permalink to this definition">¶</a></dt>
+<dd><p>Disable the profiler</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.TRTModuleNext.dump_layer_info">
+<span class="sig-name descname"><span class="pre">dump_layer_info</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_TRTModuleNext.html#TRTModuleNext.dump_layer_info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.TRTModuleNext.dump_layer_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Dump layer information encoded by the TensorRT engine in this module to STDOUT</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.TRTModuleNext.enable_profiling">
+<span class="sig-name descname"><span class="pre">enable_profiling</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">profiling_results_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_TRTModuleNext.html#TRTModuleNext.enable_profiling"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.TRTModuleNext.enable_profiling" title="Permalink to this definition">¶</a></dt>
+<dd><p>Enable the profiler to collect latency information about the execution of the engine</p>
+<p>Traces can be visualized using <a class="reference external" href="https://ui.perfetto.dev/">https://ui.perfetto.dev/</a> or compatible alternatives</p>
+<dl class="field-list simple">
+<dt class="field-odd">Keyword Arguments</dt>
+<dd class="field-odd"><p><strong>profiling_results_dir</strong> (<em>str</em>) – Absolute path to the directory to sort results of profiling.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.TRTModuleNext.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">inputs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_TRTModuleNext.html#TRTModuleNext.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.TRTModuleNext.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Implementation of the forward pass for a TensorRT engine</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>*inputs</strong> (<em>torch.Tensor</em>) – Inputs to the forward function, must all be <code class="docutils literal notranslate"><span class="pre">torch.Tensor</span></code></p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Result of the engine computation</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>torch.Tensor or Tuple(torch.Tensor)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.TRTModuleNext.get_extra_state">
+<span class="sig-name descname"><span class="pre">get_extra_state</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_TRTModuleNext.html#TRTModuleNext.get_extra_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.TRTModuleNext.get_extra_state" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns any extra state to include in the module’s state_dict.
+Implement this and a corresponding <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">set_extra_state()</span></code> for your module
+if you need to store extra state. This function is called when building the
+module’s <cite>state_dict()</cite>.</p>
+<p>Note that extra state should be picklable to ensure working serialization
+of the state_dict. We only provide provide backwards compatibility guarantees
+for serializing Tensors; other objects may break backwards compatibility if
+their serialized pickled form changes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Any extra state to store in the module’s state_dict</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>object</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.TRTModuleNext.get_layer_info">
+<span class="sig-name descname"><span class="pre">get_layer_info</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_TRTModuleNext.html#TRTModuleNext.get_layer_info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.TRTModuleNext.get_layer_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get a JSON string containing the layer information encoded by the TensorRT engine in this module</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>A JSON string which contains the layer information of the engine incapsulated in this module</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.TRTModuleNext.set_extra_state">
+<span class="sig-name descname"><span class="pre">set_extra_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_TRTModuleNext.html#TRTModuleNext.set_extra_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.TRTModuleNext.set_extra_state" title="Permalink to this definition">¶</a></dt>
+<dd><p>This function is called from <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">load_state_dict()</span></code> to handle any extra state
+found within the <cite>state_dict</cite>. Implement this function and a corresponding
+<code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">get_extra_state()</span></code> for your module if you need to store extra state within its
+<cite>state_dict</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>state</strong> (<em>dict</em>) – Extra state from the <cite>state_dict</cite></p>
+</dd>
+</dl>
 </dd></dl>
 
 </dd></dl>

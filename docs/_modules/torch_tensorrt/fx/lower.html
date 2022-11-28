@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  master (1.3.0a0+8ed2ae7)
+                  master (1.3.0a0+97b6708)
                 </div>
               
             
@@ -361,6 +361,8 @@
   <h1>Source code for torch_tensorrt.fx.lower</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">dataclasses</span> <span class="k">as</span> <span class="nn">dc</span>
 <span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">dataclasses</span> <span class="k">as</span> <span class="nn">dc</span>
+<span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span>
 
 <span class="c1"># @manual=//deeplearning/trt/python:py_tensorrt</span>
@@ -390,6 +392,7 @@
 <div class="viewcode-block" id="compile"><a class="viewcode-back" href="../../../py_api/fx.html#torch_tensorrt.fx.compile">[docs]</a><span class="k">def</span> <span class="nf">compile</span><span class="p">(</span>
     <span class="n">module</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
     <span class="nb">input</span><span class="p">,</span>
+    <span class="n">min_acc_module_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
     <span class="n">max_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2048</span><span class="p">,</span>
     <span class="n">max_workspace_size</span><span class="o">=</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">25</span><span class="p">,</span>
     <span class="n">explicit_batch_dimension</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
@@ -400,6 +403,7 @@
     <span class="n">cuda_graph_batch_size</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
     <span class="n">dynamic_batch</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">is_aten</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">use_experimental_fx_rt</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Takes in original module, input and lowering setting, run lowering workflow to turn module</span>
@@ -409,6 +413,7 @@
 <span class="sd">        module: Original module for lowering.</span>
 <span class="sd">        input: Input for module.</span>
 <span class="sd">        max_batch_size: Maximum batch size (must be &gt;= 1 to be set, 0 means not set)</span>
+<span class="sd">        min_acc_module_size: Minimal number of nodes for an accelerated submodule</span>
 <span class="sd">        max_workspace_size: Maximum size of workspace given to TensorRT.</span>
 <span class="sd">        explicit_batch_dimension: Use explicit batch dimension in TensorRT if set True, otherwise use implicit batch dimension.</span>
 <span class="sd">        lower_precision: lower_precision config given to TRTModule.</span>
@@ -417,11 +422,18 @@
 <span class="sd">        save_timing_cache: Update timing cache with current timing cache data if set to True.</span>
 <span class="sd">        cuda_graph_batch_size: Cuda graph batch size, default to be -1.</span>
 <span class="sd">        dynamic_batch: batch dimension (dim=0) is dynamic.</span>
+<span class="sd">        use_experimental_fx_rt: Uses the next generation TRTModule which supports both Python and TorchScript based execution (including in C++).</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        A torch.nn.Module lowered by TensorRT.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">use_experimental_fx_rt</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">explicit_batch_dimension</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;The experimental unifed runtime only supports explicit batch. Please make sure to set explicit_batch_dimension=True when use_experimental_fx_rt=True&quot;</span>
+        <span class="p">)</span>
+
     <span class="n">lower_setting</span> <span class="o">=</span> <span class="n">LowerSetting</span><span class="p">(</span>
         <span class="n">max_batch_size</span><span class="o">=</span><span class="n">max_batch_size</span><span class="p">,</span>
+        <span class="n">min_acc_module_size</span><span class="o">=</span><span class="n">min_acc_module_size</span><span class="p">,</span>
         <span class="n">max_workspace_size</span><span class="o">=</span><span class="n">max_workspace_size</span><span class="p">,</span>
         <span class="n">explicit_batch_dimension</span><span class="o">=</span><span class="n">explicit_batch_dimension</span><span class="p">,</span>
         <span class="n">lower_precision</span><span class="o">=</span><span class="n">lower_precision</span><span class="p">,</span>
@@ -431,6 +443,7 @@
         <span class="n">cuda_graph_batch_size</span><span class="o">=</span><span class="n">cuda_graph_batch_size</span><span class="p">,</span>
         <span class="n">dynamic_batch</span><span class="o">=</span><span class="n">dynamic_batch</span><span class="p">,</span>
         <span class="n">is_aten</span><span class="o">=</span><span class="n">is_aten</span><span class="p">,</span>
+        <span class="n">use_experimental_rt</span><span class="o">=</span><span class="n">use_experimental_fx_rt</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="n">lowerer</span> <span class="o">=</span> <span class="n">Lowerer</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">lower_setting</span><span class="o">=</span><span class="n">lower_setting</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">lowerer</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="nb">input</span><span class="p">)</span></div>
@@ -504,6 +517,7 @@
     <span class="n">splitter_setting</span> <span class="o">=</span> <span class="n">TRTSplitterSetting</span><span class="p">()</span>
     <span class="n">splitter_setting</span><span class="o">.</span><span class="n">use_implicit_batch_dim</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">explicit_batch_dimension</span>
     <span class="n">splitter_setting</span><span class="o">.</span><span class="n">min_acc_module_size</span> <span class="o">=</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">min_acc_module_size</span>
+    <span class="n">splitter_setting</span><span class="o">.</span><span class="n">use_experimental_rt</span> <span class="o">=</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">use_experimental_rt</span>
     <span class="n">splitter</span> <span class="o">=</span> <span class="n">TRTSplitter</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">settings</span><span class="o">=</span><span class="n">splitter_setting</span><span class="p">)</span>
     <span class="n">splitter</span><span class="o">.</span><span class="n">node_support_preview</span><span class="p">()</span>
     <span class="k">return</span> <span class="n">splitter</span><span class="o">.</span><span class="n">generate_split_results</span><span class="p">()</span>
@@ -525,13 +539,33 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">interpreter</span> <span class="o">=</span> <span class="n">create_trt_interpreter</span><span class="p">(</span><span class="n">lower_setting</span><span class="p">)</span>
         <span class="n">interp_res</span><span class="p">:</span> <span class="n">TRTInterpreterResult</span> <span class="o">=</span> <span class="n">interpreter</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="nb">input</span><span class="p">,</span> <span class="n">module_name</span><span class="p">)</span>
-        <span class="n">trt_module</span> <span class="o">=</span> <span class="n">TRTModule</span><span class="p">(</span>
-            <span class="n">engine</span><span class="o">=</span><span class="n">interp_res</span><span class="o">.</span><span class="n">engine</span><span class="p">,</span>
-            <span class="n">input_names</span><span class="o">=</span><span class="n">interp_res</span><span class="o">.</span><span class="n">input_names</span><span class="p">,</span>
-            <span class="n">output_names</span><span class="o">=</span><span class="n">interp_res</span><span class="o">.</span><span class="n">output_names</span><span class="p">,</span>
-            <span class="n">cuda_graph_batch_size</span><span class="o">=</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">cuda_graph_batch_size</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="k">return</span> <span class="n">trt_module</span>
+        <span class="k">if</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">use_experimental_rt</span><span class="p">:</span>
+            <span class="kn">import</span> <span class="nn">io</span>
+            <span class="kn">from</span> <span class="nn">torch_tensorrt._TRTModuleNext</span> <span class="kn">import</span> <span class="n">TRTModuleNext</span>
+            <span class="kn">from</span> <span class="nn">torch_tensorrt._Device</span> <span class="kn">import</span> <span class="n">Device</span>
+
+            <span class="k">with</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span> <span class="k">as</span> <span class="n">engine_bytes</span><span class="p">:</span>
+                <span class="n">engine_bytes</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">interp_res</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">serialize</span><span class="p">())</span>
+                <span class="n">engine_str</span> <span class="o">=</span> <span class="n">engine_bytes</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+
+            <span class="n">trt_module</span> <span class="o">=</span> <span class="n">TRTModuleNext</span><span class="p">(</span>
+                <span class="n">engine_str</span><span class="p">,</span>
+                <span class="n">name</span><span class="o">=</span><span class="n">module_name</span><span class="p">,</span>
+                <span class="n">input_binding_names</span><span class="o">=</span><span class="n">interp_res</span><span class="o">.</span><span class="n">input_names</span><span class="p">,</span>
+                <span class="n">output_binding_names</span><span class="o">=</span><span class="n">interp_res</span><span class="o">.</span><span class="n">output_names</span><span class="p">,</span>
+                <span class="n">target_device</span><span class="o">=</span><span class="n">Device</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;cuda:</span><span class="si">{</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">),</span>
+                <span class="c1"># cuda_graph_batch_size=lower_setting.cuda_graph_batch_size, # NOTE: Not sure what this is supposed to do</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">trt_module</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">trt_module</span> <span class="o">=</span> <span class="n">TRTModule</span><span class="p">(</span>
+                <span class="n">engine</span><span class="o">=</span><span class="n">interp_res</span><span class="o">.</span><span class="n">engine</span><span class="p">,</span>
+                <span class="n">input_names</span><span class="o">=</span><span class="n">interp_res</span><span class="o">.</span><span class="n">input_names</span><span class="p">,</span>
+                <span class="n">output_names</span><span class="o">=</span><span class="n">interp_res</span><span class="o">.</span><span class="n">output_names</span><span class="p">,</span>
+                <span class="n">cuda_graph_batch_size</span><span class="o">=</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">cuda_graph_batch_size</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">trt_module</span>
 
     <span class="k">return</span> <span class="n">lower_pass</span>
 
@@ -598,6 +632,7 @@
         <span class="n">module</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
         <span class="n">inputs</span><span class="p">:</span> <span class="n">Input</span><span class="p">,</span>
         <span class="n">additional_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Input</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">fp16_conversion_fn</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">Input</span><span class="p">],</span> <span class="n">Input</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
         <span class="n">lower_setting</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_pass_manager_builder</span><span class="o">.</span><span class="n">lower_setting</span>
         <span class="n">atol</span> <span class="o">=</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">correctness_atol</span>
@@ -614,9 +649,26 @@
                 <span class="o">==</span> <span class="n">LowerPrecision</span><span class="o">.</span><span class="n">FP16</span>
             <span class="p">):</span>
                 <span class="n">module</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>
-                <span class="n">inputs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
-                    <span class="n">x</span><span class="o">.</span><span class="n">half</span><span class="p">()</span> <span class="k">if</span> <span class="n">x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">x</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span> <span class="k">else</span> <span class="n">x</span>
-                    <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">inputs</span>
+                <span class="c1"># A custom conversion function can be passed to the lowerer to</span>
+                <span class="c1"># handle inputs with custom types. By default, just handle</span>
+                <span class="c1"># tensors and NoneType.</span>
+                <span class="k">if</span> <span class="n">fp16_conversion_fn</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">conversion_fn</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>
+                        <span class="k">if</span> <span class="n">x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">x</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span>
+                        <span class="k">else</span> <span class="n">x</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">conversion_fn</span> <span class="o">=</span> <span class="n">fp16_conversion_fn</span>
+
+                <span class="n">inputs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">conversion_fn</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">is_aten</span><span class="p">:</span>
+                <span class="n">pm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_pass_manager_builder</span><span class="o">.</span><span class="n">build_aten2trt_lower_pipeline</span><span class="p">(</span>
+                    <span class="n">inputs</span><span class="p">,</span> <span class="n">additional_inputs</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">pm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_pass_manager_builder</span><span class="o">.</span><span class="n">build_trt_lower_pipeline</span><span class="p">(</span>
+                    <span class="n">inputs</span><span class="p">,</span> <span class="n">additional_inputs</span>
                 <span class="p">)</span>
             <span class="k">if</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">is_aten</span><span class="p">:</span>
                 <span class="n">pm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_pass_manager_builder</span><span class="o">.</span><span class="n">build_aten2trt_lower_pipeline</span><span class="p">(</span>

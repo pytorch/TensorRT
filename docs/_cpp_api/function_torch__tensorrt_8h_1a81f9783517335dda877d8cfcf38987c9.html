@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Class DataType &mdash; Torch-TensorRT master documentation</title>
+  <title>Function torch_tensorrt::torchscript::embed_engine_in_new_module &mdash; Torch-TensorRT master documentation</title>
   
 
   
@@ -33,8 +33,8 @@
   <link rel="stylesheet" href="../_static/collapsible-lists/css/tree_view.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Class Device::DeviceType" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html" />
-    <link rel="prev" title="Struct CompileSpec" href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html" />
+    <link rel="next" title="Define STR" href="define_macros_8h_1a18d295a837ac71add5578860b55e5502.html" />
+    <link rel="prev" title="Function torch_tensorrt::torchscript::convert_method_to_trt_engine" href="function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2.html" />
   <!-- Google Analytics -->
   
   <!-- End Google Analytics -->
@@ -333,13 +333,13 @@
         
           <li><a href="torch_tensort_cpp.html">Torch-TensorRT C++ API</a> &gt;</li>
         
-      <li>Class DataType</li>
+      <li>Function torch_tensorrt::torchscript::embed_engine_in_new_module</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
         
             
-            <a href="../_sources/_cpp_api/classtorch__tensorrt_1_1DataType.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+            <a href="../_sources/_cpp_api/function_torch__tensorrt_8h_1a81f9783517335dda877d8cfcf38987c9.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
           
         
       </li>
@@ -365,176 +365,37 @@
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
-  <section id="class-datatype">
-<span id="exhale-class-classtorch-tensorrt-1-1datatype"></span><h1>Class DataType<a class="headerlink" href="#class-datatype" title="Permalink to this headline">¶</a></h1>
+  <section id="function-torch-tensorrt-torchscript-embed-engine-in-new-module">
+<span id="exhale-function-torch-tensorrt-8h-1a81f9783517335dda877d8cfcf38987c9"></span><h1>Function torch_tensorrt::torchscript::embed_engine_in_new_module<a class="headerlink" href="#function-torch-tensorrt-torchscript-embed-engine-in-new-module" title="Permalink to this headline">¶</a></h1>
 <ul class="simple">
 <li><p>Defined in <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt-h"><span class="std std-ref">File torch_tensorrt.h</span></a></p></li>
 </ul>
-<section id="class-documentation">
-<h2>Class Documentation<a class="headerlink" href="#class-documentation" title="Permalink to this headline">¶</a></h2>
-<dl class="cpp class">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt8DataTypeE">
-<span class="target" id="classtorch__tensorrt_1_1DataType"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">torch_tensorrt</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">DataType</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataTypeE" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Supported Data Types that can be used with TensorRT engines</p>
-<p>This class is compatable with c10::DataTypes (but will check for TRT support) so there should not be a reason that you need to use this type explictly. </p>
-<div class="breathe-sectiondef docutils container">
-<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-types">Public Types</p>
-<dl class="cpp enum">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt8DataType5ValueE">
-<span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Value</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5ValueE" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Underlying enum class to support the <a class="reference internal" href="#classtorch__tensorrt_1_1DataType"><span class="std std-ref">DataType</span></a> Class</p>
-<p>In the case that you need to use the <a class="reference internal" href="#classtorch__tensorrt_1_1DataType"><span class="std std-ref">DataType</span></a> class itself, interface using this enum vs. normal instatination</p>
-<p>ex. <a class="reference internal" href="#classtorch__tensorrt_1_1DataType"><span class="std std-ref">torch_tensorrt::DataType</span></a> type = <a class="reference internal" href="#classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684a45ceda04c1ab50695a4a6aeaeae99817"><span class="std std-ref">DataType::kFloat</span></a>; </p>
-<p><em>Values:</em></p>
-<dl class="cpp enumerator">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt8DataType5Value6kFloatE">
-<span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684a45ceda04c1ab50695a4a6aeaeae99817"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">kFloat</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value6kFloatE" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>FP32. </p>
-</dd></dl>
-
-<dl class="cpp enumerator">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt8DataType5Value5kHalfE">
-<span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684a3733a4b256b56596c5c52de99a196179"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">kHalf</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value5kHalfE" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>FP16. </p>
-</dd></dl>
-
-<dl class="cpp enumerator">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt8DataType5Value5kCharE">
-<span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684ab97bba9140703786c7aa08baea3ab276"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">kChar</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value5kCharE" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>INT8. </p>
-</dd></dl>
-
-<dl class="cpp enumerator">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt8DataType5Value4kIntE">
-<span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684aa331051c24898e3701b925251d85c7c1"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">kInt</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value4kIntE" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>INT. </p>
-</dd></dl>
-
-<dl class="cpp enumerator">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt8DataType5Value5kBoolE">
-<span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684a67f7e5fb797f4da732c5e217cbda4353"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">kBool</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value5kBoolE" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Bool. </p>
-</dd></dl>
-
-<dl class="cpp enumerator">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt8DataType5Value8kUnknownE">
-<span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684a140934e6b67dfe841b32eb73bea55358"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">kUnknown</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value8kUnknownE" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Sentinel value. </p>
-</dd></dl>
-
-</dd></dl>
-
-</div>
-<div class="breathe-sectiondef docutils container">
-<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<section id="function-documentation">
+<h2>Function Documentation<a class="headerlink" href="#function-documentation" title="Permalink to this headline">¶</a></h2>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt8DataType8DataTypeEv">
-<span class="target" id="classtorch__tensorrt_1_1DataType_1aeaf580c5f2d949bfe358e47b3824de85"></span><span class="sig-name descname"><span class="n"><span class="pre">DataType</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">default</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType8DataTypeEv" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Construct a new Data Type object. </p>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt8DataType8DataTypeE5Value">
-<span class="target" id="classtorch__tensorrt_1_1DataType_1a2804fe4287453fd5b5e35f44a382dcdd"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DataType</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataType5ValueE" title="torch_tensorrt::DataType::Value"><span class="n"><span class="pre">Value</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType8DataTypeE5Value" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p><a class="reference internal" href="#classtorch__tensorrt_1_1DataType"><span class="std std-ref">DataType</span></a> constructor from enum. </p>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt8DataType8DataTypeEN3c1010ScalarTypeE">
-<span class="target" id="classtorch__tensorrt_1_1DataType_1a7cb2fc58fcea525b8c07388134cb1b37"></span><span class="pre">TORCHTRT_API</span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">DataType</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">c10</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ScalarType</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">t</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType8DataTypeEN3c1010ScalarTypeE" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Construct a new Data Type object from torch type enums. </p>
+<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt11torchscript26embed_engine_in_new_moduleERKNSt6stringE6DeviceRKNSt6vectorINSt6stringEEERKNSt6vectorINSt6stringEEE">
+<span class="target" id="torch__tensorrt_8h_1a81f9783517335dda877d8cfcf38987c9"></span><span class="pre">TORCHTRT_API</span><span class="w"> </span><span class="n"><span class="pre">torch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">jit</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Module</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">torch_tensorrt</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">torchscript</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">embed_engine_in_new_module</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">engine</span></span>, <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#_CPPv4N14torch_tensorrt6DeviceE" title="torch_tensorrt::Device"><span class="n"><span class="pre">Device</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">device</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">input_binding_names</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">output_binding_names</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt11torchscript26embed_engine_in_new_moduleERKNSt6stringE6DeviceRKNSt6vectorINSt6stringEEERKNSt6vectorINSt6stringEEE" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Take a previously created TensorRT engine and embed it in in a TorchScript module. </p>
+<p>
+Takes a pre-built serialized TensorRT engine and embeds it in a TorchScript module. Registers execution of the engine as the forward method of the module Forward is defined as: forward(Tensor[]) -&gt; Tensor[]</p>
+<p>If binding names not specified TensorRT bindings must have names with the following format:<ul class="simple">
+<li><p>[symbol].[index in input / output array] ex.</p></li>
+<li><p>[x.0, x.1, x.2] -&gt; [y.0]</p></li>
+</ul>
+</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>t</strong> – </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4NK14torch_tensorrt8DataTypecv5ValueEv">
-<span class="target" id="classtorch__tensorrt_1_1DataType_1a09bc3c1870d9c469de12095a98e8caa4"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataType5ValueE" title="torch_tensorrt::DataType::Value"><span class="n"><span class="pre">Value</span></span></a></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK14torch_tensorrt8DataTypecv5ValueEv" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Get the enum value of the <a class="reference internal" href="#classtorch__tensorrt_1_1DataType"><span class="std std-ref">DataType</span></a> object. </p>
-<dl class="field-list simple">
-<dt class="field-odd">Returns</dt>
-<dd class="field-odd"><p>Value </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt8DataTypecvbEv">
-<span class="target" id="classtorch__tensorrt_1_1DataType_1aba0ed97193a870cbddf50c7bc02dd9fb"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataTypecvbEv" title="Permalink to this definition">¶</a><br /></dt>
-<dd></dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4NK14torch_tensorrt8DataTypeeqE8DataType">
-<span class="target" id="classtorch__tensorrt_1_1DataType_1ae8b45ac54760deb077d6dfc4acbd2e2b"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">==</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType"><span class="n"><span class="pre">DataType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK14torch_tensorrt8DataTypeeqE8DataType" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Comparision operator for <a class="reference internal" href="#classtorch__tensorrt_1_1DataType"><span class="std std-ref">DataType</span></a>. </p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>other</strong> – </p>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>engine</strong> – std::string - Pre-built serialized TensorRT engine </p></li>
+<li><p><strong>device</strong> – CompileSepc::Device - <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#structtorch__tensorrt_1_1Device"><span class="std std-ref">Device</span></a> information </p></li>
+<li><p><strong>input_binding_names</strong> – std::vector&lt;std::string&gt; - Name of TensorRT bindings in order passed in by original PyTorch function (defaults to assuming convention below) </p></li>
+<li><p><strong>output_binding_names</strong> – std::vector&lt;std::string&gt; - Name of TensorRT bindings in order returned by original PyTorch function (defaults to assuming convention below)</p></li>
+</ul>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p>true </p>
-</dd>
-<dt class="field-odd">Returns</dt>
-<dd class="field-odd"><p>false </p>
+<dd class="field-even"><p>: A new module targeting a TensorRT engine </p>
 </dd>
 </dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4NK14torch_tensorrt8DataTypeeqEN8DataType5ValueE">
-<span class="target" id="classtorch__tensorrt_1_1DataType_1a1232a15ad160b309db10a5ea8dd4e26c"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">==</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType"><span class="n"><span class="pre">DataType</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataType5ValueE" title="torch_tensorrt::DataType::Value"><span class="n"><span class="pre">Value</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK14torch_tensorrt8DataTypeeqEN8DataType5ValueE" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Comparision operator for <a class="reference internal" href="#classtorch__tensorrt_1_1DataType"><span class="std std-ref">DataType</span></a>. </p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>other</strong> – </p>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>true </p>
-</dd>
-<dt class="field-odd">Returns</dt>
-<dd class="field-odd"><p>false </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4NK14torch_tensorrt8DataTypeneE8DataType">
-<span class="target" id="classtorch__tensorrt_1_1DataType_1a3fb2cbdb14408da52fa9bb0e0840d7e4"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">!=</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType"><span class="n"><span class="pre">DataType</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK14torch_tensorrt8DataTypeneE8DataType" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Comparision operator for <a class="reference internal" href="#classtorch__tensorrt_1_1DataType"><span class="std std-ref">DataType</span></a>. </p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>other</strong> – </p>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>true </p>
-</dd>
-<dt class="field-odd">Returns</dt>
-<dd class="field-odd"><p>false </p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4NK14torch_tensorrt8DataTypeneEN8DataType5ValueE">
-<span class="target" id="classtorch__tensorrt_1_1DataType_1a25dd020fd88ec93b421c990045c1aba4"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">!=</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType"><span class="n"><span class="pre">DataType</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataType5ValueE" title="torch_tensorrt::DataType::Value"><span class="n"><span class="pre">Value</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">other</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><a class="headerlink" href="#_CPPv4NK14torch_tensorrt8DataTypeneEN8DataType5ValueE" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Comparision operator for <a class="reference internal" href="#classtorch__tensorrt_1_1DataType"><span class="std std-ref">DataType</span></a>. </p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>other</strong> – </p>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>true </p>
-</dd>
-<dt class="field-odd">Returns</dt>
-<dd class="field-odd"><p>false </p>
-</dd>
-</dl>
-</dd></dl>
-
-</div>
 </dd></dl>
 
 </section>
@@ -548,10 +409,10 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="classtorch__tensorrt_1_1Device_1_1DeviceType.html" class="btn btn-neutral float-right" title="Class Device::DeviceType" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+        <a href="define_macros_8h_1a18d295a837ac71add5578860b55e5502.html" class="btn btn-neutral float-right" title="Define STR" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
       
       
-        <a href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html" class="btn btn-neutral" title="Struct CompileSpec" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+        <a href="function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2.html" class="btn btn-neutral" title="Function torch_tensorrt::torchscript::convert_method_to_trt_engine" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
       
     </div>
   
@@ -583,8 +444,8 @@
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Class DataType</a><ul>
-<li><a class="reference internal" href="#class-documentation">Class Documentation</a></li>
+<li><a class="reference internal" href="#">Function torch_tensorrt::torchscript::embed_engine_in_new_module</a><ul>
+<li><a class="reference internal" href="#function-documentation">Function Documentation</a></li>
 </ul>
 </li>
 </ul>

@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  master (1.3.0a0+8ed2ae7)
+                  master (1.3.0a0+97b6708)
                 </div>
               
             
@@ -392,6 +392,8 @@
 </li>
         <li><a href="py_api/ptq.html#torch_tensorrt.ptq.DataLoaderCalibrator.__init__">(torch_tensorrt.ptq.DataLoaderCalibrator method)</a>
 </li>
+        <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.__init__">(torch_tensorrt.TRTModuleNext method)</a>
+</li>
       </ul></li>
   </ul></td>
 </tr></table>
@@ -445,9 +447,11 @@
 </li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Device.device_type">device_type (torch_tensorrt.Device attribute)</a>
 </li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.DeviceType">DeviceType (class in torch_tensorrt)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.DeviceType">DeviceType (class in torch_tensorrt)</a>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.disable_profiling">disable_profiling() (torch_tensorrt.TRTModuleNext method)</a>
 </li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Device.dla_core">dla_core (torch_tensorrt.Device attribute)</a>
 </li>
@@ -461,6 +465,8 @@
       </ul></li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dump_build_info">dump_build_info() (in module torch_tensorrt)</a>
 </li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.dump_layer_info">dump_layer_info() (torch_tensorrt.TRTModuleNext method)</a>
+</li>
   </ul></td>
 </tr></table>
 
@@ -468,6 +474,8 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/ts.html#torch_tensorrt.ts.embed_engine_in_new_module">embed_engine_in_new_module() (in module torch_tensorrt.ts)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.enable_profiling">enable_profiling() (torch_tensorrt.TRTModuleNext method)</a>
 </li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability">EngineCapability (class in torch_tensorrt)</a>
 </li>
@@ -481,6 +489,8 @@
 </li>
       <li><a href="py_api/logging.html#torch_tensorrt.logging.errors">errors (class in torch_tensorrt.logging)</a>
 </li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input.example_tensor">example_tensor() (torch_tensorrt.Input method)</a>
+</li>
   </ul></td>
 </tr></table>
 
@@ -488,6 +498,14 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input.format">format (torch_tensorrt.Input attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.forward">forward() (torch_tensorrt.TRTModuleNext method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input.from_tensor">from_tensor() (torch_tensorrt.Input class method)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input.from_tensors">from_tensors() (torch_tensorrt.Input class method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -503,10 +521,14 @@
 </li>
       <li><a href="py_api/ptq.html#torch_tensorrt.ptq.get_cache_mode_batch">get_cache_mode_batch() (in module torch_tensorrt.ptq)</a>
 </li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.get_extra_state">get_extra_state() (torch_tensorrt.TRTModuleNext method)</a>
+</li>
       <li><a href="py_api/logging.html#torch_tensorrt.logging.get_is_colored_output_on">get_is_colored_output_on() (in module torch_tensorrt.logging)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.get_layer_info">get_layer_info() (torch_tensorrt.TRTModuleNext method)</a>
+</li>
       <li><a href="py_api/logging.html#torch_tensorrt.logging.get_logging_prefix">get_logging_prefix() (in module torch_tensorrt.logging)</a>
 </li>
       <li><a href="py_api/logging.html#torch_tensorrt.logging.get_reportable_log_level">get_reportable_log_level() (in module torch_tensorrt.logging)</a>
@@ -613,6 +635,8 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.set_device">set_device() (in module torch_tensorrt)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.set_extra_state">set_extra_state() (torch_tensorrt.TRTModuleNext method)</a>
 </li>
       <li><a href="py_api/logging.html#torch_tensorrt.logging.set_is_colored_output_on">set_is_colored_output_on() (in module torch_tensorrt.logging)</a>
 </li>
@@ -895,7 +919,7 @@
 </li>
       <li><a href="_cpp_api/function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2.html#_CPPv4N14torch_tensorrt11torchscript28convert_method_to_trt_engineERKN5torch3jit6ModuleENSt6stringE11CompileSpec">torch_tensorrt::torchscript::convert_method_to_trt_engine (C++ function)</a>
 </li>
-      <li><a href="_cpp_api/function_torch__tensorrt_8h_1a710df824a7718b440e4bc17bf9693cef.html#_CPPv4N14torch_tensorrt11torchscript26embed_engine_in_new_moduleERKNSt6stringE6Device">torch_tensorrt::torchscript::embed_engine_in_new_module (C++ function)</a>
+      <li><a href="_cpp_api/function_torch__tensorrt_8h_1a81f9783517335dda877d8cfcf38987c9.html#_CPPv4N14torch_tensorrt11torchscript26embed_engine_in_new_moduleERKNSt6stringE6DeviceRKNSt6vectorINSt6stringEEERKNSt6vectorINSt6stringEEE">torch_tensorrt::torchscript::embed_engine_in_new_module (C++ function)</a>
 </li>
       <li><a href="_cpp_api/define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e.html#c.TORCH_TENSORRT_MAJOR_VERSION">TORCH_TENSORRT_MAJOR_VERSION (C macro)</a>
 </li>
@@ -914,6 +938,8 @@
       <li><a href="py_api/fx.html#torch_tensorrt.fx.TRTInterpreterResult">TRTInterpreterResult (class in torch_tensorrt.fx)</a>
 </li>
       <li><a href="py_api/fx.html#torch_tensorrt.fx.TRTModule">TRTModule (class in torch_tensorrt.fx)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext">TRTModuleNext (class in torch_tensorrt)</a>
 </li>
   </ul></td>
 </tr></table>

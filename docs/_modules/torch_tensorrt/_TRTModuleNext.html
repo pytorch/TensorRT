@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._Device &mdash; Torch-TensorRT master documentation</title>
+  <title>torch_tensorrt._TRTModuleNext &mdash; Torch-TensorRT master documentation</title>
   
 
   
@@ -330,7 +330,7 @@
         
           <li><a href="../index.html">Module code</a> &gt;</li>
         
-      <li>torch_tensorrt._Device</li>
+      <li>torch_tensorrt._TRTModuleNext</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
@@ -358,148 +358,218 @@
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
-  <h1>Source code for torch_tensorrt._Device</h1><div class="highlight"><pre>
-<span></span><span class="kn">import</span> <span class="nn">torch</span>
+  <h1>Source code for torch_tensorrt._TRTModuleNext</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">operator</span> <span class="kn">import</span> <span class="n">truediv</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
 
-<span class="kn">from</span> <span class="nn">torch_tensorrt</span> <span class="kn">import</span> <span class="n">_enums</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt</span> <span class="kn">import</span> <span class="n">logging</span>
+<span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt</span> <span class="kn">import</span> <span class="n">_C</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt._Device</span> <span class="kn">import</span> <span class="n">Device</span>
 
-<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="Device"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Device">[docs]</a><span class="k">class</span> <span class="nc">Device</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Defines a device that can be used to specify target devices for engines</span>
+<div class="viewcode-block" id="TRTModuleNext"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext">[docs]</a><span class="k">class</span> <span class="nc">TRTModuleNext</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;TRTModuleNext is a PyTorch module which encompasses an arbitrary TensorRT Engine.</span>
+
+<span class="sd">    This module is backed by the Torch-TensorRT runtime and is fully compatibile with both</span>
+<span class="sd">    FX / Python deployments (just ``import torch_tensorrt`` as part of the application) as</span>
+<span class="sd">    well as TorchScript / C++ deployments since TRTModule can be passed to ``torch.jit.trace``</span>
+<span class="sd">    and then saved.</span>
+
+<span class="sd">    The forward function is simpily forward(*args: torch.Tensor) -&gt; Tuple[torch.Tensor] where</span>
+<span class="sd">    the internal implementation is ``return Tuple(torch.ops.tensorrt.execute_engine(list(inputs), self.engine))``</span>
+
+<span class="sd">    &gt; Note: TRTModuleNext only supports engines built with explict batch</span>
 
 <span class="sd">    Attributes:</span>
-<span class="sd">        device_type (torch_tensorrt.DeviceType): Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.</span>
-<span class="sd">        gpu_id (int): Device ID for target GPU</span>
-<span class="sd">        dla_core (int): Core ID for target DLA core</span>
-<span class="sd">        allow_gpu_fallback (bool): Whether falling back to GPU if DLA cannot support an op should be allowed</span>
+<span class="sd">        name (str): Name of module (for easier debugging)</span>
+<span class="sd">        engine (torch.classess.tensorrt.Engine): Torch-TensorRT TensorRT Engine instance, manages [de]serialization, device configuration, profiling</span>
+<span class="sd">        input_binding_names (List[str]): List of input TensorRT engine binding names in the order they would be passed to the TRT modules</span>
+<span class="sd">        output_binding_names (List[str]): List of output TensorRT engine binding names in the order they should be returned</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="n">device_type</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1">#: (torch_tensorrt.DeviceType): Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.</span>
-    <span class="n">gpu_id</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1">#: (int) Device ID for target GPU</span>
-    <span class="n">dla_core</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1">#: (int) Core ID for target DLA core</span>
-    <span class="n">allow_gpu_fallback</span> <span class="o">=</span> <span class="kc">False</span>  <span class="c1">#: (bool) Whether falling back to GPU if DLA cannot support an op should be allowed</span>
+<div class="viewcode-block" id="TRTModuleNext.__init__"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">serialized_engine</span><span class="p">:</span> <span class="nb">bytearray</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">(),</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="n">input_binding_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[],</span>
+        <span class="n">output_binding_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[],</span>
+        <span class="n">target_device</span><span class="p">:</span> <span class="n">Device</span> <span class="o">=</span> <span class="n">Device</span><span class="o">.</span><span class="n">_current_device</span><span class="p">(),</span>
+    <span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;__init__ method for torch_tensorrt.TRTModuleNext</span>
 
-<div class="viewcode-block" id="Device.__init__"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Device.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;__init__ Method for torch_tensorrt.Device</span>
+<span class="sd">        Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs</span>
+<span class="sd">        a PyTorch ``torch.nn.Module`` around it.</span>
 
-<span class="sd">        Device accepts one of a few construction patterns</span>
+<span class="sd">        If binding names are not provided, it is assumed that the engine binding names follow the following convention:</span>
+
+<span class="sd">            - [symbol].[index in input / output array]</span>
+<span class="sd">                - ex. [x.0, x.1, x.2] -&gt; [y.0]</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            spec (str): String with device spec e.g. &quot;dla:0&quot; for dla, core_id 0</span>
+<span class="sd">            name (str): Name for module</span>
+<span class="sd">            serialized_engine (bytearray): Serialized TensorRT engine in the form of a bytearray</span>
+<span class="sd">            input_binding_names (List[str]): List of input TensorRT engine binding names in the order they would be passed to the TRT modules</span>
+<span class="sd">            output_binding_names (List[str]): List of output TensorRT engine binding names in the order they should be returned</span>
+<span class="sd">            target_device: (torch_tensorrt.Device): Device to instantiate TensorRT engine on. Must be a compatible device i.e. same GPU model / compute capability as was used to build the engine</span>
+
+<span class="sd">        Example:</span>
+
+<span class="sd">            ..code-block:: py</span>
+
+<span class="sd">                with io.BytesIO() as engine_bytes:</span>
+<span class="sd">                    engine_bytes.write(trt_engine.serialize())</span>
+<span class="sd">                    engine_str = engine_bytes.getvalue()</span>
+
+<span class="sd">                trt_module = TRTModule(</span>
+<span class="sd">                    engine_str,</span>
+<span class="sd">                    engine_name=&quot;my_module&quot;,</span>
+<span class="sd">                    input_names=[&quot;x&quot;],</span>
+<span class="sd">                    output_names=[&quot;output&quot;],</span>
+<span class="sd">                )</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;TRTModuleNext should be considered experimental stability, APIs are subject to change. Note: TRTModuleNext only supports engines built with explict batch&quot;</span>
+        <span class="p">)</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">TRTModuleNext</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">,</span> <span class="nb">bytearray</span><span class="p">):</span>
+            <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Expected serialized engine as bytearray&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span> <span class="o">=</span> <span class="n">input_binding_names</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_binding_names</span> <span class="o">=</span> <span class="n">output_binding_names</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+
+        <span class="k">if</span> <span class="n">serialized_engine</span> <span class="o">!=</span> <span class="nb">bytearray</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">ABI_VERSION</span><span class="p">(),</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s2">&quot;_engine&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span> <span class="k">else</span> <span class="s2">&quot;tensorrt_engine&quot;</span><span class="p">,</span>
+                    <span class="n">target_device</span><span class="o">.</span><span class="n">_to_serialized_rt_device</span><span class="p">(),</span>
+                    <span class="n">serialized_engine</span><span class="p">,</span>
+                    <span class="n">TRTModuleNext</span><span class="o">.</span><span class="n">_pack_binding_names</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span><span class="p">),</span>
+                    <span class="n">TRTModuleNext</span><span class="o">.</span><span class="n">_pack_binding_names</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_binding_names</span><span class="p">),</span>
+                <span class="p">]</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="TRTModuleNext.get_extra_state"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.get_extra_state">[docs]</a>    <span class="k">def</span> <span class="nf">get_extra_state</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">__getstate__</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">output_binding_names</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="TRTModuleNext.set_extra_state"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.set_extra_state">[docs]</a>    <span class="k">def</span> <span class="nf">set_extra_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">serialized_engine_info</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="kn">import</span> <span class="nn">base64</span>
+
+            <span class="n">serialized_engine</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">serialized_engine_info</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="n">serialized_engine_info</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                    <span class="n">serialized_engine_info</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                    <span class="n">serialized_engine_info</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+                    <span class="n">serialized_engine</span><span class="p">,</span>
+                    <span class="n">serialized_engine_info</span><span class="p">[</span><span class="mi">4</span><span class="p">],</span>
+                    <span class="n">serialized_engine_info</span><span class="p">[</span><span class="mi">5</span><span class="p">],</span>
+                <span class="p">]</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_binding_names</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="TRTModuleNext.forward"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">inputs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Implementation of the forward pass for a TensorRT engine</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            *inputs (torch.Tensor): Inputs to the forward function, must all be ``torch.Tensor``</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor or Tuple(torch.Tensor): Result of the engine computation</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Engine has not been initalized yet.&quot;</span><span class="p">)</span>
+
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span>
+        <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;Wrong number of inputs, expected </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span><span class="p">)</span><span class="si">}</span><span class="s2"> got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span>
+
+        <span class="n">types</span> <span class="o">=</span> <span class="p">[</span><span class="nb">issubclass</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">i</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">]</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">types</span><span class="p">)</span>
+        <span class="k">except</span><span class="p">:</span>
+
+            <span class="k">def</span> <span class="nf">is_non_tensor</span><span class="p">(</span><span class="n">i</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">bool</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+                <span class="k">return</span> <span class="ow">not</span> <span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+            <span class="n">non_tensors</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">filter</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">types</span><span class="p">),</span> <span class="n">is_non_tensor</span><span class="p">)]</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;TRTModuleNext expects a flattened list of tensors as input, found non tensors: </span><span class="si">{</span><span class="n">non_tensors</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">outputs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">execute_engine</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">inputs</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">outputs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">outputs</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="TRTModuleNext.enable_profiling"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.enable_profiling">[docs]</a>    <span class="k">def</span> <span class="nf">enable_profiling</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">profiling_results_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Enable the profiler to collect latency information about the execution of the engine</span>
+
+<span class="sd">        Traces can be visualized using https://ui.perfetto.dev/ or compatible alternatives</span>
 
 <span class="sd">        Keyword Arguments:</span>
-<span class="sd">            gpu_id (int): ID of target GPU (will get overrided if dla_core is specified to the GPU managing DLA). If specified, no positional arguments should be provided</span>
-<span class="sd">            dla_core (int): ID of target DLA core. If specified, no positional arguments should be provided.</span>
-<span class="sd">            allow_gpu_fallback (bool): Allow TensorRT to schedule operations on GPU if they are not supported on DLA (ignored if device type is not DLA)</span>
-
-<span class="sd">        Examples:</span>
-<span class="sd">            - Device(&quot;gpu:1&quot;)</span>
-<span class="sd">            - Device(&quot;cuda:1&quot;)</span>
-<span class="sd">            - Device(&quot;dla:0&quot;, allow_gpu_fallback=True)</span>
-<span class="sd">            - Device(gpu_id=0, dla_core=0, allow_gpu_fallback=True)</span>
-<span class="sd">            - Device(dla_core=0, allow_gpu_fallback=True)</span>
-<span class="sd">            - Device(gpu_id=1)</span>
+<span class="sd">            profiling_results_dir (str): Absolute path to the directory to sort results of profiling.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                    <span class="s2">&quot;When specifying Device through positional argument, argument must be str&quot;</span>
-                <span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device_type</span><span class="p">,</span> <span class="nb">id</span><span class="p">)</span> <span class="o">=</span> <span class="n">Device</span><span class="o">.</span><span class="n">_parse_device_str</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_type</span> <span class="o">==</span> <span class="n">_enums</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">:</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span> <span class="o">=</span> <span class="nb">id</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">dla_core</span> <span class="o">=</span> <span class="nb">id</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span> <span class="o">=</span> <span class="mi">0</span>
-                    <span class="n">logging</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
-                        <span class="n">logging</span><span class="o">.</span><span class="n">Level</span><span class="o">.</span><span class="n">Warning</span><span class="p">,</span>
-                        <span class="s2">&quot;Setting GPU id to 0 for device because device 0 manages DLA on Xavier&quot;</span><span class="p">,</span>
-                    <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Engine has not been initalized yet.&quot;</span><span class="p">)</span>
 
-        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">if</span> <span class="s2">&quot;gpu_id&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">or</span> <span class="s2">&quot;dla_core&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-                <span class="k">if</span> <span class="s2">&quot;dla_core&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">device_type</span> <span class="o">=</span> <span class="n">_enums</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">dla_core</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;dla_core&quot;</span><span class="p">]</span>
-                    <span class="k">if</span> <span class="s2">&quot;gpu_id&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;gpu_id&quot;</span><span class="p">]</span>
-                    <span class="k">else</span><span class="p">:</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span> <span class="o">=</span> <span class="mi">0</span>
-                        <span class="n">logging</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
-                            <span class="n">logging</span><span class="o">.</span><span class="n">Level</span><span class="o">.</span><span class="n">Warning</span><span class="p">,</span>
-                            <span class="s2">&quot;Setting GPU id to 0 for device because device 0 manages DLA on Xavier&quot;</span><span class="p">,</span>
-                        <span class="p">)</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;gpu_id&quot;</span><span class="p">]</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">device_type</span> <span class="o">=</span> <span class="n">_enums</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;Either gpu_id or dla_core or both must be defined if no string with device specs is provided as an arg&quot;</span>
-                <span class="p">)</span>
+        <span class="k">if</span> <span class="n">profiling_results_dir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">profile_path_prefix</span> <span class="o">=</span> <span class="n">profiling_results_dir</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">enable_profiling</span><span class="p">()</span></div>
 
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">&quot;Unexpected number of positional arguments for class Device </span><span class="se">\n</span><span class="s2">    Found </span><span class="si">{}</span><span class="s2"> arguments, expected either zero or a single positional arguments&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
-                    <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
-                <span class="p">)</span>
-            <span class="p">)</span>
+<div class="viewcode-block" id="TRTModuleNext.disable_profiling"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.disable_profiling">[docs]</a>    <span class="k">def</span> <span class="nf">disable_profiling</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Disable the profiler&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Engine has not been initalized yet.&quot;</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="s2">&quot;allow_gpu_fallback&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;allow_gpu_fallback&quot;</span><span class="p">],</span> <span class="nb">bool</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;allow_gpu_fallback must be a bool&quot;</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">allow_gpu_fallback</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;allow_gpu_fallback&quot;</span><span class="p">]</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">disable_profiling</span><span class="p">()</span></div>
 
-    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="p">(</span>
-            <span class="s2">&quot;Device(type=</span><span class="si">{}</span><span class="s2">, gpu_id=</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device_type</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;)&quot;</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_type</span> <span class="o">==</span> <span class="n">_enums</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span>
-            <span class="k">else</span> <span class="s2">&quot;, dla_core=</span><span class="si">{}</span><span class="s2">, allow_gpu_fallback=</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">dla_core</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">allow_gpu_fallback</span>
-            <span class="p">)</span>
-        <span class="p">)</span>
+<div class="viewcode-block" id="TRTModuleNext.get_layer_info"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.get_layer_info">[docs]</a>    <span class="k">def</span> <span class="nf">get_layer_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get a JSON string containing the layer information encoded by the TensorRT engine in this module</span>
 
-    <span class="k">def</span> <span class="nf">_to_internal</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_C</span><span class="o">.</span><span class="n">Device</span><span class="p">:</span>
-        <span class="n">internal_dev</span> <span class="o">=</span> <span class="n">_C</span><span class="o">.</span><span class="n">Device</span><span class="p">()</span>
-        <span class="n">internal_dev</span><span class="o">.</span><span class="n">device_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_type</span>
-        <span class="n">internal_dev</span><span class="o">.</span><span class="n">gpu_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">gpu_id</span>
-        <span class="n">internal_dev</span><span class="o">.</span><span class="n">dla_core</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dla_core</span>
-        <span class="n">internal_dev</span><span class="o">.</span><span class="n">allow_gpu_fallback</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">allow_gpu_fallback</span>
-        <span class="k">return</span> <span class="n">internal_dev</span>
+<span class="sd">        Returns:</span>
 
-    <span class="k">def</span> <span class="nf">_to_serialized_rt_device</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="n">internal_dev</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_internal</span><span class="p">()</span>
-        <span class="k">return</span> <span class="n">internal_dev</span><span class="o">.</span><span class="n">_to_serialized_rt_device</span><span class="p">()</span>
+<span class="sd">            str: A JSON string which contains the layer information of the engine incapsulated in this module</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Engine has not been initalized yet.&quot;</span><span class="p">)</span>
 
-    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">_from_torch_device</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">torch_dev</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">torch_dev</span><span class="o">.</span><span class="n">type</span> <span class="o">!=</span> <span class="s2">&quot;cuda&quot;</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Torch Device specs must have type &quot;cuda&quot;&#39;</span><span class="p">)</span>
-        <span class="n">gpu_id</span> <span class="o">=</span> <span class="n">torch_dev</span><span class="o">.</span><span class="n">index</span>
-        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">gpu_id</span><span class="o">=</span><span class="n">gpu_id</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">get_engine_layer_info</span><span class="p">()</span></div>
 
-    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">_current_device</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="n">dev</span> <span class="o">=</span> <span class="n">_C</span><span class="o">.</span><span class="n">_get_current_device</span><span class="p">()</span>
-        <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
-            <span class="n">logging</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Level</span><span class="o">.</span><span class="n">Error</span><span class="p">,</span> <span class="s2">&quot;Cannot get current device&quot;</span><span class="p">)</span>
-            <span class="k">return</span> <span class="kc">None</span>
-        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">gpu_id</span><span class="o">=</span><span class="n">dev</span><span class="o">.</span><span class="n">gpu_id</span><span class="p">)</span>
+<div class="viewcode-block" id="TRTModuleNext.dump_layer_info"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.dump_layer_info">[docs]</a>    <span class="k">def</span> <span class="nf">dump_layer_info</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Dump layer information encoded by the TensorRT engine in this module to STDOUT&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Engine has not been initalized yet.&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">dump_engine_layer_info</span><span class="p">()</span></div>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">_parse_device_str</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
-        <span class="n">s</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
-        <span class="n">spec</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;gpu&quot;</span> <span class="ow">or</span> <span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;cuda&quot;</span><span class="p">:</span>
-            <span class="k">return</span> <span class="p">(</span><span class="n">_enums</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
-        <span class="k">elif</span> <span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;dla&quot;</span><span class="p">:</span>
-            <span class="k">return</span> <span class="p">(</span><span class="n">_enums</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span></div>
+    <span class="k">def</span> <span class="nf">_pack_binding_names</span><span class="p">(</span><span class="n">binding_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">delim</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">SERIALIZED_ENGINE_BINDING_DELIM</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">delim</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">binding_names</span><span class="p">)</span></div>
 </pre></div>
 
              </article>

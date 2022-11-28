@@ -289,6 +289,10 @@ Program Listing for File torch_tensorrt.h
        std::string method_name,
        CompileSpec info);
    
-   TORCHTRT_API torch::jit::Module embed_engine_in_new_module(const std::string& engine, Device device);
+   TORCHTRT_API torch::jit::Module embed_engine_in_new_module(
+       const std::string& engine,
+       Device device,
+       const std::vector<std::string>& input_binding_names = std::vector<std::string>(),
+       const std::vector<std::string>& output_binding_names = std::vector<std::string>());
    } // namespace torchscript
    } // namespace torch_tensorrt
