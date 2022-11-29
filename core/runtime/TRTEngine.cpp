@@ -100,9 +100,9 @@ TRTEngine::TRTEngine(
     for (int64_t x = 0; x < cuda_engine->getNbIOTensors(); x++) {
       std::string bind_name = cuda_engine->getIOTensorName(x);
       if (cuda_engine->getTensorIOMode(bind_name.c_str()) == nvinfer1::TensorIOMode::kINPUT) {
-        in_binding_names.push_back(bind_name);
+        in_binding_names[in_binding_map.at(x)] = bind_name;
       } else {
-        out_binding_names.push_back(bind_name);
+        out_binding_names[out_binding_map.at(x)] = bind_name;
       }
     }
   } else {

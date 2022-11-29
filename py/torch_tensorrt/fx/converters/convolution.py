@@ -2,7 +2,7 @@
 import numpy as np
 import tensorrt as trt
 import torch
-import warnings
+import logging
 
 from ..converter_registry import tensorrt_converter
 
@@ -12,6 +12,8 @@ from .converter_utils import (
     mark_as_int8_layer,
     to_numpy,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def common_conv(network, mod, dimension, input_val, layer_name, is_quantized):
@@ -148,7 +150,7 @@ def conv3d(network, submod, args, kwargs, layer_name):
             if filter_size != 1:
                 kernel_size_one = False
     if kernel_size_one:
-        warnings.warn(
+        logger.warn(
             "Conv3d layer with kernel size = 1 configuration incurs a failure with TensorRT tactic optimizer in some cases. \
         Github issue: https://github.com/pytorch/TensorRT/issues/1445. Other conv variants do not have this issue."
         )
