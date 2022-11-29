@@ -2,6 +2,7 @@
 
 import torch
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
+import unittest
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.fx.passes.lower_basic_pass import (
     fuse_permute_linear,

@@ -129,7 +129,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     }
     for (size_t i = 0; i < inputs.size(); i++) {
       std::string name =
-          compiled_engine->in_binding_names[i]; // compiled_engine->exec_ctx->getEngine().getIOTensorName(i);
+          compiled_engine->in_binding_names[i];
       TORCHTRT_CHECK(
           inputs[i].is_cuda(), "Expected input tensors to have device cuda, found device " << inputs[i].device());
       auto expected_type =
@@ -159,7 +159,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     for (size_t o = inputs.size(); o < (compiled_engine->num_io.first + compiled_engine->num_io.second); o++) {
       uint64_t pyt_idx = compiled_engine->out_binding_map[o];
       std::string name =
-          compiled_engine->out_binding_names[pyt_idx]; // compiled_engine->exec_ctx->getEngine().getIOTensorName(o);
+          compiled_engine->out_binding_names[pyt_idx];
       auto out_shape = compiled_engine->exec_ctx->getTensorShape(name.c_str());
       LOG_DEBUG("Output Name: " << name << " Shape: " << out_shape);
       auto dims = core::util::toVec(out_shape);
