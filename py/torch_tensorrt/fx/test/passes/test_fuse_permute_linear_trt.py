@@ -51,6 +51,7 @@ class TestFusePermuteLinear(AccTestCase):
             {acc_ops.permute, trt_transposed_linear},
             apply_passes=[fuse_permute_linear],
         )
+
     # TODO: The following test has been disabled due to a bug in TRT 8.5.1.7
     # with self.linear2. Issue : https://github.com/pytorch/TensorRT/issues/1444
     # def test_multi_fuse_permute_linear(self):
