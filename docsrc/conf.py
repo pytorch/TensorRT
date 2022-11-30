@@ -25,9 +25,9 @@ project = "Torch-TensorRT"
 copyright = "2022, NVIDIA Corporation"
 author = "NVIDIA Corporation"
 
-version = "master (" + torch_tensorrt.__version__ + ")"
+version = f"v{torch_tensorrt.__version__}"
 # The full version, including alpha/beta/rc tags
-release = "master"
+release = f"v{torch_tensorrt.__version__}"
 
 # -- General configuration ---------------------------------------------------
 
@@ -134,7 +134,8 @@ html_theme_options = {
     "globaltoc_includehidden": True,
     "master_doc": True,
     "version_info": {
-        "master": "https://pytorch.org/TensorRT/",
+        "main": "https://pytorch.org/TensorRT/",
+        "v1.3.0": "https://pytorch.org/TensorRT/v1.3.0",
         "v1.2.0": "https://pytorch.org/TensorRT/v1.2.0",
         "v1.1.1": "https://nvidia.github.io/Torch-TensorRT/v1.1.1",
         "v1.1.0": "https://nvidia.github.io/Torch-TensorRT/v1.1.0/",
@@ -193,7 +194,7 @@ def patched_make_field(self, types, domain, items, **kw):
                         domain,
                         typename,
                         addnodes.literal_emphasis,
-                        **kw
+                        **kw,
                     )
                 )
             else:
