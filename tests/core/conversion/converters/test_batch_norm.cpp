@@ -165,5 +165,5 @@ TEST(Converters, ATenBatchNormHalfConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_mean, trt_var});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in}, {nvinfer1::DataType::kHALF});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-2));
 }
