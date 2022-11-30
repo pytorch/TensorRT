@@ -7,13 +7,14 @@
 #include "core/ir/ir.h"
 #include "core/util/prelude.h"
 
-namespace torch_tensorrt {
-namespace tests {
-namespace util {
-
 const float ATOL = 1e-8;
 const float RTOL = 1e-5;
 const float COSINE_THRESHOLD = 0.99f;
+const float THRESHOLD_E5 = 1e-5;
+
+namespace torch_tensorrt {
+namespace tests {
+namespace util {
 
 bool cosineSimEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float threshold = COSINE_THRESHOLD);
 
