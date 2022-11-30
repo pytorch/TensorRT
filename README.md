@@ -110,7 +110,7 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts") # save the TRT embedd
 
 ### Dependencies
 
-These are the following dependencies used to verify the testcases. Torch-TensorRT can work with other versions, but the tests are not guaranteed to pass.
+These are the following dependencies used to verify the testcases. Check out `py/requirements.txt` for python dependencies. Torch-TensorRT can work with other versions, but the tests are not guaranteed to pass.
 
 - Bazel 5.2.0
 - Libtorch 1.13.0 (built with CUDA 11.7)
