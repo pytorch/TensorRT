@@ -13,7 +13,8 @@ nvinfer1::ITensor* addPadding(
     nvinfer1::ITensor* tensor,
     int nDim,
     bool trailing,
-    bool use_zeros) {
+    bool use_zeros,
+    const std::string& name) {
   const auto dims = tensor->getDimensions();
 
   if (dims.nbDims < nDim) {
@@ -27,7 +28,11 @@ nvinfer1::ITensor* addPadding(
     TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer");
     shuffle_layer->setReshapeDimensions(newDims);
     shuffle_layer->setZeroIsPlaceholder(use_zeros);
-    shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + ']').c_str());
+    if (name.size()) {
+      shuffle_layer->setName(name.c_str());
+    } else {
+      shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + ']').c_str());
+    }
     return shuffle_layer->getOutput(0);
   } else {
     return tensor;
@@ -40,7 +45,8 @@ nvinfer1::ITensor* addUnpadding(
     nvinfer1::ITensor* tensor,
     int nDim,
     bool trailing,
-    bool use_zeros) {
+    bool use_zeros,
+    const std::string& name) {
   const auto dims = tensor->getDimensions();
   if (dims.nbDims > nDim) {
     auto newDims = dims;
@@ -52,7 +58,11 @@ nvinfer1::ITensor* addUnpadding(
     TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer");
     shuffle_layer->setReshapeDimensions(newDims);
     shuffle_layer->setZeroIsPlaceholder(use_zeros);
-    shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + "]").c_str());
+    if (name.size()) {
+      shuffle_layer->setName(name.c_str());
+    } else {
+      shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + ']').c_str());
+    }
     return shuffle_layer->getOutput(0);
   } else {
     return tensor;
