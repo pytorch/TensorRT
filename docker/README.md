@@ -1,14 +1,15 @@
 # Building a Torch-TensorRT container
 
-Use `Dockerfile` to build a container which provides the exact development environment that our master branch is usually tested against.
-`Dockerfile` currently uses the exact libraries listed in <a href="https://github.com/pytorch/TensorRT#dependencies">dependencies</a> to build Torch-TensorRT.
+* Use `Dockerfile` to build a container which provides the exact development environment that our master branch is usually tested against.
 
-This `Dockerfile` installs `pre-cxx11-abi` versions of Pytorch and builds Torch-TRT using `pre-cxx11-abi` libtorch as well.
+* `Dockerfile` currently uses the exact library versions (Torch, CUDA, CUDNN, TensorRT) listed in <a href="https://github.com/pytorch/TensorRT#dependencies">dependencies</a> to build Torch-TensorRT.
+
+* This `Dockerfile` installs `pre-cxx11-abi` versions of Pytorch and builds Torch-TRT using `pre-cxx11-abi` libtorch as well.
 Note: To install `cxx11_abi` version of Torch-TensorRT, enable `USE_CXX11=1` flag so that `dist-build.sh` can build it accordingly.
 
 ### Dependencies
 
-Install nvidia-docker by following https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker
+* Install nvidia-docker by following https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker
 
 ### Instructions
 
@@ -25,6 +26,8 @@ nvidia-docker run --gpus all -it --shm-size=8gb --env="DISPLAY" --volume="/tmp/.
 ```
 
 Test:
+
+
 You can run any converter test to verify if Torch-TRT built sucessfully inside the container. Once you launch the container, you can run
 ```
 bazel test //tests/core/conversion/converters:test_activation --compilation_mode=opt --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi

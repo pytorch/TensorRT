@@ -3,9 +3,9 @@
 TOP_DIR=$(cd $(dirname $0); pwd)/..
 
 if [[ -z "${USE_CXX11}" ]]; then
-    BUILD_CMD="python3.8 setup.py bdist_wheel"
+    BUILD_CMD="python setup.py bdist_wheel"
 else
-    BUILD_CMD="python3.8 setup.py bdist_wheel  --use-cxx11-abi"
+    BUILD_CMD="python setup.py bdist_wheel  --use-cxx11-abi"
 fi
 
 cd ${TOP_DIR} \

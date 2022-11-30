@@ -8,11 +8,12 @@ RUN apt install -y build-essential manpages-dev wget zlib1g software-properties-
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt install -y python3.8 python3.8-distutils python3.8-dev
 RUN wget https://bootstrap.pypa.io/get-pip.py
-RUN python3.8 get-pip.py
+RUN ln -s /usr/bin/python3.8 /usr/bin/python
+RUN python get-pip.py
 RUN pip3 install wheel
 
 # Install Pytorch
-RUN pip3 install torch==1.13.0.dev20221006+cu117 torchvision==0.15.0.dev20221006+cu117 --extra-index-url https://download.pytorch.org/whl/nightly/cu117
+RUN pip3 install torch==1.13.0 torchvision==0.14.0
 
 # Install CUDNN + TensorRT
 RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-ubuntu1804.pin
@@ -22,13 +23,13 @@ RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 536F8F1DE80F6A35
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
 RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/ /"
 RUN apt-get update
-RUN apt-get install -y libcudnn8=8.4.1* libcudnn8-dev=8.4.1*
+RUN apt-get install -y libcudnn8=8.5.0* libcudnn8-dev=8.5.0*
 
 RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub
 RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/ /"
 RUN apt-get update
 
-RUN apt-get install -y libnvinfer8=8.4.3* libnvinfer-plugin8=8.4.3* libnvinfer-dev=8.4.3* libnvinfer-plugin-dev=8.4.3* libnvonnxparsers8=8.4.3-1* libnvonnxparsers-dev=8.4.3-1* libnvparsers8=8.4.3-1*  libnvparsers-dev=8.4.3-1*
+RUN apt-get install -y libnvinfer8=8.5.1* libnvinfer-plugin8=8.5.1* libnvinfer-dev=8.5.1* libnvinfer-plugin-dev=8.5.1* libnvonnxparsers8=8.5.1-1* libnvonnxparsers-dev=8.5.1-1* libnvparsers8=8.5.1-1*  libnvparsers-dev=8.5.1-1*
 
 # Setup Bazel
 ARG BAZEL_VERSION=5.2.0
