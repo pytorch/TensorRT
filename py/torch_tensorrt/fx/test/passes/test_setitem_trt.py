@@ -1,10 +1,10 @@
 import torch
-import torchdynamo
+import torch._dynamo as torchdynamo
 from parameterized import parameterized
+from torch._dynamo.optimizations import backends
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.fx.passes.lower_basic_pass import transform_setitem
 from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
-from torchdynamo.optimizations import backends
 
 
 class TestTransformSetitem(AccTestCase):
@@ -24,13 +24,12 @@ class TestTransformSetitem(AccTestCase):
             gm = transform_setitem(gm, example_inputs)
             return gm
 
-        optimize_ctx = torchdynamo.optimize(
+        optimize_mod = torchdynamo.optimize(
             transform_fx,
             nopython=True,
-        )
+        )(m)
 
-        with optimize_ctx:
-            m(*inputs)
+        optimize_mod(*inputs)
 
     def test_setitem1d_c2(self):
         class TestModule(torch.nn.Module):
@@ -49,13 +48,12 @@ class TestTransformSetitem(AccTestCase):
             gm = transform_setitem(gm, example_inputs)
             return gm
 
-        optimize_ctx = torchdynamo.optimize(
+        optimize_mod = torchdynamo.optimize(
             transform_fx,
             nopython=True,
-        )
+        )(m)
 
-        with optimize_ctx:
-            m(*inputs)
+        optimize_mod(*inputs)
 
     def test_setitem1d_c3(self):
         class TestModule(torch.nn.Module):
@@ -73,13 +71,12 @@ class TestTransformSetitem(AccTestCase):
             gm = transform_setitem(gm, example_inputs)
             return gm
 
-        optimize_ctx = torchdynamo.optimize(
+        optimize_mod = torchdynamo.optimize(
             transform_fx,
             nopython=True,
-        )
+        )(m)
 
-        with optimize_ctx:
-            m(*inputs)
+        optimize_mod(*inputs)
 
     @parameterized.expand(
         [
@@ -106,12 +103,12 @@ class TestTransformSetitem(AccTestCase):
             gm = transform_setitem(gm, example_inputs)
             return gm
 
-        optimize_ctx = torchdynamo.optimize(
+        optimize_mod = torchdynamo.optimize(
             transform_fx,
             nopython=True,
-        )
-        with optimize_ctx:
-            m(*inputs)
+        )(m)
+
+        optimize_mod(*inputs)
 
     @parameterized.expand(
         [
@@ -138,12 +135,12 @@ class TestTransformSetitem(AccTestCase):
             gm = transform_setitem(gm, example_inputs)
             return gm
 
-        optimize_ctx = torchdynamo.optimize(
+        optimize_mod = torchdynamo.optimize(
             transform_fx,
             nopython=True,
-        )
-        with optimize_ctx:
-            m(*inputs)
+        )(m)
+
+        optimize_mod(*inputs)
 
     @parameterized.expand(
         [
@@ -169,12 +166,12 @@ class TestTransformSetitem(AccTestCase):
             gm = transform_setitem(gm, example_inputs)
             return gm
 
-        optimize_ctx = torchdynamo.optimize(
+        optimize_mod = torchdynamo.optimize(
             transform_fx,
             nopython=True,
-        )
-        with optimize_ctx:
-            m(*inputs)
+        )(m)
+
+        optimize_mod(*inputs)
 
     @parameterized.expand(
         [
@@ -202,12 +199,12 @@ class TestTransformSetitem(AccTestCase):
             gm = transform_setitem(gm, example_inputs)
             return gm
 
-        optimize_ctx = torchdynamo.optimize(
+        optimize_mod = torchdynamo.optimize(
             transform_fx,
             nopython=True,
-        )
-        with optimize_ctx:
-            m(*inputs)
+        )(m)
+
+        optimize_mod(*inputs)
 
     @parameterized.expand(
         [
@@ -235,12 +232,12 @@ class TestTransformSetitem(AccTestCase):
             gm = transform_setitem(gm, example_inputs)
             return gm
 
-        optimize_ctx = torchdynamo.optimize(
+        optimize_mod = torchdynamo.optimize(
             transform_fx,
             nopython=True,
-        )
-        with optimize_ctx:
-            m(*inputs)
+        )(m)
+
+        optimize_mod(*inputs)
 
     @parameterized.expand(
         [
@@ -270,12 +267,12 @@ class TestTransformSetitem(AccTestCase):
             gm = transform_setitem(gm, example_inputs)
             return gm
 
-        optimize_ctx = torchdynamo.optimize(
+        optimize_mod = torchdynamo.optimize(
             transform_fx,
             nopython=True,
-        )
-        with optimize_ctx:
-            m(*inputs)
+        )(m)
+
+        optimize_mod(*inputs)
 
     @parameterized.expand(
         [
@@ -306,12 +303,12 @@ class TestTransformSetitem(AccTestCase):
             gm = transform_setitem(gm, example_inputs)
             return gm
 
-        optimize_ctx = torchdynamo.optimize(
+        optimize_mod = torchdynamo.optimize(
             transform_fx,
             nopython=True,
-        )
-        with optimize_ctx:
-            m(*inputs)
+        )(m)
+
+        optimize_mod(*inputs)
 
     @parameterized.expand(
         [
@@ -339,12 +336,12 @@ class TestTransformSetitem(AccTestCase):
             gm = transform_setitem(gm, example_inputs)
             return gm
 
-        optimize_ctx = torchdynamo.optimize(
+        optimize_mod = torchdynamo.optimize(
             transform_fx,
             nopython=True,
-        )
-        with optimize_ctx:
-            m(*inputs)
+        )(m)
+
+        optimize_mod(*inputs)
 
     @parameterized.expand(
         [
@@ -374,12 +371,12 @@ class TestTransformSetitem(AccTestCase):
             gm = transform_setitem(gm, example_inputs)
             return gm
 
-        optimize_ctx = torchdynamo.optimize(
+        optimize_mod = torchdynamo.optimize(
             transform_fx,
             nopython=True,
-        )
-        with optimize_ctx:
-            m(*inputs)
+        )(m)
+
+        optimize_mod(*inputs)
 
     @parameterized.expand(
         [
@@ -409,12 +406,12 @@ class TestTransformSetitem(AccTestCase):
             gm = transform_setitem(gm, example_inputs)
             return gm
 
-        optimize_ctx = torchdynamo.optimize(
+        optimize_mod = torchdynamo.optimize(
             transform_fx,
             nopython=True,
-        )
-        with optimize_ctx:
-            m(*inputs)
+        )(m)
+
+        optimize_mod(*inputs)
 
     @parameterized.expand(
         [
@@ -456,12 +453,12 @@ class TestTransformSetitem(AccTestCase):
             gm = transform_setitem(gm, example_inputs)
             return gm
 
-        optimize_ctx = torchdynamo.optimize(
+        optimize_mod = torchdynamo.optimize(
             transform_fx,
             nopython=True,
-        )
-        with optimize_ctx:
-            m(*inputs)
+        )(m)
+
+        optimize_mod(*inputs)
 
     @parameterized.expand(
         [
@@ -502,12 +499,12 @@ class TestTransformSetitem(AccTestCase):
             gm = transform_setitem(gm, example_inputs)
             return gm
 
-        optimize_ctx = torchdynamo.optimize(
+        optimize_mod = torchdynamo.optimize(
             transform_fx,
             nopython=True,
-        )
-        with optimize_ctx:
-            m(*inputs)
+        )(m)
+
+        optimize_mod(*inputs)
 
     # test with torchdynamo
     def test_setitem1d_trt(self):
@@ -526,9 +523,9 @@ class TestTransformSetitem(AccTestCase):
         m.cuda()
         ref_output = m(*inputs)
 
-        optimize_ctx = torchdynamo.optimize(backends.fx2trt_compiler, nopython=True)
-        with optimize_ctx:
-            output = m(*inputs)
+        optimize_mod = torchdynamo.optimize(backends.fx2trt_compiler, nopython=True)(m)
+
+        output = optimize_mod(*inputs)
         self.assertTrue(torch.allclose(ref_output, output))
 
     @parameterized.expand(
@@ -553,9 +550,8 @@ class TestTransformSetitem(AccTestCase):
         m.cuda()
 
         ref_output = m(*inputs)
-        optimize_ctx = torchdynamo.optimize(backends.fx2trt_compiler, nopython=True)
-        with optimize_ctx:
-            output = m(*inputs)
+        optimize_mod = torchdynamo.optimize(backends.fx2trt_compiler, nopython=True)(m)
+        output = optimize_mod(*inputs)
         self.assertTrue(torch.allclose(ref_output, output))
 
     @parameterized.expand(
@@ -595,9 +591,8 @@ class TestTransformSetitem(AccTestCase):
         m.cuda()
 
         ref_output = m(*inputs)
-        optimize_ctx = torchdynamo.optimize(backends.fx2trt_compiler, nopython=True)
-        with optimize_ctx:
-            output = m(*inputs)
+        optimize_mod = torchdynamo.optimize(backends.fx2trt_compiler, nopython=True)(m)
+        output = optimize_mod(*inputs)
         self.assertTrue(torch.allclose(ref_output, output))
 
 

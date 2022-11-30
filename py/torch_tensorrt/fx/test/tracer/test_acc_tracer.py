@@ -2,7 +2,7 @@
 import logging
 import operator
 import unittest
-from typing import Callable, Dict, List, NamedTuple
+from typing import Callable, Dict, List, NamedTuple, Optional, Tuple
 
 import numpy as np
 import torch
@@ -38,12 +38,12 @@ class AccTracerTest(unittest.TestCase):
         input = torch.randn(input_shape)
         traced = acc_tracer.trace(model, [input])
         if enable_allclose:
-            torch.testing.assert_allclose(model(input), traced(input))
+            torch.testing.assert_close(model(input), traced(input))
         else:
             self.assertTrue(torch.equal(model(input), traced(input)))
         traced_again = acc_tracer.trace(traced, [input])
         if enable_allclose:
-            torch.testing.assert_allclose(model(input), traced_again(input))
+            torch.testing.assert_close(model(input), traced_again(input))
         else:
             self.assertTrue(torch.equal(model(input), traced_again(input)))
 
@@ -109,10 +109,10 @@ class AccTracerTest(unittest.TestCase):
             ref_outputs, outputs, outputs_again
         ):
             if enable_allclose:
-                torch.testing.assert_allclose(
+                torch.testing.assert_close(
                     torch.nan_to_num(ref_output), torch.nan_to_num(output)
                 )
-                torch.testing.assert_allclose(
+                torch.testing.assert_close(
                     torch.nan_to_num(ref_output), torch.nan_to_num(output_again)
                 )
             else:
@@ -1515,7 +1515,7 @@ class AccTracerTest(unittest.TestCase):
 
         ref = m(x)
         res = traced(x)
-        torch.testing.assert_allclose(ref, res)
+        torch.testing.assert_close(ref, res)
 
     def test_add_with_alpha(self):
         """
@@ -1969,7 +1969,7 @@ class AccTracerTest(unittest.TestCase):
             else:
                 self.fail(f"Unexpected node: {node.format_node()}")
 
-        torch.testing.assert_allclose(m(input, a, b), traced(input, a, b))
+        torch.testing.assert_close(m(input, a, b), traced(input, a, b))
 
     def test_log1p(self):
         class TestModule(torch.nn.Module):
@@ -1999,7 +1999,7 @@ class AccTracerTest(unittest.TestCase):
             else:
                 self.fail(f"Unexpected node: {node.format_node()}")
 
-        torch.testing.assert_allclose(m(input), traced(input))
+        torch.testing.assert_close(m(input), traced(input))
 
     @parameterized.expand([(torch.float,), (torch.float16,)])
     def test_addmm(self, dtype):
@@ -2274,6 +2274,36 @@ class AccTracerTest(unittest.TestCase):
         self.assertEqual(getitem_1.meta["tensor_rank"], ph.meta["tensor_rank"]["bar"])
 
         self.assertTrue(torch.equal(m(input), traced(input)))
+
+    def test_none_type_ret(self):
+        """
+        Test that a NoneType is traced as expected.
+        """
+
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(
+                self, a: torch.Tensor
+            ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+                return a + a, None
+
+        m = TestModule()
+        input = torch.randn(1, 2, 3)
+        try:
+            traced = acc_tracer.trace(
+                m,
+                [input],
+            )
+        except RuntimeError as e:
+            self.assertEqual(
+                "This error should not be triggered, as NoneType should be lowered without an issue",
+                str(e),
+            )
+        ans1, _ = m(input)
+        ans2, _ = traced(input)
+        self.assertTrue(torch.equal(ans1, ans2))
 
     def test_mobilenet_v3(self):
         """
@@ -2615,6 +2645,7 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.sign,
                 acc_ops.permute,
                 acc_ops.matmul,
+                # acc_ops.roi_align,
                 acc_ops.quantize_per_tensor,
                 acc_ops.quantize_per_channel,
                 acc_ops.quantized_add,
