@@ -7,7 +7,7 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "# Copyright 2022 NVIDIA Corporation. All Rights Reserved.\n",
+    "# Copyright 2020 NVIDIA Corporation. All Rights Reserved.\n",
     "#\n",
     "# Licensed under the Apache License, Version 2.0 (the \"License\");\n",
     "# you may not use this file except in compliance with the License.\n",
@@ -28,8 +28,6 @@
    "id": "18ee9d62",
    "metadata": {},
    "source": [
-    "<img src=\"http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_dynamic_shapes/nvidia_logo.png\" width=\"90px\">\n",
-    "\n",
     "# Torch-TensorRT - Using Dynamic Shapes"
    ]
   },
@@ -38,14 +36,14 @@
    "id": "73703695",
    "metadata": {},
    "source": [
-    "Torch-TensorRT is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime. Unlike PyTorch's Just-In-Time (JIT) compiler, Torch-TensorRT is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your TorchScript code, you go through an explicit compile step to convert a standard TorchScript program into a module targeting a TensorRT engine. Torch-TensorRT operates as a PyTorch extension and compiles modules that integrate into the JIT runtime seamlessly. After compilation, using the optimized graph should feel no different than running a TorchScript module. You also have access to TensorRT's suite of configurations at compile-time, so you are able to specify operating precision (FP32/FP16/INT8) and other settings for your module.\n",
+    "Torch-TensorRT is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime. Unlike PyTorch's Just-In-Time (JIT) compiler, Torch-TensorRT is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your TorchScript code, you go through an explicit compile step to convert a standard TorchScript program into an module targeting a TensorRT engine. Torch-TensorRT operates as a PyTorch extention and compiles modules that integrate into the JIT runtime seamlessly. After compilation using the optimized graph should feel no different than running a TorchScript module. You also have access to TensorRT's suite of configurations at compile time, so you are able to specify operating precision (FP32/FP16/INT8) and other settings for your module.\n",
     "\n",
-    "We highly encourage users to run this notebook using our NVIDIA's [PyTorch container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch). It comes packaged with a host of NVIDIA libraries and optimizations to widely used third-party libraries. In addition, this container is tested and updated on a monthly cadence!\n",
+    "We highly encorage users to use our NVIDIA's [PyTorch container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch) to run this notebook. It comes packaged with a host of NVIDIA libraries and optimizations to widely used third party libraries. This container is tested and updated on a monthly cadence!\n",
     "\n",
     "This notebook has the following sections:\n",
     "1. [TL;DR Explanation](#1)\n",
-    "2. [Setting up the model](#2)\n",
-    "3. [Working with Dynamic shapes in Torch TRT](#3)"
+    "1. [Setting up the model](#2)\n",
+    "1. [Working with Dynamic shapes in Torch TRT](#3)"
    ]
   },
   {
@@ -53,7 +51,6 @@
    "id": "1603028d",
    "metadata": {},
    "source": [
-    "<a id=\"1\"></a>\n",
     "---\n",
     "## TL;DR Explanation\n",
     "\n",
@@ -190,7 +187,6 @@
    "id": "0ed1b4f7",
    "metadata": {},
    "source": [
-    "<a id=\"2\"></a>\n",
     "---\n",
     "## Setting up the model\n",
     "\n",
@@ -637,7 +633,7 @@
    "id": "21402d53",
    "metadata": {},
    "source": [
-    "Let's test our util functions on the model we have set up, starting with simple predictions."
+    "Let's test our util functions on the model we have set up, starting with simple predictions"
    ]
   },
   {
@@ -822,22 +818,21 @@
    "id": "bd5746da",
    "metadata": {},
    "source": [
-    "<a id=\"3\"></a>\n",
     "---\n",
     "## Working with Dynamic shapes in Torch TRT\n",
-    " \n",
-    "Enabling \"Dynamic Shaped\" tensors to be used is essentially enabling the ability to defer defining the shape of tensors until run-time. Torch TensorRT simply leverages TensorRT's Dynamic shape support. You can read more about TensorRT's implementation in the [TensorRT Documentation](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work_dynamic_shapes).\n",
-    " \n",
+    "\n",
+    "Enabling \"Dynamic Shaped\" tensors to be used is essentially enabling the ability to defer defining the shape of tensors until runetime. Torch TensorRT simply leverages TensorRT's Dynamic shape support. You can read more about TensorRT's implementation in the [TensorRT Documentation](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work_dynamic_shapes).\n",
+    "\n",
     "#### How can you use this feature?\n",
-    " \n",
+    "\n",
     "To make use of dynamic shapes, you need to provide three shapes:\n",
     "* `min_shape`: The minimum size of the tensor considered for optimizations.\n",
-    "* `opt_shape`: The optimizations will be done in an effort to maximize performance for this shape.\n",
-    "* `max_shape`: The maximum size of the tensor considered for optimizations.\n",
-    " \n",
-    "Generally, users can expect the best performance within the specified ranges. Performance for other shapes maybe be lower for other shapes (depending on the model ops and GPU used)\n",
-    " \n",
-    "In the following example, we will showcase varying batch sizes, which is the zeroth dimension of our input tensors. As Convolution operations require that the channel dimension be a build-time constant, we won't be changing the sizes of other channels in this example, but for models which contain ops conducive to changes in other channels, this functionality can be freely used."
+    "* `opt_shape`: The optimizations will be done with an effort to maximize performance for this shape.\n",
+    "* `min_shape`: The maximum size of the tensor considered for optimizations.\n",
+    "\n",
+    "Generally, users can expect best performance within the specified ranges. Performance for other shapes may be be lower for other shapes (depending on the model ops and GPU used)\n",
+    "\n",
+    "In the following example, we will showcase varing batch size, which is the zeroth dimension of our input tensors. As Convolution operations require that the channel dimension be a build-time constant, we won't be changing sizes of other channels in this example, but for models which contain ops conducive to changes in other channels, this functionality can be freely used."
    ]
   },
   {

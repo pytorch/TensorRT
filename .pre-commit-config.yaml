@@ -6,6 +6,8 @@ repos:
       - id: check-yaml
       - id: trailing-whitespace
       - id: check-added-large-files
+        args:
+          - --maxkb=1000
       - id: check-vcs-permalinks
       - id: check-merge-conflict
       - id: mixed-line-ending
