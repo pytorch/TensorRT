@@ -39,7 +39,15 @@ void UnpackVar(std::shared_ptr<torch::jit::Graph>& graph);
 void AliasOperators(std::shared_ptr<torch::jit::Graph>& graph);
 void SiluToSigmoidMultipication(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackHardSwish(std::shared_ptr<torch::jit::Graph>& graph);
+void RewriteInputsWithParams(std::shared_ptr<torch::jit::Graph>& g, std::vector<torch::jit::IValue>& params);
 void UnpackHardSigmoid(std::shared_ptr<torch::jit::Graph>& graph);
+void UnpackAndCastMaskedFill(std::shared_ptr<torch::jit::Graph>& graph, std::string target_device_name);
+void UnpackAndCastNumToTensor(std::shared_ptr<torch::jit::Graph>& graph, std::string target_device_name);
+void UnpackAndCastFull(std::shared_ptr<torch::jit::Graph>& graph, std::string target_device_name);
+void ReplaceScalarImplicit(std::shared_ptr<torch::jit::Graph>& graph);
+
+// utility functions exposed for testing
+std::string unmangle_cls_name(const std::string& name);
 
 } // namespace passes
 } // namespace lowering

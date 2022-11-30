@@ -9,7 +9,8 @@ TEST(Converters, ATenEinsumConvertsMatMulCorrectly) {
       graph(%x.1 : Tensor, %x.2 : Tensor):
         %0 : str = prim::Constant[value="ij,jk->ik"]()
         %3 : Tensor[] = prim::ListConstruct(%x.1, %x.2)
-        %4 : Tensor = aten::einsum(%0, %3)
+        %none : NoneType = prim::Constant()
+        %4 : Tensor = aten::einsum(%0, %3, %none)
         return (%4))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -34,7 +35,8 @@ TEST(Converters, ATenEinsumConvertsElementwiseProdCorrectly) {
       graph(%x.1 : Tensor, %x.2 : Tensor):
         %0 : str = prim::Constant[value="abcd,abcd->abcd"]()
         %3 : Tensor[] = prim::ListConstruct(%x.1, %x.2)
-        %4 : Tensor = aten::einsum(%0, %3)
+        %none : NoneType = prim::Constant()
+        %4 : Tensor = aten::einsum(%0, %3, %none)
         return (%4))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -59,7 +61,8 @@ TEST(Converters, ATenEinsumConvertsTransposeCorrectly) {
       graph(%x.1 : Tensor):
         %0 : str = prim::Constant[value="jk->kj"]()
         %3 : Tensor[] = prim::ListConstruct(%x.1)
-        %4 : Tensor = aten::einsum(%0, %3)
+        %none : NoneType = prim::Constant()
+        %4 : Tensor = aten::einsum(%0, %3, %none)
         return (%4))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -83,7 +86,8 @@ TEST(Converters, ATenEinsumConvertsVectorsCorrectly) {
       graph(%x.1 : Tensor, %x.2 : Tensor):
         %0 : str = prim::Constant[value="a,b->ab"]()
         %3 : Tensor[] = prim::ListConstruct(%x.1, %x.2)
-        %4 : Tensor = aten::einsum(%0, %3)
+        %none : NoneType = prim::Constant()
+        %4 : Tensor = aten::einsum(%0, %3, %none)
         return (%4))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();

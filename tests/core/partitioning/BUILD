@@ -40,6 +40,10 @@ partitioning_test(
     name = "test_resolve_nontensor_inputs",
 )
 
+partitioning_test(
+    name = "test_type_auto_conversion",
+)
+
 cc_test(
     name = "test_loading_model",
     srcs = ["test_loading_model.cpp"],
@@ -112,5 +116,6 @@ test_suite(
         ":test_shape_analysis",
         ":test_stitched_graph",
         ":test_tensorrt_conversion",
+        ":test_type_auto_conversion",
     ],
 )

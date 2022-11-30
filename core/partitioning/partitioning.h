@@ -18,15 +18,24 @@ typedef std::unordered_map<const torch::jit::Value*, torch::jit::IValue> Example
 typedef std::pair<std::shared_ptr<torch::jit::Graph>, std::unordered_map<torch::jit::Value*, torch::jit::Value*>>
     GraphAndMapping;
 
-ExampleIValues generateRandomInputs(ir::CollectionInputSpecMap& input_ranges, ir::CollectionTypeMap& input_types);
+ExampleIValues generateRandomInputs(
+    ir::CollectionInputSpecMap& input_ranges,
+    ir::CollectionTypeMap& input_types,
+    const ir::ShapeMode& shape_mode = ir::ShapeMode::kOPT);
 
-void runShapeAnalysis(PartitioningCtx* ctx, torch::jit::Block* block, ExampleIValues& ivalues_maps);
+void populateInputIValues(PartitioningCtx* ctx);
+
+void runShapeAnalysis(
+    PartitioningCtx* ctx,
+    torch::jit::Block* block,
+    ExampleIValues& ivalues_maps,
+    const ir::ShapeMode& shape_mode);
 
 void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block);
 
 GraphAndMapping stitch(PartitioningCtx* ctx, torch::jit::Block* block);
 
-void partition(PartitioningCtx* ctx, ExampleIValues& example_tensor_map);
+void partition(PartitioningCtx* ctx);
 
 } // namespace partitioning
 } // namespace core

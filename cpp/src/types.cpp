@@ -280,7 +280,7 @@ std::vector<torch_tensorrt::core::ir::Input> to_vec_internal_inputs(std::vector<
   return internal;
 }
 
-torch_tensorrt::core::runtime::CudaDevice to_internal_cuda_device(Device device) {
+torch_tensorrt::core::runtime::RTDevice to_internal_rt_device(Device device) {
   auto device_type = nvinfer1::DeviceType::kGPU;
   switch (device.device_type) {
     case Device::DeviceType::kDLA:
@@ -290,6 +290,6 @@ torch_tensorrt::core::runtime::CudaDevice to_internal_cuda_device(Device device)
     default:
       device_type = nvinfer1::DeviceType::kGPU;
   }
-  return torch_tensorrt::core::runtime::CudaDevice(device.gpu_id, device_type);
+  return torch_tensorrt::core::runtime::RTDevice(device.gpu_id, device_type);
 }
 } // namespace torch_tensorrt

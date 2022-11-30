@@ -81,7 +81,8 @@ class TestConvolutionConverter(VanillaTestCase):
             ("tuple_parameters", 1, (1, 1, 1), (0, 0, 0)),
             param("non_zero_padding", 1, padding=1),
             param("dilation", 1, dilation=2),
-            param("groups", 1, groups=3),
+            # TODO: Enable this when TRT fixes https://github.com/pytorch/TensorRT/issues/1445
+            # param("groups", 1, groups=3),
         ]
     )
     def test_conv3d(

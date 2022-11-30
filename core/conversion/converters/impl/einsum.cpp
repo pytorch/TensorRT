@@ -12,11 +12,18 @@ namespace impl {
 namespace {
 
 auto einsum_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
-    {"aten::einsum(str equation, Tensor[] tensors) -> (Tensor)",
+    {"aten::einsum(str equation, Tensor[] tensors, *, int[]? path=None) -> (Tensor)",
      [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        // Extract equation and list of tensors
        auto equation = args[0].unwrapToString();
        auto in = args[1].IValue()->toListRef();
+
+       TORCHTRT_CHECK(
+           in.size() <= 2,
+           "TensorRT currently supports up to 2 input tensors "
+               << "to einsum but operation had " << in.size()
+               << " input tensors, please specify torch_executed_ops=[\"aten::einsum\"] "
+               << "at compilation time to avoid this error.");
 
        std::vector<nvinfer1::ITensor*> tensors;
 

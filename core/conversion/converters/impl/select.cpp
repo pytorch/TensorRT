@@ -287,7 +287,7 @@ auto select_registrations TORCHTRT_UNUSED =
 
                std::vector<nvinfer1::ITensor*> tensors;
                std::vector<int32_t> adv_idx_indices;
-               for (auto i = 0; i < ts.size(); i++) {
+               for (size_t i = 0; i < ts.size(); i++) {
                  auto t = ts[i];
                  if (t.isTensor()) {
                    auto torch_tensor = t.toTensor().to(torch::kInt32);
@@ -662,8 +662,15 @@ auto select_registrations TORCHTRT_UNUSED =
                auto self = args[0].ITensorOrFreeze(ctx);
                auto mask = args[1].ITensorOrFreeze(ctx);
                mask = addPadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
-               auto val = args[2].unwrapToScalar().to<float>();
-               auto val_t = tensor_to_const(ctx, torch::full(util::toVec(self->getDimensions()), val));
+               auto val = args[2].unwrapToScalar();
+
+               // Tensor type to use for initializing constant tensor used in Select
+               // value should inherit its type from self
+               auto val_t_dtype = util::TRTDataTypeToScalarType(self->getType());
+
+               // Initialize contant tensor for fill with the inherited data type
+               auto val_t = tensor_to_const(
+                   ctx, torch::full(util::toVec(self->getDimensions()), val, {torch::dtype(val_t_dtype)}));
 
                TORCHTRT_CHECK(
                    util::broadcastable(self->getDimensions(), mask->getDimensions(), /*multidirectional=*/false),
@@ -718,6 +725,23 @@ auto select_registrations TORCHTRT_UNUSED =
                layer->setAxis(dim);
 
                TORCHTRT_CHECK(layer, "Unable to create layer for aten::scatter.src");
+
+               layer->setName(util::node_info(n).c_str());
+
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }})
+        .pattern(
+            {"aten::where.self(Tensor condition, Tensor self, Tensor other) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto condition = args[0].ITensorOrFreeze(ctx);
+               auto x = args[1].ITensorOrFreeze(ctx);
+               auto y = args[2].ITensorOrFreeze(ctx);
+
+               auto layer = ctx->net->addSelect(*condition, *x, *y);
+
+               TORCHTRT_CHECK(layer, "Unable to create select layer for aten::where.self");
 
                layer->setName(util::node_info(n).c_str());
 
