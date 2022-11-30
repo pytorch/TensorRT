@@ -28,10 +28,10 @@ RELEASE = False
 
 CI_RELEASE = False
 
-__version__ = "1.3.0a0"
-__cuda_version__ = "11.6"
-__cudnn_version__ = "8.4"
-__tensorrt_version__ = "8.4"
+__version__ = "1.3.0"
+__cuda_version__ = "11.7"
+__cudnn_version__ = "8.5"
+__tensorrt_version__ = "8.5"
 
 
 def get_git_revision_short_hash() -> str:
@@ -375,9 +375,7 @@ setup(
     long_description_content_type="text/markdown",
     long_description=long_description,
     ext_modules=ext_modules,
-    install_requires=[
-        "torch>=1.13.0.dev0,<1.14.0",
-    ],
+    install_requires=["torch>=1.13.0,<1.14.0", "tensorrt>=8.5.1.7,<8.6.0"],
     setup_requires=[],
     cmdclass={
         "install": InstallCommand,

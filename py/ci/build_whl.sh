@@ -5,39 +5,43 @@
 cd /workspace/project/py
 
 export CXX=g++
-export CUDA_HOME=/usr/local/cuda-11.6
+export CUDA_HOME=/usr/local/cuda-11.7
 PROJECT_DIR=/workspace/project
 
 cp -r $CUDA_HOME /usr/local/cuda
 
 build_py37() {
+    /opt/python/cp37-cp37m/bin/python -m pip install --upgrade pip
     /opt/python/cp37-cp37m/bin/python -m pip install -r requirements.txt
     /opt/python/cp37-cp37m/bin/python setup.py bdist_wheel --release --ci
-    #auditwheel repair --plat manylinux2014_x86_64
+    #LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/python/cp37-cp37m/lib/python3.7/site-packages/torch/lib:/opt/python/cp37-cp37m/lib/python3.7/site-packages/tensorrt/:/usr/local/cuda-11.7/lib64:/usr/local/cuda-11.7/lib64/stubs /opt/python/cp37-cp37m/bin/python -m auditwheel repair --plat manylinux_2_17_x86_64 dist/torch_tensorrt-*-cp37-cp37m-linux_x86_64.whl
 }
 
 build_py38() {
+    /opt/python/cp38-cp38/bin/python -m pip install --upgrade pip
     /opt/python/cp38-cp38/bin/python -m pip install -r requirements.txt
     /opt/python/cp38-cp38/bin/python setup.py bdist_wheel --release --ci
-    #auditwheel repair --plat manylinux2014_x86_64
+    #LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/python/cp38-cp38/lib/python3.8/site-packages/torch/lib:/opt/python/cp38-cp38/lib/python3.8/site-packages/tensorrt/:/usr/local/cuda-11.7/lib64:/usr/local/cuda-11.7/lib64/stubs /opt/python/cp38-cp38/bin/python -m auditwheel repair --plat manylinux_2_17_x86_64 dist/torch_tensorrt-*-cp38-cp38-linux_x86_64.whl
 }
 
 build_py39() {
+    /opt/python/cp39-cp39/bin/python -m pip install --upgrade pip
     /opt/python/cp39-cp39/bin/python -m pip install -r requirements.txt
     /opt/python/cp39-cp39/bin/python setup.py bdist_wheel --release --ci
-    #auditwheel repair --plat manylinux2014_x86_64
+    #LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/python/cp39-cp39/lib/python3.8/site-packages/torch/lib:/opt/python/cp39-cp39/lib/python3.9/site-packages/tensorrt/:/usr/local/cuda-11.7/lib64:/usr/local/cuda-11.7/lib64/stubs /opt/python/cp39-cp39/bin/python -m auditwheel repair --plat manylinux_2_17_x86_64 dist/torch_tensorrt-*-cp39-cp39-linux_x86_64.whl
 }
 
 build_py310() {
+    /opt/python/cp310-cp310/bin/python -m pip install --upgrade pip
     /opt/python/cp310-cp310/bin/python -m pip install -r requirements.txt
     /opt/python/cp310-cp310/bin/python setup.py bdist_wheel --release --ci
-    #auditwheel repair --plat manylinux2014_x86_64
+    #LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/python/cp310-cp310/lib/python3.8/site-packages/torch/lib:/opt/python/cp310-cp310/lib/python3.8/site-packages/tensorrt/:/usr/local/cuda-11.7/lib64:/usr/local/cuda-11.7/lib64/stubs /opt/python/cp38-cp38/bin/python -m auditwheel repair --plat manylinux_2_17_x86_64 dist/torch_tensorrt-*-cp310-cp310-linux_x86_64.whl
 }
 
 #build_py311() {
 #    /opt/python/cp311-cp311/bin/python -m pip install -r requirements.txt
 #    /opt/python/cp311-cp311/bin/python setup.py bdist_wheel --release --ci
-#    #auditwheel repair --plat manylinux2014_x86_64
+#    #auditwheel repair --plat manylinux_2_17_x86_64
 #}
 
 build_libtorchtrt() {
