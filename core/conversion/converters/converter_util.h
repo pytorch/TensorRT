@@ -22,7 +22,8 @@ nvinfer1::ITensor* addPadding(
     nvinfer1::ITensor* tensor,
     int nDim,
     bool trailing = true,
-    bool use_zeros = true);
+    bool use_zeros = true,
+    const std::string& name = "");
 
 // If nDim < tensor size, adds shuffle layer to un-pad tensor (at the end if trailing) and returns (nDim-dimensional)
 // shuffle layer's output Otherwise, does nothing and passes tensor through. use _zeros controls whether we should be
@@ -33,7 +34,8 @@ nvinfer1::ITensor* addUnpadding(
     nvinfer1::ITensor* tensor,
     int nDim,
     bool trailing = true,
-    bool use_zeros = true);
+    bool use_zeros = true,
+    const std::string& name = "");
 
 // TODO: Change add_elementwise schema to output nvinfer1::ITensor* instead of nvinfer1::ILayer*,
 // for consistency with other utils. Need to change schema and usage in all calling contexts
