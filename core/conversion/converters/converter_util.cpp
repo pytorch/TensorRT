@@ -205,7 +205,11 @@ nvinfer1::ITensor* applyIdentityOp(ConversionCtx* ctx, nvinfer1::ITensor* tensor
   return id_out_tensor;
 }
 
-nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nvinfer1::DataType dtype) {
+nvinfer1::ITensor* castITensor(
+    ConversionCtx* ctx,
+    nvinfer1::ITensor* tensor,
+    nvinfer1::DataType dtype,
+    const std::string& layer_name_prefix) {
   if (tensor->getType() != dtype) {
     std::ostringstream tensor_id;
     tensor_id << reinterpret_cast<int*>(tensor);
@@ -219,6 +223,9 @@ nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nv
     LOG_DEBUG(ctx->logger, "Casting ITensor " << tensor_id.str() << " from " << tensor->getType() << " to " << dtype);
 
     std::stringstream ss;
+    if (layer_name_prefix.size()) {
+      ss << layer_name_prefix << " ";
+    }
     ss << "[Cast ITensor " << tensor_id.str() << " from " << tensor->getType() << " to " << dtype << "]";
     id_layer->setName(ss.str().c_str());
     return casted_tensor;

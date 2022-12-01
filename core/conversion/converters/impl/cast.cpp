@@ -26,7 +26,7 @@ auto cast_registrations TORCHTRT_UNUSED =
                } else {
                  trt_dtype = util::ScalarTypeToTRTDataType(static_cast<at::ScalarType>(output_dtype));
                }
-               auto casted_itensor = castITensor(ctx, self, trt_dtype);
+               auto casted_itensor = castITensor(ctx, self, trt_dtype, util::node_info(n));
                auto output = ctx->AssociateValueAndTensor(n->outputs()[0], casted_itensor);
                LOG_DEBUG("[aten::to.dtype] Output tensor shape: " << output->getDimensions());
 
@@ -48,7 +48,7 @@ auto cast_registrations TORCHTRT_UNUSED =
                } else {
                  trt_dtype = util::ScalarTypeToTRTDataType(static_cast<at::ScalarType>(output_dtype));
                }
-               auto casted_itensor = castITensor(ctx, self, trt_dtype);
+               auto casted_itensor = castITensor(ctx, self, trt_dtype, util::node_info(n));
                auto output = ctx->AssociateValueAndTensor(n->outputs()[0], casted_itensor);
                LOG_DEBUG("[aten::to.device] Output tensor shape: " << output->getDimensions());
 
@@ -59,7 +59,7 @@ auto cast_registrations TORCHTRT_UNUSED =
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto self = args[0].ITensorOrFreeze(ctx);
                nvinfer1::DataType other_dtype = args[1].ITensorOrFreeze(ctx)->getType();
-               auto casted_itensor = castITensor(ctx, self, other_dtype);
+               auto casted_itensor = castITensor(ctx, self, other_dtype, util::node_info(n));
                auto output = ctx->AssociateValueAndTensor(n->outputs()[0], casted_itensor);
                LOG_DEBUG("[aten::to.other] Output tensor shape: " << output->getDimensions());
 
@@ -77,7 +77,7 @@ auto cast_registrations TORCHTRT_UNUSED =
 
                auto output_dtype = args[2].unwrapToScalar().to<int64_t>();
                auto trt_dtype = util::ScalarTypeToTRTDataType(static_cast<at::ScalarType>(output_dtype));
-               auto casted_itensor = castITensor(ctx, self, trt_dtype);
+               auto casted_itensor = castITensor(ctx, self, trt_dtype, util::node_info(n));
                auto output = ctx->AssociateValueAndTensor(n->outputs()[0], casted_itensor);
                LOG_DEBUG("[aten::to.prim_Device] Output tensor shape: " << output->getDimensions());
 

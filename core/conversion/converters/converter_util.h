@@ -56,7 +56,11 @@ nvinfer1::ITensor* add_abs(
 nvinfer1::ITensor* applyIdentityOp(ConversionCtx* ctx, nvinfer1::ITensor* tensor, const std::string& name);
 
 // If an ITensor is of a type not dtype, add an Identity layer to cast it to dtype
-nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nvinfer1::DataType dtype);
+nvinfer1::ITensor* castITensor(
+    ConversionCtx* ctx,
+    nvinfer1::ITensor* tensor,
+    nvinfer1::DataType dtype,
+    const std::string& layer_name_prefix = "");
 
 // Freeze an at::Tensor in a IConstant layer
 nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t, const std::string& name = std::string());
