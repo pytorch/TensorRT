@@ -28,7 +28,7 @@ RELEASE = False
 
 CI_RELEASE = False
 
-__version__ = "1.3.0a0"
+__version__ = "1.4.0dev0"
 __cuda_version__ = "11.6"
 __cudnn_version__ = "8.4"
 __tensorrt_version__ = "8.4"
