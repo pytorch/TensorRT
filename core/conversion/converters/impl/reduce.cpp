@@ -113,6 +113,14 @@ auto reduce_registrations TORCHTRT_UNUSED =
                LOG_DEBUG("Keep dims: " << keepdim);
 
                LOG_WARNING("Sum converter disregards dtype");
+
+               if (in_tensor->getType() == nvinfer1::DataType::kBOOL) {
+                 LOG_DEBUG(
+                     "Found type  " << in_tensor->getType() << " in aten::sum, casting to "
+                                    << nvinfer1::DataType::kINT32 << " for compatibility.");
+                 in_tensor = castITensor(ctx, in_tensor, nvinfer1::DataType::kINT32);
+               }
+
                auto sum_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kSUM, axis_mask, keepdim);
 
                TORCHTRT_CHECK(sum_layer, "Unable to create sum layer from node: " << *n);
