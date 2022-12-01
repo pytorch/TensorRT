@@ -1,5 +1,7 @@
 #include "util.h"
+#include <string>
 #include "core/util/prelude.h"
+#include "gtest/gtest.h"
 #include "torch/script.h"
 #include "torch/torch.h"
 
@@ -46,6 +48,57 @@ bool exactlyEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor
   std::cout << "Max Difference: " << (computed_tensor - gt_tensor).abs().max().item<float>() << std::endl;
 
   return (computed_tensor - gt_tensor).abs().max().item<float>() == 0.f;
+}
+
+void pointwise_test_helper(
+    std::string graph_ir,
+    bool singleInput,
+    bool dynamicInput,
+    std::vector<int64_t> shape1,
+    std::vector<int64_t> shape2,
+    bool negative_input,
+    at::ScalarType type1,
+    at::ScalarType type2) {
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph_ir, g.get());
+
+  // singleInput case is enabled when elementwise operation is performed
+  // with an input and a constant embedded in graph
+  std::vector<at::Tensor> torch_inputs;
+  int first_min = negative_input ? -5 : 1;
+  int first_max = 5;
+  int second_min = 1;
+  int second_max = 5;
+  if (type1 == at::kBool) {
+    first_min = 0;
+    first_max = 1;
+  }
+  if (type2 == at::kBool) {
+    second_min = 0;
+    second_max = 1;
+  }
+  torch_inputs.push_back(at::randint(first_min, first_max, shape1, at::TensorOptions(at::kCUDA).dtype(type1)));
+  if (!singleInput) {
+    torch_inputs.push_back(at::randint(second_min, second_max, shape2, at::TensorOptions(at::kCUDA).dtype(type2)));
+  }
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, torch_inputs);
+
+  std::vector<at::Tensor> trt_inputs;
+  for (auto in : torch_inputs) {
+    trt_inputs.push_back(at::clone(in));
+  }
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  std::vector<at::Tensor> trt_results;
+  if (dynamicInput) {
+    trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, trt_inputs);
+  } else {
+    trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, trt_inputs);
+  }
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 } // namespace util
