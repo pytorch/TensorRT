@@ -137,6 +137,16 @@ converts_keepdims_correctly(mean, Mean);
 
 #undef converts_keepdims_correctly
 
+TEST(Converters, ATenSumBoolConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %4 : None = prim::Constant()
+      %5 : Tensor = aten::sum(%0, %4)
+      return (%5))IR";
+  auto in = at::randint(-1, 2, {4, 4, 4}, at::kCUDA).to(at::kBool);
+  test_body(graph, in);
+}
+
 TEST(Converters, ATenSumDimNegOneIndexConvertsCorrectly) {
   const auto graph = R"IR(
     graph(%0 : Tensor):
