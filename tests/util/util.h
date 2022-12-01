@@ -6,6 +6,7 @@
 #include "ATen/Tensor.h"
 #include "core/ir/ir.h"
 #include "core/util/prelude.h"
+#include "torch/csrc/jit/ir/irparser.h"
 
 namespace torch_tensorrt {
 namespace tests {
@@ -20,6 +21,16 @@ bool cosineSimEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tens
 bool almostEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float atol = ATOL, float rtol = RTOL);
 
 bool exactlyEqual(const at::Tensor& a, const at::Tensor& b);
+
+void pointwise_test_helper(
+    std::string graph_ir,
+    bool singleInput,
+    bool dynamicInput = false,
+    std::vector<int64_t> shape1 = {5},
+    std::vector<int64_t> shape2 = {5},
+    bool negative_input = false,
+    at::ScalarType type1 = at::kFloat,
+    at::ScalarType type2 = at::kFloat);
 
 std::vector<at::Tensor> RunEngine(std::string& eng, std::vector<at::Tensor> inputs);
 

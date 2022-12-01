@@ -30,6 +30,7 @@ cc_library(
     ],
     deps = [
         "@tensorrt//:nvinfer",
+        "@googletest//:gtest_main",
     ] + select({
         ":use_pre_cxx11_abi": [
             "@libtorch_pre_cxx11_abi//:libtorch",
