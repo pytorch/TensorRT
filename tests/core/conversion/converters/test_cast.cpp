@@ -163,6 +163,34 @@ TEST(Converters, ATenToSingleConvertsCorrectly) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
+TEST(Converters, ATenToDuplicateConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%y.1 : Tensor):
+            %4 : int = prim::Constant[value=3]()
+            %5 : bool = prim::Constant[value=0]()
+            %6 : None = prim::Constant()
+            %y0.1 : Tensor = aten::to(%y.1, %4, %5, %5, %6)
+            %y0.2 : Tensor = aten::to(%y.1, %4, %5, %5, %6)
+            return (%y0.1, %y0.2))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, &*g);
+
+  auto in = at::randint(1, 10, {3}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
+  for (size_t i = 0UL; i < jit_results.size(); ++i) {
+    ASSERT_TRUE(jit_results[i].scalar_type() == trt_results[i].scalar_type());
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt_results[i], 2e-6));
+  }
+}
+
 TEST(Converters, ATenTypeAsConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor,
