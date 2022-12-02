@@ -424,7 +424,7 @@ def add(*, input, other):
 @register_acc_op_mapping(op_and_target=("call_method", "unsqueeze"))
 @register_acc_op_mapping(op_and_target=("call_function", torch.unsqueeze))
 @register_acc_op
-def unsqueeze(*, input, dim):
+def unsqueeze(*, input, dim: int):
     return torch.unsqueeze(input=input, dim=dim)
 
 
@@ -590,6 +590,7 @@ def clamp(*, input, min=None, max=None):
     return torch.clamp(input=input, min=min, max=max)
 
 
+@register_acc_op_mapping(op_and_target=("call_function", torch.concat))
 @register_acc_op_mapping(op_and_target=("call_function", torch.cat))
 @register_acc_op
 def cat(*, tensors, dim):
@@ -2725,6 +2726,43 @@ def packed_quantized_conv2d_mapper(
         return new_node
 
 
+# @register_acc_op
+# @register_acc_op_mapping(
+#     op_and_target=("call_function", torch.ops._caffe2.RoIAlign),
+#     arg_replacement_tuples=[
+#         ("features", "features"),
+#         ("rois", "rois"),
+#         ("order", "order"),
+#         ("spatial_scale", "spatial_scale"),
+#         ("pooled_h", "pooled_h"),
+#         ("pooled_w", "pooled_w"),
+#         ("sampling_ratio", "sampling_ratio"),
+#         ("aligned", "aligned"),
+#     ],
+# )
+# def roi_align(
+#     *,
+#     features,
+#     rois,
+#     order,
+#     spatial_scale,
+#     pooled_h,
+#     pooled_w,
+#     sampling_ratio,
+#     aligned,
+# ):
+#     return torch.ops._caffe2.RoIAlign(
+#         features=features,
+#         rois=rois,
+#         order=order,
+#         spatial_scale=spatial_scale,
+#         pooled_h=pooled_h,
+#         pooled_w=pooled_w,
+#         sampling_ratio=sampling_ratio,
+#         aligned=aligned,
+#     )
+
+
 @register_custom_acc_mapper_fn(
     op_and_target=("call_function", torch.ops.quantized.add_relu),
     arg_replacement_tuples=[
@@ -2786,9 +2824,16 @@ def packed_quantized_convrelu2d_mapper(
 @register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
 @register_acc_op_mapping(op_and_target=("call_function", torch.nn.functional.gelu))
 @register_acc_op_mapping(op_and_target=("call_method", "gelu"))
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_module", torch.nn.GELU),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("approximate", "approximate"),
+    ],
+)
 @register_acc_op
-def gelu(*, input):
-    return torch.nn.functional.gelu(input=input)
+def gelu(*, input, approximate="none"):
+    return torch.nn.functional.gelu(input=input, approximate=approximate)
 
 
 @register_acc_op_properties(AccOpProperty.unary)
@@ -3073,6 +3118,108 @@ def log_softmax_mapper(node: torch.fx.Node, _: torch.nn.Module) -> torch.fx.Node
         log_node.meta = node.meta.copy()
 
         return log_node
+
+
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_function", torch.nn.functional.softplus),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("beta", "beta", this_arg_is_optional),
+        ("threshold", "threshold", this_arg_is_optional),
+    ],
+)
+def softplus_mapper(node: torch.fx.Node, _: torch.nn.Module) -> torch.fx.Node:
+    """
+    Maps torch.nn.functional.softplus to acc_ops.where, acc_ops.relu, acc_ops.exp, acc_ops.mul, acc_ops.add and acc_ops.div
+
+    softplus(input, beta, threshold) = where(beta * input > threshold, relu(input), div(log(1 + exp(beta * input))), beta))
+
+    torch.where(
+        softplus_module.beta * sample_inputs[0] > softplus_module.threshold,
+        sample_inputs[0].relu(),
+        torch.div((1 + (softplus_module.beta * sample_inputs[0]).exp()).log(), softplus_module.beta),
+    )
+
+    """
+
+    input_node = node.kwargs["input"]
+    beta_node = node.kwargs["beta"]
+    threshold_node = node.kwargs["threshold"]
+
+    with node.graph.inserting_after(node):
+        cond_mul_node = node.graph.call_function(
+            mul,
+            kwargs={
+                "input": input_node,
+                "other": beta_node,
+            },
+        )
+        cond_mul_node.meta = input_node.meta.copy()
+
+    with node.graph.inserting_after(cond_mul_node):
+        gt_node = node.graph.call_function(
+            gt,
+            kwargs={
+                "input": cond_mul_node,
+                "other": threshold_node,
+            },
+        )
+        gt_node.meta = input_node.meta.copy()
+
+    with node.graph.inserting_after(gt_node):
+        relu_node = node.graph.call_function(relu, kwargs={"input": input_node})
+        relu_node.meta = input_node.meta.copy()
+
+    with node.graph.inserting_after(relu_node):
+        mul_node = node.graph.call_function(
+            mul,
+            kwargs={
+                "input": input_node,
+                "other": beta_node,
+            },
+        )
+        mul_node.meta = input_node.meta.copy()
+
+    with node.graph.inserting_after(mul_node):
+        exp_node = node.graph.call_function(exp, kwargs={"input": mul_node})
+        exp_node.meta = input_node.meta.copy()
+
+    with node.graph.inserting_after(exp_node):
+        add_node = node.graph.call_function(
+            add,
+            kwargs={
+                "input": exp_node,
+                "other": 1,
+            },
+        )
+        add_node.meta = input_node.meta.copy()
+
+    with node.graph.inserting_after(add_node):
+        log_node = node.graph.call_function(log, kwargs={"input": add_node})
+        log_node.meta = input_node.meta.copy()
+
+    with node.graph.inserting_after(log_node):
+        div_node = node.graph.call_function(
+            div,
+            kwargs={
+                "input": log_node,
+                "other": beta_node,
+            },
+        )
+        div_node.meta = input_node.meta.copy()
+
+    with node.graph.inserting_after(div_node):
+        where_node = node.graph.call_function(
+            where,
+            kwargs={
+                "condition": gt_node,
+                "x": relu_node,
+                "y": div_node,
+            },
+        )
+        where_node.meta = div_node.meta.copy()
+
+        return where_node
 
 
 @register_custom_acc_mapper_fn(

@@ -25,6 +25,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
     trt_transposed_linear,
     trt_transposed_matmul,
 )
+from torch_tensorrt.fx.tracer.acc_tracer.acc_ops import contiguous
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -3371,6 +3372,9 @@ def acc_ops_gelu(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
+    approximate = kwargs["approximate"]
+    if approximate is not "none":
+        raise RuntimeError("GeLU converter currently doesn't support fast gelu compute")
     if not isinstance(input_val, TRTTensor):
         raise RuntimeError(
             f"GELU received input {input_val} that is not part "

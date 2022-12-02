@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._Device &mdash; Torch-TensorRT master documentation</title>
+  <title>torch_tensorrt._Device &mdash; Torch-TensorRT v1.4.0dev0+b91e3e0 documentation</title>
   
 
   
@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  master (1.3.0a0+8ed2ae7)
+                  v1.4.0dev0+b91e3e0
                 </div>
               
             
@@ -471,6 +471,10 @@
         <span class="n">internal_dev</span><span class="o">.</span><span class="n">dla_core</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dla_core</span>
         <span class="n">internal_dev</span><span class="o">.</span><span class="n">allow_gpu_fallback</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">allow_gpu_fallback</span>
         <span class="k">return</span> <span class="n">internal_dev</span>
+
+    <span class="k">def</span> <span class="nf">_to_serialized_rt_device</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">internal_dev</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_internal</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">internal_dev</span><span class="o">.</span><span class="n">_to_serialized_rt_device</span><span class="p">()</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">_from_torch_device</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">torch_dev</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">):</span>

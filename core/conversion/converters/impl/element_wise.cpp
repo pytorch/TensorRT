@@ -325,7 +325,8 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                      add_elementwise(ctx, nvinfer1::ElementWiseOperation::kFLOOR_DIV, self, other, util::node_info(n));
                } else if (rounding_mode == "trunc") {
                  // trunc = floor(abs(div)) * sign(div)
-                 auto tmp_div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, "tmp_div");
+                 auto tmp_div = add_elementwise(
+                     ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n) + "_tmp_div");
                  auto abs = add_abs(ctx, n, tmp_div->getOutput(0), util::node_info(n) + "_absolute_val");
 
                  // In this case, we allow the floor unary on non-TRT Unary types, as it is needed for this

@@ -15,12 +15,12 @@ from transformers import (
 )
 from transformers import BertConfig, ReformerConfig, XLNetModel, XLNetConfig
 
-import torchdynamo
-from torchdynamo.optimizations import backends
-from torchdynamo.optimizations.training import aot_autograd_debug_strategy1
-from torchdynamo.optimizations.training import aot_autograd_speedup_strategy
-from torchdynamo.testing import collect_results
-from torchdynamo.testing import same
+import torch._dynamo as torchdynamo
+from torch._dynamo.optimizations import backends
+from torch._dynamo.optimizations.training import aot_autograd_debug_strategy1
+from torch._dynamo.optimizations.training import aot_autograd_speedup_strategy
+from torch._dynamo.testing import collect_results
+from torch._dynamo.testing import same
 
 torch.backends.cuda.matmul.allow_tf32 = True
 

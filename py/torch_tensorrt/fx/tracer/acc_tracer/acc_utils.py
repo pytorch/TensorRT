@@ -176,6 +176,8 @@ def map_tensor_metadata(a: Any, fn: Callable):
     """
     if isinstance(a, int):
         return 1
+    elif a is None:
+        return 1
     elif isinstance(a, TensorMetadata):
         return fn(a)
     elif isinstance(a, tuple):

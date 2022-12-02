@@ -31,7 +31,7 @@ class TRTModuleNext(torch.nn.Module):
 
     def __init__(
         self,
-        serialized_engine: bytearray,
+        serialized_engine: bytearray = bytearray(),
         name: str = "",
         input_binding_names: List[str] = [],
         output_binding_names: List[str] = [],
