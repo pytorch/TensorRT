@@ -260,10 +260,10 @@ commands:
     parameters:
       torch-build:
         type: string
-        default: "1.13.0"
+        default: "1.14.0.dev20221114+cu117"
       torch-build-index:
         type: string
-        default: "https://download.pytorch.org/whl/cu117"
+        default: "https://download.pytorch.org/whl/nightly/cu117"
     steps:
       - run:
           name: Install Torch
@@ -428,7 +428,7 @@ commands:
       - run:
           name: Test torch
           command: |
-            python3 -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count()); print(torch.__version__)"
+            python3 -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"
 
       - run:
           name: Get torch-tensorrt version information
@@ -792,6 +792,7 @@ jobs:
                   TORCHTRT_VERSION=$(cd ~/project/py/torch_tensorrt && python3 -c "from _version import __version__;print(__version__)")
                   TRT_VERSION=$(cd ~/project/py/torch_tensorrt && python3 -c "from _version import __tensorrt_version__;print(__tensorrt_version__)")
                   CUDNN_VERSION=$(cd ~/project/py/torch_tensorrt && python3 -c "from _version import __cudnn_version__;print(__cudnn_version__)")
+                  pip3 install --upgrade pip
                   pip3 install -r ~/project/py/requirements.txt
                   TORCH_VERSION=$(python3 -c "from torch import __version__;print(__version__.split('+')[0])")
                   cp ~/project/bazel-bin/libtorchtrt.tar.gz ~/project/py/dist/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
