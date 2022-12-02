@@ -51,17 +51,17 @@ new_local_repository(
 http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "0a013dceedb252f4965b666a2ad772d962135597db5889bd5d43644697c17dbc",
+    sha256 = "b565c662435fd58ec295fa0791388ea52ad0f5fd33517b2d7c0fdcc91b6db531",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu117/libtorch-cxx11-abi-shared-with-deps-1.13.0%2Bcu117.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu116/libtorch-cxx11-abi-shared-with-deps-1.14.0.dev20221114%2Bcu117.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "cdbd43985ad9d5886793d5dc455d665cf3fd4b4617ef1094479678ff210ed0af",
+    sha256 = "fbb37446c33b05c1e26256c09f6ffb46cea1f6ff9ee2ad5b79b146d09023b0c1",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu117/libtorch-shared-with-deps-1.13.0%2Bcu117.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu116/libtorch-shared-with-deps-1.14.0.dev20221114%2Bcu117.zip"],
 )
 
 ####################################################################################
