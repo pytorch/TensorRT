@@ -79,6 +79,17 @@ class TRTModuleNext(torch.nn.Module):
             ValueError("Expected serialized engine as bytearray")
 
         self.input_binding_names = input_binding_names
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         self.output_binding_names = output_binding_names
         self.name = name
 
