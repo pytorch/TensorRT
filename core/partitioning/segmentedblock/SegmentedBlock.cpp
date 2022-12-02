@@ -15,6 +15,13 @@ SegmentedBlock::SegmentedBlock(BlockID id, SegmentedBlockTarget blk_target, cons
 
 SegmentedBlock::SegmentedBlock(SegmentedBlockTarget blk_target, const std::vector<torch::jit::Node*>& nodes)
     : target_(blk_target), g_(std::make_shared<torch::jit::Graph>()) {
+        
+        
+        
+        
+        
+        
+        
   for (auto& node : nodes) {
     nodes_.push_back(node);
     appendNode(node);
