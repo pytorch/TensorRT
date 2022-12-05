@@ -800,7 +800,7 @@ jobs:
                 name: Collect packages
                 command: |
                   mkdir -p /tmp/dist/x86_64-linux
-                  cp -r ~/project/py/dist/* /tmp/dist/x86_64-linux
+                  cp -r ~/project/py/wheelhouse/* /tmp/dist/x86_64-linux
             - store_artifacts:
                 path: /tmp/dist/x86_64-linux
                 destination: x86_64-linux-pkgs
