@@ -4,6 +4,7 @@ from __future__ import division
 
 import time
 import timeit
+import warnings
 import numpy as np
 import torch.backends.cudnn as cudnn
 
@@ -147,6 +148,7 @@ def run_fx2trt(model, input_tensors, params, precision, batch_size):
         max_batch_size=batch_size,
         lower_precision=precision,
         verbose_log=False,
+        explicit_batch_dimension=True,
     )
     end_compile = time.time_ns()
     compile_time_ms = (end_compile - start_compile) / 1e6
@@ -272,6 +274,7 @@ def run(
     truncate_long_and_double=False,
     batch_size=1,
     is_trt_engine=False,
+    model_torch=None,
 ):
     for backend in backends:
         if precision == "int8":
@@ -323,7 +326,13 @@ def run(
             )
 
         elif backend == "fx2trt":
-            run_fx2trt(model, input_tensors, params, precision, batch_size)
+            if model_torch is None:
+                warnings.warn(
+                    "Requested backend fx2trt without specifying a PyTorch Model, "
+                    + "skipping this backend"
+                )
+                continue
+            run_fx2trt(model_torch, input_tensors, params, precision, batch_size)
 
         elif backend == "tensorrt":
             run_tensorrt(
@@ -399,7 +408,13 @@ if __name__ == "__main__":
         type=str,
         help="Comma separated string of backends. Eg: torch,torch_tensorrt,fx2trt,tensorrt",
     )
-    arg_parser.add_argument("--model", type=str, help="Name of the model file")
+    arg_parser.add_argument("--model", type=str, help="Name of torchscript model file")
+    arg_parser.add_argument(
+        "--model_torch",
+        type=str,
+        default="",
+        help="Name of torch model file (used for fx2trt)",
+    )
     arg_parser.add_argument(
         "--inputs",
         type=str,
@@ -491,15 +506,27 @@ if __name__ == "__main__":
     else:
         params = vars(args)
         model_name = params["model"]
+        model = None
+
+        model_name_torch = params["model_torch"]
+        model_torch = None
+
+        # Load TorchScript model
         if os.path.exists(model_name):
-            print("Loading user provided model: ", model_name)
+            print("Loading user provided torchscript model: ", model_name)
             model = torch.jit.load(model_name).cuda().eval()
         elif model_name in BENCHMARK_MODELS:
+            print("Loading torchscript model from BENCHMARK_MODELS for: ", model_name)
             model = BENCHMARK_MODELS[model_name]["model"].eval().cuda()
         else:
             raise ValueError(
                 "Invalid model name. Please provide a torchscript model file or model name (among the following options vgg16|resnet50|efficientnet_b0|vit)"
             )
+
+        # Load PyTorch Model, if provided
+        if len(model_name_torch) > 0 and os.path.exists(model_name_torch):
+            print("Loading user provided torch model: ", model_name_torch)
+            model_torch = torch.load(model_name_torch).eval().cuda()
 
         backends = parse_backends(params["backends"])
         truncate_long_and_double = params["truncate"]
@@ -523,6 +550,7 @@ if __name__ == "__main__":
                 truncate_long_and_double,
                 batch_size,
                 is_trt_engine,
+                model_torch=model_torch,
             )
 
     # Generate report
