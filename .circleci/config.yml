@@ -802,7 +802,7 @@ jobs:
     parallelism: 4
     machine:
       image: ubuntu-2004-cuda-11.4:202110-01
-    resource_class: gpu.nvidia.small
+    resource_class: xlarge
     steps:
       - when:
           condition: << parameters.enabled >>
@@ -1112,34 +1112,6 @@ workflows:
     when: << pipeline.parameters.enable-packaging >>
     jobs:
 
-      - build-x86_64-linux:
-          torch-build: << pipeline.parameters.torch-build >>
-          torch-build-index: << pipeline.parameters.torch-build-index >>
-
-      - test-core-cpp-x86_64-linux:
-          torch-build: << pipeline.parameters.torch-build >>
-          torch-build-index: << pipeline.parameters.torch-build-index >>
-          trt-version-short: << pipeline.parameters.trt-version-short >>
-          trt-version-long: << pipeline.parameters.trt-version-long >>
-          cudnn-version: << pipeline.parameters.cudnn-version >>
-          requires:
-            - build-x86_64-linux
-
-      - test-py-ts-x86_64-linux:
-          torch-build: << pipeline.parameters.torch-build >>
-          torch-build-index: << pipeline.parameters.torch-build-index >>
-          trt-version-long: << pipeline.parameters.trt-version-long >>
-          requires:
-            - build-x86_64-linux
-
-      - test-py-fx-x86_64-linux:
-          torch-build: << pipeline.parameters.torch-build >>
-          torch-build-index: << pipeline.parameters.torch-build-index >>
-          trt-version-long: << pipeline.parameters.trt-version-long >>
-          requires:
-            - build-x86_64-linux
-
-
       - package-x86_64-linux-pre-cxx11-abi:
           enabled: << pipeline.parameters.enable-packaging >>
           torch-build: << pipeline.parameters.torch-build >>
@@ -1157,6 +1129,29 @@ workflows:
             #- test-core-cpp-x86_64-linux
             #- test-py-ts-x86_64-linux
             #- test-py-fx-x86_64-linux
+
+      - test-core-cpp-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-short: << pipeline.parameters.trt-version-short >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+          requires:
+            - package-x86_64-linux-pre-cxx11-abi
+
+      - test-py-ts-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          requires:
+            - package-x86_64-linux-pre-cxx11-abi
+
+      - test-py-fx-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          requires:
+            - package-x86_64-linux-pre-cxx11-abi
 
   on-push:
     jobs:
