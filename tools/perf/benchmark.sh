@@ -12,9 +12,10 @@ echo "Benchmarking VGG16 model"
 for bs in ${batch_sizes[@]}
 do
   python perf_run.py --model ${MODELS_DIR}/vgg16_scripted.jit.pt \
+                     --model_torch ${MODELS_DIR}/vgg16_pytorch.pt \
                      --precision fp32,fp16 --inputs="(${bs}, 3, 224, 224)" \
                      --batch_size ${bs} \
-                     --backends torch,torch_tensorrt,tensorrt \
+                     --backends torch,torch_tensorrt,tensorrt,fx2trt \
                      --report "vgg_perf_bs${bs}.txt"
 done
 
@@ -23,9 +24,10 @@ echo "Benchmarking Resnet50 model"
 for bs in ${batch_sizes[@]}
 do
   python perf_run.py --model ${MODELS_DIR}/resnet50_scripted.jit.pt \
+                     --model_torch ${MODELS_DIR}/resnet50_pytorch.pt \
                      --precision fp32,fp16 --inputs="(${bs}, 3, 224, 224)" \
                      --batch_size ${bs} \
-                     --backends torch,torch_tensorrt,tensorrt \
+                     --backends torch,torch_tensorrt,tensorrt,fx2trt \
                      --report "rn50_perf_bs${bs}.txt"
 done
 
@@ -45,9 +47,10 @@ echo "Benchmarking EfficientNet-B0 model"
 for bs in ${batch_sizes[@]}
 do
   python perf_run.py --model ${MODELS_DIR}/efficientnet_b0_scripted.jit.pt \
+                     --model_torch ${MODELS_DIR}/efficientnet_b0_pytorch.pt \
                      --precision fp32,fp16 --inputs="(${bs}, 3, 224, 224)" \
                      --batch_size ${bs} \
-                     --backends torch,torch_tensorrt,tensorrt \
+                     --backends torch,torch_tensorrt,tensorrt,fx2trt \
                      --report "eff_b0_perf_bs${bs}.txt"
 done
 
