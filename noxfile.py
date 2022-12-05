@@ -37,6 +37,7 @@ nox.options.sessions = [
     "l0_api_tests-" + "{}.{}".format(sys.version_info.major, sys.version_info.minor)
 ]
 
+
 def install_deps(session):
     print("Installing deps")
     session.install("-r", os.path.join(TOP_DIR, "py", "requirements.txt"))
