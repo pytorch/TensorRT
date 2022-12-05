@@ -745,7 +745,7 @@ jobs:
       - dump-test-env
       - test-fx
 
-  package-x86_64-linux:
+  package-x86_64-linux-pre-cxx11-abi:
     parameters:
       enabled:
         type: boolean
@@ -774,6 +774,40 @@ jobs:
                   cd ~/project/py/
                   cp ~/project/toolchains/ci_workspaces/WORKSPACE.x86_64.release.rhel ~/project/WORKSPACE
                   docker run -it --rm --gpus all -v ~/project:/workspace/project torch_tensorrt_release_env /bin/bash /workspace/project/py/ci/build_whl.sh $(cat /workspace/project/py/ci/build_manifest.txt | circleci tests split)
+            - run:
+                name: Collect packages
+                command: |
+                  mkdir -p /tmp/dist/x86_64-linux
+                  cp -r ~/project/py/wheelhouse/* /tmp/dist/x86_64-linux
+            - store_artifacts:
+                path: /tmp/dist/x86_64-linux
+                destination: x86_64-linux-pkgs
+      - unless:
+          condition: << parameters.enabled >>
+          steps:
+            - run:
+                name: Skipped packaging
+                command: echo -e "Packaging stage not enabled"
+
+
+  package-x86_64-linux-cxx11-abi:
+    parameters:
+      enabled:
+        type: boolean
+        default: false
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+    parallelism: 4
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: gpu.nvidia.small
+    steps:
+      - when:
+          condition: << parameters.enabled >>
+          steps:
+            - checkout
             - create-env:
                 os: "ubuntu2004"
                 platform: "x86_64"
@@ -796,12 +830,13 @@ jobs:
                   pip3 install --upgrade pip
                   pip3 install -r ~/project/py/requirements.txt
                   TORCH_VERSION=$(python3 -c "from torch import __version__;print(__version__.split('+')[0])")
+                  mkdir -p ~/project/py/dist/
                   cp ~/project/bazel-bin/libtorchtrt.tar.gz ~/project/py/dist/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
             - run:
                 name: Collect packages
                 command: |
                   mkdir -p /tmp/dist/x86_64-linux
-                  cp -r ~/project/py/wheelhouse/* /tmp/dist/x86_64-linux
+                  cp -r ~/project/py/dist/* /tmp/dist/x86_64-linux
             - store_artifacts:
                 path: /tmp/dist/x86_64-linux
                 destination: x86_64-linux-pkgs
@@ -1105,7 +1140,16 @@ workflows:
             - build-x86_64-linux
 
 
-      - package-x86_64-linux:
+      - package-x86_64-linux-pre-cxx11-abi:
+          enabled: << pipeline.parameters.enable-packaging >>
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          #requires:
+            #- test-core-cpp-x86_64-linux
+            #- test-py-ts-x86_64-linux
+            #- test-py-fx-x86_64-linux
+
+      - package-x86_64-linux-cxx11-abi:
           enabled: << pipeline.parameters.enable-packaging >>
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
