@@ -33,12 +33,9 @@ if USE_HOST_DEPS:
 # Set epochs to train VGG model for accuracy tests
 EPOCHS = 25
 
-SUPPORTED_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10"]
-
 nox.options.sessions = [
     "l0_api_tests-" + "{}.{}".format(sys.version_info.major, sys.version_info.minor)
 ]
-
 
 def install_deps(session):
     print("Installing deps")
@@ -492,67 +489,67 @@ def run_l2_multi_gpu_tests(session):
     cleanup(session)
 
 
-@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+@nox.session
 def l0_api_tests(session):
     """When a developer needs to check correctness for a PR or something"""
     run_l0_api_tests(session)
 
 
-@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+@nox.session
 def l0_fx_tests(session):
     """When a developer needs to check correctness for a PR or something"""
     run_l0_fx_tests(session)
 
 
-@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+@nox.session
 def l0_fx_core_tests(session):
     """When a developer needs to check correctness for a PR or something"""
     run_l0_fx_core_tests(session)
 
 
-@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+@nox.session
 def l0_fx_converter_tests(session):
     """When a developer needs to check correctness for a PR or something"""
     run_l0_fx_converter_tests(session)
 
 
-@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+@nox.session
 def l0_fx_lower_tests(session):
     """When a developer needs to check correctness for a PR or something"""
     run_l0_fx_lower_tests(session)
 
 
-@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+@nox.session
 def l0_dla_tests(session):
     """When a developer needs to check basic api functionality using host dependencies"""
     run_l0_dla_tests(session)
 
 
-@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+@nox.session
 def l1_model_tests(session):
     """When a user needs to test the functionality of standard models compilation and results"""
     run_l1_model_tests(session)
 
 
-@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+@nox.session
 def l1_fx_tests(session):
     """When a user needs to test the functionality of standard models compilation and results"""
     run_l1_fx_tests(session)
 
 
-@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+@nox.session
 def l1_int8_accuracy_tests(session):
     """Checking accuracy performance on various usecases"""
     run_l1_int8_accuracy_tests(session)
 
 
-@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+@nox.session
 def l2_trt_compatibility_tests(session):
     """Makes sure that TensorRT Python and Torch-TensorRT can work together"""
     run_l2_trt_compatibility_tests(session)
 
 
-@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+@nox.session
 def l2_multi_gpu_tests(session):
     """Makes sure that Torch-TensorRT can operate on multi-gpu systems"""
     run_l2_multi_gpu_tests(session)
