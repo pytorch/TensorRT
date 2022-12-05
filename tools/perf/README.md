@@ -66,7 +66,7 @@ There are two sample configuration files added.
 
 | Name              | Supported Values                     | Description                                                  |
 | ----------------- | ------------------------------------ | ------------------------------------------------------------ |
-| backend           | all, torch, torch_tensorrt, tensorrt, fx2trt | Supported backends for inference.                            |
+| backend           | all, torchscript, fx2trt, torch, torch_tensorrt, tensorrt | Supported backends for inference. "all" implies the last four methods in the list at left, and "torchscript" implies the last three (excludes fx path)                            |
 | input             | -                                    | Input binding names. Expected to list shapes of each input bindings |
 | model             | -                                    | Configure the model filename and name                        |
 | model_torch             | -                              | Name of torch model file and name (used for fx2trt) (optional)                  |
@@ -113,7 +113,7 @@ Note:
 
 Here are the list of `CompileSpec` options that can be provided directly to compile the pytorch module
 
-* `--backends` : Comma separated string of backends. Eg: torch, torch_tensorrt, tensorrt or fx2trt
+* `--backends` : Comma separated string of backends. Eg: torch,torch_tensorrt,tensorrt,fx2trt
 * `--model` : Name of the model file (Can be a torchscript module or a tensorrt engine (ending in `.plan` extension)). If the backend is `fx2trt`, the input should be a Pytorch module (instead of a torchscript module) and the options for model are (`vgg16` | `resnet50` | `efficientnet_b0`)
 * `--model_torch` : Name of the PyTorch model file (optional, only necessary if fx2trt is a chosen backend)
 * `--inputs` : List of input shapes & dtypes. Eg: (1, 3, 224, 224)@fp32 for Resnet or (1, 128)@int32;(1, 128)@int32 for BERT

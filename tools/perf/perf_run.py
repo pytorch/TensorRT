@@ -299,7 +299,35 @@ def run(
             )
             continue
 
+        if (model_torch is None) and (backend in ("all", "fx2trt")):
+            warnings.warn(
+                f"Requested backend {backend} without specifying a PyTorch Model, "
+                + "skipping this backend"
+            )
+            continue
+
         if backend == "all":
+            run_torch(model, input_tensors, params, precision, batch_size)
+            run_torch_tensorrt(
+                model,
+                input_tensors,
+                params,
+                precision,
+                truncate_long_and_double,
+                batch_size,
+            )
+            run_tensorrt(
+                model,
+                input_tensors,
+                params,
+                precision,
+                truncate_long_and_double,
+                is_trt_engine,
+                batch_size,
+            )
+            run_fx2trt(model_torch, input_tensors, params, precision, batch_size)
+
+        elif backend == "torchscript":
             run_torch(model, input_tensors, params, precision, batch_size)
             run_torch_tensorrt(
                 model,
@@ -333,12 +361,6 @@ def run(
             )
 
         elif backend == "fx2trt":
-            if model_torch is None:
-                warnings.warn(
-                    "Requested backend fx2trt without specifying a PyTorch Model, "
-                    + "skipping this backend"
-                )
-                continue
             run_fx2trt(model_torch, input_tensors, params, precision, batch_size)
 
         elif backend == "tensorrt":
