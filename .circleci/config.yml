@@ -756,7 +756,7 @@ jobs:
         type: string
     machine:
       image: ubuntu-2004-cuda-11.4:202110-01
-    resource_class: xlarge
+    resource_class: gpu.nvidia.small
     steps:
       - when:
           condition: << parameters.enabled >>
@@ -772,7 +772,7 @@ jobs:
                 command: |
                   cd ~/project/py/
                   cp ~/project/toolchains/ci_workspaces/WORKSPACE.x86_64.release.rhel ~/project/WORKSPACE
-                  docker run -it --rm -v ~/project:/workspace/project torch_tensorrt_release_env /bin/bash /workspace/project/py/ci/build_whl.sh
+                  docker run -it --rm --gpus all -v ~/project:/workspace/project torch_tensorrt_release_env /bin/bash /workspace/project/py/ci/build_whl.sh
             - create-env:
                 os: "ubuntu2004"
                 platform: "x86_64"
