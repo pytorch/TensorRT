@@ -413,7 +413,12 @@ def acc_ops_pad_with_slice_layer(
     )
 
     shape = tuple(
-        input_shape[i] + (pad[-(i - prefix_len) * 2 - 1] + pad[-(i - prefix_len) * 2 - 2] if i >= prefix_len else 0)
+        input_shape[i]
+        + (
+            pad[-(i - prefix_len) * 2 - 1] + pad[-(i - prefix_len) * 2 - 2]
+            if i >= prefix_len
+            else 0
+        )
         for i in range(0, len(input_shape))
     )
     stride = tuple([1] * len(shape))
