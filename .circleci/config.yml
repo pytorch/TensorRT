@@ -779,6 +779,10 @@ jobs:
                 command: |
                   mkdir -p /tmp/dist/x86_64-linux
                   cp -r ~/project/py/wheelhouse/* /tmp/dist/x86_64-linux
+            - persist_to_workspace:
+                root: /tmp/dist
+                paths:
+                  - x86_64-linux
             - store_artifacts:
                 path: /tmp/dist/x86_64-linux
                 destination: x86_64-linux
@@ -1114,6 +1118,11 @@ workflows:
     jobs:
 
       - package-x86_64-linux:
+          enabled: << pipeline.parameters.enable-packaging >>
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+
+      - package-x86_64-linux-cxx11-abi:
           enabled: << pipeline.parameters.enable-packaging >>
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
