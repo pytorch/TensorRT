@@ -745,7 +745,7 @@ jobs:
       - dump-test-env
       - test-fx
 
-  package-x86_64-linux-pre-cxx11-abi:
+  package-x86_64-linux:
     parameters:
       enabled:
         type: boolean
@@ -769,7 +769,7 @@ jobs:
                   cd ~/project/py/
                   docker build -t torch_tensorrt_release_env --build-arg trt_version=<< pipeline.parameters.trt-version-short >> -f ci/Dockerfile.ci .
             - run:
-                name: Build Python packages and pre-cxx11-abi tarball
+                name: Build Python packages
                 command: |
                   cd ~/project/py/
                   cp ~/project/toolchains/ci_workspaces/WORKSPACE.x86_64.release.rhel ~/project/WORKSPACE
@@ -782,69 +782,6 @@ jobs:
             - store_artifacts:
                 path: /tmp/dist/x86_64-linux
                 destination: x86_64-linux
-      - unless:
-          condition: << parameters.enabled >>
-          steps:
-            - run:
-                name: Skipped packaging
-                command: echo -e "Packaging stage not enabled"
-
-
-  package-x86_64-linux:
-    parameters:
-      enabled:
-        type: boolean
-        default: false
-      torch-build:
-        type: string
-      torch-build-index:
-        type: string
-    parallelism: 4
-    machine:
-      image: ubuntu-2004-cuda-11.4:202110-01
-    resource_class: xlarge
-    steps:
-      - when:
-          condition: << parameters.enabled >>
-          steps:
-            - checkout
-            - create-env:
-                os: "ubuntu2004"
-                platform: "x86_64"
-                cudnn-version: << pipeline.parameters.cudnn-version >>
-                trt-version-short:  << pipeline.parameters.trt-version-short >>
-                bazel-version: << pipeline.parameters.bazel-version >>
-                bazel-platform: "x86_64"
-            - attach_workspace:
-                at: /tmp/dist/
-            - run:
-                name: "Install torch-tensorrt python package for version info"
-                command: pip3 install --pre /tmp/dist/x86_64-linux/*
-            - run:
-                name: Build cxx11-abi tarball
-                command: |
-                  set -e
-                  cd ~/project/
-                  cp ~/project/toolchains/ci_workspaces/WORKSPACE.x86_64.release.ubuntu ~/project/WORKSPACE
-                  bazel build //:libtorchtrt -c opt --noshow_progress
-                  sudo chown -R $(whoami) ~/project/py
-                  CUDA_VERSION=$(cd ~/project/py/torch_tensorrt && python3 -c "from _version import __cuda_version__;print(__cuda_version__)")
-                  TORCHTRT_VERSION=$(cd ~/project/py/torch_tensorrt && python3 -c "from _version import __version__;print(__version__)")
-                  TRT_VERSION=$(cd ~/project/py/torch_tensorrt && python3 -c "from _version import __tensorrt_version__;print(__tensorrt_version__)")
-                  CUDNN_VERSION=$(cd ~/project/py/torch_tensorrt && python3 -c "from _version import __cudnn_version__;print(__cudnn_version__)")
-                  pip3 install --upgrade pip
-                  pip3 install -r ~/project/py/requirements.txt
-                  TORCH_VERSION=$(python3 -c "from torch import __version__;print(__version__.split('+')[0])")
-                  mkdir -p ~/project/py/dist/
-                  cp ~/project/bazel-bin/libtorchtrt.tar.gz ~/project/py/dist/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
-            - run:
-                name: Collect packages
-                command: |
-                  mkdir -p /tmp/dist/x86_64-linux
-                  cp -r ~/project/py/dist/* /tmp/dist/x86_64-linux
-            - store_artifacts:
-                path: /tmp/dist/x86_64-linux
-                destination: x86_64-linux-pkgs
       - unless:
           condition: << parameters.enabled >>
           steps:
