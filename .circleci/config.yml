@@ -754,7 +754,7 @@ jobs:
         type: string
       torch-build-index:
         type: string
-    parallelism: 5
+    parallelism: 6
     machine:
       image: ubuntu-2004-cuda-11.4:202110-01
     resource_class: gpu.nvidia.small
@@ -790,7 +790,7 @@ jobs:
                 command: echo -e "Packaging stage not enabled"
 
 
-  package-x86_64-linux-cxx11-abi:
+  package-x86_64-linux:
     parameters:
       enabled:
         type: boolean
@@ -1117,17 +1117,10 @@ workflows:
     when: << pipeline.parameters.enable-packaging >>
     jobs:
 
-      - package-x86_64-linux-pre-cxx11-abi:
+      - package-x86_64-linux:
           enabled: << pipeline.parameters.enable-packaging >>
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
-
-      - package-x86_64-linux-cxx11-abi:
-          enabled: << pipeline.parameters.enable-packaging >>
-          torch-build: << pipeline.parameters.torch-build >>
-          torch-build-index: << pipeline.parameters.torch-build-index >>
-          requires:
-            - package-x86_64-linux-pre-cxx11-abi
 
       - test-core-cpp-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
@@ -1136,21 +1129,21 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-version-long >>
           cudnn-version: << pipeline.parameters.cudnn-version >>
           requires:
-            - package-x86_64-linux-pre-cxx11-abi
+            - package-x86_64-linux
 
       - test-py-ts-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           requires:
-            - package-x86_64-linux-pre-cxx11-abi
+            - package-x86_64-linux
 
       - test-py-fx-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           requires:
-            - package-x86_64-linux-pre-cxx11-abi
+            - package-x86_64-linux
 
   on-push:
     jobs:

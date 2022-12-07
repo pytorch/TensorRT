@@ -16,6 +16,13 @@ import subprocess
 import platform
 import warnings
 
+from versions import (
+    __version__,
+    __cuda_version__,
+    __cudnn_version__,
+    __tensorrt_version__,
+)
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 CXX11_ABI = False
@@ -27,11 +34,6 @@ FX_ONLY = False
 RELEASE = False
 
 CI_RELEASE = False
-
-__version__ = "1.3.0"
-__cuda_version__ = "11.7"
-__cudnn_version__ = "8.5"
-__tensorrt_version__ = "8.5"
 
 
 def get_git_revision_short_hash() -> str:

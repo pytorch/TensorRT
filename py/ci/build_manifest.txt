@@ -1,5 +1,6 @@
-build_py37
-build_py38
-build_py39
-build_py310
-build_libtorchtrt_pre_cxx11_abi
+py37
+py38
+py39
+py310
+libtorchtrt
+libtorchtrt_pre_cxx11_abi
