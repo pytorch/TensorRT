@@ -72,7 +72,7 @@ py310() {
 
 libtorchtrt() {
     cd /workspace/project/py
-    mkdir -p /workspace/project/py/dist
+    mkdir -p /workspace/project/py/wheelhouse
     PY_BUILD_CODE=cp310-cp310
     PY_VERSION=3.10
     PY_NAME=python${PY_VERSION}
@@ -87,12 +87,12 @@ libtorchtrt() {
     TRT_VERSION=$(cd ${PROJECT_DIR}/py && ${PY_DIR}/bin/python3 -c "from versions import __tensorrt_version__;print(__tensorrt_version__)")
     CUDNN_VERSION=$(cd ${PROJECT_DIR}/py && ${PY_DIR}/bin/python3 -c "from versions import __cudnn_version__;print(__cudnn_version__)")
     TORCH_VERSION=$(${PY_DIR}/bin/python -c "from torch import __version__;print(__version__.split('+')[0])")
-    cp ${PROJECT_DIR}/bazel-bin/libtorchtrt.tar.gz ${PROJECT_DIR}/py/dist/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
+    cp ${PROJECT_DIR}/bazel-bin/libtorchtrt.tar.gz ${PROJECT_DIR}/py/wheelhouse/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
 }
 
 libtorchtrt_pre_cxx11_abi() {
     cd /workspace/project/py
-    mkdir -p /workspace/project/py/dist
+    mkdir -p /workspace/project/py/wheelhouse
     PY_BUILD_CODE=cp310-cp310
     PY_VERSION=3.10
     PY_NAME=python${PY_VERSION}
@@ -107,7 +107,7 @@ libtorchtrt_pre_cxx11_abi() {
     TRT_VERSION=$(cd ${PROJECT_DIR}/py && ${PY_DIR}/bin/python3 -c "from versions import __tensorrt_version__;print(__tensorrt_version__)")
     CUDNN_VERSION=$(cd ${PROJECT_DIR}/py && ${PY_DIR}/bin/python3 -c "from versions import __cudnn_version__;print(__cudnn_version__)")
     TORCH_VERSION=$(${PY_DIR}/bin/python -c "from torch import __version__;print(__version__.split('+')[0])")
-    cp ${PROJECT_DIR}/bazel-bin/libtorchtrt.tar.gz ${PROJECT_DIR}/py/dist/libtorchtrt-${TORCHTRT_VERSION}-pre-cxx11-abi-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
+    cp ${PROJECT_DIR}/bazel-bin/libtorchtrt.tar.gz ${PROJECT_DIR}/py/wheelhouse/libtorchtrt-${TORCHTRT_VERSION}-pre-cxx11-abi-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
 }
 
 #build_py37
