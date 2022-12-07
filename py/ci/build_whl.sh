@@ -71,6 +71,7 @@ build_py310() {
 #}
 
 build_libtorchtrt() {
+    cd /workspace/project/py
     bazel clean
     bazel build //:libtorchtrt --platforms //toolchains:ci_rhel_x86_64_linux -c opt --noshow_progress
     CUDA_VERSION=$(cd ${PROJECT_DIR}/py/torch_tensorrt && python3 -c "from _version import __cuda_version__;print(__cuda_version__)")

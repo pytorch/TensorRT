@@ -754,7 +754,7 @@ jobs:
         type: string
       torch-build-index:
         type: string
-    parallelism: 4
+    parallelism: 5
     machine:
       image: ubuntu-2004-cuda-11.4:202110-01
     resource_class: gpu.nvidia.small
@@ -773,7 +773,7 @@ jobs:
                 command: |
                   cd ~/project/py/
                   cp ~/project/toolchains/ci_workspaces/WORKSPACE.x86_64.release.rhel ~/project/WORKSPACE
-                  docker run -it --rm --gpus all -v ~/project:/workspace/project torch_tensorrt_release_env /bin/bash -c "source /workspace/project/py/ci/build_whl.sh && $(circleci tests split --total=4 ~/project/py/ci/build_manifest.txt)"
+                  docker run -it --rm --gpus all -v ~/project:/workspace/project torch_tensorrt_release_env /bin/bash -c "source /workspace/project/py/ci/build_whl.sh && $(circleci tests split --total=5 ~/project/py/ci/build_manifest.txt)"
             - run:
                 name: Collect packages
                 command: |
