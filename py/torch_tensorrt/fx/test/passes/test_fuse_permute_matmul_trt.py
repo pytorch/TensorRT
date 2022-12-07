@@ -37,8 +37,20 @@ class TestFusePermuteMatmul(AccTestCase):
                 lambda x: x.permute(0, 1, 3, 2),
                 torch.matmul,
             ),
-            param("transpose_lhs_bmm_broadcast", (3, 2), (3, 3, 4), tranpose_last_two_dims, op=torch.matmul),
-            param("transpose_rhs_bmm_broadcast", (3, 3, 4), (3, 4), rhs_op=tranpose_last_two_dims, op=torch.matmul),
+            param(
+                "transpose_lhs_bmm_broadcast",
+                (3, 2),
+                (3, 3, 4),
+                tranpose_last_two_dims,
+                op=torch.matmul,
+            ),
+            param(
+                "transpose_rhs_bmm_broadcast",
+                (3, 3, 4),
+                (3, 4),
+                rhs_op=tranpose_last_two_dims,
+                op=torch.matmul,
+            ),
         ]
     )
     def test_fuse_permute_matmul(
