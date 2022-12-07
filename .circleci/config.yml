@@ -773,7 +773,7 @@ jobs:
                 command: |
                   cd ~/project/py/
                   cp ~/project/toolchains/ci_workspaces/WORKSPACE.x86_64.release.rhel ~/project/WORKSPACE
-                  docker run -it --rm --gpus all -v ~/project:/workspace/project torch_tensorrt_release_env /bin/bash /workspace/project/py/ci/build_whl.sh $(cat /workspace/project/py/ci/build_manifest.txt | circleci tests split)
+                  docker run -it --rm --gpus all -v ~/project:/workspace/project torch_tensorrt_release_env /bin/bash -c "source /workspace/project/py/ci/build_whl.sh && $(circleci tests split --total=4 /workspace/project/py/ci/build_manifest.txt)"
             - run:
                 name: Collect packages
                 command: |
@@ -815,6 +815,11 @@ jobs:
                 trt-version-short:  << pipeline.parameters.trt-version-short >>
                 bazel-version: << pipeline.parameters.bazel-version >>
                 bazel-platform: "x86_64"
+            - attach_workspace:
+                at: /tmp/dist/
+            - run:
+                name: "Install torch-tensorrt python package for version info"
+                command: pip3 install --pre /tmp/dist/x86_64-linux/*
             - run:
                 name: Build cxx11-abi tarball
                 command: |
@@ -1116,19 +1121,13 @@ workflows:
           enabled: << pipeline.parameters.enable-packaging >>
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
-          #requires:
-            #- test-core-cpp-x86_64-linux
-            #- test-py-ts-x86_64-linux
-            #- test-py-fx-x86_64-linux
 
       - package-x86_64-linux-cxx11-abi:
           enabled: << pipeline.parameters.enable-packaging >>
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
-          #requires:
-            #- test-core-cpp-x86_64-linux
-            #- test-py-ts-x86_64-linux
-            #- test-py-fx-x86_64-linux
+          requires:
+            - package-x86_64-linux-pre-cxx11-abi
 
       - test-core-cpp-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
