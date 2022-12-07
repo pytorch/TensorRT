@@ -818,6 +818,9 @@ jobs:
                 trt-version-short:  << pipeline.parameters.trt-version-short >>
                 bazel-version: << pipeline.parameters.bazel-version >>
                 bazel-platform: "x86_64"
+            - install-torch-from-index:
+                torch-build:  << parameters.torch-build >>
+                torch-build-index: << parameters.torch-build-index >>
             - run:
                 name: Build cxx11-abi tarball
                 command: |
@@ -1118,11 +1121,6 @@ workflows:
     jobs:
 
       - package-x86_64-linux:
-          enabled: << pipeline.parameters.enable-packaging >>
-          torch-build: << pipeline.parameters.torch-build >>
-          torch-build-index: << pipeline.parameters.torch-build-index >>
-
-      - package-x86_64-linux-cxx11-abi:
           enabled: << pipeline.parameters.enable-packaging >>
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
