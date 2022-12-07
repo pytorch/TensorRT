@@ -736,8 +736,41 @@ auto select_registrations TORCHTRT_UNUSED =
             {"aten::where.self(Tensor condition, Tensor self, Tensor other) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto condition = args[0].ITensorOrFreeze(ctx);
+               auto c_nbDims = condition->getDimensions().nbDims;
                auto x = args[1].ITensorOrFreeze(ctx);
+               auto x_nbDims = x->getDimensions().nbDims;
                auto y = args[2].ITensorOrFreeze(ctx);
+               auto y_nbDims = y->getDimensions().nbDims;
+
+               // Get maximum rank of all input tensors
+               auto max_nbDims = std::max(c_nbDims, std::max(x_nbDims, y_nbDims));
+
+               // TensorRT requires all inputs to Select layers to have the same rank, so for each
+               // tensor input, ensure that its rank is equal to the maximum number of dimensions
+               // If not, left-pad the tensor dimension with 1s until the max rank is achieved
+               auto add_reshape = [&ctx, &max_nbDims](nvinfer1::ITensor*& tensor) {
+                 nvinfer1::Dims dimensions = tensor->getDimensions();
+
+                 // If the rank of this tensor is smaller than the max rank, use reshape
+                 if (dimensions.nbDims < max_nbDims) {
+                   auto shuffle_layer = ctx->net->addShuffle(*tensor);
+
+                   // For each dimension from the rank of the smaller tensor to the max rank,
+                   // unsqueeze dimensions by 1
+                   for (auto i = dimensions.nbDims; i < max_nbDims; i++) {
+                     dimensions = util::unsqueezeDims(dimensions, 0, 1, false);
+                   }
+
+                   // Reshape to the unsqueezed dimensions
+                   shuffle_layer->setReshapeDimensions(dimensions);
+                   tensor = shuffle_layer->getOutput(0);
+                 }
+               };
+
+               // Apply reshape to each tensor input
+               add_reshape(condition);
+               add_reshape(x);
+               add_reshape(y);
 
                auto layer = ctx->net->addSelect(*condition, *x, *y);
 
