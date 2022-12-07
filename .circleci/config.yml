@@ -789,6 +789,66 @@ jobs:
                 name: Skipped packaging
                 command: echo -e "Packaging stage not enabled"
 
+  # TODO: Merge this with above
+  package-x86_64-linux-cxx11-abi:
+    parameters:
+      enabled:
+        type: boolean
+        default: false
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+    parallelism: 4
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: xlarge
+    steps:
+      - when:
+          condition: << parameters.enabled >>
+          steps:
+            - checkout
+            - create-env:
+                os: "ubuntu2004"
+                platform: "x86_64"
+                cudnn-version: << pipeline.parameters.cudnn-version >>
+                trt-version-short:  << pipeline.parameters.trt-version-short >>
+                bazel-version: << pipeline.parameters.bazel-version >>
+                bazel-platform: "x86_64"
+            - run:
+                name: Build cxx11-abi tarball
+                command: |
+                  set -e
+                  cd ~/project/
+                  cp ~/project/toolchains/ci_workspaces/WORKSPACE.x86_64.release.ubuntu ~/project/WORKSPACE
+                  bazel build //:libtorchtrt -c opt --noshow_progress
+                  sudo chown -R $(whoami) ~/project/py
+                  cd ~/project/py
+                  CUDA_VERSION=$(python3 -c "from versions import __cuda_version__;print(__cuda_version__)")
+                  TORCHTRT_VERSION=$(python3 -c "from versions import __version__;print(__version__)")
+                  TRT_VERSION=$(python3 -c "from versions import __tensorrt_version__;print(__tensorrt_version__)")
+                  CUDNN_VERSION=$(python3 -c "from versions import __cudnn_version__;print(__cudnn_version__)")
+                  TORCH_VERSION=$(python3 -c "from torch import __version__;print(__version__.split('+')[0])")
+                  pip3 install --upgrade pip
+                  pip3 install -r ~/project/py/requirements.txt
+                  TORCH_VERSION=$(python3 -c "from torch import __version__;print(__version__.split('+')[0])")
+                  mkdir -p ~/project/py/dist/
+                  cp ~/project/bazel-bin/libtorchtrt.tar.gz ~/project/py/dist/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
+            - run:
+                name: Collect packages
+                command: |
+                  mkdir -p /tmp/dist/x86_64-linux
+                  cp -r ~/project/py/dist/* /tmp/dist/x86_64-linux
+            - store_artifacts:
+                path: /tmp/dist/x86_64-linux
+                destination: x86_64-linux-pkgs
+      - unless:
+          condition: << parameters.enabled >>
+          steps:
+            - run:
+                name: Skipped packaging
+                command: echo -e "Packaging stage not enabled"
+
   package-aarch64-jetson:
     parameters:
       enabled:
@@ -1055,6 +1115,11 @@ workflows:
     jobs:
 
       - package-x86_64-linux:
+          enabled: << pipeline.parameters.enable-packaging >>
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+
+      - package-x86_64-linux-cxx11-abi:
           enabled: << pipeline.parameters.enable-packaging >>
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
