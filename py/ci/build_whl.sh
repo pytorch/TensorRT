@@ -19,7 +19,7 @@ py37() {
     ${PY_DIR}/bin/python -m pip install -r requirements.txt
     ${PY_DIR}/bin/python -m pip install setuptools wheel auditwheel
     ${PY_DIR}/bin/python setup.py bdist_wheel --release --ci
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${PY_PKG_DIR}/torch/lib:${PY_PKG_DIR}/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs ${PY_DIR}/bin/python -m auditwheel repair --plat manylinux_2_17_x86_64 dist/torch_tensorrt-*-${PY_BUILD_CODE}-linux_x86_64.whl
+    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${PY_PKG_DIR}/torch/lib:${PY_PKG_DIR}/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs ${PY_DIR}/bin/python -m auditwheel repair $(cat ${PROJECT_DIR}/py/ci/soname_excludes.params) --plat manylinux_2_17_x86_64 dist/torch_tensorrt-*-${PY_BUILD_CODE}-linux_x86_64.whl
 }
 
 py38() {
@@ -33,7 +33,7 @@ py38() {
     ${PY_DIR}/bin/python -m pip install -r requirements.txt
     ${PY_DIR}/bin/python -m pip install setuptools wheel auditwheel
     ${PY_DIR}/bin/python setup.py bdist_wheel --release --ci
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${PY_PKG_DIR}/torch/lib:${PY_PKG_DIR}/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs ${PY_DIR}/bin/python -m auditwheel repair --plat manylinux_2_17_x86_64 dist/torch_tensorrt-*-${PY_BUILD_CODE}-linux_x86_64.whl
+    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${PY_PKG_DIR}/torch/lib:${PY_PKG_DIR}/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs ${PY_DIR}/bin/python -m auditwheel repair  $(cat ${PROJECT_DIR}/py/ci/soname_excludes.params) --plat manylinux_2_17_x86_64 dist/torch_tensorrt-*-${PY_BUILD_CODE}-linux_x86_64.whl
 }
 
 py39() {
@@ -47,7 +47,7 @@ py39() {
     ${PY_DIR}/bin/python -m pip install -r requirements.txt
     ${PY_DIR}/bin/python -m pip install setuptools wheel auditwheel
     ${PY_DIR}/bin/python setup.py bdist_wheel --release --ci
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${PY_PKG_DIR}/torch/lib:${PY_PKG_DIR}/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs ${PY_DIR}/bin/python -m auditwheel repair --plat manylinux_2_17_x86_64 dist/torch_tensorrt-*-${PY_BUILD_CODE}-linux_x86_64.whl
+    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${PY_PKG_DIR}/torch/lib:${PY_PKG_DIR}/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs ${PY_DIR}/bin/python -m auditwheel repair  $(cat ${PROJECT_DIR}/py/ci/soname_excludes.params) --plat manylinux_2_17_x86_64 dist/torch_tensorrt-*-${PY_BUILD_CODE}-linux_x86_64.whl
 }
 
 py310() {
@@ -61,7 +61,7 @@ py310() {
     ${PY_DIR}/bin/python -m pip install -r requirements.txt
     ${PY_DIR}/bin/python -m pip install setuptools wheel auditwheel
     ${PY_DIR}/bin/python setup.py bdist_wheel --release --ci
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${PY_PKG_DIR}/torch/lib:${PY_PKG_DIR}/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs ${PY_DIR}/bin/python -m auditwheel repair --plat manylinux_2_17_x86_64 dist/torch_tensorrt-*-${PY_BUILD_CODE}-linux_x86_64.whl
+    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${PY_PKG_DIR}/torch/lib:${PY_PKG_DIR}/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs ${PY_DIR}/bin/python -m auditwheel repair  $(cat ${PROJECT_DIR}/py/ci/soname_excludes.params) --plat manylinux_2_17_x86_64 dist/torch_tensorrt-*-${PY_BUILD_CODE}-linux_x86_64.whl
 }
 
 #build_py311() {
