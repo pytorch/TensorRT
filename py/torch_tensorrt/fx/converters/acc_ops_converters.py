@@ -3369,7 +3369,7 @@ def acc_ops_gelu(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     approximate = kwargs["approximate"]
-    if approximate is not "none":
+    if approximate != "none":
         raise RuntimeError("GeLU converter currently doesn't support fast gelu compute")
     if not isinstance(input_val, TRTTensor):
         raise RuntimeError(
