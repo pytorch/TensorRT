@@ -39,6 +39,7 @@ struct Input : torch::CustomClassHolder {
   std::vector<int64_t> min;
   std::vector<int64_t> opt;
   std::vector<int64_t> max;
+  std::vector<int64_t> tensor_domain;
 
   bool input_is_dynamic;
   bool explicit_set_dtype;
@@ -48,6 +49,7 @@ struct Input : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(min, std::vector<int64_t>);
   ADD_FIELD_GET_SET(opt, std::vector<int64_t>);
   ADD_FIELD_GET_SET(max, std::vector<int64_t>);
+  ADD_FIELD_GET_SET(tensor_domain, std::vector<int64_t>);
   ADD_FIELD_GET_SET(input_is_dynamic, bool);
   ADD_FIELD_GET_SET(explicit_set_dtype, bool);
   ADD_ENUM_GET_SET(dtype, DataType, static_cast<int64_t>(DataType::kUnknown));
