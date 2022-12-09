@@ -391,7 +391,7 @@ setup(
     packages=packages if FX_ONLY else find_packages(),
     package_dir=package_dir if FX_ONLY else {},
     classifiers=[
-        "Development Status :: 5 - Stable",
+        "Development Status :: 5 - Production/Stable",
         "Environment :: GPU :: NVIDIA CUDA",
         "License :: OSI Approved :: BSD License",
         "Intended Audience :: Developers",
