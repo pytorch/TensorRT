@@ -20,7 +20,7 @@ struct LowerInfo {
   std::vector<std::string> forced_fallback_modules;
   friend std::ostream& operator<<(std::ostream& os, const LowerInfo& l);
 
-  std::string getGPUDeviceString() {
+  std::string getGPUDeviceString() const {
     return "cuda:" + std::to_string(target_device.gpu_id);
   };
 };
