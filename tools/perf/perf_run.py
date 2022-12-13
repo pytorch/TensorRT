@@ -274,6 +274,7 @@ def run(
     truncate_long_and_double=False,
     batch_size=1,
     is_trt_engine=False,
+    use_dynamo=False,
     model_torch=None,
 ):
     for backend in backends:
@@ -306,7 +307,7 @@ def run(
             )
             continue
 
-        if backend == "all":
+        if backend == "all" and not use_dynamo:
             run_torch(model, input_tensors, params, precision, batch_size)
             run_torch_tensorrt(
                 model,
@@ -327,7 +328,7 @@ def run(
             )
             run_fx2trt(model_torch, input_tensors, params, precision, batch_size)
 
-        elif backend == "torchscript":
+        elif backend == "torchscript" and not use_dynamo:
             run_torch(model, input_tensors, params, precision, batch_size)
             run_torch_tensorrt(
                 model,
@@ -347,10 +348,10 @@ def run(
                 batch_size,
             )
 
-        elif backend == "torch":
+        elif backend == "torch" and not use_dynamo:
             run_torch(model, input_tensors, params, precision, batch_size)
 
-        elif backend == "torch_tensorrt":
+        elif backend == "torch_tensorrt" and not use_dynamo:
             run_torch_tensorrt(
                 model,
                 input_tensors,
@@ -500,6 +501,17 @@ if __name__ == "__main__":
         help="Boolean flag to determine if the user provided model is a TRT engine or not",
     )
     arg_parser.add_argument(
+        "--dynamo",
+        action="store_true",
+        help="Boolean flag to determine if the user provided model should be compiled with torch._dynamo",
+    )
+    arg_parser.add_argument(
+        "--dynamo_backend",
+        type=str,
+        default="inductor",
+        help="List of backends to use in Torchdynamo. Select options: inductor|fx2trt",
+    )
+    arg_parser.add_argument(
         "--report",
         type=str,
         help="Path of the output file where performance summary is written.",
@@ -579,6 +591,8 @@ if __name__ == "__main__":
 
         model_name_torch = params["model_torch"]
         model_torch = None
+        use_dynamo = params["dynamo"]
+        dynamo_backend = params["dynamo_backend"]
 
         # Load TorchScript model, if provided
         if os.path.exists(model_name):
@@ -600,6 +614,12 @@ if __name__ == "__main__":
                 + "(among the following options vgg16|resnet50|efficientnet_b0|vit) "
                 + "or provide a torch model file"
             )
+
+        if use_dynamo and (model_torch is None):
+            raise ValueError("No Pytorch model (nn.Module) is provided for torchdynamo compilation. Please provide a pytorch model")
+
+        if use_dynamo and model_torch:
+            model_torch = torch.compile(model_torch, "default", dynamic=False, fullgraph=False, backend=dynamo_backend)
 
         backends = parse_backends(params["backends"])
         truncate_long_and_double = params["truncate"]
@@ -623,6 +643,7 @@ if __name__ == "__main__":
                 truncate_long_and_double,
                 batch_size,
                 is_trt_engine,
+                use_dynamo,
                 model_torch=model_torch,
             )
 
