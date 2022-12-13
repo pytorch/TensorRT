@@ -736,8 +736,22 @@ auto select_registrations TORCHTRT_UNUSED =
             {"aten::where.self(Tensor condition, Tensor self, Tensor other) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto condition = args[0].ITensorOrFreeze(ctx);
+               auto condition_nbDims = condition->getDimensions().nbDims;
                auto x = args[1].ITensorOrFreeze(ctx);
+               auto x_nbDims = x->getDimensions().nbDims;
                auto y = args[2].ITensorOrFreeze(ctx);
+               auto y_nbDims = y->getDimensions().nbDims;
+
+               // Get maximum rank of all input tensors
+               auto max_nbDims = std::max(condition_nbDims, std::max(x_nbDims, y_nbDims));
+
+               // TensorRT requires all inputs to Select layers to have the same rank, so for each
+               // tensor input, ensure that its rank is equal to the maximum number of dimensions
+               // If not, left-pad the tensor dimension with 1s until the max rank is achieved
+               condition =
+                   addPadding(ctx, n, condition, max_nbDims, /*bool trailing =*/false, /*bool use_zeros =*/false);
+               x = addPadding(ctx, n, x, max_nbDims, /*bool trailing =*/false, /*bool use_zeros =*/false);
+               y = addPadding(ctx, n, y, max_nbDims, /*bool trailing =*/false, /*bool use_zeros =*/false);
 
                auto layer = ctx->net->addSelect(*condition, *x, *y);
 

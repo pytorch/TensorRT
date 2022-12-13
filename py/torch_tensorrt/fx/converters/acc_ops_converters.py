@@ -38,6 +38,14 @@ def trt_transposed_matmul_converter(network, target, args, kwargs, name):
         lhs = get_trt_tensor(network, lhs, f"{name}_lhs")
     if isinstance(rhs, torch.nn.Parameter):
         rhs = get_trt_tensor(network, rhs, f"{name}_rhs")
+
+    lhs, rhs = broadcast(
+        network,
+        lhs,
+        rhs,
+        f"{lhs.name}_broadcast",
+        f"{rhs.name}_broadcast",
+    )
     layer = network.add_matrix_multiply(
         lhs,
         trt.MatrixOperation.TRANSPOSE if lhs_transposed else trt.MatrixOperation.NONE,
@@ -398,46 +406,34 @@ def acc_ops_pad_with_slice_layer(
     )
 
     input_shape = input_val.shape
-    pre_start = tuple(i - 1 for i in input_shape)
     prefix_len = len(input_shape) - len(pad) // 2
-    pre_shape = tuple(
-        input_shape[i] + (pad[-(i - prefix_len) * 2 - 2] if i >= prefix_len else 0)
+    start = tuple(
+        -pad[-(i - prefix_len) * 2 - 2] if i >= prefix_len else 0
         for i in range(0, len(input_shape))
     )
-    pre_stride = [-1] * len(input_shape)
+
+    shape = tuple(
+        input_shape[i]
+        + (
+            pad[-(i - prefix_len) * 2 - 1] + pad[-(i - prefix_len) * 2 - 2]
+            if i >= prefix_len
+            else 0
+        )
+        for i in range(0, len(input_shape))
+    )
+    stride = tuple([1] * len(shape))
 
     layer = network.add_slice(
         input_val,
-        pre_start,
-        pre_shape,
-        pre_stride,
+        start,
+        shape,
+        stride,
     )
+
     layer.set_input(4, value_const)
     layer.mode = trt.SliceMode.FILL
-    set_layer_name(layer, target, f"pre_{name}")
-    half_pad_output = layer.get_output(0)
+    set_layer_name(layer, target, name)
 
-    shape = half_pad_output.shape
-    mid_start = tuple(i - 1 for i in shape)
-    mid_stride = [-1] * len(shape)
-    layer = network.add_slice(half_pad_output, mid_start, shape, mid_stride)
-    layer.set_input(4, value_const)
-    layer.mode = trt.SliceMode.FILL
-    set_layer_name(layer, target, f"transpose_{name}")
-    transpose_output = layer.get_output(0)
-
-    shape = transpose_output.shape
-    post_start = tuple([0] * len(shape))
-    post_shape = tuple(
-        shape[i] + (pad[-(i - prefix_len) * 2 - 1] if i >= prefix_len else 0)
-        for i in range(0, len(shape))
-    )
-    post_stride = tuple([1] * len(shape))
-
-    layer = network.add_slice(transpose_output, post_start, post_shape, post_stride)
-    layer.set_input(4, value_const)
-    layer.mode = trt.SliceMode.FILL
-    set_layer_name(layer, target, f"post_{name}")
     return layer.get_output(0)
 
 
@@ -3373,7 +3369,7 @@ def acc_ops_gelu(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     approximate = kwargs["approximate"]
-    if approximate is not "none":
+    if approximate != "none":
         raise RuntimeError("GeLU converter currently doesn't support fast gelu compute")
     if not isinstance(input_val, TRTTensor):
         raise RuntimeError(
