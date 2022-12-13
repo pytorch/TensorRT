@@ -99,7 +99,7 @@ torch::jit::Node* getUpstreamCastNode(torch::jit::Value* val) {
   return nullptr;
 }
 
-torch::jit::Node* createCastNode(SegmentedBlock& seg_block, size_t index, bool is_input) {
+torch::jit::Node* createCastNode(SegmentedBlock& seg_block, size_t index, bool is_input, std::string device) {
   auto cast_raw_value = is_input ? seg_block.raw_inputs()[index] : seg_block.raw_outputs()[index];
   auto cast_subgraph_value = is_input ? seg_block.inputs()[index] : seg_block.outputs()[index];
   torch::jit::Node* cast_node = getUpstreamCastNode(cast_raw_value);
@@ -125,8 +125,11 @@ torch::jit::Node* createCastNode(SegmentedBlock& seg_block, size_t index, bool i
     auto const_type = is_input ? g->insertConstant(4) : g->insertConstant(3);
     auto const_zero = g->insertConstant(0);
     const_zero->setType(torch::jit::BoolType::get());
+    auto cuda = g->insertConstant(device);
+    cuda->setType(torch::jit::DeviceObjType::get());
     auto none_val = g->insertNode(g->createNone())->output();
-    cast_node = g->create(torch::jit::aten::to, {cast_subgraph_value, const_type, const_zero, const_zero, none_val});
+    cast_node =
+        g->create(torch::jit::aten::to, {cast_subgraph_value, cuda, const_type, const_zero, const_zero, none_val});
   }
   return cast_node;
 }
@@ -217,6 +220,8 @@ void getSegmentsOutputByRunning(
     ivalues_maps[output] = jit_results[idx++];
   }
 
+  auto target_device = partitioning_info.getGPUDeviceString();
+
   // auto int64 <=> int32 conversion
   if (seg_block.target() == SegmentedBlock::kTorch && partitioning_info.truncate_long_and_double) {
     // First, check if there is Int64 input
@@ -226,7 +231,7 @@ void getSegmentsOutputByRunning(
         at::ScalarType t = cur_ivalue.toTensor().scalar_type();
         if (t == at::kLong) {
           // we add a cast operation to cast the type to Int64
-          auto cast_node = createCastNode(seg_block, i, true);
+          auto cast_node = createCastNode(seg_block, i, true, target_device);
           seg_block.g()->prependNode(cast_node);
           seg_block.inputs()[i]->replaceAllUsesAfterNodeWith(cast_node, cast_node->outputs()[0]);
         }
@@ -237,7 +242,7 @@ void getSegmentsOutputByRunning(
         auto cur_ivalue = ivalues_maps[seg_block.raw_outputs()[i]];
         at::ScalarType t = cur_ivalue.toTensor().scalar_type();
         if (t == at::kLong) {
-          auto cast_node = createCastNode(seg_block, i, false);
+          auto cast_node = createCastNode(seg_block, i, false, target_device);
           seg_block.g()->appendNode(cast_node);
           seg_block.g()->block()->replaceOutput(i, cast_node->outputs()[0]);
         }

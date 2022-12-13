@@ -5,7 +5,10 @@ import torchvision.models as models
 import timm
 
 BENCHMARK_MODELS = {
-    "vgg16": {"model": models.vgg16(pretrained=True), "path": ["script", "pytorch"]},
+    "vgg16": {
+        "model": models.vgg16(weights=models.VGG16_Weights.DEFAULT),
+        "path": ["script", "pytorch"],
+    },
     "resnet50": {
         "model": models.resnet50(weights=None),
         "path": ["script", "pytorch"],
