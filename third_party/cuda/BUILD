@@ -53,6 +53,7 @@ cc_library(
         "include/**/*.h",
         "include/**/*.hpp",
         "include/**/*.inl",
+        "include/**/*",
     ]),
     includes = ["include/"],
     linkopts = ["-Wl,-rpath,lib/"],
