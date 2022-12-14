@@ -300,11 +300,15 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
     info.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));
   }
 
+  info.partitioning_info.cast_int8_inputs = true;
+
   if (ptq_calibrator) {
     info.convert_info.engine_settings.calibrator = ptq_calibrator;
+    info.partitioning_info.cast_int8_inputs = false;
   } else {
     if (info.convert_info.engine_settings.enabled_precisions.find(nvinfer1::DataType::kINT8) !=
         info.convert_info.engine_settings.enabled_precisions.end()) {
+      info.partitioning_info.cast_int8_inputs = false;
       info.lower_info.unfreeze_module = true;
       info.lower_info.disable_cse = true;
     }
@@ -313,10 +317,23 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.convert_info.engine_settings.disable_tf32 = disable_tf32;
   info.convert_info.engine_settings.refit = refit;
   info.convert_info.engine_settings.debug = debug;
+
+  // Specify + replicate device settings for phases requiring it
   info.convert_info.engine_settings.device.device_type = toTRTDeviceType(device.device_type);
   info.convert_info.engine_settings.device.gpu_id = device.gpu_id;
   info.convert_info.engine_settings.device.dla_core = device.dla_core;
   info.convert_info.engine_settings.device.allow_gpu_fallback = device.allow_gpu_fallback;
+
+  info.lower_info.target_device.device_type = toTRTDeviceType(device.device_type);
+  info.lower_info.target_device.gpu_id = device.gpu_id;
+  info.lower_info.target_device.dla_core = device.dla_core;
+  info.lower_info.target_device.allow_gpu_fallback = device.allow_gpu_fallback;
+
+  info.partitioning_info.target_device.device_type = toTRTDeviceType(device.device_type);
+  info.partitioning_info.target_device.gpu_id = device.gpu_id;
+  info.partitioning_info.target_device.dla_core = device.dla_core;
+  info.partitioning_info.target_device.allow_gpu_fallback = device.allow_gpu_fallback;
+
   info.partitioning_info.enabled = torch_fallback.enabled;
   info.partitioning_info.min_block_size = torch_fallback.min_block_size;
   info.partitioning_info.forced_fallback_operators = torch_fallback.forced_fallback_operators;
