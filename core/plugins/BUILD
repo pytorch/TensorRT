@@ -32,7 +32,6 @@ cc_library(
         "@tensorrt//:nvinfer",
         "@tensorrt//:nvinferplugin",
         "//core/util:prelude",
-        "@cuda//:cuda",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch//:libtorch"],
