@@ -14,15 +14,19 @@
 --exclude libtorch_global_deps.so
 --exclude libtorch_python.so
 --exclude libtorch.so
+--exclude libcudart.so
 
---exclude libcudart.so.11
---exclude libnvrtc.so.11.2
 --exclude libnvToolsExt-847d78f2.so.1
+--exclude libcudart-e409450e.so.11.0
+--exclude libcudart-e409450e.so
+--exclude libgomp-a34b3233.so.1
+--exclude libcudart.so.11
+--exclude libcudart.so.11.7.60
+--exclude libnvrtc.so.11.2
 --exclude libnvinfer_plugin.so.8
 --exclude libcublas.so.11
+--exclude libcuda.so.1
 --exclude libcuda.so.515
 --exclude libcublasLt.so.11
 --exclude libnvinfer.so.8
---exclude libcudart-e409450e.so.11.0
---exclude libgomp-a34b3233.so.1
 --exclude libcudnn.so.8

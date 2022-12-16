@@ -109,11 +109,3 @@ libtorchtrt_pre_cxx11_abi() {
     TORCH_VERSION=$(${PY_DIR}/bin/python -c "from torch import __version__;print(__version__.split('+')[0])")
     cp ${PROJECT_DIR}/bazel-bin/libtorchtrt.tar.gz ${PROJECT_DIR}/py/wheelhouse/libtorchtrt-${TORCHTRT_VERSION}-pre-cxx11-abi-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
 }
-
-#build_py37
-#build_py38
-#build_py39
-#build_py310
-#build_py311
-#build_libtorchtrt_pre_cxx11_abi
-#build_libtorchtrt
