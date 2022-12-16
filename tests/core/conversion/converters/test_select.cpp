@@ -1122,6 +1122,34 @@ TEST(Converters, ATenUnbindNegativeAxisConvertsCorrectly) {
   }
 }
 
+TEST(Converters, ATenUnbindEvaluatedTensor) {
+  const auto graph = R"IR(
+      graph(%x.1 : Tensor):
+        %2 : None = prim::Constant()
+        %3 : int[] = aten::size(%x.1)
+        %z.1 : Tensor = aten::zeros(%3, %2, %2, %2, %2)
+        %5 : int = prim::Constant[value=-1]()
+        %6 : Tensor[] = aten::unbind(%z.1, %5)
+        %o1.1 : Tensor, %o2.1 : Tensor = prim::ListUnpack(%6)
+        return (%o1.1, %o2.1))IR";
+
+  auto in = at::randint(1, 10, {2}, {at::kCUDA});
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
+
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+
+  for (size_t i = 0; i < jit_results.size(); i++) {
+    auto trt = trt_results[i];
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i].cuda(), trt, 2e-6));
+  }
+}
+
 TEST(Converters, ScatterValueConvertsCorrectly) {
   const auto graph = R"IR(
         graph(%data : Tensor,
