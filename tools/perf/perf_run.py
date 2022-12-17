@@ -616,10 +616,18 @@ if __name__ == "__main__":
             )
 
         if use_dynamo and (model_torch is None):
-            raise ValueError("No Pytorch model (nn.Module) is provided for torchdynamo compilation. Please provide a pytorch model")
+            raise ValueError(
+                "No Pytorch model (nn.Module) is provided for torchdynamo compilation. Please provide a pytorch model"
+            )
 
         if use_dynamo and model_torch:
-            model_torch = torch.compile(model_torch, "default", dynamic=False, fullgraph=False, backend=dynamo_backend)
+            model_torch = torch.compile(
+                model_torch,
+                "default",
+                dynamic=False,
+                fullgraph=False,
+                backend=dynamo_backend,
+            )
 
         backends = parse_backends(params["backends"])
         truncate_long_and_double = params["truncate"]
