@@ -25,7 +25,7 @@ class TestReshapeConverter(DispatchTestCase):
         self.run_test(
             TestModule(target_shape),
             inputs,
-            expected_ops={torch.ops.aten._reshape_alias.default},
+            expected_ops={torch.ops.aten.view.default},
         )
 
     ## TODO: proxytensor tracer does not support output size containing -1. If dim=0 is set to -1 for dynamic batch,
