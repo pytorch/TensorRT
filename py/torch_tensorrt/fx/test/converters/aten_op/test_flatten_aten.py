@@ -27,7 +27,7 @@ class TestFlattenConverter(DispatchTestCase):
         self.run_test(
             Flatten(start_dim, end_dim),
             inputs,
-            expected_ops={torch.ops.aten._reshape_alias.default},
+            expected_ops={torch.ops.aten.view.default},
             test_implicit_batch_dim=(start_dim != 0),
         )
 

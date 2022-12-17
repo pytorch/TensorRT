@@ -16,7 +16,7 @@ namespace impl {
 namespace {
 
 bool add_split(ConversionCtx* ctx, const torch::jit::Node* n, args& args, bool split_list, bool unbind) {
-  auto in = args[0].ITensor();
+  auto in = args[0].ITensorOrFreeze(ctx);
   auto numOutputs = 1, numRemainder = 0;
   std::vector<int64_t> sizes;
 
