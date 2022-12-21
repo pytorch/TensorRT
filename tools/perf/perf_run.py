@@ -17,8 +17,8 @@ import pandas as pd
 # Importing supported Backends
 import torch
 import torch_tensorrt as torchtrt
-from torch_tensorrt.fx.lower import compile
-from torch_tensorrt.fx.utils import LowerPrecision
+# from torch_tensorrt.fx.lower import compile
+# from torch_tensorrt.fx.utils import LowerPrecision
 
 import tensorrt as trt
 from utils import (
@@ -134,21 +134,17 @@ def run_torch_tensorrt(
 # Runs inference using FX2TRT backend
 def run_fx2trt(model, input_tensors, params, precision, batch_size):
     print("Running FX2TRT for precision: ", precision, " batch_size : ", batch_size)
-    if precision == "fp32":
-        precision = LowerPrecision.FP32
-    elif precision == "fp16":
-        precision = LowerPrecision.FP16
+    if precision == "fp16":
         model.half()
         input_tensors = [tensor.half() for tensor in input_tensors]
+
     # Run lowering eager mode benchmark
     start_compile = time.time_ns()
-    model = compile(
+    model = torchtrt.compile(
         model,
-        input_tensors,
-        max_batch_size=batch_size,
-        lower_precision=precision,
-        verbose_log=False,
-        explicit_batch_dimension=True,
+        ir="fx",
+        inputs=input_tensors,
+        enabled_precisions={torch.float16 if precision=="fp16" else torch.float32},
     )
     end_compile = time.time_ns()
     compile_time_ms = (end_compile - start_compile) / 1e6
@@ -173,6 +169,57 @@ def run_fx2trt(model, input_tensors, params, precision, batch_size):
 
     recordStats("FX-TensorRT", timings, precision, batch_size, compile_time_ms)
 
+def run_dynamo(model, input_tensors, params, precision, batch_size):
+    dynamo_backend = params["dynamo_backend"]
+    print("Running Dynamo with backend: ", dynamo_backend, " for precision: ", precision, " batch_size : ", batch_size)
+
+    if precision == "fp16":
+       input_tensors = [tensor.half() for tensor in input_tensors]
+
+    fp16_mode = True if precision == "fp16" else False
+    # dynamo_backend_params = {"fp16_mode" : fp16_mode}
+    # model = torch.compile(
+    #     model,
+    #     mode="default",
+    #     dynamic=False,
+    #     fullgraph=False,
+    #     backend=dynamo_backend,
+    #     # **dynamo_backend_params
+    # )
+    import torch._dynamo as dynamo
+    model = dynamo.optimize(dynamo_backend, nopython=True)(model)
+    # Compile and measure the time
+    with torch.no_grad():
+        start_compile = time.time_ns()
+        features = model(*input_tensors)
+        end_compile = time.time_ns()
+        compile_time_ms = (end_compile - start_compile) / 1e6
+        iters = params.get("iterations", 20)
+        # import pdb; pdb.set_trace()
+        print("============= DONE 0 ==================")
+
+        print("============= DONE 1 ==================")
+        # Warm up
+        model = torch._dynamo.run(model)
+        # import pdb; pdb.set_trace()
+
+        exported_model, _ = torch._dynamo.export(model, *input_tensors)
+        for i in range(WARMUP_ITER):
+            print("==== ITER: ", i)
+            features = exported_model(*input_tensors)
+
+        torch.cuda.synchronize()
+        print("============= DONE 2 ==================")
+        timings = []
+        for i in range(iters):
+            start_time = timeit.default_timer()
+            features = exported_model(*input_tensors)
+            torch.cuda.synchronize()
+            end_time = timeit.default_timer()
+            meas_time = end_time - start_time
+            timings.append(meas_time)
+
+    recordStats("Dynamo-" + dynamo_backend, timings, precision, batch_size, compile_time_ms)
 
 def torch_dtype_from_trt(dtype):
     if dtype == trt.int8:
@@ -274,7 +321,6 @@ def run(
     truncate_long_and_double=False,
     batch_size=1,
     is_trt_engine=False,
-    use_dynamo=False,
     model_torch=None,
 ):
     for backend in backends:
@@ -307,7 +353,7 @@ def run(
             )
             continue
 
-        if backend == "all" and not use_dynamo:
+        if backend == "all":
             run_torch(model, input_tensors, params, precision, batch_size)
             run_torch_tensorrt(
                 model,
@@ -327,8 +373,9 @@ def run(
                 batch_size,
             )
             run_fx2trt(model_torch, input_tensors, params, precision, batch_size)
+            run_dynamo(model_torch, input_tensors, params, precision, batch_size)
 
-        elif backend == "torchscript" and not use_dynamo:
+        elif backend == "torchscript":
             run_torch(model, input_tensors, params, precision, batch_size)
             run_torch_tensorrt(
                 model,
@@ -348,10 +395,10 @@ def run(
                 batch_size,
             )
 
-        elif backend == "torch" and not use_dynamo:
+        elif backend == "torch":
             run_torch(model, input_tensors, params, precision, batch_size)
 
-        elif backend == "torch_tensorrt" and not use_dynamo:
+        elif backend == "torch_tensorrt":
             run_torch_tensorrt(
                 model,
                 input_tensors,
@@ -374,6 +421,8 @@ def run(
                 is_trt_engine,
                 batch_size,
             )
+        elif backend == "dynamo":
+            run_dynamo(model_torch, input_tensors, params, precision, batch_size)
 
 
 # Generate report
@@ -501,14 +550,9 @@ if __name__ == "__main__":
         help="Boolean flag to determine if the user provided model is a TRT engine or not",
     )
     arg_parser.add_argument(
-        "--dynamo",
-        action="store_true",
-        help="Boolean flag to determine if the user provided model should be compiled with torch._dynamo",
-    )
-    arg_parser.add_argument(
         "--dynamo_backend",
         type=str,
-        default="inductor",
+        default="fx2trt",
         help="List of backends to use in Torchdynamo. Select options: inductor|fx2trt",
     )
     arg_parser.add_argument(
@@ -591,8 +635,6 @@ if __name__ == "__main__":
 
         model_name_torch = params["model_torch"]
         model_torch = None
-        use_dynamo = params["dynamo"]
-        dynamo_backend = params["dynamo_backend"]
 
         # Load TorchScript model, if provided
         if os.path.exists(model_name):
@@ -615,21 +657,12 @@ if __name__ == "__main__":
                 + "or provide a torch model file"
             )
 
-        if use_dynamo and (model_torch is None):
-            raise ValueError(
-                "No Pytorch model (nn.Module) is provided for torchdynamo compilation. Please provide a pytorch model"
-            )
-
-        if use_dynamo and model_torch:
-            model_torch = torch.compile(
-                model_torch,
-                "default",
-                dynamic=False,
-                fullgraph=False,
-                backend=dynamo_backend,
-            )
-
         backends = parse_backends(params["backends"])
+        if "dynamo" in backends and (model_torch is None):
+            raise ValueError(
+                "No Pytorch model (nn.Module) is provided for torchdynamo compilation. Please provide a pytorch model using --model_torch argument"
+            )
+
         truncate_long_and_double = params["truncate"]
         batch_size = params["batch_size"]
         is_trt_engine = params["is_trt_engine"]
@@ -639,9 +672,11 @@ if __name__ == "__main__":
             input_tensors = parse_inputs(
                 params["inputs"], precision_to_dtype(precision)
             )
+
             if not is_trt_engine and (precision == "fp16" or precision == "half"):
                 # If model is TensorRT serialized engine then model.half will report failure
                 model = model.half()
+
             status = run(
                 model,
                 backends,
@@ -651,7 +686,6 @@ if __name__ == "__main__":
                 truncate_long_and_double,
                 batch_size,
                 is_trt_engine,
-                use_dynamo,
                 model_torch=model_torch,
             )
 
