@@ -27,6 +27,10 @@ struct LowerInfo {
 
 void LowerBlock(torch::jit::Block* b);
 void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info);
+int AutocastLongInputs(
+    std::shared_ptr<torch::jit::Graph>& g,
+    ir::TypeMap input_type_map,
+    std::string target_device_name);
 torch::jit::Module LowerModule(
     const torch::jit::Module& mod,
     std::string method_name,

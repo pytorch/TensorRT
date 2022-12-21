@@ -26,6 +26,63 @@ void LowerBlock(torch::jit::Block* b) {
   DropUnusedNodes(b);
 }
 
+int AutocastLongInputs(
+    std::shared_ptr<torch::jit::Graph>& g,
+    ir::TypeMap input_type_map,
+    std::string target_device_name) {
+  int num_autocasts = 0;
+  // For each graph input, determine if it can be autocasted
+  for (int i = 0; i < g->inputs().size(); i++) {
+    auto input = g->inputs()[i];
+
+    // Autocasted inputs must be Tensor-type
+    if (input->type()->isSubtypeOf(c10::TensorType::get())) {
+      auto dtype_input = input_type_map.find(input);
+
+      // Ensure the data type to be casted to exists in the type map
+      if (dtype_input == input_type_map.end() || !dtype_input->second) {
+        LOG_DEBUG("No inferred input dtype for tensor " << input->debugName() << ", skipping autocast");
+        continue;
+      }
+
+      auto dtype = dtype_input->second.value();
+      // Currently, we do not autocast inputs for which the determined type is not long
+      if (dtype != at::kLong) {
+        continue;
+      }
+
+      LOG_DEBUG("Inserting aten::to casting " << input->debugName() << " to dtype " << dtype);
+
+      // Generate cast node sending input tensors to the inferred or specified datatype (long)
+      auto const_type = g->insertConstant(dtype);
+      auto const_false = g->insertConstant(0);
+      const_false->setType(torch::jit::BoolType::get());
+      auto cuda = g->insertConstant(target_device_name);
+      cuda->setType(torch::jit::DeviceObjType::get());
+      auto none_val = g->insertNode(g->createNone())->output();
+      auto cast_node = g->create(torch::jit::aten::to, {input, cuda, const_type, const_false, const_false, none_val});
+
+      // Replace all uses of the original tensor with that of the casted tensor
+      g->prependNode(cast_node);
+      input->replaceAllUsesAfterNodeWith(cast_node, cast_node->outputs()[0]);
+
+      // Mark the cast node to run in PyTorch for ease of casting
+      LOG_GRAPH("Marking autocast node " << util::node_info(cast_node) << " to run in PyTorch");
+      cast_node->i_(c10::Symbol::attr("to_compile"), (int64_t) false);
+      num_autocasts++;
+    }
+  }
+
+  LOG_WARNING(
+      "Input tensors to this Torch-TRT engine may have their data types in-place modified "
+      << "if the type does not match the determined required type for TRT. To disable this "
+      << "automatic casting, specify an Input dtype other than Long");
+
+  LOG_GRAPH("Graph after Autocast: " << *g);
+
+  return num_autocasts;
+}
+
 void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, std::vector<torch::jit::IValue>& params, LowerInfo lower_info) {
   torch::jit::EliminateRedundantGuards(g);
   torch::jit::RemoveListMutation(g);

@@ -266,10 +266,10 @@ void getSegmentsOutputByRunning(
             "Unable to process subgraph input type of at::kLong/at::kDouble, try to compile model with truncate_long_and_double enabled");
       } else if (partitioning_info.truncate_long_and_double && t == at::kLong) {
         cur_ivalue = cur_ivalue.toTensor().to(at::kInt);
-        LOG_WARNING("Truncating graph input type from at::kLong to at::kInt");
+        LOG_WARNING("Truncating intermediate graph input type from at::kLong to at::kInt");
       } else if (partitioning_info.truncate_long_and_double && t == at::kDouble) {
         cur_ivalue = cur_ivalue.toTensor().to(at::kFloat);
-        LOG_WARNING("Truncating graph input type from at::kDouble to at::kFloat");
+        LOG_WARNING("Truncating intermediate graph input type from at::kDouble to at::kFloat");
       }
       c10::optional<nvinfer1::DataType> dtype = util::optTypeMetaToTRTDataType(cur_ivalue.toTensor().dtype());
       if (dtype == c10::nullopt) {
