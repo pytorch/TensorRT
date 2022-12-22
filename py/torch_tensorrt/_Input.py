@@ -244,7 +244,7 @@ class Input(object):
                 + str(type(dtype))
             )
 
-    def is_TRT_dtype(self) -> bool:
+    def is_trt_dtype(self) -> bool:
         return self.dtype != _enums.dtype.long
 
     @staticmethod

@@ -87,7 +87,7 @@ nvinfer1::DataType toTRTDataType(DataType value) {
   }
 }
 
-at::ScalarType toAtDataType(DataType value) {
+at::ScalarType toAtenDataType(DataType value) {
   switch (value) {
     case DataType::kChar:
       return at::kChar;
@@ -119,7 +119,7 @@ nvinfer1::TensorFormat toTRTTensorFormat(TensorFormat value) {
 
 DataType::DataType(c10::ScalarType t) {
   TORCHTRT_CHECK(
-      t == at::kHalf || t == at::kFloat || t == at::kChar || t == at::kInt || t == at::kBool,
+      t == at::kHalf || t == at::kFloat || t == at::kChar || t == at::kLong || t == at::kInt || t == at::kBool,
       "Data type is unsupported (" << t << ")");
   switch (t) {
     case at::kHalf:
@@ -130,6 +130,9 @@ DataType::DataType(c10::ScalarType t) {
       break;
     case at::kInt:
       value = DataType::kInt;
+      break;
+    case at::kLong:
+      value = DataType::kLong;
       break;
     case at::kBool:
       value = DataType::kBool;
@@ -286,7 +289,7 @@ torch_tensorrt::core::ir::Input to_internal_input(Input& i) {
       i.min_shape,
       i.opt_shape,
       i.max_shape,
-      toAtDataType(i.dtype),
+      toAtenDataType(i.dtype),
       toTRTTensorFormat(i.format),
       !(i.dtype == DataType::kUnknown));
 }

@@ -215,7 +215,7 @@ def _parse_input_signature(input_signature: Any):
             else input_signature
         )
 
-        if not i.is_TRT_dtype():
+        if not i.is_trt_dtype():
             raise TypeError(
                 "Using non-TRT input types with input_signature is not currently "
                 + "supported. Please specify inputs individually to use "

@@ -44,7 +44,7 @@ nvinfer1::DataType toTRTDataType(DataType value) {
   }
 }
 
-at::ScalarType toAtDataType(DataType value) {
+at::ScalarType toAtenDataType(DataType value) {
   switch (value) {
     case DataType::kChar:
       return at::kChar;
@@ -95,9 +95,9 @@ std::string to_str(TensorFormat value) {
 
 core::ir::Input Input::toInternalInput() {
   if (!input_is_dynamic) {
-    return core::ir::Input(opt, toAtDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype);
+    return core::ir::Input(opt, toAtenDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype);
   } else {
-    return core::ir::Input(min, opt, max, toAtDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype);
+    return core::ir::Input(min, opt, max, toAtenDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype);
   }
 }
 

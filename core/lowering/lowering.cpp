@@ -48,18 +48,26 @@ int AutocastLongInputs(
       auto dtype = dtype_input->second.value();
       // Currently, we do not autocast inputs for which the determined type is not long
       if (dtype != at::kLong) {
+        LOG_DEBUG(
+            "Skipping autocast for tensor " << input->debugName() << ", since its dtype is " << dtype
+                                            << " and not at::kLong");
         continue;
       }
 
       LOG_DEBUG("Inserting aten::to casting " << input->debugName() << " to dtype " << dtype);
 
       // Generate cast node sending input tensors to the inferred or specified datatype (long)
+      torch::jit::Value *const_false, *cuda, *none_val;
+      if (num_autocasts == 0) {
+        // Only generate constants once and reuse for all autocasts
+        const_false = g->insertConstant(0);
+        const_false->setType(torch::jit::BoolType::get());
+        cuda = g->insertConstant(target_device_name);
+        cuda->setType(torch::jit::DeviceObjType::get());
+        none_val = g->insertNode(g->createNone())->output();
+      }
+
       auto const_type = g->insertConstant(dtype);
-      auto const_false = g->insertConstant(0);
-      const_false->setType(torch::jit::BoolType::get());
-      auto cuda = g->insertConstant(target_device_name);
-      cuda->setType(torch::jit::DeviceObjType::get());
-      auto none_val = g->insertNode(g->createNone())->output();
       auto cast_node = g->create(torch::jit::aten::to, {input, cuda, const_type, const_false, const_false, none_val});
 
       // Replace all uses of the original tensor with that of the casted tensor
@@ -73,12 +81,16 @@ int AutocastLongInputs(
     }
   }
 
-  LOG_WARNING(
-      "Input tensors to this Torch-TRT engine may have their data types in-place modified "
-      << "if the type does not match the determined required type for TRT. To disable this "
-      << "automatic casting, specify an Input dtype other than Long");
+  LOG_GRAPH("Inserted " << num_autocasts << " autocasts");
 
-  LOG_GRAPH("Graph after Autocast: " << *g);
+  if (num_autocasts > 0) {
+    LOG_WARNING(
+        "Data types for input tensors have been modified by inserting "
+        << "aten::to operations which cast INT64 inputs to INT32. "
+        << "To disable this, please recompile using INT32 inputs");
+
+    LOG_GRAPH("Graph after Autocast: " << *g);
+  }
 
   return num_autocasts;
 }
