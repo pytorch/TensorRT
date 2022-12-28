@@ -1,4 +1,4 @@
 timm==v0.4.12
 transformers==4.17.0
 --extra-index-url https://download.pytorch.org/whl/nightly/cu117
-torchvision==0.15.0.dev20221205+cpu
+torchvision==0.15.0.dev20221222+cu117
