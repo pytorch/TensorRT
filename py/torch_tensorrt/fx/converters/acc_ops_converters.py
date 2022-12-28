@@ -3630,7 +3630,7 @@ def acc_ops_interpolate(
     else:
         layer.resize_mode = trt.ResizeMode.NEAREST
 
-    if align_corners != None:
+    if (align_corners is not None) and align_corners:
         layer.coordinate_transformation = (
             trt.ResizeCoordinateTransformation.ALIGN_CORNERS
         )
