@@ -735,9 +735,9 @@ jobs:
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
       - install-cudnn
-      - run:
-          name: "Set LD_LIBRARY_PATH path to include the installed CUDNN"
-          command: export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH
+      # - run:
+      #     name: "Set LD_LIBRARY_PATH path to include the installed CUDNN"
+      #     command: export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install --pre /tmp/dist/x86_64-linux/*
