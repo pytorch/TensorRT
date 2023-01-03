@@ -17,6 +17,7 @@ import pandas as pd
 # Importing supported Backends
 import torch
 import torch_tensorrt as torchtrt
+
 # from torch_tensorrt.fx.lower import compile
 # from torch_tensorrt.fx.utils import LowerPrecision
 
@@ -144,7 +145,7 @@ def run_fx2trt(model, input_tensors, params, precision, batch_size):
         model,
         ir="fx",
         inputs=input_tensors,
-        enabled_precisions={torch.float16 if precision=="fp16" else torch.float32},
+        enabled_precisions={torch.float16 if precision == "fp16" else torch.float32},
     )
     end_compile = time.time_ns()
     compile_time_ms = (end_compile - start_compile) / 1e6
@@ -169,12 +170,20 @@ def run_fx2trt(model, input_tensors, params, precision, batch_size):
 
     recordStats("FX-TensorRT", timings, precision, batch_size, compile_time_ms)
 
+
 def run_dynamo(model, input_tensors, params, precision, batch_size):
     dynamo_backend = params["dynamo_backend"]
-    print("Running Dynamo with backend: ", dynamo_backend, " for precision: ", precision, " batch_size : ", batch_size)
+    print(
+        "Running Dynamo with backend: ",
+        dynamo_backend,
+        " for precision: ",
+        precision,
+        " batch_size : ",
+        batch_size,
+    )
 
     if precision == "fp16":
-       input_tensors = [tensor.half() for tensor in input_tensors]
+        input_tensors = [tensor.half() for tensor in input_tensors]
 
     fp16_mode = True if precision == "fp16" else False
     # dynamo_backend_params = {"fp16_mode" : fp16_mode}
@@ -187,6 +196,7 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
     #     # **dynamo_backend_params
     # )
     import torch._dynamo as dynamo
+
     model = dynamo.optimize(dynamo_backend, nopython=True)(model)
     # Compile and measure the time
     with torch.no_grad():
@@ -219,7 +229,10 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
             meas_time = end_time - start_time
             timings.append(meas_time)
 
-    recordStats("Dynamo-" + dynamo_backend, timings, precision, batch_size, compile_time_ms)
+    recordStats(
+        "Dynamo-" + dynamo_backend, timings, precision, batch_size, compile_time_ms
+    )
+
 
 def torch_dtype_from_trt(dtype):
     if dtype == trt.int8:
