@@ -244,6 +244,9 @@ commands:
         trt-version-long:
           type: string
           default: "8.5.1.7"
+        cudnn-version-long:
+          type: string
+          default: "8.5.0.96"
       steps:
         - run:
             name: Set up python environment
@@ -252,7 +255,7 @@ commands:
               pip3 install wheel setuptools
               pip3 install nvidia-pyindex
               pip3 install tabulate
-              pip3 install tensorrt==<< parameters.trt-version-long >>
+              pip3 install tensorrt==<< parameters.trt-version-long >> nvidia-cudnn-cu11==<< parameters.cudnn-version-long >>
               pip3 install pytest parameterized expecttest nox
 
   install-torch-from-index:
