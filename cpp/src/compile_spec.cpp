@@ -167,8 +167,11 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.convert_info.engine_settings.dla_local_dram_size = external.dla_local_dram_size;
   internal.convert_info.engine_settings.dla_global_dram_size = external.dla_global_dram_size;
 
+  internal.partitioning_info.cast_int8_inputs = true;
+
   if (internal.convert_info.engine_settings.enabled_precisions.find(nvinfer1::DataType::kINT8) !=
       internal.convert_info.engine_settings.enabled_precisions.end()) {
+    internal.partitioning_info.cast_int8_inputs = false;
     if (external.ptq_calibrator) {
       internal.convert_info.engine_settings.calibrator = external.ptq_calibrator;
     } else {

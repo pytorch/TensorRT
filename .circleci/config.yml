@@ -244,6 +244,9 @@ commands:
         trt-version-long:
           type: string
           default: "8.5.1.7"
+        cudnn-version-long:
+          type: string
+          default: "8.5.0.96"
       steps:
         - run:
             name: Set up python environment
@@ -252,7 +255,7 @@ commands:
               pip3 install wheel setuptools
               pip3 install nvidia-pyindex
               pip3 install tabulate
-              pip3 install tensorrt==<< parameters.trt-version-long >>
+              pip3 install tensorrt==<< parameters.trt-version-long >> nvidia-cudnn-cu11==<< parameters.cudnn-version-long >>
               pip3 install pytest parameterized expecttest nox
 
   install-torch-from-index:
@@ -260,7 +263,7 @@ commands:
     parameters:
       torch-build:
         type: string
-        default: "1.14.0.dev20221114+cu117"
+        default: "2.0.0.dev20230103+cu117"
       torch-build-index:
         type: string
         default: "https://download.pytorch.org/whl/nightly/cu117"
@@ -735,9 +738,9 @@ jobs:
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
       - install-cudnn
-      - run:
-          name: "Set LD_LIBRARY_PATH path to include the installed CUDNN"
-          command: export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH
+      # - run:
+      #     name: "Set LD_LIBRARY_PATH path to include the installed CUDNN"
+      #     command: export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install --pre /tmp/dist/x86_64-linux/*
@@ -989,7 +992,7 @@ parameters:
   # Nightly platform config
   torch-build:
     type: string
-    default: "1.14.0.dev20221114+cu117"
+    default: "2.0.0.dev20230103+cu117"
   torch-build-index:
     type: string
     default: "https://download.pytorch.org/whl/nightly/cu117"
