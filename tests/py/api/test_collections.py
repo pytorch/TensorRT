@@ -50,6 +50,36 @@ class TestStandardTensorInput(unittest.TestCase):
         )
 
 
+class TestStandardTensorInputLong(unittest.TestCase):
+    def test_compile(self):
+
+        self.input = torch.randn((1, 3, 224, 224)).to("cuda")
+        self.model = (
+            torch.jit.load(MODULE_DIR + "/standard_tensor_input_scripted.jit.pt")
+            .eval()
+            .to("cuda")
+        )
+
+        compile_spec = {
+            "inputs": [
+                torchtrt.Input(self.input.shape, dtype=torch.long),
+                torchtrt.Input(self.input.shape, dtype=torch.long),
+            ],
+            "device": torchtrt.Device("gpu:0"),
+            "enabled_precisions": {torch.float},
+            "truncate_long_and_double": True,
+        }
+
+        trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
+        cos_sim = cosine_similarity(
+            self.model(self.input, self.input), trt_mod(self.input, self.input)
+        )
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"standard_tensor_input_long_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
+
+
 class TestTupleInput(unittest.TestCase):
     def test_compile(self):
 

@@ -183,7 +183,7 @@ void AddInputs(ConversionCtx* ctx, c10::ArrayRef<const torch::jit::Value*> input
         "Adding Input " << in->debugName() << " (named: " << name << "): " << spec
                         << " in engine (conversion.AddInputs)");
 
-    auto trt_in = ctx->net->addInput(name.c_str(), spec.dtype, spec.input_shape);
+    auto trt_in = ctx->net->addInput(name.c_str(), util::ScalarTypeToTRTDataType(spec.dtype), spec.input_shape);
     TORCHTRT_CHECK(trt_in, "Failed to add input node: " << in->debugName() << " (conversion.AddInputs)");
     trt_in->setAllowedFormats(1U << static_cast<int>(spec.format));
 
