@@ -22,6 +22,11 @@ bool min_max_dim(ConversionCtx* ctx, const torch::jit::Node* n, args& args, nvin
   if (dim < 0) {
     dim = selfDim.size() + dim;
   }
+  bool int_input = self->getType() == nvinfer1::DataType::kINT32;
+  if (int_input) {
+    LOG_DEBUG("topk layer does not support int32 inputs, adding cast to float");
+    self = castITensor(ctx, self, nvinfer1::DataType::kFLOAT, util::node_info(n) + "_input");
+  }
   uint32_t reduce_axes_mask = 1 << dim;
   auto topk_layer = ctx->net->addTopK(*self, topKOperation, 1, reduce_axes_mask);
   TORCHTRT_CHECK(topk_layer, "Unable to create topk layer from node: " << *n);
@@ -44,7 +49,10 @@ bool min_max_dim(ConversionCtx* ctx, const torch::jit::Node* n, args& args, nvin
     out0 = ctx->AssociateValueAndTensor(n->outputs()[0], topk_layer->getOutput(0));
     out1 = ctx->AssociateValueAndTensor(n->outputs()[1], topk_layer->getOutput(1));
   }
-
+  if (int_input) {
+    LOG_DEBUG("Adding cast of topK layer output back to int32");
+    out0 = castITensor(ctx, out0, nvinfer1::DataType::kINT32, util::node_info(n) + "_output");
+  }
   LOG_DEBUG("Output tensor(0) shape: " << out0->getDimensions());
   LOG_DEBUG("Output tensor(1) shape: " << out1->getDimensions());
 
@@ -58,6 +66,10 @@ bool arg_min_max(ConversionCtx* ctx, const torch::jit::Node* n, args& args, nvin
   auto selfDim = util::toVec(self->getDimensions());
   if (dim < 0) {
     dim = selfDim.size() + dim;
+  }
+  if (self->getType() == nvinfer1::DataType::kINT32) {
+    LOG_DEBUG("topk layer does not support int32 inputs, adding cast to float");
+    self = castITensor(ctx, self, nvinfer1::DataType::kFLOAT, util::node_info(n) + "_input");
   }
   uint32_t reduce_axes_mask = 1 << dim;
   auto topk_layer = ctx->net->addTopK(*self, topKOperation, 1, reduce_axes_mask);
