@@ -143,9 +143,9 @@ def compile(
             module,
             inputs,
             lower_precision=lower_precision,
-            max_batch_size=inputs[0].size(0),
-            explicit_batch_dimension=True,
-            dynamic_batch=False,
+            # max_batch_size=inputs[0].size(0),
+            # explicit_batch_dimension=True,
+            # dynamic_batch=False,
             **kwargs,
         )
     else:
