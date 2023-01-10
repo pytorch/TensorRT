@@ -219,7 +219,9 @@ class Input(object):
     @staticmethod
     def _parse_dtype(dtype: Any) -> _enums.dtype:
         if isinstance(dtype, torch.dtype):
-            if dtype == torch.int32:
+            if dtype == torch.long:
+                return _enums.dtype.long
+            elif dtype == torch.int32:
                 return _enums.dtype.int32
             elif dtype == torch.half:
                 return _enums.dtype.half
@@ -229,7 +231,7 @@ class Input(object):
                 return _enums.dtype.bool
             else:
                 raise TypeError(
-                    "Provided an unsupported data type as an input data type (support: bool, int32, half, float), got: "
+                    "Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: "
                     + str(dtype)
                 )
 
@@ -241,6 +243,9 @@ class Input(object):
                 "Input data type needs to be specified with a torch.dtype or a torch_tensorrt.dtype, got: "
                 + str(type(dtype))
             )
+
+    def is_trt_dtype(self) -> bool:
+        return self.dtype != _enums.dtype.long
 
     @staticmethod
     def _parse_format(format: Any) -> _enums.TensorFormat:

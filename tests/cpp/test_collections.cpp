@@ -45,6 +45,50 @@ TEST(CppAPITests, TestCollectionStandardTensorInput) {
   ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(out.toTensor(), trt_out.toTensor()));
 }
 
+TEST(CppAPITests, TestCollectionStandardTensorInputLongDtype) {
+  std::string path = "tests/modules/standard_tensor_input_scripted.jit.pt";
+  torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kLong);
+  std::vector<at::Tensor> inputs;
+  inputs.push_back(in0);
+  inputs.push_back(in0);
+
+  torch::jit::Module mod;
+  try {
+    // Deserialize the ScriptModule from a file using torch::jit::load().
+    mod = torch::jit::load(path);
+  } catch (const c10::Error& e) {
+    std::cerr << "error loading the model\n";
+  }
+  mod.eval();
+  mod.to(torch::kCUDA);
+
+  std::vector<torch::jit::IValue> inputs_;
+
+  for (auto in : inputs) {
+    inputs_.push_back(torch::jit::IValue(in.clone()));
+  }
+
+  auto out = mod.forward(inputs_);
+
+  std::vector<torch_tensorrt::Input> input_range;
+
+  // Specify Long input tensor type
+  input_range.push_back({in0.sizes(), torch::kLong});
+  input_range.push_back({in0.sizes(), torch::kLong});
+  torch_tensorrt::ts::CompileSpec compile_settings(input_range);
+  compile_settings.min_block_size = 1;
+
+  // // FP32 execution with long and double truncation
+  compile_settings.enabled_precisions = {torch::kFloat};
+  compile_settings.truncate_long_and_double = true;
+  // // Compile module
+  auto trt_mod = torch_tensorrt::torchscript::compile(mod, compile_settings);
+  auto trt_out = trt_mod.forward(inputs_);
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(
+      out.toTensor().to(torch::kFloat), trt_out.toTensor().to(torch::kFloat)));
+}
+
 TEST(CppAPITests, TestCollectionTupleInput) {
   std::string path = "tests/modules/tuple_input_scripted.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);

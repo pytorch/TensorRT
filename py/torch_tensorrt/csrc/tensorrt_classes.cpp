@@ -16,6 +16,8 @@ std::string to_str(DataType value) {
       return "Bool";
     case DataType::kFloat:
       return "Float";
+    case DataType::kLong:
+      return "Long";
     default:
       return "Unknown data type";
   }
@@ -29,12 +31,35 @@ nvinfer1::DataType toTRTDataType(DataType value) {
       return nvinfer1::DataType::kHALF;
     case DataType::kInt32:
       return nvinfer1::DataType::kINT32;
+    case DataType::kLong:
+      return nvinfer1::DataType::kINT32;
     case DataType::kBool:
       return nvinfer1::DataType::kBOOL;
     case DataType::kFloat:
       return nvinfer1::DataType::kFLOAT;
     case DataType::kUnknown:
       return nvinfer1::DataType::kFLOAT;
+    default:
+      TORCHTRT_THROW_ERROR("Unknown data type: " << to_str(value));
+  }
+}
+
+at::ScalarType toAtenDataType(DataType value) {
+  switch (value) {
+    case DataType::kChar:
+      return at::kChar;
+    case DataType::kHalf:
+      return at::kHalf;
+    case DataType::kInt32:
+      return at::kInt;
+    case DataType::kLong:
+      return at::kLong;
+    case DataType::kBool:
+      return at::kBool;
+    case DataType::kFloat:
+      return at::kFloat;
+    case DataType::kUnknown:
+      return at::kFloat;
     default:
       TORCHTRT_THROW_ERROR("Unknown data type: " << to_str(value));
   }
@@ -70,9 +95,9 @@ std::string to_str(TensorFormat value) {
 
 core::ir::Input Input::toInternalInput() {
   if (!input_is_dynamic) {
-    return core::ir::Input(opt, toTRTDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype);
+    return core::ir::Input(opt, toAtenDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype);
   } else {
-    return core::ir::Input(min, opt, max, toTRTDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype);
+    return core::ir::Input(min, opt, max, toAtenDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype);
   }
 }
 

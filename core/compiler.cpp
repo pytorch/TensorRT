@@ -187,7 +187,7 @@ partitioning::GraphAndMapping BuildHybridGraph(
   return partitioning::stitch(&partitioning_ctx, block);
 }
 
-void MapInputsAndDetermineDTypes(
+ir::TypeMap MapInputsAndDetermineDTypes(
     CompileSpec& cfg,
     std::shared_ptr<torch::jit::Graph>& g,
     ir::StaticParams& static_params,
@@ -197,6 +197,7 @@ void MapInputsAndDetermineDTypes(
   cfg.partitioning_info.collection_input_spec_map =
       ir::CollectionInputSpecMap(cfg.convert_info.collection_input_spec_map);
 
+  ir::TypeMap inferred_dtypes;
   auto collection_inputs = ir::get_collection_inputs(g, static_params);
   LOG_DEBUG(
       "In MapInputsAndDetermineDTypes, the g->inputs() size is "
@@ -218,13 +219,13 @@ void MapInputsAndDetermineDTypes(
         LOG_INFO(
             "Since input type is not explicitly defined, infering using first tensor calculation\n  Inferred input "
             << in->debugName() << " has type " << est_type_opt[i].value());
-        spec[i].dtype = util::ScalarTypeToTRTDataType(est_type_opt[i].value());
+        spec[i].dtype = est_type_opt[i].value();
       } else if (!est_type_opt[i] && !spec[i].dtype_is_user_defined) {
         // If we cannot calculate the type and the user did not define the type, then default to FP32
         LOG_WARNING(
             "Cannot infer input type from calcuations in graph for input "
             << in->debugName() << ". Assuming it is Float32. If not, specify input type explicity");
-        spec[i].dtype = nvinfer1::DataType::kFLOAT;
+        spec[i].dtype = at::kFloat;
       } else if (spec[i].dtype_is_user_defined && cfg.partitioning_info.enabled) {
         if (!est_type_opt[i]) {
           LOG_INFO("Cannot infer input tensor dtype in graph, compiler is going to use the user setting");
@@ -236,37 +237,35 @@ void MapInputsAndDetermineDTypes(
           auto warn_str = ss.str();
           LOG_WARNING(warn_str);
           // Overwrite type map with user settings
-          first_use_type_map[in][i] = {
-              util::TRTDataTypeToScalarType(cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype)};
+          first_use_type_map[in][i] = {cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype};
 
-        } else {
-          if (util::TRTDataTypeToScalarType(cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype) !=
-              est_type_opt[i].value()) {
-            std::stringstream ss;
-            ss << "For input " << in->debugName() << ", found user specified input dtype as ";
-            ss << cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype;
-            ss << ", however when inspecting the graph, the input type expected was inferred to be ";
-            ss << est_type_opt[i].value() << std::endl;
-            ss << "The compiler is going to use the user setting "
-               << cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype;
-            ss << "\nThis conflict may cause an error at runtime due to partial compilation being enabled and therefore\n";
-            ss << "compatibility with PyTorch's data type convention is required.\n";
-            ss << "If you do indeed see errors at runtime either:\n";
-            ss << "- Remove the dtype spec for " << in->debugName() << std::endl;
-            ss << "- Disable partial compilation by setting require_full_compilation to True";
-            auto warn_str = ss.str();
-            LOG_WARNING(warn_str);
-            // Overwrite type map with user settings
-            first_use_type_map[in][i] = {
-                util::TRTDataTypeToScalarType(cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype)};
-          }
+        } else if (cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype != est_type_opt[i].value()) {
+          std::stringstream ss;
+          ss << "For input " << in->debugName() << ", found user specified input dtype as ";
+          ss << cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype;
+          ss << ", however when inspecting the graph, the input type expected was inferred to be ";
+          ss << est_type_opt[i].value() << std::endl;
+          ss << "The compiler is going to use the user setting "
+             << cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype;
+          ss << "\nThis conflict may cause an error at runtime due to partial compilation being enabled and therefore\n";
+          ss << "compatibility with PyTorch's data type convention is required.\n";
+          ss << "If you do indeed see errors at runtime either:\n";
+          ss << "- Remove the dtype spec for " << in->debugName() << std::endl;
+          ss << "- Disable partial compilation by setting require_full_compilation to True";
+          auto warn_str = ss.str();
+          LOG_WARNING(warn_str);
+          // Overwrite type map with user settings
+          first_use_type_map[in][i] = {cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype};
         }
       } else {
         // The user defined the type so no changes are necessary
       }
+
+      // Insert entry for Value pointer and determined ScalarType
+      inferred_dtypes.insert({in, {spec[i].dtype}});
     }
   }
-  // }
+  return inferred_dtypes;
 }
 
 std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::string method_name, CompileSpec cfg) {
@@ -283,6 +282,15 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
   auto first_use_types = ir::get_block_first_calc_dtypes_opt_collection(g->block());
 
   MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types);
+
+  // Ensure none of the specified types are of acceptable input types incompatible with TRT
+  // Currently, only at::kLong is an acceptable, though TRT-incompatible type
+  for (auto value_to_dtypes : first_use_types) {
+    for (auto dtype : value_to_dtypes.second) {
+      TORCHTRT_CHECK(
+          !dtype || dtype.value() != at::kLong, "Cannot specify Int64 input for a model fully compiled in TRT");
+    }
+  }
 
   auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
 
@@ -307,10 +315,24 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
       // Infer the type of an input from the weights of the calculation
       auto first_use_types = ir::get_block_first_calc_dtypes_opt_collection(g->block());
 
-      MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types);
+      // Extract map of IValue to DType
+      auto type_map = MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types);
+
+      // Check whether any of the input types are Long
+      bool user_requested_long = false;
+      for (auto dtype : type_map) {
+        user_requested_long |= dtype.second && (dtype.second.value() == at::kLong);
+      }
+
+      // Use dtype map to autocast Tensor-type inputs to Long dtype as necessary
+      if (cfg.partitioning_info.enabled && cfg.partitioning_info.truncate_long_and_double && user_requested_long) {
+        auto casts_inserted = lowering::AutocastLongInputs(g, type_map, cfg.lower_info.getGPUDeviceString());
+        user_requested_long &= (casts_inserted > 0);
+      }
+
       auto isBlockConvertible = conversion::VerifyConverterSupportForBlock(g->block(), true);
       auto outputIsCollection = conversion::OutputIsCollection(g->block());
-      if (cfg.partitioning_info.enabled &&
+      if (cfg.partitioning_info.enabled && !user_requested_long &&
           (cfg.lower_info.forced_fallback_modules.size() == 0 &&
            cfg.partitioning_info.forced_fallback_operators.size() == 0 && isBlockConvertible) &&
           !outputIsCollection) {
@@ -320,7 +342,7 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
       if (cfg.partitioning_info.enabled &&
           (!(cfg.lower_info.forced_fallback_modules.size() == 0 &&
              cfg.partitioning_info.forced_fallback_operators.size() == 0 && isBlockConvertible) ||
-           outputIsCollection)) {
+           outputIsCollection || user_requested_long)) {
         auto graph_and_mapping = BuildHybridGraph(new_mod, g->block(), cfg, static_params, first_use_types);
         new_g = graph_and_mapping.first;
         // renaming the input name of graph after fallback to ensure pytorch deserialize it correctly
