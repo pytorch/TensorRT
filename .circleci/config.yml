@@ -1045,7 +1045,7 @@ workflows:
           filters:
             branches:
               only:
-                - master
+                - main
                 - release/**/*
     jobs:
       - build-x86_64-linux:
