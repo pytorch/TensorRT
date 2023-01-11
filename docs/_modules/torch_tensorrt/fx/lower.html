@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.fx.lower &mdash; Torch-TensorRT v1.4.0dev0+b638e78 documentation</title>
+  <title>torch_tensorrt.fx.lower &mdash; Torch-TensorRT v1.4.0dev0+5063b14 documentation</title>
   
 
   
@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+b638e78
+                  v1.4.0dev0+5063b14
                 </div>
               
             
@@ -405,7 +405,7 @@
     <span class="n">is_aten</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">use_experimental_fx_rt</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Takes in original module, input and lowering setting, run lowering workflow to turn module</span>
 <span class="sd">    into lowered module, or so called TRTModule.</span>
 
@@ -533,7 +533,7 @@
     <span class="k">def</span> <span class="nf">lower_pass</span><span class="p">(</span>
         <span class="n">mod</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">Input</span><span class="p">,</span> <span class="n">lower_setting</span><span class="p">:</span> <span class="n">LowerSetting</span><span class="p">,</span> <span class="n">module_name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Create a module transformation pass which lowers an `fx.GraphModule` into a</span>
 <span class="sd">        `TRTModule`</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -572,7 +572,7 @@
 
 <span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">Lowerer</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Lowers a module using fx2trt.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Lowers a module using fx2trt.</span>
 
 <span class="sd">    This is a composable class to facilitate fx2trt. A normal fx2trt process</span>
 <span class="sd">    composes of the following passes to transform an `fx.GraphModule`:</span>
@@ -601,7 +601,7 @@
         <span class="n">interpreter_builder</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="n">create_lower_trt_interpreter</span><span class="p">,</span>
         <span class="n">split_func</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="n">default_split_function</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Lowerer&quot;</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Instantiate a `Lowerer` instance.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Instantiate a `Lowerer` instance.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">is_aten</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
                 <span class="n">lower_pass_manager_builder</span><span class="o">=</span><span class="n">LowerPassManagerBuilder</span><span class="p">(</span>

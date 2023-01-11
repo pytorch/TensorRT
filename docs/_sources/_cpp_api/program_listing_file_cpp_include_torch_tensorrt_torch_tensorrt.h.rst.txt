@@ -55,6 +55,7 @@ Program Listing for File torch_tensorrt.h
    class DataType {
     public:
      enum Value : int8_t {
+       kLong,
        kFloat,
        kHalf,
        kChar,

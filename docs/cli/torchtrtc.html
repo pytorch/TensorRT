@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torchtrtc &mdash; Torch-TensorRT v1.4.0dev0+b638e78 documentation</title>
+  <title>torchtrtc &mdash; Torch-TensorRT v1.4.0dev0+5063b14 documentation</title>
   
 
   
@@ -215,7 +215,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+b638e78
+                  v1.4.0dev0+5063b14
                 </div>
               
             
@@ -489,19 +489,19 @@ OPTIONS:
 </pre></div>
 </div>
 <p>e.g.</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts <span class="s2">&quot;[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@f16%contiguous&quot;</span> -p f16
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>torchtrtc<span class="w"> </span>tests/modules/ssd_traced.jit.pt<span class="w"> </span>ssd_trt.ts<span class="w"> </span><span class="s2">&quot;[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@f16%contiguous&quot;</span><span class="w"> </span>-p<span class="w"> </span>f16
 </pre></div>
 </div>
 <ul class="simple">
 <li><p>To include a set of custom operators</p></li>
 </ul>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts --custom-torch-ops<span class="o">=</span>&lt;path to custom library .so file&gt; <span class="s2">&quot;[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous&quot;</span> -p f16
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>torchtrtc<span class="w"> </span>tests/modules/ssd_traced.jit.pt<span class="w"> </span>ssd_trt.ts<span class="w"> </span>--custom-torch-ops<span class="o">=</span>&lt;path<span class="w"> </span>to<span class="w"> </span>custom<span class="w"> </span>library<span class="w"> </span>.so<span class="w"> </span>file&gt;<span class="w"> </span><span class="s2">&quot;[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous&quot;</span><span class="w"> </span>-p<span class="w"> </span>f16
 </pre></div>
 </div>
 <ul class="simple">
 <li><p>To include a set of custom converters</p></li>
 </ul>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts --custom-converters<span class="o">=</span>&lt;path to custom library .so file&gt; <span class="s2">&quot;[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous&quot;</span> -p f16
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>torchtrtc<span class="w"> </span>tests/modules/ssd_traced.jit.pt<span class="w"> </span>ssd_trt.ts<span class="w"> </span>--custom-converters<span class="o">=</span>&lt;path<span class="w"> </span>to<span class="w"> </span>custom<span class="w"> </span>library<span class="w"> </span>.so<span class="w"> </span>file&gt;<span class="w"> </span><span class="s2">&quot;[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous&quot;</span><span class="w"> </span>-p<span class="w"> </span>f16
 </pre></div>
 </div>
 </section>

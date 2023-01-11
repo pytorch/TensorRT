@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Program Listing for File macros.h &mdash; Torch-TensorRT v1.4.0dev0+b638e78 documentation</title>
+  <title>Program Listing for File macros.h &mdash; Torch-TensorRT v1.4.0dev0+5063b14 documentation</title>
   
 
   
@@ -213,7 +213,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+b638e78
+                  v1.4.0dev0+5063b14
                 </div>
               
             
@@ -370,11 +370,11 @@
 <span class="cm"> *</span>
 <span class="cm"> * This library is licensed under the BSD-style license found in the</span>
 <span class="cm"> * LICENSE file in the root directory of this source tree.</span>
-<span class="cm"> */</span><span class="w"></span>
+<span class="cm"> */</span>
 <span class="cp">#pragma once</span>
 
 <span class="cp">#if defined(USE_CMAKE_GENERATED_EXPORT_HEADER)</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;torch_tensorrt_export.h&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;torch_tensorrt_export.h&gt;</span>
 <span class="cp">#else</span>
 <span class="cp">#if defined(__GNUC__)</span>
 <span class="cp">#define TORCHTRT_API __attribute__((__visibility__(&quot;default&quot;)))</span>
@@ -397,11 +397,11 @@
 <span class="cp">  &quot;.&quot; STR(TORCH_TENSORRT_MINOR_VERSION) &quot;.&quot; STR(TORCH_TENSORRT_PATCH_VERSION)</span>
 
 <span class="c1">// Setup namespace aliases for ease of use</span>
-<span class="k">namespace</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="k">namespace</span><span class="w"> </span><span class="nn">torchscript</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
-<span class="k">namespace</span><span class="w"> </span><span class="nn">ts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nn">torchscript</span><span class="p">;</span><span class="w"></span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="p">{</span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torchscript</span><span class="w"> </span><span class="p">{}</span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">ts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nn">torchscript</span><span class="p">;</span>
 <span class="p">}</span><span class="w"> </span><span class="c1">// namespace torch_tensorrt</span>
-<span class="k">namespace</span><span class="w"> </span><span class="nn">torchtrt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="p">;</span><span class="w"></span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torchtrt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="p">;</span>
 </pre></div>
 </div>
 </section>

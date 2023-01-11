@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.ts._compiler &mdash; Torch-TensorRT v1.4.0dev0+b638e78 documentation</title>
+  <title>torch_tensorrt.ts._compiler &mdash; Torch-TensorRT v1.4.0dev0+5063b14 documentation</title>
   
 
   
@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+b638e78
+                  v1.4.0dev0+5063b14
                 </div>
               
             
@@ -393,7 +393,7 @@
     <span class="n">torch_executed_ops</span><span class="o">=</span><span class="p">[],</span>
     <span class="n">torch_executed_modules</span><span class="o">=</span><span class="p">[],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Compile a TorchScript module for NVIDIA GPUs using TensorRT</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile a TorchScript module for NVIDIA GPUs using TensorRT</span>
 
 <span class="sd">    Takes a existing TorchScript module and a set of settings to configure the compiler</span>
 <span class="sd">    and will convert methods to JIT Graphs which call equivalent TensorRT engines</span>
@@ -518,7 +518,7 @@
     <span class="n">truncate_long_and_double</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">calibrator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytearray</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Convert a TorchScript module method to a serialized TensorRT engine</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a TorchScript module method to a serialized TensorRT engine</span>
 
 <span class="sd">    Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings</span>
 
@@ -618,7 +618,7 @@
     <span class="n">input_binding_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[],</span>
     <span class="n">output_binding_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Takes a pre-built serialized TensorRT engine and embeds it within a TorchScript module</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Takes a pre-built serialized TensorRT engine and embeds it within a TorchScript module</span>
 
 <span class="sd">    Takes a pre-built serialied TensorRT engine (as bytes) and embeds it within a TorchScript module.</span>
 <span class="sd">    Registers the forward method to execute the TensorRT engine with the function signature:</span>
@@ -654,7 +654,7 @@
 <div class="viewcode-block" id="check_method_op_support"><a class="viewcode-back" href="../../../py_api/ts.html#torch_tensorrt.ts.check_method_op_support">[docs]</a><span class="k">def</span> <span class="nf">check_method_op_support</span><span class="p">(</span>
     <span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span><span class="p">,</span> <span class="n">method_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;forward&quot;</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Checks to see if a method is fully supported by torch_tensorrt</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Checks to see if a method is fully supported by torch_tensorrt</span>
 
 <span class="sd">    Checks if a method of a TorchScript module can be compiled by torch_tensorrt, if not, a list of operators</span>
 <span class="sd">    that are not supported are printed out and the function returns false, else true.</span>

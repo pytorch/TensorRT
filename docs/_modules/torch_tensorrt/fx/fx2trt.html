@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.fx.fx2trt &mdash; Torch-TensorRT v1.4.0dev0+b638e78 documentation</title>
+  <title>torch_tensorrt.fx.fx2trt &mdash; Torch-TensorRT v1.4.0dev0+5063b14 documentation</title>
   
 
   
@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+b638e78
+                  v1.4.0dev0+5063b14
                 </div>
               
             
@@ -525,7 +525,7 @@
         <span class="n">profiling_verbosity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="n">tactic_sources</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TRTInterpreterResult</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Build TensorRT engine with some configs.</span>
 <span class="sd">        Args:</span>
 <span class="sd">            max_batch_size: set accordingly for maximum batch size you will use.</span>
@@ -564,7 +564,7 @@
         <span class="n">run_module_start_time</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;TRT INetwork construction elapsed time: </span><span class="si">{</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">-</span> <span class="n">run_module_start_time</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;TRT INetwork construction elapsed time: </span><span class="si">{</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">run_module_start_time</span><span class="si">}</span><span class="s2">&quot;</span>
         <span class="p">)</span>
         <span class="n">build_engine_start_time</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
 
@@ -618,7 +618,7 @@
             <span class="k">else</span> <span class="nb">bytearray</span><span class="p">()</span>
         <span class="p">)</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Build TRT engine elapsed time: </span><span class="si">{</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">-</span> <span class="n">build_engine_start_time</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Build TRT engine elapsed time: </span><span class="si">{</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">build_engine_start_time</span><span class="si">}</span><span class="s2">&quot;</span>
         <span class="p">)</span>
 
         <span class="k">return</span> <span class="n">TRTInterpreterResult</span><span class="p">(</span>

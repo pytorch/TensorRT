@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v1.4.0dev0+b638e78 documentation</title>
+  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v1.4.0dev0+5063b14 documentation</title>
   
 
   
@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+b638e78
+                  v1.4.0dev0+5063b14
                 </div>
               
             
@@ -372,14 +372,14 @@
 
 
 <span class="k">class</span> <span class="nc">_IRType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Enum to set the minimum required logging level to print a message to stdout&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enum to set the minimum required logging level to print a message to stdout&quot;&quot;&quot;</span>
 
     <span class="n">ts</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="n">fx</span> <span class="o">=</span> <span class="mi">1</span>
 
 
 <span class="k">class</span> <span class="nc">_ModuleType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Enum to set the minimum required logging level to print a message to stdout&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enum to set the minimum required logging level to print a message to stdout&quot;&quot;&quot;</span>
 
     <span class="n">nn</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="n">ts</span> <span class="o">=</span> <span class="mi">1</span>
@@ -438,7 +438,7 @@
     <span class="n">enabled_precisions</span><span class="o">=</span><span class="nb">set</span><span class="p">([</span><span class="n">_enums</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">float</span><span class="p">]),</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
 <span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Compile a PyTorch module for NVIDIA GPUs using TensorRT</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile a PyTorch module for NVIDIA GPUs using TensorRT</span>
 
 <span class="sd">    Takes a existing PyTorch module and a set of settings to configure the compiler</span>
 <span class="sd">    and using the path specified in ``ir`` lower and compile the module to TensorRT</span>
@@ -521,7 +521,7 @@
     <span class="n">enabled_precisions</span><span class="o">=</span><span class="nb">set</span><span class="p">([</span><span class="n">_enums</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">float</span><span class="p">]),</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
 <span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Convert a TorchScript module method to a serialized TensorRT engine</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a TorchScript module method to a serialized TensorRT engine</span>
 
 <span class="sd">    Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings</span>
 

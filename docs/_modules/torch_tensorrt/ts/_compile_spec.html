@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.ts._compile_spec &mdash; Torch-TensorRT v1.4.0dev0+b638e78 documentation</title>
+  <title>torch_tensorrt.ts._compile_spec &mdash; Torch-TensorRT v1.4.0dev0+5063b14 documentation</title>
   
 
   
@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+b638e78
+                  v1.4.0dev0+5063b14
                 </div>
               
             
@@ -575,6 +575,14 @@
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_signature</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span>
             <span class="k">else</span> <span class="n">input_signature</span>
         <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">i</span><span class="o">.</span><span class="n">is_trt_dtype</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="s2">&quot;Using non-TRT input types with input_signature is not currently &quot;</span>
+                <span class="o">+</span> <span class="s2">&quot;supported. Please specify inputs individually to use &quot;</span>
+                <span class="o">+</span> <span class="s2">&quot;non-TRT types.&quot;</span>
+            <span class="p">)</span>
+
         <span class="n">clone</span> <span class="o">=</span> <span class="n">_internal_input_to_torch_class_input</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">_to_internal</span><span class="p">())</span>
         <span class="k">return</span> <span class="n">clone</span>
     <span class="k">else</span><span class="p">:</span>
@@ -628,7 +636,7 @@
         <span class="p">)</span>
         <span class="n">log</span><span class="p">(</span>
             <span class="n">Level</span><span class="o">.</span><span class="n">Debug</span><span class="p">,</span>
-            <span class="sd">&quot;&quot;&quot;Adding the following ops to torch_executed_ops:</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;Adding the following ops to torch_executed_ops:</span>
 <span class="sd">    - aten::__getitem__</span>
 <span class="sd">    - prim::ListConstruct</span>
 <span class="sd">    - prim::ListUnpack</span>
@@ -738,7 +746,7 @@
     <span class="n">truncate_long_and_double</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">calibrator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">CompileSpec</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Utility to create a formated spec dictionary for using the PyTorch TensorRT backend</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Utility to create a formated spec dictionary for using the PyTorch TensorRT backend</span>
 
 <span class="sd">    Keyword Args:</span>
 <span class="sd">        inputs (List[Union(torch_tensorrt.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using</span>

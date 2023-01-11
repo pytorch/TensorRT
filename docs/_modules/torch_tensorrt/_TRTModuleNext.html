@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._TRTModuleNext &mdash; Torch-TensorRT v1.4.0dev0+b638e78 documentation</title>
+  <title>torch_tensorrt._TRTModuleNext &mdash; Torch-TensorRT v1.4.0dev0+5063b14 documentation</title>
   
 
   
@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+b638e78
+                  v1.4.0dev0+5063b14
                 </div>
               
             
@@ -371,7 +371,7 @@
 
 
 <div class="viewcode-block" id="TRTModuleNext"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext">[docs]</a><span class="k">class</span> <span class="nc">TRTModuleNext</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;TRTModuleNext is a PyTorch module which encompasses an arbitrary TensorRT Engine.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;TRTModuleNext is a PyTorch module which encompasses an arbitrary TensorRT Engine.</span>
 
 <span class="sd">    This module is backed by the Torch-TensorRT runtime and is fully compatibile with both</span>
 <span class="sd">    FX / Python deployments (just ``import torch_tensorrt`` as part of the application) as</span>
@@ -398,7 +398,7 @@
         <span class="n">output_binding_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[],</span>
         <span class="n">target_device</span><span class="p">:</span> <span class="n">Device</span> <span class="o">=</span> <span class="n">Device</span><span class="o">.</span><span class="n">_current_device</span><span class="p">(),</span>
     <span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;__init__ method for torch_tensorrt.TRTModuleNext</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;__init__ method for torch_tensorrt.TRTModuleNext</span>
 
 <span class="sd">        Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs</span>
 <span class="sd">        a PyTorch ``torch.nn.Module`` around it.</span>
@@ -489,7 +489,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">output_binding_names</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span></div>
 
 <div class="viewcode-block" id="TRTModuleNext.forward"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">inputs</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Implementation of the forward pass for a TensorRT engine</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Implementation of the forward pass for a TensorRT engine</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            *inputs (torch.Tensor): Inputs to the forward function, must all be ``torch.Tensor``</span>
@@ -526,7 +526,7 @@
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">outputs</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="TRTModuleNext.enable_profiling"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.enable_profiling">[docs]</a>    <span class="k">def</span> <span class="nf">enable_profiling</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">profiling_results_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Enable the profiler to collect latency information about the execution of the engine</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Enable the profiler to collect latency information about the execution of the engine</span>
 
 <span class="sd">        Traces can be visualized using https://ui.perfetto.dev/ or compatible alternatives</span>
 
@@ -541,14 +541,14 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">enable_profiling</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="TRTModuleNext.disable_profiling"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.disable_profiling">[docs]</a>    <span class="k">def</span> <span class="nf">disable_profiling</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Disable the profiler&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Disable the profiler&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Engine has not been initalized yet.&quot;</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">disable_profiling</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="TRTModuleNext.get_layer_info"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.get_layer_info">[docs]</a>    <span class="k">def</span> <span class="nf">get_layer_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Get a JSON string containing the layer information encoded by the TensorRT engine in this module</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get a JSON string containing the layer information encoded by the TensorRT engine in this module</span>
 
 <span class="sd">        Returns:</span>
 
@@ -560,7 +560,7 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">get_engine_layer_info</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="TRTModuleNext.dump_layer_info"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.TRTModuleNext.dump_layer_info">[docs]</a>    <span class="k">def</span> <span class="nf">dump_layer_info</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Dump layer information encoded by the TensorRT engine in this module to STDOUT&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Dump layer information encoded by the TensorRT engine in this module to STDOUT&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Engine has not been initalized yet.&quot;</span><span class="p">)</span>
 

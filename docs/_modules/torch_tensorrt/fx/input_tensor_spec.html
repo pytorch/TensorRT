@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.fx.input_tensor_spec &mdash; Torch-TensorRT v1.4.0dev0+b638e78 documentation</title>
+  <title>torch_tensorrt.fx.input_tensor_spec &mdash; Torch-TensorRT v1.4.0dev0+5063b14 documentation</title>
   
 
   
@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+b638e78
+                  v1.4.0dev0+5063b14
                 </div>
               
             
@@ -420,7 +420,7 @@
 
 
 <div class="viewcode-block" id="InputTensorSpec"><a class="viewcode-back" href="../../../py_api/fx.html#torch_tensorrt.fx.InputTensorSpec">[docs]</a><span class="k">class</span> <span class="nc">InputTensorSpec</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    This class contains the information of a input tensor.</span>
 
 <span class="sd">    shape: shape of the tensor.</span>
@@ -450,7 +450,7 @@
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">from_tensor</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">tensor</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;InputTensorSpec&quot;</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Produce an InputTenosrSpec named tuple which contains the</span>
 <span class="sd">        information of the given PyTorch tensor.</span>
 
@@ -464,7 +464,7 @@
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">from_tensors</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">tensors</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;InputTensorSpec&quot;</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Produce a list of InputTenosrSpec named tuples which contain</span>
 <span class="sd">        the information of all the given PyTorch tensors.</span>
 
@@ -485,7 +485,7 @@
         <span class="n">opt_profile_replica</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
         <span class="n">batch_dims</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;InputTensorSpec&quot;</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Produce a list of InputTenosrSpec named tuples which would contain</span>
 <span class="sd">        the information of all the given PyTorch tensors. The produced input</span>
 <span class="sd">        tensor specs will treat all tensors&#39; first dimension as batch dimension</span>
