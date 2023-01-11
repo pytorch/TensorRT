@@ -58,6 +58,8 @@ class DataType {
    * ex. torch_tensorrt::DataType type = DataType::kFloat;
    */
   enum Value : int8_t {
+    /// INT64
+    kLong,
     /// FP32
     kFloat,
     /// FP16

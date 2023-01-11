@@ -18,8 +18,8 @@ TEST(Converters, ATenStackPureTensorConvertsCorrectly) {
     params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
     auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
 
-    ASSERT_TRUE(
-        torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
+        jit_results[0], trt_results[0].reshape_as(jit_results[0]), THRESHOLD_E5));
   };
   const auto graph = R"IR(
       graph(%0 : Tensor,
@@ -54,8 +54,8 @@ TEST(Converters, ATenStackDiffTensorConvertsCorrectly) {
     params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {in2});
     auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1});
 
-    ASSERT_TRUE(
-        torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
+        jit_results[0], trt_results[0].reshape_as(jit_results[0]), THRESHOLD_E5));
   };
   const auto graph = R"IR(
       graph(%0 : Tensor,

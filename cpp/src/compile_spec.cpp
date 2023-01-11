@@ -111,6 +111,7 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.convert_info.engine_settings.truncate_long_and_double = external.truncate_long_and_double;
   internal.convert_info.engine_settings.device.allow_gpu_fallback = external.device.allow_gpu_fallback;
   internal.lower_info.target_device.allow_gpu_fallback = external.device.allow_gpu_fallback;
+  internal.partitioning_info.target_device.allow_gpu_fallback = external.device.allow_gpu_fallback;
 
   TORCHTRT_CHECK(
       !(external.require_full_compilation && (external.torch_executed_ops.size() > 0)),
@@ -132,11 +133,13 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
     case Device::DeviceType::kDLA:
       internal.convert_info.engine_settings.device.device_type = nvinfer1::DeviceType::kDLA;
       internal.lower_info.target_device.device_type = nvinfer1::DeviceType::kDLA;
+      internal.partitioning_info.target_device.device_type = nvinfer1::DeviceType::kDLA;
       break;
     case Device::DeviceType::kGPU:
     default:
       internal.convert_info.engine_settings.device.device_type = nvinfer1::DeviceType::kGPU;
       internal.lower_info.target_device.device_type = nvinfer1::DeviceType::kGPU;
+      internal.partitioning_info.target_device.device_type = nvinfer1::DeviceType::kGPU;
   }
 
   switch (external.capability) {
@@ -155,14 +158,20 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.convert_info.engine_settings.device.dla_core = external.device.dla_core;
   internal.lower_info.target_device.gpu_id = external.device.gpu_id;
   internal.lower_info.target_device.dla_core = external.device.dla_core;
+  internal.partitioning_info.target_device.gpu_id = external.device.gpu_id;
+  internal.partitioning_info.target_device.dla_core = external.device.dla_core;
+
   internal.convert_info.engine_settings.num_avg_timing_iters = external.num_avg_timing_iters;
   internal.convert_info.engine_settings.workspace_size = external.workspace_size;
   internal.convert_info.engine_settings.dla_sram_size = external.dla_sram_size;
   internal.convert_info.engine_settings.dla_local_dram_size = external.dla_local_dram_size;
   internal.convert_info.engine_settings.dla_global_dram_size = external.dla_global_dram_size;
 
+  internal.partitioning_info.cast_int8_inputs = true;
+
   if (internal.convert_info.engine_settings.enabled_precisions.find(nvinfer1::DataType::kINT8) !=
       internal.convert_info.engine_settings.enabled_precisions.end()) {
+    internal.partitioning_info.cast_int8_inputs = false;
     if (external.ptq_calibrator) {
       internal.convert_info.engine_settings.calibrator = external.ptq_calibrator;
     } else {

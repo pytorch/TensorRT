@@ -3369,7 +3369,7 @@ def acc_ops_gelu(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     approximate = kwargs["approximate"]
-    if approximate is not "none":
+    if approximate != "none":
         raise RuntimeError("GeLU converter currently doesn't support fast gelu compute")
     if not isinstance(input_val, TRTTensor):
         raise RuntimeError(
@@ -3630,7 +3630,7 @@ def acc_ops_interpolate(
     else:
         layer.resize_mode = trt.ResizeMode.NEAREST
 
-    if align_corners != None:
+    if (align_corners is not None) and align_corners:
         layer.coordinate_transformation = (
             trt.ResizeCoordinateTransformation.ALIGN_CORNERS
         )

@@ -20,13 +20,17 @@ struct LowerInfo {
   std::vector<std::string> forced_fallback_modules;
   friend std::ostream& operator<<(std::ostream& os, const LowerInfo& l);
 
-  std::string getGPUDeviceString() {
+  std::string getGPUDeviceString() const {
     return "cuda:" + std::to_string(target_device.gpu_id);
   };
 };
 
 void LowerBlock(torch::jit::Block* b);
 void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info);
+int AutocastLongInputs(
+    std::shared_ptr<torch::jit::Graph>& g,
+    ir::TypeMap input_type_map,
+    std::string target_device_name);
 torch::jit::Module LowerModule(
     const torch::jit::Module& mod,
     std::string method_name,

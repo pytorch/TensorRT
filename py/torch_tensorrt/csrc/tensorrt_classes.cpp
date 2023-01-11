@@ -16,6 +16,8 @@ std::string to_str(DataType value) {
       return "Bool";
     case DataType::kFloat:
       return "Float";
+    case DataType::kLong:
+      return "Long";
     default:
       return "Unknown data type";
   }
@@ -29,12 +31,35 @@ nvinfer1::DataType toTRTDataType(DataType value) {
       return nvinfer1::DataType::kHALF;
     case DataType::kInt32:
       return nvinfer1::DataType::kINT32;
+    case DataType::kLong:
+      return nvinfer1::DataType::kINT32;
     case DataType::kBool:
       return nvinfer1::DataType::kBOOL;
     case DataType::kFloat:
       return nvinfer1::DataType::kFLOAT;
     case DataType::kUnknown:
       return nvinfer1::DataType::kFLOAT;
+    default:
+      TORCHTRT_THROW_ERROR("Unknown data type: " << to_str(value));
+  }
+}
+
+at::ScalarType toAtenDataType(DataType value) {
+  switch (value) {
+    case DataType::kChar:
+      return at::kChar;
+    case DataType::kHalf:
+      return at::kHalf;
+    case DataType::kInt32:
+      return at::kInt;
+    case DataType::kLong:
+      return at::kLong;
+    case DataType::kBool:
+      return at::kBool;
+    case DataType::kFloat:
+      return at::kFloat;
+    case DataType::kUnknown:
+      return at::kFloat;
     default:
       TORCHTRT_THROW_ERROR("Unknown data type: " << to_str(value));
   }
@@ -70,10 +95,10 @@ std::string to_str(TensorFormat value) {
 
 core::ir::Input Input::toInternalInput() {
   if (!input_is_dynamic) {
-    return core::ir::Input(opt, toTRTDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype, tensor_domain);
+    return core::ir::Input(opt, toAtenDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype, tensor_domain);
   } else {
     return core::ir::Input(
-        min, opt, max, toTRTDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype, tensor_domain);
+        min, opt, max, toAtenDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype, tensor_domain);
   }
 }
 
@@ -308,11 +333,15 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
     info.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));
   }
 
+  info.partitioning_info.cast_int8_inputs = true;
+
   if (ptq_calibrator) {
     info.convert_info.engine_settings.calibrator = ptq_calibrator;
+    info.partitioning_info.cast_int8_inputs = false;
   } else {
     if (info.convert_info.engine_settings.enabled_precisions.find(nvinfer1::DataType::kINT8) !=
         info.convert_info.engine_settings.enabled_precisions.end()) {
+      info.partitioning_info.cast_int8_inputs = false;
       info.lower_info.unfreeze_module = true;
       info.lower_info.disable_cse = true;
     }
@@ -321,10 +350,23 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.convert_info.engine_settings.disable_tf32 = disable_tf32;
   info.convert_info.engine_settings.refit = refit;
   info.convert_info.engine_settings.debug = debug;
+
+  // Specify + replicate device settings for phases requiring it
   info.convert_info.engine_settings.device.device_type = toTRTDeviceType(device.device_type);
   info.convert_info.engine_settings.device.gpu_id = device.gpu_id;
   info.convert_info.engine_settings.device.dla_core = device.dla_core;
   info.convert_info.engine_settings.device.allow_gpu_fallback = device.allow_gpu_fallback;
+
+  info.lower_info.target_device.device_type = toTRTDeviceType(device.device_type);
+  info.lower_info.target_device.gpu_id = device.gpu_id;
+  info.lower_info.target_device.dla_core = device.dla_core;
+  info.lower_info.target_device.allow_gpu_fallback = device.allow_gpu_fallback;
+
+  info.partitioning_info.target_device.device_type = toTRTDeviceType(device.device_type);
+  info.partitioning_info.target_device.gpu_id = device.gpu_id;
+  info.partitioning_info.target_device.dla_core = device.dla_core;
+  info.partitioning_info.target_device.allow_gpu_fallback = device.allow_gpu_fallback;
+
   info.partitioning_info.enabled = torch_fallback.enabled;
   info.partitioning_info.min_block_size = torch_fallback.min_block_size;
   info.partitioning_info.forced_fallback_operators = torch_fallback.forced_fallback_operators;

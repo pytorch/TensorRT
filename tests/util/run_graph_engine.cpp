@@ -20,7 +20,7 @@ namespace util {
 std::vector<core::ir::Input> toInputs(std::vector<at::Tensor> ten) {
   std::vector<core::ir::Input> a;
   for (auto i : ten) {
-    a.push_back(core::ir::Input(core::util::toVec(i.sizes()), core::util::ScalarTypeToTRTDataType(i.scalar_type())));
+    a.push_back(core::ir::Input(core::util::toVec(i.sizes()), i.scalar_type()));
   }
   return a;
 }
@@ -30,7 +30,7 @@ std::vector<core::ir::Input> toInputsDynamic(std::vector<at::Tensor> ten, bool d
 
   for (auto i : ten) {
     auto opt = core::util::toVec(i.sizes());
-    auto dtype = core::util::ScalarTypeToTRTDataType(i.scalar_type());
+    auto dtype = i.scalar_type();
 
     if (dynamic_batch) {
       std::vector<int64_t> min_range(opt);
