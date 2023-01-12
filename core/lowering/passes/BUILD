@@ -39,6 +39,7 @@ cc_library(
         "unpack_std.cpp",
         "unpack_var.cpp",
         "view_to_reshape.cpp",
+        "replace_aten_pad.cpp",
     ],
     hdrs = [
         "passes.h",

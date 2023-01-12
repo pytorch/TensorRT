@@ -95,6 +95,10 @@ lowering_test(
     name = "test_rewrite_inputs_with_params",
 )
 
+lowering_test(
+    name = "test_replace_aten_pad_pass",
+)
+
 test_suite(
     name = "lowering_tests",
     tests = [
@@ -116,5 +120,6 @@ test_suite(
         ":test_unpack_hardswish",
         ":test_unpack_reduce_ops",
         ":test_view_to_reshape_pass",
+        ":test_replace_aten_pad_pass",
     ],
 )
