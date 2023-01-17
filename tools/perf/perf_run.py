@@ -187,19 +187,20 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
 
     fp16_mode = True if precision == "fp16" else False
     # dynamo_backend_params = {"fp16_mode" : fp16_mode}
-    # model = torch.compile(
-    #     model,
-    #     mode="default",
-    #     dynamic=False,
-    #     fullgraph=False,
-    #     backend=dynamo_backend,
-    #     # **dynamo_backend_params
-    # )
-    import torch._dynamo as dynamo
-
-    model = dynamo.optimize(dynamo_backend, nopython=True)(model)
+    model = torch.compile(
+        model,
+        mode="default",
+        dynamic=False,
+        fullgraph=False,
+        backend=dynamo_backend,
+        # **dynamo_backend_params
+    )
+    # import torch._dynamo as dynamo
+    #
+    # model = dynamo.optimize(dynamo_backend, nopython=True)(model)
     # Compile and measure the time
     with torch.no_grad():
+        import pdb; pdb.set_trace()
         start_compile = time.time_ns()
         features = model(*input_tensors)
         end_compile = time.time_ns()
@@ -210,20 +211,20 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
 
         print("============= DONE 1 ==================")
         # Warm up
-        model = torch._dynamo.run(model)
-        # import pdb; pdb.set_trace()
-
-        exported_model, _ = torch._dynamo.export(model, *input_tensors)
+        # model = torch._dynamo.run(model)
+        # # import pdb; pdb.set_trace()
+        #
+        # exported_model, _ = torch._dynamo.export(model, *input_tensors)
         for i in range(WARMUP_ITER):
             print("==== ITER: ", i)
-            features = exported_model(*input_tensors)
+            features = model(*input_tensors)
 
         torch.cuda.synchronize()
         print("============= DONE 2 ==================")
         timings = []
         for i in range(iters):
             start_time = timeit.default_timer()
-            features = exported_model(*input_tensors)
+            features = model(*input_tensors)
             torch.cuda.synchronize()
             end_time = timeit.default_timer()
             meas_time = end_time - start_time

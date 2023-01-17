@@ -127,12 +127,12 @@ Here are the list of `CompileSpec` options that can be provided directly to comp
 Eg:
 
 ```
-  python perf_run.py --model ${MODELS_DIR}/vgg16_scripted.jit.pt \
-                     --model_torch ${MODELS_DIR}/vgg16_torch.pt \
-                     --precision fp32,fp16 --inputs="(1, 3, 224, 224)@fp32" \
-                     --batch_size 1 \
-                     --backends torch,torch_tensorrt,tensorrt,fx2trt \
-                     --report "vgg_perf_bs1.txt"
+  python perf_run.py --model ${MODELS_DIR}/vgg16_scripted.jit.pt --model_torch ${MODELS_DIR}/vgg16_torch.pt --precision fp32,fp16 --inputs="(1, 3, 224, 224)@fp32" --batch_size 1 --backends torch,torch_tensorrt,tensorrt,fx2trt --report "vgg_perf_bs1.txt"
+```
+
+Example usage of dynamo backend:
+```
+  python perf_run.py --model resnet50 --model_torch models/resnet50_pytorch.pt --precision fp32 --inputs="(1, 3, 224, 224)@fp32" --batch_size 1 --backends dynamo --dynamo_backend fx2trt
 ```
 
 ### Example models
