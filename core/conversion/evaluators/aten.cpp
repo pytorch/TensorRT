@@ -173,6 +173,53 @@ auto aten_registrations TORCHTRT_UNUSED =
                return out_tensor;
              }})
         .evaluator(
+            {c10::Symbol::fromQualString("aten::full_like"),
+             // aten::full_like(Tensor self, Scalar fill_value, *, ScalarType? dtype=None, Layout? layout=None,
+             // Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> (Tensor)
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               // Override options related to layout and device for TensorRT
+               auto options = torch::TensorOptions().layout(torch::kStrided).device(torch::kCUDA);
+               auto input_tensor_var = args.at(n->input(0));
+
+               std::vector<int64_t> input_shape;
+               c10::ScalarType input_dtype;
+
+               // Extract data type and shape of input tensor
+               if (input_tensor_var.isITensor()) {
+                 auto tensor = input_tensor_var.ITensor();
+                 input_shape = util::toVec(tensor->getDimensions());
+                 input_dtype = util::TRTDataTypeToScalarType(tensor->getType());
+               } else if (input_tensor_var.IValue()->isTensor()) {
+                 auto tensor = input_tensor_var.unwrapToTensor();
+                 input_shape = tensor.sizes().vec();
+                 input_dtype = tensor.scalar_type();
+               } else if (input_tensor_var.IValue()->isCustomClass()) {
+                 auto tensor = input_tensor_var.IValue()->toCustomClass<TensorContainer>()->tensor();
+                 input_shape = util::toVec(tensor->getDimensions());
+                 input_dtype = util::TRTDataTypeToScalarType(tensor->getType());
+               } else {
+                 TORCHTRT_THROW_ERROR(
+                     "Invalid IValue type. IValue is not some class of torch::Tensor or nvinfer1::ITensor. Found: "
+                     << input_tensor_var.IValue()->type());
+               }
+
+               // If specified, use third input arg to determine data type, otherwise default to input tensor data type
+               if (!args.at(n->input(2)).isNone() && !args.at(n->input(2)).IValue()->isNone()) {
+                 options = options.dtype(c10::ScalarType(args.at(n->input(2)).unwrapToInt()));
+               } else {
+                 options = options.dtype(input_dtype);
+               }
+
+               // Generate full tensor with specified input options
+               auto scalar_value = args.at(n->input(1)).unwrapToScalar();
+               auto out_tensor = torch::full(input_shape, scalar_value, options);
+               return out_tensor;
+             },
+             EvalOptions().validSchemas(
+                 {R"SIG(aten::full_like(Tensor self, Scalar fill_value, *, ScalarType? dtype=None,
+                 Layout? layout=None, Device? device=None, bool? pin_memory=None,
+                 MemoryFormat? memory_format=None) -> (Tensor))SIG"})})
+        .evaluator(
             {c10::Symbol::fromQualString("aten::slice"),
              [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                c10::List<c10::IValue> list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
