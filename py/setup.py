@@ -388,7 +388,7 @@ setup(
     },
     zip_safe=False,
     license="BSD",
-    packages=packages if FX_ONLY else find_packages(),
+    packages=packages if FX_ONLY else find_namespace_packages(),
     package_dir=package_dir if FX_ONLY else {},
     classifiers=[
         "Development Status :: 5 - Stable",
