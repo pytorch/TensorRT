@@ -1112,13 +1112,14 @@ workflows:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
 
-  release:
+
+    
     when: << pipeline.parameters.enable-ngc-packaging >>
     jobs:
 
       - package-x86_64-linux-ngc:
           enabled: << pipeline.parameters.enable-ngc-packaging >>
-          torch-base-image: << pipeline.parameters.torch-base-image >>
+          torch-base-image: << pipeline.parameters.torch-base-image >
 
 
   on-push:
