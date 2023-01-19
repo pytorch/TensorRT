@@ -359,7 +359,7 @@ commands:
         default: false
       torch-base-image:
         type: string
-        default: nvcr.io/nvidia/pytorch:latest
+        default: nvcr.io/nvidia/pytorch:22.12-py3
     steps:
       - run:
           name: Log into docker
@@ -958,6 +958,7 @@ jobs:
         default: false
       torch-base-image:
         type: string
+        default: nvcr.io/nvidia/pytorch:22.12-py3
     machine:
       image: ubuntu-2004-cuda-11.4:202110-01
     resource_class: xlarge
@@ -1106,15 +1107,18 @@ workflows:
           requires:
             - build-x86_64-linux
 
-
       - package-x86_64-linux:
           enabled: << pipeline.parameters.enable-packaging >>
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
-          #requires:
-            #- test-core-cpp-x86_64-linux
-            #- test-py-ts-x86_64-linux
-            #- test-py-fx-x86_64-linux
+
+    when: << pipeline.parameters.enable-ngc-packaging >>
+    jobs:
+
+      - package-x86_64-linux-ngc:
+          enabled: << pipeline.parameters.enable-ngc-packaging >>
+          torch-base-image: << pipeline.parameters.torch-base-image >>
+
 
   on-push:
     jobs:
