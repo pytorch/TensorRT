@@ -1120,7 +1120,7 @@ workflows:
 
       - package-x86_64-linux-ngc:
           enabled: << pipeline.parameters.enable-ngc-packaging >>
-          torch-base-image: << pipeline.parameters.torch-base-image >
+          torch-base-image: << pipeline.parameters.torch-base-image >>
 
 
   on-push:
