@@ -1114,6 +1114,7 @@ workflows:
 
 
 
+  release-ngc:
     when: << pipeline.parameters.enable-ngc-packaging >>
     jobs:
 
