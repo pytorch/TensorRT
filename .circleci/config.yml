@@ -1026,7 +1026,7 @@ parameters:
 
   torch-ngc-base-image:
     type: string
-    default: "nvcr.io/nvidia/pytorch:22.09-py3"
+    default: "nvcr.io/nvidia/pytorch:22.12-py3"
 
   enable-packaging:
     type: boolean
@@ -1120,7 +1120,7 @@ workflows:
 
       - package-x86_64-linux-ngc:
           enabled: << pipeline.parameters.enable-ngc-packaging >>
-          torch-base-image: << pipeline.parameters.torch-base-image >>
+          torch-base-image: << pipeline.parameters.torch-ngc-base-image >>
 
 
   on-push:
