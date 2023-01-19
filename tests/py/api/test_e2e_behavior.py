@@ -109,6 +109,38 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
         )
         trt_mod(self.input)
 
+    def test_nested_tuple_output_with_full_compilation(self):
+        class Sample(torch.nn.Module):
+            def __init__(self):
+                super(Sample, self).__init__()
+
+            def forward(self, x, y, z):
+                c = 1.0
+                b = x + 2.0 * z
+                b = y + b
+                a = b + c
+                return (a, (b, c))
+
+        self.model = Sample().eval().to("cuda")
+        self.input_1 = torch.zeros((5, 5), dtype=torch.float, device="cuda:0")
+        self.input_2 = torch.ones((5, 5), dtype=torch.float, device="cuda:0")
+        self.input_3 = torch.ones((5, 5), dtype=torch.float, device="cuda:0")
+        scripted_mod = torch.jit.script(self.model)
+
+        inputs = [
+            torchtrt.Input((5, 5), dtype=torch.float),
+            torchtrt.Input((5, 5), dtype=torch.float),
+            torchtrt.Input((5, 5), dtype=torch.float),
+        ]
+
+        trt_mod = torchtrt.ts.compile(
+            scripted_mod,
+            inputs=inputs,
+            require_full_compilation=True,
+            enabled_precisions={torch.float, torch.half},
+        )
+        trt_mod(self.input_1, self.input_2, self.input_3)
+
 
 if __name__ == "__main__":
     unittest.main()

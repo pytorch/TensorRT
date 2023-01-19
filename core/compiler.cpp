@@ -138,9 +138,15 @@ partitioning::GraphAndMapping BuildHybridGraph(
     torch::jit::Block* block,
     CompileSpec cfg,
     ir::StaticParams static_params,
-    ir::CollectionTypeMap first_use_types) {
+    ir::CollectionTypeMap first_use_types,
+    bool expect_full_compilation = false) {
   auto convert_info = cfg.convert_info;
   auto partitioning_info = cfg.partitioning_info;
+
+  // Any nonzero block size is valid if full compilation to TRT is desired
+  if (expect_full_compilation) {
+    partitioning_info.min_block_size = 1;
+  }
 
   auto partitioning_ctx = partitioning::PartitioningCtx(block, partitioning_info);
   partitioning_ctx.input_types_map = first_use_types;
@@ -153,6 +159,8 @@ partitioning::GraphAndMapping BuildHybridGraph(
 
   for (auto& partitioned_block : partitioning_ctx.partitioned_blocks) {
     partitioning::PartitionedGraph& segmented_blocks = partitioned_block.second;
+    int num_torch_segments = 0;
+    int num_trt_segments = 0;
 
     for (auto& seg_block : segmented_blocks) {
       LOG_INFO("Block segment:" << seg_block);
@@ -160,6 +168,7 @@ partitioning::GraphAndMapping BuildHybridGraph(
       trt_engine_id << reinterpret_cast<const int*>(&seg_block);
 
       if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
+        num_trt_segments++;
         auto inputs = seg_block.construct_inputs_spec();
         // update the input ranges for each segments
         convert_info.inputs = ir::associate_specs_with_inputs(seg_block.g(), inputs, static_params);
@@ -180,7 +189,31 @@ partitioning::GraphAndMapping BuildHybridGraph(
             true);
 
         seg_block.update_graph(temp_g);
+      } else {
+        num_torch_segments++;
+
+        // If full compilation is expected, ensure that all operators in Torch blocks are
+        // for collections processing
+        if (expect_full_compilation) {
+          for (auto torch_node : seg_block.block()->nodes()) {
+            if (partitioning::CollectionSchemas.find(torch_node->kind().toQualString()) ==
+                partitioning::CollectionSchemas.end()) {
+              LOG_WARNING(
+                  "Full compilation specified but node " << torch_node->kind().toQualString()
+                                                         << " was executed in Torch.");
+            }
+          }
+        }
       }
+    }
+
+    // If full compilation is expected, cannot have more than 2 Torch segments
+    // (one for preprocessing inputs, one for post-processing outputs) and 1 TRT segment
+    if (expect_full_compilation && !(num_torch_segments <= 2 && num_trt_segments == 1)) {
+      LOG_WARNING(
+          "Full compilation specified but number of torch segments was "
+          << num_torch_segments << " and number of trt segments was " << num_trt_segments
+          << ". Was expecting at most 2 Torch segments and 1 TRT segment.");
     }
   }
 
@@ -191,7 +224,8 @@ ir::TypeMap MapInputsAndDetermineDTypes(
     CompileSpec& cfg,
     std::shared_ptr<torch::jit::Graph>& g,
     ir::StaticParams& static_params,
-    ir::CollectionTypeMap& first_use_type_map) {
+    ir::CollectionTypeMap& first_use_type_map,
+    bool expect_full_compilation = false) {
   cfg.convert_info.collection_input_spec_map =
       std::move(ir::associate_specs_with_collection_inputs(g, cfg.graph_inputs, static_params));
   cfg.partitioning_info.collection_input_spec_map =
@@ -226,7 +260,7 @@ ir::TypeMap MapInputsAndDetermineDTypes(
             "Cannot infer input type from calcuations in graph for input "
             << in->debugName() << ". Assuming it is Float32. If not, specify input type explicity");
         spec[i].dtype = at::kFloat;
-      } else if (spec[i].dtype_is_user_defined && cfg.partitioning_info.enabled) {
+      } else if (spec[i].dtype_is_user_defined && (cfg.partitioning_info.enabled || expect_full_compilation)) {
         if (!est_type_opt[i]) {
           LOG_INFO("Cannot infer input tensor dtype in graph, compiler is going to use the user setting");
           std::stringstream ss;
@@ -315,8 +349,14 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
       // Infer the type of an input from the weights of the calculation
       auto first_use_types = ir::get_block_first_calc_dtypes_opt_collection(g->block());
 
+      // Determine if the block is convertible/has collection output, and based on the result,
+      // whether full compilation can be expected
+      auto isBlockConvertible = conversion::VerifyConverterSupportForBlock(g->block(), true);
+      auto outputIsCollection = conversion::OutputIsCollection(g->block());
+      auto nearly_full_compilation = (isBlockConvertible && outputIsCollection);
+
       // Extract map of IValue to DType
-      auto type_map = MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types);
+      auto type_map = MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types, nearly_full_compilation);
 
       // Check whether any of the input types are Long
       bool user_requested_long = false;
@@ -330,8 +370,6 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
         user_requested_long &= (casts_inserted > 0);
       }
 
-      auto isBlockConvertible = conversion::VerifyConverterSupportForBlock(g->block(), true);
-      auto outputIsCollection = conversion::OutputIsCollection(g->block());
       if (cfg.partitioning_info.enabled && !user_requested_long &&
           (cfg.lower_info.forced_fallback_modules.size() == 0 &&
            cfg.partitioning_info.forced_fallback_operators.size() == 0 && isBlockConvertible) &&
@@ -339,11 +377,16 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
         LOG_INFO("Skipping partitioning since model is fully supported");
       }
 
-      if (cfg.partitioning_info.enabled &&
-          (!(cfg.lower_info.forced_fallback_modules.size() == 0 &&
-             cfg.partitioning_info.forced_fallback_operators.size() == 0 && isBlockConvertible) ||
-           outputIsCollection || user_requested_long)) {
-        auto graph_and_mapping = BuildHybridGraph(new_mod, g->block(), cfg, static_params, first_use_types);
+      if ((cfg.partitioning_info.enabled &&
+           (!(cfg.lower_info.forced_fallback_modules.size() == 0 &&
+              cfg.partitioning_info.forced_fallback_operators.size() == 0 && isBlockConvertible) ||
+            outputIsCollection || user_requested_long)) ||
+          nearly_full_compilation) {
+        // If the model is fully-compilable and the user has specified full compilation, run partitioning
+        // to generate collection-processing code in Torch
+        auto expect_full_compilation = (nearly_full_compilation && !cfg.partitioning_info.enabled);
+        auto graph_and_mapping =
+            BuildHybridGraph(new_mod, g->block(), cfg, static_params, first_use_types, expect_full_compilation);
         new_g = graph_and_mapping.first;
         // renaming the input name of graph after fallback to ensure pytorch deserialize it correctly
         for (size_t i = 0; i < new_g->inputs().size(); ++i) {

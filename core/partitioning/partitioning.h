@@ -18,6 +18,19 @@ typedef std::unordered_map<const torch::jit::Value*, torch::jit::IValue> Example
 typedef std::pair<std::shared_ptr<torch::jit::Graph>, std::unordered_map<torch::jit::Value*, torch::jit::Value*>>
     GraphAndMapping;
 
+// Set of schemas allowed to be executed in Torch, even with require_full_compilation=true,
+// as necessary for returning collections of Tensors or other complex constructs, and for
+// processing inputs to TRT engines
+const std::unordered_set<std::string> CollectionSchemas = {
+    "prim::Constant",
+    "aten::__getitem__",
+    "prim::ListConstruct",
+    "prim::ListUnpack",
+    "prim::TupleIndex",
+    "prim::TupleConstruct",
+    "prim::TupleUnpack",
+};
+
 ExampleIValues generateRandomInputs(
     ir::CollectionInputSpecMap& input_ranges,
     ir::CollectionTypeMap& input_types,
