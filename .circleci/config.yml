@@ -1112,6 +1112,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
 
+  release:
     when: << pipeline.parameters.enable-ngc-packaging >>
     jobs:
 
