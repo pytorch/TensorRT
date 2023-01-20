@@ -1010,7 +1010,7 @@ parameters:
   # Jetson platform config
   torch-jetson-build:
     type: string
-    default: "torch-1.13.0a0+d0d6b1f2.nv22.09-cp38-cp38-linux_aarch64.whl"
+    default: "torch-1.13.0a0+410ce96a.nv22.12-cp38-cp38-linux_aarch64.whl"
   jetpack-version:
     type: string
     default: "502"
@@ -1121,6 +1121,15 @@ workflows:
       - package-x86_64-linux-ngc:
           enabled: << pipeline.parameters.enable-ngc-packaging >>
           torch-base-image: << pipeline.parameters.torch-ngc-base-image >>
+
+  release-jetson:
+    when: << pipeline.parameters.enable-jetson-packaging >>
+    jobs:
+
+      - package-aarch64-jetson:
+          enabled: << pipeline.parameters.enable-jetson-packaging >>
+          torch-build: << pipeline.parameters.torch-jetson-build >>
+          jetpack-version: << pipeline.parameters.jetpack-version >>
 
 
   on-push:
