@@ -846,7 +846,7 @@ jobs:
           platform: "sbsa"
           architecture: "arm64"
           cudnn-version: << pipeline.parameters.cudnn-jetson-version >>
-          trt-version-short:  << pipeline.parameters.trt-jetson-version-short >>
+          trt-version-short:  << pipeline.parameters.trt-version-short >>
           bazel-version: << pipeline.parameters.bazel-version >>
           bazel-platform: "arm64"
       - run:
@@ -1017,12 +1017,12 @@ parameters:
   cudnn-jetson-version:
     type: string
     default: "8.5.0.96"
-  trt-jetson-version-short:
-    type: string
-    default: "8.4.1"
-  trt-jetson-version-long:
-    type: string
-    default: "8.4.1.5"
+  # trt-jetson-version-short:
+  #   type: string
+  #   default: "8.4.1"
+  # trt-jetson-version-long:
+  #   type: string
+  #   default: "8.4.1.5"
 
   torch-ngc-base-image:
     type: string
