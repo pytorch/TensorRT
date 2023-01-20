@@ -4,6 +4,7 @@ import torch
 import torchvision.models as models
 import copy
 from typing import Dict
+from utils import same_output_format
 
 
 class TestInputTypeDefaultsFP32Model(unittest.TestCase):
@@ -109,7 +110,7 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
         )
         trt_mod(self.input)
 
-    def test_nested_tuple_output_with_full_compilation(self):
+    def test_nested_combination_tuple_list_output_with_full_compilation(self):
         class Sample(torch.nn.Module):
             def __init__(self):
                 super(Sample, self).__init__()
@@ -119,7 +120,7 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
                 b = x + 2.0 * z
                 b = y + b
                 a = b + c
-                return (a, (b, c))
+                return (a, [b, c])
 
         self.model = Sample().eval().to("cuda")
         self.input_1 = torch.zeros((5, 5), dtype=torch.float, device="cuda:0")
@@ -139,7 +140,11 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
             require_full_compilation=True,
             enabled_precisions={torch.float, torch.half},
         )
-        trt_mod(self.input_1, self.input_2, self.input_3)
+        trt_output = trt_mod(self.input_1, self.input_2, self.input_3)
+        torch_output = self.model(self.input_1, self.input_2, self.input_3)
+        assert same_output_format(
+            trt_output, torch_output
+        ), "Found differing output formatting between Torch-TRT and Torch"
 
 
 if __name__ == "__main__":

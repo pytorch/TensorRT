@@ -21,14 +21,14 @@ typedef std::pair<std::shared_ptr<torch::jit::Graph>, std::unordered_map<torch::
 // Set of schemas allowed to be executed in Torch, even with require_full_compilation=true,
 // as necessary for returning collections of Tensors or other complex constructs, and for
 // processing inputs to TRT engines
-const std::unordered_set<std::string> CollectionSchemas = {
-    "prim::Constant",
-    "aten::__getitem__",
-    "prim::ListConstruct",
-    "prim::ListUnpack",
-    "prim::TupleIndex",
-    "prim::TupleConstruct",
-    "prim::TupleUnpack",
+const std::unordered_set<c10::Symbol> CollectionNodeKinds = {
+    c10::Symbol::fromQualString("prim::Constant"),
+    c10::Symbol::fromQualString("aten::__getitem__"),
+    c10::Symbol::fromQualString("prim::ListConstruct"),
+    c10::Symbol::fromQualString("prim::ListUnpack"),
+    c10::Symbol::fromQualString("prim::TupleIndex"),
+    c10::Symbol::fromQualString("prim::TupleConstruct"),
+    c10::Symbol::fromQualString("prim::TupleUnpack"),
 };
 
 ExampleIValues generateRandomInputs(

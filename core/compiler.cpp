@@ -196,9 +196,8 @@ partitioning::GraphAndMapping BuildHybridGraph(
         // for collections processing
         if (expect_full_compilation) {
           for (auto torch_node : seg_block.block()->nodes()) {
-            if (partitioning::CollectionSchemas.find(torch_node->kind().toQualString()) ==
-                partitioning::CollectionSchemas.end()) {
-              LOG_WARNING(
+            if (partitioning::CollectionNodeKinds.find(torch_node->kind()) == partitioning::CollectionNodeKinds.end()) {
+              LOG_ERROR(
                   "Full compilation specified but node " << torch_node->kind().toQualString()
                                                          << " was executed in Torch.");
             }
@@ -210,7 +209,7 @@ partitioning::GraphAndMapping BuildHybridGraph(
     // If full compilation is expected, cannot have more than 2 Torch segments
     // (one for preprocessing inputs, one for post-processing outputs) and 1 TRT segment
     if (expect_full_compilation && !(num_torch_segments <= 2 && num_trt_segments == 1)) {
-      LOG_WARNING(
+      LOG_ERROR(
           "Full compilation specified but number of torch segments was "
           << num_torch_segments << " and number of trt segments was " << num_trt_segments
           << ". Was expecting at most 2 Torch segments and 1 TRT segment.");
