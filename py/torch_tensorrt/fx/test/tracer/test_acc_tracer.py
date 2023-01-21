@@ -19,6 +19,8 @@ torch.manual_seed(0)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
+torch.fx.wrap("len")
+
 
 class AccTracerTest(unittest.TestCase):
     def _make_model_unit_test(
@@ -1393,6 +1395,37 @@ class AccTracerTest(unittest.TestCase):
             acc_ops.permute, lambda x: torch.transpose(x, 1, 0)
         )
 
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, a: torch.Tensor) -> torch.Tensor:
+                x = len(a.shape) - 2
+                y = len(a.shape) - 1
+                return a.transpose(x, y)
+
+        m = TestModule()
+        m.eval()
+
+        a = torch.randn(2, 3, 4, 5)
+        traced = acc_tracer.trace(m, [a])
+
+        ph_a = permute = None
+        for node in traced.graph.nodes:
+            if node.op == "placeholder":
+                ph_a = node
+            elif node.op == "call_function":
+                self.assertEqual(node.target, acc_ops.permute)
+                self.assertEqual(node.kwargs["input"], ph_a)
+                self.assertEqual(node.kwargs["permutation"], [0, 1, 3, 2])
+                permute = node
+            elif node.op == "output":
+                self.assertEqual(permute, node.args[0])
+            else:
+                self.fail(f"Unexpected node: {node.format_node()}")
+
+        self.assertTrue(torch.equal(m(a), traced(a)))
+
     def test_permute(self):
         """
         Test that torch.permute is traced correctly.
@@ -2341,10 +2374,24 @@ class AccTracerTest(unittest.TestCase):
         self._make_model_unit_test(m)
 
     def test_cumsum(self):
+        # Tests call_function version
         self._make_acc_op_function_test(acc_ops.cumsum, torch.cumsum, dim=1)
         self._make_acc_op_function_test(
             acc_ops.cumsum, torch.cumsum, dim=1, dtype=torch.float
         )
+
+        # Tests call_method version
+        class TestModule(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+
+            def forward(self, a: torch.Tensor) -> torch.Tensor:
+                return a.cumsum(dim=0)
+
+        m = TestModule()
+        a = torch.rand(2, 2)
+        gm = acc_tracer.trace(m, [a])
+        self.assertTrue(torch.equal(m(a), gm(a)))
 
     def test_chunk(self):
         self._make_acc_op_function_test(acc_ops.chunk, torch.chunk, chunks=2, dim=0)
@@ -2645,7 +2692,7 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.sign,
                 acc_ops.permute,
                 acc_ops.matmul,
-                # acc_ops.roi_align,
+                acc_ops.roi_align,
                 acc_ops.quantize_per_tensor,
                 acc_ops.quantize_per_channel,
                 acc_ops.quantized_add,
@@ -2659,6 +2706,7 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.trunc_div,
                 acc_ops.pow,
                 acc_ops.relu,
+                acc_ops.prelu,
                 acc_ops.leaky_relu,
                 acc_ops.elu,
                 acc_ops.selu,

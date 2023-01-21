@@ -262,7 +262,7 @@ def custom_type_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     input_obj = node.kwargs["input"]
     dtype_obj = node.kwargs.get("dtype")
     with node.graph.inserting_before(node):
-        if dtype_obj == None:
+        if dtype_obj is None:
             dtype_node = node.graph.call_function(dtype, kwargs={"input": input_obj})
             dtype_node.meta["type"] = torch.dtype
             return dtype_node
@@ -788,6 +788,13 @@ def square_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     ],
 )
 @register_acc_op_mapping(
+    op_and_target=("call_method", "matmul"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("mat2", "other"),
+    ],
+)
+@register_acc_op_mapping(
     op_and_target=("call_function", operator.matmul),
     arg_replacement_tuples=[
         ("input", "input"),
@@ -1160,6 +1167,16 @@ def relu(*, input, inplace=False):
 def leaky_relu(*, input, negative_slope=0.01, inplace=False):
     return nn.functional.leaky_relu(
         input=input, negative_slope=negative_slope, inplace=inplace
+    )
+
+
+@register_acc_op_properties(AccOpProperty.pointwise)
+@register_acc_op_mapping(op_and_target=("call_function", torch.nn.functional.prelu))
+@register_acc_op
+def prelu(*, input, weight):
+    return nn.functional.prelu(
+        input=input,
+        weight=weight,
     )
 
 
@@ -2726,41 +2743,41 @@ def packed_quantized_conv2d_mapper(
         return new_node
 
 
-# @register_acc_op
-# @register_acc_op_mapping(
-#     op_and_target=("call_function", torch.ops._caffe2.RoIAlign),
-#     arg_replacement_tuples=[
-#         ("features", "features"),
-#         ("rois", "rois"),
-#         ("order", "order"),
-#         ("spatial_scale", "spatial_scale"),
-#         ("pooled_h", "pooled_h"),
-#         ("pooled_w", "pooled_w"),
-#         ("sampling_ratio", "sampling_ratio"),
-#         ("aligned", "aligned"),
-#     ],
-# )
-# def roi_align(
-#     *,
-#     features,
-#     rois,
-#     order,
-#     spatial_scale,
-#     pooled_h,
-#     pooled_w,
-#     sampling_ratio,
-#     aligned,
-# ):
-#     return torch.ops._caffe2.RoIAlign(
-#         features=features,
-#         rois=rois,
-#         order=order,
-#         spatial_scale=spatial_scale,
-#         pooled_h=pooled_h,
-#         pooled_w=pooled_w,
-#         sampling_ratio=sampling_ratio,
-#         aligned=aligned,
-#     )
+@register_acc_op
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.ops._caffe2.RoIAlign),
+    arg_replacement_tuples=[
+        ("features", "features"),
+        ("rois", "rois"),
+        ("order", "order"),
+        ("spatial_scale", "spatial_scale"),
+        ("pooled_h", "pooled_h"),
+        ("pooled_w", "pooled_w"),
+        ("sampling_ratio", "sampling_ratio"),
+        ("aligned", "aligned"),
+    ],
+)
+def roi_align(
+    *,
+    features,
+    rois,
+    order,
+    spatial_scale,
+    pooled_h,
+    pooled_w,
+    sampling_ratio,
+    aligned,
+):
+    return torch.ops._caffe2.RoIAlign(
+        features=features,
+        rois=rois,
+        order=order,
+        spatial_scale=spatial_scale,
+        pooled_h=pooled_h,
+        pooled_w=pooled_w,
+        sampling_ratio=sampling_ratio,
+        aligned=aligned,
+    )
 
 
 @register_custom_acc_mapper_fn(
@@ -2838,7 +2855,14 @@ def gelu(*, input, approximate="none"):
 
 @register_acc_op_properties(AccOpProperty.unary)
 @register_acc_op_mapping(op_and_target=("call_function", torch.cumsum))
-@register_acc_op_mapping(op_and_target=("call_method", "cumsum"))
+@register_acc_op_mapping(
+    op_and_target=("call_method", "cumsum"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("dim", "dim"),
+        ("dtype", "dtype", this_arg_is_optional),
+    ],
+)
 @register_acc_op
 def cumsum(*, input, dim, dtype=None):
     return torch.cumsum(input=input, dim=dim, dtype=dtype)

@@ -2802,7 +2802,7 @@ def acc_ops_linear(
 
     if isinstance(kwargs["weight"], torch.Tensor):
         weight = get_trt_tensor(network, kwargs["weight"].t(), f"{name}_weight")
-        if target is not acc_ops.linear:
+        if target not in (acc_ops.linear, torch.ops.aten.linear):
             weight_op = trt.MatrixOperation.TRANSPOSE
         else:
             weight_op = trt.MatrixOperation.NONE

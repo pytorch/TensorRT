@@ -22,8 +22,9 @@ def lower_mod_default(
     interpreter_result = interp.run(max_batch_size=batch_size)
     if use_experimental_rt:
         import io
-        from torch_tensorrt._TRTModuleNext import TRTModuleNext
+
         from torch_tensorrt._Device import Device
+        from torch_tensorrt._TRTModuleNext import TRTModuleNext
 
         with io.BytesIO() as engine_bytes:
             engine_bytes.write(interpreter_result.engine.serialize())

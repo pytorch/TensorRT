@@ -608,3 +608,25 @@ def _get_shape(node: fx.Node) -> Optional[torch.Size]:
         # shape info not available
         return None
     return node.meta["tensor_meta"].shape
+
+
+@log_before_after
+@validate_inference(atol=1e-3, rtol=1e-2)
+def fix_clamp_numerical_limits_to_fp16(
+    mod: torch.fx.GraphModule, input: Input
+) -> torch.fx.GraphModule:
+    MIN_FP16 = -65504.0
+    MAX_FP16 = 65504.0
+    for node in mod.graph.nodes:
+        if node.op == "call_function" and "clamp" in str(node.target):
+            input_kwargs = node.kwargs
+            if input_kwargs["min"] < MIN_FP16 and input_kwargs["max"] > MAX_FP16:
+                new_kwargs = {
+                    "input": input_kwargs["input"],
+                    "min": MIN_FP16,
+                    "max": MAX_FP16,
+                }
+                node.kwargs = new_kwargs
+
+    mod.recompile()
+    return mod
