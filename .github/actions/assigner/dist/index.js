@@ -114,14 +114,15 @@ async function main() {
         if (assignees.length > 0) {
             const currDate = new Date();
             const currDay = currDate.getDate();
-            let a = assignees[currDay % assignees.length];
+            let assigned = [assignees[currDay % assignees.length]];
+            console.log(assigned);
             if (!issue.pull_request) {
-                core.debug(`Assigning ${assignees[a]} to issue #${issueNum}`);
-                await addAssignees(ghClient, issueNum, [assignees[a]]);
+                core.debug(`Assigning ${assigned} to issue #${issueNum}`);
+                await addAssignees(ghClient, issueNum, assigned);
             }
             else {
-                core.debug(`Requesting ${assignees[a]} to review PR #${issueNum}`);
-                await addReviewers(ghClient, issueNum, [assignees[a]]);
+                core.debug(`Requesting ${assigned} to review PR #${issueNum}`);
+                await addReviewers(ghClient, issueNum, assigned);
             }
         }
         else {
