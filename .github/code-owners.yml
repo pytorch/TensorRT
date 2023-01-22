@@ -40,7 +40,6 @@
 
 "component: plugins":
   - "peri044"
-  - "andi4191"
 
 "component: quantization":
   - "peri044"
