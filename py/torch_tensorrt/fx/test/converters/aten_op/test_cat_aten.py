@@ -9,7 +9,7 @@ class TestCatConverter(DispatchTestCase):
     @parameterized.expand(
         [
             ("pos", 1),
-            #("neg", -2), #Dynamo tracer issue
+            # ("neg", -2), #Dynamo tracer issue
         ]
     )
     def test_cat(self, _, dim):
@@ -27,7 +27,7 @@ class TestCatConverter(DispatchTestCase):
     @parameterized.expand(
         [
             ("pos", 1),
-            #("neg", -2),  #Dynamo tracer issue
+            # ("neg", -2),  #Dynamo tracer issue
         ]
     )
     def test_cat_dynamic_shape(self, _, dim):
