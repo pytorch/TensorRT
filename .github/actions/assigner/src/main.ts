@@ -99,12 +99,15 @@ async function main() {
     assignees = assignees.filter((i) => i !== issue.user?.login);
 
     if (assignees.length > 0) {
+      const currDate = new Date();
+      const currDay = currDate.getDate();
+      let a = assignees[currDay % assignees.length];
       if (!issue.pull_request) {
-        core.debug(`Assigning ${assignees} to issue #${issueNum}`);
-        await addAssignees(ghClient, issueNum, assignees);
+        core.debug(`Assigning ${assignees[a]} to issue #${issueNum}`);
+        await addAssignees(ghClient, issueNum, [assignees[a]]);
       } else {
-        core.debug(`Requesting ${assignees} to review PR #${issueNum}`);
-        await addReviewers(ghClient, issueNum, assignees);
+        core.debug(`Requesting ${assignees[a]} to review PR #${issueNum}`);
+        await addReviewers(ghClient, issueNum, [assignees[a]]);
       }
     } else {
       core.debug("No addtional assignees to add");
