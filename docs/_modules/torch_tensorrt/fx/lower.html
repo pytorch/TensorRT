@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.fx.lower &mdash; Torch-TensorRT v1.4.0dev0+4793bb2 documentation</title>
+  <title>torch_tensorrt.fx.lower &mdash; Torch-TensorRT v1.4.0dev0+2e21ce6 documentation</title>
   
 
   
@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+4793bb2
+                  v1.4.0dev0+2e21ce6
                 </div>
               
             
@@ -360,8 +360,6 @@
               
   <h1>Source code for torch_tensorrt.fx.lower</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">dataclasses</span> <span class="k">as</span> <span class="nn">dc</span>
-<span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">import</span> <span class="nn">dataclasses</span> <span class="k">as</span> <span class="nn">dc</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span>
 
@@ -541,8 +539,9 @@
         <span class="n">interp_res</span><span class="p">:</span> <span class="n">TRTInterpreterResult</span> <span class="o">=</span> <span class="n">interpreter</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="nb">input</span><span class="p">,</span> <span class="n">module_name</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">use_experimental_rt</span><span class="p">:</span>
             <span class="kn">import</span> <span class="nn">io</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt._TRTModuleNext</span> <span class="kn">import</span> <span class="n">TRTModuleNext</span>
+
             <span class="kn">from</span> <span class="nn">torch_tensorrt._Device</span> <span class="kn">import</span> <span class="n">Device</span>
+            <span class="kn">from</span> <span class="nn">torch_tensorrt._TRTModuleNext</span> <span class="kn">import</span> <span class="n">TRTModuleNext</span>
 
             <span class="k">with</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span> <span class="k">as</span> <span class="n">engine_bytes</span><span class="p">:</span>
                 <span class="n">engine_bytes</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">interp_res</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">serialize</span><span class="p">())</span>
