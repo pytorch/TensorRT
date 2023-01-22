@@ -2743,41 +2743,41 @@ def packed_quantized_conv2d_mapper(
         return new_node
 
 
-@register_acc_op
-@register_acc_op_mapping(
-    op_and_target=("call_function", torch.ops._caffe2.RoIAlign),
-    arg_replacement_tuples=[
-        ("features", "features"),
-        ("rois", "rois"),
-        ("order", "order"),
-        ("spatial_scale", "spatial_scale"),
-        ("pooled_h", "pooled_h"),
-        ("pooled_w", "pooled_w"),
-        ("sampling_ratio", "sampling_ratio"),
-        ("aligned", "aligned"),
-    ],
-)
-def roi_align(
-    *,
-    features,
-    rois,
-    order,
-    spatial_scale,
-    pooled_h,
-    pooled_w,
-    sampling_ratio,
-    aligned,
-):
-    return torch.ops._caffe2.RoIAlign(
-        features=features,
-        rois=rois,
-        order=order,
-        spatial_scale=spatial_scale,
-        pooled_h=pooled_h,
-        pooled_w=pooled_w,
-        sampling_ratio=sampling_ratio,
-        aligned=aligned,
-    )
+# @register_acc_op
+# @register_acc_op_mapping(
+#     op_and_target=("call_function", torch.ops._caffe2.RoIAlign),
+#     arg_replacement_tuples=[
+#         ("features", "features"),
+#         ("rois", "rois"),
+#         ("order", "order"),
+#         ("spatial_scale", "spatial_scale"),
+#         ("pooled_h", "pooled_h"),
+#         ("pooled_w", "pooled_w"),
+#         ("sampling_ratio", "sampling_ratio"),
+#         ("aligned", "aligned"),
+#     ],
+# )
+# def roi_align(
+#     *,
+#     features,
+#     rois,
+#     order,
+#     spatial_scale,
+#     pooled_h,
+#     pooled_w,
+#     sampling_ratio,
+#     aligned,
+# ):
+#     return torch.ops._caffe2.RoIAlign(
+#         features=features,
+#         rois=rois,
+#         order=order,
+#         spatial_scale=spatial_scale,
+#         pooled_h=pooled_h,
+#         pooled_w=pooled_w,
+#         sampling_ratio=sampling_ratio,
+#         aligned=aligned,
+#     )
 
 
 @register_custom_acc_mapper_fn(
