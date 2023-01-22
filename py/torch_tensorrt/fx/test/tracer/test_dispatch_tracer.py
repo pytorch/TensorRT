@@ -3,6 +3,8 @@ import unittest
 
 import torch
 import torch._dynamo as torchdynamo
+
+import torch._dynamo.config
 import torchvision
 from functorch.experimental import functionalize
 from torch._dynamo.optimizations import backends
@@ -12,6 +14,9 @@ from torch.library import Library
 from torch_tensorrt.fx.lower import compile
 from torch_tensorrt.fx.tracer.dispatch_tracer.tracer import make_fx
 from torch_tensorrt.fx.utils import LowerPrecision, proxytensor_trace
+
+# TODO(ezyang): remove this after we properly support fake example inputs
+torch._dynamo.config.DO_NOT_USE_legacy_non_fake_example_inputs = True
 
 torch.manual_seed(0)
 
@@ -109,9 +114,6 @@ class ProxytensorTracerTest(unittest.TestCase):
         mod = torchvision.models.resnet18()
         mod = mod.cuda().half().eval()
 
-        def f(x):
-            return mod(x)
-
         inputs = [torch.ones(32, 3, 224, 224)]
         inputs = [i.cuda().half() for i in inputs]
 
@@ -148,9 +150,10 @@ class ProxytensorTracerTest(unittest.TestCase):
         # Greatest absolute difference: 0.05859375 at index (0, 499) (up to 1e-05 allowed)
         # Greatest relative difference: 3.293713681986265 at index (0, 142) (up to 0.001 allowed)
         # so we choose to use cosine similarity
-        cos = torch.nn.CosineSimilarity(dim=0, eps=1e-4)
-        cos_val = cos(aten_output.flatten(), fx_output.flatten())
-        self.assertTrue(cos_val.cpu().numpy() > 0.999)
+        cos_val = torch.nn.functional.cosine_similarity(
+            aten_output.flatten(), fx_output.flatten(), dim=0, eps=1e-4
+        )
+        self.assertTrue(cos_val.detach().cpu().numpy() > 0.999)
 
     def test_resnet18_dynamo(self):
         mod = torchvision.models.resnet18()

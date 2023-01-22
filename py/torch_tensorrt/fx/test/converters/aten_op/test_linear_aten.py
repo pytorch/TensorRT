@@ -7,20 +7,20 @@ from torch_tensorrt.fx.tools.common_fx2trt import DispatchTestCase, InputTensorS
 class TestLinearConverter(DispatchTestCase):
     @parameterized.expand(
         [
-            ("default", [1, 512], True, torch.ops.aten.addmm.default),
-            ("matrix", [5, 512], True, torch.ops.aten.addmm.default),
-            ("no_bias", [1, 512], False, torch.ops.aten.mm.default),
+            ("default", [1, 512], True, torch.ops.aten.linear),
+            ("matrix", [5, 512], True, torch.ops.aten.linear),
+            ("no_bias", [1, 512], False, torch.ops.aten.linear),
             (
                 "multi_dim_matrix",
                 [4, 5, 512],
                 True,
-                torch.ops.aten.addmm.default,
+                torch.ops.aten.linear,
             ),
             (
                 "multi_dim_matrix",
                 [4, 5, 512],
                 False,
-                torch.ops.aten.mm.default,
+                torch.ops.aten.linear,
             ),
         ]
     )
@@ -34,9 +34,7 @@ class TestLinearConverter(DispatchTestCase):
                 return self.linear(x)
 
         inputs = [torch.randn(shape)]
-        self.run_test(
-            TestModule(), inputs, expected_ops={op}, test_implicit_batch_dim=False
-        )
+        self.run_test(TestModule(), inputs, expected_ops={op})
 
         # linear will be decomposed to P531484488 and view(reshape) can not handle reshape pattern
         # like (2, 3, n)->(6, n) in implicit mode which is similar to dynamic shape test below.
