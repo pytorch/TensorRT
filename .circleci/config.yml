@@ -126,7 +126,7 @@ commands:
         type: string
         default: "515.65.01-1"
       jetson-11.4:
-        type: bool
+        type: boolean
         default: false
     steps:
       - run:
