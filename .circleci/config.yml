@@ -2,95 +2,1187 @@
 # See: https://circleci.com/docs/2.0/configuration-reference
 version: 2.1
 
+commands:
+  install-bazel:
+    description: "Install bazel"
+    parameters:
+      platform:
+        type: string
+        default: "x86_64"
+      version:
+        type: string
+        default: "5.2.0"
+    steps:
+      - run:
+          name: Install bazel
+          command: |
+            sudo wget -q https://github.com/bazelbuild/bazel/releases/download/<< parameters.version >>/bazel-<< parameters.version >>-linux-<< parameters.platform >> -O /usr/bin/bazel
+            sudo chmod a+x /usr/bin/bazel
+
+  install-cmake:
+    description: Install CMake.
+    parameters:
+        cache:
+            default: true
+            description: Whether or not to cache the installation.
+            type: boolean
+        cache-key:
+            default: v1
+            description: String to use in cache key. Typically overridden when needed to bust cache.
+            type: string
+        install-dir:
+            default: $HOME/cmake
+            description: The path to install CMake to.
+            type: string
+        version:
+            default: 3.18.2
+            description: The version of CMake to install.
+            type: string
+    steps:
+        - when:
+            condition:
+                equal:
+                    - << parameters.cache >>
+                    - true
+            steps:
+                - run:
+                    command: mkdir -pv << parameters.install-dir >>
+                    name: Prep cache restore
+                - restore_cache:
+                    keys:
+                        - cmake-<< parameters.cache-key >>-<< parameters.version >>
+        - run:
+            command: |
+                echo 'export PATH="<< parameters.install-dir >>/bin:$PATH"' >> $BASH_ENV
+            name: Add CMake to PATH
+        - run:
+            command: |
+                if which cmake; then
+                  if cmake --version | grep "<< parameters.version >>"; then
+                    echo "CMake is already installed."
+                    exit 0
+                  else
+                    echo "CMake is already installed but it is the wrong version."
+                  fi
+                fi
+
+                rm -rf << parameters.install-dir >>/*
+                echo "Installing the requested version of CMake."
+                baseUrl="https://github.com/Kitware/CMake/releases/download/"
+                url="${baseUrl}/v<< parameters.version >>/cmake-<< parameters.version >>-Linux-x86_64.tar.gz"
+                curl -sSL -o /tmp/cmake.tar.gz $url
+                tar -C << parameters.install-dir >> --strip-components 1 -zxf /tmp/cmake.tar.gz
+            name: Install CMake
+        - run:
+            command: rm -rf << parameters.install-dir >>/{doc,man}
+            name: Remove unnecessary files
+        - run:
+            command: |
+                ls -l << parameters.install-dir >>/bin
+                echo $PATH
+                cmake --version
+            name: Verify CMake installation
+        - when:
+            condition:
+                equal:
+                    - << parameters.cache >>
+                    - true
+            steps:
+                - save_cache:
+                    key: cmake-<< parameters.cache-key >>-<< parameters.version >>
+                    paths:
+                        - << parameters.install-dir >>
+  uninstall-cuda:
+    description: "Uninstall CUDA"
+    steps:
+      - run:
+          name: "Uninstall CUDA"
+          command: |
+            sudo apt-get --purge remove "cuda*" "nsight*"
+            sudo apt-get --purge remove "*nvidia*"
+
+  install-cudnn:
+    description: "Install CUDNN 8.5.0"
+    parameters:
+      os:
+        type: string
+        default: "ubuntu2004"
+      platform:
+        type: string
+        default: "x86_64"
+      cudnn-version:
+        type: string
+        default: "8.5.0.96"
+      cuda-version:
+        type: string
+        default: "cuda11.7"
+    steps:
+      - run:
+          name: Install CUDNN
+          command: |
+            cd ~
+            wget https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/cuda-<< parameters.os >>.pin
+            sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
+            sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/3bf863cc.pub
+            sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/ /"
+            sudo apt-get update
+
+            sudo apt-get install libcudnn8=<< parameters.cudnn-version >>-1+<< parameters.cuda-version >>
+            sudo apt-get install libcudnn8-dev=<< parameters.cudnn-version >>-1+<< parameters.cuda-version >>
+
+      - run:
+          when: on_fail
+          name: Dump apt sources
+          command: cat /etc/apt/sources.list
+
+  install-cuda:
+    description: "Install CUDA"
+    parameters:
+      os:
+        type: string
+        default: "ubuntu2004"
+      platform:
+        type: string
+        default: "x86_64"
+      architecture:
+        type: string
+        default: "amd64"
+      cuda-pkg-name:
+        type: string
+        default: "cuda-toolkit-11-7"
+      cuda-pkg-version:
+        type: string
+        default: "11-7"
+      cuda-version:
+        type: string
+        default: "11.7.1"
+    steps:
+      - run:
+          name: Install CUDA
+          command: |
+            cd ~
+            wget https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/cuda-<< parameters.os >>.pin
+            sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
+            wget https://developer.download.nvidia.com/compute/cuda/<< parameters.cuda-version >>/local_installers/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-515.65.01-1_<< parameters.architecture >>.deb
+            sudo dpkg -i cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-515.65.01-1_<< parameters.architecture >>.deb
+            sudo cp /var/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local/cuda-*-keyring.gpg /usr/share/keyrings/
+            sudo apt-get update
+            sudo apt-get install -y cuda
+
+      - run:
+          when: on_fail
+          name: Dump apt sources
+          command: cat /etc/apt/sources.list
+
+  create-env:
+    description: "Install dependencies for Torch-TensorRT"
+    parameters:
+      os:
+        type: string
+        default: "ubuntu2004"
+      platform:
+        type: string
+        default: "x86_64"
+      architecture:
+        type: string
+        default: "amd64"
+      cuda-pkg-name:
+        type: string
+        default: "cuda-toolkit-11-7"
+      cuda-pkg-version:
+        type: string
+        default: "11-7"
+      cuda-version:
+        type: string
+        default: "11.7.1"
+      cuda-string-version:
+        type: string
+        default: "cuda11.7"
+      cudnn-version:
+        type: string
+        default: "8.5.0.96"
+      trt-version-short:
+        type: string
+        default: "8.5.1"
+      bazel-version:
+        type: string
+        default: "5.2.0"
+      bazel-platform:
+        type: string
+        default: "x86_64"
+    steps:
+      - uninstall-cuda
+      - install-cuda:
+          os: << parameters.os >>
+          platform: << parameters.platform >>
+          architecture: << parameters.architecture >>
+          cuda-pkg-name: << parameters.cuda-pkg-name >>
+          cuda-pkg-version: << parameters.cuda-pkg-version >>
+          cuda-version: << parameters.cuda-version >>
+      - install-cudnn:
+          os: << parameters.os >>
+          platform: << parameters.platform >>
+          cudnn-version: << parameters.cudnn-version >>
+          cuda-version: << parameters.cuda-string-version >>
+      - run:
+          name: Install Tensorrt
+          command: |
+            cd ~
+            sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/3bf863cc.pub
+            sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/ /"
+            sudo apt-get update
+
+            sudo apt-get install libnvinfer8=<< parameters.trt-version-short >>* libnvinfer-plugin8=<< parameters.trt-version-short>>* libnvinfer-dev=<< parameters.trt-version-short>>* libnvinfer-plugin-dev=<< parameters.trt-version-short>>*
+      - install-bazel:
+          platform: << parameters.bazel-platform >>
+          version: << parameters.bazel-version >>
+
+
+  create-py-env:
+      description: "Install python dependencies"
+      parameters:
+        trt-version-long:
+          type: string
+          default: "8.5.1.7"
+        cudnn-version-long:
+          type: string
+          default: "8.5.0.96"
+      steps:
+        - run:
+            name: Set up python environment
+            command: |
+              pip3 install --upgrade pip
+              pip3 install wheel setuptools
+              pip3 install nvidia-pyindex
+              pip3 install tabulate
+              pip3 install tensorrt==<< parameters.trt-version-long >> nvidia-cudnn-cu11==<< parameters.cudnn-version-long >>
+              pip3 install pytest parameterized expecttest nox
+
+  install-torch-from-index:
+    description: "Install Pytorch"
+    parameters:
+      torch-build:
+        type: string
+        default: "2.0.0.dev20230103+cu117"
+      torch-build-index:
+        type: string
+        default: "https://download.pytorch.org/whl/nightly/cu117"
+    steps:
+      - run:
+          name: Install Torch
+          command: |
+            pip3 install --upgrade pip
+            pip3 install --pre torch==<< parameters.torch-build >>  torchvision torchaudio --extra-index-url << parameters.torch-build-index >>
+
+  build-py:
+    description: "Build the torch-tensorrt python release (pre-cxx11-abi)"
+    parameters:
+      platform:
+        type: string
+        default: "x86_64"
+    steps:
+      - run:
+          name: Build torch-tensorrt python release (pre-cxx11-abi)
+          command: |
+            mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
+            cd py
+            python3 -m pip install wheel setuptools
+            python3 -m pip install pybind11==2.6.2
+            python3 setup.py bdist_wheel
+            python3 setup.py install
+            mkdir -p /tmp/dist/builds
+            cp dist/* /tmp/dist/builds
+
+  build-py-cxx11-abi:
+    description: "Build the torch-tensorrt python release (cxx11-abi)"
+    parameters:
+      platform:
+        type: string
+        default: "x86_64"
+      release:
+        type: boolean
+        default: false
+    steps:
+      - run:
+          name: Build setup
+          command: |
+            mv ~/project/toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> ~/project/WORKSPACE
+            python3 -m pip install wheel setuptools
+            python3 -m pip install pybind11==2.6.2
+      - when:
+          condition: << parameters.release >>
+          steps:
+            - run:
+                name: Build torch-tensorrt python release package
+                command: |
+                  cd ~/project/py
+                  python3 setup.py bdist_wheel --use-cxx11-abi --release
+                  python3 setup.py install --use-cxx11-abi --release
+                  mkdir -p /tmp/dist/builds
+                  cp dist/* /tmp/dist/builds
+      - unless:
+          condition: << parameters.release >>
+          steps:
+            - run:
+                name: Build torch-tensorrt python package
+                command: |
+                  cd ~/project/py
+                  python3 setup.py bdist_wheel --use-cxx11-abi
+                  python3 setup.py install --use-cxx11-abi
+                  mkdir -p /tmp/dist/builds
+                  cp dist/* /tmp/dist/builds
+
+  build-py-fx-only:
+    description: "Build the torch-tensorrt python release with only the fx backend"
+    parameters:
+      platform:
+        type: string
+        default: "x86_64"
+    steps:
+      - run:
+          name: Build torch-tensorrt python release with only the fx backend
+          command: |
+            mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
+            cd py
+            python3 -m pip install wheel setuptools
+            python3 -m pip install pybind11==2.6.2
+            python3 setup.py bdist_wheel --fx-only
+            python3 setup.py install --fx-only
+            mkdir -p /tmp/dist/builds
+            cp dist/* /tmp/dist/builds
+
+  build-py-ngc:
+    description: "Build the torch-tensorrt python release for NGC PyTorch (cxx11-abi)"
+    parameters:
+      release:
+        type: boolean
+        default: false
+      torch-base-image:
+        type: string
+        default: nvcr.io/nvidia/pytorch:22.07-py3
+    steps:
+      - run:
+          name: Log into docker
+          command: |
+            docker login --username="\$oauthtoken" --password=$NGC_TOKEN nvcr.io
+      - run:
+          name: Pull image
+          command: |
+            docker pull << parameters.torch-base-image >>
+      - run:
+          name: Create container
+          command: |
+              docker run -it -d --name ngc_build_container -v /home/circleci/project:/workspace -e BAZEL_VERSION="$(cat /home/circleci/project/.bazelversion)" -w /workspace << parameters.torch-base-image >>
+      - run:
+          name: Install build deps
+          command: |
+            export BAZEL_VERSION="$(cat /home/circleci/project/.bazelversion)"
+            docker exec ngc_build_container bash -c "wget https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-linux-x86_64 -O /usr/bin/bazel && chmod a+x /usr/bin/bazel"
+            docker exec ngc_build_container bash -c "mv /workspace/docker/WORKSPACE.ngc /workspace/WORKSPACE"
+            docker exec ngc_build_container bash -c "cd /workspace/py && pip install wheel setuptools pybind11==2.6.2"
+            docker exec ngc_build_container bash -c "git config --global --add safe.directory /workspace"
+      - when:
+          condition: << parameters.release >>
+          steps:
+            - run:
+                name: Build torch-tensorrt release build for NGC
+                command: |
+                  docker exec ngc_build_container bash -c "cd /workspace/py && python3 setup.py bdist_wheel --use-cxx11-abi --release"
+      - unless:
+          condition: << parameters.release >>
+          steps:
+            - run:
+                name: Build torch-tensorrt debug build for NGC
+                command: |
+                  docker exec ngc_build_container bash -c "cd /workspace/py && python3 setup.py bdist_wheel --use-cxx11-abi"
+      - run:
+          name: Collect builds
+          command: |
+            mkdir -p /tmp/dist/builds
+            cp /home/circleci/project/py/dist/* /tmp/dist/builds
+
+  build-cmake:
+    description: "Build the torch-tensorrt using CMake"
+    parameters:
+      platform:
+        type: string
+        default: "x86_64"
+    steps:
+      - run:
+          name: Build torch-tensorrt library with CMake
+          command: |
+            mkdir build
+            export PATH=$PATH:/usr/local/cuda/bin
+            ~/cmake/bin/cmake -S. -Bbuild \
+              -DCMAKE_MODULE_PATH=cmake/Module \
+              -DTorch_DIR=/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch/share/cmake/Torch \
+              -DTensorRT_ROOT=/usr \
+              -DCMAKE_BUILD_TYPE=Debug
+            cmake --build build -- -j12
+            mkdir -p /tmp/dist/builds
+            cp -r build/bin /tmp/dist/builds
+            cp -r build/lib /tmp/dist/builds
+            cp -r cpp/include /tmp/dist/builds
+
+
+  dump-test-env:
+    description: "Dump the test env to console"
+    steps:
+      - run:
+          name: Test torch
+          command: |
+            python3 -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"
+
+      - run:
+          name: Get torch-tensorrt version information
+          command: |
+            python3 -c "import torch_tensorrt; torch_tensorrt.dump_build_info()"
+
+  pull-test-models:
+    description: "Pull the test model set"
+    steps:
+      - run:
+          name: Pull test models
+          environment:
+            USE_HOST_DEPS: "1"
+          command: |
+            cd tests/modules
+            pip3 install -r requirements.txt
+            python3 hub.py
+            cd ~/project
+
+  test-ts-core:
+    description: "Test torchscript backend c++ api"
+    parameters:
+      platform:
+        type: string
+        default: "x86_64"
+    steps:
+      - pull-test-models
+      - run: mkdir -p /tmp/artifacts
+      - run:
+          name: Run core / C++ tests
+          environment:
+            LD_LIBRARY_PATH: "/home/circleci/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:/home/circleci/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
+          command: |
+            set -e
+            mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
+            bazel query 'kind(cc_*, tests(//tests))' --noshow_progress >> /tmp/test_manifest.txt
+            circleci tests split < /tmp/test_manifest.txt > /tmp/node_test_manifest.txt
+            bazel test $(cat /tmp/node_test_manifest.txt) --test_arg=--gtest_output=xml:/tmp/artifacts/test_results/ --jobs 4 --config ci_testing --config pre_cxx11_abi --noshow_progress --test_timeout=8000
+      - run:
+          name: Collect logs
+          when: on_fail
+          command: |
+            mkdir -p /tmp/testlogs
+            cp -r bazel-testlogs /tmp/testlogs
+            sudo apt install tree
+            tree . > /tmp/testlogs/dir_structure.txt
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-ts-py-api:
+    description: "Run L0 torch-tensorrt python tests"
+    steps:
+      - pull-test-models
+      - run:
+          name: Run L0 torch-tensorrt python tests
+          environment:
+            USE_HOST_DEPS: "1"
+            PYT_PATH: "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/"
+            LD_LIBRARY_PATH: "/usr/lib/x86_64-linux-gnu/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
+          command: |
+            set -e
+            mkdir -p /tmp/artifacts/test_results
+            cd tests/py
+            pytest --junitxml=/tmp/artifacts/test_results/api/api_test_results.xml api/
+            pytest --junitxml=/tmp/artifacts/test_results/models/models_test_results.xml models/
+            pytest --junitxml=/tmp/artifacts/test_results/integrations/integrations_test_results.xml integrations/
+            cd ~/project
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-fx_converters:
+    description: "Test the fx converters"
+    steps:
+      - run:
+          name: Run FX converter tests
+          command: |
+            cd py/torch_tensorrt/fx/test
+            pushd converters/
+            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/test_results.xml
+            popd
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-fx_passes:
+    description: "Test the fx passes"
+    steps:
+      - run:
+          name: Run FX passes
+          command: |
+            cd py/torch_tensorrt/fx/test
+            pushd passes
+            list_passes=$(ls | grep -v test_setitem*)
+            pytest $list_passes --junitxml=/tmp/artifacts/test_results/fx/passes/test_results.xml
+            popd
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-fx_tools:
+    description: "Test the fx tools"
+    steps:
+      - run:
+          name: Run FX tools
+          command: |
+            cd py/torch_tensorrt/fx/test
+            pushd tools
+            pytest --junitxml=/tmp/artifacts/test_results/fx/tools/test_results.xml
+            popd
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-fx_trt_lower:
+    description: "Test the fx TRT lowering"
+    steps:
+      - run:
+          name: Run FX TRT lowering
+          command: |
+            cd py/torch_tensorrt/fx/test
+            pushd trt_lower
+            pytest --junitxml=/tmp/artifacts/test_results/fx/trt_lower/test_results.xml
+            popd
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-fx_tracer:
+    description: "Test the fx tracer"
+    steps:
+      - run:
+          name: Run FX tracer
+          command: |
+            cd py/torch_tensorrt/fx/test
+            pushd tracer
+            list_tracer=$(ls | grep -v test_dispatch_*)
+            pytest $list_tracer --junitxml=/tmp/artifacts/test_results/fx/tracer/test_results.xml
+            popd
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-fx:
+    description: "Test the fx backend"
+    steps:
+      - run:
+          name: Run fx tests
+          command: |
+            mkdir -p /tmp/artifacts/test_results
+      - test-fx_converters
+      - test-fx_passes
+      - test-fx_tools
+      - test-fx_trt_lower
+      - test-fx_tracer
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
-  build:
+  build-x86_64-linux:
+    parameters:
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+      cxx11-abi:
+        type: boolean
+        default: false
     machine:
-    # Primary container image where all steps run.
-      # image: nvcr.io/nvidia/tensorrt:22.01-py3 # does not work with customized image
-      # https://circleci.com/docs/2.0/configuration-reference#available-linux-gpu-images
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: xlarge
+    steps:
+      - checkout
+      - create-env:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+          trt-version-short:  << pipeline.parameters.trt-version-short >>
+          bazel-version: << pipeline.parameters.bazel-version >>
+          bazel-platform: "x86_64"
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
+      - when:
+          condition: << parameters.cxx11-abi >>
+          steps:
+            - build-py-cxx11-abi
+      - unless:
+          condition: << parameters.cxx11-abi >>
+          steps:
+            - build-py
+      - run:
+          name: Move to build dir
+          command: |
+            mkdir -p /tmp/dist/x86_64-linux
+            cp -r /tmp/dist/builds/* /tmp/dist/x86_64-linux
+      - persist_to_workspace:
+          root: /tmp/dist
+          paths:
+            - x86_64-linux
+      - store_artifacts:
+          path: /tmp/dist/x86_64-linux
+          destination: x86_64-linux
+
+  test-core-cpp-x86_64-linux:
+    parameters:
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+      trt-version-short:
+        type: string
+      trt-version-long:
+        type: string
+      cudnn-version:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: gpu.nvidia.large
+    parallelism: 4
+    steps:
+      - checkout
+      - create-env:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          cudnn-version: << parameters.cudnn-version >>
+          trt-version-short:  << parameters.trt-version-short >>
+          bazel-version: << pipeline.parameters.bazel-version >>
+          bazel-platform: "x86_64"
+      - create-py-env:
+          trt-version-long: << parameters.trt-version-long >>
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
+      - attach_workspace:
+          at: /tmp/dist
+      - run:
+          name: "Install torch-tensorrt"
+          command: pip3 install /tmp/dist/x86_64-linux/*
+      - dump-test-env
+      - test-ts-core
+
+  test-py-ts-x86_64-linux:
+    parameters:
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+      trt-version-long:
+        type: string
+    machine:
       image: ubuntu-2004-cuda-11.4:202110-01
     resource_class: gpu.nvidia.large
     steps:
       - checkout
+      - uninstall-cuda
+      - install-cuda
+      - create-py-env:
+          trt-version-long: << parameters.trt-version-long >>
+      - attach_workspace:
+          at: /tmp/dist
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
       - run:
-          name: install cudnn + tensorrt + bazel
-          command: |
-            cd ~
-            OS=ubuntu2004
-            CUDNN_VERSION=8.2.1.*-1+cuda11.3
-            TRT_VERSION=8.2.4-1+cuda11.4
-            BAZEL_VERSION=5.1.1
-            
-            wget https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/cuda-${OS}.pin 
-            sudo mv cuda-${OS}.pin /etc/apt/preferences.d/cuda-repository-pin-600
-            sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/7fa2af80.pub
-            sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 536F8F1DE80F6A35
-            sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
-            sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/ /"
-            sudo apt-get update
-            sudo apt-get install libcudnn8=${CUDNN_VERSION}
-            sudo apt-get install libcudnn8-dev=${CUDNN_VERSION}
+          name: "Install torch-tensorrt"
+          command: pip3 install --pre /tmp/dist/x86_64-linux/*
+      - dump-test-env
+      - test-ts-py-api
 
-            sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/{OS}/x86_64/3bf863cc.pub
-            sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/ /"
-            sudo apt-get update
-             
-            sudo apt-get install libnvinfer8=${TRT_VERSION} libnvonnxparsers8=${TRT_VERSION} libnvparsers8=${TRT_VERSION} libnvinfer-plugin8=${TRT_VERSION} libnvinfer-dev=${TRT_VERSION} libnvonnxparsers-dev=${TRT_VERSION} libnvparsers-dev=${TRT_VERSION} libnvinfer-plugin-dev=${TRT_VERSION} python3-libnvinfer=${TRT_VERSION}
-            # check available version, apt list libnvinfer8 -a
-            sudo wget -q https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-x86_64 -O /usr/bin/bazel
-            sudo chmod a+x /usr/bin/bazel
-
+  test-py-fx-x86_64-linux:
+    parameters:
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+      trt-version-long:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: gpu.nvidia.large
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/dist/
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
+      - create-py-env:
+          trt-version-long: << parameters.trt-version-long >>
+      - install-cudnn
+      # - run:
+      #     name: "Set LD_LIBRARY_PATH path to include the installed CUDNN"
+      #     command: export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH
       - run:
-          name: set up python environment
-          command: |
-            pip3 install nvidia-pyindex
-            pip3 install nvidia-tensorrt==8.2.4.2
-            pip3 install --pre torch==1.13.0.dev20220621  torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cu113
-            pip3 install pytest parameterized expecttest
-            # install torch_tensorrt
-            mv WORKSPACE.ci WORKSPACE
-            cd py
-            python3 setup.py install
+          name: "Install torch-tensorrt"
+          command: pip3 install --pre /tmp/dist/x86_64-linux/*
+      # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
+      - dump-test-env
+      - test-fx
 
-            # install fx2trt
-            # cd py/torch_tensorrt/fx/setup
-            # python3 setup.py install
+  package-x86_64-linux:
+    parameters:
+      enabled:
+        type: boolean
+        default: false
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: xlarge
+    steps:
+      - when:
+          condition: << parameters.enabled >>
+          steps:
+            - checkout
+            - run:
+                name: "Build packaging container"
+                command: |
+                  cd ~/project/py/
+                  docker build -t torch_tensorrt_release_env --build-arg trt_version=<< pipeline.parameters.trt-version-short >> -f ci/Dockerfile.ci .
+            - run:
+                name: Build Python packages and pre-cxx11-abi tarball
+                command: |
+                  cd ~/project/py/
+                  cp ~/project/toolchains/ci_workspaces/WORKSPACE.x86_64.release.rhel ~/project/WORKSPACE
+                  docker run -it --rm -v ~/project:/workspace/project torch_tensorrt_release_env /bin/bash /workspace/project/py/ci/build_whl.sh
+            - create-env:
+                os: "ubuntu2004"
+                platform: "x86_64"
+                cudnn-version: << pipeline.parameters.cudnn-version >>
+                trt-version-short:  << pipeline.parameters.trt-version-short >>
+                bazel-version: << pipeline.parameters.bazel-version >>
+                bazel-platform: "x86_64"
+            - run:
+                name: Build cxx11-abi tarball
+                command: |
+                  set -e
+                  cd ~/project/
+                  cp ~/project/toolchains/ci_workspaces/WORKSPACE.x86_64.release.ubuntu ~/project/WORKSPACE
+                  bazel build //:libtorchtrt -c opt --noshow_progress
+                  sudo chown -R $(whoami) ~/project/py
+                  CUDA_VERSION=$(cd ~/project/py/torch_tensorrt && python3 -c "from _version import __cuda_version__;print(__cuda_version__)")
+                  TORCHTRT_VERSION=$(cd ~/project/py/torch_tensorrt && python3 -c "from _version import __version__;print(__version__)")
+                  TRT_VERSION=$(cd ~/project/py/torch_tensorrt && python3 -c "from _version import __tensorrt_version__;print(__tensorrt_version__)")
+                  CUDNN_VERSION=$(cd ~/project/py/torch_tensorrt && python3 -c "from _version import __cudnn_version__;print(__cudnn_version__)")
+                  pip3 install --upgrade pip
+                  pip3 install -r ~/project/py/requirements.txt
+                  TORCH_VERSION=$(python3 -c "from torch import __version__;print(__version__.split('+')[0])")
+                  cp ~/project/bazel-bin/libtorchtrt.tar.gz ~/project/py/dist/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
+            - run:
+                name: Collect packages
+                command: |
+                  mkdir -p /tmp/dist/x86_64-linux
+                  cp -r ~/project/py/dist/* /tmp/dist/x86_64-linux
+            - store_artifacts:
+                path: /tmp/dist/x86_64-linux
+                destination: x86_64-linux-pkgs
+      - unless:
+          condition: << parameters.enabled >>
+          steps:
+            - run:
+                name: Skipped packaging
+                command: echo -e "Packaging stage not enabled"
+
+  package-aarch64-jetson:
+    parameters:
+      enabled:
+        type: boolean
+        default: true
+      torch-build:
+        type: string
+      jetpack-version:
+        type: string
+      cxx11-abi:
+        type: boolean
+        default: true
+      python-version:
+        type: string
+        default: 3.8.10
+    machine:
+      image: ubuntu-2004:202201-02
+    resource_class: arm.xlarge
+    steps:
+      - checkout
+      - install-cuda:
+          os: "ubuntu2004"
+          platform: "sbsa"
+          architecture: "arm64"
       - run:
-          name: run fx2trt tests
+          name: Install openblas
+          command: sudo apt install libopenblas-dev
+      - create-env:
+          os: "ubuntu2004"
+          platform: "sbsa"
+          architecture: "arm64"
+          cudnn-version: << pipeline.parameters.cudnn-jetson-version >>
+          cuda-pkg-name: << pipeline.parameters.cuda-jetson-pkg-name >>
+          cuda-pkg-version: << pipeline.parameters.cuda-jetson-pkg-version >>
+          cuda-version: << pipeline.parameters.cuda-jetson-version >>
+          cuda-string-version: << pipeline.parameters.cuda-string-jetson-version >>
+          trt-version-short:  << pipeline.parameters.trt-jetson-version-short >>
+          bazel-version: << pipeline.parameters.bazel-version >>
+          bazel-platform: "arm64"
+      - run:
+          name: Set python version
           command: |
-            # one fix pending to enable below
-            # cd py/torch_tensorrt/fx/test
-            # pytest $(find . -name '*.py' | grep -v test_dispatch* | grep -v test_setitem*)
-            
-            cd py/torch_tensorrt/fx/test
-            pushd converters/acc_op
-            pytest 
-            popd
-            pushd passes
-            list_passes=$(ls | grep -v test_setitem*) 
-            pytest $list_passes
-            popd
-            pushd core
-            pytest
-            popd
-            # pushd quant
-            # pytest
-            # popd
-            pushd tools
-            pytest
-            popd
-            pushd trt_lower
-            pytest
-            popd
-            pushd tracer
-            list_tracer=$(ls | grep -v test_dispatch_*) 
-            pytest $list_tracer
-            popd
+            pyenv install << parameters.python-version >>
+            pyenv global << parameters.python-version >>
+      - run:
+          name: Install NGC Torch
+          environment:
+            TORCH_INSTALL: https://developer.download.nvidia.com/compute/redist/jp/v<< parameters.jetpack-version >>/pytorch/<< parameters.torch-build >>
+          command: |
+            set -e
+            python3 -m pip install --upgrade pip; python3 -m pip install setuptools wheel; python3 -m pip install expecttest xmlrunner hypothesis aiohttp numpy=='1.19.4' pyyaml scipy=='1.5.3' ninja cython typing_extensions protobuf; export "LD_LIBRARY_PATH=/usr/lib/llvm-8/lib:$LD_LIBRARY_PATH"; python3 -m pip install --upgrade protobuf; python3 -m pip install --no-cache $TORCH_INSTALL
+      - build-py-cxx11-abi:
+          platform: "sbsa"
+          release: true
+      - run:
+          name: Build cxx11-abi tarball
+          command: |
+            set -e
+            cd ~/project/py/
+            bazel build //:libtorchtrt -c opt --noshow_progress
+            CUDA_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __cuda_version__;print(__cuda_version__)")
+            TORCHTRT_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __version__;print(__version__)")
+            TRT_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __tensorrt_version__;print(__tensorrt_version__)")
+            CUDNN_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __cudnn_version__;print(__cudnn_version__)")
+            python3 -m pip install pybind11==2.6.2
+            TORCH_VERSION=$(python3 -c "from torch import __version__;print(__version__.split('+')[0])")
+            cp ~/project/bazel-bin/libtorchtrt.tar.gz ~/project/py/dist/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-aarch64-linux-jp<< parameters.jetpack-version >>.tar.gz
+      - run:
+          name: Move to release dir
+          command: |
+            mkdir -p /tmp/dist/jetson
+            cp -r ~/project/py/dist/* /tmp/dist/jetson
+      - store_artifacts:
+          path: /tmp/dist/jetson
+          destination: aarch64-jetson-pkgs
+
+  build-x86_64-linux-cmake:
+    parameters:
+      cudnn-version:
+        type: string
+      trt-version-short:
+        type: string
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: xlarge
+    steps:
+      - checkout
+      - create-env:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          cudnn-version: << parameters.cudnn-version >>
+          trt-version-short:  << parameters.trt-version-short >>
+          bazel-platform: "x86_64"
+      - install-cmake:
+          version: 3.24.1
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
+      - build-cmake
+      - run:
+          name: Move to cmake build dir
+          command: |
+            mkdir -p /tmp/dist/cmake
+            cp -r /tmp/dist/builds/* /tmp/dist/cmake
+      - persist_to_workspace:
+          root: /tmp/dist
+          paths:
+            - cmake
+      - store_artifacts:
+          path: /tmp/dist/cmake
+          destination: x86_64-cmake
+
+  build-x86_64-linux-ngc:
+    parameters:
+      torch-base-image:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: xlarge
+    steps:
+      - checkout
+      - build-py-ngc:
+          release: false
+          torch-base-image: << parameters.torch-base-image >>
+      - run:
+          name: Move to NGC dir
+          command: |
+            mkdir -p /tmp/dist/ngc
+            cp -r /tmp/dist/builds/* /tmp/dist/ngc
+      - persist_to_workspace:
+          root: /tmp/dist
+          paths:
+            - ngc
+      - store_artifacts:
+          path: /tmp/dist/ngc
+          destination: x86_64-pyt-ngc
+
+  package-x86_64-linux-ngc:
+    parameters:
+      enabled:
+        type: boolean
+        default: false
+      torch-base-image:
+        type: string
+        default: nvcr.io/nvidia/pytorch:22.07-py3
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: xlarge
+    steps:
+      - when:
+          condition: << parameters.enabled >>
+          steps:
+            - checkout
+            - build-py-ngc:
+                release: true
+                torch-base-image: << parameters.torch-base-image >>
+            - run:
+                name: Collect packages
+                command: |
+                  mkdir -p /tmp/dist/ngc
+                  cp -r ~/project/py/dist/* /tmp/dist/ngc
+            - store_artifacts:
+                path: /tmp/dist/ngc
+                destination: x86_64-ngc-pkgs
+      - unless:
+          condition: << parameters.enabled >>
+          steps:
+            - run:
+                name: Skipped packaging
+                command: echo -e "Packaging stage not enabled"
+
+parameters:
+  bazel-version:
+    type: string
+    default: "5.2.0"
+
+  # Nightly platform config
+  torch-build:
+    type: string
+    default: "2.0.0.dev20230103+cu117"
+  torch-build-index:
+    type: string
+    default: "https://download.pytorch.org/whl/nightly/cu117"
+  cudnn-version:
+    type: string
+    default: "8.5.0.96"
+  trt-version-short:
+    type: string
+    default: "8.5.1"
+  trt-version-long:
+    type: string
+    default: "8.5.1.7"
+
+  # Jetson platform config
+  torch-jetson-build:
+    type: string
+    default: "torch-1.13.0a0+08820cb0.nv22.07-cp38-cp38-linux_aarch64.whl"
+  jetpack-version:
+    type: string
+    default: "502"
+  cudnn-jetson-version:
+    type: string
+    default: "8.5.0.96"
+  cuda-jetson-pkg-name:
+    type: string
+    default: "cuda-toolkit-11-4"
+  cuda-jetson-pkg-version:
+    type: string
+    default: "11-4"
+  cuda-jetson-version:
+    type: string
+    default: "11.4.1"
+  cuda-string-jetson-version:
+    type: string
+    default: "cuda11.4"
+  trt-jetson-version-short:
+    type: string
+    default: "8.4.1"
+  trt-jetson-version-long:
+    type: string
+    default: "8.4.1.5"
+
+  torch-ngc-base-image:
+    type: string
+    default: "nvcr.io/nvidia/pytorch:22.07-py3"
+
+  enable-packaging:
+    type: boolean
+    default: false
+
+  enable-ngc-packaging:
+    type: boolean
+    default: false
+
+  enable-jetson-packaging:
+    type: boolean
+    default: false
+
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
-  build_run:
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - main
+                - release/**/*
     jobs:
-      - build
+      - build-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+
+      - test-core-cpp-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-short: << pipeline.parameters.trt-version-short >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+          requires:
+            - build-x86_64-linux
+
+      - test-py-ts-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          requires:
+            - build-x86_64-linux
+
+      - test-py-fx-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          requires:
+            - build-x86_64-linux
+
+  release:
+    when: << pipeline.parameters.enable-packaging >>
+    jobs:
+
+      - build-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+
+      - test-core-cpp-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-short: << pipeline.parameters.trt-version-short >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+          requires:
+            - build-x86_64-linux
+
+      - test-py-ts-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          requires:
+            - build-x86_64-linux
+
+      - test-py-fx-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          requires:
+            - build-x86_64-linux
+
+      - package-x86_64-linux:
+          enabled: << pipeline.parameters.enable-packaging >>
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+
+
+
+  release-ngc:
+    when: << pipeline.parameters.enable-ngc-packaging >>
+    jobs:
+
+      - package-x86_64-linux-ngc:
+          enabled: << pipeline.parameters.enable-ngc-packaging >>
+          torch-base-image: << pipeline.parameters.torch-ngc-base-image >>
+
+  release-jetson:
+    when: << pipeline.parameters.enable-jetson-packaging >>
+    jobs:
+
+      - package-aarch64-jetson:
+          enabled: << pipeline.parameters.enable-jetson-packaging >>
+          torch-build: << pipeline.parameters.torch-jetson-build >>
+          jetpack-version: << pipeline.parameters.jetpack-version >>
+
+
+  on-push:
+    jobs:
+      - build-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+
+      - test-core-cpp-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-short: << pipeline.parameters.trt-version-short >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+          requires:
+            - build-x86_64-linux
+
+      - test-py-ts-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          requires:
+            - build-x86_64-linux
+
+      - test-py-fx-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          requires:
+            - build-x86_64-linux
+
+      - build-x86_64-linux-cmake:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-short: << pipeline.parameters.trt-version-short >>
+          cudnn-version: << pipeline.parameters.cudnn-version >>
