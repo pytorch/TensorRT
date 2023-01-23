@@ -611,7 +611,6 @@ jobs:
           os: "ubuntu2004"
           platform: "x86_64"
           cudnn-version: << pipeline.parameters.cudnn-version >>
-          cuda-version: << pipeline.parameters.cuda-string-version >>
       - install-tensorrt:
           os: "ubuntu2004"
           platform: "x86_64"
@@ -666,7 +665,6 @@ jobs:
           os: "ubuntu2004"
           platform: "x86_64"
           cudnn-version: << pipeline.parameters.cudnn-version >>
-          cuda-version: << pipeline.parameters.cuda-string-version >>
       - install-tensorrt:
           os: "ubuntu2004"
           platform: "x86_64"
@@ -780,7 +778,6 @@ jobs:
                 os: "ubuntu2004"
                 platform: "x86_64"
                 cudnn-version: << pipeline.parameters.cudnn-version >>
-                cuda-version: << pipeline.parameters.cuda-string-version >>
             - install-tensorrt:
                 os: "ubuntu2004"
                 platform: "x86_64"
@@ -856,7 +853,7 @@ jobs:
           os: "ubuntu2004"
           platform: "x86_64"
           cudnn-version: << pipeline.parameters.cudnn-jetson-version >>
-          cuda-stringversion: << pipeline.parameters.cuda-string-jetson-version >>
+          cuda-string-version: << pipeline.parameters.cuda-string-jetson-version >>
       - install-tensorrt:
           os: "ubuntu2004"
           architecture: "arm64"
@@ -926,7 +923,6 @@ jobs:
           os: "ubuntu2004"
           platform: "x86_64"
           cudnn-version: << parameters.cudnn-version >>
-          cuda-version: << parameters.cuda-string-version >>
       - install-tensorrt:
           os: "ubuntu2004"
           platform: "x86_64"
