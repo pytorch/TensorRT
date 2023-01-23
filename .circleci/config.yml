@@ -607,6 +607,11 @@ jobs:
       - install-cuda:
           os: "ubuntu2004"
           platform: "x86_64"
+          architecture: "amd64"
+          cuda-pkg-name: << pipeline.parameters.cuda-pkg-name >>
+          cuda-pkg-version: << pipeline.parameters.cuda-pkg-version >>
+          cuda-version: << pipeline.parameters.cuda-version >>
+          cuda-driver-version: << pipeline.parameters.cuda-driver-version >>
       - install-cudnn:
           os: "ubuntu2004"
           platform: "x86_64"
@@ -661,6 +666,11 @@ jobs:
       - install-cuda:
           os: "ubuntu2004"
           platform: "x86_64"
+          architecture: "amd64"
+          cuda-pkg-name: << pipeline.parameters.cuda-pkg-name >>
+          cuda-pkg-version: << pipeline.parameters.cuda-pkg-version >>
+          cuda-version: << pipeline.parameters.cuda-version >>
+          cuda-driver-version: << pipeline.parameters.cuda-driver-version >>
       - install-cudnn:
           os: "ubuntu2004"
           platform: "x86_64"
@@ -774,6 +784,11 @@ jobs:
             - install-cuda:
                 os: "ubuntu2004"
                 platform: "x86_64"
+                architecture: "amd64"
+                cuda-pkg-name: << pipeline.parameters.cuda-pkg-name >>
+                cuda-pkg-version: << pipeline.parameters.cuda-pkg-version >>
+                cuda-version: << pipeline.parameters.cuda-version >>
+                cuda-driver-version: << pipeline.parameters.cuda-driver-version >>
             - install-cudnn:
                 os: "ubuntu2004"
                 platform: "x86_64"
@@ -844,6 +859,7 @@ jobs:
       - install-cuda:
           os: "ubuntu2004"
           platform: "sbsa"
+          architecture: "arm64"
           cuda-pkg-name: << pipeline.parameters.cuda-jetson-pkg-name >>
           cuda-pkg-version: << pipeline.parameters.cuda-jetson-pkg-version >>
           cuda-version: << pipeline.parameters.cuda-jetson-version >>
@@ -919,6 +935,11 @@ jobs:
       - install-cuda:
           os: "ubuntu2004"
           platform: "x86_64"
+          architecture: "amd64"
+          cuda-pkg-name: << pipeline.parameters.cuda-pkg-name >>
+          cuda-pkg-version: << pipeline.parameters.cuda-pkg-version >>
+          cuda-version: << pipeline.parameters.cuda-version >>
+          cuda-driver-version: << pipeline.parameters.cuda-driver-version >>
       - install-cudnn:
           os: "ubuntu2004"
           platform: "x86_64"
@@ -1023,6 +1044,21 @@ parameters:
   cudnn-version:
     type: string
     default: "8.5.0.96"
+  cuda-pkg-name:
+    type: string
+    default: "cuda-toolkit-11-7"
+  cuda-pkg-version:
+    type: string
+    default: "11-7"
+  cuda-version:
+    type: string
+    default: "11.7.1"
+  cuda-string-version:
+    type: string
+    default: "cuda11.7"
+  cuda-driver-version:
+    type: string
+    default: "515.65.01-1"
   trt-version-short:
     type: string
     default: "8.5.1"
