@@ -101,40 +101,6 @@ commands:
             sudo apt-get --purge remove "cuda*" "nsight*"
             sudo apt-get --purge remove "*nvidia*"
 
-  install-cudnn:
-    description: "Install CUDNN 8.5.0"
-    parameters:
-      os:
-        type: string
-        default: "ubuntu2004"
-      platform:
-        type: string
-        default: "x86_64"
-      cudnn-version:
-        type: string
-        default: "8.5.0.96"
-      cuda-version:
-        type: string
-        default: "cuda11.7"
-    steps:
-      - run:
-          name: Install CUDNN
-          command: |
-            cd ~
-            wget https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/cuda-<< parameters.os >>.pin
-            sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
-            sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/3bf863cc.pub
-            sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/ /"
-            sudo apt-get update
-
-            sudo apt-get install libcudnn8=<< parameters.cudnn-version >>-1+<< parameters.cuda-version >>
-            sudo apt-get install libcudnn8-dev=<< parameters.cudnn-version >>-1+<< parameters.cuda-version >>
-
-      - run:
-          when: on_fail
-          name: Dump apt sources
-          command: cat /etc/apt/sources.list
-
   install-cuda:
     description: "Install CUDA"
     parameters:
@@ -159,6 +125,9 @@ commands:
       cuda-driver-version:
         type: string
         default: "515.65.01-1"
+      jetson-11.4:
+        type: bool
+        default: false
     steps:
       - run:
           name: Install CUDA
@@ -168,17 +137,26 @@ commands:
             sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
             wget https://developer.download.nvidia.com/compute/cuda/<< parameters.cuda-version >>/local_installers/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-<< parameters.cuda-driver-version >>_<< parameters.architecture >>.deb
             sudo dpkg -i cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-<< parameters.cuda-driver-version >>_<< parameters.architecture >>.deb
-            sudo cp /var/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local/cuda-*-keyring.gpg /usr/share/keyrings/
+      - when:
+          condition:
+            not: << parameters.jetson-11.4 >>
+            steps:
+              - run: sudo cp /var/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local/cuda-*-keyring.gpg /usr/share/keyrings/
+      - when:
+          condition: << parameters.jetson-11.4 >>
+            steps:
+              - run: sudo apt-key add /var/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local/7fa2af80.pub
+      - run:
+          command: |
             sudo apt-get update
             sudo apt-get install -y cuda
-
       - run:
           when: on_fail
           name: Dump apt sources
           command: cat /etc/apt/sources.list
 
-  create-env:
-    description: "Install dependencies for Torch-TensorRT"
+  install-cudnn:
+    description: "Install CUDNN 8.5.0"
     parameters:
       os:
         type: string
@@ -186,64 +164,57 @@ commands:
       platform:
         type: string
         default: "x86_64"
-      architecture:
-        type: string
-        default: "amd64"
-      cuda-pkg-name:
-        type: string
-        default: "cuda-toolkit-11-7"
-      cuda-pkg-version:
-        type: string
-        default: "11-7"
-      cuda-version:
-        type: string
-        default: "11.7.1"
-      cuda-string-version:
-        type: string
-        default: "cuda11.7"
-      cuda-driver-version:
-        type: string
-        default: "515.65.01-1"
       cudnn-version:
         type: string
         default: "8.5.0.96"
-      trt-version-short:
+      cuda-string-version:
         type: string
-        default: "8.5.1"
-      bazel-version:
-        type: string
-        default: "5.2.0"
-      bazel-platform:
-        type: string
-        default: "x86_64"
+        default: "cuda11.7"
     steps:
-      - uninstall-cuda
-      - install-cuda:
-          os: << parameters.os >>
-          platform: << parameters.platform >>
-          architecture: << parameters.architecture >>
-          cuda-pkg-name: << parameters.cuda-pkg-name >>
-          cuda-pkg-version: << parameters.cuda-pkg-version >>
-          cuda-version: << parameters.cuda-version >>
-          cuda-driver-version: << parameters.cuda-driver-version >>
-      - install-cudnn:
-          os: << parameters.os >>
-          platform: << parameters.platform >>
-          cudnn-version: << parameters.cudnn-version >>
-          cuda-version: << parameters.cuda-string-version >>
       - run:
-          name: Install Tensorrt
+          name: Install CUDNN
           command: |
             cd ~
+            wget https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/cuda-<< parameters.os >>.pin
+            sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
             sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/3bf863cc.pub
             sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/ /"
             sudo apt-get update
 
-            sudo apt-get install libnvinfer8=<< parameters.trt-version-short >>* libnvinfer-plugin8=<< parameters.trt-version-short>>* libnvinfer-dev=<< parameters.trt-version-short>>* libnvinfer-plugin-dev=<< parameters.trt-version-short>>*
-      - install-bazel:
-          platform: << parameters.bazel-platform >>
-          version: << parameters.bazel-version >>
+            sudo apt-get install libcudnn8=<< parameters.cudnn-version >>-1+<< parameters.cuda-string-version >>
+            sudo apt-get install libcudnn8-dev=<< parameters.cudnn-version >>-1+<< parameters.cuda-string-version >>
 
+      - run:
+          when: on_fail
+          name: Dump apt sources
+          command: cat /etc/apt/sources.list
+
+  install-tensorrt:
+    description: "Install TensorRT"
+    parameters:
+      os:
+        type: string
+        default: "ubuntu2004"
+      architecture:
+        type: string
+        default: "x86_64"
+      trt-version-short:
+        type: string
+        default: "8.5.1"
+    steps:
+      - run:
+          name: Install TensorRT
+          command: |
+              cd ~
+              sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.architecture >>/3bf863cc.pub
+              sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.architecture >>/ /"
+              sudo apt-get update
+              sudo apt-get install libnvinfer8=<< parameters.trt-version-short >>* libnvinfer-plugin8=<< parameters.trt-version-short>>* libnvinfer-dev=<< parameters.trt-version-short>>* libnvinfer-plugin-dev=<< parameters.trt-version-short>>*
+
+      - run:
+          when: on_fail
+          name: Dump apt sources
+          command: cat /etc/apt/sources.list
 
   create-py-env:
       description: "Install python dependencies"
@@ -627,13 +598,24 @@ jobs:
     resource_class: xlarge
     steps:
       - checkout
-      - create-env:
+      # Setup basic deps like CUDA, TensorRT, CUDNN, Bazel
+      - uninstall-cuda
+      - install-cuda:
           os: "ubuntu2004"
           platform: "x86_64"
-          cudnn-version: << pipeline.parameters.cudnn-version >>
+      - install-cudnn:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          cudnn-version: << parameters.cudnn-version >>
+          cuda-version: << parameters.cuda-string-version >>
+      - install-tensorrt:
+          os: "ubuntu2004"
+          platform: "x86_64"
           trt-version-short:  << pipeline.parameters.trt-version-short >>
-          bazel-version: << pipeline.parameters.bazel-version >>
-          bazel-platform: "x86_64"
+      - install-bazel:
+          platform: << parameters.bazel-platform >>
+          version: << parameters.bazel-version >>
+      # Basic dependencies setup done
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
@@ -676,13 +658,24 @@ jobs:
     parallelism: 4
     steps:
       - checkout
-      - create-env:
+      # Setup basic deps like CUDA, TensorRT, CUDNN, Bazel
+      - uninstall-cuda
+      - install-cuda:
+          os: "ubuntu2004"
+          platform: "x86_64"
+      - install-cudnn:
           os: "ubuntu2004"
           platform: "x86_64"
           cudnn-version: << parameters.cudnn-version >>
-          trt-version-short:  << parameters.trt-version-short >>
-          bazel-version: << pipeline.parameters.bazel-version >>
-          bazel-platform: "x86_64"
+          cuda-version: << parameters.cuda-string-version >>
+      - install-tensorrt:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          trt-version-short:  << pipeline.parameters.trt-version-short >>
+      - install-bazel:
+          platform: << parameters.bazel-platform >>
+          version: << parameters.bazel-version >>
+      # Basic dependencies setup done
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
       - install-torch-from-index:
@@ -783,13 +776,24 @@ jobs:
                   cd ~/project/py/
                   cp ~/project/toolchains/ci_workspaces/WORKSPACE.x86_64.release.rhel ~/project/WORKSPACE
                   docker run -it --rm -v ~/project:/workspace/project torch_tensorrt_release_env /bin/bash /workspace/project/py/ci/build_whl.sh
-            - create-env:
+            # Setup basic deps like CUDA, TensorRT, CUDNN, Bazel
+            - uninstall-cuda
+            - install-cuda:
                 os: "ubuntu2004"
                 platform: "x86_64"
-                cudnn-version: << pipeline.parameters.cudnn-version >>
+            - install-cudnn:
+                os: "ubuntu2004"
+                platform: "x86_64"
+                cudnn-version: << parameters.cudnn-version >>
+                cuda-version: << parameters.cuda-string-version >>
+            - install-tensorrt:
+                os: "ubuntu2004"
+                platform: "x86_64"
                 trt-version-short:  << pipeline.parameters.trt-version-short >>
-                bazel-version: << pipeline.parameters.bazel-version >>
-                bazel-platform: "x86_64"
+            - install-bazel:
+                platform: << parameters.bazel-platform >>
+                version: << parameters.bazel-version >>
+            # Basic dependencies setup done
             - run:
                 name: Build cxx11-abi tarball
                 command: |
@@ -844,19 +848,29 @@ jobs:
       - run:
           name: Install openblas
           command: sudo apt install libopenblas-dev
-      - create-env:
+      # Setup basic deps like CUDA, TensorRT, CUDNN, Bazel
+      - uninstall-cuda
+      - install-cuda:
           os: "ubuntu2004"
           platform: "sbsa"
-          architecture: "arm64"
-          cudnn-version: << pipeline.parameters.cudnn-jetson-version >>
           cuda-pkg-name: << pipeline.parameters.cuda-jetson-pkg-name >>
           cuda-pkg-version: << pipeline.parameters.cuda-jetson-pkg-version >>
           cuda-version: << pipeline.parameters.cuda-jetson-version >>
-          cuda-string-version: << pipeline.parameters.cuda-string-jetson-version >>
           cuda-driver-version: << pipeline.parameters.cuda-jetson-driver-version >>
-          trt-version-short:  << pipeline.parameters.trt-jetson-version-short >>
-          bazel-version: << pipeline.parameters.bazel-version >>
-          bazel-platform: "arm64"
+          jetson-11.4: true
+      - install-cudnn:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          cudnn-version: << pipeline.parameters.cudnn-jetson-version >>
+          cuda-stringversion: << pipeline.parameters.cuda-string-jetson-version >>
+      - install-tensorrt:
+          os: "ubuntu2004"
+          architecture: "arm64"
+          trt-version-short:  << pipeline.parameters.trt-version-short >>
+      - install-bazel:
+          platform: "arm64"
+          version: << parameters.bazel-version >>
+      # Basic dependencies setup done
       - run:
           name: Set python version
           command: |
@@ -909,12 +923,24 @@ jobs:
     resource_class: xlarge
     steps:
       - checkout
-      - create-env:
+      # Setup basic deps like CUDA, TensorRT, CUDNN, Bazel
+      - uninstall-cuda
+      - install-cuda:
+          os: "ubuntu2004"
+          platform: "x86_64"
+      - install-cudnn:
           os: "ubuntu2004"
           platform: "x86_64"
           cudnn-version: << parameters.cudnn-version >>
-          trt-version-short:  << parameters.trt-version-short >>
-          bazel-platform: "x86_64"
+          cuda-version: << parameters.cuda-string-version >>
+      - install-tensorrt:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          trt-version-short:  << pipeline.parameters.trt-version-short >>
+      - install-bazel:
+          platform: << parameters.bazel-platform >>
+          version: << parameters.bazel-version >>
+      # Basic dependencies setup done
       - install-cmake:
           version: 3.24.1
       - install-torch-from-index:
