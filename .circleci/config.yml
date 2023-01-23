@@ -508,6 +508,22 @@ commands:
       - store_artifacts:
           path: /tmp/testlogs
 
+  test-fx_core:
+    description: "Test the fx core"
+    steps:
+      - run:
+          name: Run FX core tests
+          command: |
+            cd py/torch_tensorrt/fx/test
+            pushd core/
+            pytest --junitxml=/tmp/artifacts/test_results/fx/core/test_results.xml
+            popd
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
   test-fx_converters:
     description: "Test the fx converters"
     steps:
@@ -586,6 +602,22 @@ commands:
       - store_artifacts:
           path: /tmp/testlogs
 
+  test-fx_quant:
+    description: "Test the fx quant"
+    steps:
+      - run:
+          name: Run FX quant tests
+          command: |
+            cd py/torch_tensorrt/fx/test
+            pushd quant/
+            pytest --junitxml=/tmp/artifacts/test_results/fx/quant/test_results.xml
+            popd
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
   test-fx:
     description: "Test the fx backend"
     steps:
@@ -598,6 +630,8 @@ commands:
       - test-fx_tools
       - test-fx_trt_lower
       - test-fx_tracer
+      - test-fx_core
+      - test-fx_quant
       - store_test_results:
           path: /tmp/artifacts
       - store_artifacts:
