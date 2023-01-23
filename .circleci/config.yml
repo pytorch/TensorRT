@@ -666,7 +666,7 @@ jobs:
           cudnn-version: << pipeline.parameters.cudnn-version >>
       - install-tensorrt:
           os: "ubuntu2004"
-          platform: "x86_64"
+          architecture: "x86_64"
       - install-bazel:
           version: << pipeline.parameters.bazel-version >>
       # Basic dependencies setup done
