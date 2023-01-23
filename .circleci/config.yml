@@ -201,6 +201,9 @@ commands:
       cuda-string-version:
         type: string
         default: "cuda11.7"
+      cuda-driver-version:
+        type: string
+        default: "515.65.01-1"
       cudnn-version:
         type: string
         default: "8.5.0.96"
@@ -222,6 +225,7 @@ commands:
           cuda-pkg-name: << parameters.cuda-pkg-name >>
           cuda-pkg-version: << parameters.cuda-pkg-version >>
           cuda-version: << parameters.cuda-version >>
+          cuda-driver-version: << parameters.cuda-driver-version >>
       - install-cudnn:
           os: << parameters.os >>
           platform: << parameters.platform >>
