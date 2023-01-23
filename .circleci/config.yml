@@ -156,6 +156,9 @@ commands:
       cuda-version:
         type: string
         default: "11.7.1"
+      cuda-driver-version:
+        type: string
+        default: "515.65.01-1"
     steps:
       - run:
           name: Install CUDA
@@ -163,8 +166,8 @@ commands:
             cd ~
             wget https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/cuda-<< parameters.os >>.pin
             sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
-            wget https://developer.download.nvidia.com/compute/cuda/<< parameters.cuda-version >>/local_installers/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-515.65.01-1_<< parameters.architecture >>.deb
-            sudo dpkg -i cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-515.65.01-1_<< parameters.architecture >>.deb
+            wget https://developer.download.nvidia.com/compute/cuda/<< parameters.cuda-version >>/local_installers/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-<< parameters.cuda-driver-version >>_<< parameters.architecture >>.deb
+            sudo dpkg -i cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-<< parameters.cuda-driver-version >>_<< parameters.architecture >>.deb
             sudo cp /var/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local/cuda-*-keyring.gpg /usr/share/keyrings/
             sudo apt-get update
             sudo apt-get install -y cuda
@@ -834,10 +837,6 @@ jobs:
     resource_class: arm.xlarge
     steps:
       - checkout
-      - install-cuda:
-          os: "ubuntu2004"
-          platform: "sbsa"
-          architecture: "arm64"
       - run:
           name: Install openblas
           command: sudo apt install libopenblas-dev
@@ -850,6 +849,7 @@ jobs:
           cuda-pkg-version: << pipeline.parameters.cuda-jetson-pkg-version >>
           cuda-version: << pipeline.parameters.cuda-jetson-version >>
           cuda-string-version: << pipeline.parameters.cuda-string-jetson-version >>
+          cuda-driver-version: << pipeline.parameters.cuda-jetson-driver-version >>
           trt-version-short:  << pipeline.parameters.trt-jetson-version-short >>
           bazel-version: << pipeline.parameters.bazel-version >>
           bazel-platform: "arm64"
@@ -1033,6 +1033,9 @@ parameters:
   cuda-string-jetson-version:
     type: string
     default: "cuda11.4"
+  cuda-jetson-driver-version:
+    type: string
+    default: "470.57.02-1"
   trt-jetson-version-short:
     type: string
     default: "8.4.1"
