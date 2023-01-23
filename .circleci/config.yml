@@ -604,17 +604,10 @@ jobs:
       - checkout
       # Setup basic deps like CUDA, TensorRT, CUDNN, Bazel
       - uninstall-cuda
+      - install-cudnn
+      - install-tensorrt
       - install-cuda
-      - install-cudnn:
-          os: "ubuntu2004"
-          platform: "x86_64"
-          cudnn-version: << pipeline.parameters.cudnn-version >>
-      - install-tensorrt:
-          os: "ubuntu2004"
-          platform: "x86_64"
-          trt-version-short:  << pipeline.parameters.trt-version-short >>
-      - install-bazel:
-          version: << pipeline.parameters.bazel-version >>
+      - install-bazel
       # Basic dependencies setup done
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
