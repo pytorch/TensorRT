@@ -667,12 +667,10 @@ jobs:
       - install-tensorrt:
           os: "ubuntu2004"
           platform: "x86_64"
-          trt-version-short:  << pipeline.parameters.trt-version-short >>
       - install-bazel:
           version: << pipeline.parameters.bazel-version >>
       # Basic dependencies setup done
-      - create-py-env:
-          trt-version-long: << pipeline.parameters.trt-version-long >>
+      - create-py-env
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
