@@ -6,7 +6,7 @@ commands:
   install-bazel:
     description: "Install bazel"
     parameters:
-      platform:
+      architecture:
         type: string
         default: "x86_64"
       version:
@@ -16,7 +16,7 @@ commands:
       - run:
           name: Install bazel
           command: |
-            sudo wget -q https://github.com/bazelbuild/bazel/releases/download/<< parameters.version >>/bazel-<< parameters.version >>-linux-<< parameters.platform >> -O /usr/bin/bazel
+            sudo wget -q https://github.com/bazelbuild/bazel/releases/download/<< parameters.version >>/bazel-<< parameters.version >>-linux-<< parameters.architecture >> -O /usr/bin/bazel
             sudo chmod a+x /usr/bin/bazel
 
   install-cmake:
@@ -610,15 +610,14 @@ jobs:
       - install-cudnn:
           os: "ubuntu2004"
           platform: "x86_64"
-          cudnn-version: << parameters.cudnn-version >>
-          cuda-version: << parameters.cuda-string-version >>
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+          cuda-version: << pipeline.parameters.cuda-string-version >>
       - install-tensorrt:
           os: "ubuntu2004"
           platform: "x86_64"
           trt-version-short:  << pipeline.parameters.trt-version-short >>
       - install-bazel:
-          platform: << parameters.bazel-platform >>
-          version: << parameters.bazel-version >>
+          version: << pipeline.parameters.bazel-version >>
       # Basic dependencies setup done
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
@@ -650,10 +649,6 @@ jobs:
         type: string
       torch-build-index:
         type: string
-      trt-version-short:
-        type: string
-      trt-version-long:
-        type: string
       cudnn-version:
         type: string
     machine:
@@ -670,18 +665,17 @@ jobs:
       - install-cudnn:
           os: "ubuntu2004"
           platform: "x86_64"
-          cudnn-version: << parameters.cudnn-version >>
-          cuda-version: << parameters.cuda-string-version >>
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+          cuda-version: << pipeline.parameters.cuda-string-version >>
       - install-tensorrt:
           os: "ubuntu2004"
           platform: "x86_64"
           trt-version-short:  << pipeline.parameters.trt-version-short >>
       - install-bazel:
-          platform: << parameters.bazel-platform >>
-          version: << parameters.bazel-version >>
+          version: << pipeline.parameters.bazel-version >>
       # Basic dependencies setup done
       - create-py-env:
-          trt-version-long: << parameters.trt-version-long >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
@@ -742,9 +736,6 @@ jobs:
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
       - install-cudnn
-      # - run:
-      #     name: "Set LD_LIBRARY_PATH path to include the installed CUDNN"
-      #     command: export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install --pre /tmp/dist/x86_64-linux/*
@@ -788,15 +779,14 @@ jobs:
             - install-cudnn:
                 os: "ubuntu2004"
                 platform: "x86_64"
-                cudnn-version: << parameters.cudnn-version >>
-                cuda-version: << parameters.cuda-string-version >>
+                cudnn-version: << pipeline.parameters.cudnn-version >>
+                cuda-version: << pipeline.parameters.cuda-string-version >>
             - install-tensorrt:
                 os: "ubuntu2004"
                 platform: "x86_64"
                 trt-version-short:  << pipeline.parameters.trt-version-short >>
             - install-bazel:
-                platform: << parameters.bazel-platform >>
-                version: << parameters.bazel-version >>
+                version: << pipeline.parameters.bazel-version >>
             # Basic dependencies setup done
             - run:
                 name: Build cxx11-abi tarball
@@ -872,7 +862,7 @@ jobs:
           architecture: "arm64"
           trt-version-short:  << pipeline.parameters.trt-version-short >>
       - install-bazel:
-          platform: "arm64"
+          architecture: "arm64"
           version: << parameters.bazel-version >>
       # Basic dependencies setup done
       - run:
@@ -942,8 +932,7 @@ jobs:
           platform: "x86_64"
           trt-version-short:  << pipeline.parameters.trt-version-short >>
       - install-bazel:
-          platform: << parameters.bazel-platform >>
-          version: << parameters.bazel-version >>
+          version: << pipeline.parameters.bazel-version >>
       # Basic dependencies setup done
       - install-cmake:
           version: 3.24.1
