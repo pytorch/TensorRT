@@ -705,7 +705,14 @@ jobs:
     steps:
       - checkout
       - uninstall-cuda
-      - install-cuda
+      - install-cuda:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          architecture: "amd64"
+          cuda-pkg-name: << pipeline.parameters.cuda-pkg-name >>
+          cuda-pkg-version: << pipeline.parameters.cuda-pkg-version >>
+          cuda-version: << pipeline.parameters.cuda-version >>
+          cuda-driver-version: << pipeline.parameters.cuda-driver-version >>
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
       - attach_workspace:
