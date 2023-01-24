@@ -863,7 +863,7 @@ jobs:
           trt-version-short:  << pipeline.parameters.trt-version-short >>
       - install-bazel:
           architecture: "arm64"
-          version: << parameters.bazel-version >>
+          version: << pipeline.parameters.bazel-version >>
       # Basic dependencies setup done
       - run:
           name: Set python version
