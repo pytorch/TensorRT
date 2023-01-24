@@ -146,6 +146,37 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
             trt_output, torch_output
         ), "Found differing output formatting between Torch-TRT and Torch"
 
+    def test_tuple_output_with_full_compilation(self):
+        class Sample(torch.nn.Module):
+            def __init__(self):
+                super(Sample, self).__init__()
+
+            def forward(self, x, y):
+                a = x + y
+                return (a,)
+
+        self.model = Sample().eval().to("cuda")
+        self.input_1 = torch.zeros((5, 5), dtype=torch.float, device="cuda:0")
+        self.input_2 = torch.ones((5, 5), dtype=torch.float, device="cuda:0")
+        scripted_mod = torch.jit.script(self.model)
+
+        inputs = [
+            torchtrt.Input((5, 5), dtype=torch.float),
+            torchtrt.Input((5, 5), dtype=torch.float),
+        ]
+
+        trt_mod = torchtrt.ts.compile(
+            scripted_mod,
+            inputs=inputs,
+            require_full_compilation=True,
+            enabled_precisions={torch.float, torch.half},
+        )
+        trt_output = trt_mod(self.input_1, self.input_2)
+        torch_output = self.model(self.input_1, self.input_2)
+        assert same_output_format(
+            trt_output, torch_output
+        ), "Found differing output formatting between Torch-TRT and Torch"
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -48,7 +48,7 @@ void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block);
 
 GraphAndMapping stitch(PartitioningCtx* ctx, torch::jit::Block* block);
 
-void partition(PartitioningCtx* ctx);
+void partition(PartitioningCtx* ctx, bool expect_full_compilation = false);
 
 } // namespace partitioning
 } // namespace core

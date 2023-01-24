@@ -143,11 +143,6 @@ partitioning::GraphAndMapping BuildHybridGraph(
   auto convert_info = cfg.convert_info;
   auto partitioning_info = cfg.partitioning_info;
 
-  // Any nonzero block size is valid if full compilation to TRT is desired
-  if (expect_full_compilation) {
-    partitioning_info.min_block_size = 1;
-  }
-
   auto partitioning_ctx = partitioning::PartitioningCtx(block, partitioning_info);
   partitioning_ctx.input_types_map = first_use_types;
 
@@ -155,7 +150,7 @@ partitioning::GraphAndMapping BuildHybridGraph(
   // TODO: Combine this within partition call
   partitioning::populateInputIValues(&partitioning_ctx);
 
-  partitioning::partition(&partitioning_ctx);
+  partitioning::partition(&partitioning_ctx, expect_full_compilation);
 
   for (auto& partitioned_block : partitioning_ctx.partitioned_blocks) {
     partitioning::PartitionedGraph& segmented_blocks = partitioned_block.second;
@@ -197,9 +192,11 @@ partitioning::GraphAndMapping BuildHybridGraph(
         if (expect_full_compilation) {
           for (auto torch_node : seg_block.block()->nodes()) {
             if (partitioning::CollectionNodeKinds.find(torch_node->kind()) == partitioning::CollectionNodeKinds.end()) {
-              LOG_ERROR(
-                  "Full compilation specified but node " << torch_node->kind().toQualString()
-                                                         << " was executed in Torch.");
+              TORCHTRT_THROW_ERROR(
+                  "Full compilation specified but node "
+                  << *torch_node
+                  << " is set to run in PyTorch due to either lack of support in TensorRT or graph partitioning rules."
+                  << " Try recompiling with require_full_compilation=False.");
             }
           }
         }
@@ -209,10 +206,9 @@ partitioning::GraphAndMapping BuildHybridGraph(
     // If full compilation is expected, cannot have more than 2 Torch segments
     // (one for preprocessing inputs, one for post-processing outputs) and 1 TRT segment
     if (expect_full_compilation && !(num_torch_segments <= 2 && num_trt_segments == 1)) {
-      LOG_ERROR(
-          "Full compilation specified but number of torch segments was "
-          << num_torch_segments << " and number of trt segments was " << num_trt_segments
-          << ". Was expecting at most 2 Torch segments and 1 TRT segment.");
+      TORCHTRT_THROW_ERROR(
+          "Full compilation was requested but unable to convert all operations to TensorRT."
+          << " Try recompiling with require_full_compilation=False.");
     }
   }
 
@@ -224,7 +220,7 @@ ir::TypeMap MapInputsAndDetermineDTypes(
     std::shared_ptr<torch::jit::Graph>& g,
     ir::StaticParams& static_params,
     ir::CollectionTypeMap& first_use_type_map,
-    bool expect_full_compilation = false) {
+    bool requires_collection_handling = false) {
   cfg.convert_info.collection_input_spec_map =
       std::move(ir::associate_specs_with_collection_inputs(g, cfg.graph_inputs, static_params));
   cfg.partitioning_info.collection_input_spec_map =
@@ -259,7 +255,7 @@ ir::TypeMap MapInputsAndDetermineDTypes(
             "Cannot infer input type from calcuations in graph for input "
             << in->debugName() << ". Assuming it is Float32. If not, specify input type explicity");
         spec[i].dtype = at::kFloat;
-      } else if (spec[i].dtype_is_user_defined && (cfg.partitioning_info.enabled || expect_full_compilation)) {
+      } else if (spec[i].dtype_is_user_defined && (cfg.partitioning_info.enabled || requires_collection_handling)) {
         if (!est_type_opt[i]) {
           LOG_INFO("Cannot infer input tensor dtype in graph, compiler is going to use the user setting");
           std::stringstream ss;
@@ -330,6 +326,11 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
   return engine;
 }
 
+bool userRequestedFallback(CompileSpec& cfg) {
+  return cfg.lower_info.forced_fallback_modules.size() != 0 ||
+      cfg.partitioning_info.forced_fallback_operators.size() != 0;
+}
+
 torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) {
   torch::jit::Module new_mod(mod._ivalue()->name() + "_trt");
 
@@ -352,10 +353,13 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
       // whether full compilation can be expected
       auto isBlockConvertible = conversion::VerifyConverterSupportForBlock(g->block(), true);
       auto outputIsCollection = conversion::OutputIsCollection(g->block());
-      auto nearly_full_compilation = (isBlockConvertible && outputIsCollection);
+      auto requires_collection_handling = (isBlockConvertible && outputIsCollection);
+
+      // Determine whether user specifications necessitate partitioning
+      auto isFallbackRequested = userRequestedFallback(cfg);
 
       // Extract map of IValue to DType
-      auto type_map = MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types, nearly_full_compilation);
+      auto type_map = MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types, requires_collection_handling);
 
       // Check whether any of the input types are Long
       bool user_requested_long = false;
@@ -369,21 +373,26 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
         user_requested_long &= (casts_inserted > 0);
       }
 
-      if (cfg.partitioning_info.enabled && !user_requested_long &&
-          (cfg.lower_info.forced_fallback_modules.size() == 0 &&
-           cfg.partitioning_info.forced_fallback_operators.size() == 0 && isBlockConvertible) &&
-          !outputIsCollection) {
+      // Partitioning is required if:
+      // 1. User requested some modules/operators fallback
+      // 2. The block (graph) cannot be converted due to operator coverage
+      // 3. The output of the graph is a collection
+      // 4. The user requested a non-TRT data type input
+      auto isPartitioningRequired =
+          (isFallbackRequested || !isBlockConvertible || outputIsCollection || user_requested_long);
+
+      // The user did not require full compilation, but the model can be fully compiled
+      if (cfg.partitioning_info.enabled && !isPartitioningRequired) {
         LOG_INFO("Skipping partitioning since model is fully supported");
       }
 
-      if ((cfg.partitioning_info.enabled &&
-           (!(cfg.lower_info.forced_fallback_modules.size() == 0 &&
-              cfg.partitioning_info.forced_fallback_operators.size() == 0 && isBlockConvertible) ||
-            outputIsCollection || user_requested_long)) ||
-          nearly_full_compilation) {
+      // The user did not require full compilation, and the model can be fully compiled
+      // or, the user required full compilation but the I/O of the graph use collections
+      if ((cfg.partitioning_info.enabled && isPartitioningRequired) || requires_collection_handling) {
         // If the model is fully-compilable and the user has specified full compilation, run partitioning
         // to generate collection-processing code in Torch
-        auto expect_full_compilation = (nearly_full_compilation && !cfg.partitioning_info.enabled);
+        auto expect_full_compilation = (requires_collection_handling && !cfg.partitioning_info.enabled);
+
         auto graph_and_mapping =
             BuildHybridGraph(new_mod, g->block(), cfg, static_params, first_use_types, expect_full_compilation);
         new_g = graph_and_mapping.first;
