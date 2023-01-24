@@ -601,12 +601,25 @@ jobs:
     resource_class: xlarge
     steps:
       - checkout
-      # Setup basic deps like CUDA, TensorRT, CUDNN, Bazel
-      - install-cuda
       - uninstall-cuda
-      - install-cudnn
-      - install-tensorrt
-      - install-bazel
+      # Setup basic deps like CUDA, TensorRT, CUDNN, Bazel
+      - install-cuda:
+        os: "ubuntu2004"
+        platform: "x86_64"
+        architecture: "amd64"
+        cuda-pkg-name: << pipeline.parameters.cuda-pkg-name >>
+        cuda-pkg-version: << pipeline.parameters.cuda-pkg-version >>
+        cuda-version: << pipeline.parameters.cuda-version >>
+        cuda-driver-version: << pipeline.parameters.cuda-driver-version >>
+      - install-cudnn:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+      - install-tensorrt:
+          os: "ubuntu2004"
+          architecture: "x86_64"
+      - install-bazel:
+          version: << pipeline.parameters.bazel-version >>
       # Basic dependencies setup done
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
