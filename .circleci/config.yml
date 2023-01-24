@@ -125,9 +125,6 @@ commands:
       cuda-driver-version:
         type: string
         default: "515.65.01-1"
-      jetson:
-        type: boolean
-        default: false
     steps:
       - run:
           name: Install CUDA
@@ -137,22 +134,50 @@ commands:
             sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
             wget https://developer.download.nvidia.com/compute/cuda/<< parameters.cuda-version >>/local_installers/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-<< parameters.cuda-driver-version >>_<< parameters.architecture >>.deb
             sudo dpkg -i cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-<< parameters.cuda-driver-version >>_<< parameters.architecture >>.deb
-      - when:
-          condition: << parameters.jetson >>
-          steps:
-            - run:
-              command: |
-                sudo apt-key add /var/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local/7fa2af80.pub
-                sudo apt-get update
-                sudo apt-get install -y cuda
-      - unless:
-          condition: << parameters.jetson >>
-          steps:
-            - run:
-              command: |
-                sudo cp /var/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local/cuda-*-keyring.gpg /usr/share/keyrings/
-                sudo apt-get update
-                sudo apt-get install -y cuda
+            sudo cp /var/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local/cuda-*-keyring.gpg /usr/share/keyrings/
+            sudo apt-get update
+            sudo apt-get install -y cuda
+      - run:
+          when: on_fail
+          name: Dump apt sources
+          command: cat /etc/apt/sources.list
+
+  install-cuda-11.4:
+    description: "Install CUDA"
+    parameters:
+      os:
+        type: string
+        default: "ubuntu2004"
+      platform:
+        type: string
+        default: "x86_64"
+      architecture:
+        type: string
+        default: "amd64"
+      cuda-pkg-name:
+        type: string
+        default: "cuda-toolkit-11-7"
+      cuda-pkg-version:
+        type: string
+        default: "11-7"
+      cuda-version:
+        type: string
+        default: "11.7.1"
+      cuda-driver-version:
+        type: string
+        default: "515.65.01-1"
+    steps:
+      - run:
+          name: Install CUDA
+          command: |
+            cd ~
+            wget https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/cuda-<< parameters.os >>.pin
+            sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
+            wget https://developer.download.nvidia.com/compute/cuda/<< parameters.cuda-version >>/local_installers/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-<< parameters.cuda-driver-version >>_<< parameters.architecture >>.deb
+            sudo dpkg -i cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-<< parameters.cuda-driver-version >>_<< parameters.architecture >>.deb
+            sudo apt-key add /var/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local/7fa2af80.pub
+            sudo apt-get update
+            sudo apt-get install -y cuda
       - run:
           when: on_fail
           name: Dump apt sources
@@ -859,7 +884,7 @@ jobs:
           command: sudo apt install libopenblas-dev
       # Setup basic deps like CUDA, TensorRT, CUDNN, Bazel
       - uninstall-cuda
-      - install-cuda:
+      - install-cuda-11.4:
           os: "ubuntu2004"
           platform: "sbsa"
           architecture: "arm64"
@@ -867,7 +892,6 @@ jobs:
           cuda-pkg-version: << pipeline.parameters.cuda-jetson-pkg-version >>
           cuda-version: << pipeline.parameters.cuda-jetson-version >>
           cuda-driver-version: << pipeline.parameters.cuda-jetson-driver-version >>
-          jetson: true
       - install-cudnn:
           os: "ubuntu2004"
           platform: "x86_64"
