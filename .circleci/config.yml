@@ -143,16 +143,16 @@ commands:
             - run:
               command: |
                 sudo apt-key add /var/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local/7fa2af80.pub
+                sudo apt-get update
+                sudo apt-get install -y cuda
       - unless:
           condition: << parameters.jetson >>
           steps:
             - run:
               command: |
                 sudo cp /var/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local/cuda-*-keyring.gpg /usr/share/keyrings/
-      - run:
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y cuda
+                sudo apt-get update
+                sudo apt-get install -y cuda
       - run:
           when: on_fail
           name: Dump apt sources
