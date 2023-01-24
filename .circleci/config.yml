@@ -142,8 +142,8 @@ commands:
           name: Dump apt sources
           command: cat /etc/apt/sources.list
 
-  install-cuda-11.4:
-    description: "Install CUDA"
+  install-cuda-11-4:
+    description: "Install CUDA 11.4"
     parameters:
       os:
         type: string
@@ -884,7 +884,7 @@ jobs:
           command: sudo apt install libopenblas-dev
       # Setup basic deps like CUDA, TensorRT, CUDNN, Bazel
       - uninstall-cuda
-      - install-cuda-11.4:
+      - install-cuda-11-4:
           os: "ubuntu2004"
           platform: "sbsa"
           architecture: "arm64"
