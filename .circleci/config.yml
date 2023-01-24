@@ -604,13 +604,13 @@ jobs:
       - uninstall-cuda
       # Setup basic deps like CUDA, TensorRT, CUDNN, Bazel
       - install-cuda:
-        os: "ubuntu2004"
-        platform: "x86_64"
-        architecture: "amd64"
-        cuda-pkg-name: << pipeline.parameters.cuda-pkg-name >>
-        cuda-pkg-version: << pipeline.parameters.cuda-pkg-version >>
-        cuda-version: << pipeline.parameters.cuda-version >>
-        cuda-driver-version: << pipeline.parameters.cuda-driver-version >>
+          os: "ubuntu2004"
+          platform: "x86_64"
+          architecture: "amd64"
+          cuda-pkg-name: << pipeline.parameters.cuda-pkg-name >>
+          cuda-pkg-version: << pipeline.parameters.cuda-pkg-version >>
+          cuda-version: << pipeline.parameters.cuda-version >>
+          cuda-driver-version: << pipeline.parameters.cuda-driver-version >>
       - install-cudnn:
           os: "ubuntu2004"
           platform: "x86_64"
