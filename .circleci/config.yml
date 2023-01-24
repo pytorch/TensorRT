@@ -782,7 +782,7 @@ jobs:
                 cudnn-version: << pipeline.parameters.cudnn-version >>
             - install-tensorrt:
                 os: "ubuntu2004"
-                platform: "x86_64"
+                architecture: "x86_64"
                 trt-version-short:  << pipeline.parameters.trt-version-short >>
             - install-bazel:
                 version: << pipeline.parameters.bazel-version >>
@@ -933,7 +933,7 @@ jobs:
           cudnn-version: << parameters.cudnn-version >>
       - install-tensorrt:
           os: "ubuntu2004"
-          platform: "x86_64"
+          architecture: "x86_64"
           trt-version-short:  << pipeline.parameters.trt-version-short >>
       - install-bazel:
           version: << pipeline.parameters.bazel-version >>
