@@ -273,21 +273,34 @@ void resolveTRTNonTensorInputs(PartitioningCtx* ctx, torch::jit::Block* block) {
   PartitionedGraph& cur_partitioned_block = ctx->partitioned_blocks[block];
   for (size_t i = 0; i < cur_partitioned_block.size(); ++i) {
     if (cur_partitioned_block[i].target() == SegmentedBlock::kTensorRT) {
-      std::vector<torch::jit::Value*> inputs_to_resolve;
-      for (auto input : cur_partitioned_block[i].raw_inputs()) {
-        if (!isTensor(input)) {
-          inputs_to_resolve.push_back(input);
+      // Store current number of inputs to block, and number of inputs after one round
+      // of reductions
+      auto current_input_size = cur_partitioned_block[i].inputs().size();
+      auto reduced_input_size = current_input_size;
+
+      // While the number of inputs to the block is strictly decreasing, continue to resolve inputs
+      do {
+        current_input_size = reduced_input_size;
+        std::vector<torch::jit::Value*> inputs_to_resolve;
+        for (auto input : cur_partitioned_block[i].raw_inputs()) {
+          if (!isTensor(input)) {
+            inputs_to_resolve.push_back(input);
+          }
         }
-      }
-      if (!inputs_to_resolve.empty()) {
-        std::vector<torch::jit::Node*> dependency_nodes =
-            getDependencyNodes(inputs_to_resolve, cur_partitioned_block[i]);
-        dependency_nodes.insert(
-            dependency_nodes.end(),
-            cur_partitioned_block[i].raw_nodes().begin(),
-            cur_partitioned_block[i].raw_nodes().end());
-        cur_partitioned_block[i] = SegmentedBlock(SegmentedBlock::kTensorRT, dependency_nodes);
-      }
+        if (!inputs_to_resolve.empty()) {
+          std::vector<torch::jit::Node*> dependency_nodes =
+              getDependencyNodes(inputs_to_resolve, cur_partitioned_block[i]);
+          dependency_nodes.insert(
+              dependency_nodes.end(),
+              cur_partitioned_block[i].raw_nodes().begin(),
+              cur_partitioned_block[i].raw_nodes().end());
+          cur_partitioned_block[i] =
+              SegmentedBlock(cur_partitioned_block[i].get_id(), SegmentedBlock::kTensorRT, dependency_nodes);
+        }
+        // Update reduced number of inputs to be current inputs to block
+        reduced_input_size = cur_partitioned_block[i].inputs().size();
+        // If number of inputs has not decreased, all dependencies have been resolved
+      } while (current_input_size != reduced_input_size);
     }
   }
 }
