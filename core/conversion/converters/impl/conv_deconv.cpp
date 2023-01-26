@@ -14,9 +14,9 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   // Input to conv/deconv
   auto in = args[0].ITensor();
   if (in->getType() == nvinfer1::DataType::kINT32) {
-    LOG_DEBUG(
-      "Found type  " << in->getType() << " in aten::convolution, casting to "
-      << nvinfer1::DataType::kFLOAT << " for compatibility.");
+    LOG_WARNING(
+        "Found type  " << in->getType() << "in aten::convolution, casting to" << nvinfer1::DataType::kFLOAT
+                       << " for compatibility.");
     in = castITensor(ctx, in, nvinfer1::DataType::kFLOAT);
   }
   // Conv /deconv parameters
