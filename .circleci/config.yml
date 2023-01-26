@@ -894,7 +894,7 @@ jobs:
       #     cuda-driver-version: << pipeline.parameters.cuda-jetson-driver-version >>
       - install-cudnn:
           os: "ubuntu2004"
-          platform: "x86_64"
+          platform: "sbsa"
           cudnn-version: << pipeline.parameters.cudnn-jetson-version >>
           cuda-string-version: << pipeline.parameters.cuda-string-jetson-version >>
       - install-tensorrt:
