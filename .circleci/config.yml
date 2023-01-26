@@ -1114,7 +1114,7 @@ parameters:
     default: "11.4.1"
   cuda-string-jetson-version:
     type: string
-    default: "cuda11.4"
+    default: "cuda11.8"
   cuda-jetson-driver-version:
     type: string
     default: "470.57.02-1"
