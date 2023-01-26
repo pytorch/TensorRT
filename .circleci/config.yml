@@ -173,6 +173,8 @@ commands:
             cd ~
             wget https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/cuda-<< parameters.os >>.pin
             sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
+            sudo dpkg --configure -a
+            sudo apt-get clean
             wget https://developer.download.nvidia.com/compute/cuda/<< parameters.cuda-version >>/local_installers/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-<< parameters.cuda-driver-version >>_<< parameters.architecture >>.deb
             sudo dpkg -i cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-<< parameters.cuda-driver-version >>_<< parameters.architecture >>.deb
             sudo apt-key add /var/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local/7fa2af80.pub
