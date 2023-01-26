@@ -884,14 +884,14 @@ jobs:
           command: sudo apt install libopenblas-dev
       # Setup basic deps like CUDA, TensorRT, CUDNN, Bazel
       # - uninstall-cuda
-      # - install-cuda-11-4:
-      #     os: "ubuntu2004"
-      #     platform: "sbsa"
-      #     architecture: "arm64"
-      #     cuda-pkg-name: << pipeline.parameters.cuda-jetson-pkg-name >>
-      #     cuda-pkg-version: << pipeline.parameters.cuda-jetson-pkg-version >>
-      #     cuda-version: << pipeline.parameters.cuda-jetson-version >>
-      #     cuda-driver-version: << pipeline.parameters.cuda-jetson-driver-version >>
+      - install-cuda-11-4:
+          os: "ubuntu2004"
+          platform: "sbsa"
+          architecture: "arm64"
+          cuda-pkg-name: << pipeline.parameters.cuda-jetson-pkg-name >>
+          cuda-pkg-version: << pipeline.parameters.cuda-jetson-pkg-version >>
+          cuda-version: << pipeline.parameters.cuda-jetson-version >>
+          cuda-driver-version: << pipeline.parameters.cuda-jetson-driver-version >>
       - install-cudnn:
           os: "ubuntu2004"
           platform: "sbsa"
