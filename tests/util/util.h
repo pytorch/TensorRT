@@ -21,6 +21,8 @@ bool cosineSimEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tens
 
 bool almostEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float atol = ATOL, float rtol = RTOL);
 
+bool sameShape(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor);
+
 bool exactlyEqual(const at::Tensor& a, const at::Tensor& b);
 
 void pointwise_test_helper(

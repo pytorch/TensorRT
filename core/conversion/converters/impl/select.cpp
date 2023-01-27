@@ -149,8 +149,26 @@ auto select_registrations TORCHTRT_UNUSED =
                  // IShuffleLayer removes redundant dimensions
                  auto shuffle_layer = ctx->net->addShuffle(*out);
                  TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
-                 shuffle_layer->setReshapeDimensions(
-                     util::squeezeDims(out->getDimensions(), dim, !ctx->input_is_dynamic));
+
+                 auto num_zero_dimensions =
+                     util::validateInputDimsForShuffle(out->getDimensions(), ctx->input_is_dynamic);
+                 TORCHTRT_CHECK(
+                     num_zero_dimensions >= 0,
+                     "Detected multiple zero dimensions and dynamic shape in aten::select, "
+                         << "which is not currently supported in TensorRT");
+
+                 // If the input is not dynamic, and the tensor is empty (has some dimension 0)
+                 // Then 0 is no longer a placeholder for inherited dimensions
+                 if (!ctx->input_is_dynamic && (num_zero_dimensions > 0)) {
+                   LOG_DEBUG("Setting zero as a true dimension (not placeholder) in aten::select");
+                   shuffle_layer->setZeroIsPlaceholder(false);
+                 }
+
+                 shuffle_layer->setReshapeDimensions(util::squeezeDims(
+                     out->getDimensions(),
+                     dim,
+                     ctx->input_is_dynamic,
+                     ctx->input_is_dynamic && (num_zero_dimensions > 0)));
                  shuffle_layer->setName(util::node_info(n).c_str());
                  out = shuffle_layer->getOutput(0);
                }
