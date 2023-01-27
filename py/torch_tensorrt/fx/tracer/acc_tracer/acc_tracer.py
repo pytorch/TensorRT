@@ -3,12 +3,14 @@ import builtins
 import copy
 import inspect
 import logging
+import operator
 import textwrap
 import warnings
 from types import FunctionType
 from typing import (
     Any,
     Callable,
+    cast,
     Dict,
     Iterable,
     Optional,
@@ -507,6 +509,78 @@ def _replace_tensor_meta_with_rank(gm: torch.fx.GraphModule):
             del node.meta["tensor_meta"]
 
 
+def _replace_transpose_last_dims_impl(
+    transpose_node: torch.fx.Node,
+) -> int:
+    transpose_input_node = transpose_node.args[0]
+    dim0 = cast(int, transpose_node.args[1])
+    dim1 = cast(int, transpose_node.args[2])
+    changed = False
+
+    def _calculate_dim(
+        transpose_dim: Union[torch.fx.Node, int]
+    ) -> Union[torch.fx.Node, int]:
+        nonlocal transpose_input_node
+        nonlocal changed
+        if isinstance(transpose_dim, torch.fx.Node):
+            # Transpose dim is sub node
+            if not (
+                transpose_dim.op == "call_function"
+                and transpose_dim.target == operator.sub
+                and len(transpose_dim.args) == 2
+            ):
+                return transpose_dim
+            # Validity of length/subtracted int
+            len_node = transpose_dim.args[0]
+            sub_value = transpose_dim.args[1]
+            if not (
+                isinstance(len_node, torch.fx.Node)
+                and len_node.target == len
+                and isinstance(sub_value, int)
+            ):
+                return transpose_dim
+            getattr_node = len_node.args[0]
+            # Check nodes for input.shape
+            if not (
+                isinstance(getattr_node, torch.fx.Node)
+                and getattr_node.target == getattr
+                and len(getattr_node.args) == 2
+                and getattr_node.args[0] == transpose_input_node
+                and getattr_node.args[1] == "shape"
+            ):
+                return transpose_dim
+            changed = True
+            rank = transpose_input_node.meta["tensor_rank"]
+            return rank - sub_value
+        return transpose_dim
+
+    dim0 = _calculate_dim(dim0)
+    dim1 = _calculate_dim(dim1)
+    if changed:
+        with transpose_node.graph.inserting_before(transpose_node):
+            new_transpose_node = transpose_node.graph.call_method(
+                "transpose", (transpose_input_node, dim0, dim1)
+            )
+            new_transpose_node.meta = transpose_node.meta.copy()
+            transpose_node.replace_all_uses_with(new_transpose_node)
+    return changed
+
+
+# Allows mapping for transpose in the case where inputs are of the form x.transpose(a, b),
+# where a and b are len(x.shape()) - n, where n is an int. In this case the inputs to transpose
+# would be nodes rather than ints, so this replaces those nodes with their integral values
+def _replace_transpose_last_dims(gm: torch.fx.GraphModule):
+    for node in gm.graph.nodes:
+        if node.op == "call_method" and node.target == "transpose":
+            if len(node.args) != 3:
+                continue
+            changed = _replace_transpose_last_dims_impl(node)
+            if changed:
+                gm.graph.eliminate_dead_code()
+                gm.graph.lint()
+                gm.recompile()
+
+
 def rewriter_base_trace(mod, ast_rewriter_allow_list, leaf_module_list):
     rewritten_graph, rewritten_mod = AccRewritingTracer().trace(
         mod,
@@ -608,6 +682,9 @@ def trace(
     # Swap out tensor_meta for tensor_rank, because we don't actually want to rely on
     # tensor_meta yet for normalization/lowering, though rank shouldn't change.
     _replace_tensor_meta_with_rank(traced)
+    # Replace occurrences of x.transpose(len(x.shape) - a, len(x.shape) - b), where
+    # a and b are integers with their directly calculated dimensions
+    _replace_transpose_last_dims(traced)
     # Now normalize args/kwargs to make default values visible. Leave args/kwargs as
     # they were, since all-kwarg normalization is broken, and we don't need it anyway.
     traced = NormalizeArgs(traced, normalize_to_only_use_kwargs=False).transform()

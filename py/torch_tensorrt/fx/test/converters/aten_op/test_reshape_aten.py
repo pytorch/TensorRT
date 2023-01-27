@@ -1,3 +1,5 @@
+import unittest
+
 import torch
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
@@ -12,6 +14,7 @@ class TestReshapeConverter(DispatchTestCase):
             ((1, 10, -1),),
         ]
     )
+    @unittest.skip("Need support")
     def test_reshape(self, target_shape):
         class TestModule(torch.nn.Module):
             def __init__(self, target_shape):

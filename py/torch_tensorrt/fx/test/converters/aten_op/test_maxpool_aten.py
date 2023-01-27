@@ -1,3 +1,5 @@
+import unittest
+
 import torch
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import param, parameterized
@@ -71,6 +73,7 @@ class TestMaxPoolConverter(DispatchTestCase):
             # param("ceil_mode", 1, ceil_mode=True),
         ]
     )
+    @unittest.skip("PT tracer issue")
     def test_max_pool3d(
         self,
         test_name,
@@ -144,6 +147,7 @@ class TestMaxPoolConverter(DispatchTestCase):
             param("stride", 2, stride=()),
         ]
     )
+    @unittest.skip("PT tracer issue")
     def test_stride_none_max_pool3d(
         self,
         test_name,

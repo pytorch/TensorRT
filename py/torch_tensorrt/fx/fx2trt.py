@@ -341,7 +341,12 @@ class TRTInterpreter(torch.fx.Interpreter):
 
     def output(self, target, args, kwargs):
         assert len(args) == 1
-        outputs = args[0] if isinstance(args[0], tuple) else (args[0],)
+        if isinstance(args[0], tuple):
+            outputs = args[0]
+        elif isinstance(args[0], list):
+            outputs = tuple(args[0])
+        else:
+            outputs = (args[0],)
 
         if not all(isinstance(output, trt.tensorrt.ITensor) for output in outputs):
             raise RuntimeError("TensorRT requires all outputs to be Tensor!")

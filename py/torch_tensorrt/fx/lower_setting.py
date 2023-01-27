@@ -66,8 +66,8 @@ class LowerSetting(LowerSettingBasic):
     cuda_graph_batch_size (int): Cuda graph batch size, default to be -1.
     preset_lowerer (str): when specified, use a preset logic to build the
     instance of Lowerer.
-    opt_profile_replica (int): the number of opt profile set for TensorRT engine, this field is
-    only used by explicit batch dim with dynamic shape mode.
+    only used by explicit batch dim with dynamic shape mode. In general, we use 2 GPU setting with
+    2 stream on each. Set total number to 8 as a safe default value.
     dynamic_batch: enable the dynamic shape in TRT with dim=-1 for the 1st dimension.
     tactic_sources: tactic sources for TensorRT kernel selection. Default to None,
     meaning all possible tactic sources.
@@ -81,9 +81,13 @@ class LowerSetting(LowerSettingBasic):
     explicit_precision: bool = False
     max_workspace_size: int = 1 << 30
     strict_type_constraints: bool = False
-    customized_fuse_pass: PassManager = PassManager.build_from_passlist([])
-    lower_basic_fuse_pass: PassManager = PassManager.build_from_passlist(
-        [fuse_permute_matmul, fuse_permute_linear]
+    customized_fuse_pass: PassManager = dc.field(
+        default_factory=lambda: PassManager.build_from_passlist([])
+    )
+    lower_basic_fuse_pass: PassManager = dc.field(
+        default_factory=lambda: PassManager.build_from_passlist(
+            [fuse_permute_matmul, fuse_permute_linear]
+        )
     )
     verbose_log: bool = False
     algo_selector = None
@@ -91,7 +95,7 @@ class LowerSetting(LowerSettingBasic):
     save_timing_cache: bool = False
     cuda_graph_batch_size: int = -1
     preset_lowerer: str = ""
-    opt_profile_replica: int = 1
+    opt_profile_replica: int = 8
     dynamic_batch: bool = True
     tactic_sources: Optional[int] = None
     correctness_atol: float = 0.1

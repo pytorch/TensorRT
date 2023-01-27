@@ -1,7 +1,5 @@
 import dataclasses as dc
 import logging
-import dataclasses as dc
-import logging
 from typing import Any, Callable, Optional, Sequence
 
 # @manual=//deeplearning/trt/python:py_tensorrt
@@ -180,8 +178,9 @@ def default_lower_pass(
         interp_res: TRTInterpreterResult = interpreter(mod, input, module_name)
         if lower_setting.use_experimental_rt:
             import io
-            from torch_tensorrt._TRTModuleNext import TRTModuleNext
+
             from torch_tensorrt._Device import Device
+            from torch_tensorrt._TRTModuleNext import TRTModuleNext
 
             with io.BytesIO() as engine_bytes:
                 engine_bytes.write(interp_res.engine.serialize())

@@ -187,8 +187,7 @@ def aten_ops_fmod(
     return acc_ops_converters.acc_ops_fmod(network, target, None, kwargs_new, name)
 
 
-@tensorrt_converter(torch.ops.aten.mm.default)
-@tensorrt_converter(torch.ops.aten.addmm.default)
+@tensorrt_converter(torch.ops.aten.linear)
 def aten_ops_linear(
     network: TRTNetwork,
     target: Target,
@@ -196,18 +195,12 @@ def aten_ops_linear(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    if target == torch.ops.aten.addmm.default:
-        kwargs_new = {
-            "bias": args[0],
-            "input": args[1],
-            "weight": args[2],
-        }
-    elif target == torch.ops.aten.mm.default:
-        kwargs_new = {
-            "bias": None,
-            "input": args[0],
-            "weight": args[1],
-        }
+    kwargs_new = {
+        "input": args[0],
+        "weight": args[1],
+        "bias": args[2],
+    }
+
     return acc_ops_converters.acc_ops_linear(network, target, None, kwargs_new, name)
 
 
@@ -320,3 +313,35 @@ def aten_ops_reshape(
         "acc_out_ty": acc_utils.build_raw_tensor_meta(shape=args[1]),
     }
     return acc_ops_converters.acc_ops_reshape(network, target, None, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten.cat.default)
+def aten_ops_cat(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "tensors": args[0],
+        "dim": args[1],
+    }
+    return acc_ops_converters.acc_ops_cat(network, target, None, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten.expand.default)
+def aten_ops_expand(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "input": args[0],
+        "sizes": args[1],
+    }
+    return acc_ops_converters.acc_ops_expand_tensor(
+        network, target, None, kwargs_new, name
+    )
