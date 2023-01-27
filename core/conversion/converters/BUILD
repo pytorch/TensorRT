@@ -62,7 +62,11 @@ cc_library(
         "impl/constant_pad.cpp",
         "impl/conv_deconv.cpp",
         "impl/cumsum.cpp",
+<<<<<<< HEAD
         "impl/dual_ops.cpp",
+=======
+        "impl/einsum.cpp",
+>>>>>>> main
         "impl/element_wise.cpp",
         "impl/expand.cpp",
         "impl/interpolate.cpp",

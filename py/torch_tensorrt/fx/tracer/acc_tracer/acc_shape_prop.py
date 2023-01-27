@@ -3,6 +3,8 @@ import sys
 from typing import Any
 
 import torch.fx
+
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from torch.fx.passes import shape_prop
 
 
@@ -29,11 +31,22 @@ class AccShapeProp(shape_prop.ShapeProp):
 
     """
 
+    def _run_node(self, n: torch.fx.Node) -> Any:
+        # Run ops with XL weights by clamping their inputs, see
+        # docstring for self.run_node_with_xl_weights for more details
+        if any(
+            isinstance(kwarg, torch.fx.Node) and kwarg.target == acc_ops.xl_weight
+            for kwarg in n.kwargs.values()
+        ):
+            return self.run_node_with_xl_weights(n)
+        else:
+            return super().run_node(n)
+
     def run_node(self, n: torch.fx.Node) -> Any:
         # First try running shape_prop with the original inputs.
         with SuppressStderrPrints():
             try:
-                return super().run_node(n)
+                return self._run_node(n)
             except Exception:
                 pass
 
@@ -47,7 +60,7 @@ class AccShapeProp(shape_prop.ShapeProp):
                 self.env[in_node] = in_ten.clone().to(dtype=torch.float)
 
         # Now try running again with upconverted fp32 input tensor in env.
-        result = super().run_node(n)
+        result = self._run_node(n)
 
         # Now that we succeeded, assume it's thanks to upconverting. Therefore we
         # downconvert fp32 tensor results to fp16.
@@ -59,5 +72,59 @@ class AccShapeProp(shape_prop.ShapeProp):
         # Finally, restore the original env back to fp16 for any upconverted tensors.
         for in_node, in_ten in orig_dtype_env:
             self.env[in_node] = in_ten
+
+        return result
+
+    def run_node_with_xl_weights(self, n: torch.fx.Node) -> Any:
+        """
+        EmbeddingBag with XL Weights of shape (num_embeddings, embedding_dim)
+        are replaced with smaller proxies of shape
+        (acc_ops.PROXY_EMBEDDING_SIZE, embedding_dim) during tracing. This can
+        cause index out of bounds issues when sample inputs lead to the
+        embedding bag op indexing into the first dimension of the weight tensor
+        which it expects to be bigger than it is during tracing.
+
+        For these ops, return a zeros tensor of the correct shape and dtype.
+
+        # TODO(T137066700): migrate shape inference to OSS and use it here to
+        determine shape/dtype of output tensor. This will enable all ops to use
+        xl_weights instead of just the ones treated here.
+        """
+
+        op = n.target.__module__ + "." + n.target.__name__
+
+        if op.endswith("acc_ops.int_nbit_split_embedding_codegen_lookup_function"):
+            output_dtype_int = n.kwargs["output_dtype"]
+            assert output_dtype_int < 2, "only support float16 and float32"
+            output_dtype = torch.float if output_dtype_int == 0 else torch.float16
+            total_D = n.kwargs["total_D"]
+
+            D_offsets_shape = self.env[n.kwargs["D_offsets"]].shape
+            offsets_shape = self.env[n.kwargs["offsets"]].shape
+            batches = (offsets_shape[0] - 1) // (D_offsets_shape[0] - 1)
+            result = torch.zeros((batches, total_D), dtype=output_dtype)
+
+        elif op.find("acc_ops.embedding_bag"):
+            weight = self.env[n.kwargs["weight"]]
+            offsets_shape = self.env[n.kwargs["offsets"]].shape
+            batches = offsets_shape[0] - int(n.kwargs["include_last_offset"])
+            output_dtype = weight.dtype
+
+            embedding_size = weight.shape[1]
+            if op.endswith("acc_ops.embedding_bag_byte_rowwise_offsets"):
+                embedding_size -= 8
+                # output dtype is hardcoded in https://fburl.com/code/unc4l6lj
+                output_dtype = torch.float32
+            elif op.endswith("acc_ops.embedding_bag_4bit_rowwise_offsets"):
+                embedding_size = (embedding_size - 4) * 2
+                # output dtype is hardcoded in https://fburl.com/code/434rkdtk
+                output_dtype = torch.float32
+
+            result = torch.zeros((batches, embedding_size), dtype=output_dtype)
+
+        else:
+            raise NotImplementedError(
+                f"The op {op} cannot be run with xl_weight(s) inputs"
+            )
 
         return result

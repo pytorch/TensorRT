@@ -58,6 +58,8 @@ class DataType {
    * ex. torch_tensorrt::DataType type = DataType::kFloat;
    */
   enum Value : int8_t {
+    /// INT64
+    kLong,
     /// FP32
     kFloat,
     /// FP16
@@ -761,18 +763,26 @@ TORCHTRT_API std::string convert_method_to_trt_engine(
  *
  * @param engine: std::string - Pre-built serialized TensorRT engine
  * @param device: CompileSepc::Device - Device information
+ * @param input_binding_names: std::vector<std::string> - Name of TensorRT bindings in order passed in by original
+ * PyTorch function (defaults to assuming convention below)
+ * @param output_binding_names: std::vector<std::string> - Name of TensorRT bindings in order returned by original
+ * PyTorch function (defaults to assuming convention below)
  *
  * Takes a pre-built serialized TensorRT engine and embeds it in a TorchScript
  * module. Registers execution of the engine as the forward method of the module
  * Forward is defined as: forward(Tensor[]) -> Tensor[]
  *
- * TensorRT bindings must have names with the following format:
+ * If binding names not specified TensorRT bindings must have names with the following format:
  * - [symbol].[index in input / output array]
  * ex.
  * - [x.0, x.1, x.2] -> [y.0]
  *
  * @return: A new module targeting a TensorRT engine
  */
-TORCHTRT_API torch::jit::Module embed_engine_in_new_module(const std::string& engine, Device device);
+TORCHTRT_API torch::jit::Module embed_engine_in_new_module(
+    const std::string& engine,
+    Device device,
+    const std::vector<std::string>& input_binding_names = std::vector<std::string>(),
+    const std::vector<std::string>& output_binding_names = std::vector<std::string>());
 } // namespace torchscript
 } // namespace torch_tensorrt

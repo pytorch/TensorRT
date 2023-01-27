@@ -50,6 +50,12 @@ class TRTSplitterSetting(splitter_base._SplitterSettingBase):
         # don't support the batch dim.
         self.use_implicit_batch_dim: bool = True
         self.exclude_support_node_name: set = set()
+        self.use_experimental_rt: bool = False
+
+        if self.use_experimental_rt and self.use_implicit_batch_dim:
+            raise ValueError(
+                "The experimental unifed runtime only supports explicit batch. Please make sure to set use_implicit_batch_dim=False when use_experimental_rt=True"
+            )
 
 
 class TRTSplitter(splitter_base._SplitterBase):
@@ -84,11 +90,30 @@ class TRTSplitter(splitter_base._SplitterBase):
         # based on feeds model's actual status
         interp = TRTInterpreter(mod, InputTensorSpec.from_tensors(inputs))
         interpreter_result = interp.run(*inputs)
-        return TRTModule(
-            interpreter_result.engine,
-            interpreter_result.input_names,
-            interpreter_result.output_names,
-        )
+        if self.settings.use_experimental_rt:
+            import io
+
+            from torch_tensorrt._Device import Device
+            from torch_tensorrt._TRTModuleNext import TRTModuleNext
+
+            with io.BytesIO() as engine_bytes:
+                engine_bytes.write(interpreter_result.engine.serialize())
+                engine_str = engine_bytes.getvalue()
+
+            return TRTModuleNext(
+                engine_str,
+                name=str(type(mod)),
+                input_binding_names=interpreter_result.input_names,
+                output_binding_names=interpreter_result.output_names,
+                target_device=Device(f"cuda:{torch.cuda.current_device()}"),
+                # cuda_graph_batch_size=lower_setting.cuda_graph_batch_size, # NOTE: Not sure what this is supposed to do
+            )
+        else:
+            return TRTModule(
+                interpreter_result.engine,
+                interpreter_result.input_names,
+                interpreter_result.output_names,
+            )
 
     def _find_culprit(self, mod: torch.fx.GraphModule, inputs: Tensors):
         """

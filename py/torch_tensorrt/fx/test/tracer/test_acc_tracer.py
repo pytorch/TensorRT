@@ -1,7 +1,8 @@
 # Owner(s): ["oncall: fx"]
 import logging
+import operator
 import unittest
-from typing import Callable, List
+from typing import Callable, Dict, List, NamedTuple, Optional, Tuple
 
 import numpy as np
 import torch
@@ -17,6 +18,8 @@ from parameterized import param, parameterized
 torch.manual_seed(0)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+torch.fx.wrap("len")
 
 
 class AccTracerTest(unittest.TestCase):
@@ -37,12 +40,12 @@ class AccTracerTest(unittest.TestCase):
         input = torch.randn(input_shape)
         traced = acc_tracer.trace(model, [input])
         if enable_allclose:
-            torch.testing.assert_allclose(model(input), traced(input))
+            torch.testing.assert_close(model(input), traced(input))
         else:
             self.assertTrue(torch.equal(model(input), traced(input)))
         traced_again = acc_tracer.trace(traced, [input])
         if enable_allclose:
-            torch.testing.assert_allclose(model(input), traced_again(input))
+            torch.testing.assert_close(model(input), traced_again(input))
         else:
             self.assertTrue(torch.equal(model(input), traced_again(input)))
 
@@ -108,10 +111,10 @@ class AccTracerTest(unittest.TestCase):
             ref_outputs, outputs, outputs_again
         ):
             if enable_allclose:
-                torch.testing.assert_allclose(
+                torch.testing.assert_close(
                     torch.nan_to_num(ref_output), torch.nan_to_num(output)
                 )
-                torch.testing.assert_allclose(
+                torch.testing.assert_close(
                     torch.nan_to_num(ref_output), torch.nan_to_num(output_again)
                 )
             else:
@@ -1392,6 +1395,37 @@ class AccTracerTest(unittest.TestCase):
             acc_ops.permute, lambda x: torch.transpose(x, 1, 0)
         )
 
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, a: torch.Tensor) -> torch.Tensor:
+                x = len(a.shape) - 2
+                y = len(a.shape) - 1
+                return a.transpose(x, y)
+
+        m = TestModule()
+        m.eval()
+
+        a = torch.randn(2, 3, 4, 5)
+        traced = acc_tracer.trace(m, [a])
+
+        ph_a = permute = None
+        for node in traced.graph.nodes:
+            if node.op == "placeholder":
+                ph_a = node
+            elif node.op == "call_function":
+                self.assertEqual(node.target, acc_ops.permute)
+                self.assertEqual(node.kwargs["input"], ph_a)
+                self.assertEqual(node.kwargs["permutation"], [0, 1, 3, 2])
+                permute = node
+            elif node.op == "output":
+                self.assertEqual(permute, node.args[0])
+            else:
+                self.fail(f"Unexpected node: {node.format_node()}")
+
+        self.assertTrue(torch.equal(m(a), traced(a)))
+
     def test_permute(self):
         """
         Test that torch.permute is traced correctly.
@@ -1514,7 +1548,7 @@ class AccTracerTest(unittest.TestCase):
 
         ref = m(x)
         res = traced(x)
-        torch.testing.assert_allclose(ref, res)
+        torch.testing.assert_close(ref, res)
 
     def test_add_with_alpha(self):
         """
@@ -1829,6 +1863,55 @@ class AccTracerTest(unittest.TestCase):
         res = traced(a)
         self.assertEqual(ref, res)
 
+    def test_getattr_named_tuple(self):
+        """
+        Test that call_function getattr on namedtuples is
+        traced correctly.
+        """
+
+        class TestNamedTuple(NamedTuple):
+            foo: torch.Tensor
+            bar: torch.Tensor
+
+        class TestModule(nn.Module):
+            def forward(self, a: TestNamedTuple):
+                return a.foo + a.bar
+
+        m = TestModule()
+        a = TestNamedTuple(torch.randn(2, 2), torch.randn(2, 2))
+        traced = acc_tracer.trace(m, [a])
+
+        ph_a = getitem_1 = getitem_2 = add = None
+        for node in traced.graph.nodes:
+            if node.op == "placeholder":
+                self.assertEqual(node.target, "a")
+                ph_a = node
+
+            elif node.op == "call_function" and node.target == acc_ops.getitem:
+                if getitem_1:
+                    getitem_2 = node
+                    self.assertEqual(getitem_2.kwargs["idx"], 1)
+                else:
+                    getitem_1 = node
+                    self.assertEqual(getitem_1.kwargs["idx"], 0)
+
+                self.assertEqual(node.kwargs["input"], ph_a)
+
+            elif node.op == "call_function" and node.target == acc_ops.add:
+                self.assertEqual(node.kwargs["input"], getitem_1)
+                self.assertEqual(node.kwargs["other"], getitem_2)
+                add = node
+
+            elif node.op == "output":
+                self.assertEqual(node.args[0], add)
+
+            else:
+                self.fail(f"Unexpected node: {node.format_node()}")
+
+        ref = m(a)
+        res = traced(a)
+        self.assertTrue(torch.equal(ref, res))
+
     def test_flatten(self):
         """
         Test that torch.flatten is traced correctly.
@@ -1919,7 +2002,7 @@ class AccTracerTest(unittest.TestCase):
             else:
                 self.fail(f"Unexpected node: {node.format_node()}")
 
-        torch.testing.assert_allclose(m(input, a, b), traced(input, a, b))
+        torch.testing.assert_close(m(input, a, b), traced(input, a, b))
 
     def test_log1p(self):
         class TestModule(torch.nn.Module):
@@ -1949,7 +2032,7 @@ class AccTracerTest(unittest.TestCase):
             else:
                 self.fail(f"Unexpected node: {node.format_node()}")
 
-        torch.testing.assert_allclose(m(input), traced(input))
+        torch.testing.assert_close(m(input), traced(input))
 
     @parameterized.expand([(torch.float,), (torch.float16,)])
     def test_addmm(self, dtype):
@@ -2171,12 +2254,89 @@ class AccTracerTest(unittest.TestCase):
                 self.fail(f"Unexpected node: {node.format_node()}")
 
         # Check the tensor ranks are correct given the input is a list.
-        self.assertTrue(isinstance(ph.meta["tensor_rank"], list))
+        self.assertIsInstance(ph.meta["tensor_rank"], list)
         self.assertEqual(len(ph.meta["tensor_rank"]), 2)
         self.assertEqual(getitem_0.meta["tensor_rank"], ph.meta["tensor_rank"][0])
         self.assertEqual(getitem_1.meta["tensor_rank"], ph.meta["tensor_rank"][1])
 
         self.assertTrue(torch.equal(m(input), traced(input)))
+
+    def test_dict_input(self):
+        """
+        Test that dict inputs are traced correctly.
+        """
+
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, a: Dict[str, torch.Tensor]) -> torch.Tensor:
+                return a["foo"] + a["bar"]
+
+        m = TestModule()
+        input = {"foo": torch.randn(2, 3), "bar": torch.randn(2, 3)}
+        traced = acc_tracer.trace(m, [input])
+
+        ph = getitem_0 = getitem_1 = add = None
+        for node in traced.graph.nodes:
+            if node.op == "placeholder":
+                self.assertEqual(str(node.target), "a")
+                ph = node
+            elif node.op == "call_function" and node.target == acc_ops.getitem:
+                self.assertTrue(
+                    node.kwargs["idx"] == "foo" or node.kwargs["idx"] == "bar"
+                )
+                if node.kwargs["idx"] == "foo":
+                    getitem_0 = node
+                else:
+                    getitem_1 = node
+            elif node.op == "call_function":
+                self.assertEqual(node.target, acc_ops.add)
+                self.assertEqual(node.kwargs["input"], getitem_0)
+                self.assertEqual(node.kwargs["other"], getitem_1)
+                add = node
+            elif node.op == "output":
+                self.assertEqual(add, node.args[0])
+            else:
+                self.fail(f"Unexpected node: {node.format_node()}")
+
+        # Check the tensor ranks are correct given the input is a dict.
+        self.assertIsInstance(ph.meta["tensor_rank"], dict)
+        self.assertEqual(len(ph.meta["tensor_rank"]), 2)
+        self.assertEqual(getitem_0.meta["tensor_rank"], ph.meta["tensor_rank"]["foo"])
+        self.assertEqual(getitem_1.meta["tensor_rank"], ph.meta["tensor_rank"]["bar"])
+
+        self.assertTrue(torch.equal(m(input), traced(input)))
+
+    def test_none_type_ret(self):
+        """
+        Test that a NoneType is traced as expected.
+        """
+
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(
+                self, a: torch.Tensor
+            ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+                return a + a, None
+
+        m = TestModule()
+        input = torch.randn(1, 2, 3)
+        try:
+            traced = acc_tracer.trace(
+                m,
+                [input],
+            )
+        except RuntimeError as e:
+            self.assertEqual(
+                "This error should not be triggered, as NoneType should be lowered without an issue",
+                str(e),
+            )
+        ans1, _ = m(input)
+        ans2, _ = traced(input)
+        self.assertTrue(torch.equal(ans1, ans2))
 
     def test_mobilenet_v3(self):
         """
@@ -2214,10 +2374,24 @@ class AccTracerTest(unittest.TestCase):
         self._make_model_unit_test(m)
 
     def test_cumsum(self):
+        # Tests call_function version
         self._make_acc_op_function_test(acc_ops.cumsum, torch.cumsum, dim=1)
         self._make_acc_op_function_test(
             acc_ops.cumsum, torch.cumsum, dim=1, dtype=torch.float
         )
+
+        # Tests call_method version
+        class TestModule(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+
+            def forward(self, a: torch.Tensor) -> torch.Tensor:
+                return a.cumsum(dim=0)
+
+        m = TestModule()
+        a = torch.rand(2, 2)
+        gm = acc_tracer.trace(m, [a])
+        self.assertTrue(torch.equal(m(a), gm(a)))
 
     def test_chunk(self):
         self._make_acc_op_function_test(acc_ops.chunk, torch.chunk, chunks=2, dim=0)
@@ -2454,6 +2628,46 @@ class AccTracerTest(unittest.TestCase):
             self.assertIsNotNone(getitem)
         self.assertTrue(torch.equal(m(x), traced(x)))
 
+    def test_acc_normalization_block_list(self):
+        class TestModule(nn.Module):
+            def forward(self, x: List[torch.Tensor]) -> torch.Tensor:
+                return x[0] + x[1]
+
+        m = TestModule()
+        x = [torch.randn(1), torch.randn(1)]
+        traced = acc_tracer.trace(
+            m, [x], acc_normalization_block_list={("call_function", operator.getitem)}
+        )
+        for node in traced.graph.nodes:
+            if "getitem" in node.name:
+                # Make sure we didn't convert to the acc version
+                self.assertEqual(node.target, operator.getitem)
+
+    def test_detach(self):
+        class TestModule(nn.Module):
+            def forward(self, x: torch.Tensor) -> torch.Tensor:
+                return torch.detach(x)
+
+        m = TestModule()
+        sample_inputs = [torch.randn(8)]
+        traced = acc_tracer.trace(m, sample_inputs)
+
+        placeholder = output = None
+        for node in traced.graph.nodes:
+            if node.op == "placeholder":
+                assert placeholder is None
+                placeholder = node
+            elif node.op == "output":
+                assert output is None
+                output = node
+            else:
+                raise RuntimeError(f"Unexpected Node {node.format_node()}")
+
+        self.assertIsNotNone(placeholder)
+        self.assertIsNotNone(output)
+
+        self.assertTrue(torch.equal(m(*sample_inputs), traced(*sample_inputs)))
+
     def test_all_acc_ops_registered(self):
         self.assertEqual(
             acc_normalizer._acc_ops,
@@ -2466,8 +2680,9 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.flatten,
                 acc_ops.adaptive_avg_pool2d,
                 acc_ops.adaptive_avg_pool3d,
-                acc_ops.avg_pool2d,
                 acc_ops.avg_pool1d,
+                acc_ops.avg_pool2d,
+                acc_ops.avg_pool3d,
                 acc_ops.add,
                 acc_ops.min_full_reduce,
                 acc_ops.min_dim_reduce,
@@ -2477,6 +2692,7 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.sign,
                 acc_ops.permute,
                 acc_ops.matmul,
+                # acc_ops.roi_align,
                 acc_ops.quantize_per_tensor,
                 acc_ops.quantize_per_channel,
                 acc_ops.quantized_add,
@@ -2490,6 +2706,7 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.trunc_div,
                 acc_ops.pow,
                 acc_ops.relu,
+                acc_ops.prelu,
                 acc_ops.leaky_relu,
                 acc_ops.elu,
                 acc_ops.selu,
@@ -2580,5 +2797,6 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.as_strided,
                 acc_ops.var,
                 acc_ops.grid_sample,
+                acc_ops.xl_weight,
             },
         )

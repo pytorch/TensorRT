@@ -6,7 +6,7 @@ import torch  # isort:skip
 from typing import cast, Iterable, List, Sequence
 
 import torch.nn as nn
-from torch.fx.passes.shape_prop import _extract_tensor_metadata
+from torch.fx.passes.shape_prop import _extract_tensor_metadata, TensorMetadata
 
 from . import acc_utils
 from .acc_normalizer import (
@@ -19,6 +19,12 @@ from .acc_op_properties import AccOpProperty, register_acc_op_properties
 this_arg_is_optional = True
 move_to_qparams = True
 dont_move_to_qparams = False
+
+# A proxy embedding size. We use this for tracing proxy operators using XL
+# weights which we can't load into memory (because they're too large), we
+# instead substitute a smaller weight with embedding size =
+# PROXY_EMBEDDING_SIZE.
+PROXY_EMBEDDING_SIZE = 8
 
 
 @register_acc_op_mapping(op_and_target=("call_function", nn.functional.linear))
@@ -215,6 +221,29 @@ def avg_pool2d(
     )
 
 
+@register_acc_op_mapping(op_and_target=("call_function", nn.functional.avg_pool3d))
+@register_acc_op
+def avg_pool3d(
+    *,
+    input,
+    kernel_size,
+    stride,
+    padding,
+    ceil_mode,
+    count_include_pad,
+    divisor_override,
+):
+    return nn.functional.avg_pool3d(
+        input=input,
+        kernel_size=kernel_size,
+        stride=stride,
+        padding=padding,
+        ceil_mode=ceil_mode,
+        count_include_pad=count_include_pad,
+        divisor_override=divisor_override,
+    )
+
+
 @register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
 @register_acc_op_mapping(op_and_target=("call_function", torch.sign))
 @register_acc_op
@@ -233,7 +262,7 @@ def custom_type_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     input_obj = node.kwargs["input"]
     dtype_obj = node.kwargs.get("dtype")
     with node.graph.inserting_before(node):
-        if dtype_obj == None:
+        if dtype_obj is None:
             dtype_node = node.graph.call_function(dtype, kwargs={"input": input_obj})
             dtype_node.meta["type"] = torch.dtype
             return dtype_node
@@ -304,17 +333,40 @@ def numel(*, input):
 )
 def custom_getattr_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     """
-    Custom function for mapping a call_function getattr to other ops. Currently only
-    supports loading a getattr called on a torch.Tensor with attr name "shape", which is
-    supported by mapping it to acc_ops.size().
+    Custom function for mapping a call_function getattr to other ops.
+
+    Supports:
+    * getattr on a torch.Tensor with "shape", "device", or "dtype" attributes
+    * getattr for accessing named tuples
     """
     # Have to use args here since getattr forces positional args.
     input_obj = node.args[0]
     attr_name = node.args[1]
     assert isinstance(input_obj, torch.fx.Node)
+    input_obj_type = input_obj.meta["type"]
+
+    # Handle named tuple access. NamedTupleMeta and the namedtuple factory function
+    # create a subclass of tuple with an extra _fields attribute.
+    if issubclass(input_obj_type, tuple) and hasattr(input_obj_type, "_fields"):
+        idx = None
+        for i, name in enumerate(input_obj_type._fields):
+            if name == attr_name:
+                idx = i
+                break
+        assert (
+            idx is not None
+        ), f"Named tuple type {input_obj_type} does not have field {name}"
+
+        with node.graph.inserting_before(node):
+            getitem_node = node.graph.call_function(
+                getitem, kwargs={"input": input_obj, "idx": idx}
+            )
+            getitem_node.meta = node.meta.copy()
+            return getitem_node
+
     assert (
-        input_obj.meta["type"] == torch.Tensor
-    ), f"Expected torch.Tensor type for {input_obj.meta['type']}"
+        input_obj_type == torch.Tensor
+    ), f"Expected torch.Tensor type for {input_obj_type}"
     assert (
         attr_name == "shape" or attr_name == "device" or attr_name == "dtype"
     ), f"Only supporting shape, device and dtype getattr for now, not {attr_name}"
@@ -372,7 +424,7 @@ def add(*, input, other):
 @register_acc_op_mapping(op_and_target=("call_method", "unsqueeze"))
 @register_acc_op_mapping(op_and_target=("call_function", torch.unsqueeze))
 @register_acc_op
-def unsqueeze(*, input, dim):
+def unsqueeze(*, input, dim: int):
     return torch.unsqueeze(input=input, dim=dim)
 
 
@@ -452,7 +504,7 @@ def repeat_interleave_mapper(node: torch.fx.Node, _: nn.Module):
         tile_node = node.graph.create_node(
             "call_function",
             tile,
-            kwargs={"input": unsqueeze_node, "dims": tile_dims},
+            kwargs={"input": unsqueeze_node, "dims": tuple(tile_dims)},
             name=f"{node.name}_repeat_interleave_map_tile",
         )
         new_shape = []
@@ -530,12 +582,15 @@ def stack_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
 
 @register_acc_op_properties(AccOpProperty.pointwise)
 @register_acc_op_mapping(op_and_target=("call_function", torch.clamp))
+@register_acc_op_mapping(op_and_target=("call_function", torch.clip))
 @register_acc_op_mapping(op_and_target=("call_method", "clamp"))
+@register_acc_op_mapping(op_and_target=("call_method", "clip"))
 @register_acc_op
 def clamp(*, input, min=None, max=None):
     return torch.clamp(input=input, min=min, max=max)
 
 
+@register_acc_op_mapping(op_and_target=("call_function", torch.concat))
 @register_acc_op_mapping(op_and_target=("call_function", torch.cat))
 @register_acc_op
 def cat(*, tensors, dim):
@@ -733,6 +788,13 @@ def square_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     ],
 )
 @register_acc_op_mapping(
+    op_and_target=("call_method", "matmul"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("mat2", "other"),
+    ],
+)
+@register_acc_op_mapping(
     op_and_target=("call_function", operator.matmul),
     arg_replacement_tuples=[
         ("input", "input"),
@@ -765,6 +827,10 @@ def matmul(*, input, other):
 )
 @register_custom_acc_mapper_fn(
     op_and_target=("call_method", "detach"), arg_replacement_tuples=[("input", "input")]
+)
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_function", torch.detach),
+    arg_replacement_tuples=[("input", "input")],
 )
 def dropout_mapper(node: torch.fx.Node, mod: nn.Module):
     """
@@ -1002,6 +1068,14 @@ def mul(*, input, other):
 
 
 @register_custom_acc_mapper_fn(
+    op_and_target=("call_method", "div"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("other", "other"),
+        ("rounding_mode", "rounding_mode", this_arg_is_optional),
+    ],
+)
+@register_custom_acc_mapper_fn(
     op_and_target=("call_function", torch.div),
     arg_replacement_tuples=[
         ("input", "input"),
@@ -1093,6 +1167,16 @@ def relu(*, input, inplace=False):
 def leaky_relu(*, input, negative_slope=0.01, inplace=False):
     return nn.functional.leaky_relu(
         input=input, negative_slope=negative_slope, inplace=inplace
+    )
+
+
+@register_acc_op_properties(AccOpProperty.pointwise)
+@register_acc_op_mapping(op_and_target=("call_function", torch.nn.functional.prelu))
+@register_acc_op
+def prelu(*, input, weight):
+    return nn.functional.prelu(
+        input=input,
+        weight=weight,
     )
 
 
@@ -1708,7 +1792,7 @@ def ceil(*, input):
 
 @register_acc_op_mapping(op_and_target=("call_function", torch.nn.functional.pad))
 @register_acc_op
-def pad(*, input, pad, mode, value):
+def pad(*, input, pad: List[int], mode: str, value: float):
     return torch.nn.functional.pad(input=input, pad=pad, mode=mode, value=value)
 
 
@@ -1944,6 +2028,42 @@ def torch_argmin_mapper(node: torch.fx.Node, _: torch.nn.Module) -> torch.fx.Nod
 @register_acc_op
 def linalg_norm(*, input, ord, dim, keepdim):
     return torch.linalg.norm(input=input, ord=ord, dim=dim, keepdim=keepdim)
+
+
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_function", torch.functional.norm),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("p", "p"),
+        ("dim", "dim"),
+        ("keepdim", "keepdim"),
+    ],
+)
+def norm_mapper(node: torch.fx.Node, _: torch.nn.Module) -> torch.fx.Node:
+
+    input_node = node.kwargs["input"]
+    p = node.kwargs["p"]
+    dim = node.kwargs["dim"]
+    keepdim = node.kwargs["keepdim"]
+    output_node = None
+    with node.graph.inserting_before(node):
+        if dim is None and p == 1:
+            # linalg_norm takes the max along the sum along a dim
+            # rather than the entire sum for p = 1
+            abs_node = node.graph.call_function(abs, kwargs={"input": input_node})
+            output_node = node.graph.call_function(
+                sum,
+                kwargs={"input": abs_node},
+            )
+        elif dim is None:
+            raise RuntimeError("dim=None has not been implemented for p != 1")
+        else:
+            output_node = node.graph.call_function(
+                linalg_norm,
+                kwargs={"input": input_node, "ord": p, "dim": dim, "keepdim": keepdim},
+            )
+
+    return output_node
 
 
 @register_custom_acc_mapper_fn(
@@ -2623,6 +2743,43 @@ def packed_quantized_conv2d_mapper(
         return new_node
 
 
+# @register_acc_op
+# @register_acc_op_mapping(
+#     op_and_target=("call_function", torch.ops._caffe2.RoIAlign),
+#     arg_replacement_tuples=[
+#         ("features", "features"),
+#         ("rois", "rois"),
+#         ("order", "order"),
+#         ("spatial_scale", "spatial_scale"),
+#         ("pooled_h", "pooled_h"),
+#         ("pooled_w", "pooled_w"),
+#         ("sampling_ratio", "sampling_ratio"),
+#         ("aligned", "aligned"),
+#     ],
+# )
+# def roi_align(
+#     *,
+#     features,
+#     rois,
+#     order,
+#     spatial_scale,
+#     pooled_h,
+#     pooled_w,
+#     sampling_ratio,
+#     aligned,
+# ):
+#     return torch.ops._caffe2.RoIAlign(
+#         features=features,
+#         rois=rois,
+#         order=order,
+#         spatial_scale=spatial_scale,
+#         pooled_h=pooled_h,
+#         pooled_w=pooled_w,
+#         sampling_ratio=sampling_ratio,
+#         aligned=aligned,
+#     )
+
+
 @register_custom_acc_mapper_fn(
     op_and_target=("call_function", torch.ops.quantized.add_relu),
     arg_replacement_tuples=[
@@ -2684,14 +2841,28 @@ def packed_quantized_convrelu2d_mapper(
 @register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
 @register_acc_op_mapping(op_and_target=("call_function", torch.nn.functional.gelu))
 @register_acc_op_mapping(op_and_target=("call_method", "gelu"))
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_module", torch.nn.GELU),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("approximate", "approximate"),
+    ],
+)
 @register_acc_op
-def gelu(*, input):
-    return torch.nn.functional.gelu(input=input)
+def gelu(*, input, approximate="none"):
+    return torch.nn.functional.gelu(input=input, approximate=approximate)
 
 
 @register_acc_op_properties(AccOpProperty.unary)
 @register_acc_op_mapping(op_and_target=("call_function", torch.cumsum))
-@register_acc_op_mapping(op_and_target=("call_method", "cumsum"))
+@register_acc_op_mapping(
+    op_and_target=("call_method", "cumsum"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("dim", "dim"),
+        ("dtype", "dtype", this_arg_is_optional),
+    ],
+)
 @register_acc_op
 def cumsum(*, input, dim, dtype=None):
     return torch.cumsum(input=input, dim=dim, dtype=dtype)
@@ -2925,3 +3096,205 @@ def as_strided(*, input, size, stride, storage_offset=0):
 @register_acc_op
 def var(*, input, dim, unbiased, keepdim=False):
     return torch.var(input=input, dim=dim, unbiased=unbiased, keepdim=keepdim)
+
+
+@register_acc_op
+def xl_weight(weight_id: str, metadata: TensorMetadata, proxy_shape, dtype):
+    """
+    This op stores metadata and weight_id and otherwise returns a zeros tensor
+    with shape `proxy_shape` and dtype `dtype`.
+
+    Note: when Nodes with this op are run through ShapeProp, its metadata will
+    be the same as computed and set as of that of `proxy`, however when running
+    acc_shape_inference, it will return `metadata`.
+
+    Args:
+        weight_id: string identifier for the XL weight
+        metadata: metadata of the XL weight
+        proxy_shape: shape of substitute tensor
+        dtype: dtype of substitute tensor
+    """
+    return torch.zeros(proxy_shape, dtype=dtype)
+
+
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_function", torch.nn.functional.log_softmax),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("dim", "dim"),
+        ("dtype", "dtype"),
+    ],
+)
+def log_softmax_mapper(node: torch.fx.Node, _: torch.nn.Module) -> torch.fx.Node:
+    with node.graph.inserting_after(node):
+
+        softmax_kwargs = {
+            "input": node.kwargs["input"],
+            "dim": node.kwargs["dim"],
+            "dtype": node.kwargs["dtype"],
+        }
+        softmax_node = node.graph.call_function(softmax, kwargs=softmax_kwargs)
+        softmax_node.meta = node.meta.copy()
+
+    with softmax_node.graph.inserting_after(softmax_node):
+        log_kwargs = {"input": softmax_node}
+        log_node = node.graph.call_function(log, kwargs=log_kwargs)
+        log_node.meta = node.meta.copy()
+
+        return log_node
+
+
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_function", torch.nn.functional.softplus),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("beta", "beta", this_arg_is_optional),
+        ("threshold", "threshold", this_arg_is_optional),
+    ],
+)
+def softplus_mapper(node: torch.fx.Node, _: torch.nn.Module) -> torch.fx.Node:
+    """
+    Maps torch.nn.functional.softplus to acc_ops.where, acc_ops.relu, acc_ops.exp, acc_ops.mul, acc_ops.add and acc_ops.div
+
+    softplus(input, beta, threshold) = where(beta * input > threshold, relu(input), div(log(1 + exp(beta * input))), beta))
+
+    torch.where(
+        softplus_module.beta * sample_inputs[0] > softplus_module.threshold,
+        sample_inputs[0].relu(),
+        torch.div((1 + (softplus_module.beta * sample_inputs[0]).exp()).log(), softplus_module.beta),
+    )
+
+    """
+
+    input_node = node.kwargs["input"]
+    beta_node = node.kwargs["beta"]
+    threshold_node = node.kwargs["threshold"]
+
+    with node.graph.inserting_after(node):
+        cond_mul_node = node.graph.call_function(
+            mul,
+            kwargs={
+                "input": input_node,
+                "other": beta_node,
+            },
+        )
+        cond_mul_node.meta = input_node.meta.copy()
+
+    with node.graph.inserting_after(cond_mul_node):
+        gt_node = node.graph.call_function(
+            gt,
+            kwargs={
+                "input": cond_mul_node,
+                "other": threshold_node,
+            },
+        )
+        gt_node.meta = input_node.meta.copy()
+
+    with node.graph.inserting_after(gt_node):
+        relu_node = node.graph.call_function(relu, kwargs={"input": input_node})
+        relu_node.meta = input_node.meta.copy()
+
+    with node.graph.inserting_after(relu_node):
+        mul_node = node.graph.call_function(
+            mul,
+            kwargs={
+                "input": input_node,
+                "other": beta_node,
+            },
+        )
+        mul_node.meta = input_node.meta.copy()
+
+    with node.graph.inserting_after(mul_node):
+        exp_node = node.graph.call_function(exp, kwargs={"input": mul_node})
+        exp_node.meta = input_node.meta.copy()
+
+    with node.graph.inserting_after(exp_node):
+        add_node = node.graph.call_function(
+            add,
+            kwargs={
+                "input": exp_node,
+                "other": 1,
+            },
+        )
+        add_node.meta = input_node.meta.copy()
+
+    with node.graph.inserting_after(add_node):
+        log_node = node.graph.call_function(log, kwargs={"input": add_node})
+        log_node.meta = input_node.meta.copy()
+
+    with node.graph.inserting_after(log_node):
+        div_node = node.graph.call_function(
+            div,
+            kwargs={
+                "input": log_node,
+                "other": beta_node,
+            },
+        )
+        div_node.meta = input_node.meta.copy()
+
+    with node.graph.inserting_after(div_node):
+        where_node = node.graph.call_function(
+            where,
+            kwargs={
+                "condition": gt_node,
+                "x": relu_node,
+                "y": div_node,
+            },
+        )
+        where_node.meta = div_node.meta.copy()
+
+        return where_node
+
+
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_function", torch.baddbmm),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("batch1", "batch1"),
+        ("batch2", "batch2"),
+        ("beta", "beta", this_arg_is_optional),
+        ("alpha", "alpha", this_arg_is_optional),
+    ],
+)
+def baddbmm_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
+    """
+    Mapping from torch.baddbmm to acc_ops.mm -> acc_ops.add, if alpha or beta is not 1
+    then we also insert acc_ops.mul to the right place.
+    """
+    with node.graph.inserting_before(node):
+        mm_kwargs = {"input": node.kwargs["batch1"], "other": node.kwargs["batch2"]}
+        mm_node = node.graph.create_node(
+            "call_function", matmul, kwargs=mm_kwargs, name=f"{node.name}_matmul"
+        )
+        mm_node.meta = node.meta.copy()
+
+        if node.kwargs["alpha"] != 1:
+            mul_kwargs = {"input": mm_node, "other": node.kwargs["alpha"]}
+            mm_node = node.graph.create_node(
+                "call_function", mul, kwargs=mul_kwargs, name=f"{mm_node.name}_mul"
+            )
+        mm_node.meta = node.meta.copy()
+
+        input_node = node.kwargs["input"]
+        if node.kwargs["beta"] != 1:
+            mul_kwargs = {"input": input_node, "other": node.kwargs["beta"]}
+            new_input_node = node.graph.create_node(
+                "call_function", mul, kwargs=mul_kwargs, name=f"{node.name}_input_mul"
+            )
+            assert isinstance(input_node, torch.fx.Node)
+            new_input_node.meta = input_node.meta.copy()
+            input_node = new_input_node
+
+        add_kwargs = {"input": input_node, "other": mm_node}
+        add_node = node.graph.create_node(
+            "call_function", add, kwargs=add_kwargs, name=f"{node.name}_add"
+        )
+        add_node.meta = node.meta.copy()
+        return add_node
+
+
+###############################################################################
+
+# Set ops as side-effectul, this prevents them from being optimized away or
+# being folded into constants.
+torch.fx.node._side_effectful_functions.add(xl_weight)

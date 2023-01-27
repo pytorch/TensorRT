@@ -22,7 +22,7 @@ cc_binary(
         "parser_util.h",
     ],
     linkopts = [
-        "-l:libdl.so",
+        "-ldl",
     ],
     deps = [
         "//third_party/args",

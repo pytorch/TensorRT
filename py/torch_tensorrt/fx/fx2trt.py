@@ -9,6 +9,7 @@ import numpy
 import tensorrt as trt
 import torch
 import torch.fx
+from torch._ops import OpOverload
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 
@@ -202,7 +203,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         run_module_start_time = datetime.now()
         super().run()
         _LOGGER.info(
-            f"Run Module elapsed time: {datetime.now() - run_module_start_time}"
+            f"TRT INetwork construction elapsed time: {datetime.now() - run_module_start_time}"
         )
         build_engine_start_time = datetime.now()
 
@@ -318,7 +319,6 @@ class TRTInterpreter(torch.fx.Interpreter):
 
     def call_function(self, target, args, kwargs):
         converter = CONVERTERS.get(target)
-
         if not converter:
             raise RuntimeError(
                 f"Conversion of function {torch.typename(target)} not currently supported!"
@@ -341,7 +341,12 @@ class TRTInterpreter(torch.fx.Interpreter):
 
     def output(self, target, args, kwargs):
         assert len(args) == 1
-        outputs = args[0] if isinstance(args[0], tuple) else (args[0],)
+        if isinstance(args[0], tuple):
+            outputs = args[0]
+        elif isinstance(args[0], list):
+            outputs = tuple(args[0])
+        else:
+            outputs = (args[0],)
 
         if not all(isinstance(output, trt.tensorrt.ITensor) for output in outputs):
             raise RuntimeError("TensorRT requires all outputs to be Tensor!")

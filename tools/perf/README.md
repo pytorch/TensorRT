@@ -66,9 +66,10 @@ There are two sample configuration files added.
 
 | Name              | Supported Values                     | Description                                                  |
 | ----------------- | ------------------------------------ | ------------------------------------------------------------ |
-| backend           | all, torch, torch_tensorrt, tensorrt | Supported backends for inference.                            |
+| backend           | all, torchscript, fx2trt, torch, torch_tensorrt, tensorrt | Supported backends for inference. "all" implies the last four methods in the list at left, and "torchscript" implies the last three (excludes fx path)                            |
 | input             | -                                    | Input binding names. Expected to list shapes of each input bindings |
 | model             | -                                    | Configure the model filename and name                        |
+| model_torch             | -                              | Name of torch model file and name (used for fx2trt) (optional)                  |
 | filename          | -                                    | Model file name to load from disk.                           |
 | name              | -                                    | Model name                                                   |
 | runtime           | -                                    | Runtime configurations                                       |
@@ -83,6 +84,7 @@ backend:
   - torch
   - torch_tensorrt
   - tensorrt
+  - fx2trt
 input:
   input0:
     - 3
@@ -91,6 +93,9 @@ input:
   num_inputs: 1
 model:
   filename: model.plan
+  name: vgg16
+model_torch:
+  filename: model_torch.pt
   name: vgg16
 runtime:
   device: 0
@@ -108,8 +113,9 @@ Note:
 
 Here are the list of `CompileSpec` options that can be provided directly to compile the pytorch module
 
-* `--backends` : Comma separated string of backends. Eg: torch,torch_tensorrt, tensorrt or fx2trt
+* `--backends` : Comma separated string of backends. Eg: torch,torch_tensorrt,tensorrt,fx2trt
 * `--model` : Name of the model file (Can be a torchscript module or a tensorrt engine (ending in `.plan` extension)). If the backend is `fx2trt`, the input should be a Pytorch module (instead of a torchscript module) and the options for model are (`vgg16` | `resnet50` | `efficientnet_b0`)
+* `--model_torch` : Name of the PyTorch model file (optional, only necessary if fx2trt is a chosen backend)
 * `--inputs` : List of input shapes & dtypes. Eg: (1, 3, 224, 224)@fp32 for Resnet or (1, 128)@int32;(1, 128)@int32 for BERT
 * `--batch_size` : Batch size
 * `--precision` : Comma separated list of precisions to build TensorRT engine Eg: fp32,fp16
@@ -122,9 +128,10 @@ Eg:
 
 ```
   python perf_run.py --model ${MODELS_DIR}/vgg16_scripted.jit.pt \
+                     --model_torch ${MODELS_DIR}/vgg16_torch.pt \
                      --precision fp32,fp16 --inputs="(1, 3, 224, 224)@fp32" \
                      --batch_size 1 \
-                     --backends torch,torch_tensorrt,tensorrt \
+                     --backends torch,torch_tensorrt,tensorrt,fx2trt \
                      --report "vgg_perf_bs1.txt"
 ```
 

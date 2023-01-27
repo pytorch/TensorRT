@@ -146,6 +146,7 @@ def compile(
             max_batch_size=inputs[0].size(0),
             explicit_batch_dimension=True,
             dynamic_batch=False,
+            **kwargs,
         )
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")

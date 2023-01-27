@@ -196,6 +196,19 @@ nvinfer1::Dims squeezeDims(const nvinfer1::Dims& d, int pos, bool use_zeros) {
   return dims;
 }
 
+nvinfer1::Dims squeezeAllDims(const nvinfer1::Dims& d, bool use_zeros_for_unknown_dims) {
+  nvinfer1::Dims dims;
+  int j = 0;
+  for (int i = 0; i < d.nbDims; i++) {
+    if (d.d[i] != 1) {
+      dims.d[j++] = (use_zeros_for_unknown_dims && d.d[i] == -1) ? 0 : d.d[i];
+    }
+  }
+  dims.nbDims = j;
+
+  return dims;
+}
+
 std::vector<int64_t> toVec(nvinfer1::Dims d) {
   std::vector<int64_t> dims;
   for (int i = 0; i < d.nbDims; i++) {
@@ -238,7 +251,9 @@ const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_at_trt_type_ma
       {at::kFloat, nvinfer1::DataType::kFLOAT},
       {at::kHalf, nvinfer1::DataType::kHALF},
       {at::kInt, nvinfer1::DataType::kINT32},
+      {at::kLong, nvinfer1::DataType::kINT32},
       {at::kChar, nvinfer1::DataType::kINT8},
+      {at::kByte, nvinfer1::DataType::kINT8},
       {at::kBool, nvinfer1::DataType::kBOOL}};
   return at_trt_type_map;
 }

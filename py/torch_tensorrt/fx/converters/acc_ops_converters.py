@@ -21,9 +21,70 @@ from torch.fx.node import Argument, Target
 from ..utils import get_dynamic_dims, torch_dtype_from_trt, torch_dtype_to_trt
 
 from .converter_utils import *  # noqa: F403
-
+from torch_tensorrt.fx.passes.lower_basic_pass import (
+    trt_transposed_linear,
+    trt_transposed_matmul,
+)
+from torch_tensorrt.fx.tracer.acc_tracer.acc_ops import contiguous
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+@tensorrt_converter(trt_transposed_matmul)
+def trt_transposed_matmul_converter(network, target, args, kwargs, name):
+    lhs, rhs, lhs_transposed, rhs_transposed = args
+
+    if isinstance(lhs, torch.nn.Parameter):
+        lhs = get_trt_tensor(network, lhs, f"{name}_lhs")
+    if isinstance(rhs, torch.nn.Parameter):
+        rhs = get_trt_tensor(network, rhs, f"{name}_rhs")
+
+    lhs, rhs = broadcast(
+        network,
+        lhs,
+        rhs,
+        f"{lhs.name}_broadcast",
+        f"{rhs.name}_broadcast",
+    )
+    layer = network.add_matrix_multiply(
+        lhs,
+        trt.MatrixOperation.TRANSPOSE if lhs_transposed else trt.MatrixOperation.NONE,
+        rhs,
+        trt.MatrixOperation.TRANSPOSE if rhs_transposed else trt.MatrixOperation.NONE,
+    )
+    set_layer_name(layer, target, name)
+    return layer.get_output(0)
+
+
+@tensorrt_converter(trt_transposed_linear)
+def trt_transposed_linear_converter(network, target, args, kwargs, name):
+    input, weight, bias = args
+
+    weight = get_trt_tensor(network, weight.t(), f"{name}_weight")
+    bias = get_trt_tensor(network, bias.reshape(1, -1), f"{name}_bias")
+
+    input, weight = broadcast(
+        network,
+        input,
+        weight,
+        f"{input.name}_broadcast",
+        f"{weight.name}_broadcast",
+    )
+    layer = network.add_matrix_multiply(
+        input,
+        trt.MatrixOperation.TRANSPOSE,
+        weight,
+        trt.MatrixOperation.NONE,
+    )
+    set_layer_name(layer, target, f"{name}_mm")
+    return add_binary_elementwise_layer(
+        network,
+        layer.get_output(0),
+        bias,
+        trt.ElementWiseOperation.SUM,
+        target,
+        f"{name}_add",
+    )
 
 
 @tensorrt_converter(acc_ops.conv1d)
@@ -345,46 +406,34 @@ def acc_ops_pad_with_slice_layer(
     )
 
     input_shape = input_val.shape
-    pre_start = tuple(i - 1 for i in input_shape)
     prefix_len = len(input_shape) - len(pad) // 2
-    pre_shape = tuple(
-        input_shape[i] + (pad[-(i - prefix_len) * 2 - 2] if i >= prefix_len else 0)
+    start = tuple(
+        -pad[-(i - prefix_len) * 2 - 2] if i >= prefix_len else 0
         for i in range(0, len(input_shape))
     )
-    pre_stride = [-1] * len(input_shape)
+
+    shape = tuple(
+        input_shape[i]
+        + (
+            pad[-(i - prefix_len) * 2 - 1] + pad[-(i - prefix_len) * 2 - 2]
+            if i >= prefix_len
+            else 0
+        )
+        for i in range(0, len(input_shape))
+    )
+    stride = tuple([1] * len(shape))
 
     layer = network.add_slice(
         input_val,
-        pre_start,
-        pre_shape,
-        pre_stride,
+        start,
+        shape,
+        stride,
     )
+
     layer.set_input(4, value_const)
     layer.mode = trt.SliceMode.FILL
-    set_layer_name(layer, target, f"pre_{name}")
-    half_pad_output = layer.get_output(0)
+    set_layer_name(layer, target, name)
 
-    shape = half_pad_output.shape
-    mid_start = tuple(i - 1 for i in shape)
-    mid_stride = [-1] * len(shape)
-    layer = network.add_slice(half_pad_output, mid_start, shape, mid_stride)
-    layer.set_input(4, value_const)
-    layer.mode = trt.SliceMode.FILL
-    set_layer_name(layer, target, f"transpose_{name}")
-    transpose_output = layer.get_output(0)
-
-    shape = transpose_output.shape
-    post_start = tuple([0] * len(shape))
-    post_shape = tuple(
-        shape[i] + (pad[-(i - prefix_len) * 2 - 1] if i >= prefix_len else 0)
-        for i in range(0, len(shape))
-    )
-    post_stride = tuple([1] * len(shape))
-
-    layer = network.add_slice(transpose_output, post_start, post_shape, post_stride)
-    layer.set_input(4, value_const)
-    layer.mode = trt.SliceMode.FILL
-    set_layer_name(layer, target, f"post_{name}")
     return layer.get_output(0)
 
 
@@ -1975,7 +2024,10 @@ def acc_ops_max_poolnd(
             f"MaxPool2d received input {input_val} that is not part "
             "of the TensorRT region!"
         )
-    extend_len = 2 if target == acc_ops.max_pool2d else 3
+    if target not in (acc_ops.max_pool2d, acc_ops.max_pool3d):
+        extend_len = 2 if len(kwargs["kernel_size"]) == 2 else 3
+    else:
+        extend_len = 2 if target == acc_ops.max_pool2d else 3
     kernel_size = extend_attr_to_tuple(kwargs["kernel_size"], extend_len)
     stride = extend_attr_to_tuple(kwargs["stride"], extend_len)
     padding = extend_attr_to_tuple(kwargs["padding"], extend_len)
@@ -2259,8 +2311,11 @@ def acc_ops_adaptive_avg_poolnd(
             f"AdaptiveAvgPool2d received input {input_val} that is not part "
             "of the TensorRT region!"
         )
+    if target not in (acc_ops.adaptive_avg_pool3d, acc_ops.adaptive_avg_pool2d):
+        extend_len = 2 if len(kwargs["output_size"]) == 2 else 3
+    else:
+        extend_len = 2 if target == acc_ops.adaptive_avg_pool2d else 3
 
-    extend_len = 2 if target == acc_ops.adaptive_avg_pool2d else 3
     assert all(
         input_val.shape[-(i + 1)] != -1 for i in range(extend_len)
     ), "AdaptiveAvgPool2d and AdaptiveAvgPool3d currently doesn't support dynamic shapes for last two dims."
@@ -2747,7 +2802,10 @@ def acc_ops_linear(
 
     if isinstance(kwargs["weight"], torch.Tensor):
         weight = get_trt_tensor(network, kwargs["weight"].t(), f"{name}_weight")
-        weight_op = trt.MatrixOperation.NONE
+        if target not in (acc_ops.linear, torch.ops.aten.linear):
+            weight_op = trt.MatrixOperation.TRANSPOSE
+        else:
+            weight_op = trt.MatrixOperation.NONE
     else:
         assert isinstance(
             kwargs["weight"], TRTTensor
@@ -2782,17 +2840,30 @@ def acc_ops_linear(
     return res
 
 
-def add_clamp(network, input, val, op):
-    acc_ops_clamp_shape = (1,) * len(input.shape)  # broadcast all dimensions
-    acc_ops_clamp_tensor = (
-        val
-        * torch.ones(acc_ops_clamp_shape, dtype=torch_dtype_from_trt(input.dtype))
-        .cpu()
-        .numpy()
-    )
-    acc_ops_clamp_trt = network.add_constant(acc_ops_clamp_shape, acc_ops_clamp_tensor)
-    layer = network.add_elementwise(input, acc_ops_clamp_trt.get_output(0), op)
-
+def add_clamp(network, input, val, op, name):
+    if not len(input.shape):
+        # clamping scalar
+        acc_ops_clamp_trt = get_trt_tensor(
+            network,
+            squeeze_left(torch.tensor([val], dtype=torch_dtype_from_trt(input.dtype))),
+            f"{name}_clamp_{val}",
+        )
+    else:
+        acc_ops_clamp_shape = (1,) * len(input.shape)  # broadcast all dimensions
+        acc_ops_clamp_tensor = (
+            (
+                val
+                * torch.ones(
+                    acc_ops_clamp_shape, dtype=torch_dtype_from_trt(input.dtype)
+                )
+            )
+            .cpu()
+            .numpy()
+        )
+        acc_ops_clamp_trt = network.add_constant(
+            acc_ops_clamp_shape, acc_ops_clamp_tensor
+        ).get_output(0)
+    layer = network.add_elementwise(input, acc_ops_clamp_trt, op)
     return layer
 
 
@@ -2816,13 +2887,13 @@ def acc_ops_clamp(
 
     if min_val is not None:
         clamp_min_layer = add_clamp(
-            network, input_val, min_val, trt.ElementWiseOperation.MAX
+            network, input_val, min_val, trt.ElementWiseOperation.MAX, name
         )
         set_layer_name(clamp_min_layer, target, f"{name}_clamp_min")
         input_val = clamp_min_layer.get_output(0)
     if max_val is not None:
         clamp_max_layer = add_clamp(
-            network, input_val, max_val, trt.ElementWiseOperation.MIN
+            network, input_val, max_val, trt.ElementWiseOperation.MIN, name
         )
         set_layer_name(clamp_max_layer, target, f"{name}_clamp_max")
         input_val = clamp_max_layer.get_output(0)
@@ -3297,6 +3368,9 @@ def acc_ops_gelu(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
+    approximate = kwargs["approximate"]
+    if approximate != "none":
+        raise RuntimeError("GeLU converter currently doesn't support fast gelu compute")
     if not isinstance(input_val, TRTTensor):
         raise RuntimeError(
             f"GELU received input {input_val} that is not part "
@@ -3556,7 +3630,7 @@ def acc_ops_interpolate(
     else:
         layer.resize_mode = trt.ResizeMode.NEAREST
 
-    if align_corners != None:
+    if (align_corners is not None) and align_corners:
         layer.coordinate_transformation = (
             trt.ResizeCoordinateTransformation.ALIGN_CORNERS
         )

@@ -78,7 +78,7 @@ TEST(CppAPITests, RuntimeThreadSafety) {
 
   bool flag = true;
   for (int i = 0; i < num_threads; i++) {
-    bool f = torch_tensorrt::tests::util::almostEqual(out_vec[i].toTensor(), trt_out_vec[i].toTensor(), 1e-2);
+    bool f = torch_tensorrt::tests::util::cosineSimEqual(out_vec[i].toTensor(), trt_out_vec[i].toTensor());
     flag = flag && f;
   }
   ASSERT_TRUE(flag);

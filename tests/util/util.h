@@ -6,16 +6,32 @@
 #include "ATen/Tensor.h"
 #include "core/ir/ir.h"
 #include "core/util/prelude.h"
+#include "torch/csrc/jit/ir/irparser.h"
+
+const float ATOL = 1e-8;
+const float RTOL = 1e-5;
+const float COSINE_THRESHOLD = 0.99f;
+const float THRESHOLD_E5 = 1e-5;
 
 namespace torch_tensorrt {
 namespace tests {
 namespace util {
 
-bool cosineSimEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float threshold);
+bool cosineSimEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float threshold = COSINE_THRESHOLD);
 
-bool almostEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float atol = 1e-8, float rtol = 1e-5);
+bool almostEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float atol = ATOL, float rtol = RTOL);
 
 bool exactlyEqual(const at::Tensor& a, const at::Tensor& b);
+
+void pointwise_test_helper(
+    std::string graph_ir,
+    bool singleInput,
+    bool dynamicInput = false,
+    std::vector<int64_t> shape1 = {5},
+    std::vector<int64_t> shape2 = {5},
+    bool negative_input = false,
+    at::ScalarType type1 = at::kFloat,
+    at::ScalarType type2 = at::kFloat);
 
 std::vector<at::Tensor> RunEngine(std::string& eng, std::vector<at::Tensor> inputs);
 

@@ -374,12 +374,13 @@ auto expand_registrations TORCHTRT_UNUSED =
 
                // Collapse repeated dimension back into desired dimension
                std::vector<int64_t> collapse_shape_vec;
-               for (int k = 0; k < repeat_shape_dims.nbDims; k++) {
+               for (int64_t k = 0; k < repeat_shape_dims.nbDims; k++) {
                  if (k == dim) {
-                   int64_t collapse_dim = repeat_shape_dims.d[k] * repeat_shape_dims.d[++k];
+                   int64_t collapse_dim = repeat_shape_dims.d[k] * repeat_shape_dims.d[k + 1];
                    // Set dim size to -1 if repeat is being done on dynamic dim
                    collapse_dim = std::max(collapse_dim, (int64_t)-1);
                    collapse_shape_vec.push_back(collapse_dim);
+                   k++;
                  } else {
                    collapse_shape_vec.push_back(repeat_shape_dims.d[k]);
                  }
@@ -392,6 +393,89 @@ auto expand_registrations TORCHTRT_UNUSED =
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], collapse->getOutput(0));
                LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
 
+               return true;
+             }})
+        .pattern(
+            {"aten::meshgrid(Tensor[] tensors) -> (Tensor[])",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               // torch.meshgrid only supports 1D or 0D input tensors
+               auto arg_tensors = args[0].IValue()->toListRef();
+               std::vector<nvinfer1::ITensor*> tensors;
+               for (auto t : arg_tensors) {
+                 if (t.isTensor()) {
+                   auto torch_tensor = t.toTensor();
+                   tensors.push_back(tensor_to_const(ctx, torch_tensor));
+                 } else {
+                   auto cont = t.toCustomClass<TensorContainer>();
+                   tensors.push_back(cont->tensor());
+                 }
+               }
+
+               // build the output shape for all tensors in the output list
+               nvinfer1::Dims output_dims;
+               output_dims.nbDims = tensors.size();
+               for (size_t idx = 0UL; idx < tensors.size(); ++idx) {
+                 auto dims = tensors[idx]->getDimensions();
+                 output_dims.d[idx] = dims.nbDims == 0 ? 1 : dims.d[0];
+               }
+               std::vector<nvinfer1::ITensor*> out_tensors;
+               // Reshape tensors into output shape (reshape, expand)
+               for (size_t idx = 0UL; idx < tensors.size(); ++idx) {
+                 auto t = tensors[idx];
+                 auto dims = t->getDimensions();
+                 nvinfer1::Dims reshape_dims;
+                 reshape_dims.nbDims = tensors.size();
+                 for (size_t reshape_idx = 0UL; reshape_idx < tensors.size(); ++reshape_idx) {
+                   if (reshape_idx == idx) {
+                     reshape_dims.d[reshape_idx] = dims.nbDims == 0 ? 1 : dims.d[0];
+                   } else {
+                     reshape_dims.d[reshape_idx] = 1;
+                   }
+                 }
+                 // Add a reshape layer before expanding dims
+                 auto reshape_layer = ctx->net->addShuffle(*t);
+                 reshape_layer->setReshapeDimensions(reshape_dims);
+                 std::stringstream reshape_layer_name;
+                 reshape_layer_name << util::node_info(n) << "_meshgrid_reshape_" << std::to_string(idx);
+                 reshape_layer->setName(reshape_layer_name.str().c_str());
+                 auto reshaped = reshape_layer->getOutput(0);
+                 LOG_DEBUG("Tensor " << idx << " reshaped to : " << reshaped->getDimensions() << " from " << dims);
+
+                 // Add slice layer for expansion
+                 std::vector<int64_t> start_vec(output_dims.nbDims, 0);
+                 auto start_offset = util::toDims(c10::IntArrayRef(start_vec));
+
+                 std::vector<int64_t> strides_vec(output_dims.nbDims, 0);
+                 for (int64_t i = 0; i < output_dims.nbDims; i++) {
+                   strides_vec[i] = (reshaped->getDimensions().d[i] != 1);
+                 }
+
+                 auto strides = util::toDims(c10::IntArrayRef(strides_vec));
+
+                 auto slice_layer = ctx->net->addSlice(*reshaped, start_offset, output_dims, strides);
+                 std::stringstream slice_layer_name;
+                 slice_layer_name << util::node_info(n) << "_meshgrid_slice_" << std::to_string(idx);
+                 slice_layer->setName(slice_layer_name.str().c_str());
+                 auto slice_output = slice_layer->getOutput(0);
+                 LOG_DEBUG("Tensor " << idx << " expanded to : " << slice_output->getDimensions());
+                 out_tensors.push_back(slice_output);
+               }
+
+               // Pack output tensors into list
+               c10::ListTypePtr lt = n->output()->type()->expect<c10::ListType>();
+               c10::TypePtr elementType = lt->getElementType();
+               auto list = c10::impl::GenericList(elementType);
+               list.reserve(out_tensors.size());
+
+               for (auto t : out_tensors) {
+                 auto tensor_holder = TensorContainer();
+                 tensor_holder.hold_tensor(t);
+                 auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                 list.emplace_back(ival);
+               }
+
+               auto output_list = std::move(torch::jit::IValue(list));
+               ctx->AssociateValueAndIValue(n->outputs()[0], output_list);
                return true;
              }});
 

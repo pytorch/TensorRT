@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Installation &mdash; Torch-TensorRT master documentation</title>
+  <title>Installation &mdash; Torch-TensorRT v1.4.0dev0+b2b6871 documentation</title>
   
 
   
@@ -114,12 +114,16 @@
                   <span class="dropdown-title">torchvision</span>
                   <p></p>
                 </a>
-                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchrec">
-                  <span class="dropdown-title">TorchRec</span>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torcharrow">
+                  <span class="dropdown-title">torcharrow</span>
                   <p></p>
                 </a>
                 <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/data">
                   <span class="dropdown-title">TorchData</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchrec">
+                  <span class="dropdown-title">TorchRec</span>
                   <p></p>
                 </a>
                 <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/serve/">
@@ -147,13 +151,25 @@
                   <span class="dropdown-title">About</span>
                   <p>Learn about PyTorch’s features and capabilities</p>
                 </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/foundation">
+                  <span class="dropdown-title">PyTorch Foundation</span>
+                  <p>Learn about the PyTorch foundation</p>
+                </a>
                 <a class="nav-dropdown-item" href="https://pytorch.org/#community-module">
                   <span class="dropdown-title">Community</span>
                   <p>Join the PyTorch developer community to contribute, learn, and get your questions answered.</p>
                 </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/community-stories">
+                  <span class="dropdown-title">Community Stories</span>
+                  <p>Learn how our community solves real, everyday machine learning problems with PyTorch.</p>
+                </a>
                 <a class="nav-dropdown-item" href="https://pytorch.org/resources">
                   <span class="dropdown-title">Developer Resources</span>
                   <p>Find resources and get questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/events">
+                  <span class="dropdown-title">Events</span>
+                  <p>Find events, webinars, and podcasts</p>
                 </a>
                 <a class="nav-dropdown-item" href="https://discuss.pytorch.org/" target="_blank">
                   <span class="dropdown-title">Forums</span>
@@ -199,7 +215,7 @@
               
               
                 <div class="version">
-                  master (1.3.0a0+c096f31)
+                  v1.4.0dev0+b2b6871
                 </div>
               
             
@@ -367,9 +383,9 @@ and you must have CUDA, cuDNN and TensorRT installed.</p>
 <section id="python-package">
 <h3>Python Package<a class="headerlink" href="#python-package" title="Permalink to this headline">¶</a></h3>
 <p>You can install the python package using</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>pip3 install nvidia-pyindex
-pip3 install nvidia-tensorrt
-pip3 install torch-tensorrt -f https://github.com/pytorch/TensorRT/releases
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>pip3<span class="w"> </span>install<span class="w"> </span>nvidia-pyindex
+pip3<span class="w"> </span>install<span class="w"> </span>nvidia-tensorrt
+pip3<span class="w"> </span>install<span class="w"> </span>torch-tensorrt<span class="o">==</span>&lt;VERSION&gt;<span class="w"> </span>-f<span class="w"> </span>https://github.com/pytorch/TensorRT/releases/expanded_assets/&lt;VERSION&gt;
 </pre></div>
 </div>
 </section>
@@ -389,13 +405,13 @@ pip3 install torch-tensorrt -f https://github.com/pytorch/TensorRT/releases
 <li><p>Otherwise you can use the following instructions to install binaries <a class="reference external" href="https://docs.bazel.build/versions/master/install.html">https://docs.bazel.build/versions/master/install.html</a></p></li>
 <li><p>Finally if you need to compile from source (e.g. aarch64 until bazel distributes binaries for the architecture) you can use these instructions</p></li>
 </ul>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span> <span class="nv">BAZEL_VERSION</span><span class="o">=</span><span class="k">$(</span>cat &lt;PATH_TO_TORCHTRT_ROOT&gt;/.bazelversion<span class="k">)</span>
-mkdir bazel
-<span class="nb">cd</span> bazel
-curl -fSsL -O https://github.com/bazelbuild/bazel/releases/download/<span class="nv">$BAZEL_VERSION</span>/bazel-<span class="nv">$BAZEL_VERSION</span>-dist.zip
-unzip bazel-<span class="nv">$BAZEL_VERSION</span>-dist.zip
-bash ./compile.sh
-cp output/bazel /usr/local/bin/
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">BAZEL_VERSION</span><span class="o">=</span><span class="k">$(</span>cat<span class="w"> </span>&lt;PATH_TO_TORCHTRT_ROOT&gt;/.bazelversion<span class="k">)</span>
+mkdir<span class="w"> </span>bazel
+<span class="nb">cd</span><span class="w"> </span>bazel
+curl<span class="w"> </span>-fSsL<span class="w"> </span>-O<span class="w"> </span>https://github.com/bazelbuild/bazel/releases/download/<span class="nv">$BAZEL_VERSION</span>/bazel-<span class="nv">$BAZEL_VERSION</span>-dist.zip
+unzip<span class="w"> </span>bazel-<span class="nv">$BAZEL_VERSION</span>-dist.zip
+bash<span class="w"> </span>./compile.sh
+cp<span class="w"> </span>output/bazel<span class="w"> </span>/usr/local/bin/
 </pre></div>
 </div>
 </div></blockquote>
@@ -481,7 +497,7 @@ recommended commands:</p>
 </div></blockquote>
 <section id="release-build">
 <h4>Release Build<a class="headerlink" href="#release-build" title="Permalink to this headline">¶</a></h4>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bazel build //:libtorchtrt -c opt --distdir third_party/distdir/<span class="o">[</span>x86_64-linux-gnu <span class="p">|</span> aarch64-linux-gnu<span class="o">]</span>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bazel<span class="w"> </span>build<span class="w"> </span>//:libtorchtrt<span class="w"> </span>-c<span class="w"> </span>opt<span class="w"> </span>--distdir<span class="w"> </span>third_party/distdir/<span class="o">[</span>x86_64-linux-gnu<span class="w"> </span><span class="p">|</span><span class="w"> </span>aarch64-linux-gnu<span class="o">]</span>
 </pre></div>
 </div>
 <p>A tarball with the include files and library can then be found in <code class="docutils literal notranslate"><span class="pre">bazel-bin</span></code></p>
@@ -489,7 +505,7 @@ recommended commands:</p>
 <section id="debug-build">
 <span id="build-from-archive-debug"></span><h4>Debug Build<a class="headerlink" href="#debug-build" title="Permalink to this headline">¶</a></h4>
 <p>To build with debug symbols use the following command</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bazel build //:libtorchtrt -c dbg --distdir third_party/distdir/<span class="o">[</span>x86_64-linux-gnu <span class="p">|</span> aarch64-linux-gnu<span class="o">]</span>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bazel<span class="w"> </span>build<span class="w"> </span>//:libtorchtrt<span class="w"> </span>-c<span class="w"> </span>dbg<span class="w"> </span>--distdir<span class="w"> </span>third_party/distdir/<span class="o">[</span>x86_64-linux-gnu<span class="w"> </span><span class="p">|</span><span class="w"> </span>aarch64-linux-gnu<span class="o">]</span>
 </pre></div>
 </div>
 <p>A tarball with the include files and library can then be found in <code class="docutils literal notranslate"><span class="pre">bazel-bin</span></code></p>
@@ -497,7 +513,7 @@ recommended commands:</p>
 <section id="pre-cxx11-abi-build">
 <h4>Pre CXX11 ABI Build<a class="headerlink" href="#pre-cxx11-abi-build" title="Permalink to this headline">¶</a></h4>
 <p>To build using the pre-CXX11 ABI use the <code class="docutils literal notranslate"><span class="pre">pre_cxx11_abi</span></code> config</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bazel build //:libtorchtrt --config pre_cxx11_abi -c <span class="o">[</span>dbg/opt<span class="o">]</span> --distdir third_party/distdir/<span class="o">[</span>x86_64-linux-gnu <span class="p">|</span> aarch64-linux-gnu<span class="o">]</span>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bazel<span class="w"> </span>build<span class="w"> </span>//:libtorchtrt<span class="w"> </span>--config<span class="w"> </span>pre_cxx11_abi<span class="w"> </span>-c<span class="w"> </span><span class="o">[</span>dbg/opt<span class="o">]</span><span class="w"> </span>--distdir<span class="w"> </span>third_party/distdir/<span class="o">[</span>x86_64-linux-gnu<span class="w"> </span><span class="p">|</span><span class="w"> </span>aarch64-linux-gnu<span class="o">]</span>
 </pre></div>
 </div>
 <p>A tarball with the include files and library can then be found in <code class="docutils literal notranslate"><span class="pre">bazel-bin</span></code></p>
@@ -546,7 +562,7 @@ recommended commands:</p>
 <section id="id6">
 <h4>Release Build<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h4>
 <p>Compile using:</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bazel build //:libtorchtrt -c opt
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bazel<span class="w"> </span>build<span class="w"> </span>//:libtorchtrt<span class="w"> </span>-c<span class="w"> </span>opt
 </pre></div>
 </div>
 <p>A tarball with the include files and library can then be found in <code class="docutils literal notranslate"><span class="pre">bazel-bin</span></code></p>
@@ -554,7 +570,7 @@ recommended commands:</p>
 <section id="build-from-local-debug">
 <span id="id7"></span><h4>Debug Build<a class="headerlink" href="#build-from-local-debug" title="Permalink to this headline">¶</a></h4>
 <p>To build with debug symbols use the following command</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bazel build //:libtorchtrt -c dbg
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bazel<span class="w"> </span>build<span class="w"> </span>//:libtorchtrt<span class="w"> </span>-c<span class="w"> </span>dbg
 </pre></div>
 </div>
 <p>A tarball with the include files and library can then be found in <code class="docutils literal notranslate"><span class="pre">bazel-bin</span></code></p>
@@ -562,7 +578,7 @@ recommended commands:</p>
 <section id="id8">
 <h4>Pre CXX11 ABI Build<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h4>
 <p>To build using the pre-CXX11 ABI use the <code class="docutils literal notranslate"><span class="pre">pre_cxx11_abi</span></code> config</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bazel build //:libtorchtrt --config pre_cxx11_abi -c <span class="o">[</span>dbg/opt<span class="o">]</span>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bazel<span class="w"> </span>build<span class="w"> </span>//:libtorchtrt<span class="w"> </span>--config<span class="w"> </span>pre_cxx11_abi<span class="w"> </span>-c<span class="w"> </span><span class="o">[</span>dbg/opt<span class="o">]</span>
 </pre></div>
 </div>
 </section>
@@ -589,12 +605,12 @@ libtorch with <cite>-DTorch_DIR=&lt;path to libtorch&gt;/share/cmake/Torch</cite
 <li><p>Finally, configure and build the project in a build directory of your choice with the following command
 from the root of Torch-TensorRT project:</p></li>
 </ul>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>cmake -S. -B&lt;build directory&gt; <span class="se">\</span>
-    <span class="o">[</span>-DCMAKE_MODULE_PATH<span class="o">=</span>cmake/Module<span class="o">]</span> <span class="se">\</span>
-    <span class="o">[</span>-DTorch_DIR<span class="o">=</span>&lt;path to libtorch&gt;/share/cmake/Torch<span class="o">]</span> <span class="se">\</span>
-    <span class="o">[</span>-DTensorRT_ROOT<span class="o">=</span>&lt;path to TensorRT&gt;<span class="o">]</span> <span class="se">\</span>
-    <span class="o">[</span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Debug<span class="p">|</span>Release<span class="o">]</span>
-cmake --build &lt;build directory&gt;
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>cmake<span class="w"> </span>-S.<span class="w"> </span>-B&lt;build<span class="w"> </span>directory&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span><span class="o">[</span>-DCMAKE_MODULE_PATH<span class="o">=</span>cmake/Module<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span><span class="o">[</span>-DTorch_DIR<span class="o">=</span>&lt;path<span class="w"> </span>to<span class="w"> </span>libtorch&gt;/share/cmake/Torch<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span><span class="o">[</span>-DTensorRT_ROOT<span class="o">=</span>&lt;path<span class="w"> </span>to<span class="w"> </span>TensorRT&gt;<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span><span class="o">[</span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Debug<span class="p">|</span>Release<span class="o">]</span>
+cmake<span class="w"> </span>--build<span class="w"> </span>&lt;build<span class="w"> </span>directory&gt;
 </pre></div>
 </div>
 </div></blockquote>
@@ -603,12 +619,12 @@ cmake --build &lt;build directory&gt;
 <h3><strong>Building the Python package</strong><a class="headerlink" href="#building-the-python-package" title="Permalink to this headline">¶</a></h3>
 <p>Begin by installing <code class="docutils literal notranslate"><span class="pre">ninja</span></code></p>
 <p>You can build the Python package using <code class="docutils literal notranslate"><span class="pre">setup.py</span></code> (this will also build the correct version of <code class="docutils literal notranslate"><span class="pre">libtorchtrt.so</span></code>)</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>python3 setup.py <span class="o">[</span>install/bdist_wheel<span class="o">]</span>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>setup.py<span class="w"> </span><span class="o">[</span>install/bdist_wheel<span class="o">]</span>
 </pre></div>
 </div>
 <section id="id9">
 <h4>Debug Build<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h4>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>python3 setup.py develop <span class="o">[</span>--user<span class="o">]</span>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>setup.py<span class="w"> </span>develop<span class="w"> </span><span class="o">[</span>--user<span class="o">]</span>
 </pre></div>
 </div>
 <p>This also compiles a debug build of <code class="docutils literal notranslate"><span class="pre">libtorchtrt.so</span></code></p>
@@ -641,15 +657,15 @@ In the case you installed with <code class="docutils literal notranslate"><span 
 PyTorch on x86_64, NVIDIA aarch64 PyTorch uses the CXX11-ABI. If you compiled for source using the pre_cxx11_abi and only would like to
 use that library, set the paths to the same path but when you compile make sure to add the flag <code class="docutils literal notranslate"><span class="pre">--config=pre_cxx11_abi</span></code></p>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>new_local_repository<span class="o">(</span>
-    <span class="nv">name</span> <span class="o">=</span> <span class="s2">&quot;libtorch&quot;</span>,
-    <span class="nv">path</span> <span class="o">=</span> <span class="s2">&quot;/usr/local/lib/python3.8/dist-packages/torch&quot;</span>,
-    <span class="nv">build_file</span> <span class="o">=</span> <span class="s2">&quot;third_party/libtorch/BUILD&quot;</span>
+<span class="w">    </span><span class="nv">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;libtorch&quot;</span>,
+<span class="w">    </span><span class="nv">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;/usr/local/lib/python3.8/dist-packages/torch&quot;</span>,
+<span class="w">    </span><span class="nv">build_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;third_party/libtorch/BUILD&quot;</span>
 <span class="o">)</span>
 
 new_local_repository<span class="o">(</span>
-    <span class="nv">name</span> <span class="o">=</span> <span class="s2">&quot;libtorch_pre_cxx11_abi&quot;</span>,
-    <span class="nv">path</span> <span class="o">=</span> <span class="s2">&quot;/usr/local/lib/python3.8/dist-packages/torch&quot;</span>,
-    <span class="nv">build_file</span> <span class="o">=</span> <span class="s2">&quot;third_party/libtorch/BUILD&quot;</span>
+<span class="w">    </span><span class="nv">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;libtorch_pre_cxx11_abi&quot;</span>,
+<span class="w">    </span><span class="nv">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;/usr/local/lib/python3.8/dist-packages/torch&quot;</span>,
+<span class="w">    </span><span class="nv">build_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;third_party/libtorch/BUILD&quot;</span>
 <span class="o">)</span>
 </pre></div>
 </div>
@@ -658,12 +674,12 @@ new_local_repository<span class="o">(</span>
 <h4>Compile C++ Library and Compiler CLI<a class="headerlink" href="#compile-c-library-and-compiler-cli" title="Permalink to this headline">¶</a></h4>
 <blockquote>
 <div><p>NOTE: Due to shifting dependency locations between Jetpack 4.5 and 4.6 there is a now a flag to inform bazel of the Jetpack version</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>--platforms //toolchains:jetpack_x.x
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>--platforms<span class="w"> </span>//toolchains:jetpack_x.x
 </pre></div>
 </div>
 </div></blockquote>
 <p>Compile Torch-TensorRT library using bazel command:</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bazel build //:libtorchtrt --platforms //toolchains:jetpack_5.0
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bazel<span class="w"> </span>build<span class="w"> </span>//:libtorchtrt<span class="w"> </span>--platforms<span class="w"> </span>//toolchains:jetpack_5.0
 </pre></div>
 </div>
 </section>
@@ -673,7 +689,7 @@ new_local_repository<span class="o">(</span>
 <div><p>NOTE: Due to shifting dependencies locations between Jetpack 4.5 and newer Jetpack verisons there is now a flag for <code class="docutils literal notranslate"><span class="pre">setup.py</span></code> which sets the jetpack version (default: 5.0)</p>
 </div></blockquote>
 <p>Compile the Python API using the following command from the <code class="docutils literal notranslate"><span class="pre">//py</span></code> directory:</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>python3 setup.py install --use-cxx11-abi
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>setup.py<span class="w"> </span>install<span class="w"> </span>--use-cxx11-abi
 </pre></div>
 </div>
 <p>If you have a build of PyTorch that uses Pre-CXX11 ABI drop the <code class="docutils literal notranslate"><span class="pre">--use-cxx11-abi</span></code> flag</p>
@@ -928,13 +944,9 @@ new_local_repository<span class="o">(</span>
           <li>
             <a href="https://pytorch.org/ecosystem">Ecosystem</a>
           </li>
-
+            
           <li>
             <a href="https://pytorch.org/mobile">Mobile</a>
-          </li>
-
-          <li>
-            <a href="https://pytorch.org/hub">PyTorch Hub</a>
           </li>
 
           <li>
@@ -967,6 +979,18 @@ new_local_repository<span class="o">(</span>
             </li>
 
             <li>
+              <a href="https://pytorch.org/torcharrow">torcharrow</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/data">TorchData</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/torchrec">TorchRec</a>
+            </li>
+
+            <li>
               <a href="https://pytorch.org/serve/">TorchServe</a>
             </li>
 
@@ -982,18 +1006,15 @@ new_local_repository<span class="o">(</span>
           <li class="resources-mobile-menu-title">
             Resources
           </li>
-
-          <ul class="resources-mobile-menu-items">
-            <li>
-              <a href="https://pytorch.org/resources">Developer Resources</a>
-            </li>
+            
+           <ul class="resources-mobile-menu-items">
 
             <li>
               <a href="https://pytorch.org/features">About</a>
             </li>
 
             <li>
-              <a href="https://pytorch.org/hub">Models (Beta)</a>
+              <a href="https://pytorch.org/foundation">PyTorch Foundation</a>
             </li>
 
             <li>
@@ -1001,7 +1022,23 @@ new_local_repository<span class="o">(</span>
             </li>
 
             <li>
+              <a href="https://pytorch.org/community-stories">Community Stories</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/resources">Developer Resources</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/events">Events</a>
+            </li>
+
+            <li>
               <a href="https://discuss.pytorch.org/">Forums</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/hub">Models (Beta)</a>
             </li>
           </ul>
 

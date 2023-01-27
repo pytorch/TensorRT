@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include "core/ir/ir.h"
 #include "torch/csrc/jit/ir/ir.h"
 
 namespace torch_tensorrt {
@@ -15,12 +16,21 @@ struct LowerInfo {
   // Since these QDQ nodes will be identical as they share same input, one of them is eliminated due to CSE lowering
   // pass. Disable this in order to not disturb TensorRT's QAT optimizations.
   bool disable_cse = false;
+  ir::Device target_device;
   std::vector<std::string> forced_fallback_modules;
   friend std::ostream& operator<<(std::ostream& os, const LowerInfo& l);
+
+  std::string getGPUDeviceString() const {
+    return "cuda:" + std::to_string(target_device.gpu_id);
+  };
 };
 
 void LowerBlock(torch::jit::Block* b);
 void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info);
+int AutocastLongInputs(
+    std::shared_ptr<torch::jit::Graph>& g,
+    ir::TypeMap input_type_map,
+    std::string target_device_name);
 torch::jit::Module LowerModule(
     const torch::jit::Module& mod,
     std::string method_name,

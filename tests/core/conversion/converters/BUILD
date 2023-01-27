@@ -12,6 +12,14 @@ converter_test(
 )
 
 converter_test(
+    name = "test_add_sub_mul",
+)
+
+converter_test(
+    name = "test_atan2",
+)
+
+converter_test(
     name = "test_batch_norm",
 )
 
@@ -32,6 +40,10 @@ converter_test(
 )
 
 converter_test(
+    name = "test_clamp",
+)
+
+converter_test(
     name = "test_concat",
 )
 
@@ -48,7 +60,19 @@ converter_test(
 )
 
 converter_test(
+    name = "test_comparators",
+)
+
+converter_test(
     name = "test_cumsum",
+)
+
+converter_test(
+    name = "test_div",
+)
+
+converter_test(
+    name = "test_einsum",
 )
 
 converter_test(
@@ -143,16 +167,21 @@ test_suite(
     name = "converter_tests",
     tests = [
         ":test_activation",
+        ":test_add_sub_mul",
+        ":test_atan2",
         ":test_batch_norm",
         ":test_bitwise",
         ":test_cast",
+        ":test_clamp",
         ":test_clone",
+        ":test_comparators",
         ":test_concat",
         ":test_constant_pad",
         ":test_conv_deconv",
         ":test_copy",
         ":test_cumsum",
-        ":test_element_wise",
+        ":test_div",
+        ":test_einsum",
         ":test_expand",
         ":test_instance_norm",
         ":test_interpolate",

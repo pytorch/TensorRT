@@ -83,6 +83,71 @@ TEST(Evaluators, FullEvaluatesCorrectly) {
   ASSERT_TRUE(at::equal(jit_results[0].toTensor().to(at::kCUDA), trt_results[0].toTensor()));
 }
 
+TEST(Evaluators, FullLikeEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph(%x.1 : Tensor):
+        %9 : None = prim::Constant()
+        %13 : float = prim::Constant[value=1.3]()
+        %14 : int = prim::Constant[value=4]()
+        %35 : Device = prim::Constant[value="cuda:0"]()
+        %19 : Tensor = aten::full_like(%x.1, %13, %14, %9, %35, %9, %9)
+        return (%19))IR";
+
+  auto in = at::randint(1, 10, {1, 2, 3, 5}, {at::kCUDA});
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {in});
+
+  ASSERT_TRUE(at::equal(jit_results[0].toTensor().to(at::kCUDA), trt_results[0].toTensor()));
+  ASSERT_TRUE(jit_results[0].toTensor().dtype() == trt_results[0].toTensor().dtype());
+}
+
+TEST(Evaluators, FullLikeNewDtypeEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph(%x.1 : Tensor):
+        %9 : None = prim::Constant()
+        %13 : Scalar = prim::Constant[value=1]()
+        %14 : int = prim::Constant[value=11]()
+        %35 : Device = prim::Constant[value="cuda:0"]()
+        %19 : Tensor = aten::full_like(%x.1, %13, %14, %9, %35, %9, %9)
+        return (%19))IR";
+
+  auto in = at::randint(1, 10, {1, 2, 3, 5}, {at::kCUDA});
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {in});
+
+  ASSERT_TRUE(at::equal(jit_results[0].toTensor().to(at::kCUDA), trt_results[0].toTensor()));
+  ASSERT_TRUE(jit_results[0].toTensor().dtype() == trt_results[0].toTensor().dtype());
+}
+
+TEST(Evaluators, FullLikeOldDtypeEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph(%x.1 : Tensor):
+        %9 : None = prim::Constant()
+        %13 : Scalar = prim::Constant[value=1.5]()
+        %35 : Device = prim::Constant[value="cuda:0"]()
+        %19 : Tensor = aten::full_like(%x.1, %13, %9, %9, %35, %9, %9)
+        return (%19))IR";
+
+  auto in = at::randint(1, 10, {1, 2, 3, 5}, {at::kCUDA}).to(torch::kInt32);
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {in});
+
+  ASSERT_TRUE(at::equal(jit_results[0].toTensor().to(at::kCUDA), trt_results[0].toTensor()));
+  ASSERT_TRUE(jit_results[0].toTensor().dtype() == trt_results[0].toTensor().dtype());
+}
+
 TEST(Evaluators, OnesDataTypeEvaluatesCorrectly) {
   const auto graph = R"IR(
       graph(%x.1 : Tensor):

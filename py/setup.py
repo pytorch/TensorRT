@@ -28,7 +28,7 @@ RELEASE = False
 
 CI_RELEASE = False
 
-__version__ = "1.3.0a0"
+__version__ = "1.4.0dev0"
 __cuda_version__ = "11.6"
 __cudnn_version__ = "8.4"
 __tensorrt_version__ = "8.4"
@@ -376,7 +376,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        "torch>=1.12.0+cu113,<1.13.0",
+        "torch>=1.14.0.dev0",
     ],
     setup_requires=[],
     cmdclass={
@@ -405,7 +405,7 @@ setup(
         "Topic :: Software Development",
         "Topic :: Software Development :: Libraries",
     ],
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     include_package_data=True,
     package_data={
         "torch_tensorrt": [
@@ -422,6 +422,9 @@ setup(
             "include/torch_tensorrt/core/lowering/*.h",
             "include/torch_tensorrt/core/lowering/passes/*.h",
             "include/torch_tensorrt/core/partitioning/*.h",
+            "include/torch_tensorrt/core/partitioning/segmentedblock/*.h",
+            "include/torch_tensorrt/core/partitioning/partitioninginfo/*.h",
+            "include/torch_tensorrt/core/partitioning/partitioningctx/*.h",
             "include/torch_tensorrt/core/plugins/*.h",
             "include/torch_tensorrt/core/plugins/impl/*.h",
             "include/torch_tensorrt/core/runtime/*.h",

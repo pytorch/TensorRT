@@ -210,10 +210,18 @@ def _parse_input_signature(input_signature: Any):
         input_signature, torch.Tensor
     ):
         i = (
-            Input._from_tensor(input_signature)
+            Input.from_tensor(input_signature)
             if isinstance(input_signature, torch.Tensor)
             else input_signature
         )
+
+        if not i.is_trt_dtype():
+            raise TypeError(
+                "Using non-TRT input types with input_signature is not currently "
+                + "supported. Please specify inputs individually to use "
+                + "non-TRT types."
+            )
+
         clone = _internal_input_to_torch_class_input(i._to_internal())
         return clone
     else:
@@ -243,7 +251,7 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
             )
 
         inputs = [
-            Input._from_tensor(i) if isinstance(i, torch.Tensor) else i
+            Input.from_tensor(i) if isinstance(i, torch.Tensor) else i
             for i in compile_spec["inputs"]
         ]
         info.inputs = [i._to_internal() for i in inputs]

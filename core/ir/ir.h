@@ -11,20 +11,35 @@ namespace torch_tensorrt {
 namespace core {
 namespace ir {
 
+enum class ShapeMode {
+  kMIN,
+  kOPT,
+  kMAX,
+};
+
+struct Device {
+  nvinfer1::DeviceType device_type;
+  int64_t gpu_id;
+  int64_t dla_core;
+  bool allow_gpu_fallback;
+  Device() : device_type(nvinfer1::DeviceType::kGPU), gpu_id(0), dla_core(0), allow_gpu_fallback(false) {}
+};
+
 struct Input : torch::CustomClassHolder {
   Input(){};
   Input(
       std::vector<int64_t> shape,
-      nvinfer1::DataType dtype = nvinfer1::DataType::kFLOAT,
+      at::ScalarType dtype = at::kFloat,
       nvinfer1::TensorFormat format = nvinfer1::TensorFormat::kLINEAR,
       bool dtype_is_user_defined = false);
   Input(
       std::vector<int64_t> min_shape,
       std::vector<int64_t> opt_shape,
       std::vector<int64_t> max_shape,
-      nvinfer1::DataType dtype = nvinfer1::DataType::kFLOAT,
+      at::ScalarType dtype = at::kFloat,
       nvinfer1::TensorFormat format = nvinfer1::TensorFormat::kLINEAR,
       bool dtype_is_used_defined = false);
+
   friend std::ostream& operator<<(std::ostream& os, const Input& input);
 
   bool input_is_dynamic = false;
@@ -33,7 +48,7 @@ struct Input : torch::CustomClassHolder {
   nvinfer1::Dims min;
   nvinfer1::Dims max;
   nvinfer1::Dims opt;
-  nvinfer1::DataType dtype;
+  at::ScalarType dtype;
   nvinfer1::TensorFormat format;
   int id;
 };

@@ -696,7 +696,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             return [extra_input]
 
         conv_add_config = {
-            "pattern": (operator.add, torch.nn.Conv2d, MatchAllNode),
+            "pattern_complex_format": (operator.add, torch.nn.Conv2d, MatchAllNode),
             "observation_type": ObservationType.OUTPUT_USE_DIFFERENT_OBSERVER_AS_INPUT,
             "dtype_configs": [
                 weighted_op_qint8_dtype_config,
@@ -748,9 +748,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
                 y = self.conv(x)
                 return self.standalone(x, y)
 
-        from torch.ao.quantization.backend_config.observation_type import (
-            ObservationType,
-        )
+        from torch.ao.quantization.backend_config import ObservationType
 
         weighted_op_quint8_dtype_config = {
             # optional, input activation dtype
@@ -766,7 +764,10 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
         }
 
         conv_add_config = {
-            "pattern": (torch.nn.ReLU, (operator.add, torch.nn.Conv2d, MatchAllNode)),
+            "pattern_complex_format": (
+                torch.nn.ReLU,
+                (operator.add, torch.nn.Conv2d, MatchAllNode),
+            ),
             "observation_type": ObservationType.OUTPUT_USE_DIFFERENT_OBSERVER_AS_INPUT,
             "dtype_configs": [
                 weighted_op_quint8_dtype_config,

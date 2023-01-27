@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.ts._compiler &mdash; Torch-TensorRT master documentation</title>
+  <title>torch_tensorrt.ts._compiler &mdash; Torch-TensorRT v1.4.0dev0+b2b6871 documentation</title>
   
 
   
@@ -111,12 +111,16 @@
                   <span class="dropdown-title">torchvision</span>
                   <p></p>
                 </a>
-                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchrec">
-                  <span class="dropdown-title">TorchRec</span>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torcharrow">
+                  <span class="dropdown-title">torcharrow</span>
                   <p></p>
                 </a>
                 <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/data">
                   <span class="dropdown-title">TorchData</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchrec">
+                  <span class="dropdown-title">TorchRec</span>
                   <p></p>
                 </a>
                 <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/serve/">
@@ -144,13 +148,25 @@
                   <span class="dropdown-title">About</span>
                   <p>Learn about PyTorch’s features and capabilities</p>
                 </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/foundation">
+                  <span class="dropdown-title">PyTorch Foundation</span>
+                  <p>Learn about the PyTorch foundation</p>
+                </a>
                 <a class="nav-dropdown-item" href="https://pytorch.org/#community-module">
                   <span class="dropdown-title">Community</span>
                   <p>Join the PyTorch developer community to contribute, learn, and get your questions answered.</p>
                 </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/community-stories">
+                  <span class="dropdown-title">Community Stories</span>
+                  <p>Learn how our community solves real, everyday machine learning problems with PyTorch.</p>
+                </a>
                 <a class="nav-dropdown-item" href="https://pytorch.org/resources">
                   <span class="dropdown-title">Developer Resources</span>
                   <p>Find resources and get questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/events">
+                  <span class="dropdown-title">Events</span>
+                  <p>Find events, webinars, and podcasts</p>
                 </a>
                 <a class="nav-dropdown-item" href="https://discuss.pytorch.org/" target="_blank">
                   <span class="dropdown-title">Forums</span>
@@ -196,7 +212,7 @@
               
               
                 <div class="version">
-                  master (1.3.0a0+c096f31)
+                  v1.4.0dev0+b2b6871
                 </div>
               
             
@@ -377,7 +393,7 @@
     <span class="n">torch_executed_ops</span><span class="o">=</span><span class="p">[],</span>
     <span class="n">torch_executed_modules</span><span class="o">=</span><span class="p">[],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Compile a TorchScript module for NVIDIA GPUs using TensorRT</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile a TorchScript module for NVIDIA GPUs using TensorRT</span>
 
 <span class="sd">    Takes a existing TorchScript module and a set of settings to configure the compiler</span>
 <span class="sd">    and will convert methods to JIT Graphs which call equivalent TensorRT engines</span>
@@ -485,7 +501,7 @@
 
 <div class="viewcode-block" id="convert_method_to_trt_engine"><a class="viewcode-back" href="../../../py_api/ts.html#torch_tensorrt.ts.convert_method_to_trt_engine">[docs]</a><span class="k">def</span> <span class="nf">convert_method_to_trt_engine</span><span class="p">(</span>
     <span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span><span class="p">,</span>
-    <span class="n">method_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">method_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;forward&quot;</span><span class="p">,</span>
     <span class="n">inputs</span><span class="o">=</span><span class="p">[],</span>
     <span class="n">device</span><span class="o">=</span><span class="n">Device</span><span class="o">.</span><span class="n">_current_device</span><span class="p">(),</span>
     <span class="n">disable_tf32</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
@@ -501,8 +517,8 @@
     <span class="n">dla_global_dram_size</span><span class="o">=</span><span class="mi">536870912</span><span class="p">,</span>
     <span class="n">truncate_long_and_double</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">calibrator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Convert a TorchScript module method to a serialized TensorRT engine</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytearray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a TorchScript module method to a serialized TensorRT engine</span>
 
 <span class="sd">    Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings</span>
 
@@ -561,7 +577,7 @@
 <span class="sd">        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs</span>
+<span class="sd">        bytearray: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptFunction</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
@@ -583,22 +599,33 @@
         <span class="s2">&quot;truncate_long_and_double&quot;</span><span class="p">:</span> <span class="n">truncate_long_and_double</span><span class="p">,</span>
     <span class="p">}</span>
 
-    <span class="k">return</span> <span class="n">_C</span><span class="o">.</span><span class="n">convert_graph_to_trt_engine</span><span class="p">(</span>
+    <span class="n">engine_str</span> <span class="o">=</span> <span class="n">_C</span><span class="o">.</span><span class="n">convert_graph_to_trt_engine</span><span class="p">(</span>
         <span class="n">module</span><span class="o">.</span><span class="n">_c</span><span class="p">,</span> <span class="n">method_name</span><span class="p">,</span> <span class="n">_parse_compile_spec</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">)</span>
-    <span class="p">)</span></div>
+    <span class="p">)</span>
+
+    <span class="kn">import</span> <span class="nn">io</span>
+
+    <span class="k">with</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span> <span class="k">as</span> <span class="n">engine_bytes</span><span class="p">:</span>
+        <span class="n">engine_bytes</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">engine_str</span><span class="p">)</span>
+        <span class="n">engine_bytearray</span> <span class="o">=</span> <span class="n">engine_bytes</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">engine_bytearray</span></div>
 
 
 <div class="viewcode-block" id="embed_engine_in_new_module"><a class="viewcode-back" href="../../../py_api/ts.html#torch_tensorrt.ts.embed_engine_in_new_module">[docs]</a><span class="k">def</span> <span class="nf">embed_engine_in_new_module</span><span class="p">(</span>
-    <span class="n">serialized_engine</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">Device</span><span class="o">.</span><span class="n">_current_device</span><span class="p">()</span>
+    <span class="n">serialized_engine</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">Device</span> <span class="o">=</span> <span class="n">Device</span><span class="o">.</span><span class="n">_current_device</span><span class="p">(),</span>
+    <span class="n">input_binding_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[],</span>
+    <span class="n">output_binding_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Takes a pre-built serialized TensorRT engine and embeds it within a TorchScript module</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Takes a pre-built serialized TensorRT engine and embeds it within a TorchScript module</span>
 
 <span class="sd">    Takes a pre-built serialied TensorRT engine (as bytes) and embeds it within a TorchScript module.</span>
 <span class="sd">    Registers the forward method to execute the TensorRT engine with the function signature:</span>
 
 <span class="sd">        forward(Tensor[]) -&gt; Tensor[]</span>
 
-<span class="sd">    TensorRT bindings must have names with the following format:</span>
+<span class="sd">    TensorRT bindings either be explicitly specified using ``[in/out]put_binding_names`` or have names with the following format:</span>
 <span class="sd">      - [symbol].[index in input / output array]</span>
 <span class="sd">      ex.</span>
 <span class="sd">      - [x.0, x.1, x.2] -&gt; [y.0]</span>
@@ -610,16 +637,24 @@
 
 <span class="sd">    Keyword Arguments:</span>
 <span class="sd">        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device to run engine on. Must be compatible with engine provided. Default: Current active device</span>
-
+<span class="sd">        input_binding_names (List[str]): List of names of TensorRT bindings in order to be passed to the encompassing PyTorch module</span>
+<span class="sd">        output_binding_names (List[str]): List of names of TensorRT bindings in order that should be returned from the encompassing PyTorch module</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.jit.ScriptModule: New TorchScript module with engine embedded</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">cpp_mod</span> <span class="o">=</span> <span class="n">_C</span><span class="o">.</span><span class="n">embed_engine_in_new_module</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">,</span> <span class="n">_parse_device</span><span class="p">(</span><span class="n">device</span><span class="p">))</span>
+    <span class="n">cpp_mod</span> <span class="o">=</span> <span class="n">_C</span><span class="o">.</span><span class="n">embed_engine_in_new_module</span><span class="p">(</span>
+        <span class="n">serialized_engine</span><span class="p">,</span>
+        <span class="n">_parse_device</span><span class="p">(</span><span class="n">device</span><span class="p">),</span>
+        <span class="n">input_binding_names</span><span class="p">,</span>
+        <span class="n">output_binding_names</span><span class="p">,</span>
+    <span class="p">)</span>
     <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">_recursive</span><span class="o">.</span><span class="n">wrap_cpp_module</span><span class="p">(</span><span class="n">cpp_mod</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="check_method_op_support"><a class="viewcode-back" href="../../../py_api/ts.html#torch_tensorrt.ts.check_method_op_support">[docs]</a><span class="k">def</span> <span class="nf">check_method_op_support</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span><span class="p">,</span> <span class="n">method_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Checks to see if a method is fully supported by torch_tensorrt</span>
+<div class="viewcode-block" id="check_method_op_support"><a class="viewcode-back" href="../../../py_api/ts.html#torch_tensorrt.ts.check_method_op_support">[docs]</a><span class="k">def</span> <span class="nf">check_method_op_support</span><span class="p">(</span>
+    <span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span><span class="p">,</span> <span class="n">method_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;forward&quot;</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Checks to see if a method is fully supported by torch_tensorrt</span>
 
 <span class="sd">    Checks if a method of a TorchScript module can be compiled by torch_tensorrt, if not, a list of operators</span>
 <span class="sd">    that are not supported are printed out and the function returns false, else true.</span>
@@ -828,13 +863,9 @@
           <li>
             <a href="https://pytorch.org/ecosystem">Ecosystem</a>
           </li>
-
+            
           <li>
             <a href="https://pytorch.org/mobile">Mobile</a>
-          </li>
-
-          <li>
-            <a href="https://pytorch.org/hub">PyTorch Hub</a>
           </li>
 
           <li>
@@ -867,6 +898,18 @@
             </li>
 
             <li>
+              <a href="https://pytorch.org/torcharrow">torcharrow</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/data">TorchData</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/torchrec">TorchRec</a>
+            </li>
+
+            <li>
               <a href="https://pytorch.org/serve/">TorchServe</a>
             </li>
 
@@ -882,18 +925,15 @@
           <li class="resources-mobile-menu-title">
             Resources
           </li>
-
-          <ul class="resources-mobile-menu-items">
-            <li>
-              <a href="https://pytorch.org/resources">Developer Resources</a>
-            </li>
+            
+           <ul class="resources-mobile-menu-items">
 
             <li>
               <a href="https://pytorch.org/features">About</a>
             </li>
 
             <li>
-              <a href="https://pytorch.org/hub">Models (Beta)</a>
+              <a href="https://pytorch.org/foundation">PyTorch Foundation</a>
             </li>
 
             <li>
@@ -901,7 +941,23 @@
             </li>
 
             <li>
+              <a href="https://pytorch.org/community-stories">Community Stories</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/resources">Developer Resources</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/events">Events</a>
+            </li>
+
+            <li>
               <a href="https://discuss.pytorch.org/">Forums</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/hub">Models (Beta)</a>
             </li>
           </ul>
 

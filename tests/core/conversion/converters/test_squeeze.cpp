@@ -56,3 +56,29 @@ TEST(Converters, ATenSqueezeDontNeedSqueezeConvertsCorrectly) {
   ASSERT_TRUE(
       torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
+
+TEST(Converters, ATenSqueezeNoDimConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %1 : Tensor = aten::squeeze(%0)
+        return (%1))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto validate_squeeze_with_input = [&g](const at::Tensor& in) {
+    auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+    auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
+
+    params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+    auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  };
+
+  validate_squeeze_with_input(at::randint(1, 10, {2, 1, 3, 3}, {at::kCUDA}));
+  validate_squeeze_with_input(at::randint(1, 10, {1, 1, 1, 3}, {at::kCUDA}));
+  validate_squeeze_with_input(at::randint(1, 10, {1, 10, 1, 3}, {at::kCUDA}));
+  validate_squeeze_with_input(at::randint(1, 10, {2, 10, 3, 3}, {at::kCUDA}));
+  validate_squeeze_with_input(at::randint(1, 10, {1, 1}, {at::kCUDA}));
+  validate_squeeze_with_input(at::randint(1, 10, {1}, {at::kCUDA}));
+}

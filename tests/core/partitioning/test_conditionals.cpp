@@ -40,7 +40,7 @@ TEST(Partitioning, FallbackOnConditionalsCorrectly) {
 
   auto conditional_engines_count = count_trt_engines_in_conditionals(new_g);
 
-  ASSERT_TRUE(conditional_engines_count == 2);
+  ASSERT_TRUE(conditional_engines_count == 1);
 }
 
 TEST(Partitioning, FallbackInplaceOPInConditionalsCorrectly) {
@@ -71,5 +71,5 @@ TEST(Partitioning, FallbackInplaceOPInConditionalsCorrectly) {
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
   auto trt_mod = torch_tensorrt::core::CompileGraph(mod, cfg);
   auto trt_results = trt_mod.forward(trt_inputs_ivalues).toTensor();
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results, trt_results, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(jit_results, trt_results));
 }

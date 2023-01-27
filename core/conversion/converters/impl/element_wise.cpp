@@ -1,7 +1,8 @@
-#include <torch/torch.h>
+#include "c10/util/MathConstants.h"
 #include "core/conversion/converters/converter_util.h"
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
+#include "torch/torch.h"
 
 namespace torch_tensorrt {
 namespace core {
@@ -165,11 +166,11 @@ auto element_wise_registrations TORCHTRT_UNUSED =
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                // Should implement self - alpha * other
                auto self = args[0].ITensorOrFreeze(ctx);
-               auto scalar = args[2].unwrapToScalar().to<float>();
                auto other = args[1].ITensorOrFreeze(ctx);
+               auto scalar = args[2].unwrapToScalar();
 
-               if (1 != scalar) {
-                 auto alphaTensor = tensor_to_const(ctx, torch::tensor({scalar}));
+               if (1 != scalar.to<float>()) {
+                 auto alphaTensor = scalar_to_tensor(ctx, scalar);
                  auto scaleLayer = add_elementwise(
                      ctx,
                      nvinfer1::ElementWiseOperation::kPROD,
@@ -213,11 +214,11 @@ auto element_wise_registrations TORCHTRT_UNUSED =
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                // Should implement self - alpha * other
                auto self = args[0].ITensorOrFreeze(ctx);
-               auto scalar = args[2].unwrapToScalar().to<float>();
                auto other = args[1].ITensorOrFreeze(ctx);
+               auto scalar = args[2].unwrapToScalar();
 
-               if (1 != scalar) {
-                 auto alphaTensor = tensor_to_const(ctx, torch::tensor({scalar}));
+               if (1 != scalar.to<float>()) {
+                 auto alphaTensor = scalar_to_tensor(ctx, scalar);
                  auto scaleLayer = add_elementwise(
                      ctx,
                      nvinfer1::ElementWiseOperation::kPROD,
@@ -324,16 +325,29 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                      add_elementwise(ctx, nvinfer1::ElementWiseOperation::kFLOOR_DIV, self, other, util::node_info(n));
                } else if (rounding_mode == "trunc") {
                  // trunc = floor(abs(div)) * sign(div)
-                 auto tmp_div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, "tmp_div");
-                 auto abs = ctx->net->addUnary(*tmp_div->getOutput(0), nvinfer1::UnaryOperation::kABS);
-                 auto floor = ctx->net->addUnary(*abs->getOutput(0), nvinfer1::UnaryOperation::kFLOOR);
+                 auto tmp_div = add_elementwise(
+                     ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n) + "_tmp_div");
+                 auto abs = add_abs(ctx, n, tmp_div->getOutput(0), util::node_info(n) + "_absolute_val");
+
+                 // In this case, we allow the floor unary on non-TRT Unary types, as it is needed for this
+                 // specific function. Floor applied to non-float types equates to identity
+                 nvinfer1::ITensor* floor;
+
+                 if ((abs->getType() == nvinfer1::DataType::kINT32) || (abs->getType() == nvinfer1::DataType::kBOOL)) {
+                   LOG_DEBUG(
+                       "Tensor is of unsupported type " << abs->getType()
+                                                        << " for IUnaryLayer::kFLOOR. Using identity instead.");
+                   floor = abs;
+                 } else {
+                   auto floor_layer = ctx->net->addUnary(*abs, nvinfer1::UnaryOperation::kFLOOR);
+                   TORCHTRT_CHECK(floor_layer, "Unable to create floor layer from node: " << *n);
+                   floor_layer->setName((util::node_info(n) + "_floor").c_str());
+                   floor = floor_layer->getOutput(0);
+                 }
+
                  auto sign = ctx->net->addUnary(*tmp_div->getOutput(0), nvinfer1::UnaryOperation::kSIGN);
                  div = add_elementwise(
-                     ctx,
-                     nvinfer1::ElementWiseOperation::kPROD,
-                     floor->getOutput(0),
-                     sign->getOutput(0),
-                     util::node_info(n));
+                     ctx, nvinfer1::ElementWiseOperation::kPROD, floor, sign->getOutput(0), util::node_info(n));
                } else {
                  div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
                }
@@ -350,8 +364,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
             {"aten::div.Scalar(Tensor self, Scalar other) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto self = args[0].ITensorOrFreeze(ctx);
-               auto otherScalar = args[1].unwrapToScalar().to<float>();
-               auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
+               auto other = scalar_to_tensor(ctx, args[1].unwrapToScalar());
                auto div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
                TORCHTRT_CHECK(div, "Unable to create div layer from node: " << *n);
 
@@ -380,8 +393,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
             {"aten::div_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto self = args[0].ITensorOrFreeze(ctx);
-               auto otherScalar = args[1].unwrapToScalar().to<float>();
-               auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
+               auto other = scalar_to_tensor(ctx, args[1].unwrapToScalar());
                auto div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
                TORCHTRT_CHECK(div, "Unable to create div layer from node: " << *n);
 
@@ -480,18 +492,12 @@ auto element_wise_registrations TORCHTRT_UNUSED =
             {"aten::ne.Scalar(Tensor self, Scalar other) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto self = args[0].ITensorOrFreeze(ctx);
-               auto scalar = args[1].unwrapToScalar();
-               nvinfer1::ITensor* scalar_tensor;
-               if (self->getType() == nvinfer1::DataType::kFLOAT || self->getType() == nvinfer1::DataType::kHALF) {
-                 scalar_tensor = tensor_to_const(ctx, torch::tensor({scalar.to<float>()}));
-               } else {
-                 scalar_tensor = tensor_to_const(ctx, torch::tensor({scalar.to<int>()}));
-               }
+               auto other = scalar_to_tensor(ctx, args[1].unwrapToScalar());
                auto equal = add_elementwise(
                    ctx,
                    nvinfer1::ElementWiseOperation::kEQUAL,
                    self,
-                   scalar_tensor,
+                   other,
                    util::node_info(n) + std::string("is_equal"));
                TORCHTRT_CHECK(equal, "Unable to create elementwise equal layer from node: " << *n);
                // XOR with ones negates and produces not_equal result
@@ -533,8 +539,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
             {"aten::pow.Tensor_Scalar(Tensor self, Scalar exponent) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto self = args[0].ITensorOrFreeze(ctx);
-               auto exponentScalar = args[1].unwrapToScalar().to<float>();
-               auto exponent = tensor_to_const(ctx, torch::tensor({exponentScalar}));
+               auto exponent = scalar_to_tensor(ctx, args[1].unwrapToScalar());
                auto pow =
                    add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPOW, self, exponent, util::node_info(n));
                TORCHTRT_CHECK(pow, "Unable to create Power layer from node: " << *n);
@@ -565,8 +570,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                // TODO: Remove with functionalization
                auto self = args[0].ITensorOrFreeze(ctx);
-               auto otherScalar = args[1].unwrapToScalar().to<float>();
-               auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
+               auto other = scalar_to_tensor(ctx, args[1].unwrapToScalar());
                auto floor_divide =
                    add_elementwise(ctx, nvinfer1::ElementWiseOperation::kFLOOR_DIV, self, other, util::node_info(n));
                TORCHTRT_CHECK(floor_divide, "Unable to create floor_divide layer from node: " << *n);
@@ -681,9 +685,9 @@ auto element_wise_registrations TORCHTRT_UNUSED =
             {"aten::eq.Scalar(Tensor self, Scalar other) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto self = args[0].ITensorOrFreeze(ctx);
-               auto otherScalar = args[1].unwrapToScalar().to<float>();
-               auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
+               auto other = scalar_to_tensor(ctx, args[1].unwrapToScalar());
                if (self->getType() == nvinfer1::DataType::kBOOL) {
+                 auto otherScalar = args[1].unwrapToScalar().to<float>();
                  if (otherScalar == 0 || otherScalar == 1) {
                    LOG_DEBUG("Since input tensor is type bool, casting input tensor and scalar to int32");
                    other = castITensor(ctx, other, nvinfer1::DataType::kINT32);
@@ -803,6 +807,94 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], or_op->getOutput(0));
 
                LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+               return true;
+             }})
+        .pattern(
+            {"aten::atan2(Tensor self, Tensor other) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               // Element-wise divide input Tensors, apply atan unary, apply quadrant correction
+               auto self = args[0].ITensorOrFreeze(ctx);
+               auto other = args[1].ITensorOrFreeze(ctx);
+
+               // atan(self / other)
+               auto intermediate_div = add_elementwise(
+                   ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n) + "_intermediate_div");
+               auto atan2_intermediate =
+                   ctx->net->addUnary(*intermediate_div->getOutput(0), nvinfer1::UnaryOperation::kATAN);
+
+               // Constant tensors used for quadrant correction
+               auto ZERO = tensor_to_const(ctx, torch::tensor({0.}));
+               auto ONE = tensor_to_const(ctx, torch::tensor({1.}));
+               auto TWO = tensor_to_const(ctx, torch::tensor({2.}));
+               // Using PI float for TRT compatibility, however double is preferred for PyTorch
+               auto PI = tensor_to_const(ctx, torch::tensor({c10::pi<float>}));
+
+               // Quadrant correction is only needed when (other < 0) (elementwise)
+               // In this scenario, the correction is +/- pi, depending on the sign of self (elementwise)
+
+               // Full atan2 Formula is given by:
+               // atan2(self, other) = atan(self / other) - (other < 0) * (2 * (self < 0) - 1) * pi
+
+               // Mask of (other < 0)
+               auto other_mask = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kLESS,
+                   other,
+                   ZERO,
+                   util::node_info(n) + "_less_than_zero_other_mask");
+
+               // Mask of (self < 0)
+               auto self_mask = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kLESS,
+                   self,
+                   ZERO,
+                   util::node_info(n) + "_greater_than_zero_self_mask");
+
+               // Apply 2 * x - 1 to translate mask from {0, 1} to {-1, 1}
+               self_mask = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kPROD,
+                   self_mask->getOutput(0),
+                   TWO,
+                   util::node_info(n) + "_greater_than_zero_times_two_self_mask");
+               self_mask = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kSUB,
+                   self_mask->getOutput(0),
+                   ONE,
+                   util::node_info(n) + "_greater_than_zero_normalized_self_mask");
+
+               // Multiply mask by pi
+               self_mask = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kPROD,
+                   self_mask->getOutput(0),
+                   PI,
+                   util::node_info(n) + "_greater_than_zero_times_pi_self_mask");
+
+               // Take product of masks to generate correction term
+               auto correction_term = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kPROD,
+                   other_mask->getOutput(0),
+                   self_mask->getOutput(0),
+                   util::node_info(n) + "_correction_term");
+
+               // Add correction term to atan(self/other) to obtain atan2(self, other)
+               auto atan2 = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kSUB,
+                   atan2_intermediate->getOutput(0),
+                   correction_term->getOutput(0),
+                   util::node_info(n) + "_corrected_atan2");
+
+               TORCHTRT_CHECK(atan2, "Unable to create atan2 layer from node: " << *n);
+
+               atan2->setName(util::node_info(n).c_str());
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], atan2->getOutput(0));
+
+               LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
                return true;
              }});
 

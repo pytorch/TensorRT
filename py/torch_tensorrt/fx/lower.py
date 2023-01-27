@@ -12,13 +12,14 @@ from torch.fx.passes.splitter_base import SplitResult
 from .fx2trt import TRTInterpreter, TRTInterpreterResult
 from .lower_setting import LowerSetting
 from .passes.lower_pass_manager_builder import LowerPassManagerBuilder
-from .passes.pass_utils import decorate_method, PassFunc, validate_inference
+from .passes.pass_utils import PassFunc, validate_inference
 from .tools.timing_cache_utils import TimingCacheManager
 from .tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 
 from .tracer.acc_tracer import acc_tracer
 from .trt_module import TRTModule
-from .utils import LowerPrecision
+from .utils import LowerPrecision, proxytensor_trace
+
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ Input = Sequence[Any]
 def compile(
     module: nn.Module,
     input,
+    min_acc_module_size: int = 10,
     max_batch_size: int = 2048,
     max_workspace_size=1 << 25,
     explicit_batch_dimension=False,
@@ -37,6 +39,8 @@ def compile(
     save_timing_cache=False,
     cuda_graph_batch_size=-1,
     dynamic_batch=True,
+    is_aten=False,
+    use_experimental_fx_rt=False,
 ) -> nn.Module:
     """
     Takes in original module, input and lowering setting, run lowering workflow to turn module
@@ -46,6 +50,7 @@ def compile(
         module: Original module for lowering.
         input: Input for module.
         max_batch_size: Maximum batch size (must be >= 1 to be set, 0 means not set)
+        min_acc_module_size: Minimal number of nodes for an accelerated submodule
         max_workspace_size: Maximum size of workspace given to TensorRT.
         explicit_batch_dimension: Use explicit batch dimension in TensorRT if set True, otherwise use implicit batch dimension.
         lower_precision: lower_precision config given to TRTModule.
@@ -54,11 +59,18 @@ def compile(
         save_timing_cache: Update timing cache with current timing cache data if set to True.
         cuda_graph_batch_size: Cuda graph batch size, default to be -1.
         dynamic_batch: batch dimension (dim=0) is dynamic.
+        use_experimental_fx_rt: Uses the next generation TRTModule which supports both Python and TorchScript based execution (including in C++).
     Returns:
         A torch.nn.Module lowered by TensorRT.
     """
+    if use_experimental_fx_rt and not explicit_batch_dimension:
+        raise ValueError(
+            "The experimental unifed runtime only supports explicit batch. Please make sure to set explicit_batch_dimension=True when use_experimental_fx_rt=True"
+        )
+
     lower_setting = LowerSetting(
         max_batch_size=max_batch_size,
+        min_acc_module_size=min_acc_module_size,
         max_workspace_size=max_workspace_size,
         explicit_batch_dimension=explicit_batch_dimension,
         lower_precision=lower_precision,
@@ -67,6 +79,8 @@ def compile(
         save_timing_cache=save_timing_cache,
         cuda_graph_batch_size=cuda_graph_batch_size,
         dynamic_batch=dynamic_batch,
+        is_aten=is_aten,
+        use_experimental_rt=use_experimental_fx_rt,
     )
     lowerer = Lowerer.create(lower_setting=lower_setting)
     return lowerer(module, input)
@@ -98,6 +112,7 @@ class LowerTrtInterpreter:
         if self.timing_cache_manager:
             try:
                 cache_data = self.timing_cache_manager.get_timing_cache_trt(split_name)
+                logger.info("Timing cache is used!")
             except Exception as e:
                 logger.warning(f"Cannot load timing cache for {split_name}: {str(e)}")
                 cache_data = None
@@ -139,6 +154,7 @@ def default_split_function(
     splitter_setting = TRTSplitterSetting()
     splitter_setting.use_implicit_batch_dim = not lower_setting.explicit_batch_dimension
     splitter_setting.min_acc_module_size = lower_setting.min_acc_module_size
+    splitter_setting.use_experimental_rt = lower_setting.use_experimental_rt
     splitter = TRTSplitter(model, inputs, settings=splitter_setting)
     splitter.node_support_preview()
     return splitter.generate_split_results()
@@ -160,13 +176,34 @@ def default_lower_pass(
         """
         interpreter = create_trt_interpreter(lower_setting)
         interp_res: TRTInterpreterResult = interpreter(mod, input, module_name)
-        trt_module = TRTModule(
-            engine=interp_res.engine,
-            input_names=interp_res.input_names,
-            output_names=interp_res.output_names,
-            cuda_graph_batch_size=lower_setting.cuda_graph_batch_size,
-        )
-        return trt_module
+        if lower_setting.use_experimental_rt:
+            import io
+
+            from torch_tensorrt._Device import Device
+            from torch_tensorrt._TRTModuleNext import TRTModuleNext
+
+            with io.BytesIO() as engine_bytes:
+                engine_bytes.write(interp_res.engine.serialize())
+                engine_str = engine_bytes.getvalue()
+
+            trt_module = TRTModuleNext(
+                engine_str,
+                name=module_name,
+                input_binding_names=interp_res.input_names,
+                output_binding_names=interp_res.output_names,
+                target_device=Device(f"cuda:{torch.cuda.current_device()}"),
+                # cuda_graph_batch_size=lower_setting.cuda_graph_batch_size, # NOTE: Not sure what this is supposed to do
+            )
+            return trt_module
+
+        else:
+            trt_module = TRTModule(
+                engine=interp_res.engine,
+                input_names=interp_res.input_names,
+                output_names=interp_res.output_names,
+                cuda_graph_batch_size=lower_setting.cuda_graph_batch_size,
+            )
+            return trt_module
 
     return lower_pass
 
@@ -203,32 +240,46 @@ class Lowerer:
         split_func: Callable = default_split_function,
     ) -> "Lowerer":
         """Instantiate a `Lowerer` instance."""
-
-        return cls(
-            lower_pass_manager_builder=LowerPassManagerBuilder(
-                lower_setting=lower_setting,
-                trace_func=lambda module, inputs: acc_tracer.trace(
-                    module,
-                    inputs,  # type: ignore[arg-type]
-                    ast_rewriter_allow_list=lower_setting.ast_rewriter_allow_list,
-                    leaf_module_list=lower_setting.leaf_module_list,
-                ),
-                split_func=split_func,
-                lower_func=default_lower_pass(interpreter_builder),
+        if not lower_setting.is_aten:
+            return cls(
+                lower_pass_manager_builder=LowerPassManagerBuilder(
+                    lower_setting=lower_setting,
+                    trace_func=lambda module, inputs: acc_tracer.trace(
+                        module,
+                        inputs,  # type: ignore[arg-type]
+                        ast_rewriter_allow_list=lower_setting.ast_rewriter_allow_list,
+                        leaf_module_list=lower_setting.leaf_module_list,
+                    ),
+                    split_func=split_func,
+                    lower_func=default_lower_pass(interpreter_builder),
+                )
             )
-        )
+        # proxytensor_trace
+        else:
+            return cls(
+                lower_pass_manager_builder=LowerPassManagerBuilder(
+                    lower_setting=lower_setting,
+                    trace_func=lambda module, inputs: proxytensor_trace(module, inputs),
+                    split_func=split_func,
+                    lower_func=default_lower_pass(interpreter_builder),
+                )
+            )
 
     def __call__(
         self,
         module: nn.Module,
         inputs: Input,
         additional_inputs: Optional[Input] = None,
+        fp16_conversion_fn: Optional[Callable[[Input], Input]] = None,
     ) -> nn.Module:
         lower_setting = self.lower_pass_manager_builder.lower_setting
         atol = lower_setting.correctness_atol
         rtol = lower_setting.correctness_rtol
 
-        @validate_inference(atol=atol, rtol=rtol)
+        @validate_inference(
+            atol=atol,
+            rtol=rtol,
+        )
         def do_lower(module: nn.Module, inputs: Input) -> nn.Module:
             module.eval()
             if (
@@ -236,13 +287,35 @@ class Lowerer:
                 == LowerPrecision.FP16
             ):
                 module.half()
-                inputs = tuple(
-                    x.half() if x is not None and x.dtype == torch.float32 else x
-                    for x in inputs
+                # A custom conversion function can be passed to the lowerer to
+                # handle inputs with custom types. By default, just handle
+                # tensors and NoneType.
+                if fp16_conversion_fn is None:
+                    conversion_fn = (
+                        lambda x: x.half()
+                        if x is not None and x.dtype == torch.float32
+                        else x
+                    )
+                else:
+                    conversion_fn = fp16_conversion_fn
+
+                inputs = tuple(conversion_fn(x) for x in inputs)
+            if lower_setting.is_aten:
+                pm = self.lower_pass_manager_builder.build_aten2trt_lower_pipeline(
+                    inputs, additional_inputs
                 )
-            pm = self.lower_pass_manager_builder.build_trt_lower_pipeline(
-                inputs, additional_inputs
-            )
+            else:
+                pm = self.lower_pass_manager_builder.build_trt_lower_pipeline(
+                    inputs, additional_inputs
+                )
+            if lower_setting.is_aten:
+                pm = self.lower_pass_manager_builder.build_aten2trt_lower_pipeline(
+                    inputs, additional_inputs
+                )
+            else:
+                pm = self.lower_pass_manager_builder.build_trt_lower_pipeline(
+                    inputs, additional_inputs
+                )
             lower_result = pm(module)
             return lower_result
 

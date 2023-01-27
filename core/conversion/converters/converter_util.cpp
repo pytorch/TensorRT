@@ -13,7 +13,8 @@ nvinfer1::ITensor* addPadding(
     nvinfer1::ITensor* tensor,
     int nDim,
     bool trailing,
-    bool use_zeros) {
+    bool use_zeros,
+    const std::string& name) {
   const auto dims = tensor->getDimensions();
 
   if (dims.nbDims < nDim) {
@@ -27,7 +28,11 @@ nvinfer1::ITensor* addPadding(
     TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer");
     shuffle_layer->setReshapeDimensions(newDims);
     shuffle_layer->setZeroIsPlaceholder(use_zeros);
-    shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + ']').c_str());
+    if (name.size()) {
+      shuffle_layer->setName(name.c_str());
+    } else {
+      shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + ']').c_str());
+    }
     return shuffle_layer->getOutput(0);
   } else {
     return tensor;
@@ -40,7 +45,8 @@ nvinfer1::ITensor* addUnpadding(
     nvinfer1::ITensor* tensor,
     int nDim,
     bool trailing,
-    bool use_zeros) {
+    bool use_zeros,
+    const std::string& name) {
   const auto dims = tensor->getDimensions();
   if (dims.nbDims > nDim) {
     auto newDims = dims;
@@ -52,7 +58,11 @@ nvinfer1::ITensor* addUnpadding(
     TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer");
     shuffle_layer->setReshapeDimensions(newDims);
     shuffle_layer->setZeroIsPlaceholder(use_zeros);
-    shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + "]").c_str());
+    if (name.size()) {
+      shuffle_layer->setName(name.c_str());
+    } else {
+      shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + ']').c_str());
+    }
     return shuffle_layer->getOutput(0);
   } else {
     return tensor;
@@ -156,6 +166,38 @@ nvinfer1::ILayer* add_elementwise(
   return ele;
 }
 
+nvinfer1::ITensor* add_abs(
+    ConversionCtx* ctx,
+    const torch::jit::Node* n,
+    nvinfer1::ITensor* self,
+    const std::string& name) {
+  nvinfer1::ILayer* absolute_value_layer;
+
+  // Check if TRT Unary ops support the input type
+  bool unary_supported_input = (self->getType() == nvinfer1::DataType::kFLOAT) ||
+      (self->getType() == nvinfer1::DataType::kHALF) || (self->getType() == nvinfer1::DataType::kINT8);
+  if (unary_supported_input) {
+    absolute_value_layer = ctx->net->addUnary(*self, nvinfer1::UnaryOperation::kABS);
+    TORCHTRT_CHECK(absolute_value_layer, "Unable to create abs layer from node: " << *n);
+    absolute_value_layer->setName(name.c_str());
+  } else {
+    LOG_GRAPH(
+        "Tensor is of unsupported type "
+        << self->getType() << " for IUnaryLayer::kABS. Using backup implementation via IElementWise (max(x, -x)");
+    // For types not supported by kABS, use an elementwise implementation abs(x) = max(x, -1 * x)
+    at::Tensor neg_one = torch::full({1}, -1).to(util::TRTDataTypeToScalarType(self->getType()));
+    auto neg_one_const = tensor_to_const(ctx, neg_one);
+    auto neg_layer = add_elementwise(
+        ctx, nvinfer1::ElementWiseOperation::kPROD, self, neg_one_const, util::node_info(n) + std::string("_Negation"));
+    TORCHTRT_CHECK(neg_layer, "Unable to create prod layer from node: " << *n);
+    absolute_value_layer =
+        add_elementwise(ctx, nvinfer1::ElementWiseOperation::kMAX, self, neg_layer->getOutput(0), name);
+    TORCHTRT_CHECK(absolute_value_layer, "Unable to create max layer from node: " << *n);
+  }
+
+  return absolute_value_layer->getOutput(0);
+}
+
 nvinfer1::ITensor* applyIdentityOp(ConversionCtx* ctx, nvinfer1::ITensor* tensor, const std::string& tensor_name) {
   auto id_layer = ctx->net->addIdentity(*tensor);
   auto id_out_tensor = id_layer->getOutput(0);
@@ -163,7 +205,11 @@ nvinfer1::ITensor* applyIdentityOp(ConversionCtx* ctx, nvinfer1::ITensor* tensor
   return id_out_tensor;
 }
 
-nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nvinfer1::DataType dtype) {
+nvinfer1::ITensor* castITensor(
+    ConversionCtx* ctx,
+    nvinfer1::ITensor* tensor,
+    nvinfer1::DataType dtype,
+    const std::string& layer_name_prefix) {
   if (tensor->getType() != dtype) {
     std::ostringstream tensor_id;
     tensor_id << reinterpret_cast<int*>(tensor);
@@ -177,6 +223,9 @@ nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nv
     LOG_DEBUG(ctx->logger, "Casting ITensor " << tensor_id.str() << " from " << tensor->getType() << " to " << dtype);
 
     std::stringstream ss;
+    if (layer_name_prefix.size()) {
+      ss << layer_name_prefix << " ";
+    }
     ss << "[Cast ITensor " << tensor_id.str() << " from " << tensor->getType() << " to " << dtype << "]";
     id_layer->setName(ss.str().c_str());
     return casted_tensor;

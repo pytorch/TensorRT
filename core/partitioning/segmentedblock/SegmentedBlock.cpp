@@ -1,4 +1,5 @@
 #include "SegmentedBlock.h"
+#include "core/util/prelude.h"
 
 namespace torch_tensorrt {
 namespace core {
@@ -54,6 +55,24 @@ torch::jit::Value* SegmentedBlock::getOrAddInputForValue(torch::jit::Value* old_
   } else {
     return old_to_new_[old_value];
   }
+}
+
+std::vector<ir::Input> SegmentedBlock::construct_inputs_spec() const {
+  std::vector<ir::Input> inputs;
+  if (min_shapes_.size() == opt_shapes_.size() && opt_shapes_.size() == max_shapes_.size()) {
+    for (uint64_t i = 0; i < opt_shapes_.size(); i++) {
+      auto in = ir::Input(min_shapes_[i], opt_shapes_[i], max_shapes_[i]);
+      in.dtype = in_types_[i];
+      inputs.push_back(in);
+    }
+  } else {
+    for (uint64_t i = 0; i < opt_shapes_.size(); i++) {
+      auto in = ir::Input(opt_shapes_[i]);
+      in.dtype = in_types_[i];
+      inputs.push_back(in);
+    }
+  }
+  return inputs;
 }
 
 torch::jit::Node* SegmentedBlock::cloneNode(torch::jit::Node* node) {

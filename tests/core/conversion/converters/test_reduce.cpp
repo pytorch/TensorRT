@@ -5,6 +5,7 @@
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
 #include "torch/csrc/jit/passes/common_subexpression_elimination.h"
+#include "torch/torch.h"
 
 namespace {
 std::string gen_basic_graph(const std::string& op) {
@@ -136,6 +137,16 @@ converts_keepdims_correctly(mean, Mean);
 
 #undef converts_keepdims_correctly
 
+TEST(Converters, ATenSumBoolConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %4 : None = prim::Constant()
+      %5 : Tensor = aten::sum(%0, %4)
+      return (%5))IR";
+  auto in = at::randint(-1, 2, {4, 4, 4}, at::kCUDA).to(at::kBool);
+  test_body(graph, in);
+}
+
 TEST(Converters, ATenSumDimNegOneIndexConvertsCorrectly) {
   const auto graph = R"IR(
     graph(%0 : Tensor):
@@ -159,6 +170,19 @@ TEST(Converters, ATenSumDimNegOneIndexKeepDimsConvertsCorrectly) {
       %5 : Tensor = aten::sum(%0, %2, %3, %4)
       return (%5))IR";
   auto in = at::randint(-5, 5, {4, 4, 4}, at::kCUDA);
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenSumDimNegOneIndexKeepDimsBoolTensorConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=-1]()
+      %2 : int[] = prim::ListConstruct(%1)
+      %3 : bool = prim::Constant[value=1]()
+      %4 : None = prim::Constant()
+      %5 : Tensor = aten::sum(%0, %2, %3, %4)
+      return (%5))IR";
+  auto in = at::randint(0, 2, {4, 4, 4}, at::kCUDA).to(torch::kBool);
   test_body(graph, in);
 }
 
@@ -465,7 +489,8 @@ TEST(Converters, UnpackStdUnbiasedKeepDimsLowersCorrectly) {
         %5 : bool = prim::Constant[value=0]() # test_zeros.py:10:65
         %4 : bool = prim::Constant[value=1]() # test_zeros.py:10:50
         %3 : int = prim::Constant[value=0]() # test_zeros.py:10:39
-        %6 : int[] = prim::ListConstruct(%3)
+        %one : int = prim::Constant[value=1]()
+        %6 : int[] = prim::ListConstruct(%3, %one)
         %7 : Tensor = aten::std(%x.1, %6, %4, %5) # test_zeros.py:10:26
         return (%7))IR";
 

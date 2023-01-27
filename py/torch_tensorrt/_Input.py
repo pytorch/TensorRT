@@ -219,7 +219,9 @@ class Input(object):
     @staticmethod
     def _parse_dtype(dtype: Any) -> _enums.dtype:
         if isinstance(dtype, torch.dtype):
-            if dtype == torch.int32:
+            if dtype == torch.long:
+                return _enums.dtype.long
+            elif dtype == torch.int32:
                 return _enums.dtype.int32
             elif dtype == torch.half:
                 return _enums.dtype.half
@@ -229,7 +231,7 @@ class Input(object):
                 return _enums.dtype.bool
             else:
                 raise TypeError(
-                    "Provided an unsupported data type as an input data type (support: bool, int32, half, float), got: "
+                    "Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: "
                     + str(dtype)
                 )
 
@@ -241,6 +243,9 @@ class Input(object):
                 "Input data type needs to be specified with a torch.dtype or a torch_tensorrt.dtype, got: "
                 + str(type(dtype))
             )
+
+    def is_trt_dtype(self) -> bool:
+        return self.dtype != _enums.dtype.long
 
     @staticmethod
     def _parse_format(format: Any) -> _enums.TensorFormat:
@@ -263,7 +268,16 @@ class Input(object):
             )
 
     @classmethod
-    def _from_tensor(cls, t: torch.Tensor):
+    def from_tensor(cls, t: torch.Tensor) -> "Input":
+        """
+        Produce a Input which contains the information of the given PyTorch tensor.
+
+        Args:
+            tensor (torch.Tensor): A PyTorch tensor.
+
+        Returns:
+            A Input object.
+        """
         if not any(
             [
                 t.is_contiguous(memory_format=torch.contiguous_format),
@@ -271,7 +285,7 @@ class Input(object):
             ]
         ):
             raise ValueError(
-                "Tensor does not have a supported contiguous memory format, supported formats are contiguous or channel_last"
+                "Tensor does not have a supported memory format, supported formats are contiguous or channel_last"
             )
         frmt = (
             torch.contiguous_format
@@ -279,3 +293,65 @@ class Input(object):
             else torch.channels_last
         )
         return cls(shape=t.shape, dtype=t.dtype, format=frmt)
+
+    @classmethod
+    def from_tensors(cls, ts: torch.Tensor) -> List["Input"]:
+        """
+        Produce a list of Inputs which contain
+        the information of all the given PyTorch tensors.
+
+        Args:
+            tensors (Iterable[torch.Tensor]): A list of PyTorch tensors.
+
+        Returns:
+            A list of Inputs.
+        """
+
+        assert isinstance(ts, (list, tuple))
+        return [cls.from_tensor(t) for t in ts]
+
+    def example_tensor(self, optimization_profile_field: str = None) -> torch.Tensor:
+        """
+        Get an example tensor of the shape specified by the Input object
+
+        Args:
+            optimization_profile_field (Optional(str)): Name of the field to use for shape in the case the Input is dynamically shaped
+
+        Returns:
+            A PyTorch Tensor
+        """
+        if optimization_profile_field is not None:
+            try:
+                assert any(
+                    [
+                        optimization_profile_field == field_name
+                        for field_name in ["min_shape", "opt_shape", "max_shape"]
+                    ]
+                )
+            except:
+                raise ValueError(
+                    "Invalid field name, expected one of min_shape, opt_shape, max_shape"
+                )
+
+        if (
+            optimization_profile_field is not None
+            and self.shape_mode == Input._ShapeMode.STATIC
+        ):
+            raise ValueError(
+                "Specified a optimization profile field but the input is static"
+            )
+
+        if (
+            optimization_profile_field is None
+            and self.shape_mode == Input._ShapeMode.DYNAMIC
+        ):
+            raise ValueError(
+                "Requested an example tensor from a dynamic shaped input but did not specific which profile field to use."
+            )
+
+        if self.shape_mode == Input._ShapeMode.STATIC:
+            return torch.randn(self.shape).to(dtype=self.dtype)
+        else:
+            return torch.randn(self.shape[optimization_profile_field]).to(
+                dtype=self.dtype
+            )

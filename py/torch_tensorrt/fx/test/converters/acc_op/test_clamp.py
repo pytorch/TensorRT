@@ -12,6 +12,7 @@ class TestClampConverter(AccTestCase):
             param("min", min=0.5),
             param("max", max=0.5),
             param("minBiggerThanMax", min=1, max=0),
+            param("float32Boundary", min=-3.4028234663852886e38),
         ]
     )
     def test_clamp(
@@ -45,6 +46,11 @@ class TestClampConverter(AccTestCase):
             def forward(self, x):
                 return torch.clamp(x, min, max)
 
+        class TestScalarModule(torch.nn.Module):
+            def forward(self, x):
+                y = torch.sum(x)
+                return torch.clamp(y, min, max)
+
         input_specs = [
             InputTensorSpec(
                 shape=(-1, -1, 3, 3),
@@ -55,6 +61,9 @@ class TestClampConverter(AccTestCase):
 
         self.run_test_with_dynamic_shape(
             TestModule(), input_specs, expected_ops={acc_ops.clamp}
+        )
+        self.run_test_with_dynamic_shape(
+            TestScalarModule(), input_specs, expected_ops={acc_ops.clamp}
         )
 
 

@@ -51,6 +51,6 @@ class ModelPackagerTest(unittest.TestCase):
         reload_model = pi.load_pickle("repro", "model")
         reload_inputs = pi.load_pickle("repro", "inputs")
 
-        torch.testing.assert_allclose(model(*inputs), reload_model(*reload_inputs))
+        torch.testing.assert_close(model(*inputs), reload_model(*reload_inputs))
         keys = dict(reload_model.named_children()).keys()
         self.assertEqual(keys, {"_holder"})

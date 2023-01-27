@@ -26,7 +26,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "<img src=\"http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_efficientnet/nvidia_logo.png\" width=\"90px\">\n",
+    "<img src=\"http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png\" style=\"width: 90px; float: right;\">\n",
     "\n",
     "# Torch-TensorRT Getting Started - EfficientNet-B0"
    ]
@@ -658,7 +658,7 @@
     "In this notebook, we have walked through the complete process of compiling TorchScript models with Torch-TensorRT for EfficientNet-B0 model and test the performance impact of the optimization. With Torch-TensorRT, we observe a speedup of **1.35x** with FP32, and **3.13x** with FP16 on an NVIDIA 3090 GPU. These acceleration numbers will vary from GPU to GPU(as well as implementation to implementation based on the ops used) and we encorage you to try out latest generation of Data center compute cards for maximum acceleration.\n",
     "\n",
     "### What's next\n",
-    "Now it's time to try Torch-TensorRT on your own model. If you run into any issues, you can fill them at https://github.com/pytorch/TensorRT. Your involvement will help future development of Torch-TensorRT.\n"
+    "Now it's time to try Torch-TensorRT on your own model. If you run into any issues, you can fill them at https://github.com/NVIDIA/Torch-TensorRT. Your involvement will help future development of Torch-TensorRT.\n"
    ]
   },
   {
@@ -685,7 +685,7 @@
    "name": "python",
    "nbconvert_exporter": "python",
    "pygments_lexer": "ipython3",
-   "version": "3.8.13"
+   "version": "3.8.12"
   }
  },
  "nbformat": 4,

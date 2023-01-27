@@ -44,6 +44,14 @@ class TestInterpolateConverter(AccTestCase):
                 (None),
             ),  # linear for 4D only
             (
+                "4d_dim_scale_bilinear_align_corners_bool",
+                (2, 3, 4, 5),
+                (None),
+                (2),
+                ("bilinear"),
+                (False),
+            ),  # linear for 4D only
+            (
                 "4d_dim_scale_align",
                 (2, 3, 4, 5),
                 (None),

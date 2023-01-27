@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Torch-TensorRT (FX Frontend) User Guide &mdash; Torch-TensorRT master documentation</title>
+  <title>Torch-TensorRT (FX Frontend) User Guide &mdash; Torch-TensorRT v1.4.0dev0+b2b6871 documentation</title>
   
 
   
@@ -114,12 +114,16 @@
                   <span class="dropdown-title">torchvision</span>
                   <p></p>
                 </a>
-                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchrec">
-                  <span class="dropdown-title">TorchRec</span>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torcharrow">
+                  <span class="dropdown-title">torcharrow</span>
                   <p></p>
                 </a>
                 <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/data">
                   <span class="dropdown-title">TorchData</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchrec">
+                  <span class="dropdown-title">TorchRec</span>
                   <p></p>
                 </a>
                 <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/serve/">
@@ -147,13 +151,25 @@
                   <span class="dropdown-title">About</span>
                   <p>Learn about PyTorch’s features and capabilities</p>
                 </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/foundation">
+                  <span class="dropdown-title">PyTorch Foundation</span>
+                  <p>Learn about the PyTorch foundation</p>
+                </a>
                 <a class="nav-dropdown-item" href="https://pytorch.org/#community-module">
                   <span class="dropdown-title">Community</span>
                   <p>Join the PyTorch developer community to contribute, learn, and get your questions answered.</p>
                 </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/community-stories">
+                  <span class="dropdown-title">Community Stories</span>
+                  <p>Learn how our community solves real, everyday machine learning problems with PyTorch.</p>
+                </a>
                 <a class="nav-dropdown-item" href="https://pytorch.org/resources">
                   <span class="dropdown-title">Developer Resources</span>
                   <p>Find resources and get questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/events">
+                  <span class="dropdown-title">Events</span>
+                  <p>Find events, webinars, and podcasts</p>
                 </a>
                 <a class="nav-dropdown-item" href="https://discuss.pytorch.org/" target="_blank">
                   <span class="dropdown-title">Forums</span>
@@ -199,7 +215,7 @@
               
               
                 <div class="version">
-                  master (1.3.0a0+c096f31)
+                  v1.4.0dev0+b2b6871
                 </div>
               
             
@@ -357,28 +373,28 @@ workflow to be very accessible to researchers and engineers. There are a few sta
 user want to use this tool and we will introduce them here.</p>
 <p>&gt; Torch-TensorRT (FX Frontend) is in <code class="docutils literal notranslate"><span class="pre">Beta</span></code> and currently it is recommended to work with PyTorch nightly.</p>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="c1"># Test an example by</span>
-$ python py/torch_tensorrt/fx/example/lower_example.py
+$<span class="w"> </span>python<span class="w"> </span>py/torch_tensorrt/fx/example/lower_example.py
 </pre></div>
 </div>
 <section id="converting-a-pytorch-model-to-tensorrt-engine">
 <h2>Converting a PyTorch Model to TensorRT Engine<a class="headerlink" href="#converting-a-pytorch-model-to-tensorrt-engine" title="Permalink to this headline">¶</a></h2>
 <p>In general, users are welcome to use the <code class="docutils literal notranslate"><span class="pre">compile()</span></code> to finish the conversion from a model to tensorRT engine. It is a
 wrapper API that consists of the major steps needed to finish this converison. Please refer to an example usage in <code class="docutils literal notranslate"><span class="pre">lower_example.py</span></code> file under <code class="docutils literal notranslate"><span class="pre">examples/fx</span></code>.</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>def compile<span class="o">(</span>
-    module: nn.Module,
-    input,
-    <span class="nv">max_batch_size</span><span class="o">=</span><span class="m">2048</span>,
-    <span class="nv">max_workspace_size</span><span class="o">=</span><span class="m">33554432</span>,
-    <span class="nv">explicit_batch_dimension</span><span class="o">=</span>False,
-    <span class="nv">lower_precision</span><span class="o">=</span>LowerPrecision.FP16,
-    <span class="nv">verbose_log</span><span class="o">=</span>False,
-    <span class="nv">timing_cache_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span>,
-    <span class="nv">save_timing_cache</span><span class="o">=</span>False,
-    <span class="nv">cuda_graph_batch_size</span><span class="o">=</span>-1,
-    <span class="nv">dynamic_batch</span><span class="o">=</span>True,
-<span class="o">)</span> -&gt; nn.Module:
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>def<span class="w"> </span>compile<span class="o">(</span>
+<span class="w">    </span>module:<span class="w"> </span>nn.Module,
+<span class="w">    </span>input,
+<span class="w">    </span><span class="nv">max_batch_size</span><span class="o">=</span><span class="m">2048</span>,
+<span class="w">    </span><span class="nv">max_workspace_size</span><span class="o">=</span><span class="m">33554432</span>,
+<span class="w">    </span><span class="nv">explicit_batch_dimension</span><span class="o">=</span>False,
+<span class="w">    </span><span class="nv">lower_precision</span><span class="o">=</span>LowerPrecision.FP16,
+<span class="w">    </span><span class="nv">verbose_log</span><span class="o">=</span>False,
+<span class="w">    </span><span class="nv">timing_cache_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span>,
+<span class="w">    </span><span class="nv">save_timing_cache</span><span class="o">=</span>False,
+<span class="w">    </span><span class="nv">cuda_graph_batch_size</span><span class="o">=</span>-1,
+<span class="w">    </span><span class="nv">dynamic_batch</span><span class="o">=</span>True,
+<span class="o">)</span><span class="w"> </span>-&gt;<span class="w"> </span>nn.Module:
 
-    <span class="s2">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="s2">&quot;&quot;&quot;</span>
 <span class="s2">    Takes in original module, input and lowering setting, run lowering workflow to turn module</span>
 <span class="s2">    into lowered module, or so called TRTModule.</span>
 
@@ -405,16 +421,16 @@ Users can refer to <code class="docutils literal notranslate"><span class="pre">
 <li><p><strong>Step 1: Trace the model with acc_tracer</strong></p></li>
 </ul>
 <p>Acc_tracer is a tracer inheritated from FX tracer. It comes with args normalizer to convert all args to kwargs and pass to TRT converters.</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>import<span class="w"> </span>torch_tensorrt.fx.tracer.acc_tracer.acc_tracer<span class="w"> </span>as<span class="w"> </span>acc_tracer
 
 <span class="c1"># Build the model which needs to be a PyTorch nn.Module.</span>
-<span class="nv">my_pytorch_model</span> <span class="o">=</span> build_model<span class="o">()</span>
+<span class="nv">my_pytorch_model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>build_model<span class="o">()</span>
 
 <span class="c1"># Prepare inputs to the model. Inputs have to be a List of Tensors</span>
-<span class="nv">inputs</span> <span class="o">=</span> <span class="o">[</span>Tensor, Tensor, ...<span class="o">]</span>
+<span class="nv">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">[</span>Tensor,<span class="w"> </span>Tensor,<span class="w"> </span>...<span class="o">]</span>
 
 <span class="c1"># Trace the model with acc_tracer.</span>
-<span class="nv">acc_mod</span> <span class="o">=</span> acc_tracer.trace<span class="o">(</span>my_pytorch_model, inputs<span class="o">)</span>
+<span class="nv">acc_mod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>acc_tracer.trace<span class="o">(</span>my_pytorch_model,<span class="w"> </span>inputs<span class="o">)</span>
 </pre></div>
 </div>
 <p><em>Common Errors:</em></p>
@@ -429,83 +445,73 @@ This means the model contains dynamic control flow. Please refer to section “D
 2. Inputs, outputs and activations have batch dimension as the major dimension.
 3. All the operators in the model do not modify batch dimension (permute, transpose, split, etc.) or compute over batch dimension (sum, softmax, etc.).</p>
 <p>For examples of the last path, if we have a 3D tensor t shaped as (batch, sequence, dimension), operations such as torch.transpose(0, 2). If any of these three are not satisfied, we’ll need to specify InputTensorSpec as inputs with dynamic range.</p>
-<p>c</p>
-<blockquote>
-<div><p>import deeplearning.trt.fx2trt.converter.converters
-from torch.fx.experimental.fx2trt.fx2trt import InputTensorSpec, TRTInterpreter</p>
-<p># InputTensorSpec is a dataclass we use to store input information.
-# There’re two ways we can build input_specs.
-# Option 1, build it manually.
-input_specs = [</p>
-<blockquote>
-<div><p>InputTensorSpec(shape=(1, 2, 3), dtype=torch.float32),
-InputTensorSpec(shape=(1, 4, 5), dtype=torch.float32),</p>
-</div></blockquote>
-<p>]
-# Option 2, build it using sample_inputs where user provide a sample
-inputs = [
-torch.rand((1,2,3), dtype=torch.float32),
-torch.rand((1,4,5), dtype=torch.float32),
-]
-input_specs = InputTensorSpec.from_tensors(inputs)</p>
-<p># IMPORTANT: If dynamic shape is needed, we need to build it slightly differently.
-input_specs = [</p>
-<blockquote>
-<div><dl>
-<dt>InputTensorSpec(</dt><dd><p>shape=(-1, 2, 3),
-dtype=torch.float32,
-# Currently we only support one set of dynamic range. User may set other dimensions but it is not promised to work for any models
-# (min_shape, optimize_target_shape, max_shape)
-# For more information refer to fx/input_tensor_spec.py
-shape_ranges = [</p>
-<blockquote>
-<div><p>((1, 2, 3), (4, 2, 3), (100, 2, 3)),</p>
-</div></blockquote>
-<p>],</p>
-</dd>
-</dl>
-<p>),
-InputTensorSpec(shape=(1, 4, 5), dtype=torch.float32),</p>
-</div></blockquote>
-<p>]</p>
-<p># Build a TRT interpreter. Set explicit_batch_dimension accordingly.
-interpreter = TRTInterpreter(</p>
-<blockquote>
-<div><p>acc_mod, input_specs, explicit_batch_dimension=True/False</p>
-</div></blockquote>
-<p>)</p>
-<p># The output of TRTInterpreter run() is wrapped as TRTInterpreterResult.
-# The TRTInterpreterResult contains required parameter to build TRTModule,
-# and other informational output from TRTInterpreter run.
-class TRTInterpreterResult(NamedTuple):</p>
-<blockquote>
-<div><p>engine: Any
-input_names: Sequence[str]
-output_names: Sequence[str]
-serialized_cache: bytearray</p>
-</div></blockquote>
-<p>#max_batch_size: set accordingly for maximum batch size you will use.
-#max_workspace_size: set to the maximum size we can afford for temporary buffer
-#lower_precision: the precision model layers are running on (TensorRT will choose the best perforamnce precision).
-#sparse_weights: allow the builder to examine weights and use optimized functions when weights have suitable sparsity
-#force_fp32_output: force output to be fp32
-#strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric #reasons.
-#algorithm_selector: set up algorithm selection for certain layer
-#timing_cache: enable timing cache for TensorRT
-#profiling_verbosity: TensorRT logging level
-trt_interpreter_result = interpreter.run(</p>
-<blockquote>
-<div><p>max_batch_size=64,
-max_workspace_size=1 &lt;&lt; 25,
-sparse_weights=False,
-force_fp32_output=False,
-strict_type_constraints=False,
-algorithm_selector=None,
-timing_cache=None,
-profiling_verbosity=None,</p>
-</div></blockquote>
-<p>)</p>
-</div></blockquote>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>import<span class="w"> </span>deeplearning.trt.fx2trt.converter.converters
+from<span class="w"> </span>torch.fx.experimental.fx2trt.fx2trt<span class="w"> </span>import<span class="w"> </span>InputTensorSpec,<span class="w"> </span>TRTInterpreter
+
+<span class="c1"># InputTensorSpec is a dataclass we use to store input information.</span>
+<span class="c1"># There&#39;re two ways we can build input_specs.</span>
+<span class="c1"># Option 1, build it manually.</span>
+<span class="nv">input_specs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">[</span>
+<span class="w">  </span>InputTensorSpec<span class="o">(</span><span class="nv">shape</span><span class="o">=(</span><span class="m">1</span>,<span class="w"> </span><span class="m">2</span>,<span class="w"> </span><span class="m">3</span><span class="o">)</span>,<span class="w"> </span><span class="nv">dtype</span><span class="o">=</span>torch.float32<span class="o">)</span>,
+<span class="w">  </span>InputTensorSpec<span class="o">(</span><span class="nv">shape</span><span class="o">=(</span><span class="m">1</span>,<span class="w"> </span><span class="m">4</span>,<span class="w"> </span><span class="m">5</span><span class="o">)</span>,<span class="w"> </span><span class="nv">dtype</span><span class="o">=</span>torch.float32<span class="o">)</span>,
+<span class="o">]</span>
+<span class="c1"># Option 2, build it using sample_inputs where user provide a sample</span>
+<span class="nv">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">[</span>
+torch.rand<span class="o">((</span><span class="m">1</span>,2,3<span class="o">)</span>,<span class="w"> </span><span class="nv">dtype</span><span class="o">=</span>torch.float32<span class="o">)</span>,
+torch.rand<span class="o">((</span><span class="m">1</span>,4,5<span class="o">)</span>,<span class="w"> </span><span class="nv">dtype</span><span class="o">=</span>torch.float32<span class="o">)</span>,
+<span class="o">]</span>
+<span class="nv">input_specs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>InputTensorSpec.from_tensors<span class="o">(</span>inputs<span class="o">)</span>
+
+<span class="c1"># IMPORTANT: If dynamic shape is needed, we need to build it slightly differently.</span>
+<span class="nv">input_specs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">[</span>
+<span class="w">    </span>InputTensorSpec<span class="o">(</span>
+<span class="w">        </span><span class="nv">shape</span><span class="o">=(</span>-1,<span class="w"> </span><span class="m">2</span>,<span class="w"> </span><span class="m">3</span><span class="o">)</span>,
+<span class="w">        </span><span class="nv">dtype</span><span class="o">=</span>torch.float32,
+<span class="w">        </span><span class="c1"># Currently we only support one set of dynamic range. User may set other dimensions but it is not promised to work for any models</span>
+<span class="w">        </span><span class="c1"># (min_shape, optimize_target_shape, max_shape)</span>
+<span class="w">        </span><span class="c1"># For more information refer to fx/input_tensor_spec.py</span>
+<span class="w">        </span><span class="nv">shape_ranges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">[</span>
+<span class="w">            </span><span class="o">((</span><span class="m">1</span>,<span class="w"> </span><span class="m">2</span>,<span class="w"> </span><span class="m">3</span><span class="o">)</span>,<span class="w"> </span><span class="o">(</span><span class="m">4</span>,<span class="w"> </span><span class="m">2</span>,<span class="w"> </span><span class="m">3</span><span class="o">)</span>,<span class="w"> </span><span class="o">(</span><span class="m">100</span>,<span class="w"> </span><span class="m">2</span>,<span class="w"> </span><span class="m">3</span><span class="o">))</span>,
+<span class="w">        </span><span class="o">]</span>,
+<span class="w">    </span><span class="o">)</span>,
+<span class="w">    </span>InputTensorSpec<span class="o">(</span><span class="nv">shape</span><span class="o">=(</span><span class="m">1</span>,<span class="w"> </span><span class="m">4</span>,<span class="w"> </span><span class="m">5</span><span class="o">)</span>,<span class="w"> </span><span class="nv">dtype</span><span class="o">=</span>torch.float32<span class="o">)</span>,
+<span class="o">]</span>
+
+<span class="c1"># Build a TRT interpreter. Set explicit_batch_dimension accordingly.</span>
+<span class="nv">interpreter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>TRTInterpreter<span class="o">(</span>
+<span class="w">    </span>acc_mod,<span class="w"> </span>input_specs,<span class="w"> </span><span class="nv">explicit_batch_dimension</span><span class="o">=</span>True/False
+<span class="o">)</span>
+
+<span class="c1"># The output of TRTInterpreter run() is wrapped as TRTInterpreterResult.</span>
+<span class="c1"># The TRTInterpreterResult contains required parameter to build TRTModule,</span>
+<span class="c1"># and other informational output from TRTInterpreter run.</span>
+class<span class="w"> </span>TRTInterpreterResult<span class="o">(</span>NamedTuple<span class="o">)</span>:
+<span class="w">    </span>engine:<span class="w"> </span>Any
+<span class="w">    </span>input_names:<span class="w"> </span>Sequence<span class="o">[</span>str<span class="o">]</span>
+<span class="w">    </span>output_names:<span class="w"> </span>Sequence<span class="o">[</span>str<span class="o">]</span>
+<span class="w">    </span>serialized_cache:<span class="w"> </span>bytearray
+
+<span class="c1">#max_batch_size: set accordingly for maximum batch size you will use.</span>
+<span class="c1">#max_workspace_size: set to the maximum size we can afford for temporary buffer</span>
+<span class="c1">#lower_precision: the precision model layers are running on (TensorRT will choose the best perforamnce precision).</span>
+<span class="c1">#sparse_weights: allow the builder to examine weights and use optimized functions when weights have suitable sparsity</span>
+<span class="c1">#force_fp32_output: force output to be fp32</span>
+<span class="c1">#strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric #reasons.</span>
+<span class="c1">#algorithm_selector: set up algorithm selection for certain layer</span>
+<span class="c1">#timing_cache: enable timing cache for TensorRT</span>
+<span class="c1">#profiling_verbosity: TensorRT logging level</span>
+<span class="nv">trt_interpreter_result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>interpreter.run<span class="o">(</span>
+<span class="w">    </span><span class="nv">max_batch_size</span><span class="o">=</span><span class="m">64</span>,
+<span class="w">    </span><span class="nv">max_workspace_size</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="s">&lt;&lt; 25,</span>
+<span class="s">    sparse_weights=False,</span>
+<span class="s">    force_fp32</span>_output<span class="o">=</span>False,
+<span class="w">    </span><span class="nv">strict_type_constraints</span><span class="o">=</span>False,
+<span class="w">    </span><span class="nv">algorithm_selector</span><span class="o">=</span>None,
+<span class="w">    </span><span class="nv">timing_cache</span><span class="o">=</span>None,
+<span class="w">    </span><span class="nv">profiling_verbosity</span><span class="o">=</span>None,
+<span class="o">)</span>
+</pre></div>
+</div>
 <p><em>Common Errors:</em></p>
 <p>RuntimeError: Conversion of function xxx not currently supported!
 - This means we don’t have the support for this xxx operator. Please refer to section “How to add a missing op” below for further instructions.</p>
@@ -513,16 +519,16 @@ profiling_verbosity=None,</p>
 <li><p><strong>Step 3: Run the model</strong></p></li>
 </ul>
 <p>One way is using TRTModule, which is basically a PyTorch nn.Module.</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>from torch_tensorrt.fx import TRTModule
-<span class="nv">mod</span> <span class="o">=</span> TRTModule<span class="o">(</span>
-    trt_interpreter_result.engine,
-    trt_interpreter_result.input_names,
-    trt_interpreter_result.output_names<span class="o">)</span>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>from<span class="w"> </span>torch_tensorrt.fx<span class="w"> </span>import<span class="w"> </span>TRTModule
+<span class="nv">mod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>TRTModule<span class="o">(</span>
+<span class="w">    </span>trt_interpreter_result.engine,
+<span class="w">    </span>trt_interpreter_result.input_names,
+<span class="w">    </span>trt_interpreter_result.output_names<span class="o">)</span>
 <span class="c1"># Just like all other PyTorch modules</span>
-<span class="nv">outputs</span> <span class="o">=</span> mod<span class="o">(</span>*inputs<span class="o">)</span>
-torch.save<span class="o">(</span>mod, <span class="s2">&quot;trt.pt&quot;</span><span class="o">)</span>
-<span class="nv">reload_trt_mod</span> <span class="o">=</span> torch.load<span class="o">(</span><span class="s2">&quot;trt.pt&quot;</span><span class="o">)</span>
-<span class="nv">reload_model_output</span> <span class="o">=</span> reload_trt_mod<span class="o">(</span>*inputs<span class="o">)</span>
+<span class="nv">outputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>mod<span class="o">(</span>*inputs<span class="o">)</span>
+torch.save<span class="o">(</span>mod,<span class="w"> </span><span class="s2">&quot;trt.pt&quot;</span><span class="o">)</span>
+<span class="nv">reload_trt_mod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>torch.load<span class="o">(</span><span class="s2">&quot;trt.pt&quot;</span><span class="o">)</span>
+<span class="nv">reload_model_output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>reload_trt_mod<span class="o">(</span>*inputs<span class="o">)</span>
 </pre></div>
 </div>
 <p>So far, we give a detailed explanation of major steps in convterting a PyTorch model into TensorRT engine. Users are welcome to refer to the source code for some parameters explanations. In the converting scheme, there are two important actions in it. One is acc tracer which helps us to convert a PyTorch model to acc graph. The other is FX path converter which helps to convert the acc graph’s operation to corresponding TensorRT operation and build up the TensoRT engine for it.</p>
@@ -540,21 +546,21 @@ torch.save<span class="o">(</span>mod, <span class="s2">&quot;trt.pt&quot;</span
 <p>After symbolic tracing, we have the graph representation of a PyTorch model. fx2trt leverages the power of fx.Interpreter. fx.Interpreter goes through the whole graph node by node and calls the function that node represents. fx2trt overrides the original behavior of calling the function with invoking corresponding converts for each node. Each converter function adds corresponding TensorRT layer(s).</p>
 <p>Below is an example of a converter function. The decorator is used to register this converter function with the corresponding node. In this example, we register this converter to a fx node whose target is acc_ops.sigmoid.</p>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>@tensorrt_converter<span class="o">(</span>acc_ops.sigmoid<span class="o">)</span>
-def acc_ops_sigmoid<span class="o">(</span>network, target, args, kwargs, name<span class="o">)</span>:
-    <span class="s2">&quot;&quot;&quot;</span>
+def<span class="w"> </span>acc_ops_sigmoid<span class="o">(</span>network,<span class="w"> </span>target,<span class="w"> </span>args,<span class="w"> </span>kwargs,<span class="w"> </span>name<span class="o">)</span>:
+<span class="w">    </span><span class="s2">&quot;&quot;&quot;</span>
 <span class="s2">    network: TensorRT network. We&#39;ll be adding layers to it.</span>
 
 <span class="s2">    The rest arguments are attributes of fx node.</span>
 <span class="s2">    &quot;&quot;&quot;</span>
-    <span class="nv">input_val</span> <span class="o">=</span> kwargs<span class="o">[</span><span class="s1">&#39;input&#39;</span><span class="o">]</span>
+<span class="w">    </span><span class="nv">input_val</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>kwargs<span class="o">[</span><span class="s1">&#39;input&#39;</span><span class="o">]</span>
 
-    <span class="k">if</span> not isinstance<span class="o">(</span>input_val, trt.tensorrt.ITensor<span class="o">)</span>:
-        raise RuntimeError<span class="o">(</span>f<span class="s1">&#39;Sigmoid received input {input_val} that is not part &#39;</span>
-                        <span class="s1">&#39;of the TensorRT region!&#39;</span><span class="o">)</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span>not<span class="w"> </span>isinstance<span class="o">(</span>input_val,<span class="w"> </span>trt.tensorrt.ITensor<span class="o">)</span>:
+<span class="w">        </span>raise<span class="w"> </span>RuntimeError<span class="o">(</span>f<span class="s1">&#39;Sigmoid received input {input_val} that is not part &#39;</span>
+<span class="w">                        </span><span class="s1">&#39;of the TensorRT region!&#39;</span><span class="o">)</span>
 
-    <span class="nv">layer</span> <span class="o">=</span> network.add_activation<span class="o">(</span><span class="nv">input</span><span class="o">=</span>input_val, <span class="nv">type</span><span class="o">=</span>trt.ActivationType.SIGMOID<span class="o">)</span>
-    layer.name <span class="o">=</span> name
-    <span class="k">return</span> layer.get_output<span class="o">(</span><span class="m">0</span><span class="o">)</span>
+<span class="w">    </span><span class="nv">layer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>network.add_activation<span class="o">(</span><span class="nv">input</span><span class="o">=</span>input_val,<span class="w"> </span><span class="nv">type</span><span class="o">=</span>trt.ActivationType.SIGMOID<span class="o">)</span>
+<span class="w">    </span>layer.name<span class="w"> </span><span class="o">=</span><span class="w"> </span>name
+<span class="w">    </span><span class="k">return</span><span class="w"> </span>layer.get_output<span class="o">(</span><span class="m">0</span><span class="o">)</span>
 </pre></div>
 </div>
 <section id="how-to-add-a-missing-op">
@@ -570,24 +576,24 @@ def acc_ops_sigmoid<span class="o">(</span>network, target, args, kwargs, name<s
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="c1"># NOTE: all acc ops should only take kwargs as inputs, therefore we need the &quot;*&quot;</span>
 <span class="c1"># at the beginning.</span>
 @register_acc_op
-def foo<span class="o">(</span>*, input, other, alpha<span class="o">)</span>:
-    <span class="k">return</span> input + alpha * other
+def<span class="w"> </span>foo<span class="o">(</span>*,<span class="w"> </span>input,<span class="w"> </span>other,<span class="w"> </span>alpha<span class="o">)</span>:
+<span class="w">    </span><span class="k">return</span><span class="w"> </span>input<span class="w"> </span>+<span class="w"> </span>alpha<span class="w"> </span>*<span class="w"> </span>other
 </pre></div>
 </div>
 <p>There’re two ways to register a mapping. One is <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/1a22204fecec690bc3c2a318dab4f57b98c57f05/py/torch_tensorrt/fx/tracer/acc_tracer/acc_normalizer.py#L164">register_acc_op_mapping()</a>. Let’s register a mapping from torch.add to foo() we just created above. We need to add decorator register_acc_op_mapping to it.</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="nv">this_arg_is_optional</span> <span class="o">=</span> True
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="nv">this_arg_is_optional</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>True
 
 @register_acc_op_mapping<span class="o">(</span>
-    <span class="nv">op_and_target</span><span class="o">=(</span><span class="s2">&quot;call_function&quot;</span>, torch.add<span class="o">)</span>,
-    <span class="nv">arg_replacement_tuples</span><span class="o">=[</span>
-        <span class="o">(</span><span class="s2">&quot;input&quot;</span>, <span class="s2">&quot;input&quot;</span><span class="o">)</span>,
-        <span class="o">(</span><span class="s2">&quot;other&quot;</span>, <span class="s2">&quot;other&quot;</span><span class="o">)</span>,
-        <span class="o">(</span><span class="s2">&quot;alpha&quot;</span>, <span class="s2">&quot;alpha&quot;</span>, this_arg_is_optional<span class="o">)</span>,
-    <span class="o">]</span>,
+<span class="w">    </span><span class="nv">op_and_target</span><span class="o">=(</span><span class="s2">&quot;call_function&quot;</span>,<span class="w"> </span>torch.add<span class="o">)</span>,
+<span class="w">    </span><span class="nv">arg_replacement_tuples</span><span class="o">=[</span>
+<span class="w">        </span><span class="o">(</span><span class="s2">&quot;input&quot;</span>,<span class="w"> </span><span class="s2">&quot;input&quot;</span><span class="o">)</span>,
+<span class="w">        </span><span class="o">(</span><span class="s2">&quot;other&quot;</span>,<span class="w"> </span><span class="s2">&quot;other&quot;</span><span class="o">)</span>,
+<span class="w">        </span><span class="o">(</span><span class="s2">&quot;alpha&quot;</span>,<span class="w"> </span><span class="s2">&quot;alpha&quot;</span>,<span class="w"> </span>this_arg_is_optional<span class="o">)</span>,
+<span class="w">    </span><span class="o">]</span>,
 <span class="o">)</span>
 @register_acc_op
-def foo<span class="o">(</span>*, input, other, <span class="nv">alpha</span><span class="o">=</span><span class="m">1</span>.0<span class="o">)</span>:
-    <span class="k">return</span> input + alpha * other
+def<span class="w"> </span>foo<span class="o">(</span>*,<span class="w"> </span>input,<span class="w"> </span>other,<span class="w"> </span><span class="nv">alpha</span><span class="o">=</span><span class="m">1</span>.0<span class="o">)</span>:
+<span class="w">    </span><span class="k">return</span><span class="w"> </span>input<span class="w"> </span>+<span class="w"> </span>alpha<span class="w"> </span>*<span class="w"> </span>other
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">op_and_target</span></code> determines which node will trigger this mapping. op and target are the attributes of FX node. In acc_normalization when we see a node with the same op and target as set in the <code class="docutils literal notranslate"><span class="pre">op_and_target</span></code>, we will trigger the mapping. Since we want to map from <code class="docutils literal notranslate"><span class="pre">torch.add</span></code>, then op would be call_function and target would be <code class="docutils literal notranslate"><span class="pre">torch.add</span></code>. <code class="docutils literal notranslate"><span class="pre">arg_replacement_tuples</span></code> determines how we construct kwargs for new acc op node using args and kwargs from original node. Each tuple in <code class="docutils literal notranslate"><span class="pre">arg_replacement_tuples</span></code> represents one argument mapping rule. It contains two or three elements. The third element is a boolean variable that determines whether this kwarg is optional in <em>original node</em>. We only need to specify the third element if it’s True. The first element is the argument name in original node which will be used as the acc op node’s argument whose name is the second element in the tuple. The sequence of the tuples does matter because the position of the tuple determines where the argument is in original node’s args. We use this information to map args from original node to kwargs in acc op node.
@@ -598,30 +604,30 @@ We don’t have to specify arg_replacement_tuples if none of the followings are 
 </ol>
 <p>The other way to register a mapping is through <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/1a22204fecec690bc3c2a318dab4f57b98c57f05/py/torch_tensorrt/fx/tracer/acc_tracer/acc_normalizer.py#L206">register_custom_acc_mapper_fn()</a>. This one is designed to reduce the redundant op registration as it allows you to use a function to map to one or more existing acc ops throught some combinations. In the function, you can do basically whatever you want. Let’s use an example to explain how it works.</p>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>@register_acc_op
-def foo<span class="o">(</span>*, input, other, <span class="nv">alpha</span><span class="o">=</span><span class="m">1</span>.0<span class="o">)</span>:
-    <span class="k">return</span> input + alpha * other
+def<span class="w"> </span>foo<span class="o">(</span>*,<span class="w"> </span>input,<span class="w"> </span>other,<span class="w"> </span><span class="nv">alpha</span><span class="o">=</span><span class="m">1</span>.0<span class="o">)</span>:
+<span class="w">    </span><span class="k">return</span><span class="w"> </span>input<span class="w"> </span>+<span class="w"> </span>alpha<span class="w"> </span>*<span class="w"> </span>other
 
 @register_custom_acc_mapper_fn<span class="o">(</span>
-    <span class="nv">op_and_target</span><span class="o">=(</span><span class="s2">&quot;call_function&quot;</span>, torch.add<span class="o">)</span>,
-    <span class="nv">arg_replacement_tuples</span><span class="o">=[</span>
-        <span class="o">(</span><span class="s2">&quot;input&quot;</span>, <span class="s2">&quot;input&quot;</span><span class="o">)</span>,
-        <span class="o">(</span><span class="s2">&quot;other&quot;</span>, <span class="s2">&quot;other&quot;</span><span class="o">)</span>,
-        <span class="o">(</span><span class="s2">&quot;alpha&quot;</span>, <span class="s2">&quot;alpha&quot;</span>, this_arg_is_optional<span class="o">)</span>,
-    <span class="o">]</span>,
+<span class="w">    </span><span class="nv">op_and_target</span><span class="o">=(</span><span class="s2">&quot;call_function&quot;</span>,<span class="w"> </span>torch.add<span class="o">)</span>,
+<span class="w">    </span><span class="nv">arg_replacement_tuples</span><span class="o">=[</span>
+<span class="w">        </span><span class="o">(</span><span class="s2">&quot;input&quot;</span>,<span class="w"> </span><span class="s2">&quot;input&quot;</span><span class="o">)</span>,
+<span class="w">        </span><span class="o">(</span><span class="s2">&quot;other&quot;</span>,<span class="w"> </span><span class="s2">&quot;other&quot;</span><span class="o">)</span>,
+<span class="w">        </span><span class="o">(</span><span class="s2">&quot;alpha&quot;</span>,<span class="w"> </span><span class="s2">&quot;alpha&quot;</span>,<span class="w"> </span>this_arg_is_optional<span class="o">)</span>,
+<span class="w">    </span><span class="o">]</span>,
 <span class="o">)</span>
-def custom_mapper<span class="o">(</span>node: torch.fx.Node, _: nn.Module<span class="o">)</span> -&gt; torch.fx.Node:
-    <span class="s2">&quot;&quot;&quot;</span>
+def<span class="w"> </span>custom_mapper<span class="o">(</span>node:<span class="w"> </span>torch.fx.Node,<span class="w"> </span>_:<span class="w"> </span>nn.Module<span class="o">)</span><span class="w"> </span>-&gt;<span class="w"> </span>torch.fx.Node:
+<span class="w">    </span><span class="s2">&quot;&quot;&quot;</span>
 <span class="s2">    `node` is original node, which is a call_function node with target</span>
 <span class="s2">    being torch.add.</span>
 <span class="s2">    &quot;&quot;&quot;</span>
-    <span class="nv">alpha</span> <span class="o">=</span> <span class="m">1</span>
-    <span class="k">if</span> <span class="s2">&quot;alpha&quot;</span> <span class="k">in</span> node.kwargs:
-        <span class="nv">alpha</span> <span class="o">=</span> node.kwargs<span class="o">[</span><span class="s2">&quot;alpha&quot;</span><span class="o">]</span>
-    <span class="nv">foo_kwargs</span> <span class="o">=</span> <span class="o">{</span><span class="s2">&quot;input&quot;</span>: node<span class="o">[</span><span class="s2">&quot;input&quot;</span><span class="o">]</span>, <span class="s2">&quot;other&quot;</span>: node<span class="o">[</span><span class="s2">&quot;other&quot;</span><span class="o">]</span>, <span class="s2">&quot;alpha&quot;</span>: alpha<span class="o">}</span>
-    with node.graph.inserting_before<span class="o">(</span>node<span class="o">)</span>:
-        <span class="nv">foo_node</span> <span class="o">=</span> node.graph.call_function<span class="o">(</span>foo, <span class="nv">kwargs</span><span class="o">=</span>foo_kwargs<span class="o">)</span>
-        foo_node.meta <span class="o">=</span> node.meta.copy<span class="o">()</span>
-        <span class="k">return</span> foo_node
+<span class="w">    </span><span class="nv">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="s2">&quot;alpha&quot;</span><span class="w"> </span><span class="k">in</span><span class="w"> </span>node.kwargs:
+<span class="w">        </span><span class="nv">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>node.kwargs<span class="o">[</span><span class="s2">&quot;alpha&quot;</span><span class="o">]</span>
+<span class="w">    </span><span class="nv">foo_kwargs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">{</span><span class="s2">&quot;input&quot;</span>:<span class="w"> </span>node<span class="o">[</span><span class="s2">&quot;input&quot;</span><span class="o">]</span>,<span class="w"> </span><span class="s2">&quot;other&quot;</span>:<span class="w"> </span>node<span class="o">[</span><span class="s2">&quot;other&quot;</span><span class="o">]</span>,<span class="w"> </span><span class="s2">&quot;alpha&quot;</span>:<span class="w"> </span>alpha<span class="o">}</span>
+<span class="w">    </span>with<span class="w"> </span>node.graph.inserting_before<span class="o">(</span>node<span class="o">)</span>:
+<span class="w">        </span><span class="nv">foo_node</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>node.graph.call_function<span class="o">(</span>foo,<span class="w"> </span><span class="nv">kwargs</span><span class="o">=</span>foo_kwargs<span class="o">)</span>
+<span class="w">        </span>foo_node.meta<span class="w"> </span><span class="o">=</span><span class="w"> </span>node.meta.copy<span class="o">()</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span>foo_node
 </pre></div>
 </div>
 <p>In the custom mapper function, we construct an acc op node and return it. The node we returns here would take over all the children nodes of original nodes <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/1a22204fecec690bc3c2a318dab4f57b98c57f05/py/torch_tensorrt/fx/tracer/acc_tracer/acc_normalizer.py#L379">acc_normalizer.py</a>.</p>
@@ -632,21 +638,21 @@ def custom_mapper<span class="o">(</span>node: torch.fx.Node, _: nn.Module<span 
 <p>All the developed converters for acc ops are all in <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/py/torch_tensorrt/fx/converters/acc_ops_converters.py">acc_op_converter.py</a>. It could give you a good example of how the converter is added.</p>
 <p>Essentially, the converter is the mapping mechanism that maps the acc ops to a TensorRT layer. If we are able to find all the TensorRT layers we need we can get start to add a converter for the node using <a class="reference external" href="https://docs.nvidia.com/deeplearning/tensorrt/api/python_api/infer/Graph/Network.html">TensorRT APIs</a>.</p>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>@tensorrt_converter<span class="o">(</span>acc_ops.sigmoid<span class="o">)</span>
-def acc_ops_sigmoid<span class="o">(</span>network, target, args, kwargs, name<span class="o">)</span>:
-    <span class="s2">&quot;&quot;&quot;</span>
+def<span class="w"> </span>acc_ops_sigmoid<span class="o">(</span>network,<span class="w"> </span>target,<span class="w"> </span>args,<span class="w"> </span>kwargs,<span class="w"> </span>name<span class="o">)</span>:
+<span class="w">    </span><span class="s2">&quot;&quot;&quot;</span>
 <span class="s2">    network: TensorRT network. We&#39;ll be adding layers to it.</span>
 
 <span class="s2">    The rest arguments are attributes of fx node.</span>
 <span class="s2">    &quot;&quot;&quot;</span>
-    <span class="nv">input_val</span> <span class="o">=</span> kwargs<span class="o">[</span><span class="s1">&#39;input&#39;</span><span class="o">]</span>
+<span class="w">    </span><span class="nv">input_val</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>kwargs<span class="o">[</span><span class="s1">&#39;input&#39;</span><span class="o">]</span>
 
-    <span class="k">if</span> not isinstance<span class="o">(</span>input_val, trt.tensorrt.ITensor<span class="o">)</span>:
-        raise RuntimeError<span class="o">(</span>f<span class="s1">&#39;Sigmoid received input {input_val} that is not part &#39;</span>
-                        <span class="s1">&#39;of the TensorRT region!&#39;</span><span class="o">)</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span>not<span class="w"> </span>isinstance<span class="o">(</span>input_val,<span class="w"> </span>trt.tensorrt.ITensor<span class="o">)</span>:
+<span class="w">        </span>raise<span class="w"> </span>RuntimeError<span class="o">(</span>f<span class="s1">&#39;Sigmoid received input {input_val} that is not part &#39;</span>
+<span class="w">                        </span><span class="s1">&#39;of the TensorRT region!&#39;</span><span class="o">)</span>
 
-    <span class="nv">layer</span> <span class="o">=</span> network.add_activation<span class="o">(</span><span class="nv">input</span><span class="o">=</span>input_val, <span class="nv">type</span><span class="o">=</span>trt.ActivationType.SIGMOID<span class="o">)</span>
-    layer.name <span class="o">=</span> name
-    <span class="k">return</span> layer.get_output<span class="o">(</span><span class="m">0</span><span class="o">)</span>
+<span class="w">    </span><span class="nv">layer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>network.add_activation<span class="o">(</span><span class="nv">input</span><span class="o">=</span>input_val,<span class="w"> </span><span class="nv">type</span><span class="o">=</span>trt.ActivationType.SIGMOID<span class="o">)</span>
+<span class="w">    </span>layer.name<span class="w"> </span><span class="o">=</span><span class="w"> </span>name
+<span class="w">    </span><span class="k">return</span><span class="w"> </span>layer.get_output<span class="o">(</span><span class="m">0</span><span class="o">)</span>
 </pre></div>
 </div>
 <p>We need to use <code class="docutils literal notranslate"><span class="pre">tensorrt_converter</span></code> decorator to register the converter. The argument for the decorator is the target of the fx node that we need to convert. In the converter, we can find the inputs to the fx node in kwargs. As in the example, the original node is <cite>acc_ops.sigmoid</cite> which only has one argument “input” in acc_ops.py. We get the input and check if it’s a TensorRT tensor. After that, we add a sigmoid layer to TensorRT network and return the output of the layer. The output we returned will be passed to the children nodes of acc_ops.sigmoid by fx.Interpreter.</p>
@@ -871,13 +877,9 @@ def acc_ops_sigmoid<span class="o">(</span>network, target, args, kwargs, name<s
           <li>
             <a href="https://pytorch.org/ecosystem">Ecosystem</a>
           </li>
-
+            
           <li>
             <a href="https://pytorch.org/mobile">Mobile</a>
-          </li>
-
-          <li>
-            <a href="https://pytorch.org/hub">PyTorch Hub</a>
           </li>
 
           <li>
@@ -910,6 +912,18 @@ def acc_ops_sigmoid<span class="o">(</span>network, target, args, kwargs, name<s
             </li>
 
             <li>
+              <a href="https://pytorch.org/torcharrow">torcharrow</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/data">TorchData</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/torchrec">TorchRec</a>
+            </li>
+
+            <li>
               <a href="https://pytorch.org/serve/">TorchServe</a>
             </li>
 
@@ -925,18 +939,15 @@ def acc_ops_sigmoid<span class="o">(</span>network, target, args, kwargs, name<s
           <li class="resources-mobile-menu-title">
             Resources
           </li>
-
-          <ul class="resources-mobile-menu-items">
-            <li>
-              <a href="https://pytorch.org/resources">Developer Resources</a>
-            </li>
+            
+           <ul class="resources-mobile-menu-items">
 
             <li>
               <a href="https://pytorch.org/features">About</a>
             </li>
 
             <li>
-              <a href="https://pytorch.org/hub">Models (Beta)</a>
+              <a href="https://pytorch.org/foundation">PyTorch Foundation</a>
             </li>
 
             <li>
@@ -944,7 +955,23 @@ def acc_ops_sigmoid<span class="o">(</span>network, target, args, kwargs, name<s
             </li>
 
             <li>
+              <a href="https://pytorch.org/community-stories">Community Stories</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/resources">Developer Resources</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/events">Events</a>
+            </li>
+
+            <li>
               <a href="https://discuss.pytorch.org/">Forums</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/hub">Models (Beta)</a>
             </li>
           </ul>
 

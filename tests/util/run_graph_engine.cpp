@@ -20,7 +20,7 @@ namespace util {
 std::vector<core::ir::Input> toInputs(std::vector<at::Tensor> ten) {
   std::vector<core::ir::Input> a;
   for (auto i : ten) {
-    a.push_back(core::ir::Input(core::util::toVec(i.sizes()), core::util::ScalarTypeToTRTDataType(i.scalar_type())));
+    a.push_back(core::ir::Input(core::util::toVec(i.sizes()), i.scalar_type()));
   }
   return a;
 }
@@ -30,7 +30,7 @@ std::vector<core::ir::Input> toInputsDynamic(std::vector<at::Tensor> ten, bool d
 
   for (auto i : ten) {
     auto opt = core::util::toVec(i.sizes());
-    auto dtype = core::util::ScalarTypeToTRTDataType(i.scalar_type());
+    auto dtype = i.scalar_type();
 
     if (dynamic_batch) {
       std::vector<int64_t> min_range(opt);
@@ -56,8 +56,9 @@ std::vector<core::ir::Input> toInputsDynamic(std::vector<at::Tensor> ten, bool d
 
 std::vector<at::Tensor> RunEngine(std::string& eng, std::vector<at::Tensor> inputs) {
   LOG_DEBUG("Running TRT version");
-  auto cuda_device = core::runtime::CudaDevice(0, nvinfer1::DeviceType::kGPU);
-  auto engine_ptr = c10::make_intrusive<torch_tensorrt::core::runtime::TRTEngine>("test_engine", eng, cuda_device);
+  auto cuda_device = core::runtime::RTDevice(0, nvinfer1::DeviceType::kGPU);
+  auto engine_ptr = c10::make_intrusive<torch_tensorrt::core::runtime::TRTEngine>(
+      "test_engine", eng, cuda_device, std::vector<std::string>(), std::vector<std::string>());
   auto outputs = torch_tensorrt::core::runtime::execute_engine(inputs, engine_ptr);
   return outputs;
 }

@@ -9,6 +9,8 @@ requires = [
     "cffi",
     "typing_extensions",
     "future",
+    "nvidia-pyindex",
+    "nvidia-tensorrt==8.4.3.1"
 ]
 
 # Use legacy backend to import local packages in setup.py
