@@ -7,6 +7,7 @@ import tensorrt as trt
 import torch
 import torch.fx as fx
 import torch.nn as nn
+import torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer as aten_tracer
 from torch.fx.passes.splitter_base import SplitResult
 
 from .fx2trt import TRTInterpreter, TRTInterpreterResult
@@ -18,8 +19,7 @@ from .tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 
 from .tracer.acc_tracer import acc_tracer
 from .trt_module import TRTModule
-from .utils import LowerPrecision, proxytensor_trace
-
+from .utils import LowerPrecision
 
 logger = logging.getLogger(__name__)
 
@@ -259,7 +259,9 @@ class Lowerer:
             return cls(
                 lower_pass_manager_builder=LowerPassManagerBuilder(
                     lower_setting=lower_setting,
-                    trace_func=lambda module, inputs: proxytensor_trace(module, inputs),
+                    trace_func=lambda module, inputs: aten_tracer.opt_trace(
+                        module, inputs
+                    ),
                     split_func=split_func,
                     lower_func=default_lower_pass(interpreter_builder),
                 )
@@ -300,14 +302,6 @@ class Lowerer:
                     conversion_fn = fp16_conversion_fn
 
                 inputs = tuple(conversion_fn(x) for x in inputs)
-            if lower_setting.is_aten:
-                pm = self.lower_pass_manager_builder.build_aten2trt_lower_pipeline(
-                    inputs, additional_inputs
-                )
-            else:
-                pm = self.lower_pass_manager_builder.build_trt_lower_pipeline(
-                    inputs, additional_inputs
-                )
             if lower_setting.is_aten:
                 pm = self.lower_pass_manager_builder.build_aten2trt_lower_pipeline(
                     inputs, additional_inputs
