@@ -28,6 +28,7 @@ cc_library(
         "remove_dropout.cpp",
         "remove_nops.cpp",
         "remove_unnecessary_casts.cpp",
+        "replace_aten_pad.cpp",
         "rewrite_inputs_with_params.cpp",
         "silu_to_sigmoid_multiplication.cpp",
         "unpack_addmm.cpp",
@@ -39,7 +40,6 @@ cc_library(
         "unpack_std.cpp",
         "unpack_var.cpp",
         "view_to_reshape.cpp",
-        "replace_aten_pad.cpp",
     ],
     hdrs = [
         "passes.h",
