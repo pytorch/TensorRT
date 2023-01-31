@@ -3,7 +3,6 @@
 --exclude libcaffe2_nvrtc.so
 --exclude libcublasLt.so
 --exclude libcuda.so
---exclude libgomp.so
 --exclude libnvrtc.so
 --exclude libnvToolsExt.so
 --exclude libshm.so
@@ -19,7 +18,6 @@
 --exclude libnvToolsExt-847d78f2.so.1
 --exclude libcudart-e409450e.so.11.0
 --exclude libcudart-e409450e.so
---exclude libgomp-a34b3233.so.1
 --exclude libcudart.so.11
 --exclude libcudart.so.11.7.60
 --exclude libnvrtc.so.11.2
