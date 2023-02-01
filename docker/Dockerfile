@@ -1,10 +1,10 @@
 # Base image starts with CUDA
-ARG BASE_IMG=nvidia/cuda:11.7.1-devel-ubuntu18.04
+ARG BASE_IMG=nvidia/cuda:11.7.1-devel-ubuntu20.04
 FROM ${BASE_IMG} as base
 
 # Install basic dependencies
 RUN apt-get update
-RUN apt install -y build-essential manpages-dev wget zlib1g software-properties-common git
+RUN DEBIAN_FRONTEND=noninteractive apt install -y build-essential manpages-dev wget zlib1g software-properties-common git
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt install -y python3.8 python3.8-distutils python3.8-dev
 RUN wget https://bootstrap.pypa.io/get-pip.py
@@ -16,17 +16,17 @@ RUN pip3 install wheel
 RUN pip3 install torch==2.0.0.dev20230103+cu117 torchvision==0.15.0.dev20230103+cu117 --extra-index-url https://download.pytorch.org/whl/nightly/cu117
 
 # Install CUDNN + TensorRT
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-ubuntu1804.pin
-RUN mv cuda-ubuntu1804.pin /etc/apt/preferences.d/cuda-repository-pin-600
-RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
+RUN mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 536F8F1DE80F6A35
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
-RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/ /"
+RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
 RUN apt-get update
 RUN apt-get install -y libcudnn8=8.5.0* libcudnn8-dev=8.5.0*
 
-RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub
-RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/ /"
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
+RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
 RUN apt-get update
 
 RUN apt-get install -y libnvinfer8=8.5.1* libnvinfer-plugin8=8.5.1* libnvinfer-dev=8.5.1* libnvinfer-plugin-dev=8.5.1* libnvonnxparsers8=8.5.1-1* libnvonnxparsers-dev=8.5.1-1* libnvparsers8=8.5.1-1*  libnvparsers-dev=8.5.1-1*
@@ -36,9 +36,6 @@ ARG BAZEL_VERSION=5.2.0
 RUN wget -q https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-x86_64 -O /usr/bin/bazel \
  && chmod a+x /usr/bin/bazel
 
-# Remove cuda symlink to avoid bazel circle symlink errors
-RUN rm /usr/local/cuda-11.7/cuda-11.7
-
 # Build Torch-TensorRT in an auxillary container
 FROM base as torch-tensorrt-builder-base
 
@@ -46,7 +43,7 @@ ARG ARCH="x86_64"
 ARG TARGETARCH="amd64"
 
 RUN apt-get install -y python3-setuptools
-RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
 RUN  apt-get update
 
 RUN apt-get update && apt-get install -y --no-install-recommends locales ninja-build && rm -rf /var/lib/apt/lists/* && locale-gen en_US.UTF-8
