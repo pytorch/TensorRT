@@ -147,7 +147,6 @@ bool Var::isITensor() const {
 }
 
 bool Var::isITensorList() const {
-  LOG_DEBUG("===== TYPE NAME: " << type_name());
   if (type_ == Type::kITensor) {
     return true;
   } else {
@@ -155,13 +154,16 @@ bool Var::isITensorList() const {
   }
 }
 
-bool Var::unwrapToITensorList() {
+std::vector<nvinfer1::ITensor*> Var::unwrapToITensorList() {
   TORCHTRT_CHECK(
       isIValue(), "Requested unwrapping of arg assuming it was an IValue, however arg type is " << type_name());
-  LOG_DEBUG("===== TYPE NAME: " << type_name());
-  auto ivalue = ptr_.ivalue;
-  return false;
-  // return ptr_.ivalue->to<nvinfer1::ITensor*>();
+  auto ivalue_list = ptr_.ivalue->toList();
+  std::vector<nvinfer1::ITensor*> outputs;
+  for (int i=0; i < ivalue_list.size(); i++){
+    auto element = ivalue_list.get(i).toCustomClass<TensorContainer>()->tensor();
+    outputs.push_back(std::move(element));
+  }
+  return outputs;
 }
 
 bool Var::isIValue() const {

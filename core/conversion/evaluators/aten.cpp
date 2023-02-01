@@ -19,6 +19,41 @@ namespace conversion {
 namespace evaluators {
 namespace {
 
+nvinfer1::ITensor* index_layer(){
+
+}
+
+c10::IValue dynamic_size_layer(ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args){
+  LOG_DEBUG("Using dynamic version of aten::size evaluator");
+  auto in = args.at(n->input(0)).ITensorOrFreeze(ctx);
+  LOG_DEBUG("Input dimensions: " << in->getDimensions());
+  auto shape_layer = ctx->net->addShape(*in);
+  auto shape_1d_tensor = shape_layer->getOutput(0);
+
+  if (n->inputs().size() != 1){
+    auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
+    auto dim = args.at(n->input(1)).unwrapToInt();
+    // Handle negative axis by refering to nbDims of input Tensor
+    dim = dim < 0 ? dim + maxDim : dim;
+    LOG_DEBUG("Dimension to select: " << dim);
+
+    // index to access needs to be an at::Tensor
+    at::Tensor indices = torch::tensor({dim}).to(torch::kI32);
+    auto indices_out = torch_tensorrt::core::conversion::converters::tensor_to_const(ctx, indices);
+
+    auto gather_layer = ctx->net->addGather(*shape_1d_tensor, *indices_out, 0);
+    shape_1d_tensor = gather_layer->getOutput(0);
+  }
+  
+  LOG_DEBUG("Output tensor shape: " << shape_1d_tensor->getDimensions());
+
+  auto tensor_holder = TensorContainer();
+  tensor_holder.hold_tensor(shape_1d_tensor);
+  auto shape_1d_ivalue = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+
+  return shape_1d_ivalue;
+}
+
 DEFINE_GENERIC_TWO_INPUT_EVALUATOR(
     eq,
     "aten::eq",
@@ -176,7 +211,7 @@ auto aten_registrations TORCHTRT_UNUSED =
             {c10::Symbol::fromQualString("aten::full_like"),
              // aten::full_like(Tensor self, Scalar fill_value, *, ScalarType? dtype=None, Layout? layout=None,
              // Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> (Tensor)
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                // Override options related to layout and device for TensorRT
                auto options = torch::TensorOptions().layout(torch::kStrided).device(torch::kCUDA);
                auto input_tensor_var = args.at(n->input(0));
@@ -262,67 +297,80 @@ auto aten_registrations TORCHTRT_UNUSED =
                return static_cast<int64_t>(list.size());
              },
              EvalOptions().validSchemas({"aten::len.t(t[] a) -> (int)"})})
-        // .evaluator(
-        //     {c10::Symbol::fromQualString("aten::size"),
-        //      [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-        //        LOG_WARNING("There may be undefined behavior using dynamic shape and aten::size");
-        //        auto tensor_var = args.at(n->input(0));
-        //        if (n->inputs().size() == 1) {
-        //          if (tensor_var.isITensor()) {
-        //            auto tensor = tensor_var.ITensor();
-        //            return util::toVec(tensor->getDimensions());
-        //          } else if (tensor_var.IValue()->isTensor()) {
-        //            auto tensor = tensor_var.unwrapToTensor();
-        //            return tensor.sizes();
-        //          } else if (tensor_var.IValue()->isCustomClass()) {
-        //            auto tensor = tensor_var.IValue()->toCustomClass<TensorContainer>()->tensor();
-        //            return util::toVec(tensor->getDimensions());
-        //          } else {
-        //            TORCHTRT_THROW_ERROR("IValue is not some class of Tensor. Found: " << tensor_var.IValue()->type());
-        //          }
-        //        } else {
-        //          auto dim = args.at(n->input(1)).unwrapToInt();
-        //          if (tensor_var.isITensor()) {
-        //            auto tensor = tensor_var.ITensor();
-        //            auto dims = util::toVec(tensor->getDimensions());
-        //            auto nbDims = tensor->getDimensions().nbDims;
-        //            if (dim < 0) {
-        //              dim += nbDims;
-        //            }
-        //            return dims[dim];
-        //          } else if (tensor_var.IValue()->isTensor()) {
-        //            auto tensor = tensor_var.unwrapToTensor();
-        //            auto nbDims = tensor.sizes().size();
-        //            if (dim < 0) {
-        //              dim += nbDims;
-        //            }
-        //            return tensor.sizes()[dim];
-        //          } else if (tensor_var.IValue()->isCustomClass()) {
-        //            auto tensor = tensor_var.IValue()->toCustomClass<TensorContainer>()->tensor();
-        //            auto dims = util::toVec(tensor->getDimensions());
-        //            auto nbDims = tensor->getDimensions().nbDims;
-        //            if (dim < 0) {
-        //              dim += nbDims;
-        //            }
-        //            return dims[dim];
-        //          } else {
-        //            TORCHTRT_THROW_ERROR("IValue is not some class of Tensor. Found: " << tensor_var.IValue()->type());
-        //          }
-        //        }
-        //      },
-        //      EvalOptions().validSchemas(
-        //          {"aten::size(Tensor self) -> (int[])", "aten::size.int(Tensor self, int dim) -> (int)"})})
+        .evaluator(
+            {c10::Symbol::fromQualString("aten::size"),
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               auto tensor_var = args.at(n->input(0));
+               if (n->inputs().size() == 1) {
+                 if (tensor_var.isITensor()) {
+                   auto tensor = tensor_var.ITensor();
+                   if (ctx->input_is_dynamic){
+                     return dynamic_size_layer(ctx, n, args);
+                   }
+                   return util::toVec(tensor->getDimensions());
+                 } else if (tensor_var.IValue()->isTensor()) {
+                   auto tensor = tensor_var.unwrapToTensor();
+                   return tensor.sizes();
+                 } else if (tensor_var.IValue()->isCustomClass()) {
+                   auto tensor = tensor_var.IValue()->toCustomClass<TensorContainer>()->tensor();
+                   return util::toVec(tensor->getDimensions());
+                 } else {
+                   TORCHTRT_THROW_ERROR("IValue is not some class of Tensor. Found: " << tensor_var.IValue()->type());
+                 }
+               } else {
+                 auto dim = args.at(n->input(1)).unwrapToInt();
+                 if (tensor_var.isITensor()) {
+                   if (ctx->input_is_dynamic){
+                     return dynamic_size_layer(ctx, n, args);
+                   }
+                   auto tensor = tensor_var.ITensor();
+                   auto dims = util::toVec(tensor->getDimensions());
+                   auto nbDims = tensor->getDimensions().nbDims;
+                   if (dim < 0) {
+                     dim += nbDims;
+                   }
+                   return dims[dim];
+                 } else if (tensor_var.IValue()->isTensor()) {
+                   auto tensor = tensor_var.unwrapToTensor();
+                   auto nbDims = tensor.sizes().size();
+                   if (dim < 0) {
+                     dim += nbDims;
+                   }
+                   return tensor.sizes()[dim];
+                 } else if (tensor_var.IValue()->isCustomClass()) {
+                   auto tensor = tensor_var.IValue()->toCustomClass<TensorContainer>()->tensor();
+                   auto dims = util::toVec(tensor->getDimensions());
+                   auto nbDims = tensor->getDimensions().nbDims;
+                   if (dim < 0) {
+                     dim += nbDims;
+                   }
+                   return dims[dim];
+                 } else {
+                   TORCHTRT_THROW_ERROR("IValue is not some class of Tensor. Found: " << tensor_var.IValue()->type());
+                 }
+               }
+             },
+             EvalOptions().validSchemas(
+                 {"aten::size(Tensor self) -> (int[])", "aten::size.int(Tensor self, int dim) -> (int)"})})
         .evaluator(
             {c10::Symbol::fromQualString("aten::__getitem__"),
              [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-               auto list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
+               auto list_input = args.at(n->input(0));
                auto idx = args.at(n->input(1)).unwrapToInt();
+               if (list_input.isIValue()){
+                  auto list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
+                  const int64_t list_size = list.size();
+                  const int64_t normalized_idx = normalizeIndex(idx, list_size);
+                  TORCHTRT_CHECK(
+                      normalized_idx >= 0 || normalized_idx < list_size, "List index out of range (aten::__getitem__)");
+                  return list.get(normalized_idx);
+               } elif (list_input.isITensor()){
+                 return dynamic_size_layer(ctx, n, args);
+               }
+               
+               
 
-               const int64_t list_size = list.size();
-               const int64_t normalized_idx = normalizeIndex(idx, list_size);
-               TORCHTRT_CHECK(
-                   normalized_idx >= 0 || normalized_idx < list_size, "List index out of range (aten::__getitem__)");
-               return list.get(normalized_idx);
+               
              },
              EvalOptions().validSchemas({
                  "aten::__getitem__.t(t[](a) list, int idx) -> (t(*))",
