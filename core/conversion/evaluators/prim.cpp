@@ -48,7 +48,6 @@ auto prim_registrations =
              [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                const auto num_inputs = n->inputs().size();
                if (constTypesOnly(args)) {
-                 LOG_DEBUG("==== CONST TYPES ARGS ==== ");
                  c10::ListTypePtr lt = n->output()->type()->expect<c10::ListType>();
                  if (torch::jit::IntType::get() == lt->getElementType()) {
                    c10::List<int64_t> list;
@@ -106,8 +105,7 @@ auto prim_registrations =
                        auto ival = torch::jit::IValue();
                        list.emplace_back(std::move(ival));
                      } else if (args.at(in).IValue()->isInt()) {
-                       LOG_DEBUG("==== INT TYPE ITENSOR ==== ");
-                       auto itensor = torch_tensorrt::core::conversion::converters::tensor_to_const(ctx, torch::tensor({args.at(in).unwrapToInt()}));
+                       auto itensor = torch_tensorrt::core::conversion::converters::tensor_to_const(ctx, torch::tensor({args.at(in).unwrapToInt()}).to(torch::kI32));
                        auto tensor_holder = TensorContainer();
                        tensor_holder.hold_tensor(itensor);
                        auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));

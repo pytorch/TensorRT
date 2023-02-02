@@ -19,8 +19,15 @@ namespace conversion {
 namespace evaluators {
 namespace {
 
-nvinfer1::ITensor* index_layer(){
+nvinfer1::ITensor* index_layer(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* input_tensor, int64_t index){
+  // index to access needs to be an at::Tensor
+  at::Tensor indices = torch::tensor({index}).to(torch::kI32);
+  auto indices_out = torch_tensorrt::core::conversion::converters::tensor_to_const(ctx, indices);
 
+  auto gather_layer = ctx->net->addGather(*input_tensor, *indices_out, 0);
+  TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+  auto indexed_tensor = gather_layer->getOutput(0);
+  return indexed_tensor;
 }
 
 c10::IValue dynamic_size_layer(ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args){
@@ -28,6 +35,7 @@ c10::IValue dynamic_size_layer(ConversionCtx* ctx, const torch::jit::Node* n, kw
   auto in = args.at(n->input(0)).ITensorOrFreeze(ctx);
   LOG_DEBUG("Input dimensions: " << in->getDimensions());
   auto shape_layer = ctx->net->addShape(*in);
+  TORCHTRT_CHECK(shape_layer, "Unable to create shape layer from node: " << *n);
   auto shape_1d_tensor = shape_layer->getOutput(0);
 
   if (n->inputs().size() != 1){
@@ -36,15 +44,9 @@ c10::IValue dynamic_size_layer(ConversionCtx* ctx, const torch::jit::Node* n, kw
     // Handle negative axis by refering to nbDims of input Tensor
     dim = dim < 0 ? dim + maxDim : dim;
     LOG_DEBUG("Dimension to select: " << dim);
-
-    // index to access needs to be an at::Tensor
-    at::Tensor indices = torch::tensor({dim}).to(torch::kI32);
-    auto indices_out = torch_tensorrt::core::conversion::converters::tensor_to_const(ctx, indices);
-
-    auto gather_layer = ctx->net->addGather(*shape_1d_tensor, *indices_out, 0);
-    shape_1d_tensor = gather_layer->getOutput(0);
+    shape_1d_tensor = index_layer(ctx, n, shape_1d_tensor, dim);
   }
-  
+
   LOG_DEBUG("Output tensor shape: " << shape_1d_tensor->getDimensions());
 
   auto tensor_holder = TensorContainer();
@@ -364,13 +366,13 @@ auto aten_registrations TORCHTRT_UNUSED =
                   TORCHTRT_CHECK(
                       normalized_idx >= 0 || normalized_idx < list_size, "List index out of range (aten::__getitem__)");
                   return list.get(normalized_idx);
-               } elif (list_input.isITensor()){
-                 return dynamic_size_layer(ctx, n, args);
+               } else if(list_input.isITensor()){
+                 auto indexed_tensor = index_layer(ctx, n, list_input.ITensorOrFreeze(ctx), idx);
+                 auto tensor_holder = TensorContainer();
+                 tensor_holder.hold_tensor(indexed_tensor);
+                 auto indexed_ivalue = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                 return indexed_ivalue;
                }
-               
-               
-
-               
              },
              EvalOptions().validSchemas({
                  "aten::__getitem__.t(t[](a) list, int idx) -> (t(*))",
