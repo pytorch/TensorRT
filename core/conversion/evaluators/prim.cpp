@@ -105,13 +105,14 @@ auto prim_registrations =
                        auto ival = torch::jit::IValue();
                        list.emplace_back(std::move(ival));
                      } else if (args.at(in).IValue()->isInt()) {
-                       auto itensor = torch_tensorrt::core::conversion::converters::tensor_to_const(ctx, torch::tensor({args.at(in).unwrapToInt()}).to(torch::kI32));
+                       auto itensor = torch_tensorrt::core::conversion::converters::tensor_to_const(
+                           ctx, torch::tensor({args.at(in).unwrapToInt()}).to(torch::kI32));
                        auto tensor_holder = TensorContainer();
                        tensor_holder.hold_tensor(itensor);
                        auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
                        list.emplace_back(std::move(ival));
                      } else {
-                        list.emplace_back(std::move(args.at(in).unwrapToTensor()));
+                       list.emplace_back(std::move(args.at(in).unwrapToTensor()));
                      }
                    }
                  }

@@ -159,7 +159,7 @@ std::vector<nvinfer1::ITensor*> Var::unwrapToITensorList() {
       isIValue(), "Requested unwrapping of arg assuming it was an IValue, however arg type is " << type_name());
   auto ivalue_list = ptr_.ivalue->toList();
   std::vector<nvinfer1::ITensor*> outputs;
-  for (int i=0; i < ivalue_list.size(); i++){
+  for (int i = 0; i < ivalue_list.size(); i++) {
     auto element = ivalue_list.get(i).toCustomClass<TensorContainer>()->tensor();
     outputs.push_back(std::move(element));
   }

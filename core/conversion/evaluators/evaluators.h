@@ -6,9 +6,9 @@
 
 #include "torch/csrc/jit/ir/ir.h"
 
-#include "core/conversion/tensorcontainer/TensorContainer.h"
 #include "core/conversion/conversionctx/ConversionCtx.h"
 #include "core/conversion/converters/converter_util.h"
+#include "core/conversion/tensorcontainer/TensorContainer.h"
 #include "core/conversion/var/Var.h"
 
 namespace torch_tensorrt {
@@ -35,7 +35,8 @@ inline bool constTypesOnly(kwargs& args) {
 // to use the node itself to pull out arguments.
 // This means that you should iterate over node inputs vs. the args
 // when writing evaluators
-typedef std::function<c10::optional<torch::jit::IValue>(ConversionCtx*, const torch::jit::Node*, kwargs&)> NodeEvaluator;
+typedef std::function<c10::optional<torch::jit::IValue>(ConversionCtx*, const torch::jit::Node*, kwargs&)>
+    NodeEvaluator;
 
 struct EvalOptions {
   std::set<c10::TypePtr> blacklisted_output_types;

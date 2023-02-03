@@ -19,7 +19,11 @@ namespace conversion {
 namespace evaluators {
 namespace {
 
-nvinfer1::ITensor* index_layer(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* input_tensor, int64_t index){
+nvinfer1::ITensor* index_layer(
+    ConversionCtx* ctx,
+    const torch::jit::Node* n,
+    nvinfer1::ITensor* input_tensor,
+    int64_t index) {
   // index to access needs to be an at::Tensor
   at::Tensor indices = torch::tensor({index}).to(torch::kI32);
   auto indices_out = torch_tensorrt::core::conversion::converters::tensor_to_const(ctx, indices);
@@ -30,7 +34,7 @@ nvinfer1::ITensor* index_layer(ConversionCtx* ctx, const torch::jit::Node* n, nv
   return indexed_tensor;
 }
 
-c10::IValue dynamic_size_layer(ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args){
+c10::IValue dynamic_size_layer(ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) {
   LOG_DEBUG("Using dynamic version of aten::size evaluator");
   auto in = args.at(n->input(0)).ITensorOrFreeze(ctx);
   LOG_DEBUG("Input dimensions: " << in->getDimensions());
@@ -38,7 +42,7 @@ c10::IValue dynamic_size_layer(ConversionCtx* ctx, const torch::jit::Node* n, kw
   TORCHTRT_CHECK(shape_layer, "Unable to create shape layer from node: " << *n);
   auto shape_1d_tensor = shape_layer->getOutput(0);
 
-  if (n->inputs().size() != 1){
+  if (n->inputs().size() != 1) {
     auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
     auto dim = args.at(n->input(1)).unwrapToInt();
     // Handle negative axis by refering to nbDims of input Tensor
@@ -306,7 +310,7 @@ auto aten_registrations TORCHTRT_UNUSED =
                if (n->inputs().size() == 1) {
                  if (tensor_var.isITensor()) {
                    auto tensor = tensor_var.ITensor();
-                   if (ctx->input_is_dynamic){
+                   if (ctx->input_is_dynamic) {
                      return dynamic_size_layer(ctx, n, args);
                    }
                    return util::toVec(tensor->getDimensions());
@@ -322,7 +326,7 @@ auto aten_registrations TORCHTRT_UNUSED =
                } else {
                  auto dim = args.at(n->input(1)).unwrapToInt();
                  if (tensor_var.isITensor()) {
-                   if (ctx->input_is_dynamic){
+                   if (ctx->input_is_dynamic) {
                      return dynamic_size_layer(ctx, n, args);
                    }
                    auto tensor = tensor_var.ITensor();
@@ -359,14 +363,14 @@ auto aten_registrations TORCHTRT_UNUSED =
              [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto list_input = args.at(n->input(0));
                auto idx = args.at(n->input(1)).unwrapToInt();
-               if (list_input.isIValue()){
-                  auto list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
-                  const int64_t list_size = list.size();
-                  const int64_t normalized_idx = normalizeIndex(idx, list_size);
-                  TORCHTRT_CHECK(
-                      normalized_idx >= 0 || normalized_idx < list_size, "List index out of range (aten::__getitem__)");
-                  return list.get(normalized_idx);
-               } else if(list_input.isITensor()){
+               if (list_input.isIValue()) {
+                 auto list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
+                 const int64_t list_size = list.size();
+                 const int64_t normalized_idx = normalizeIndex(idx, list_size);
+                 TORCHTRT_CHECK(
+                     normalized_idx >= 0 || normalized_idx < list_size, "List index out of range (aten::__getitem__)");
+                 return list.get(normalized_idx);
+               } else if (list_input.isITensor()) {
                  auto indexed_tensor = index_layer(ctx, n, list_input.ITensorOrFreeze(ctx), idx);
                  auto tensor_holder = TensorContainer();
                  tensor_holder.hold_tensor(indexed_tensor);

@@ -67,33 +67,33 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
         .pattern(
             {"aten::reshape(Tensor self, int[] shape) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                auto in = args[0].ITensorOrFreeze(ctx);
-                auto in_shape = util::toVec(in->getDimensions());
-                std::vector<int64_t> new_shape;
-                nvinfer1::ITensor* shape_tensor;
-                if (ctx->input_is_dynamic) {
-                  auto new_shape = args[1].unwrapToITensorList();
-                  auto concat_layer = ctx->net->addConcatenation(new_shape.data(), new_shape.size());
-                  TORCHTRT_CHECK(concat_layer, "Unable to create concatenation layer from node: " << *n);
-                  concat_layer->setAxis(static_cast<int32_t>(0));
-                  shape_tensor = concat_layer->getOutput(0);
-                } else {
-                  auto new_shape = torch::reshape(torch::rand(in_shape), args[1].unwrapToIntList().vec()).sizes().vec();
-                }
-                auto shuffle = ctx->net->addShuffle(*in);
-                shuffle->setName(util::node_info(n).c_str());
-                TORCHTRT_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
+               auto in = args[0].ITensorOrFreeze(ctx);
+               auto in_shape = util::toVec(in->getDimensions());
+               std::vector<int64_t> new_shape;
+               nvinfer1::ITensor* shape_tensor;
+               if (ctx->input_is_dynamic) {
+                 auto new_shape = args[1].unwrapToITensorList();
+                 auto concat_layer = ctx->net->addConcatenation(new_shape.data(), new_shape.size());
+                 TORCHTRT_CHECK(concat_layer, "Unable to create concatenation layer from node: " << *n);
+                 concat_layer->setAxis(static_cast<int32_t>(0));
+                 shape_tensor = concat_layer->getOutput(0);
+               } else {
+                 auto new_shape = torch::reshape(torch::rand(in_shape), args[1].unwrapToIntList().vec()).sizes().vec();
+               }
+               auto shuffle = ctx->net->addShuffle(*in);
+               shuffle->setName(util::node_info(n).c_str());
+               TORCHTRT_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
 
-                if (ctx->input_is_dynamic){
-                  shuffle->setInput(1, *shape_tensor);
-                } else {
-                  shuffle->setReshapeDimensions(util::toDims(new_shape));
-                } 
+               if (ctx->input_is_dynamic) {
+                 shuffle->setInput(1, *shape_tensor);
+               } else {
+                 shuffle->setReshapeDimensions(util::toDims(new_shape));
+               }
 
-                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle->getOutput(0));
-                LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle->getOutput(0));
+               LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
 
-                return true;
+               return true;
              }})
         .pattern(
             {"aten::view(Tensor(a) self, int[] size) -> (Tensor(a))",
