@@ -269,12 +269,12 @@ def run_fx_quant_tests(session):
 def run_fx_tracer_tests(session):
     print("Running FX Tracer tests")
     session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
-    # skipping a test since it depends on torchdynamo
-    # Enable this test once NGC moves to latest pytorch which has dynamo integrated.
     tests = [
         "tracer/test_acc_shape_prop.py",
         "tracer/test_acc_tracer.py",
-        # "tracer/test_dispatch_tracer.py"
+        "tracer/test_dispatch_tracer.py",
+        "tracer/test_compile_e2e.py",
+        "tracer/test_resnet.py",
     ]
     for test in tests:
         if USE_HOST_DEPS:

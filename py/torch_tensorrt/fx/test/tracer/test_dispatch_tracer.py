@@ -237,6 +237,7 @@ class DispatchTracerTest(unittest.TestCase):
             gm = make_fx(functionalize(fake_signature(gm, nargs)))(*example_inputs)
             return gm
 
+        torchdynamo.reset()
         optimized_mod = torchdynamo.optimize(
             compile_dispatch,
             nopython=True,
