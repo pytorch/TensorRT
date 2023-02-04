@@ -78,7 +78,7 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                  concat_layer->setAxis(static_cast<int32_t>(0));
                  shape_tensor = concat_layer->getOutput(0);
                } else {
-                 auto new_shape = torch::reshape(torch::rand(in_shape), args[1].unwrapToIntList().vec()).sizes().vec();
+                 new_shape = torch::reshape(torch::rand(in_shape), args[1].unwrapToIntList().vec()).sizes().vec();
                }
                auto shuffle = ctx->net->addShuffle(*in);
                shuffle->setName(util::node_info(n).c_str());

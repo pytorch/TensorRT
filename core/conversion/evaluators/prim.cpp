@@ -1,12 +1,11 @@
 #include <limits>
 
-#include "torch/csrc/jit/ir/ir.h"
-//#include "torch/csrc/jit/ir/constants.h"
 #include "ATen/core/List.h"
 #include "ATen/core/functional.h"
 #include "ATen/core/ivalue.h"
 #include "ATen/core/stack.h"
 #include "c10/util/intrusive_ptr.h"
+#include "torch/csrc/jit/ir/ir.h"
 #include "torch/torch.h"
 
 #include "core/conversion/evaluators/eval_macros.h"
@@ -111,8 +110,20 @@ auto prim_registrations =
                        tensor_holder.hold_tensor(itensor);
                        auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
                        list.emplace_back(std::move(ival));
+                     } else if (args.at(in).IValue()->isDouble()) {
+                       auto itensor = torch_tensorrt::core::conversion::converters::tensor_to_const(
+                           ctx, torch::tensor({args.at(in).unwrapToDouble()}).to(torch::kFloat));
+                       auto tensor_holder = TensorContainer();
+                       tensor_holder.hold_tensor(itensor);
+                       auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                       list.emplace_back(std::move(ival));
                      } else {
-                       list.emplace_back(std::move(args.at(in).unwrapToTensor()));
+                       auto itensor = torch_tensorrt::core::conversion::converters::tensor_to_const(
+                           ctx, std::move(args.at(in).unwrapToTensor()));
+                       auto tensor_holder = TensorContainer();
+                       tensor_holder.hold_tensor(itensor);
+                       auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                       list.emplace_back(std::move(ival));
                      }
                    }
                  }
