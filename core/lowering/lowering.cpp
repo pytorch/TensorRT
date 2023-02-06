@@ -144,6 +144,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, std::vector<torch::jit::I
   passes::UnpackAndCastFull(g, lower_info.getGPUDeviceString());
   passes::ReplaceScalarImplicit(g);
   passes::RewriteInputsWithParams(g, params);
+  passes::ReplaceAtenPad(g);
   LOG_GRAPH(*g);
 }
 
