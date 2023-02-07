@@ -25,104 +25,104 @@ import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-## converter list in alphabetic order
-@tensorrt_converter(torch.ops.aten.add.Tensor)
-def aten_ops_add(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    kwargs_new = {
-        "input": args[0],
-        "other": args[1],
-    }
-    return acc_ops_converters.acc_ops_add(network, target, None, kwargs_new, name)
+# converter list in alphabetic order
+# @tensorrt_converter(torch.ops.aten.add.Tensor)
+# def aten_ops_add(
+#     network: TRTNetwork,
+#     target: Target,
+#     args: Tuple[Argument, ...],
+#     kwargs: Dict[str, Argument],
+#     name: str,
+# ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+#     kwargs_new = {
+#         "input": args[0],
+#         "other": args[1],
+#     }
+#     return acc_ops_converters.acc_ops_add(network, target, None, kwargs_new, name)
 
 
-@tensorrt_converter(torch.ops.aten.mean.dim)
-@tensorrt_converter(torch.ops.aten._adaptive_avg_pool3d.default)
-@tensorrt_converter(torch.ops.aten._adaptive_avg_pool2d.default)
-def aten_ops_adaptive_avg_poolnd(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    if target == torch.ops.aten.mean.dim:
+# @tensorrt_converter(torch.ops.aten.mean.dim)
+# @tensorrt_converter(torch.ops.aten._adaptive_avg_pool3d.default)
+# @tensorrt_converter(torch.ops.aten._adaptive_avg_pool2d.default)
+# def aten_ops_adaptive_avg_poolnd(
+#     network: TRTNetwork,
+#     target: Target,
+#     args: Tuple[Argument, ...],
+#     kwargs: Dict[str, Argument],
+#     name: str,
+# ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+#     if target == torch.ops.aten.mean.dim:
 
-        if list(args[1]) != [-1, -2]:
-            raise RuntimeError(f"We do not support {target} has dim={args[1]}")
-        else:
-            output_size = [1, 1]
-    else:
-        output_size = args[1]
+#         if list(args[1]) != [-1, -2]:
+#             raise RuntimeError(f"We do not support {target} has dim={args[1]}")
+#         else:
+#             output_size = [1, 1]
+#     else:
+#         output_size = args[1]
 
-    kwargs_new = {
-        "input": args[0],
-        "output_size": output_size,
-    }
-    return acc_ops_converters.acc_ops_adaptive_avg_poolnd(
-        network, target, None, kwargs_new, name
-    )
-
-
-@tensorrt_converter(torch.ops.aten.batch_norm)
-def aten_ops_batch_norm(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    kwargs_new = {
-        "input": args[0],
-        "weight": args[1],
-        "bias": args[2],
-        "running_mean": args[3],
-        "running_var": args[4],
-        "training": args[5],
-        "momentum": args[6],
-        "eps": args[7],
-    }
-    return acc_ops_converters.acc_ops_batch_norm(
-        network, target, None, kwargs_new, name
-    )
+#     kwargs_new = {
+#         "input": args[0],
+#         "output_size": output_size,
+#     }
+#     return acc_ops_converters.acc_ops_adaptive_avg_poolnd(
+#         network, target, None, kwargs_new, name
+#     )
 
 
-@tensorrt_converter(torch.ops.aten.convolution.default)
-def aten_ops_convolution(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    kwargs_new = {
-        "input": args[0],
-        "weight": args[1],
-        "bias": args[2],
-        "stride": args[3],
-        "padding": args[4],
-        "dilation": args[5],
-        "groups": args[8],
-    }
-    # we do not handle transposed.
-    if args[6] is True:
-        raise RuntimeError(f"Target {target} does not support `transposed=True` ")
-    # we do not handle output_padding.
-    if args[7] not in ([0], [0, 0], [0, 0, 0]):
-        raise RuntimeError(f"Target {target} has non-0 output_padding")
-    if len(kwargs_new["stride"]) == 1:
-        return acc_ops_converters.acc_ops_conv1d(
-            network, target, None, kwargs_new, name
-        )
-    else:
-        return acc_ops_converters.acc_ops_convnd(
-            network, target, None, kwargs_new, name
-        )
+# @tensorrt_converter(torch.ops.aten.batch_norm)
+# def aten_ops_batch_norm(
+#     network: TRTNetwork,
+#     target: Target,
+#     args: Tuple[Argument, ...],
+#     kwargs: Dict[str, Argument],
+#     name: str,
+# ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+#     kwargs_new = {
+#         "input": args[0],
+#         "weight": args[1],
+#         "bias": args[2],
+#         "running_mean": args[3],
+#         "running_var": args[4],
+#         "training": args[5],
+#         "momentum": args[6],
+#         "eps": args[7],
+#     }
+#     return acc_ops_converters.acc_ops_batch_norm(
+#         network, target, None, kwargs_new, name
+#    )
+
+
+# @tensorrt_converter(torch.ops.aten.convolution.default)
+# def aten_ops_convolution(
+#     network: TRTNetwork,
+#     target: Target,
+#     args: Tuple[Argument, ...],
+#     kwargs: Dict[str, Argument],
+#     name: str,
+# ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+#     kwargs_new = {
+#         "input": args[0],
+#         "weight": args[1],
+#         "bias": args[2],
+#         "stride": args[3],
+#         "padding": args[4],
+#         "dilation": args[5],
+#         "groups": args[8],
+#     }
+#     # we do not handle transposed.
+#     if args[6] is True:
+#         raise RuntimeError(f"Target {target} does not support `transposed=True` ")
+#     # we do not handle output_padding.
+#     if args[7] not in ([0], [0, 0], [0, 0, 0]):
+#         raise RuntimeError(f"Target {target} has non-0 output_padding")
+#     if len(kwargs_new["stride"]) == 1:
+#         return acc_ops_converters.acc_ops_conv1d(
+#             network, target, None, kwargs_new, name
+#         )
+#     else:
+#         return acc_ops_converters.acc_ops_convnd(
+#             network, target, None, kwargs_new, name
+#         )
 
 
 @tensorrt_converter(torch.ops.aten.div.default)
