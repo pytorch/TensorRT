@@ -161,10 +161,8 @@ nvinfer1::ILayer* add_elementwise(
           canSqueeze = false;
         }
       }
-      LOG_DEBUG("Can the self be squeezed" << canSqueeze);
-      LOG_DEBUG("The size of selfDim" << selfDim.size());
-      LOG_DEBUG("The size of otherDim" << otherDim.size());
       if (canSqueeze) {
+        LOG_WARNING("The self tensor is getting unpadded");
         auto selfShuffle = ctx->net->addShuffle(*self);
         nvinfer1::Dims self_dim = util::toDims(selfDim);
         auto squeezed_self_dim = self_dim;
