@@ -699,7 +699,20 @@ auto select_registrations TORCHTRT_UNUSED =
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto self = args[0].ITensorOrFreeze(ctx);
                auto mask = args[1].ITensorOrFreeze(ctx);
-               mask = addPadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
+
+               if (mask->getDimensions().nbDims > self->getDimensions().nbDims) {
+                 LOG_WARNING("The mask dimensions is greater than self dimensions");
+                 int diff = mask->getDimensions().nbDims - self->getDimensions().nbDims;
+                 for (int i = 0; i < diff; i++) {
+                   if (mask->getDimensions().d[i] != 1) {
+                     LOG_DEBUG("The mask dimension cannot be unpadded to the self dimension");
+                   }
+                 }
+                 mask = addUnpadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
+               } else {
+                 self = addPadding(ctx, n, self, mask->getDimensions().nbDims, false, true);
+               }
+               // mask = addPadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
                auto val = args[2].unwrapToScalar();
 
                // Tensor type to use for initializing constant tensor used in Select
