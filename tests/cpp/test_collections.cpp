@@ -111,7 +111,7 @@ TEST(CppAPITests, TestSpecifyDomainStandardTensorInput) {
   auto out = mod.forward(complex_inputs);
 
   // Specify input tensor domain argument
-  auto tensor_domain = std::vector<int64_t>{35, 377};
+  auto tensor_domain = std::vector<double>{35, 377};
   auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf, tensor_domain);
 
   auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::Input>(input_shape)));

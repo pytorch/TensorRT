@@ -382,7 +382,7 @@ struct Input : torch::CustomClassHolder {
   /// Expected tensor format for the input
   TensorFormat format;
   /// Expected allowed domain for tensor input
-  std::vector<int64_t> tensor_domain;
+  std::vector<double> tensor_domain;
 
   Input() {}
   /**
@@ -409,7 +409,7 @@ struct Input : torch::CustomClassHolder {
    */
   TORCHTRT_API Input(
       std::vector<int64_t> shape,
-      std::vector<int64_t> tensor_domain,
+      std::vector<double> tensor_domain,
       TensorFormat format = TensorFormat::kContiguous);
 
   /**
@@ -438,7 +438,7 @@ struct Input : torch::CustomClassHolder {
   TORCHTRT_API Input(
       std::vector<int64_t> shape,
       DataType dtype,
-      std::vector<int64_t> tensor_domain,
+      std::vector<double> tensor_domain,
       TensorFormat format = TensorFormat::kContiguous);
 
   /**
@@ -466,7 +466,7 @@ struct Input : torch::CustomClassHolder {
    */
   TORCHTRT_API Input(
       c10::ArrayRef<int64_t> shape,
-      std::vector<int64_t> tensor_domain,
+      std::vector<double> tensor_domain,
       TensorFormat format = TensorFormat::kContiguous);
 
   /**
@@ -495,7 +495,7 @@ struct Input : torch::CustomClassHolder {
   TORCHTRT_API Input(
       c10::ArrayRef<int64_t> shape,
       DataType dtype,
-      std::vector<int64_t> tensor_domain,
+      std::vector<double> tensor_domain,
       TensorFormat format = TensorFormat::kContiguous);
 
   /**
@@ -530,7 +530,7 @@ struct Input : torch::CustomClassHolder {
       std::vector<int64_t> min_shape,
       std::vector<int64_t> opt_shape,
       std::vector<int64_t> max_shape,
-      std::vector<int64_t> tensor_domain,
+      std::vector<double> tensor_domain,
       TensorFormat format = TensorFormat::kContiguous);
 
   /**
@@ -570,7 +570,7 @@ struct Input : torch::CustomClassHolder {
       std::vector<int64_t> opt_shape,
       std::vector<int64_t> max_shape,
       DataType dtype,
-      std::vector<int64_t> tensor_domain,
+      std::vector<double> tensor_domain,
       TensorFormat format = TensorFormat::kContiguous);
 
   /**
@@ -606,7 +606,7 @@ struct Input : torch::CustomClassHolder {
       c10::ArrayRef<int64_t> min_shape,
       c10::ArrayRef<int64_t> opt_shape,
       c10::ArrayRef<int64_t> max_shape,
-      std::vector<int64_t> tensor_domain,
+      std::vector<double> tensor_domain,
       TensorFormat format = TensorFormat::kContiguous);
 
   /**
@@ -646,7 +646,7 @@ struct Input : torch::CustomClassHolder {
       c10::ArrayRef<int64_t> opt_shape,
       c10::ArrayRef<int64_t> max_shape,
       DataType dtype,
-      std::vector<int64_t> tensor_domain,
+      std::vector<double> tensor_domain,
       TensorFormat format = TensorFormat::kContiguous);
 
   /**

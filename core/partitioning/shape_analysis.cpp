@@ -26,8 +26,8 @@ at::Tensor generateSingleInput(
   }
 
   // Initialize min and max ranges for random number selection
-  int LoValIncl = input.tensor_domain[0];
-  int HiValExcl = input.tensor_domain[1];
+  double LoValIncl = input.tensor_domain[0];
+  double HiValExcl = input.tensor_domain[1];
 
   auto type = at::kFloat;
   if (type_opt) {

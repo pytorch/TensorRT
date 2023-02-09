@@ -92,8 +92,8 @@ class TestStandardTensorInputDomain(unittest.TestCase):
 
         compile_spec = {
             "inputs": [
-                torchtrt.Input(self.input.shape, tensor_domain=(70, 800)),
-                torchtrt.Input(self.input.shape, tensor_domain=(-20, -17)),
+                torchtrt.Input(self.input.shape, tensor_domain=(70.8, 800)),
+                torchtrt.Input(self.input.shape, tensor_domain=(-20, -17.9)),
             ],
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},

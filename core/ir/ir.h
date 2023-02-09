@@ -32,7 +32,7 @@ struct Input : torch::CustomClassHolder {
       at::ScalarType dtype = at::kFloat,
       nvinfer1::TensorFormat format = nvinfer1::TensorFormat::kLINEAR,
       bool dtype_is_user_defined = false,
-      std::vector<int64_t> tensor_domain = std::vector<int64_t>{0, 2});
+      std::vector<double> tensor_domain = std::vector<double>{0, 2});
   Input(
       std::vector<int64_t> min_shape,
       std::vector<int64_t> opt_shape,
@@ -40,13 +40,13 @@ struct Input : torch::CustomClassHolder {
       at::ScalarType dtype = at::kFloat,
       nvinfer1::TensorFormat format = nvinfer1::TensorFormat::kLINEAR,
       bool dtype_is_user_defined = false,
-      std::vector<int64_t> tensor_domain = std::vector<int64_t>{0, 2});
+      std::vector<double> tensor_domain = std::vector<double>{0, 2});
 
   friend std::ostream& operator<<(std::ostream& os, const Input& input);
 
   bool input_is_dynamic = false;
   bool dtype_is_user_defined = false;
-  std::vector<int64_t> tensor_domain;
+  std::vector<double> tensor_domain;
   nvinfer1::Dims input_shape;
   nvinfer1::Dims min;
   nvinfer1::Dims max;

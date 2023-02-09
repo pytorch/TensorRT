@@ -69,7 +69,7 @@ bool valid_input_dtype(nvinfer1::DataType dtype) {
   }
 }
 
-bool valid_input_domain(std::vector<int64_t> domain) {
+bool valid_input_domain(std::vector<double> domain) {
   return (domain.size() == 2) && (domain[0] < domain[1]);
 }
 
@@ -78,7 +78,7 @@ Input::Input(
     at::ScalarType dtype,
     nvinfer1::TensorFormat format,
     bool dtype_is_user_defined,
-    std::vector<int64_t> tensor_domain) {
+    std::vector<double> tensor_domain) {
   if (shape.size() > 5) {
     LOG_WARNING("Verify that this dim size is accepted");
   }
@@ -112,7 +112,7 @@ Input::Input(
     at::ScalarType dtype,
     nvinfer1::TensorFormat format,
     bool dtype_is_user_defined,
-    std::vector<int64_t> tensor_domain) {
+    std::vector<double> tensor_domain) {
   if (min_shape.size() > 5 || opt_shape.size() > 5 || max_shape.size() > 5) {
     LOG_WARNING("Verify that this dim size is accepted");
   }

@@ -113,7 +113,7 @@ std::string Input::to_str() {
     return ss.str();
   };
 
-  auto domain_to_str = [](std::vector<int64_t> domain) -> std::string {
+  auto domain_to_str = [](std::vector<double> domain) -> std::string {
     std::stringstream ss;
     ss << "[" << domain[0] << ", " << domain[1] << ")";
     return ss.str();
