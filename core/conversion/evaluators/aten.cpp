@@ -19,47 +19,6 @@ namespace conversion {
 namespace evaluators {
 namespace {
 
-nvinfer1::ITensor* index_layer(
-    ConversionCtx* ctx,
-    const torch::jit::Node* n,
-    nvinfer1::ITensor* input_tensor,
-    int64_t index) {
-  // index to access needs to be an at::Tensor
-  at::Tensor indices = torch::tensor({index}).to(torch::kI32);
-  auto indices_out = torch_tensorrt::core::conversion::converters::tensor_to_const(ctx, indices);
-
-  auto gather_layer = ctx->net->addGather(*input_tensor, *indices_out, 0);
-  TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
-  auto indexed_tensor = gather_layer->getOutput(0);
-  return indexed_tensor;
-}
-
-c10::IValue dynamic_size_layer(ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) {
-  LOG_DEBUG("Using dynamic version of aten::size evaluator");
-  auto in = args.at(n->input(0)).ITensorOrFreeze(ctx);
-  LOG_DEBUG("Input dimensions: " << in->getDimensions());
-  auto shape_layer = ctx->net->addShape(*in);
-  TORCHTRT_CHECK(shape_layer, "Unable to create shape layer from node: " << *n);
-  auto shape_1d_tensor = shape_layer->getOutput(0);
-
-  if (n->inputs().size() != 1) {
-    auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
-    auto dim = args.at(n->input(1)).unwrapToInt();
-    // Handle negative axis by refering to nbDims of input Tensor
-    dim = dim < 0 ? dim + maxDim : dim;
-    LOG_DEBUG("Dimension to select: " << dim);
-    shape_1d_tensor = index_layer(ctx, n, shape_1d_tensor, dim);
-  }
-
-  LOG_DEBUG("Output tensor shape: " << shape_1d_tensor->getDimensions());
-
-  auto tensor_holder = TensorContainer();
-  tensor_holder.hold_tensor(shape_1d_tensor);
-  auto shape_1d_ivalue = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
-
-  return shape_1d_ivalue;
-}
-
 DEFINE_GENERIC_TWO_INPUT_EVALUATOR(
     eq,
     "aten::eq",

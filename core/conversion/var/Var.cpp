@@ -218,8 +218,10 @@ bool Var::isBoolList() const {
 std::vector<nvinfer1::ITensor*> Var::unwrapToITensorList() {
   TORCHTRT_CHECK(
       isIValue(), "Requested unwrapping of arg assuming it was an IValue, however arg type is " << type_name());
-  LOG_DEBUG(" === Is INT list: " << ptr_.ivalue->isIntList());
-  LOG_DEBUG(" === Is List: " << ptr_.ivalue->isList());
+  TORCHTRT_CHECK(
+      isITensorList(),
+      "Expected IValue to be an ITensorList, however the type is "
+          << static_cast<std::underlying_type<IValueType>::type>(ivalue_type_));
   auto ivalue_list = ptr_.ivalue->toList();
   std::vector<nvinfer1::ITensor*> outputs;
   for (int i = 0; i < ivalue_list.size(); i++) {

@@ -88,9 +88,8 @@ auto prim_registrations =
                    return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
                  }
                } else {
-                 c10::ListTypePtr lt = n->output()->type()->expect<c10::ListType>();
-                 c10::TypePtr elementType = lt->getElementType();
-                 auto list = c10::impl::GenericList(elementType);
+                 // List would be of IValues (with ITensors embedded in them)
+                 auto list = c10::impl::GenericList(c10::AnyType::get());
                  list.reserve(num_inputs);
                  for (auto in : n->inputs()) {
                    if (args.at(in).isITensor()) {
