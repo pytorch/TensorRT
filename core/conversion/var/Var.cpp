@@ -21,6 +21,28 @@ Var::Var(nvinfer1::ITensor* p) : type_(Type::kITensor) {
   ptr_.tensor = p;
 }
 
+Var::IValueType Var::determineIValueType(torch::jit::IValue* p) {
+  if (p->isInt()) {
+    return IValueType::kInt;
+  } else if (p->isDouble()) {
+    return IValueType::kDouble;
+  } else if (p->isBool()) {
+    return IValueType::kBool;
+  } else if (p->isTensor()) {
+    return IValueType::kTensor;
+  } else if (p->isIntList()) {
+    return IValueType::kIntList;
+  } else if (p->isDoubleList()) {
+    return IValueType::kDoubleList;
+  } else if (p->isBoolList()) {
+    return IValueType::kBoolList;
+  } else if (p->isTensorList()) {
+    return IValueType::kTensorList;
+  } else if (p->isList()) {
+    return IValueType::kITensorList;
+  }
+}
+
 Var::Var(const Var& a) {
   switch (a.type_) {
     case Type::kITensor:
@@ -30,6 +52,7 @@ Var::Var(const Var& a) {
     case Type::kIValue:
       ptr_.ivalue = a.ptr_.ivalue;
       type_ = Type::kIValue;
+      ivalue_type_ = determineIValueType(ptr_.ivalue);
       break;
     case Type::kNone:
     default:
@@ -47,6 +70,7 @@ Var& Var::operator=(const Var& a) {
     case Type::kIValue:
       ptr_.ivalue = a.ptr_.ivalue;
       type_ = Type::kIValue;
+      ivalue_type_ = determineIValueType(ptr_.ivalue);
       break;
     case Type::kNone:
     default:
@@ -59,6 +83,7 @@ Var& Var::operator=(const Var& a) {
 Var& Var::operator=(torch::jit::IValue* in) {
   ptr_.ivalue = in;
   type_ = Type::kIValue;
+  ivalue_type_ = determineIValueType(ptr_.ivalue);
   return (*this);
 }
 
@@ -70,6 +95,10 @@ Var& Var::operator=(nvinfer1::ITensor* in) {
 
 Var::Type Var::type() const {
   return type_;
+}
+
+Var::IValueType Var::ivalue_type() const {
+  return ivalue_type_;
 }
 
 std::string Var::type_name() const {
@@ -147,7 +176,39 @@ bool Var::isITensor() const {
 }
 
 bool Var::isITensorList() const {
-  if (type_ == Type::kITensor) {
+  if (ivalue_type_ == IValueType::kITensorList) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool Var::isIntList() const {
+  if (ivalue_type_ == IValueType::kIntList) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool Var::isDoubleList() const {
+  if (ivalue_type_ == IValueType::kDoubleList) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool Var::isTensorList() const {
+  if (ivalue_type_ == IValueType::kTensorList) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool Var::isBoolList() const {
+  if (ivalue_type_ == IValueType::kBoolList) {
     return true;
   } else {
     return false;
@@ -157,6 +218,8 @@ bool Var::isITensorList() const {
 std::vector<nvinfer1::ITensor*> Var::unwrapToITensorList() {
   TORCHTRT_CHECK(
       isIValue(), "Requested unwrapping of arg assuming it was an IValue, however arg type is " << type_name());
+  LOG_DEBUG(" === Is INT list: " << ptr_.ivalue->isIntList());
+  LOG_DEBUG(" === Is List: " << ptr_.ivalue->isList());
   auto ivalue_list = ptr_.ivalue->toList();
   std::vector<nvinfer1::ITensor*> outputs;
   for (int i = 0; i < ivalue_list.size(); i++) {

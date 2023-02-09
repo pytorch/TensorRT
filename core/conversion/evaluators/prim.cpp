@@ -88,7 +88,6 @@ auto prim_registrations =
                    return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
                  }
                } else {
-                 LOG_DEBUG("==== NON CONST TYPES ==== ");
                  c10::ListTypePtr lt = n->output()->type()->expect<c10::ListType>();
                  c10::TypePtr elementType = lt->getElementType();
                  auto list = c10::impl::GenericList(elementType);

@@ -5,7 +5,7 @@
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
 
-TEST(Converters, ATenResizeDynamicInputCorrectly) {
+TEST(Converters, ATenResizeDynamicShapeCorrectly) {
   const auto graph = R"IR(
     graph(%x : Tensor):
           %3 : int = prim::Constant[value=0]()
@@ -20,6 +20,32 @@ TEST(Converters, ATenResizeDynamicInputCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {16, 3, 2}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in}, true);
+
+  auto trt = trt_results[0].reshape(jit_results[0].sizes());
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+}
+
+TEST(Converters, ATenResizeDynamicInputCorrectly) {
+  const auto graph = R"IR(
+    graph(%x : Tensor):
+          %2 : int[] = prim::Constant[value=[-1, 4, 64]]()
+          %3 : Tensor = aten::reshape(%x, %2)
+          return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {16, 16, 16}, {at::kCUDA});
 
   auto jit_in = at::clone(in);
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});

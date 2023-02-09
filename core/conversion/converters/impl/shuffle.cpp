@@ -72,11 +72,23 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                std::vector<int64_t> new_shape;
                nvinfer1::ITensor* shape_tensor;
                if (ctx->input_is_dynamic) {
-                 auto new_shape = args[1].unwrapToITensorList();
-                 auto concat_layer = ctx->net->addConcatenation(new_shape.data(), new_shape.size());
-                 TORCHTRT_CHECK(concat_layer, "Unable to create concatenation layer from node: " << *n);
-                 concat_layer->setAxis(static_cast<int32_t>(0));
-                 shape_tensor = concat_layer->getOutput(0);
+                 LOG_DEBUG("Using dynamic version of reshape layer");
+                 if (args[1].isITensorList()) {
+                   LOG_DEBUG("Shape tensor is an ITensorList");
+                   auto new_shape = args[1].unwrapToITensorList();
+                   auto concat_layer = ctx->net->addConcatenation(new_shape.data(), new_shape.size());
+                   TORCHTRT_CHECK(concat_layer, "Unable to create concatenation layer from node: " << *n);
+                   concat_layer->setAxis(static_cast<int32_t>(0));
+                   shape_tensor = concat_layer->getOutput(0);
+                 } else if (args[1].isIntList()) {
+                   LOG_DEBUG("Shape tensor is an IntList");
+                   auto shape_vec = args[1].unwrapToIntList().vec();
+                   shape_tensor = tensor_to_const(ctx, torch::tensor(shape_vec).to(torch::kI32));
+                 } else {
+                   LOG_ERROR(
+                       "Invalid IValue type of " << args[1].ivalue_type()
+                                                 << " detected for shape tensor from node: " << *n);
+                 }
                } else {
                  new_shape = torch::reshape(torch::rand(in_shape), args[1].unwrapToIntList().vec()).sizes().vec();
                }
