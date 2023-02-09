@@ -404,3 +404,65 @@ TEST(CppAPITests, TestCollectionComplexModel) {
   ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(
       out.toTuple()->elements()[1].toTensor(), trt_out.toTuple()->elements()[1].toTensor()));
 }
+
+TEST(CppAPITests, TestCollectionFullCompilationComplexModel) {
+  std::string path = "tests/modules/list_input_tuple_output_scripted.jit.pt";
+  torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
+  std::vector<at::Tensor> inputs;
+  inputs.push_back(in0);
+
+  torch::jit::Module mod;
+  try {
+    // Deserialize the ScriptModule from a file using torch::jit::load().
+    mod = torch::jit::load(path);
+  } catch (const c10::Error& e) {
+    std::cerr << "error loading the model\n";
+  }
+  mod.eval();
+  mod.to(torch::kCUDA);
+
+  std::vector<torch::jit::IValue> inputs_;
+
+  for (auto in : inputs) {
+    inputs_.push_back(torch::jit::IValue(in.clone()));
+  }
+
+  std::vector<torch::jit::IValue> complex_inputs;
+  auto input_list = c10::impl::GenericList(c10::TensorType::get());
+  input_list.push_back(inputs_[0]);
+  input_list.push_back(inputs_[0]);
+
+  torch::jit::IValue input_list_ivalue = torch::jit::IValue(input_list);
+
+  complex_inputs.push_back(input_list_ivalue);
+
+  auto out = mod.forward(complex_inputs);
+
+  auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf);
+
+  auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::Input>(input_shape)));
+
+  c10::TypePtr elementType = input_shape_ivalue.type();
+  auto list = c10::impl::GenericList(elementType);
+  list.push_back(input_shape_ivalue);
+  list.push_back(input_shape_ivalue);
+
+  torch::jit::IValue complex_input_shape(list);
+  std::tuple<torch::jit::IValue> input_tuple2(complex_input_shape);
+  torch::jit::IValue complex_input_shape2(input_tuple2);
+
+  auto compile_settings = torch_tensorrt::ts::CompileSpec(complex_input_shape2);
+  compile_settings.min_block_size = 1;
+  compile_settings.require_full_compilation = true;
+
+  // // FP16 execution
+  compile_settings.enabled_precisions = {torch::kHalf};
+  // // Compile module
+  auto trt_mod = torch_tensorrt::torchscript::compile(mod, compile_settings);
+  auto trt_out = trt_mod.forward(complex_inputs);
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(
+      out.toTuple()->elements()[0].toTensor(), trt_out.toTuple()->elements()[0].toTensor()));
+  ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(
+      out.toTuple()->elements()[1].toTensor(), trt_out.toTuple()->elements()[1].toTensor()));
+}
