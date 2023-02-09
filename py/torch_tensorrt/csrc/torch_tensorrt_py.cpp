@@ -223,6 +223,7 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("input_is_dynamic", &Input::input_is_dynamic)
       .def_readwrite("_explicit_set_dtype", &Input::explicit_set_dtype)
       .def_readwrite("dtype", &Input::dtype)
+      .def_readwrite("tensor_domain", &Input::tensor_domain)
       .def_readwrite("format", &Input::format);
 
   py::class_<InputSignature>(m, "InputSignature")
