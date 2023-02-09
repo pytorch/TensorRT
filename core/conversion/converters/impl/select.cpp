@@ -705,12 +705,12 @@ auto select_registrations TORCHTRT_UNUSED =
                  int diff = mask->getDimensions().nbDims - self->getDimensions().nbDims;
                  for (int i = 0; i < diff; i++) {
                    if (mask->getDimensions().d[i] != 1) {
-                     LOG_DEBUG("The mask dimension cannot be unpadded to the self dimension");
+                     LOG_ERROR("The mask dimension cannot be unpadded to the self dimension");
                    }
                  }
                  mask = addUnpadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
                } else {
-                 self = addPadding(ctx, n, self, mask->getDimensions().nbDims, false, true);
+                 mask = addPadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
                }
                // mask = addPadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
                auto val = args[2].unwrapToScalar();
