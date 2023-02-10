@@ -22,7 +22,7 @@ from ..utils import get_dynamic_dims, torch_dtype_from_trt, torch_dtype_to_trt
 
 from .converter_utils import *  # noqa: F403
 import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
-from fx2trt_ops_converter_utils import *
+from .fx2trt_ops_converter_utils import *
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
