@@ -5,7 +5,7 @@ from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.fx.tools.common_fx2trt import DispatchTestCase, InputTensorSpec
 
 class TestAddBasic(DispatchTestCase):
-    def test_batchnorm(self):
+    def test_add(self):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super(TestModule, self).__init__()
@@ -19,7 +19,6 @@ class TestAddBasic(DispatchTestCase):
             inputs,
             expected_ops=({torch.ops.aten.add.Tensor}),
         )
-
 if __name__ == "__main__":
     run_tests()
 
