@@ -298,8 +298,6 @@ def aten_ops_sub(
     return acc_ops_converters.acc_ops_sub(network, target, None, kwargs_new, name)
 
 
-@tensorrt_converter(torch.ops.aten._unsafe_view.default)
-@tensorrt_converter(torch.ops.aten._reshape_alias.default)
 @tensorrt_converter(torch.ops.aten.view.default)
 def aten_ops_reshape(
     network: TRTNetwork,
@@ -308,11 +306,33 @@ def aten_ops_reshape(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    kwargs_new = {
-        "input": args[0],
-        "acc_out_ty": acc_utils.build_raw_tensor_meta(shape=args[1]),
-    }
-    return acc_ops_converters.acc_ops_reshape(network, target, None, kwargs_new, name)
+    input_val = args[0]
+    # for case where input_val is TRTensor
+    input_val = get_trt_tensor(network, input_val, f"{name}_input_val")
+    shape = args[1]
+
+    layer = network.add_shuffle(input_val)
+
+    if all(isinstance(s, int) for s in shape):
+        layer.reshape_dims = tuple(shape)
+    else:
+        # Convert all the dimensions to trt Tensors.
+        trt_shape = []
+
+        for i, s in enumerate(shape):
+            if isinstance(s, TRTTensor):
+                trt_shape.append(s)
+            else:
+                a = get_trt_tensor(network, s, f"{name}_{i}")
+                trt_shape.append(a)
+
+        shape_layer = network.add_concatenation(inputs=trt_shape)
+        shape_layer.axis = 0
+        shape_layer.name = f"{name}_output_shape"
+        layer.set_input(1, shape_layer.get_output(0))
+
+    set_layer_name(layer, target, name)
+    return layer.get_output(0)
 
 
 @tensorrt_converter(torch.ops.aten.cat.default)
@@ -345,3 +365,104 @@ def aten_ops_expand(
     return acc_ops_converters.acc_ops_expand_tensor(
         network, target, None, kwargs_new, name
     )
+
+
+@tensorrt_converter(operator.floordiv)
+def aten_ops_operator_floordiv(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "input": args[0],
+        "other": args[1],
+    }
+    return acc_ops_converters.acc_ops_floor_div(network, target, None, kwargs_new, name)
+
+
+@tensorrt_converter(operator.mul)
+def aten_ops_operator_mul(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "input": args[0],
+        "other": args[1],
+    }
+    return acc_ops_converters.acc_ops_mul(network, target, None, kwargs_new, name)
+
+
+@tensorrt_converter(operator.add)
+def aten_ops_operator_add(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "input": args[0],
+        "other": args[1],
+    }
+    return acc_ops_converters.acc_ops_add(network, target, None, kwargs_new, name)
+
+
+@tensorrt_converter(operator.sub)
+def aten_ops_operator_sub(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "input": args[0],
+        "other": args[1],
+    }
+    return acc_ops_converters.acc_ops_sub(network, target, None, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten.sym_numel)
+def aten_ops_sym_numel(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    shape_layer = network.add_shape(args[0])
+    set_layer_name(shape_layer, target, "_shape_layer")
+    reduce_layer = network.add_reduce(
+        shape_layer.get_output(0),
+        trt.ReduceOperation.PROD,
+        axes=get_axes_for_reduce_op(0, False),
+        keep_dims=True,
+    )
+    set_layer_name(reduce_layer, target, "_reduce_layer")
+    return reduce_layer.get_output(0)
+
+
+@tensorrt_converter(torch.ops.aten.sym_size)
+def aten_ops_sym_size(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    shape_layer = network.add_shape(args[0])
+    ind = args[1]
+    set_layer_name(shape_layer, target, "_shape_layer")
+    slice_layer = network.add_slice(
+        input=shape_layer.get_output(0),
+        start=[ind],
+        shape=[1],
+        stride=[1],
+    )
+    set_layer_name(slice_layer, target, "_slice_layer")
+    return slice_layer.get_output(0)

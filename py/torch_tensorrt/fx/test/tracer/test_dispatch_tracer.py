@@ -65,118 +65,21 @@ class ProxytensorTracerTest(unittest.TestCase):
         ref_output = mod(*inputs_new)
         torch.testing.assert_close(output, ref_output)
 
-    def test_simple(self):
-        class TestModule(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.relu = torch.nn.ReLU(inplace=True)
-
-            def forward(self, x, y):
-                y = y + x
-                y = y.mul(x)
-                y = y + x
-                y = y + x
-                y = y / x
-                y = y + x
-                y = y + x
-                y = y / x
-                y = y + x
-                y = self.relu(y)
-                return y
-
-        mod = TestModule()
-        mod = mod.cuda().half().eval()
-
-        def f(x, y):
-            return mod(x, y)
-
-        inputs = [torch.randn(2, 5), torch.ones(2, 5)]
-        inputs = [i.cuda().half() for i in inputs]
-        ref_output = f(*inputs)
-
-        mod = compile(
-            mod,
-            inputs,
-            max_batch_size=100,
-            explicit_batch_dimension=True,
-            lower_precision=LowerPrecision.FP16,
-            verbose_log=False,
-            timing_cache_prefix="",
-            save_timing_cache=False,
-            cuda_graph_batch_size=-1,
-            dynamic_batch=True,
-            is_aten=True,
-        )
-        output = mod(*inputs)
-        torch.testing.assert_close(output, ref_output)
-
-    def test_resnet18_aten(self):
-        mod = torchvision.models.resnet18()
-        mod = mod.cuda().half().eval()
-
-        inputs = [torch.ones(32, 3, 224, 224)]
-        inputs = [i.cuda().half() for i in inputs]
-
-        aten_mod = compile(
-            mod,
-            inputs,
-            max_batch_size=32,
-            explicit_batch_dimension=True,
-            lower_precision=LowerPrecision.FP16,
-            verbose_log=False,
-            timing_cache_prefix="",
-            save_timing_cache=False,
-            cuda_graph_batch_size=-1,
-            dynamic_batch=False,
-            is_aten=True,
-        )
-        aten_output = aten_mod(*inputs)
-        fx_mod = compile(
-            mod,
-            inputs,
-            max_batch_size=32,
-            explicit_batch_dimension=True,
-            lower_precision=LowerPrecision.FP16,
-            verbose_log=False,
-            timing_cache_prefix="",
-            save_timing_cache=False,
-            cuda_graph_batch_size=-1,
-            dynamic_batch=False,
-            is_aten=False,
-        )
-        fx_output = fx_mod(*inputs)
-        # Kernel selection is tricky in TRT with big variance as shown below:
-        # Mismatched elements: 30816 / 32000 (96.3%)
-        # Greatest absolute difference: 0.05859375 at index (0, 499) (up to 1e-05 allowed)
-        # Greatest relative difference: 3.293713681986265 at index (0, 142) (up to 0.001 allowed)
-        # so we choose to use cosine similarity
-        cos_val = torch.nn.functional.cosine_similarity(
-            aten_output.flatten(), fx_output.flatten(), dim=0, eps=1e-4
-        )
-        self.assertTrue(cos_val.detach().cpu().numpy() > 0.999)
-
     def test_resnet18_dynamo(self):
         mod = torchvision.models.resnet18()
         mod = mod.cuda().half().eval()
 
-        def f(x):
-            return mod(x)
-
         inputs = [torch.ones(32, 3, 224, 224)]
         inputs = [i.cuda().half() for i in inputs]
-        torchdynamo.reset()
-        dynamo_aten_mod = torchdynamo.optimize(backends.fx2trt_compiler_fp16)(mod)
-        dynamo_aten_output = dynamo_aten_mod(*inputs)
+        ref_output = mod(*inputs)
 
         torchdynamo.reset()
-
         dynamo_mod = torchdynamo.optimize(backends.fx2trt_compiler_fp16)(mod)
         dynamo_output = dynamo_mod(*inputs)
-
-        cos = torch.nn.CosineSimilarity(dim=0, eps=1e-4)
-        cos_val = cos(dynamo_output.flatten(), dynamo_aten_output.flatten())
-
-        self.assertTrue(cos_val.cpu().numpy() > 0.999)
+        cos_val = torch.nn.functional.cosine_similarity(
+            dynamo_output.flatten(), ref_output.flatten(), dim=0, eps=1e-4
+        )
+        self.assertTrue(cos_val.detach().cpu().numpy() > 0.999)
 
 
 class DispatchTracerTest(unittest.TestCase):

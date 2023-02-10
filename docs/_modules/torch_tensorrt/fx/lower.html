@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.fx.lower &mdash; Torch-TensorRT v1.4.0dev0+e576d20 documentation</title>
+  <title>torch_tensorrt.fx.lower &mdash; Torch-TensorRT v1.4.0dev0+3d59933 documentation</title>
   
 
   
@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+e576d20
+                  v1.4.0dev0+3d59933
                 </div>
               
             
@@ -368,6 +368,7 @@
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torch.fx</span> <span class="k">as</span> <span class="nn">fx</span>
 <span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
+<span class="kn">import</span> <span class="nn">torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer</span> <span class="k">as</span> <span class="nn">aten_tracer</span>
 <span class="kn">from</span> <span class="nn">torch.fx.passes.splitter_base</span> <span class="kn">import</span> <span class="n">SplitResult</span>
 
 <span class="kn">from</span> <span class="nn">.fx2trt</span> <span class="kn">import</span> <span class="n">TRTInterpreter</span><span class="p">,</span> <span class="n">TRTInterpreterResult</span>
@@ -379,8 +380,7 @@
 
 <span class="kn">from</span> <span class="nn">.tracer.acc_tracer</span> <span class="kn">import</span> <span class="n">acc_tracer</span>
 <span class="kn">from</span> <span class="nn">.trt_module</span> <span class="kn">import</span> <span class="n">TRTModule</span>
-<span class="kn">from</span> <span class="nn">.utils</span> <span class="kn">import</span> <span class="n">LowerPrecision</span><span class="p">,</span> <span class="n">proxytensor_trace</span>
-
+<span class="kn">from</span> <span class="nn">.utils</span> <span class="kn">import</span> <span class="n">LowerPrecision</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -620,7 +620,9 @@
             <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
                 <span class="n">lower_pass_manager_builder</span><span class="o">=</span><span class="n">LowerPassManagerBuilder</span><span class="p">(</span>
                     <span class="n">lower_setting</span><span class="o">=</span><span class="n">lower_setting</span><span class="p">,</span>
-                    <span class="n">trace_func</span><span class="o">=</span><span class="k">lambda</span> <span class="n">module</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">proxytensor_trace</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">inputs</span><span class="p">),</span>
+                    <span class="n">trace_func</span><span class="o">=</span><span class="k">lambda</span> <span class="n">module</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">aten_tracer</span><span class="o">.</span><span class="n">opt_trace</span><span class="p">(</span>
+                        <span class="n">module</span><span class="p">,</span> <span class="n">inputs</span>
+                    <span class="p">),</span>
                     <span class="n">split_func</span><span class="o">=</span><span class="n">split_func</span><span class="p">,</span>
                     <span class="n">lower_func</span><span class="o">=</span><span class="n">default_lower_pass</span><span class="p">(</span><span class="n">interpreter_builder</span><span class="p">),</span>
                 <span class="p">)</span>
@@ -661,14 +663,6 @@
                     <span class="n">conversion_fn</span> <span class="o">=</span> <span class="n">fp16_conversion_fn</span>
 
                 <span class="n">inputs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">conversion_fn</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">is_aten</span><span class="p">:</span>
-                <span class="n">pm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_pass_manager_builder</span><span class="o">.</span><span class="n">build_aten2trt_lower_pipeline</span><span class="p">(</span>
-                    <span class="n">inputs</span><span class="p">,</span> <span class="n">additional_inputs</span>
-                <span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">pm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_pass_manager_builder</span><span class="o">.</span><span class="n">build_trt_lower_pipeline</span><span class="p">(</span>
-                    <span class="n">inputs</span><span class="p">,</span> <span class="n">additional_inputs</span>
-                <span class="p">)</span>
             <span class="k">if</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">is_aten</span><span class="p">:</span>
                 <span class="n">pm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_pass_manager_builder</span><span class="o">.</span><span class="n">build_aten2trt_lower_pipeline</span><span class="p">(</span>
                     <span class="n">inputs</span><span class="p">,</span> <span class="n">additional_inputs</span>

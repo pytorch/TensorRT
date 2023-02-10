@@ -28,6 +28,20 @@ bool almostEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor,
   return result <= threshold;
 }
 
+bool sameShape(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor) {
+  if (computed_tensor.sizes().size() != gt_tensor.sizes().size()) {
+    return false;
+  }
+
+  for (size_t i = 0; i < computed_tensor.sizes().size(); i++) {
+    if (computed_tensor.sizes()[i] != gt_tensor.sizes()[i]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 bool cosineSimEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float threshold) {
   torch::Tensor cosine_sim = torch::nn::functional::cosine_similarity(
       computed_tensor.flatten(), gt_tensor.flatten(), torch::nn::functional::CosineSimilarityFuncOptions().dim(0));

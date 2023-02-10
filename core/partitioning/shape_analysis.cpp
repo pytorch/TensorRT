@@ -26,8 +26,8 @@ at::Tensor generateSingleInput(
   }
 
   // Initialize min and max ranges for random number selection
-  int LoValIncl = 0;
-  int HiValExcl = 2;
+  double LoValIncl = input.tensor_domain[0];
+  double HiValExcl = input.tensor_domain[1];
 
   auto type = at::kFloat;
   if (type_opt) {
@@ -35,6 +35,10 @@ at::Tensor generateSingleInput(
   } else {
     LOG_WARNING("Input type for doing shape analysis could not be determined, defaulting to F32");
   }
+
+  LOG_DEBUG(
+      "Using the Range: [" << LoValIncl << ", " << HiValExcl
+                           << ") as a random range for shape analysis on input with data type " << type);
 
   // Make the value range for input tensor a uniform (float) distribution
   // over [LoValIncl, HiValExcl), then cast to the desired dtype

@@ -178,20 +178,49 @@ Program Listing for File torch_tensorrt.h
      std::vector<int64_t> shape;
      DataType dtype;
      TensorFormat format;
+     std::vector<double> tensor_domain;
    
      Input() {}
      TORCHTRT_API Input(std::vector<int64_t> shape, TensorFormat format = TensorFormat::kContiguous);
    
+     TORCHTRT_API Input(
+         std::vector<int64_t> shape,
+         std::vector<double> tensor_domain,
+         TensorFormat format = TensorFormat::kContiguous);
+   
      TORCHTRT_API Input(std::vector<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
    
+     TORCHTRT_API Input(
+         std::vector<int64_t> shape,
+         DataType dtype,
+         std::vector<double> tensor_domain,
+         TensorFormat format = TensorFormat::kContiguous);
+   
      TORCHTRT_API Input(c10::ArrayRef<int64_t> shape, TensorFormat format = TensorFormat::kContiguous);
+   
+     TORCHTRT_API Input(
+         c10::ArrayRef<int64_t> shape,
+         std::vector<double> tensor_domain,
+         TensorFormat format = TensorFormat::kContiguous);
    
      TORCHTRT_API Input(c10::ArrayRef<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
    
      TORCHTRT_API Input(
+         c10::ArrayRef<int64_t> shape,
+         DataType dtype,
+         std::vector<double> tensor_domain,
+         TensorFormat format = TensorFormat::kContiguous);
+   
+     TORCHTRT_API Input(
          std::vector<int64_t> min_shape,
          std::vector<int64_t> opt_shape,
          std::vector<int64_t> max_shape,
+         TensorFormat format = TensorFormat::kContiguous);
+     TORCHTRT_API Input(
+         std::vector<int64_t> min_shape,
+         std::vector<int64_t> opt_shape,
+         std::vector<int64_t> max_shape,
+         std::vector<double> tensor_domain,
          TensorFormat format = TensorFormat::kContiguous);
    
      TORCHTRT_API Input(
@@ -199,6 +228,14 @@ Program Listing for File torch_tensorrt.h
          std::vector<int64_t> opt_shape,
          std::vector<int64_t> max_shape,
          DataType dtype,
+         TensorFormat format = TensorFormat::kContiguous);
+   
+     TORCHTRT_API Input(
+         std::vector<int64_t> min_shape,
+         std::vector<int64_t> opt_shape,
+         std::vector<int64_t> max_shape,
+         DataType dtype,
+         std::vector<double> tensor_domain,
          TensorFormat format = TensorFormat::kContiguous);
    
      TORCHTRT_API Input(
@@ -211,7 +248,22 @@ Program Listing for File torch_tensorrt.h
          c10::ArrayRef<int64_t> min_shape,
          c10::ArrayRef<int64_t> opt_shape,
          c10::ArrayRef<int64_t> max_shape,
+         std::vector<double> tensor_domain,
+         TensorFormat format = TensorFormat::kContiguous);
+   
+     TORCHTRT_API Input(
+         c10::ArrayRef<int64_t> min_shape,
+         c10::ArrayRef<int64_t> opt_shape,
+         c10::ArrayRef<int64_t> max_shape,
          DataType dtype,
+         TensorFormat format = TensorFormat::kContiguous);
+   
+     TORCHTRT_API Input(
+         c10::ArrayRef<int64_t> min_shape,
+         c10::ArrayRef<int64_t> opt_shape,
+         c10::ArrayRef<int64_t> max_shape,
+         DataType dtype,
+         std::vector<double> tensor_domain,
          TensorFormat format = TensorFormat::kContiguous);
    
      TORCHTRT_API Input(at::Tensor tensor);
