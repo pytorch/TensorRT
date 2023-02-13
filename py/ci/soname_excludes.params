@@ -16,8 +16,11 @@
 --exclude libcudart.so
 
 --exclude libnvToolsExt-847d78f2.so.1
+--exclude libnvToolsExt-847d78f2.so
 --exclude libcudart-e409450e.so.11.0
 --exclude libcudart-e409450e.so
+--exclude libgomp-a34b3233.so.1
+--exclude libgomp-a34b3233.so
 --exclude libcudart.so.11
 --exclude libcudart.so.11.7.60
 --exclude libnvrtc.so.11.2
