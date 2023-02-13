@@ -57,3 +57,81 @@ TEST(LoweringPasses, LinearToAddMMBiasNone) {
 
   ASSERT_TRUE(!torch::jit::findPatternMatches(*tg, *sg).empty());
 }
+
+TEST(LoweringPasses, LinearToAddMMBiasNoneGraphRun) {
+  std::string source_graph = R"IR(
+    graph(%input, %weight):
+      %biasNone : None = prim::Constant()
+      %true : bool = prim::Constant[value=1]()
+      %invalid_weight : Tensor = aten::t(%weight)
+      %4 : Tensor = prim::If(%true)
+        block0():
+          %res = aten::linear(%input, %weight, %biasNone)
+          -> (%res)
+        block1():
+          %res = aten::linear(%input, %invalid_weight, %biasNone)
+          -> (%res)
+      return (%4))IR";
+
+  // This regression test case ensures the Linear-to-AddMM lowering pass satisfies two constraints for non-Tensor bias:
+  // 1. It recursively resolves sub-blocks within the node, replacing sub-blocks to be converted as well
+  // 2. It does not pre-evaluate branches of the block which may have invalid operations
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(source_graph, g.get());
+
+  auto in_0 = at::rand({8, 7}, {at::kCUDA});
+  auto in_1 = at::rand({8, 7}, {at::kCUDA});
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in_0, in_1});
+
+  torch_tensorrt::core::lowering::passes::LinearToAddMM(g);
+
+  LOG_DEBUG(g);
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in_0, in_1});
+
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+}
+
+TEST(LoweringPasses, LinearToAddMMBiasGraphRun) {
+  std::string source_graph = R"IR(
+    graph(%input, %weight, %bias):
+      %true : bool = prim::Constant[value=1]()
+      %invalid_weight : Tensor = aten::t(%weight)
+      %4 : Tensor = prim::If(%true)
+        block0():
+          %res = aten::linear(%input, %weight, %bias)
+          -> (%res)
+        block1():
+          %res = aten::linear(%input, %invalid_weight, %bias)
+          -> (%res)
+      return (%4))IR";
+
+  // This regression test case ensures the Linear-to-AddMM lowering pass satisfies two constraints for Tensor bias:
+  // 1. It recursively resolves sub-blocks within the node, replacing sub-blocks to be converted as well
+  // 2. It does not pre-evaluate branches of the block which may have invalid operations
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(source_graph, g.get());
+
+  auto in_0 = at::rand({8, 7}, {at::kCUDA});
+  auto in_1 = at::rand({8, 7}, {at::kCUDA});
+  auto in_2 = at::rand({8, 8}, {at::kCUDA});
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in_0, in_1, in_2});
+
+  torch_tensorrt::core::lowering::passes::LinearToAddMM(g);
+
+  LOG_DEBUG(g);
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in_0, in_1, in_2});
+
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+}

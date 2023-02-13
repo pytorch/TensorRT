@@ -6,6 +6,21 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, U
 import torch
 import torch._dynamo as torchdynamo
 from torch._dynamo.guards import Guard
+from torch.fx.passes.infra.pass_base import PassResult
+
+from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
+    compose_bmm,
+    compose_chunk,
+    compose_getitem_slice,
+    remove_ops,
+    replace_aten_op_with_indices,
+    replace_aten_reshape_alias_with_replace,
+    replace_builtin_ops,
+    replace_inplace_ops,
+    replace_native_layernorm_with_layernorm,
+    replace_transpose_mm_op_with_linear,
+    run_const_fold,
+)
 from typing_extensions import TypeAlias
 
 Value: TypeAlias = Union[
@@ -112,3 +127,34 @@ def dynamo_trace(
 def trace(f, args, *rest):
     graph_module, guards = dynamo_trace(f, args, True, "symbolic")
     return graph_module, guards
+
+
+def opt_trace(f, args, *rest):
+    """
+    Optimized trace with necessary passes which re-compose some ops or replace some ops
+    These passes should be general and functional purpose
+    """
+    passes_list = [
+        compose_bmm,
+        compose_chunk,
+        compose_getitem_slice,
+        replace_aten_reshape_alias_with_replace,
+        replace_aten_op_with_indices,
+        replace_transpose_mm_op_with_linear,  # after compose_bmm
+        replace_native_layernorm_with_layernorm,
+        remove_ops,
+        replace_builtin_ops,  # after replace_native_layernorm_with_layernorm
+        replace_inplace_ops,  # remove it once functionalization is enabled
+    ]
+
+    fx_module, _ = trace(f, args)
+    print(fx_module.graph)
+    for passes in passes_list:
+        pr: PassResult = passes(fx_module)
+        fx_module = pr.graph_module
+
+    fx_module(*args)
+
+    fx_module = run_const_fold(fx_module)
+    print(fx_module.graph)
+    return fx_module

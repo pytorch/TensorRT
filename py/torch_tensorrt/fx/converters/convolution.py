@@ -1,8 +1,9 @@
 # @manual=//deeplearning/trt/python:py_tensorrt
+import logging
+
 import numpy as np
 import tensorrt as trt
 import torch
-import logging
 
 from ..converter_registry import tensorrt_converter
 
