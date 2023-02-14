@@ -7,7 +7,7 @@ RUN apt-get update
 RUN DEBIAN_FRONTEND=noninteractive apt install -y build-essential manpages-dev wget zlib1g software-properties-common git
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt install -y python3.8 python3.8-distutils python3.8-dev
-RUN wget https://bootstrap.pypa.io/get-pip.py
+RUN wget -q https://bootstrap.pypa.io/get-pip.py
 RUN ln -s /usr/bin/python3.8 /usr/bin/python
 RUN python get-pip.py
 RUN pip3 install wheel
@@ -16,7 +16,7 @@ RUN pip3 install wheel
 RUN pip3 install torch==2.0.0.dev20230103+cu117 torchvision==0.15.0.dev20230103+cu117 --extra-index-url https://download.pytorch.org/whl/nightly/cu117
 
 # Install CUDNN + TensorRT
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
+RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
 RUN mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
 RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 536F8F1DE80F6A35
