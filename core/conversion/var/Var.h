@@ -15,7 +15,7 @@ namespace conversion {
 class Var : torch::CustomClassHolder {
  public:
   enum Type { kITensor, kIValue, kNone };
-  enum IValueType { kInt, kDouble, kBool, kTensor, kIntList, kDoubleList, kBoolList, kTensorList, kITensorList };
+
   Var();
   Var(torch::jit::IValue* p);
   Var(nvinfer1::ITensor* p);
@@ -59,16 +59,23 @@ class Var : torch::CustomClassHolder {
 
   bool isIValue() const;
   bool isITensor() const;
-  bool isITensorList() const;
-  bool isTensorList() const;
-  bool isDoubleList() const;
-  bool isIntList() const;
-  bool isBoolList() const;
   bool isNone() const;
+
+  bool isInt();
+  bool isDouble();
+  bool isBool();
+  bool isString();
+  bool isScalar();
+  bool isTensor();
+  bool isIntList();
+  bool isDoubleList();
+  bool isBoolList();
+  bool isTensorList();
+  bool isITensorList();
+  bool isList();
+
   Var::Type type() const;
-  Var::IValueType ivalue_type() const;
   std::string type_name() const;
-  Var::IValueType determineIValueType(torch::jit::IValue* p);
 
  private:
   union VarContainer {
@@ -79,7 +86,6 @@ class Var : torch::CustomClassHolder {
 
   VarContainer ptr_;
   Type type_;
-  IValueType ivalue_type_;
 };
 
 } // namespace conversion
