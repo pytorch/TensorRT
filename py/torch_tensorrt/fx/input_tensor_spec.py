@@ -4,58 +4,59 @@ import torch
 
 from .types import Shape, ShapeRange
 from .utils import get_dynamic_dims
+from torch_tensorrt._Input import Input
 
 
-def generate_input_specs(inputs, lower_setting, additional_inputs=None):
-    # dynamic_batch is TRT only flag.
-    if (
-        not lower_setting.explicit_batch_dimension
-        or lower_setting.dynamic_batch is False
-    ):
-        return InputTensorSpec.from_tensors(inputs)
-
-    # If we don't have additional inputs, we assume the first dimension
-    # is the dynamic batch dimension. Otherwise, we use the additional
-    # inputs to determine the batch dimension.
-    if additional_inputs is None:
-        return InputTensorSpec.from_tensors_with_dynamic_batch_size(
-            inputs,
-            (
-                0,
-                lower_setting.max_batch_size,
-                lower_setting.max_batch_size,
-            ),
-            lower_setting.opt_profile_replica,
-        )
-    else:
-        batch_dims = []
-
-        for i, j in zip(inputs, additional_inputs):
-            found_batch_dim = False
-
-            for idx, values in enumerate(zip(i.shape, j.shape)):
-                if values[0] != values[1]:
-                    assert (
-                        found_batch_dim is False
-                    ), f"We've already found a batch dim, {i.shape}, {j.shape}."
-                    batch_dims.append(idx)
-                    found_batch_dim = True
-
-            if not found_batch_dim:
-                raise RuntimeError(
-                    f"Failed to find batch dimension because shapes are the same, {i.shape}"
-                )
-
-        return InputTensorSpec.from_tensors_with_dynamic_batch_size(
-            inputs,
-            (
-                0,
-                lower_setting.max_batch_size,
-                lower_setting.max_batch_size,
-            ),
-            lower_setting.opt_profile_replica,
-            batch_dims,
-        )
+# def generate_input_specs(inputs, lower_setting, additional_inputs=None):
+#     # dynamic_batch is TRT only flag.
+#     if (
+#         not lower_setting.explicit_batch_dimension
+#         or lower_setting.dynamic_batch is False
+#     ):
+#         return InputTensorSpec.from_tensors(inputs)
+#
+#     # If we don't have additional inputs, we assume the first dimension
+#     # is the dynamic batch dimension. Otherwise, we use the additional
+#     # inputs to determine the batch dimension.
+#     if additional_inputs is None:
+#         return InputTensorSpec.from_tensors_with_dynamic_batch_size(
+#             inputs,
+#             (
+#                 0,
+#                 lower_setting.max_batch_size,
+#                 lower_setting.max_batch_size,
+#             ),
+#             lower_setting.opt_profile_replica,
+#         )
+#     else:
+#         batch_dims = []
+#
+#         for i, j in zip(inputs, additional_inputs):
+#             found_batch_dim = False
+#
+#             for idx, values in enumerate(zip(i.shape, j.shape)):
+#                 if values[0] != values[1]:
+#                     assert (
+#                         found_batch_dim is False
+#                     ), f"We've already found a batch dim, {i.shape}, {j.shape}."
+#                     batch_dims.append(idx)
+#                     found_batch_dim = True
+#
+#             if not found_batch_dim:
+#                 raise RuntimeError(
+#                     f"Failed to find batch dimension because shapes are the same, {i.shape}"
+#                 )
+#
+#         return InputTensorSpec.from_tensors_with_dynamic_batch_size(
+#             inputs,
+#             (
+#                 0,
+#                 lower_setting.max_batch_size,
+#                 lower_setting.max_batch_size,
+#             ),
+#             lower_setting.opt_profile_replica,
+#             batch_dims,
+#         )
 
 
 class InputTensorSpec(NamedTuple):
@@ -115,6 +116,43 @@ class InputTensorSpec(NamedTuple):
         """
         assert isinstance(tensors, (list, tuple))
         return [cls.from_tensor(t) for t in tensors]
+
+    @classmethod
+    def from_input(cls, input_obj: Input) -> "InputTensorSpec":
+        """
+        Produce a list of InputTenosrSpec named tuples which contain
+        the information of all the given PyTorch tensors.
+
+        Args:
+            tensors (Iterable[torch.Tensor]): A list of PyTorch tensors.
+
+        Returns:
+            A list of InputTensorSpec named tuples.
+        """
+        assert isinstance(input_obj, Input)
+        input_spec = None
+        if isinstance(input_obj.shape, dict):
+            min_shape = input_obj.shape["min_shape"]
+            opt_shape = input_obj.shape["opt_shape"]
+            max_shape = input_obj.shape["max_shape"]
+            dyn_shape = []
+            for min, opt, max in zip(min_shape, opt_shape, max_shape):
+                if min == opt == max:
+                    dyn_shape.append(min)
+                else:
+                    dyn_shape.append(-1)
+            dtype = input_obj.torch_dtype
+            input_spec = cls(
+                shape=dyn_shape,
+                dtype=dtype,
+                shape_ranges=[(min_shape, opt_shape, max_shape)],
+            )
+        else:
+            shape = input_obj.shape
+            dtype = input_obj.torch_dtype
+            input_spec = cls(shape=shape, dtype=dtype)
+
+        return input_spec
 
     @classmethod
     def from_tensors_with_dynamic_batch_size(

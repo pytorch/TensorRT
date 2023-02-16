@@ -12,6 +12,8 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
     run_const_fold,
 )
 
+from typing import Any
+from torch_tensorrt._Input import Input
 from .types import Shape, TRTDataType
 
 

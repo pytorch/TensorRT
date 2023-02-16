@@ -9,6 +9,7 @@ from torch_tensorrt.logging import Level, log
 from typing import Tuple, List, Dict
 import warnings
 from copy import deepcopy
+from torch_tensorrt.ts.ts_input import TSInput
 
 
 def _internal_input_to_torch_class_input(i: _C.Input) -> torch.classes.tensorrt._Input:
@@ -36,46 +37,6 @@ def _supported_input_size_type(input_size: Any) -> bool:
             "Input sizes for inputs are required to be a List, tuple or torch.Size or a Dict of three sizes (min, opt, max), found type: "
             + str(type(input_size))
         )
-
-
-def _parse_input_ranges(input_sizes: List) -> List:
-
-    if any(
-        not isinstance(i, dict) and not _supported_input_size_type(i)
-        for i in input_sizes
-    ):
-        raise KeyError(
-            "An input size must either be a static size or a range of three sizes (min, opt, max) as Dict"
-        )
-
-    parsed_input_sizes = []
-    for i in input_sizes:
-        if isinstance(i, dict):
-            if all(k in i for k in ["min", "opt", "min"]):
-                parsed_input_sizes.append(
-                    Input(
-                        min_shape=i["min"], opt_shape=i["opt"], max_shape=i["max"]
-                    )._to_internal()
-                )
-
-            elif "opt" in i:
-                parsed_input_sizes.append(Input(shape=i["opt"])._to_internal())
-
-            else:
-                raise KeyError(
-                    "An input size must either be a static size or a range of three sizes (min, opt, max) as Dict"
-                )
-
-        elif isinstance(i, list):
-            parsed_input_sizes.append(Input(shape=i)._to_internal())
-
-        elif isinstance(i, tuple):
-            parsed_input_sizes.append(Input(shape=i)._to_internal())
-
-        elif isinstance(i, torch.Size):
-            parsed_input_sizes.append(Input(shape=i)._to_internal())
-
-    return parsed_input_sizes
 
 
 def _parse_op_precision(precision: Any) -> _enums.dtype:
@@ -228,7 +189,23 @@ def _parse_input_signature(input_signature: Any, depth: int = 0):
                 + "non-TRT types."
             )
 
-        clone = _internal_input_to_torch_class_input(i._to_internal())
+        ts_i = i
+        if i.shape_mode == Input._ShapeMode.STATIC:
+            ts_i = TSInput(shape=i.shape, dtype=i.dtype, format=i.format)
+        elif i.shape_mode == Input._ShapeMode.DYNAMIC:
+            ts_i = TSInput(
+                min_shape=i.shape["min_shape"],
+                opt_shape=i.shape["opt_shape"],
+                max_shape=i.shape["max_shape"],
+                dtype=i.dtype,
+                format=i.format,
+            )
+        else:
+            raise ValueError(
+                "Invalid shape mode detected for input while parsing the input_signature"
+            )
+
+        clone = _internal_input_to_torch_class_input(ts_i._to_internal())
         return clone
     else:
         raise KeyError(
@@ -260,7 +237,25 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
             Input.from_tensor(i) if isinstance(i, torch.Tensor) else i
             for i in compile_spec["inputs"]
         ]
-        info.inputs = [i._to_internal() for i in inputs]
+        ts_inputs = []
+        for i in inputs:
+            if i.shape_mode == Input._ShapeMode.STATIC:
+                ts_inputs.append(
+                    TSInput(
+                        shape=i.shape, dtype=i.dtype, format=i.format
+                    )._to_internal()
+                )
+            elif i.shape_mode == Input._ShapeMode.DYNAMIC:
+                ts_inputs.append(
+                    TSInput(
+                        min_shape=i.shape["min_shape"],
+                        opt_shape=i.shape["opt_shape"],
+                        max_shape=i.shape["max_shape"],
+                        dtype=i.dtype,
+                        format=i.format,
+                    )._to_internal()
+                )
+        info.inputs = ts_inputs
 
     elif compile_spec["input_signature"] is not None:
         log(

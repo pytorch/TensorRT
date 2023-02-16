@@ -4,6 +4,7 @@ from dataclasses import dataclass, field, replace
 
 import torch
 import torchvision
+import torch_tensorrt
 from torch_tensorrt.fx import compile
 from torch_tensorrt.fx.utils import LowerPrecision
 
@@ -97,21 +98,25 @@ def benchmark(
     """
 
     model = model.cuda().eval()
-    inputs = [x.cuda() for x in inputs]
-
+    # inputs = [x.cuda() for x in inputs]
+    inputs = [torch_tensorrt.Input(shape=(128, 3, 224, 224), dtype=torch.float32)]
+    # inputs = [torch_tensorrt.Input(min_shape=[1, 3, 224, 224],
+    #                                opt_shape=[8, 3, 224, 224],
+    #                                max_shape=[32, 3, 224, 224],
+    #                                dtype=torch.float32)]
     # benchmark base configuration
     conf = Configuration(batch_iter=batch_iter, batch_size=batch_size)
 
     configurations = [
         # Baseline
-        replace(conf, name="CUDA Eager", trt=False),
+        # replace(conf, name="CUDA Eager", trt=False),
         # FP16
         replace(
             conf,
-            name="TRT FP16 Eager",
+            name="TRT FP32 Eager",
             trt=True,
             jit=False,
-            fp16=True,
+            fp16=False,
             accuracy_rtol=1e-2,
         ),
     ]
@@ -182,7 +187,10 @@ def run_configuration_benchmark(
             explicit_batch_dimension=True,
             is_aten=True,
         )
-        time = benchmark_torch_function(conf.batch_iter, lambda: lowered_module(*input))
+        random_inputs = [torch.randn((128, 3, 224, 224), dtype=torch.float32).cuda()]
+        time = benchmark_torch_function(
+            conf.batch_iter, lambda: lowered_module(*random_inputs)
+        )
     else:
         print("Lowering with JIT is not available!", "red")
 

@@ -9,13 +9,14 @@ from torch.fx.passes.pass_manager import inplace_wrapper, PassManager
 from torch.fx.passes.shape_prop import ShapeProp
 from torch.fx.passes.splitter_base import generate_inputs_for_submodules, SplitResult
 from torch_tensorrt.fx.utils import LowerPrecision
-
-from ..input_tensor_spec import generate_input_specs
+from torch_tensorrt import _Input
+from ..input_tensor_spec import InputTensorSpec
 
 from ..lower_setting import LowerSetting
 from ..observer import Observer
 from ..passes.remove_duplicate_output_args import remove_duplicate_output_args
 from .graph_opts import common_subexpression_elimination
+from .pass_utils import extract_example_tensors_from_input
 
 from .lower_basic_pass import (  # noqa
     fix_clamp_numerical_limits_to_fp16,
@@ -165,6 +166,7 @@ class LowerPassManagerBuilder:
                 )
             )
         )
+
         return PassManager.build_from_passlist(passes)
 
     def _trt_lower_pass(self) -> PassManager:
@@ -192,13 +194,8 @@ class LowerPassManagerBuilder:
                     _LOGGER.info(f"Now lowering submodule {submod_name}")
                     lowering_start_time = datetime.datetime.now()
 
-                    self.lower_setting.input_specs = generate_input_specs(
-                        submod_inputs,
-                        self.lower_setting,
-                        additional_submodule_inputs[submod_name]
-                        if additional_submodule_inputs
-                        else None,
-                    )
+                    self.lower_setting.input_specs = self._trt_input
+
                     lowered_module = self._lower_func(
                         submod, submod_inputs, self.lower_setting, submod_name
                     )
@@ -262,7 +259,19 @@ class LowerPassManagerBuilder:
     def build_trt_lower_pipeline(
         self, input: Input, additional_input: Optional[Input] = None
     ) -> PassManager:
-        self._input = input
+
+        self._input = extract_example_tensors_from_input(input)
+        self._trt_input = []
+        for input_obj in input:
+            if isinstance(input_obj, _Input.Input):
+                self._trt_input.append(InputTensorSpec.from_input(input_obj))
+            elif isinstance(input_obj, torch.Tensor):
+                self._trt_input.append(InputTensorSpec.from_tensor(input_obj))
+            else:
+                raise ValueError(
+                    "Invalid input type provided in the FX lowering. Expected type: torch_tensorrt.Input or torch.Tensor"
+                )
+
         self._additional_input = additional_input
         passes = []
 
@@ -278,7 +287,19 @@ class LowerPassManagerBuilder:
     def build_aten2trt_lower_pipeline(
         self, input: Input, additional_input: Optional[Input] = None
     ) -> PassManager:
-        self._input = input
+
+        self._input = extract_example_tensors_from_input(input)
+        self._trt_input = []
+        for input_obj in input:
+            if isinstance(input_obj, _Input.Input):
+                self._trt_input.append(InputTensorSpec.from_input(input_obj))
+            elif isinstance(input_obj, torch.Tensor):
+                self._trt_input.append(InputTensorSpec.from_tensor(input_obj))
+            else:
+                raise ValueError(
+                    "Invalid input type provided in the FX lowering. Expected type: torch_tensorrt.Input or torch.Tensor"
+                )
+
         self._additional_input = additional_input
         passes = []
         passes.append(

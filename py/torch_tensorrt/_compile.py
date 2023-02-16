@@ -142,9 +142,8 @@ def compile(
         return torch_tensorrt.fx.compile(
             module,
             inputs,
-            lower_precision=lower_precision,
-            max_batch_size=inputs[0].size(0),
             explicit_batch_dimension=True,
+            lower_precision=lower_precision,
             dynamic_batch=False,
             **kwargs,
         )

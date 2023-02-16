@@ -5,7 +5,8 @@ import torch
 import torch.fx.passes.net_min_base as net_min_base
 from torch.fx.passes.tools_common import Tensors
 
-from .. import InputTensorSpec, TRTInterpreter, TRTModule
+from .. import TRTInterpreter, TRTModule
+from torch_tensorrt._Input import Input
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -13,13 +14,13 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 def lower_mod_default(
     mod: torch.fx.GraphModule,
     inputs: Tensors,
-    batch_size: Any = 2048,
+    # batch_size: Any = 2048,
     use_experimental_rt: bool = False,
 ) -> TRTModule:
     interp = TRTInterpreter(
-        mod, InputTensorSpec.from_tensors(inputs), explicit_batch_dimension=True
+        mod, _Input.Input.from_tensors(inputs), explicit_batch_dimension=True
     )
-    interpreter_result = interp.run(max_batch_size=batch_size)
+    interpreter_result = interp.run()
     if use_experimental_rt:
         import io
 
@@ -68,13 +69,13 @@ class TensorRTMinimizer(net_min_base._MinimizerBase):
         sample_input: Tensors,
         compare_fn: Callable[[Any, Any, Any], Tuple[float, bool]],
         settings: TensorRTMinizerSetting = TensorRTMinizerSetting(),
-        max_batch_size: Any = 2048,
+        # max_batch_size: Any = 2048,
         lower_fn: Callable[
             [torch.fx.GraphModule, Tensors, Any, bool], TRTModule
         ] = lower_mod_default,
     ):
         self.lower_fn = lower_fn
-        self.max_batch_size = max_batch_size
+        # self.max_batch_size = max_batch_size
         self.use_experiemental_rt = settings.use_experimental_rt
         super().__init__(module, sample_input, compare_fn, settings)
 
@@ -86,9 +87,7 @@ class TensorRTMinimizer(net_min_base._MinimizerBase):
     def run_b(self, mod, inputs):
         mod.eval()
         try:
-            mod = self.lower_fn(
-                mod, inputs, self.max_batch_size, self.use_experiemental_rt
-            )
+            mod = self.lower_fn(mod, inputs, self.use_experiemental_rt)
             output = mod(*inputs)
         except RuntimeError as e:
             raise net_min_base.FxNetMinimizerRunFuncError(

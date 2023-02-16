@@ -8,6 +8,7 @@ from typing import Any, Callable, List, Optional
 import torch
 from torch import fx
 from torch.fx.passes.shape_prop import ShapeProp
+from torch_tensorrt import _Input
 
 # Create an alias for module input type to avoid littering pyre-ignore for Any
 # throughout the file.
@@ -19,6 +20,30 @@ PassFunc = Callable[[fx.GraphModule, Input], fx.GraphModule]
 RELAX_ACCURACY_FAILURE: bool = False
 FINAL_CHECK_ATOL_MULTIPLIER: float = 10
 FINAL_CHECK_RTOL_MULTIPLIER: float = 10
+
+
+def extract_example_tensors_from_input(
+    inputs: Any, device: torch.device = torch.device("cuda")
+):
+    input_tensors = []
+    for input_obj in inputs:
+        if isinstance(input_obj, _Input.Input):
+            if isinstance(input_obj.shape, dict):
+                input_tensors.append(
+                    input_obj.example_tensor(optimization_profile_field="opt_shape").to(
+                        device
+                    )
+                )
+            else:
+                input_tensors.append(input_obj.example_tensor().to(device))
+        elif isinstance(input_obj, torch.Tensor):
+            input_tensors.append(input_obj)
+        else:
+            raise ValueError(
+                "Invalid input type provided in the FX lowering. Expected type: torch_tensorrt.Input or torch.Tensor"
+            )
+
+    return input_tensors
 
 
 class RelaxAccuracyCheckMode:
@@ -114,10 +139,10 @@ def validate_inference(rtol=None, atol=None):
             *args,
             **kwargs,
         ) -> fx.GraphModule:
-            res0 = module(*input)
+            input_tensors = extract_example_tensors_from_input(input)
+            res0 = module(*input_tensors)
             processed_module = pass_(module, input, *args, **kwargs)
-            res1 = processed_module(*input)
-
+            res1 = processed_module(*input_tensors)
             tensor_res_0 = _collect_tensors(res0)
             tensor_res_1 = _collect_tensors(res1)
             relax_accuracy_check_failure = RELAX_ACCURACY_FAILURE

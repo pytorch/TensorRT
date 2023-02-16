@@ -350,6 +350,7 @@ ext_modules = [
 if FX_ONLY:
     ext_modules = None
     packages = [
+        "torch_tensorrt",
         "torch_tensorrt.fx",
         "torch_tensorrt.fx.converters",
         "torch_tensorrt.fx.passes",
@@ -358,6 +359,7 @@ if FX_ONLY:
         "torch_tensorrt.fx.tracer.dispatch_tracer",
     ]
     package_dir = {
+        "torch_tensorrt": "torch_tensorrt/",
         "torch_tensorrt.fx": "torch_tensorrt/fx",
         "torch_tensorrt.fx.converters": "torch_tensorrt/fx/converters",
         "torch_tensorrt.fx.passes": "torch_tensorrt/fx/passes",
@@ -437,7 +439,9 @@ setup(
             "bin/*",
             "BUILD",
             "WORKSPACE",
-        ],
+        ]
+        if not FX_ONLY
+        else ["_Input.py"]
     },
     exclude_package_data={
         "": ["*.cpp"],
