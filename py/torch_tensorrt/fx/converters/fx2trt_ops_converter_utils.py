@@ -1,6 +1,7 @@
 import tensorrt as trt
 import torch
 
+
 def get_arg(args, kwargs, name, pos, default):
     if name in kwargs:
         return kwargs[name]
@@ -8,7 +9,8 @@ def get_arg(args, kwargs, name, pos, default):
         return args[pos]
     else:
         return default
-    
+
+
 def add_missing_trt_tensors(network, tensors):
     """Creates missing TensorRT tensors as constants and attaches them to the Torch Tensors"""
     with use_shape_wrapping(False):
@@ -46,7 +48,6 @@ def add_missing_trt_tensors(network, tensors):
                 t._trt = network.add_constant(shape, weight).get_output(0)
                 trt_tensor = t._trt
 
-
             assert trt_tensor is not None
 
             trt_tensors[i] = trt_tensor
@@ -75,6 +76,7 @@ def broadcast_trt_tensors(network, trt_tensors, broadcast_ndim):
 
         return broadcasted_trt_tensors
 
+
 def check_torch_dtype(*tensors):
     dtype = None
     for t in tensors:
@@ -88,18 +90,20 @@ def check_torch_dtype(*tensors):
     )  # , 'Data type could not be inferred from any item in list')
     return dtype
 
+
 class use_shape_wrapping:
 
-    stack = [True] # default true
+    stack = [True]  # default true
 
     def __init__(self, value: bool):
         self._value = value
-    
+
     def __enter__(self, *args, **kwargs):
         self.stack.insert(0, self._value)
 
     def __exit__(self, *args, **kwargs):
         self.stack.pop(0)
+
 
 def convert_AdaptiveAvgPool2d(method_args):
     network = method_args[0]
@@ -108,17 +112,22 @@ def convert_AdaptiveAvgPool2d(method_args):
     input_trt = add_missing_trt_tensors(method_args[0], [input])[0]
     output_size = module.output_size
     if not isinstance(output_size, tuple):
-        output_size = (output_size, ) * 2
+        output_size = (output_size,) * 2
 
-    stride = (input_trt.shape[-2] // output_size[-2], input_trt.shape[-1] // output_size[-1])
+    stride = (
+        input_trt.shape[-2] // output_size[-2],
+        input_trt.shape[-1] // output_size[-1],
+    )
 
     kernel_size = stride
     layer = network.add_pooling(
-        input=input_trt, type=trt.PoolingType.AVERAGE, window_size=kernel_size)
+        input=input_trt, type=trt.PoolingType.AVERAGE, window_size=kernel_size
+    )
     layer.stride = stride
 
     output = layer.get_output(0)
     return output
+
 
 def convert_AdaptiveAvgPool3d(method_args):
     network = method_args[0]

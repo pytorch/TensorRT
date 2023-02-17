@@ -11,7 +11,9 @@ class TestReLUConverter(DispatchTestCase):
                 return nn.functional.leaky_relu(x)
 
         inputs = [torch.randn(1, 10)]
-        self.run_test(TestModule(), inputs, expected_ops={torch.ops.aten.leaky_relu.default})
+        self.run_test(
+            TestModule(), inputs, expected_ops={torch.ops.aten.leaky_relu.default}
+        )
 
     def test_relu_with_dynamic_shape(self):
         class TestModule(nn.Module):
