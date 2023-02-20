@@ -22,6 +22,7 @@ from ..utils import get_dynamic_dims, torch_dtype_from_trt, torch_dtype_to_trt
 
 from .converter_utils import *  # noqa: F403
 import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
+import activation
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -280,7 +281,7 @@ def aten_ops_relu(
     kwargs_new = {
         "input": args[0],
     }
-    return acc_ops_converters.acc_ops_relu(network, target, None, kwargs_new, name)
+    return activation.add_relu(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.sub.Tensor)
