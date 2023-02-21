@@ -105,15 +105,6 @@ def benchmark(
     configurations = [
         # Baseline
         replace(conf, name="CUDA Eager", trt=False),
-        # FP32
-        replace(
-            conf,
-            name="TRT FP32 Eager",
-            trt=True,
-            jit=False,
-            fp16=False,
-            accuracy_rtol=1e-3,
-        ),
         # FP16
         replace(
             conf,
@@ -189,6 +180,7 @@ def run_configuration_benchmark(
             max_batch_size=conf.batch_size,
             lower_precision=LowerPrecision.FP16 if conf.fp16 else LowerPrecision.FP32,
             explicit_batch_dimension=True,
+            is_aten=True,
         )
         time = benchmark_torch_function(conf.batch_iter, lambda: lowered_module(*input))
     else:
