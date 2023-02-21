@@ -45,6 +45,7 @@ void UnpackAndCastMaskedFill(std::shared_ptr<torch::jit::Graph>& graph, std::str
 void UnpackAndCastNumToTensor(std::shared_ptr<torch::jit::Graph>& graph, std::string target_device_name);
 void UnpackAndCastFull(std::shared_ptr<torch::jit::Graph>& graph, std::string target_device_name);
 void ReplaceScalarImplicit(std::shared_ptr<torch::jit::Graph>& graph);
+void ReplaceAtenPad(std::shared_ptr<torch::jit::Graph>& graph);
 
 // utility functions exposed for testing
 std::string unmangle_cls_name(const std::string& name);

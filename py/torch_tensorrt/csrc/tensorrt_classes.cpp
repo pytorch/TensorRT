@@ -95,9 +95,10 @@ std::string to_str(TensorFormat value) {
 
 core::ir::Input Input::toInternalInput() {
   if (!input_is_dynamic) {
-    return core::ir::Input(opt, toAtenDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype);
+    return core::ir::Input(opt, toAtenDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype, tensor_domain);
   } else {
-    return core::ir::Input(min, opt, max, toAtenDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype);
+    return core::ir::Input(
+        min, opt, max, toAtenDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype, tensor_domain);
   }
 }
 
@@ -109,6 +110,12 @@ std::string Input::to_str() {
       ss << i << ',';
     }
     ss << ')';
+    return ss.str();
+  };
+
+  auto domain_to_str = [](std::vector<double> domain) -> std::string {
+    std::stringstream ss;
+    ss << "[" << domain[0] << ", " << domain[1] << ")";
     return ss.str();
   };
 
@@ -124,7 +131,8 @@ std::string Input::to_str() {
   }
 
   ss << "dtype=" << pyapi::to_str(dtype) << ", ";
-  ss << "format=" << pyapi::to_str(format) << ')';
+  ss << "format=" << pyapi::to_str(format) << ", ";
+  ss << "tensor_domain=" << domain_to_str(tensor_domain) << ")";
 
   return ss.str();
 }

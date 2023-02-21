@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._Input &mdash; Torch-TensorRT v1.4.0dev0+8eb2eab documentation</title>
+  <title>torch_tensorrt._Input &mdash; Torch-TensorRT v1.4.0dev0+3bfc052 documentation</title>
   
 
   
@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+8eb2eab
+                  v1.4.0dev0+3bfc052
                 </div>
               
             
@@ -360,7 +360,7 @@
               
   <h1>Source code for torch_tensorrt._Input</h1><div class="highlight"><pre>
 <span></span><span class="kn">from</span> <span class="nn">enum</span> <span class="kn">import</span> <span class="n">Enum</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Optional</span>
 
 <span class="kn">import</span> <span class="nn">torch</span>
 
@@ -399,6 +399,10 @@
         <span class="n">_enums</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">contiguous</span>
     <span class="p">)</span>  <span class="c1">#: The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)</span>
 
+    <span class="n">DOMAIN_OFFSET</span> <span class="o">=</span> <span class="mf">2.0</span>
+    <span class="n">low_tensor_domain_incl</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">high_tensor_domain_excl</span> <span class="o">=</span> <span class="n">low_tensor_domain_incl</span> <span class="o">+</span> <span class="n">DOMAIN_OFFSET</span>
+
 <div class="viewcode-block" id="Input.__init__"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Input.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;__init__ Method for torch_tensorrt.Input</span>
 
@@ -417,6 +421,8 @@
 <span class="sd">                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implictly this sets Input&#39;s shape_mode to DYNAMIC</span>
 <span class="sd">            dtype (torch.dtype or torch_tensorrt.dtype): Expected data type for input tensor (default: torch_tensorrt.dtype.float32)</span>
 <span class="sd">            format (torch.memory_format or torch_tensorrt.TensorFormat): The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)</span>
+<span class="sd">            tensor_domain (Tuple(float, float), optional): The domain of allowed values for the tensor, as interval notation: [tensor_domain[0], tensor_domain[1]).</span>
+<span class="sd">                Note: Entering &quot;None&quot; (or not specifying) will set the bound to [0, 2)</span>
 
 <span class="sd">        Examples:</span>
 <span class="sd">            - Input([1,3,32,32], dtype=torch.float32, format=torch.channel_last)</span>
@@ -497,20 +503,33 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">_explicit_set_dtype</span> <span class="o">=</span> <span class="kc">True</span>
 
         <span class="k">if</span> <span class="s2">&quot;format&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">format</span> <span class="o">=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_parse_format</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;format&quot;</span><span class="p">])</span></div>
+            <span class="bp">self</span><span class="o">.</span><span class="n">format</span> <span class="o">=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_parse_format</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;format&quot;</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="s2">&quot;tensor_domain&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">domain</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;tensor_domain&quot;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">domain</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">tensor_domain</span> <span class="o">=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_parse_tensor_domain</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span></div>
 
     <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">STATIC</span><span class="p">:</span>
-            <span class="k">return</span> <span class="s2">&quot;Input(shape=</span><span class="si">{}</span><span class="s2">, dtype=</span><span class="si">{}</span><span class="s2">, format=</span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">)</span>
+            <span class="k">return</span> <span class="s2">&quot;Input(shape=</span><span class="si">{}</span><span class="s2">, dtype=</span><span class="si">{}</span><span class="s2">, format=</span><span class="si">{}</span><span class="s2">, domain=[</span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">))&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
+                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span>
+                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">),</span>
+                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tensor_domain</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tensor_domain</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">:</span>
-            <span class="k">return</span> <span class="s2">&quot;Input(min_shape=</span><span class="si">{}</span><span class="s2">, opt_shape=</span><span class="si">{}</span><span class="s2">, max_shape=</span><span class="si">{}</span><span class="s2">, dtype=</span><span class="si">{}</span><span class="s2">, format=</span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="k">return</span> <span class="s2">&quot;Input(min_shape=</span><span class="si">{}</span><span class="s2">, opt_shape=</span><span class="si">{}</span><span class="s2">, max_shape=</span><span class="si">{}</span><span class="s2">, dtype=</span><span class="si">{}</span><span class="s2">, format=</span><span class="si">{}</span><span class="s2">, domain=[</span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">))&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">],</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">],</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">],</span>
                 <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span>
                 <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">),</span>
+                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tensor_domain</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tensor_domain</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Unknown input shape mode&quot;</span><span class="p">)</span>
@@ -564,6 +583,8 @@
         <span class="n">internal_in</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_parse_dtype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
         <span class="n">internal_in</span><span class="o">.</span><span class="n">_explicit_set_dtype</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_explicit_set_dtype</span>
         <span class="n">internal_in</span><span class="o">.</span><span class="n">format</span> <span class="o">=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_parse_format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">)</span>
+
+        <span class="n">internal_in</span><span class="o">.</span><span class="n">tensor_domain</span> <span class="o">=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_parse_tensor_domain</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tensor_domain</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">internal_in</span>
 
     <span class="nd">@staticmethod</span>
@@ -627,6 +648,51 @@
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
                 <span class="s2">&quot;Tensor format needs to be specified with either torch.memory_format or torch_tensorrt.TensorFormat&quot;</span>
             <span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_parse_tensor_domain</span><span class="p">(</span><span class="n">domain</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Produce a tuple of integers which specifies a tensor domain in the interval format: [lo, hi)</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            domain (Tuple[int, int]): A tuple of integers (or NoneTypes) to verify</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A tuple of two int32_t-valid integers</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">domain</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">result_domain</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">Input</span><span class="o">.</span><span class="n">low_tensor_domain_incl</span><span class="p">,</span>
+                <span class="n">Input</span><span class="o">.</span><span class="n">high_tensor_domain_excl</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">domain_lo</span><span class="p">,</span> <span class="n">domain_hi</span> <span class="o">=</span> <span class="n">domain</span>
+
+            <span class="c1"># Validate type and provided values for domain</span>
+            <span class="n">valid_type_lo</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">domain_lo</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">domain_lo</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span>
+            <span class="n">valid_type_hi</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">domain_hi</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">domain_hi</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">valid_type_lo</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Expected value for tensor domain low specifier, got </span><span class="si">{</span><span class="n">domain_lo</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="ow">not</span> <span class="n">valid_type_hi</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Expected value for tensor domain high specifier, got </span><span class="si">{</span><span class="n">domain_hi</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">domain_hi</span> <span class="o">&lt;=</span> <span class="n">domain_lo</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Expected provided integer range to have low tensor domain value &quot;</span>
+                    <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot;&lt; high tensor domain value, got invalid range [</span><span class="si">{</span><span class="n">domain_lo</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">domain_hi</span><span class="si">}</span><span class="s2">)&quot;</span>
+                <span class="p">)</span>
+            <span class="n">result_domain</span> <span class="o">=</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">domain_lo</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">domain_hi</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Expected 2 values for domain, got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">domain</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result_domain</span>
 
 <div class="viewcode-block" id="Input.from_tensor"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Input.from_tensor">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">from_tensor</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Input&quot;</span><span class="p">:</span>
