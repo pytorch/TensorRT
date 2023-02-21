@@ -223,13 +223,20 @@ auto aten_registrations TORCHTRT_UNUSED =
             {c10::Symbol::fromQualString("aten::slice"),
              [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                c10::List<c10::IValue> list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
-
                int64_t start = 0;
+               int64_t end = 9223372036854775807;
                auto startIVal = args.at(n->input(1)).IValue();
+               auto endIVal = args.at(n->input(2)).IValue();
+
                if (!startIVal->isNone()) {
                  start = args.at(n->input(1)).unwrapToInt();
                }
-               int64_t end = args.at(n->input(2)).unwrapToInt();
+               if (!endIVal->isNone()) {
+                 end = args.at(n->input(2)).unwrapToInt();
+               }
+               if (start > end) {
+                 LOG_DEBUG("The end should be greater than start");
+               }
                int64_t step = args.at(n->input(3)).unwrapToInt();
 
                const int64_t list_size = list.size();
@@ -253,8 +260,9 @@ auto aten_registrations TORCHTRT_UNUSED =
 
                return sliced_list;
              },
-             EvalOptions().validSchemas(
-                 {"aten::slice.t(t[] l, int start, int end=9223372036854775807, int step=1) -> (t[])"})})
+             EvalOptions().validSchemas({"aten::slice.t(t[] l, int? start=None, int? end=None, int step=1) -> (t[])"})})
+        // EvalOptions().validSchemas(
+        //     {"aten::slice.t(t[] l, int start, int end=9223372036854775807, int step=1) -> (t[])"})})
         .evaluator(
             {c10::Symbol::fromQualString("aten::len"),
              [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
@@ -862,8 +870,14 @@ auto aten_registrations TORCHTRT_UNUSED =
                auto step = args.at(n->input(2)).unwrapToInt();
                return start + idx * step;
              },
-             EvalOptions().validSchemas({"aten::__derive_index(int idx, int start, int step) -> int"})});
-
+             EvalOptions().validSchemas({"aten::__derive_index(int idx, int start, int step) -> int"})})
+        .evaluator(
+            {c10::Symbol::fromQualString("aten::list"),
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               c10::List<c10::IValue> list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
+               return list.copy();
+             },
+             EvalOptions().validSchemas({"aten::list.t(t[] l) -> (t[])"})});
 } // namespace
 } // namespace evaluators
 } // namespace conversion
