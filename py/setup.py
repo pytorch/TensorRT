@@ -353,6 +353,7 @@ if FX_ONLY:
         "torch_tensorrt.fx.passes",
         "torch_tensorrt.fx.tools",
         "torch_tensorrt.fx.tracer.acc_tracer",
+        "torch_tensorrt.fx.tracer.dispatch_tracer",
     ]
     package_dir = {
         "torch_tensorrt.fx": "torch_tensorrt/fx",
@@ -360,6 +361,7 @@ if FX_ONLY:
         "torch_tensorrt.fx.passes": "torch_tensorrt/fx/passes",
         "torch_tensorrt.fx.tools": "torch_tensorrt/fx/tools",
         "torch_tensorrt.fx.tracer.acc_tracer": "torch_tensorrt/fx/tracer/acc_tracer",
+        "torch_tensorrt.fx.tracer.dispatch_tracer": "torch_tensorrt/fx/tracer/dispatch_tracer",
     }
 
 with open("README.md", "r", encoding="utf-8") as fh:
