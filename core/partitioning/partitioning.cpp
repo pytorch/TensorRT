@@ -286,7 +286,8 @@ void resolveTRTNonTensorInputs(PartitioningCtx* ctx, torch::jit::Block* block) {
             dependency_nodes.end(),
             cur_partitioned_block[i].raw_nodes().begin(),
             cur_partitioned_block[i].raw_nodes().end());
-        cur_partitioned_block[i] = SegmentedBlock(SegmentedBlock::kTensorRT, dependency_nodes);
+        cur_partitioned_block[i] =
+            SegmentedBlock(cur_partitioned_block[i].get_id(), SegmentedBlock::kTensorRT, dependency_nodes);
       }
     }
   }
