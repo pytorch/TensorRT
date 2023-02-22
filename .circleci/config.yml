@@ -791,7 +791,7 @@ jobs:
         type: string
       torch-build-index:
         type: string
-    parallelism: 5
+    parallelism: 4
     machine:
       image: ubuntu-2004-cuda-11.4:202110-01
     resource_class: gpu.nvidia.small
