@@ -112,7 +112,7 @@ commands:
         default: "x86_64"
       cudnn-version:
         type: string
-        default: "8.5.0.96"
+        default: "8.6.0.163"
       cuda-version:
         type: string
         default: "cuda11.8"
@@ -200,7 +200,7 @@ commands:
         default: "cuda11.8"
       cudnn-version:
         type: string
-        default: "8.5.0.96"
+        default: "8.6.0.163"
       trt-version-short:
         type: string
         default: "8.5.1"
@@ -246,7 +246,7 @@ commands:
           default: "8.5.1.7"
         cudnn-version-long:
           type: string
-          default: "8.5.0.96"
+          default: "8.6.0.163"
       steps:
         - run:
             name: Set up python environment
@@ -1032,7 +1032,7 @@ parameters:
     default: "https://download.pytorch.org/whl/nightly/cu118"
   cudnn-version:
     type: string
-    default: "8.5.0.96"
+    default: "8.6.0.163"
   trt-version-short:
     type: string
     default: "8.5.1"
