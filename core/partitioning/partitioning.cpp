@@ -74,7 +74,7 @@ void setExplicitFallbackNodes(PartitioningCtx* ctx, torch::jit::Block* block) {
       continue;
     }
 
-    if (n->kind() == torch::jit::prim::Loop && checkLoopEvaluatable) {
+    if (n->kind() == torch::jit::prim::Loop && checkLoopEvaluatable(n)) {
       ctx->setNodeExecutorDecision(n, NodeExecutorDecision::kCONVERT);
     } else if (!conversion::OpSupported(n)) {
       // If the op is not supported by the conversion phase it should run in PyTorch
