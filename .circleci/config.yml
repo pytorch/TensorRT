@@ -115,7 +115,7 @@ commands:
         default: "8.5.0.96"
       cuda-version:
         type: string
-        default: "cuda11.7"
+        default: "cuda11.8"
     steps:
       - run:
           name: Install CUDNN
@@ -149,13 +149,13 @@ commands:
         default: "amd64"
       cuda-pkg-name:
         type: string
-        default: "cuda-toolkit-11-7"
+        default: "cuda-toolkit-11-8"
       cuda-pkg-version:
         type: string
-        default: "11-7"
+        default: "11-8"
       cuda-version:
         type: string
-        default: "11.7.1"
+        default: "11.8.0"
     steps:
       - run:
           name: Install CUDA
@@ -188,16 +188,16 @@ commands:
         default: "amd64"
       cuda-pkg-name:
         type: string
-        default: "cuda-toolkit-11-7"
+        default: "cuda-toolkit-11-8"
       cuda-pkg-version:
         type: string
-        default: "11-7"
+        default: "11-8"
       cuda-version:
         type: string
-        default: "11.7.1"
+        default: "11.8.0"
       cuda-string-version:
         type: string
-        default: "cuda11.7"
+        default: "cuda11.8"
       cudnn-version:
         type: string
         default: "8.5.0.96"
@@ -263,10 +263,10 @@ commands:
     parameters:
       torch-build:
         type: string
-        default: "2.0.0.dev20230213+cu117"
+        default: "2.0.0.dev20230220+cu118"
       torch-build-index:
         type: string
-        default: "https://download.pytorch.org/whl/nightly/cu117"
+        default: "https://download.pytorch.org/whl/nightly/cu118"
     steps:
       - run:
           name: Install Torch
@@ -1026,10 +1026,10 @@ parameters:
   # Nightly platform config
   torch-build:
     type: string
-    default: "2.0.0.dev20230213+cu117"
+    default: "2.0.0.dev20230220+cu118"
   torch-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/nightly/cu117"
+    default: "https://download.pytorch.org/whl/nightly/cu118"
   cudnn-version:
     type: string
     default: "8.5.0.96"
