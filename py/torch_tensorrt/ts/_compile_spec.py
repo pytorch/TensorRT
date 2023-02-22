@@ -17,6 +17,7 @@ def _internal_input_to_torch_class_input(i: _C.Input) -> torch.classes.tensorrt.
     clone._set_opt(i.opt)
     clone._set_max(i.max)
     clone._set_dtype(i.dtype)
+    clone._set_tensor_domain(i.tensor_domain)
     clone._set_format(i.format)
     clone._set_input_is_dynamic(i.input_is_dynamic)
     clone._set_explicit_set_dtype(i._explicit_set_dtype)
