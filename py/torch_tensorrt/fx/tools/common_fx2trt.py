@@ -353,7 +353,6 @@ class DispatchTestCase(TRTTestCase):
         # Combine with customized passes specific to any model
         if customized_passes:
             passes_list.extend(customized_passes)
-
         fx_module, _ = aten_tracer.trace(mod, original_inputs)
         for passes in passes_list:
             pr: PassResult = passes(fx_module)
@@ -361,7 +360,7 @@ class DispatchTestCase(TRTTestCase):
         fx_module(*original_inputs)
 
         fx_module = run_const_fold(fx_module)
-        print(fx_module.graph)
+        _LOGGER.info(f"FX graph= {fx_module.graph}")
 
         if len(expected_ops):
             self.assert_has_op(fx_module, expected_ops)
@@ -429,10 +428,10 @@ class DispatchTestCase(TRTTestCase):
         rtol=1e-03,
         atol=1e-03,
     ):
-
+        mod.eval()
         inputs = InputTensorSpec.create_inputs_from_specs(input_specs)
+        mod = self.generate_graph(mod, inputs, expected_ops, unexpected_ops, None)
 
-        mod = proxytensor_trace(mod, inputs)
         interp = TRTInterpreter(
             mod,
             input_specs,

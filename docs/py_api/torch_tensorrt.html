@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt &mdash; Torch-TensorRT v1.4.0dev0+b2b6871 documentation</title>
+  <title>torch_tensorrt &mdash; Torch-TensorRT v1.4.0dev0+c526b29 documentation</title>
   
 
   
@@ -215,7 +215,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+b2b6871
+                  v1.4.0dev0+c526b29
                 </div>
               
             
@@ -525,6 +525,8 @@ Note: All three of min_shape, opt_shape, max_shape must be provided, there must 
 Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implictly this sets Input’s shape_mode to DYNAMIC</p></li>
 <li><p><strong>dtype</strong> (<em>torch.dpython:type</em><em> or </em><em>torch_tensorrt.dpython:type</em>) – Expected data type for input tensor (default: torch_tensorrt.dtype.float32)</p></li>
 <li><p><strong>format</strong> (<em>torch.memory_format</em><em> or </em><a class="reference internal" href="#torch_tensorrt.TensorFormat" title="torch_tensorrt.TensorFormat"><em>torch_tensorrt.TensorFormat</em></a>) – The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)</p></li>
+<li><p><strong>tensor_domain</strong> (<em>Tuple</em><em>(</em><em>python:float</em><em>, </em><em>python:float</em><em>)</em><em>, </em><em>optional</em>) – The domain of allowed values for the tensor, as interval notation: [tensor_domain[0], tensor_domain[1]).
+Note: Entering “None” (or not specifying) will set the bound to [0, 2)</p></li>
 </ul>
 </dd>
 </dl>

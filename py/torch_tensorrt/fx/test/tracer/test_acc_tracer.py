@@ -2692,7 +2692,6 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.sign,
                 acc_ops.permute,
                 acc_ops.matmul,
-                # acc_ops.roi_align,
                 acc_ops.quantize_per_tensor,
                 acc_ops.quantize_per_channel,
                 acc_ops.quantized_add,
