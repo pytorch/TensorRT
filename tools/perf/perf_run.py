@@ -200,7 +200,9 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
     # model = dynamo.optimize(dynamo_backend, nopython=True)(model)
     # Compile and measure the time
     with torch.no_grad():
-        import pdb; pdb.set_trace()
+        import pdb
+
+        pdb.set_trace()
         start_compile = time.time_ns()
         features = model(*input_tensors)
         end_compile = time.time_ns()
