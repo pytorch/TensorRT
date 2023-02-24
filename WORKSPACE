@@ -56,17 +56,15 @@ new_local_repository(
 http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "59b8b5e1954a86d50b79c13f06398d385b200da13e37a08ecf31d3c62e5ca127",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu117/libtorch-cxx11-abi-shared-with-deps-2.0.0.dev20230103%2Bcu117.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu117/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "e260fc7476be89d1650953e8643e9f7363845f5a52de4bab87ac0e619c1f6ad4",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu117/libtorch-shared-with-deps-2.0.0.dev20230103%2Bcu117.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu117/libtorch-shared-with-deps-latest.zip"],
 )
 
 # Download these tarballs manually from the NVIDIA website

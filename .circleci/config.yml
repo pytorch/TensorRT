@@ -272,7 +272,7 @@ commands:
           name: Install Torch
           command: |
             pip3 install --upgrade pip
-            pip3 install --pre torch==<< parameters.torch-build >>  torchvision torchaudio --extra-index-url << parameters.torch-build-index >>
+            pip3 install --pre torch torchvision torchaudio --extra-index-url << parameters.torch-build-index >>
 
   build-py:
     description: "Build the torch-tensorrt python release (pre-cxx11-abi)"
