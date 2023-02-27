@@ -124,7 +124,9 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, std::vector<torch::jit::I
   passes::Conv1DToConvolution(g);
   passes::ConvTransposed1DToConvolution(g);
   passes::Conv2DToConvolution(g);
+  passes::ConvTransposed2DToConvolution(g);
   passes::Conv3DToConvolution(g);
+  passes::ConvTransposed3DToConvolution(g);
   passes::FuseAddMMBranches(g);
   passes::RemoveBNDimCheck(g);
   // torch::jit::UnrollLoops(g);
