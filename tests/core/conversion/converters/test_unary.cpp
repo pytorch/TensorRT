@@ -81,6 +81,21 @@ TEST(Converters, ATenSignConvertsZerosCorrectly) {
       torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
 
+TEST(Converters, ATenLogicalNotBoolConvertsCorrectly) {
+  const auto graph = gen_test_graph("logical_not");
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+  auto in = at::randint(0, 2, {7, 3, 1, 5}, {at::kCUDA}).to(torch::kBool);
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
 #define test_unary(unary, name)                                                                  \
   TEST(Converters, ATen##name##ConvertsCorrectly) {                                              \
     const auto graph = gen_test_graph(#unary);                                                   \
@@ -122,5 +137,6 @@ test_unary(erf, Erf);
 test_unary(asinh, Asinh);
 test_unary(acosh, Acosh);
 test_unary(atanh, Atanh);
+test_unary(logical_not, LogicalNot);
 
 #undef test_unary
