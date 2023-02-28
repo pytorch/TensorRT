@@ -12,6 +12,8 @@ const float ATOL = 1e-8;
 const float RTOL = 1e-5;
 const float COSINE_THRESHOLD = 0.99f;
 const float THRESHOLD_E5 = 1e-5;
+const float THRESHOLD_E4 = 1e-4;
+const float THRESHOLD_E3 = 1e-3;
 
 namespace torch_tensorrt {
 namespace tests {
