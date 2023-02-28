@@ -34,6 +34,21 @@ auto reciprocal_registration TORCHTRT_UNUSED = RegisterNodeConversionPatterns().
        return true;
      }});
 
+auto logical_not_registration TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
+    {"aten::logical_not(Tensor self) -> Tensor", [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+       auto in = args[0].ITensorOrFreeze(ctx);
+       if (in->getType() != nvinfer1::DataType::kBOOL) {
+         // unary not layer only supports bool inputs
+         in = castITensor(ctx, in, nvinfer1::DataType::kBOOL, util::node_info(n).c_str());
+       }
+       auto unary_layer = ctx->net->addUnary(*in, nvinfer1::UnaryOperation::kNOT);
+       TORCHTRT_CHECK(unary_layer, "Unable to create logical_not layer from node: " << *n);
+       unary_layer->setName(util::node_info(n).c_str());
+       auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], unary_layer->getOutput(0));
+       LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+       return true;
+     }});
+
 #define convert(unary, trt_type)                                                               \
   auto unary##_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(       \
       {"aten::" #unary "(Tensor self) -> Tensor",                                              \

@@ -263,7 +263,7 @@ commands:
     parameters:
       torch-build:
         type: string
-        default: "2.0.0.dev20230129+cu117"
+        default: "2.0.0.dev20230219+cu117"
       torch-build-index:
         type: string
         default: "https://download.pytorch.org/whl/nightly/cu117"
@@ -463,7 +463,7 @@ commands:
       - run:
           name: Run core / C++ tests
           environment:
-            LD_LIBRARY_PATH: "/home/circleci/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:/home/circleci/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
+            LD_LIBRARY_PATH: "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch_tensorrt.libs:/home/circleci/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:/home/circleci/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
           command: |
             set -e
             mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
@@ -719,7 +719,7 @@ jobs:
           at: /tmp/dist
       - run:
           name: "Install torch-tensorrt"
-          command: pip3 install /tmp/dist/x86_64-linux/*
+          command: pip3 install /tmp/dist/x86_64-linux/*cp39-cp39*.whl
       - dump-test-env
       - test-ts-core
 
@@ -747,7 +747,7 @@ jobs:
           torch-build-index: << parameters.torch-build-index >>
       - run:
           name: "Install torch-tensorrt"
-          command: pip3 install --pre /tmp/dist/x86_64-linux/*
+          command: pip3 install --pre /tmp/dist/x86_64-linux/*cp39-cp39*.whl
       - dump-test-env
       - test-ts-py-api
 
@@ -777,12 +777,61 @@ jobs:
       #     command: export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH
       - run:
           name: "Install torch-tensorrt"
-          command: pip3 install --pre /tmp/dist/x86_64-linux/*
+          command: pip3 install --pre /tmp/dist/x86_64-linux/*cp39-cp39*.whl
       # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - dump-test-env
       - test-fx
 
   package-x86_64-linux:
+    parameters:
+      enabled:
+        type: boolean
+        default: false
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+    parallelism: 4
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: gpu.nvidia.small
+    steps:
+      - when:
+          condition: << parameters.enabled >>
+          steps:
+            - checkout
+            - run:
+                name: "Build packaging container"
+                command: |
+                  cd ~/project/py/
+                  docker build -t torch_tensorrt_release_env --build-arg trt_version=<< pipeline.parameters.trt-version-short >> -f ci/Dockerfile.ci .
+            - run:
+                name: Build Python packages
+                command: |
+                  cd ~/project/py/
+                  cp ~/project/toolchains/ci_workspaces/WORKSPACE.x86_64.release.rhel ~/project/WORKSPACE
+                  docker run -it --rm --gpus all -v ~/project:/workspace/project torch_tensorrt_release_env /bin/bash -c "source /workspace/project/py/ci/build_whl.sh && $(circleci tests split --total=4 ~/project/py/ci/build_manifest.txt)"
+            - run:
+                name: Collect packages
+                command: |
+                  mkdir -p /tmp/dist/x86_64-linux
+                  cp -r ~/project/py/wheelhouse/* /tmp/dist/x86_64-linux
+            - persist_to_workspace:
+                root: /tmp/dist
+                paths:
+                  - x86_64-linux
+            - store_artifacts:
+                path: /tmp/dist/x86_64-linux
+                destination: x86_64-linux
+      - unless:
+          condition: << parameters.enabled >>
+          steps:
+            - run:
+                name: Skipped packaging
+                command: echo -e "Packaging stage not enabled"
+
+  # TODO: Merge this with above
+  package-x86_64-linux-cxx11-abi:
     parameters:
       enabled:
         type: boolean
@@ -799,17 +848,6 @@ jobs:
           condition: << parameters.enabled >>
           steps:
             - checkout
-            - run:
-                name: "Build packaging container"
-                command: |
-                  cd ~/project/py/
-                  docker build -t torch_tensorrt_release_env --build-arg trt_version=<< pipeline.parameters.trt-version-short >> -f ci/Dockerfile.ci .
-            - run:
-                name: Build Python packages and pre-cxx11-abi tarball
-                command: |
-                  cd ~/project/py/
-                  cp ~/project/toolchains/ci_workspaces/WORKSPACE.x86_64.release.rhel ~/project/WORKSPACE
-                  docker run -it --rm -v ~/project:/workspace/project torch_tensorrt_release_env /bin/bash /workspace/project/py/ci/build_whl.sh
             - create-env:
                 os: "ubuntu2004"
                 platform: "x86_64"
@@ -817,6 +855,9 @@ jobs:
                 trt-version-short:  << pipeline.parameters.trt-version-short >>
                 bazel-version: << pipeline.parameters.bazel-version >>
                 bazel-platform: "x86_64"
+            - install-torch-from-index:
+                torch-build:  << parameters.torch-build >>
+                torch-build-index: << parameters.torch-build-index >>
             - run:
                 name: Build cxx11-abi tarball
                 command: |
@@ -825,13 +866,16 @@ jobs:
                   cp ~/project/toolchains/ci_workspaces/WORKSPACE.x86_64.release.ubuntu ~/project/WORKSPACE
                   bazel build //:libtorchtrt -c opt --noshow_progress
                   sudo chown -R $(whoami) ~/project/py
-                  CUDA_VERSION=$(cd ~/project/py/torch_tensorrt && python3 -c "from _version import __cuda_version__;print(__cuda_version__)")
-                  TORCHTRT_VERSION=$(cd ~/project/py/torch_tensorrt && python3 -c "from _version import __version__;print(__version__)")
-                  TRT_VERSION=$(cd ~/project/py/torch_tensorrt && python3 -c "from _version import __tensorrt_version__;print(__tensorrt_version__)")
-                  CUDNN_VERSION=$(cd ~/project/py/torch_tensorrt && python3 -c "from _version import __cudnn_version__;print(__cudnn_version__)")
+                  cd ~/project/py
+                  CUDA_VERSION=$(python3 -c "from versions import __cuda_version__;print(__cuda_version__)")
+                  TORCHTRT_VERSION=$(python3 -c "from versions import __version__;print(__version__)")
+                  TRT_VERSION=$(python3 -c "from versions import __tensorrt_version__;print(__tensorrt_version__)")
+                  CUDNN_VERSION=$(python3 -c "from versions import __cudnn_version__;print(__cudnn_version__)")
+                  TORCH_VERSION=$(python3 -c "from torch import __version__;print(__version__.split('+')[0])")
                   pip3 install --upgrade pip
                   pip3 install -r ~/project/py/requirements.txt
                   TORCH_VERSION=$(python3 -c "from torch import __version__;print(__version__.split('+')[0])")
+                  mkdir -p ~/project/py/dist/
                   cp ~/project/bazel-bin/libtorchtrt.tar.gz ~/project/py/dist/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
             - run:
                 name: Collect packages
@@ -1026,7 +1070,7 @@ parameters:
   # Nightly platform config
   torch-build:
     type: string
-    default: "2.0.0.dev20230129+cu117"
+    default: "2.0.0.dev20230219+cu117"
   torch-build-index:
     type: string
     default: "https://download.pytorch.org/whl/nightly/cu117"
@@ -1113,7 +1157,13 @@ workflows:
     when: << pipeline.parameters.enable-packaging >>
     jobs:
 
-      - build-x86_64-linux:
+      - package-x86_64-linux:
+          enabled: << pipeline.parameters.enable-packaging >>
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+
+      - package-x86_64-linux-cxx11-abi:
+          enabled: << pipeline.parameters.enable-packaging >>
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
 
@@ -1124,31 +1174,21 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-version-long >>
           cudnn-version: << pipeline.parameters.cudnn-version >>
           requires:
-            - build-x86_64-linux
+            - package-x86_64-linux
 
       - test-py-ts-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           requires:
-            - build-x86_64-linux
+            - package-x86_64-linux
 
       - test-py-fx-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           requires:
-            - build-x86_64-linux
-
-
-      - package-x86_64-linux:
-          enabled: << pipeline.parameters.enable-packaging >>
-          torch-build: << pipeline.parameters.torch-build >>
-          torch-build-index: << pipeline.parameters.torch-build-index >>
-          #requires:
-            #- test-core-cpp-x86_64-linux
-            #- test-py-ts-x86_64-linux
-            #- test-py-fx-x86_64-linux
+            - package-x86_64-linux
 
   on-push:
     jobs:
