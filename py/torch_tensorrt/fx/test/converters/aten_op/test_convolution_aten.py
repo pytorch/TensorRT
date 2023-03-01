@@ -5,7 +5,7 @@ from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.fx.tools.common_fx2trt import DispatchTestCase, InputTensorSpec
 
 
-@pytest.mark.xfail(reason="Nondeterministic Dynamo errors", raises=AssertionError)
+@pytest.mark.xfail(reason="Nondeterministic Dynamo errors", raises=RuntimeError)
 class TestConvolutionConverter(DispatchTestCase):
     @parameterized.expand(
         [
