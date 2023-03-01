@@ -125,7 +125,7 @@ def dynamo_trace(
 
 
 def trace(f, args, *rest):
-    graph_module, guards = dynamo_trace(f, args, True, "fake")
+    graph_module, guards = dynamo_trace(f, args, True, "syhmbolic")
     return graph_module, guards
 
 
