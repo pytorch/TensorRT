@@ -455,6 +455,16 @@ auto aten_registrations TORCHTRT_UNUSED =
         .evaluator(
             {c10::Symbol::fromQualString("aten::mul"),
              [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               if (!constTypesOnly(args)) {
+                 auto a = args.at(n->input(0)).ITensorOrFreeze(ctx);
+                 auto b = args.at(n->input(1)).ITensorOrFreeze(ctx);
+                 auto mul =
+                     converters::add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, a, b, util::node_info(n));
+                 TORCHTRT_CHECK(mul, "Unable to create mul layer from node: " << *n);
+                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], mul->getOutput(0));
+                 LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                 return {};
+               }
                if (args.at(n->input(0)).IValue()->isInt()) {
                  auto a = args.at(n->input(0)).unwrapToInt();
                  auto b = args.at(n->input(1)).unwrapToInt();
