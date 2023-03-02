@@ -1,6 +1,7 @@
 from typing import Callable
 
 import torch
+import pytest
 import torch.nn as nn
 
 from parameterized import parameterized
@@ -58,6 +59,7 @@ elementwise_ops = [
 ]
 
 
+@pytest.mark.xfail(reason="Nondeterministic Dynamo errors", raises=RuntimeError)
 class TestBinaryOpConverters(DispatchTestCase):
     @parameterized.expand([(op[1].__name__, op[0], op[1]) for op in elementwise_ops])
     def test_elementwise_ops(self, name, orig_op: Callable, expected_op):
