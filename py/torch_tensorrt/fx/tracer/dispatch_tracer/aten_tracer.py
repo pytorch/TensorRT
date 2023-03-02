@@ -104,8 +104,8 @@ def dynamo_trace(
     """
     if dynamo_config is None:
         dynamo_config = DynamoConfig()
-    torchdynamo.reset()
     with using_config(dynamo_config), setting_python_recursive_limit(2000):
+        torchdynamo.reset()
         try:
             return torchdynamo.export(
                 f,
