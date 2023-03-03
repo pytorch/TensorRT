@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <fstream>
+#include <sstream>
 #include <iomanip>
 
 #include "core/runtime/TRTEngineProfiler.h"
