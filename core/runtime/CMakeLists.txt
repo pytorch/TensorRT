@@ -33,8 +33,14 @@ target_link_libraries(${lib_name}
         TensorRT::nvinfer
         torch
         core_util
-        #stdc++fs
 )
+
+if(NOT WIN32)
+    target_link_libraries(${lib_name}
+        PUBLIC
+            stdc++fs
+    )
+endif(NOT WIN32)
 
 # Install
 install(FILES ${HEADER_FILES} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/torch_tensorrt/core/runtime")
