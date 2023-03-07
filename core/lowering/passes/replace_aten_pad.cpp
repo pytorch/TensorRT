@@ -101,7 +101,7 @@ void ReplaceAtenPad(std::shared_ptr<torch::jit::Graph>& graph) {
           torch::jit::Node* new_node;
           auto pad_value = it->inputs()[3];
           auto is_pad_none = torch::jit::toIValue(it->inputs()[3])->isNone();
-          if(is_pad_none){
+          if (is_pad_none) {
             pad_value = graph->insertConstant(0.0);
           }
 
