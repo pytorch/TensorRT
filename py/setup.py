@@ -380,7 +380,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        "torch>=1.14.0.dev0",
+        "torch>=1.13.1",
     ],
     setup_requires=[],
     cmdclass={
