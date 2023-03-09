@@ -203,7 +203,8 @@ auto reduce_registrations TORCHTRT_UNUSED =
                return true;
              }})
         .pattern(
-            {"aten::min(Tensor self) -> Tensor", [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+            {"aten::min(Tensor self) -> Tensor",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto in_tensor = args[0].ITensorOrFreeze(ctx);
                auto in_dims = util::toVec(in_tensor->getDimensions());
 
@@ -216,6 +217,38 @@ auto reduce_registrations TORCHTRT_UNUSED =
                min_layer->setName(util::node_info(n).c_str());
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], min_layer->getOutput(0));
 
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }})
+        .pattern(
+            {"aten::any.dim(Tensor self, int dim, bool keepdim=False) -> Tensor",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto in_tensor = args[0].ITensorOrFreeze(ctx);
+               auto in_dims = in_tensor->getDimensions();
+               auto dim = args[1].unwrapToInt();
+               LOG_DEBUG("Dim to reduce (original): " << dim);
+               dim = dim < 0 ? (in_dims.nbDims + dim) : dim;
+               LOG_DEBUG("Dim to reduce (converted): " << dim);
+
+               uint32_t axis_mask = 1 << dim;
+               LOG_DEBUG("Axis Mask: " << std::bitset<32>(axis_mask));
+
+               auto keepdim = args[2].unwrapToBool();
+               LOG_DEBUG("Keep dims: " << keepdim);
+
+               // Reduce does not work on bool inputs
+               if (in_tensor->getType() == nvinfer1::DataType::kBOOL) {
+                 in_tensor =
+                     castITensor(ctx, in_tensor, nvinfer1::DataType::kINT32, (util::node_info(n) + "_in").c_str());
+               }
+               auto sum_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kSUM, axis_mask, keepdim);
+
+               TORCHTRT_CHECK(sum_layer, "Unable to create sum layer from node: " << *n);
+
+               sum_layer->setName(util::node_info(n).c_str());
+               auto out_tensor = castITensor(
+                   ctx, sum_layer->getOutput(0), nvinfer1::DataType::kBOOL, (util::node_info(n) + "_out").c_str());
+               out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
                LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
                return true;
              }});

@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.ts._compile_spec &mdash; Torch-TensorRT v1.4.0dev0+3d59933 documentation</title>
+  <title>torch_tensorrt.ts._compile_spec &mdash; Torch-TensorRT v1.4.0.dev0+6feb673 documentation</title>
   
 
   
@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+3d59933
+                  v1.4.0.dev0+6feb673
                 </div>
               
             
@@ -555,17 +555,22 @@
     <span class="k">return</span> <span class="n">info</span>
 
 
-<span class="k">def</span> <span class="nf">_parse_input_signature</span><span class="p">(</span><span class="n">input_signature</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">_parse_input_signature</span><span class="p">(</span><span class="n">input_signature</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">depth</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">depth</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+            <span class="s2">&quot;Input nesting depth exceeds max supported depth, use 1 level: [A, B], or 2 level: [A, (B, C)]&quot;</span>
+        <span class="p">)</span>
+
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_signature</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
         <span class="n">input_list</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">input_signature</span><span class="p">:</span>
-            <span class="nb">input</span> <span class="o">=</span> <span class="n">_parse_input_signature</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+            <span class="nb">input</span> <span class="o">=</span> <span class="n">_parse_input_signature</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">depth</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
             <span class="n">input_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">input_list</span><span class="p">)</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_signature</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
         <span class="n">input_list</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">input_signature</span><span class="p">:</span>
-            <span class="nb">input</span> <span class="o">=</span> <span class="n">_parse_input_signature</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+            <span class="nb">input</span> <span class="o">=</span> <span class="n">_parse_input_signature</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">depth</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
             <span class="n">input_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">input_list</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_signature</span><span class="p">,</span> <span class="n">Input</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span>
