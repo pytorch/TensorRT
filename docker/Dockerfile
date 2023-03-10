@@ -12,9 +12,6 @@ RUN ln -s /usr/bin/python3.8 /usr/bin/python
 RUN python get-pip.py
 RUN pip3 install wheel
 
-# Install Pytorch
-RUN pip3 install torch==2.0.0.dev20230103+cu117 torchvision==0.15.0.dev20230103+cu117 --extra-index-url https://download.pytorch.org/whl/nightly/cu117
-
 # Install CUDNN + TensorRT
 RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
 RUN mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
@@ -64,6 +61,7 @@ COPY . /opt/torch_tensorrt
 COPY --from=torch-tensorrt-builder  /workspace/torch_tensorrt/src/py/dist/ .
 
 RUN cp /opt/torch_tensorrt/docker/WORKSPACE.docker /opt/torch_tensorrt/WORKSPACE
+RUN pip install -r /opt/torch_tensorrt/py/requirements.txt
 RUN pip3 install *.whl && rm -fr /workspace/torch_tensorrt/py/dist/* *.whl
 
 # Install native tensorrt python package required by torch_tensorrt whl file
