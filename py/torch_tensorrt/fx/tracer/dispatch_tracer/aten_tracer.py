@@ -4,8 +4,10 @@ from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Union
 
 import torch
-import torch._dynamo as torchdynamo
-from torch._dynamo.guards import Guard
+
+if not torch.__version__.startswith("1"):
+    import torch._dynamo as torchdynamo
+
 from torch.fx.passes.infra.pass_base import PassResult
 
 from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
@@ -96,12 +98,17 @@ def dynamo_trace(
     aten_graph: bool,
     tracing_mode: str = "real",
     dynamo_config: Optional[DynamoConfig] = None,
-) -> Tuple[torch.fx.GraphModule, Set[Guard]]:
+) -> Tuple[torch.fx.GraphModule, Set]:
     """
     TODO: Once we fully migrate to torchdynamo frontend, we will remove
     this config option alltogether.  For now, it helps with quick
     experiments with playing around with TorchDynamo
     """
+    if torch.__version__.startswith("1"):
+        raise ValueError(
+            f"The aten tracer requires Torch version >= 2.0. Detected version {torch.__version__}"
+        )
+
     if dynamo_config is None:
         dynamo_config = DynamoConfig()
     with using_config(dynamo_config), setting_python_recursive_limit(2000):

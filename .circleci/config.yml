@@ -524,15 +524,47 @@ commands:
       - store_artifacts:
           path: /tmp/testlogs
 
-  test-fx_converters:
-    description: "Test the fx converters"
+  test-fx_converters_acc:
+    description: "Test the fx acc converters"
     steps:
       - run:
           name: Run FX converter tests
           command: |
             cd py/torch_tensorrt/fx/test
-            pushd converters/
-            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/test_results.xml
+            pushd converters/acc_op/
+            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/acc_op/test_results.xml
+            popd
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-fx_converters_aten:
+    description: "Test the fx aten converters"
+    steps:
+      - run:
+          name: Run FX converter tests
+          command: |
+            cd py/torch_tensorrt/fx/test
+            pushd converters/aten_op/
+            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/aten_op/test_results.xml
+            popd
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-fx_converters_vanilla:
+    description: "Test the fx vanilla converters"
+    steps:
+      - run:
+          name: Run FX converter tests
+          command: |
+            cd py/torch_tensorrt/fx/test
+            pushd converters/vanilla/
+            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/vanilla/test_results.xml
             popd
 
       - store_test_results:
@@ -587,7 +619,7 @@ commands:
           path: /tmp/testlogs
 
   test-fx_tracer:
-    description: "Test the fx tracer"
+    description: "Test all fx tracers"
     steps:
       - run:
           name: Run FX tracer
@@ -595,6 +627,22 @@ commands:
             cd py/torch_tensorrt/fx/test
             pushd tracer
             list_tracer=$(ls | grep -v test_dispatch_*)
+            pytest $list_tracer --junitxml=/tmp/artifacts/test_results/fx/tracer/test_results.xml
+            popd
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-fx_tracer_acc:
+    description: "Test the fx acc tracer only"
+    steps:
+      - run:
+          name: Run FX tracer
+          command: |
+            cd py/torch_tensorrt/fx/test
+            pushd tracer
+            list_tracer=$(ls | grep test_acc)
             pytest $list_tracer --junitxml=/tmp/artifacts/test_results/fx/tracer/test_results.xml
             popd
       - store_test_results:
@@ -625,11 +673,33 @@ commands:
           name: Run fx tests
           command: |
             mkdir -p /tmp/artifacts/test_results
-      - test-fx_converters
+      - test-fx_converters_acc
+      - test-fx_converters_aten
+      - test-fx_converters_vanilla
       - test-fx_passes
       - test-fx_tools
       - test-fx_trt_lower
       - test-fx_tracer
+      - test-fx_core
+      - test-fx_quant
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-fx-no-aten:
+    description: "Test the fx backend without aten operators"
+    steps:
+      - run:
+          name: Run fx tests without aten ops
+          command: |
+            mkdir -p /tmp/artifacts/test_results
+      - test-fx_converters_acc
+      - test-fx_converters_vanilla
+      - test-fx_passes
+      - test-fx_tools
+      - test-fx_trt_lower
+      - test-fx_tracer_acc
       - test-fx_core
       - test-fx_quant
       - store_test_results:
@@ -781,6 +851,37 @@ jobs:
       # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - dump-test-env
       - test-fx
+
+  test-py-fx-x86_64-linux-no-aten:
+    parameters:
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+      trt-version-long:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: gpu.nvidia.large
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/dist/
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
+      - create-py-env:
+          trt-version-long: << parameters.trt-version-long >>
+      - install-cudnn
+      # - run:
+      #     name: "Set LD_LIBRARY_PATH path to include the installed CUDNN"
+      #     command: export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH
+      - run:
+          name: "Install torch-tensorrt"
+          command: pip3 install --pre /tmp/dist/x86_64-linux/*cp39-cp39*.whl
+      # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
+      - dump-test-env
+      - test-fx-no-aten
 
   package-x86_64-linux:
     parameters:
@@ -1074,6 +1175,12 @@ parameters:
   torch-build-index:
     type: string
     default: "https://download.pytorch.org/whl/nightly/cu117"
+  torch-build-legacy:
+    type: string
+    default: "1.13.1+cu117"
+  torch-build-index-legacy:
+    type: string
+    default: "https://download.pytorch.org/whl/cu117"
   cudnn-version:
     type: string
     default: "8.5.0.96"
@@ -1127,6 +1234,7 @@ workflows:
                 - release/**/*
     jobs:
       - build-x86_64-linux:
+          name: build-x86_64-linux
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
 
@@ -1152,6 +1260,36 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-version-long >>
           requires:
             - build-x86_64-linux
+
+      - build-x86_64-linux:
+          name: build-x86_64-linux-legacy
+          torch-build: << pipeline.parameters.torch-build-legacy >>
+          torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
+
+      - test-core-cpp-x86_64-linux:
+          name: test-core-cpp-x86_64-linux-legacy
+          torch-build: << pipeline.parameters.torch-build-legacy >>
+          torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
+          trt-version-short: << pipeline.parameters.trt-version-short >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+          requires:
+            - build-x86_64-linux-legacy
+
+      - test-py-ts-x86_64-linux:
+          name: test-py-ts-x86_64-linux-legacy
+          torch-build: << pipeline.parameters.torch-build-legacy >>
+          torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          requires:
+            - build-x86_64-linux-legacy
+
+      - test-py-fx-x86_64-linux-no-aten:
+          torch-build: << pipeline.parameters.torch-build-legacy >>
+          torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          requires:
+            - build-x86_64-linux-legacy
 
   release:
     when: << pipeline.parameters.enable-packaging >>
