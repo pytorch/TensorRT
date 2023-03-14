@@ -564,7 +564,21 @@ void populateInputIValues(PartitioningCtx* ctx) {
   }
 }
 
-void partition(PartitioningCtx* ctx) {
+void partition(PartitioningCtx* ctx, bool expect_full_compilation) {
+  // If full compilation is expected, overwrite minimum block size
+  // Any nonzero block size is valid if full compilation to TRT is desired
+  // Override the default min_block_size to ensure all TRT-supported operations are
+  // executed in TRT, regardless of the size of the graph
+  if (expect_full_compilation) {
+    // If minimum block size is different from the default, the user must have specified it
+    if (ctx->settings.min_block_size != 3) {
+      LOG_WARNING(
+          "Detected user-specified min_block_size with require_full_compilation=True "
+          << "disregarding min_block_size.");
+    }
+    ctx->settings.min_block_size = 1;
+  }
+
   LOG_DEBUG(ctx->settings);
 
   // Go through all the blocks to do the partitioning
