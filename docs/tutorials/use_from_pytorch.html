@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Using Torch-TensorRT Directly From PyTorch &mdash; Torch-TensorRT v1.4.0dev0+3bfc052 documentation</title>
+  <title>Using Torch-TensorRT Directly From PyTorch &mdash; Torch-TensorRT v1.4.0.dev0+d0af394 documentation</title>
   
 
   
@@ -215,7 +215,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+3bfc052
+                  v1.4.0.dev0+d0af394
                 </div>
               
             
@@ -386,7 +386,7 @@ sort of dictionary you would provide to <code class="docutils literal notranslat
 at the documentation for the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">TensorRTCompileSpec</span></code> API.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">spec</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">&quot;forward&quot;</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ts</span><span class="o">.</span><span class="n">TensorRTCompileSpec</span><span class="p">(</span>
-        <span class="p">{</span>
+        <span class="o">**</span><span class="p">{</span>
             <span class="s2">&quot;inputs&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">])],</span>
             <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span>
             <span class="s2">&quot;refit&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>

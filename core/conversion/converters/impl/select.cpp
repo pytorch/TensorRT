@@ -180,6 +180,29 @@ auto select_registrations TORCHTRT_UNUSED =
                return true;
              }})
         .pattern(
+            {"aten::index_select(Tensor self, int dim, Tensor index) -> Tensor",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto in = args[0].ITensorOrFreeze(ctx);
+               auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
+               auto dim = args[1].unwrapToInt();
+               // Handle negative axis by refering to nbDims of input Tensor
+               dim = dim < 0 ? dim + maxDim : dim;
+               auto index = args[2].ITensorOrFreeze(ctx);
+
+               LOG_DEBUG("Gather input dimensions: " << in->getDimensions());
+               LOG_DEBUG("Dimension to select: " << dim);
+               LOG_DEBUG("Index dimensions: " << index->getDimensions());
+
+               auto gather_layer = ctx->net->addGather(*in, *index, dim);
+               TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+               auto out = gather_layer->getOutput(0);
+               LOG_DEBUG("Gather tensor shape: " << out->getDimensions());
+
+               out = ctx->AssociateValueAndTensor(n->outputs()[0], out);
+               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+               return true;
+             }})
+        .pattern(
             {"aten::narrow(Tensor(a) self, int dim, int start, int length) -> Tensor(a)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto in = args[0].ITensor();
@@ -337,7 +360,7 @@ auto select_registrations TORCHTRT_UNUSED =
 
                  // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices
                  // from
-                 auto gather_layer = ctx->net->addGather(*in, *indicesTensor, 0);
+                 auto gather_layer = ctx->net->addGather(*in, *indicesTensor, adv_idx_indices[0]);
                  TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
                  auto gather_out = gather_layer->getOutput(0);
 

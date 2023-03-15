@@ -16,6 +16,13 @@ import subprocess
 import platform
 import warnings
 
+from versions import (
+    __version__,
+    __cuda_version__,
+    __cudnn_version__,
+    __tensorrt_version__,
+)
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 CXX11_ABI = False
@@ -27,11 +34,6 @@ FX_ONLY = False
 RELEASE = False
 
 CI_RELEASE = False
-
-__version__ = "1.4.0dev0"
-__cuda_version__ = "11.6"
-__cudnn_version__ = "8.4"
-__tensorrt_version__ = "8.4"
 
 
 def get_git_revision_short_hash() -> str:
@@ -353,6 +355,7 @@ if FX_ONLY:
         "torch_tensorrt.fx.passes",
         "torch_tensorrt.fx.tools",
         "torch_tensorrt.fx.tracer.acc_tracer",
+        "torch_tensorrt.fx.tracer.dispatch_tracer",
     ]
     package_dir = {
         "torch_tensorrt.fx": "torch_tensorrt/fx",
@@ -360,6 +363,7 @@ if FX_ONLY:
         "torch_tensorrt.fx.passes": "torch_tensorrt/fx/passes",
         "torch_tensorrt.fx.tools": "torch_tensorrt/fx/tools",
         "torch_tensorrt.fx.tracer.acc_tracer": "torch_tensorrt/fx/tracer/acc_tracer",
+        "torch_tensorrt.fx.tracer.dispatch_tracer": "torch_tensorrt/fx/tracer/dispatch_tracer",
     }
 
 with open("README.md", "r", encoding="utf-8") as fh:
@@ -376,7 +380,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        "torch>=1.14.0.dev0",
+        "torch>=1.13.1",
     ],
     setup_requires=[],
     cmdclass={
@@ -391,7 +395,7 @@ setup(
     packages=packages if FX_ONLY else find_packages(),
     package_dir=package_dir if FX_ONLY else {},
     classifiers=[
-        "Development Status :: 5 - Stable",
+        "Development Status :: 5 - Production/Stable",
         "Environment :: GPU :: NVIDIA CUDA",
         "License :: OSI Approved :: BSD License",
         "Intended Audience :: Developers",

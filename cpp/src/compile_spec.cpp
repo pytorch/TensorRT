@@ -36,13 +36,15 @@ CompileSpec::CompileSpec(torch::jit::IValue input_signature) {
   graph_inputs.input_signature = input_signature;
 }
 
-void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IValue& converted_ivalue) {
+void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IValue& converted_ivalue, int depth = 0) {
+  TORCHTRT_CHECK(
+      depth <= 2, "Input nesting depth exceeds max supported depth, use 1 level: [A, B], or 2 level: [A, (B, C)]")
   if (input_ivalue.isTuple()) {
     auto input_tuple = input_ivalue.toTuple();
     std::vector<torch::jit::IValue> converted_elements;
     for (auto item : input_tuple->elements()) {
       torch::jit::IValue converted_item;
-      to_internal_input_signature(item, converted_item);
+      to_internal_input_signature(item, converted_item, depth++);
       converted_elements.push_back(converted_item);
       auto tuple_ptr = c10::ivalue::Tuple::create(converted_elements);
       converted_ivalue = torch::jit::IValue(tuple_ptr);
@@ -53,7 +55,7 @@ void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IV
     auto converted_elements = c10::impl::GenericList(type);
     for (auto item : input_list) {
       torch::jit::IValue converted_item;
-      to_internal_input_signature(item, converted_item);
+      to_internal_input_signature(item, converted_item, depth++);
       converted_elements.push_back(converted_item);
     }
     converted_ivalue = torch::jit::IValue(converted_elements);

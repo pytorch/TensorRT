@@ -194,17 +194,22 @@ def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> _ts_C.TorchFallback:
     return info
 
 
-def _parse_input_signature(input_signature: Any):
+def _parse_input_signature(input_signature: Any, depth: int = 0):
+    if depth > 2:
+        raise AssertionError(
+            "Input nesting depth exceeds max supported depth, use 1 level: [A, B], or 2 level: [A, (B, C)]"
+        )
+
     if isinstance(input_signature, tuple):
         input_list = []
         for item in input_signature:
-            input = _parse_input_signature(item)
+            input = _parse_input_signature(item, depth + 1)
             input_list.append(input)
         return tuple(input_list)
     elif isinstance(input_signature, list):
         input_list = []
         for item in input_signature:
-            input = _parse_input_signature(item)
+            input = _parse_input_signature(item, depth + 1)
             input_list.append(input)
         return input_list
     elif isinstance(input_signature, Input) or isinstance(
