@@ -254,19 +254,6 @@ def aten_ops_mul(
     }
     return operator.add_mul(network, target, None, kwargs_new, name)
 
-@tensorrt_converter(torch.ops.aten.mul.Tensor)
-def aten_ops_mul(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    kwargs_new = {
-        "input": args[0],
-        "other": args[1],
-    }
-    return operator.add_mul(network, target, None, kwargs_new, name)
 
 @tensorrt_converter(torch.ops.aten.matmul.Tensor)
 def aten_ops_matmul(
@@ -281,7 +268,6 @@ def aten_ops_matmul(
         "other": args[1],
     }
     return operator.add_matmul(network, target, None, kwargs_new, name)
-
 
 
 @tensorrt_converter(torch.ops.aten.pow.Tensor_Scalar)
@@ -392,10 +378,8 @@ def aten_ops_expand(
         "input": args[0],
         "sizes": args[1],
     }
-    return acc_ops_converters.acc_ops_expand_tensor(
-        network, target, None, kwargs_new, name
-    )
-
+    return operator.add_expand(network, target, kwargs_new, name)
+     
 
 @tensorrt_converter(operator.floordiv)
 def aten_ops_operator_floordiv(
@@ -497,8 +481,42 @@ def aten_ops_sym_size(
     set_layer_name(slice_layer, target, "_slice_layer")
     return slice_layer.get_output(0)
 
+
+@tensorrt_converter(torch.ops.aten.slice.Tensor)
+def aten_ops_slice(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "input" : args[0],
+        "dim" : args[1],
+        "start" : args[2],
+        "stop" : args[3],
+        "step" : args[4],
+    }
+    return operator.add_slice(network, target. kwargs_new, name)
+
+@tensorrt_converter(torch.ops.aten.select.Tensor)
+def aten_ops_select(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "input" : args[0],
+        "dim" : args[1],
+        "index" : args[2],
+    }
+    return operator.add_select(network, target. kwargs_new, name)
+
+
 @tensorrt_converter(torch.ops.aten.leaky_relu.default)
-def aten_ops_relu(
+def aten_ops_leaky_relu(
     network: TRTNetwork,
     target: Target,
     args: Tuple[Argument, ...],
@@ -510,8 +528,9 @@ def aten_ops_relu(
     }
     return activation.add_leaky_relu(network, target, kwargs_new, name)
 
+
 @tensorrt_converter(torch.ops.aten.elu.default)
-def aten_ops_relu(
+def aten_ops_elu(
     network: TRTNetwork,
     target: Target,
     args: Tuple[Argument, ...],
@@ -521,7 +540,8 @@ def aten_ops_relu(
     kwargs_new = {
         "input": args[0],
     }
-    return activation.elu(network, target, kwargs_new, name)
+    return activation.add_elu(network, target, kwargs_new, name)
+
 
 @tensorrt_converter(torch.ops.aten.selu.default)
 def aten_ops_selu(
@@ -534,10 +554,11 @@ def aten_ops_selu(
     kwargs_new = {
         "input": args[0],
     }
-    return activation.add_selu(network, target, kwargs_new, name)
+    return activation.selu(network, target, kwargs_new, name)
 
-@tensorrt_converter(torch.ops.aten.selu.default)
-def aten_ops_selu(
+
+@tensorrt_converter(torch.ops.aten.gelu.default)
+def aten_ops_gelu(
     network: TRTNetwork,
     target: Target,
     args: Tuple[Argument, ...],
@@ -547,7 +568,8 @@ def aten_ops_selu(
     kwargs_new = {
         "input": args[0],
     }
-    return activation.add_selu(network, target, kwargs_new, name)
+    return activation.add_gelu(network, target, kwargs_new, name)
+
 
 @tensorrt_converter(torch.ops.aten.softsign.default)
 def aten_ops_softsign(
@@ -561,6 +583,7 @@ def aten_ops_softsign(
         "input": args[0],
     }
     return activation.add_softsign(network, target, kwargs_new, name)
+
 
 @tensorrt_converter(torch.ops.aten.tanh.default)
 def aten_ops_tanh(
@@ -588,6 +611,7 @@ def aten_ops_softsign(
     }
     return activation.add_softsign(network, target, kwargs_new, name)
 
+
 @tensorrt_converter(torch.ops.aten.softsign.default)
 def aten_ops_hard_sigmoid(
     network: TRTNetwork,
@@ -601,6 +625,7 @@ def aten_ops_hard_sigmoid(
     }
     return activation.add_hard_sigmoid(network, target, kwargs_new, name)
 
+
 @tensorrt_converter(torch.ops.aten.sigmoid.default)
 def aten_ops_hard_tanh(
     network: TRTNetwork,
@@ -613,6 +638,7 @@ def aten_ops_hard_tanh(
         "input": args[0],
     }
     return activation.add_hard_tanh(network, target, kwargs_new, name)
+
 
 @tensorrt_converter(torch.ops.aten.sigmoid.default)
 def aten_ops_sigmoid(

@@ -396,7 +396,7 @@ def get_shape_with_dynamic_shape(
     )
     set_layer_name(zero_layer, target, f"{name}_zeros")
 
-    condition_val = add_binary_elementwise_layer(
+    condition_val = operator.add_binary_elementwise_layer(
         network,
         scale_res,
         zero_layer.get_output(0),

@@ -1980,53 +1980,8 @@ def acc_ops_slice_tensor(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"slice_tensor received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
-
-    ranks = len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0)
-    dim = get_positive_dim(cast(int, kwargs["dim"]), ranks)
-    dynamic_shape = has_dynamic_shape(input_val.shape)
-    if network.has_implicit_batch_dimension:
-        if dim == 0:
-            raise RuntimeError(
-                f"We do not support slice_tensor at batch dim when it's implicit, got {dim}!"
-            )
-        dim = dim - 1
-    else:
-        if dynamic_shape:
-            # Check whether slice target dim is dynamic shape dim
-            assert input_val.shape[dim] != -1, "Can't chunk on dynamic shape dimension!"
-
-    start_int = cast(int, kwargs["start"])
-    stop_int = cast(int, kwargs["stop"])
-    step_int = cast(int, kwargs["step"])
-    start = [0] * len(input_val.shape)
-    start[dim] = start_int
-    stride = [1] * len(start)
-    stride[dim] = step_int
-    output_shape = list(input_val.shape)
-    output_shape[dim] = (stop_int - start_int) // step_int
-
-    if dynamic_shape > 0:
-        output_shape = get_shape_with_dynamic_shape(
-            network, output_shape, input_val, target, name
-        )
-    layer = network.add_slice(
-        input_val,
-        start=start,
-        shape=[] if dynamic_shape else output_shape,
-        stride=stride,
-    )
-    if dynamic_shape:
-        layer.set_input(2, output_shape)
-    set_layer_name(layer, target, name)
-    return layer.get_output(0)
-
+    return operator.add_slice(network, target, kwargs, name)
+    
 
 @tensorrt_converter(acc_ops.expand)
 def acc_ops_expand_tensor(
@@ -2036,29 +1991,8 @@ def acc_ops_expand_tensor(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_t = kwargs["input"]
-    shape = list(kwargs["sizes"])
-
-    input_val = get_trt_tensor(network, input_t, f"{name}_input")
-
-    if network.has_implicit_batch_dimension:
-        shape = shape[1:]
-
-    ranks = len(input_val.shape)
-    # TRT does not support different dimension size
-    assert len(shape) == ranks
-    shape = [input_val.shape[i] if shape[i] == -1 else shape[i] for i in range(ranks)]
-
-    inshape = tuple(input_val.shape)
-    shape = tuple(shape)
-    start = tuple([0] * ranks)
-    stride = tuple(
-        [int(i == o) for i, o in zip(inshape, shape)]
-    )  # stride == 1 if dimensions match, 0 otherwise
-    layer = network.add_slice(input_val, start=start, shape=shape, stride=stride)
-    set_layer_name(layer, target, name)
-    return layer.get_output(0)
-
+    return operator.add_expand(network, target, kwargs, name)
+    
 
 @tensorrt_converter(acc_ops.where)
 def acc_ops_where(
@@ -2754,34 +2688,8 @@ def acc_ops_gelu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-    approximate = kwargs["approximate"]
-    if approximate != "none":
-        raise RuntimeError("GeLU converter currently doesn't support fast gelu compute")
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"GELU received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
-    if network.has_implicit_batch_dimension:
-        raise RuntimeError(
-            "GeLU converter currently doesn't support implicit batch dimension"
-        )
-
-    plugin_name = "CustomGeluPluginDynamic"
-    # type_id 0 for float32, 1 for  float16
-    type_id = trt.PluginField(
-        "type_id", np.array(0, dtype=np.int32), trt.PluginFieldType.INT32
-    )
-    field_collection = TRTPluginFieldCollection([type_id])
-    plugin_version = "1"
-
-    plugin = get_trt_plugin(plugin_name, field_collection, plugin_version)
-
-    layer = network.add_plugin_v2([input_val], plugin)
-    set_layer_name(layer, target, name)
-    return layer.get_output(0)
-
+    return activation.add_gelu(network, target, kwargs, name)
+    
 
 @tensorrt_converter(acc_ops.chunk)
 def acc_ops_chunk(
