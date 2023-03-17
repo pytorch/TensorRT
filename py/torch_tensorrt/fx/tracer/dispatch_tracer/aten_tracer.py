@@ -91,7 +91,7 @@ def setting_python_recursive_limit(limit: int = 10000) -> Generator[None, None, 
         sys.setrecursionlimit(default)
 
 
-@req_torch_version("2.0")
+@req_torch_version("2.dev")
 def dynamo_trace(
     f: Callable[..., Value],
     # pyre-ignore
@@ -127,13 +127,13 @@ def dynamo_trace(
             ) from exc
 
 
-@req_torch_version("2.0")
+@req_torch_version("2.dev")
 def trace(f, args, *rest):
     graph_module, guards = dynamo_trace(f, args, True, "symbolic")
     return graph_module, guards
 
 
-@req_torch_version("2.0")
+@req_torch_version("2.dev")
 def opt_trace(f, args, *rest):
     """
     Optimized trace with necessary passes which re-compose some ops or replace some ops
