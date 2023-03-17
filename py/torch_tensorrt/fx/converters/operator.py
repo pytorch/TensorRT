@@ -977,47 +977,6 @@ def add_slice(network, target, kwargs, name):
     set_layer_name(layer, target, name)
     return layer.get_output(0)
 
-def add_select(network, target, kwargs, name):
-    input_val = kwargs["input"]
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"slice_tensor received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
-    
-    ranks = len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0)
-    dim = get_positive_dim(cast(int, kwargs["dim"]), ranks)
-    dynamic_shape = has_dynamic_shape(input_val.shape)
-    if network.has_implicit_batch_dimension:
-        if dim == 0:
-            raise RuntimeError(
-                f"We do not support slice_tensor at batch dim when it's implicit, got {dim}!"
-            )
-        dim = dim - 1
-    else:
-        if dynamic_shape:
-            # Check whether slice target dim is dynamic shape dim
-            assert input_val.shape[dim] != -1, "Can't select on negative shape dimension!"
-    index = kwargs[2]
-    if index >= input_val.shape[dim]:
-        raise RuntimeError(
-            f"cannot have index greater than the dimension length! {input_val.shape[dim]}"
-        )
-    output_shape = list(input_val.shape)
-    output_shape[dim] = 1
-    if dynamic_shape > 0:
-        output_shape = get_shape_with_dynamic_shape(
-            network, output_shape, input_val, target, name
-        )
-    layer = network.add_gather(
-        input_val,
-        dim,
-        index
-    )
-    out = layer.getOutput(0)
-    if(len(out.shape) != 1):
-        layer = network.add_shuffle(out)
-    return layer.getOutput(0)
 
         
     
