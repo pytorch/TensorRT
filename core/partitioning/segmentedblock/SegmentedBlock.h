@@ -98,6 +98,9 @@ struct SegmentedBlock {
     return in_types_;
   }
 
+  BlockID get_id() {
+    return id_;
+  }
   void update_id(BlockID new_id) {
     id_ = new_id;
   }
