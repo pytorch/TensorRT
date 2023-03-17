@@ -11,7 +11,7 @@ class TestMatMulConverter(DispatchTestCase):
         class TestModule(torch.nn.Module):
             def forward(self, x, y):
                 return torch.matmul(x, y)
-        inputOne = torch.randn(1, 32)
+        inputOne = torch.randn(3, 32)
         inputTwo = torch.randn(32, 3)
         inputs = [inputOne, inputTwo]
         self.run_test(

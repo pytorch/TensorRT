@@ -7,19 +7,25 @@ from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.fx.tools.common_fx2trt import DispatchTestCase, InputTensorSpec
 
 class TestSelectConverter(DispatchTestCase):
-    def test_select(self):
+    @parameterized.expand(
+        [
+            ("select_dim_index", 2, 1),
+        ]
+    )
+    def test_select(self, dim_test, index_test):
         class TestModule(torch.nn.Module):
-            def forward(self, input, dim, index):
-                return torch.select(input, dim, index)
+            def __init__(self, dim, index):
+                super().__init__()
+                self.dim = dim
+                self.index = index
+            def forward(self, input):
+                return torch.select(input, self.dim, self.index)
         input = [torch.randn(1, 3, 32)]
-        dim = 2
-        index = 1
-        inputs = (input, dim, index)
         self.run_test(
-            TestModule(), input, expected_ops={torch.ops.aten.select.Tensor}, test_explicit_precision=True,
+            TestModule(dim_test, index_test), input, expected_ops={torch.ops.aten.select}, test_explicit_precision=True,
         )
 
-    def test_select_with_dynamic_shape(self, x, y):
+    def test_select_with_dynamic_shape(self, dim_test, index_test):
         class TestModule(torch.nn.Module):
             def forward(self, input, dim, index):
                 return torch.select(input, dim, index)
@@ -31,9 +37,9 @@ class TestSelectConverter(DispatchTestCase):
                 shape_ranges=[((1, 3, 3), (3, 3, 3), (32, 32, 32))],
             ),
         ]
-        dim = 2
-        index = 1
-        inputs_spec = (input_spec, dim, index)
         self.run_test_with_dynamic_shape(
-            TestModule(), inputs_spec, expected_ops={torch.ops.aten.select.Tensor}
+            TestModule(dim_test, index_test), input_spec, expected_ops={torch.ops.aten.select}
         )
+
+if __name__ == "__main__":
+    run_tests()
