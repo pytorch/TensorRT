@@ -12,7 +12,7 @@ class TestSelectConverter(DispatchTestCase):
             ("select_dim_index", 2, 1),
         ]
     )
-    def test_select(self, dim_test, index_test):
+    def test_select(self, _, dim_test, index_test):
         class TestModule(torch.nn.Module):
             def __init__(self, dim, index):
                 super().__init__()
@@ -25,10 +25,14 @@ class TestSelectConverter(DispatchTestCase):
             TestModule(dim_test, index_test), input, expected_ops={torch.ops.aten.select}, test_explicit_precision=True,
         )
 
-    def test_select_with_dynamic_shape(self, dim_test, index_test):
+    def test_select_with_dynamic_shape(self, _, dim_test, index_test):
         class TestModule(torch.nn.Module):
-            def forward(self, input, dim, index):
-                return torch.select(input, dim, index)
+            def __init__(self, dim, index):
+                super().__init__()
+                self.dim = dim
+                self.index = index
+            def forward(self, input):
+                return torch.select(input, self.dim, self.index)
 
         input_spec = [
             InputTensorSpec(
