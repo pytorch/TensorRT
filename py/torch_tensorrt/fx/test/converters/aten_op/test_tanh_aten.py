@@ -3,21 +3,21 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.fx.tools.common_fx2trt import DispatchTestCase, InputTensorSpec
 
-class TestGeLUConverter(DispatchTestCase):
-    def test_gelu(self):
+class TestTanhConverter(DispatchTestCase):
+    def test_tanh(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.gelu(x)
+                return nn.functional.tanh(x)
 
         inputs = [torch.randn(1, 10)]
         self.run_test(
-            TestModule(), inputs, expected_ops={torch.ops.aten.gelu.default}
+            TestModule(), inputs, expected_ops={torch.ops.aten.tanh.default}
         )
 
-    def test_gelu_with_dynamic_shape(self):
+    def test_tanh_with_dynamic_shape(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.gelu(x)
+                return nn.functional.tanh(x)
 
         input_specs = [
             InputTensorSpec(
@@ -27,13 +27,13 @@ class TestGeLUConverter(DispatchTestCase):
             ),
         ]
         self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.gelu.default}
+            TestModule(), input_specs, expected_ops={torch.ops.aten.tanh.default}
         )
 
-    def test_gelu_with_dynamic_shape_four_dimensions(self):
+    def test_tanh_with_dynamic_shape_four_dimensions(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.gelu(x)
+                return nn.functional.tanh(x)
 
         input_specs = [
             InputTensorSpec(
@@ -44,7 +44,7 @@ class TestGeLUConverter(DispatchTestCase):
         ]
 
         self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.gelu.default}
+            TestModule(), input_specs, expected_ops={torch.ops.aten.tanh.default}
         )
 
 

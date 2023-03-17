@@ -33,7 +33,7 @@ def add_activation_layer(
     name: str,
     alpha: Optional[Any] = None,
     beta: Optional[Any] = None,
-    dyn_range_fn: Optional[Callable[Tuple[float, float]]] = None
+    dyn_range_fn: Optional[Callable[[float, float], Any]] = None
 ) -> TRTTensor:
     """
     Add a TensorRT Activation layer to `network`.
@@ -109,9 +109,10 @@ def add_tanh(network, target, kwargs, name):
 
 def add_gelu(network, target, kwargs, name):
     input_val = kwargs["input"]
-    approximate = kwargs["approximate"]
-    if approximate != "none":
-        raise RuntimeError("GeLU converter currently doesn't support fast gelu compute")
+    if "approximate" in kwargs.keys():
+        approximate = kwargs["approximate"]
+        if approximate != "none":
+            raise RuntimeError("GeLU converter currently doesn't support fast gelu compute")
     if not isinstance(input_val, TRTTensor):
         raise RuntimeError(
             f"GELU received input {input_val} that is not part "

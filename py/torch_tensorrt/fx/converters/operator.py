@@ -1,6 +1,7 @@
 import numpy as np
 import operator
 import warnings
+import logging
 from typing import Any, Callable, cast, Dict, List, Optional, Sequence, Tuple, Union
 
 import tensorrt as trt
@@ -687,7 +688,7 @@ def add_pow(network, target, kwargs, name):
         network,
         kwargs["input"],
         kwargs["other"],
-        trt.ElementWiseOperation.PROD,
+        trt.ElementWiseOperation.POW,
         target,
         name,
     )

@@ -26,8 +26,9 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
     trt_transposed_matmul,
 )
 from torch_tensorrt.fx.tracer.acc_tracer.acc_ops import contiguous
-import activation
-import operator
+
+from .activation import *
+from .operator import *
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

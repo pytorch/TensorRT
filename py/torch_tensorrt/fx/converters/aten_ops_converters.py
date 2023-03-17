@@ -21,9 +21,11 @@ from torch.fx.node import Argument, Target
 from ..utils import get_dynamic_dims, torch_dtype_from_trt, torch_dtype_to_trt
 
 from .converter_utils import *  # noqa: F403
+from .activation import *
+from .operator import *
+
 import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
-import activation
-import operator
+
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -40,7 +42,7 @@ def aten_ops_add(
         "input": args[0],
         "other": args[1],
     }
-    return operator.add_add(network, target, None, kwargs_new, name)
+    return add_add(network, target, None, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.mean.dim)
@@ -143,13 +145,13 @@ def aten_ops_div(
     }
     rounding_mode = kwargs.get("rounding_mode")
     if rounding_mode is None:
-        return operator.add_div(network, target, None, kwargs_new, name)
+        return add_div(network, target, None, kwargs_new, name)
     elif rounding_mode == "floor":
-        return operator.add_floor_div(
+        return add_floor_div(
             network, target, None, kwargs_new, name
         )
     elif rounding_mode == "trunc":
-        return operator.add_trunc_div(
+        return add_trunc_div(
             network, target, None, kwargs_new, name
         )
     else:
@@ -170,7 +172,7 @@ def aten_ops_floor_div(
         "input": args[0],
         "other": args[1],
     }
-    return operator.add_floor_div(network, target, None, kwargs_new, name)
+    return add_floor_div(network, target, None, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.fmod.Scalar)
@@ -186,7 +188,7 @@ def aten_ops_fmod(
         "input": args[0],
         "other": args[1],
     }
-    return operator.add_fmod(network, target, None, kwargs_new, name)
+    return add_fmod(network, target, None, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.linear)
@@ -203,7 +205,7 @@ def aten_ops_linear(
         "bias": args[2],
     }
 
-    return operator.add_linear(network, target, None, kwargs_new, name)
+    return add_linear(network, target, None, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.max_pool3d)
@@ -252,10 +254,11 @@ def aten_ops_mul(
         "input": args[0],
         "other": args[1],
     }
-    return operator.add_mul(network, target, None, kwargs_new, name)
+    return add_mul(network, target, None, kwargs_new, name)
 
 
-@tensorrt_converter(torch.ops.aten.matmul.Tensor)
+@tensorrt_converter(torch.ops.aten.matmul)
+@tensorrt_converter(torch.ops.aten.mm.default)
 def aten_ops_matmul(
     network: TRTNetwork,
     target: Target,
@@ -267,7 +270,7 @@ def aten_ops_matmul(
         "input": args[0],
         "other": args[1],
     }
-    return operator.add_matmul(network, target, None, kwargs_new, name)
+    return add_matmul(network, target, None, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.pow.Tensor_Scalar)
@@ -283,7 +286,7 @@ def aten_ops_pow(
         "input": args[0],
         "exponent": args[1],
     }
-    return operator.add_pow(network, target, None, kwargs_new, name)
+    return add_pow(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.relu.default)
@@ -297,7 +300,7 @@ def aten_ops_relu(
     kwargs_new = {
         "input": args[0],
     }
-    return activation.add_relu(network, target, kwargs_new, name)
+    return add_relu(network, target, kwargs_new, name)
     
 @tensorrt_converter(torch.ops.aten.sub.Tensor)
 def aten_ops_sub(
@@ -311,7 +314,7 @@ def aten_ops_sub(
         "input": args[0],
         "other": args[1],
     }
-    return operator.add_sub(network, target, None, kwargs_new, name)
+    return add_sub(network, target, None, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.view.default)
@@ -378,7 +381,7 @@ def aten_ops_expand(
         "input": args[0],
         "sizes": args[1],
     }
-    return operator.add_expand(network, target, kwargs_new, name)
+    return add_expand(network, target, kwargs_new, name)
      
 
 @tensorrt_converter(operator.floordiv)
@@ -393,7 +396,7 @@ def aten_ops_operator_floordiv(
         "input": args[0],
         "other": args[1],
     }
-    return operator.add_floor_div(network, target, None, kwargs_new, name)
+    return add_floor_div(network, target, None, kwargs_new, name)
 
 
 @tensorrt_converter(operator.mul)
@@ -408,7 +411,7 @@ def aten_ops_operator_mul(
         "input": args[0],
         "other": args[1],
     }
-    return operator.add_mul(network, target, None, kwargs_new, name)
+    return add_mul(network, target, None, kwargs_new, name)
 
 
 @tensorrt_converter(operator.add)
@@ -423,7 +426,7 @@ def aten_ops_operator_add(
         "input": args[0],
         "other": args[1],
     }
-    return operator.add_add(network, target, None, kwargs_new, name)
+    return add_add(network, target, None, kwargs_new, name)
 
 
 @tensorrt_converter(operator.sub)
@@ -438,7 +441,7 @@ def aten_ops_operator_sub(
         "input": args[0],
         "other": args[1],
     }
-    return operator.add_sub(network, target, None, kwargs_new, name)
+    return add_sub(network, target, None, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.sym_numel)
@@ -497,9 +500,10 @@ def aten_ops_slice(
         "stop" : args[3],
         "step" : args[4],
     }
-    return operator.add_slice(network, target. kwargs_new, name)
+    return add_slice(network, target. kwargs_new, name)
 
-@tensorrt_converter(torch.ops.aten.select.Tensor)
+
+@tensorrt_converter(torch.ops.aten.select)
 def aten_ops_select(
     network: TRTNetwork,
     target: Target,
@@ -512,7 +516,7 @@ def aten_ops_select(
         "dim" : args[1],
         "index" : args[2],
     }
-    return operator.add_select(network, target. kwargs_new, name)
+    return add_select(network, target. kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.leaky_relu.default)
@@ -526,7 +530,7 @@ def aten_ops_leaky_relu(
     kwargs_new = {
         "input": args[0],
     }
-    return activation.add_leaky_relu(network, target, kwargs_new, name)
+    return add_leaky_relu(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.elu.default)
@@ -540,7 +544,7 @@ def aten_ops_elu(
     kwargs_new = {
         "input": args[0],
     }
-    return activation.add_elu(network, target, kwargs_new, name)
+    return add_elu(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.selu.default)
@@ -554,7 +558,7 @@ def aten_ops_selu(
     kwargs_new = {
         "input": args[0],
     }
-    return activation.selu(network, target, kwargs_new, name)
+    return add_selu(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.gelu.default)
@@ -568,22 +572,7 @@ def aten_ops_gelu(
     kwargs_new = {
         "input": args[0],
     }
-    return activation.add_gelu(network, target, kwargs_new, name)
-
-
-@tensorrt_converter(torch.ops.aten.softsign.default)
-def aten_ops_softsign(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    kwargs_new = {
-        "input": args[0],
-    }
-    return activation.add_softsign(network, target, kwargs_new, name)
-
+    return add_gelu(network, target, kwargs_new, name)
 
 @tensorrt_converter(torch.ops.aten.tanh.default)
 def aten_ops_tanh(
@@ -596,34 +585,7 @@ def aten_ops_tanh(
     kwargs_new = {
         "input": args[0],
     }
-    return activation.add_tanh(network, target, kwargs_new, name)
-
-@tensorrt_converter(torch.ops.aten.softsign.default)
-def aten_ops_softsign(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    kwargs_new = {
-        "input": args[0],
-    }
-    return activation.add_softsign(network, target, kwargs_new, name)
-
-
-@tensorrt_converter(torch.ops.aten.softsign.default)
-def aten_ops_hard_sigmoid(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    kwargs_new = {
-        "input": args[0],
-    }
-    return activation.add_hard_sigmoid(network, target, kwargs_new, name)
+    return add_tanh(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.sigmoid.default)
@@ -637,7 +599,7 @@ def aten_ops_hard_tanh(
     kwargs_new = {
         "input": args[0],
     }
-    return activation.add_hard_tanh(network, target, kwargs_new, name)
+    return add_hard_tanh(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.sigmoid.default)
@@ -651,7 +613,7 @@ def aten_ops_sigmoid(
     kwargs_new = {
         "input": args[0],
     }
-    return activation.add_sigmoid(network, target, kwargs_new, name)
+    return add_sigmoid(network, target, kwargs_new, name)
 
 
 
