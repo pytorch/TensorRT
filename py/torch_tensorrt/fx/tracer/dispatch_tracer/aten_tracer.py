@@ -9,7 +9,7 @@ if not torch.__version__.startswith("1"):
     import torch._dynamo as torchdynamo
 
 from torch.fx.passes.infra.pass_base import PassResult
-
+from torch_tensorrt.fx.utils import req_torch_version
 from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
     compose_bmm,
     compose_chunk,
@@ -91,6 +91,7 @@ def setting_python_recursive_limit(limit: int = 10000) -> Generator[None, None, 
         sys.setrecursionlimit(default)
 
 
+@req_torch_version("2.0")
 def dynamo_trace(
     f: Callable[..., Value],
     # pyre-ignore
@@ -104,11 +105,6 @@ def dynamo_trace(
     this config option alltogether.  For now, it helps with quick
     experiments with playing around with TorchDynamo
     """
-    if torch.__version__.startswith("1"):
-        raise ValueError(
-            f"The aten tracer requires Torch version >= 2.0. Detected version {torch.__version__}"
-        )
-
     if dynamo_config is None:
         dynamo_config = DynamoConfig()
     with using_config(dynamo_config), setting_python_recursive_limit(2000):
@@ -131,11 +127,13 @@ def dynamo_trace(
             ) from exc
 
 
+@req_torch_version("2.0")
 def trace(f, args, *rest):
     graph_module, guards = dynamo_trace(f, args, True, "symbolic")
     return graph_module, guards
 
 
+@req_torch_version("2.0")
 def opt_trace(f, args, *rest):
     """
     Optimized trace with necessary passes which re-compose some ops or replace some ops
