@@ -156,6 +156,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         max_batch_size=64,
         max_workspace_size=1 << 25,
         lower_precision=LowerPrecision.FP16,
+        calibrator=None,
         sparse_weights=False,
         force_fp32_output=False,
         strict_type_constraints=False,
@@ -170,6 +171,7 @@ class TRTInterpreter(torch.fx.Interpreter):
             max_batch_size: set accordingly for maximum batch size you will use.
             max_workspace_size: set to the maximum size we can afford for temporary buffer
             lower_precision: the precision model layers are running on (TensorRT will choose the best perforamnce precision).
+            calibrator: Calibrator object which will provide data to the PTQ system for INT8 Calibration
             sparse_weights: allow the builder to examine weights and use optimized functions when weights have suitable sparsity
             force_fp32_output: force output to be fp32
             strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric reasons.
@@ -230,6 +232,10 @@ class TRTInterpreter(torch.fx.Interpreter):
 
         if lower_precision == LowerPrecision.INT8:
             builder_config.set_flag(trt.BuilderFlag.INT8)
+            if calibrator:
+                builder_config.int8_calibrator = calibrator
+            else:
+                _LOGGER.info("Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks")
 
         if sparse_weights:
             builder_config.set_flag(trt.BuilderFlag.SPARSE_WEIGHTS)
