@@ -36,6 +36,7 @@ from ..types import (
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
+
 def get_python_op_from_trt_elementwise_op(
     trt_op: TRTElementWiseOp,
 ) -> Callable[[Any, Any], Any]:
@@ -51,6 +52,7 @@ def get_python_op_from_trt_elementwise_op(
         return operator.floordiv
     else:
         raise RuntimeError(f"{trt_op} is not supported yet!")
+
 
 def add_binary_elementwise_layer(
     network: TRTNetwork,
@@ -159,6 +161,7 @@ def add_binary_elementwise_layer(
     output.name = output.name + "_" + target.__name__
     return output
 
+
 def trunc_div(
     input: TRTTensor, other: TRTTensor, network: TRTNetwork, target: Target, name: str
 ) -> TRTTensor:
@@ -214,6 +217,7 @@ def trunc_div(
     )
 
     return output
+
 
 def add_tile(network, target, kwargs, name):
     input_t = kwargs["input"]
@@ -314,6 +318,7 @@ def add_tile(network, target, kwargs, name):
 
     return layer.get_output(0)
 
+
 def add_linear(network, target, kwargs, name):
     input_val = kwargs["input"]
 
@@ -368,6 +373,7 @@ def add_linear(network, target, kwargs, name):
         )
     return res
 
+
 def add_unary_layer(
     network: TRTNetwork,
     input_val: TRTTensor,
@@ -398,6 +404,7 @@ def add_unary_layer(
     output = layer.get_output(0)
     output.name = output.name + "_" + target.__name__
     return layer.get_output(0)
+
 
 def layer_norm(
     network: TRTNetwork,
@@ -509,6 +516,7 @@ def layer_norm(
         name,
     )
 
+
 def add_add(network, target, kwargs, name):
     return add_binary_elementwise_layer(
         network,
@@ -518,6 +526,7 @@ def add_add(network, target, kwargs, name):
         target,
         name,
     )
+
 
 def add_matmul(network, target, kwargs, name):
     input_val = get_trt_tensor(network, kwargs["input"], f"{name}_input")
@@ -548,6 +557,7 @@ def add_matmul(network, target, kwargs, name):
     )
     set_layer_name(layer, target, name)
     return layer.get_output(0)
+
 
 def add_layer_norm(network, target, kwargs, name):
     input_val = kwargs["input"]
@@ -591,6 +601,7 @@ def add_layer_norm(network, target, kwargs, name):
     layer = network.add_plugin_v2([input_val], plugin)
     layer.name = name
     return layer.get_output(0)
+
 
 def add_cumsum(network, target, kwargs, name):
     input_val = kwargs["input"]
@@ -663,6 +674,7 @@ def add_cumsum(network, target, kwargs, name):
     loop_output.set_input(1, trip_limit)
     return loop_output.get_output(0)
 
+
 def add_maximum(network, target, kwargs, name):
     return add_binary_elementwise_layer(
         network,
@@ -672,6 +684,7 @@ def add_maximum(network, target, kwargs, name):
         target,
         name,
     )
+
 
 def add_mul(network, target, kwargs, name):
     return add_binary_elementwise_layer(
@@ -683,6 +696,7 @@ def add_mul(network, target, kwargs, name):
         name,
     )
 
+
 def add_pow(network, target, kwargs, name):
     return add_binary_elementwise_layer(
         network,
@@ -692,6 +706,7 @@ def add_pow(network, target, kwargs, name):
         target,
         name,
     )
+
 
 def add_floor_div(network, target, kwargs, name):
     return add_binary_elementwise_layer(
@@ -703,6 +718,7 @@ def add_floor_div(network, target, kwargs, name):
         name,
     )
 
+
 def add_div(network, target, kwargs, name):
     return add_binary_elementwise_layer(
         network,
@@ -713,6 +729,7 @@ def add_div(network, target, kwargs, name):
         name,
     )
 
+
 def add_sub(network, target, kwargs, name):
     return add_binary_elementwise_layer(
         network,
@@ -722,6 +739,8 @@ def add_sub(network, target, kwargs, name):
         target,
         name,
     )
+
+
 def add_minimum(network, target, kwargs, name):
     return add_binary_elementwise_layer(
         network,
@@ -731,6 +750,7 @@ def add_minimum(network, target, kwargs, name):
         target,
         name,
     )
+
 
 def add_logical_and(network, target, kwargs, name):
     if network.has_implicit_batch_dimension:
@@ -751,6 +771,7 @@ def add_logical_and(network, target, kwargs, name):
 
     return add_unary_layer(network, eq_t, trt.UnaryOperation.NOT, target, name)
 
+
 def add_ne(network, target, kwargs, name):
     if network.has_implicit_batch_dimension:
         raise RuntimeError(
@@ -770,6 +791,7 @@ def add_ne(network, target, kwargs, name):
 
     return add_unary_layer(network, eq_t, trt.UnaryOperation.NOT, target, name)
 
+
 def add_eq(network, target, kwargs, name):
     if network.has_implicit_batch_dimension:
         raise RuntimeError(
@@ -786,6 +808,7 @@ def add_eq(network, target, kwargs, name):
     return add_binary_elementwise_layer(
         network, input_t, other_t, trt.ElementWiseOperation.EQUAL, target, name
     )
+
 
 def add_gt(network, target, kwargs, name):
     if network.has_implicit_batch_dimension:
@@ -804,6 +827,7 @@ def add_gt(network, target, kwargs, name):
         network, input_t, other_t, trt.ElementWiseOperation.GREATER, target, name
     )
 
+
 def add_lt(network, target, kwargs, name):
     if network.has_implicit_batch_dimension:
         raise RuntimeError(
@@ -820,6 +844,7 @@ def add_lt(network, target, kwargs, name):
     return add_binary_elementwise_layer(
         network, input_t, other_t, trt.ElementWiseOperation.LESS, target, name
     )
+
 
 def add_logical_or(network, target, kwargs, name):
     if network.has_implicit_batch_dimension:
@@ -850,6 +875,7 @@ def add_logical_or(network, target, kwargs, name):
         network, input_t, other_t, trt.ElementWiseOperation.OR, target, name
     )
 
+
 def add_logical_xor(network, target, kwargs, name):
     if network.has_implicit_batch_dimension:
         raise RuntimeError(
@@ -879,8 +905,9 @@ def add_logical_xor(network, target, kwargs, name):
         network, input_t, other_t, trt.ElementWiseOperation.XOR, target, name
     )
 
+
 def add_fmod(network, target, kwargs, name):
-     # NOTE: TRT doesnt currently implement fmod so we need multiple operations to perform it
+    # NOTE: TRT doesnt currently implement fmod so we need multiple operations to perform it
     trunc_div_value = trunc_div(
         kwargs["input"], kwargs["other"], network, target, name + "_trunc_div"
     )
@@ -902,8 +929,10 @@ def add_fmod(network, target, kwargs, name):
     )
     return sub_value
 
+
 def add_trunc_div(network, target, kwargs, name):
     return trunc_div(kwargs["input"], kwargs["other"], network, target, name)
+
 
 def add_expand(network, target, kwargs, name):
     input_t = kwargs["input"]
@@ -928,6 +957,7 @@ def add_expand(network, target, kwargs, name):
     layer = network.add_slice(input_val, start=start, shape=shape, stride=stride)
     set_layer_name(layer, target, name)
     return layer.get_output(0)
+
 
 def add_slice(network, target, kwargs, name):
     input_val = kwargs["input"]
@@ -976,7 +1006,3 @@ def add_slice(network, target, kwargs, name):
         layer.set_input(2, output_shape)
     set_layer_name(layer, target, name)
     return layer.get_output(0)
-
-
-        
-    

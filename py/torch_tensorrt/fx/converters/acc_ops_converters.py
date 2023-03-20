@@ -680,7 +680,8 @@ def acc_ops_batch_norm(
 @tensorrt_converter(acc_ops.layer_norm)
 def acc_ops_layer_norm(network, target, args, kwargs, name):
     return add_layer_norm(network, target, kwargs, name)
-    
+
+
 @tensorrt_converter(acc_ops.softmax)
 def acc_ops_softmax(
     network: TRTNetwork,
@@ -731,7 +732,8 @@ def acc_ops_tile(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_tile(network, target, kwargs, name)
-    
+
+
 @tensorrt_converter(acc_ops.sign)
 def acc_ops_sign(
     network: TRTNetwork,
@@ -760,6 +762,7 @@ def acc_ops_relu(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_relu(network, target, kwargs, name)
 
+
 @tensorrt_converter(acc_ops.leaky_relu)
 def acc_ops_leaky_relu(
     network: TRTNetwork,
@@ -769,7 +772,8 @@ def acc_ops_leaky_relu(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_leaky_relu(network, target, kwargs, name)
-    
+
+
 @tensorrt_converter(acc_ops.elu)
 def acc_ops_elu(
     network: TRTNetwork,
@@ -779,7 +783,8 @@ def acc_ops_elu(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_elu(network, target, kwargs, name)
-    
+
+
 @tensorrt_converter(acc_ops.selu)
 def acc_ops_selu(
     network: TRTNetwork,
@@ -790,6 +795,7 @@ def acc_ops_selu(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_selu(network, target, kwargs, name)
 
+
 @tensorrt_converter(acc_ops.softsign)
 def acc_ops_softsign(
     network: TRTNetwork,
@@ -799,7 +805,8 @@ def acc_ops_softsign(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_softsign(network, target, kwargs, name)
-    
+
+
 @tensorrt_converter(acc_ops.sin)
 def acc_ops_sin(
     network: TRTNetwork,
@@ -874,6 +881,7 @@ def acc_ops_tanh(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_tanh(network, target, kwargs, name)
+
 
 @tensorrt_converter(acc_ops.asin)
 def acc_ops_asin(
@@ -1191,7 +1199,8 @@ def acc_ops_maximum(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_maximum(network, target, kwargs, name)
-    
+
+
 @tensorrt_converter(acc_ops.minimum)
 def acc_ops_minimum(
     network: TRTNetwork,
@@ -1201,7 +1210,8 @@ def acc_ops_minimum(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_minimum(network, target, kwargs, name)
-    
+
+
 @tensorrt_converter(acc_ops.dtype)
 def acc_ops_dtype(
     network: TRTNetwork,
@@ -1271,6 +1281,7 @@ def acc_ops_logical_and(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_logical_and(network, target, kwargs, name)
 
+
 @tensorrt_converter(acc_ops.ne, no_implicit_batch_dim=True)
 def acc_ops_ne(
     network: TRTNetwork,
@@ -1280,7 +1291,8 @@ def acc_ops_ne(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_ne(network, target, kwargs, name)
-    
+
+
 @tensorrt_converter(acc_ops.eq, no_implicit_batch_dim=True)
 def acc_ops_eq(
     network: TRTNetwork,
@@ -1290,7 +1302,8 @@ def acc_ops_eq(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_eq(network, target, kwargs, name)
-    
+
+
 @tensorrt_converter(acc_ops.gt, no_implicit_batch_dim=True)
 def acc_ops_gt(
     network: TRTNetwork,
@@ -1300,7 +1313,8 @@ def acc_ops_gt(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_gt(network, target, kwargs, name)
-    
+
+
 @tensorrt_converter(acc_ops.lt, no_implicit_batch_dim=True)
 def acc_ops_lt(
     network: TRTNetwork,
@@ -1310,7 +1324,7 @@ def acc_ops_lt(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_lt(network, target, kwargs, name)
-    
+
 
 @tensorrt_converter(acc_ops.logical_or, no_implicit_batch_dim=True)
 def acc_ops_logical_or(
@@ -1321,7 +1335,8 @@ def acc_ops_logical_or(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_logical_or(network, target, kwargs, name)
-    
+
+
 @tensorrt_converter(acc_ops.logical_xor, no_implicit_batch_dim=True)
 def acc_ops_logical_xor(
     network: TRTNetwork,
@@ -1331,7 +1346,8 @@ def acc_ops_logical_xor(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_logical_xor(network, target, kwargs, name)
-    
+
+
 # T113156424 Have some accuracy problems in hf_T5.
 # [TRT] [W] Weights [name=isinf_1_inf_t]: Converted FP32 value in weights (either FP32 infinity or FP32 value outside FP16 range) to corresponding FP16 infinity. If this is not the desired behavior, please modify the weights or retrain with regularization to reduce the magnitude of the weights.
 # @tensorrt_converter(acc_ops.isinf)
@@ -1424,6 +1440,7 @@ def acc_ops_fmod(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_fmod(network, target, kwargs, name)
+
 
 # T113156424 embedding implemenatation is very limited and shows no usage in hf models due to the indices are int64.
 # if we cast to int32, it will create accuracy issues. We'd better leave it to future implementation.
@@ -1653,6 +1670,7 @@ def acc_ops_add(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_add(network, target, kwargs, name)
 
+
 @tensorrt_converter(acc_ops.sub)
 def acc_ops_sub(
     network: TRTNetwork,
@@ -1662,6 +1680,7 @@ def acc_ops_sub(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_sub(network, target, kwargs, name)
+
 
 @tensorrt_converter(acc_ops.div)
 def acc_ops_div(
@@ -1673,6 +1692,7 @@ def acc_ops_div(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_div(network, target, kwargs, name)
 
+
 @tensorrt_converter(acc_ops.floor_div)
 def acc_ops_floor_div(
     network: TRTNetwork,
@@ -1682,7 +1702,8 @@ def acc_ops_floor_div(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_floor_div(network, target, kwargs, name)
-    
+
+
 @tensorrt_converter(acc_ops.trunc_div)
 def acc_ops_trunc_div(
     network: TRTNetwork,
@@ -1692,7 +1713,8 @@ def acc_ops_trunc_div(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_trunc_div(network, target, kwargs, name)
-    
+
+
 @tensorrt_converter(acc_ops.mul)
 def acc_ops_mul(
     network: TRTNetwork,
@@ -1702,7 +1724,8 @@ def acc_ops_mul(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_mul(network, target, kwargs, name)
-    
+
+
 @tensorrt_converter(acc_ops.pow)
 def acc_ops_pow(
     network: TRTNetwork,
@@ -1712,6 +1735,7 @@ def acc_ops_pow(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_pow(network, target, kwargs, name)
+
 
 @tensorrt_converter(acc_ops.unsqueeze)
 def acc_ops_unsqueeze(
@@ -1982,7 +2006,7 @@ def acc_ops_slice_tensor(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_slice(network, target, kwargs, name)
-    
+
 
 @tensorrt_converter(acc_ops.expand)
 def acc_ops_expand_tensor(
@@ -1993,7 +2017,7 @@ def acc_ops_expand_tensor(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_expand(network, target, kwargs, name)
-    
+
 
 @tensorrt_converter(acc_ops.where)
 def acc_ops_where(
@@ -2215,7 +2239,8 @@ def acc_ops_linear(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_linear(network, target, kwargs, name)
-    
+
+
 def add_clamp(network, input, val, op, name):
     if not len(input.shape):
         # clamping scalar
@@ -2468,7 +2493,8 @@ def acc_ops_matmul(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_matmul(network, target, kwargs, name)
-    
+
+
 @tensorrt_converter(acc_ops.hardsigmoid)
 def acc_ops_hard_sigmoid(
     network: TRTNetwork,
@@ -2690,7 +2716,7 @@ def acc_ops_gelu(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_gelu(network, target, kwargs, name)
-    
+
 
 @tensorrt_converter(acc_ops.chunk)
 def acc_ops_chunk(
@@ -2767,7 +2793,8 @@ def acc_ops_cumsum(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_cumsum(network, target, kwargs, name)
-   
+
+
 @tensorrt_converter(acc_ops.hardtanh)
 def acc_ops_hardtanh(
     network: TRTNetwork,
@@ -2777,6 +2804,7 @@ def acc_ops_hardtanh(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return add_hardtanh(network, target, kwargs, name)
+
 
 @tensorrt_converter(acc_ops.interpolate)
 def acc_ops_interpolate(

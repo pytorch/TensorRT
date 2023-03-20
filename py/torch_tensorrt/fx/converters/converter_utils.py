@@ -409,9 +409,6 @@ def get_shape_with_dynamic_shape(
     return select_layer.get_output(0)
 
 
-
-
-
 def squeeze_left(const: torch.Tensor):
     """
     Squeeze the size-1 dimensions on the left side of the shape tuple.
@@ -421,6 +418,7 @@ def squeeze_left(const: torch.Tensor):
     while len(const.shape) > 0 and const.shape[0] == 1:
         const = const.squeeze(dim=0)
     return const
+
 
 def add_reduce_layer(
     network: TRTNetwork,
@@ -640,6 +638,7 @@ def trunc_div(
     )
 
     return output
+
 
 def dtype_uniform(
     network: TRTNetwork, target: Target, name: str, input: TRTTensor, other: TRTTensor

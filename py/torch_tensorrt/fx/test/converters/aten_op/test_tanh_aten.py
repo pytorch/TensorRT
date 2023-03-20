@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.fx.tools.common_fx2trt import DispatchTestCase, InputTensorSpec
 
+
 class TestTanhConverter(DispatchTestCase):
     def test_tanh(self):
         class TestModule(nn.Module):
@@ -10,9 +11,7 @@ class TestTanhConverter(DispatchTestCase):
                 return nn.functional.tanh(x)
 
         inputs = [torch.randn(1, 10)]
-        self.run_test(
-            TestModule(), inputs, expected_ops={torch.ops.aten.tanh.default}
-        )
+        self.run_test(TestModule(), inputs, expected_ops={torch.ops.aten.tanh.default})
 
     def test_tanh_with_dynamic_shape(self):
         class TestModule(nn.Module):

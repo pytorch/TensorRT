@@ -25,6 +25,7 @@ from ..types import (
     TRTTensor,
 )
 
+
 def add_activation_layer(
     network: TRTNetwork,
     input_val: TRTTensor,
@@ -33,7 +34,7 @@ def add_activation_layer(
     name: str,
     alpha: Optional[Any] = None,
     beta: Optional[Any] = None,
-    dyn_range_fn: Optional[Callable[[float, float], Any]] = None
+    dyn_range_fn: Optional[Callable[[float, float], Any]] = None,
 ) -> TRTTensor:
     """
     Add a TensorRT Activation layer to `network`.
@@ -51,7 +52,7 @@ def add_activation_layer(
         beta (Optional[Any]): If not None, we will use it to set the beta
             attribute of the created TensorRT activation layer.
         dyn_range_fn: Optional[Callable[Tuple[float, float]]]: A function which takes the dynamic range of a TensorRT Tensor and returns the output dynamic range
-        
+
 
     Returns:
         The output of TensorRT Activation layer.
@@ -73,10 +74,12 @@ def add_activation_layer(
         mark_as_int8_layer(layer, dyn_range)
     return layer.get_output(0)
 
+
 def add_relu(network, target, kwargs, name):
     input_val = kwargs["input"]
     operation_type = trt.ActivationType.RELU
     return add_activation_layer(network, input_val, operation_type, target, name)
+
 
 def add_leaky_relu(network, target, kwargs, name):
     input_val = kwargs["input"]
@@ -86,33 +89,40 @@ def add_leaky_relu(network, target, kwargs, name):
         network, input_val, operation_type, target, name, negative_slope
     )
 
+
 def add_elu(network, target, kwargs, name):
     input_val = kwargs["input"]
     alpha = kwargs["alpha"]
     operation_type = trt.ActivationType.ELU
     return add_activation_layer(network, input_val, operation_type, target, name, alpha)
 
+
 def add_selu(network, target, kwargs, name):
     input_val = kwargs["input"]
     operation_type = trt.ActivationType.SELU
     return add_activation_layer(network, input_val, operation_type, target, name)
+
 
 def add_softsign(network, target, kwargs, name):
     input_val = kwargs["input"]
     operation_type = trt.ActivationType.SOFTSIGN
     return add_activation_layer(network, input_val, operation_type, target, name)
 
+
 def add_tanh(network, target, kwargs, name):
     input_val = kwargs["input"]
     operation_type = trt.ActivationType.TANH
     return add_activation_layer(network, input_val, operation_type, target, name)
+
 
 def add_gelu(network, target, kwargs, name):
     input_val = kwargs["input"]
     if "approximate" in kwargs.keys():
         approximate = kwargs["approximate"]
         if approximate != "none":
-            raise RuntimeError("GeLU converter currently doesn't support fast gelu compute")
+            raise RuntimeError(
+                "GeLU converter currently doesn't support fast gelu compute"
+            )
     if not isinstance(input_val, TRTTensor):
         raise RuntimeError(
             f"GELU received input {input_val} that is not part "
@@ -137,6 +147,7 @@ def add_gelu(network, target, kwargs, name):
     set_layer_name(layer, target, name)
     return layer.get_output(0)
 
+
 def add_hard_sigmoid(network, target, kwargs, name):
     input_val = kwargs["input"]
 
@@ -156,6 +167,7 @@ def add_hard_sigmoid(network, target, kwargs, name):
         beta=0.5,
     )
 
+
 def add_sigmoid(network, target, kwargs, name):
     input_val = kwargs["input"]
 
@@ -169,10 +181,12 @@ def add_sigmoid(network, target, kwargs, name):
         network, input_val, trt.ActivationType.SIGMOID, target, name
     )
 
+
 def add_hard_tanh(network, target, kwargs, name):
     input_val = kwargs["input"]
     operation_type = trt.ActivationType.TANH
     return add_activation_layer(network, input_val, operation_type, target, name)
+
 
 def add_sigmoid(network, target, kwargs, name):
     input_val = kwargs["input"]
@@ -192,4 +206,3 @@ def add_sigmoid(network, target, kwargs, name):
         alpha=1 / 6,
         beta=0.5,
     )
-

@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.fx.tools.common_fx2trt import DispatchTestCase, InputTensorSpec
 
+
 class TestGeLUConverter(DispatchTestCase):
     def test_gelu(self):
         class TestModule(nn.Module):
@@ -10,9 +11,7 @@ class TestGeLUConverter(DispatchTestCase):
                 return nn.functional.gelu(x)
 
         inputs = [torch.randn(1, 10)]
-        self.run_test(
-            TestModule(), inputs, expected_ops={torch.ops.aten.gelu.default}
-        )
+        self.run_test(TestModule(), inputs, expected_ops={torch.ops.aten.gelu.default})
 
     def test_gelu_with_dynamic_shape(self):
         class TestModule(nn.Module):
