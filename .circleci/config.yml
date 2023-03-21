@@ -2,6 +2,9 @@
 # See: https://circleci.com/docs/2.0/configuration-reference
 version: 2.1
 
+orbs:
+  win: circleci/windows@5.0
+
 commands:
   install-bazel:
     description: "Install bazel"
@@ -1131,10 +1134,9 @@ jobs:
           destination: x86_64-pyt-ngc
 
   build-x86_64-windows-cmake:
-    machine: 
-      image: windows-server-2019-nvidia:stable
+    executor: win/server-2022
     steps:
-      - run: '&"C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe"'
+      - run: Write-Host 'Hello, Windows'
 
   package-x86_64-linux-ngc:
     parameters:
