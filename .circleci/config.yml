@@ -1130,6 +1130,12 @@ jobs:
           path: /tmp/dist/ngc
           destination: x86_64-pyt-ngc
 
+  build-x86_64-windows-cmake:
+    machine: 
+      image: windows-server-2019-nvidia:stable
+    steps:
+      - run: '&"C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe"'
+
   package-x86_64-linux-ngc:
     parameters:
       enabled:
@@ -1362,3 +1368,5 @@ workflows:
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-short: << pipeline.parameters.trt-version-short >>
           cudnn-version: << pipeline.parameters.cudnn-version >>
+          
+      - build-x86_64-windows-cmake
