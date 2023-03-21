@@ -144,11 +144,11 @@ def aten_ops_div(
     }
     rounding_mode = kwargs.get("rounding_mode")
     if rounding_mode is None:
-        return add_div(network, target, None, kwargs_new, name)
+        return add_div(network, target, kwargs_new, name)
     elif rounding_mode == "floor":
-        return add_floor_div(network, target, None, kwargs_new, name)
+        return add_floor_div(network, target, kwargs_new, name)
     elif rounding_mode == "trunc":
-        return add_trunc_div(network, target, None, kwargs_new, name)
+        return add_trunc_div(network, target, kwargs_new, name)
     else:
         raise RuntimeError(
             f"Target {target} does not support rounding mode {rounding_mode}"
@@ -167,7 +167,7 @@ def aten_ops_floor_div(
         "input": args[0],
         "other": args[1],
     }
-    return add_floor_div(network, target, None, kwargs_new, name)
+    return add_floor_div(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.fmod.Scalar)
@@ -183,7 +183,7 @@ def aten_ops_fmod(
         "input": args[0],
         "other": args[1],
     }
-    return add_fmod(network, target, None, kwargs_new, name)
+    return add_fmod(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.linear)
@@ -200,7 +200,7 @@ def aten_ops_linear(
         "bias": args[2],
     }
 
-    return add_linear(network, target, None, kwargs_new, name)
+    return add_linear(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.max_pool3d)
@@ -249,7 +249,7 @@ def aten_ops_mul(
         "input": args[0],
         "other": args[1],
     }
-    return add_mul(network, target, None, kwargs_new, name)
+    return add_mul(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.matmul)
@@ -265,7 +265,7 @@ def aten_ops_matmul(
         "input": args[0],
         "other": args[1],
     }
-    return add_matmul(network, target, None, kwargs_new, name)
+    return add_matmul(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.pow.Tensor_Scalar)
@@ -310,7 +310,7 @@ def aten_ops_sub(
         "input": args[0],
         "other": args[1],
     }
-    return add_sub(network, target, None, kwargs_new, name)
+    return add_sub(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.view.default)
@@ -392,7 +392,7 @@ def aten_ops_operator_floordiv(
         "input": args[0],
         "other": args[1],
     }
-    return add_floor_div(network, target, None, kwargs_new, name)
+    return add_floor_div(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(operator.mul)
@@ -407,7 +407,7 @@ def aten_ops_operator_mul(
         "input": args[0],
         "other": args[1],
     }
-    return add_mul(network, target, None, kwargs_new, name)
+    return add_mul(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(operator.add)
@@ -422,7 +422,7 @@ def aten_ops_operator_add(
         "input": args[0],
         "other": args[1],
     }
-    return add_add(network, target, None, kwargs_new, name)
+    return add_add(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(operator.sub)
@@ -437,7 +437,7 @@ def aten_ops_operator_sub(
         "input": args[0],
         "other": args[1],
     }
-    return add_sub(network, target, None, kwargs_new, name)
+    return add_sub(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.sym_numel)
@@ -497,22 +497,6 @@ def aten_ops_slice(
         "step": args[4],
     }
     return add_slice(network, target.kwargs_new, name)
-
-
-@tensorrt_converter(torch.ops.aten.select)
-def aten_ops_select(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    kwargs_new = {
-        "input": args[0],
-        "dim": args[1],
-        "index": args[2],
-    }
-    return add_select(network, target.kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.leaky_relu.default)
