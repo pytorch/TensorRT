@@ -17,6 +17,9 @@ from torch_tensorrt.fx.utils import LowerPrecision
 
 from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
 
+from torch._inductor.decomposition import decompositions
+
+DECOMPOSITIONS = decompositions.copy()
 MAX_SPLITS_THRESHOLD = 10
 
 
@@ -26,6 +29,7 @@ def tensorrt_backend(gm, sample_inputs):
         gm,
         sample_inputs,
         fw_compiler=make_boxed_compiler(fx2trt_compiler),
+        decompositions=DECOMPOSITIONS,
     )
 
 
