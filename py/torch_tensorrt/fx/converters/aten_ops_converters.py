@@ -481,24 +481,6 @@ def aten_ops_sym_size(
     return slice_layer.get_output(0)
 
 
-@tensorrt_converter(torch.ops.aten.slice.Tensor)
-def aten_ops_slice(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    kwargs_new = {
-        "input": args[0],
-        "dim": args[1],
-        "start": args[2],
-        "stop": args[3],
-        "step": args[4],
-    }
-    return add_slice(network, target.kwargs_new, name)
-
-
 @tensorrt_converter(torch.ops.aten.leaky_relu.default)
 def aten_ops_leaky_relu(
     network: TRTNetwork,
