@@ -149,13 +149,13 @@ commands:
         default: "amd64"
       cuda-pkg-name:
         type: string
-        default: "cuda-toolkit-11-7"
+        default: "cuda-toolkit-11-8"
       cuda-pkg-version:
         type: string
-        default: "11-7"
+        default: "11-8"
       cuda-version:
         type: string
-        default: "11.7.1"
+        default: "11.8.0"
     steps:
       - run:
           name: Install CUDA
@@ -163,8 +163,8 @@ commands:
             cd ~
             wget https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/cuda-<< parameters.os >>.pin
             sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
-            wget https://developer.download.nvidia.com/compute/cuda/<< parameters.cuda-version >>/local_installers/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-515.65.01-1_<< parameters.architecture >>.deb
-            sudo dpkg -i cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-515.65.01-1_<< parameters.architecture >>.deb
+            wget https://developer.download.nvidia.com/compute/cuda/<< parameters.cuda-version >>/local_installers/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-520.61.05-1_<< parameters.architecture >>.deb
+            sudo dpkg -i cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-520.61.05-1_<< parameters.architecture >>.deb
             sudo cp /var/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local/cuda-*-keyring.gpg /usr/share/keyrings/
             sudo apt-get update
             sudo apt-get install -y cuda
@@ -188,16 +188,16 @@ commands:
         default: "amd64"
       cuda-pkg-name:
         type: string
-        default: "cuda-toolkit-11-7"
+        default: "cuda-toolkit-11-8"
       cuda-pkg-version:
         type: string
-        default: "11-7"
+        default: "11-8"
       cuda-version:
         type: string
-        default: "11.7.1"
+        default: "11.8.0"
       cuda-string-version:
         type: string
-        default: "cuda11.7"
+        default: "cuda11.8"
       cudnn-version:
         type: string
         default: "8.5.0.96"
@@ -223,7 +223,6 @@ commands:
           os: << parameters.os >>
           platform: << parameters.platform >>
           cudnn-version: << parameters.cudnn-version >>
-          cuda-version: << parameters.cuda-string-version >>
       - run:
           name: Install Tensorrt
           command: |
@@ -263,10 +262,10 @@ commands:
     parameters:
       torch-build:
         type: string
-        default: "2.0.0.dev20230219+cu117"
+        default: "2.0.0"
       torch-build-index:
         type: string
-        default: "https://download.pytorch.org/whl/nightly/cu117"
+        default: "https://download.pytorch.org/whl/nightly/cu118"
     steps:
       - run:
           name: Install Torch
@@ -1171,10 +1170,10 @@ parameters:
   # Nightly platform config
   torch-build:
     type: string
-    default: "2.0.0.dev20230219+cu117"
+    default: "2.0.0"
   torch-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/nightly/cu117"
+    default: "https://download.pytorch.org/whl/nightly/cu118"
   torch-build-legacy:
     type: string
     default: "1.13.1+cu117"

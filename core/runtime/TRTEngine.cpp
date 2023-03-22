@@ -148,10 +148,10 @@ TRTEngine::TRTEngine(
 }
 
 TRTEngine::~TRTEngine() {
-  rt.reset();
   trt_engine_profiler.reset();
   exec_ctx.reset();
   cuda_engine.reset();
+  rt.reset();
 }
 
 void TRTEngine::disable_profiling() {
