@@ -120,30 +120,6 @@ def extend_mod_attr_to_tuple(mod: torch.nn.Module, name: str, size: int):
     return extend_attr_to_tuple(val, size)
 
 
-def to_numpy(tensor: Optional[torch.Tensor]) -> Optional[np.ndarray]:
-    """
-    Convert a PyTorch Tensor to a Numpy Array. If the tensor is
-    quantized it will be dequantized first.
-
-    Args:
-        tensor (Optional[torch.Tensor]): A PyTorch tensor or None.
-
-    Returns:
-        A Numpy array.
-    """
-
-    if tensor is None:
-        return tensor
-
-    assert isinstance(
-        tensor, torch.Tensor
-    ), f"to_numpy can only be called on None or a torch.Tensor, got: {tensor}"
-    if tensor.is_quantized:
-        tensor = tensor.dequantize()
-
-    return tensor.cpu().detach().contiguous().numpy()
-
-
 def has_dynamic_shape(shape: Shape) -> bool:
     """
     Determine if the given shape has dynamic dim. i.e. if there're -1 in shape.
@@ -567,13 +543,3 @@ def type_cast(
     layer_i.set_output_type(0, cast_type)
     set_layer_name(layer_i, target, f"{name}_dtype_change")
     return layer_i.get_output(0)
-
-
-def trt_dtype_to_torch_dtype(trt_dtype):
-    table = {
-        trt.bool: torch.bool,
-        trt.int32: torch.int32,
-        trt.float16: torch.float16,
-        trt.float32: torch.float32,
-    }
-    return table[trt_dtype]
