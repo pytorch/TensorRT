@@ -22,6 +22,7 @@ from .converter_utils import get_positive_dim
 from .converter_utils import prepend_ones
 from .converter_utils import has_dynamic_shape
 from .converter_utils import get_shape_with_dynamic_shape
+from .converter_utils import to_numpy
 
 from ..types import (
     Shape,
@@ -276,30 +277,6 @@ def trunc_div(
     )
 
     return output
-
-
-def to_numpy(tensor: Optional[torch.Tensor]) -> Optional[np.ndarray]:
-    """
-    Convert a PyTorch Tensor to a Numpy Array. If the tensor is
-    quantized it will be dequantized first.
-
-    Args:
-        tensor (Optional[torch.Tensor]): A PyTorch tensor or None.
-
-    Returns:
-        A Numpy array.
-    """
-
-    if tensor is None:
-        return tensor
-
-    assert isinstance(
-        tensor, torch.Tensor
-    ), f"to_numpy can only be called on None or a torch.Tensor, got: {tensor}"
-    if tensor.is_quantized:
-        tensor = tensor.dequantize()
-
-    return tensor.cpu().detach().contiguous().numpy()
 
 
 def trt_dtype_to_torch_dtype(trt_dtype):
@@ -1050,3 +1027,44 @@ def add_expand(network, target, kwargs, name):
     layer = network.add_slice(input_val, start=start, shape=shape, stride=stride)
     set_layer_name(layer, target, name)
     return layer.get_output(0)
+
+
+def add_select(network, target, kwargs, name):
+    input_val = kwargs["input"]
+    if not isinstance(input_val, TRTTensor):
+        raise RuntimeError(
+            f"slice_tensor received input {input_val} that is not part "
+            "of the TensorRT region!"
+        )
+
+    ranks = len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0)
+    dim = get_positive_dim(cast(int, kwargs["dim"]), ranks)
+    dynamic_shape = has_dynamic_shape(input_val.shape)
+    if network.has_implicit_batch_dimension:
+        if dim == 0:
+            raise RuntimeError(
+                f"We do not support slice_tensor at batch dim when it's implicit, got {dim}!"
+            )
+        dim = dim - 1
+    else:
+        if dynamic_shape:
+            # Check whether slice target dim is dynamic shape dim
+            assert (
+                input_val.shape[dim] != -1
+            ), "Can't select on negative shape dimension!"
+    index = kwargs[2]
+    if index >= input_val.shape[dim]:
+        raise RuntimeError(
+            f"cannot have index greater than the dimension length! {input_val.shape[dim]}"
+        )
+    output_shape = list(input_val.shape)
+    output_shape[dim] = 1
+    if dynamic_shape > 0:
+        output_shape = get_shape_with_dynamic_shape(
+            network, output_shape, input_val, target, name
+        )
+    layer = network.add_gather(input_val, dim, index)
+    out = layer.getOutput(0)
+    if len(out.shape) != 1:
+        layer = network.add_shuffle(out)
+    return layer.getOutput(0)

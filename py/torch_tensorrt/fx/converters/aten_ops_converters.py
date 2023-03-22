@@ -572,3 +572,19 @@ def aten_ops_sigmoid(
         "input": args[0],
     }
     return add_sigmoid(network, target, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten.select)
+def aten_ops_select(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "input": args[0],
+        "dim": args[1],
+        "index": args[2],
+    }
+    return add_select(network, target.kwargs_new, name)
