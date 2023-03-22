@@ -1262,12 +1262,7 @@ def acc_ops_logical_not(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-    operation_type = trt.UnaryOperation.NOT
-    # cast to bool type
-    if input_val.dtype in (trt.float32, trt.float16, trt.int32):
-        input_val = type_cast(network, target, f"{name}_input", input_val, trt.bool)
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return add_logical_not(network, target, kwargs, name)
 
 
 @tensorrt_converter(acc_ops.logical_and, no_implicit_batch_dim=True)
@@ -2335,7 +2330,7 @@ def acc_ops_getitem(
     input_val = kwargs["input"]
     slices = kwargs["idx"]
     if not isinstance(input_val, TRTTensor):
-        return getitem(input_val, slices)  # type: ignore[arg-type]
+        return operator.getitem(input_val, slices)  # type: ignore[arg-type]
 
     if not isinstance(slices, tuple) and not isinstance(slices, list):
         slices = (slices,)
@@ -2803,7 +2798,7 @@ def acc_ops_hardtanh(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return add_hardtanh(network, target, kwargs, name)
+    return add_hard_tanh(network, target, kwargs, name)
 
 
 @tensorrt_converter(acc_ops.interpolate)

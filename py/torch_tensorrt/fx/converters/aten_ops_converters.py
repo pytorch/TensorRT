@@ -489,9 +489,7 @@ def aten_ops_leaky_relu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    kwargs_new = {
-        "input": args[0],
-    }
+    kwargs_new = {"input": args[0], "negative_slope": args[1]}
     return add_leaky_relu(network, target, kwargs_new, name)
 
 

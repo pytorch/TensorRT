@@ -8,7 +8,7 @@ class TestLeakyReLUConverter(DispatchTestCase):
     def test_leaky_relu(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.leaky_relu(x)
+                return nn.functional.leaky_relu(x, negative_slope=0.05)
 
         inputs = [torch.randn(1, 10)]
         self.run_test(
@@ -18,7 +18,7 @@ class TestLeakyReLUConverter(DispatchTestCase):
     def test_leaky_relu_with_dynamic_shape(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.leaky_relu(x)
+                return nn.functional.leaky_relu(x, negative_slope=0.05)
 
         input_specs = [
             InputTensorSpec(
@@ -34,7 +34,7 @@ class TestLeakyReLUConverter(DispatchTestCase):
     def test_leaky_relu_with_dynamic_shape_four_dimensions(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.leaky_relu(x)
+                return nn.functional.leaky_relu(x, negative_slope=0.05)
 
         input_specs = [
             InputTensorSpec(
