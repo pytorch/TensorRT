@@ -4,21 +4,19 @@ from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.fx.tools.common_fx2trt import DispatchTestCase, InputTensorSpec
 
 
-class TestLeakyReLUConverter(DispatchTestCase):
-    def test_leaky_relu(self):
+class TestSeLUConverter(DispatchTestCase):
+    def test_selu(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.leaky_relu(x)
+                return nn.functional.selu(x)
 
         inputs = [torch.randn(1, 10)]
-        self.run_test(
-            TestModule(), inputs, expected_ops={torch.ops.aten.leaky_relu.default}
-        )
+        self.run_test(TestModule(), inputs, expected_ops={torch.ops.aten.elu.default})
 
-    def test_leaky_relu_with_dynamic_shape(self):
+    def test_selu_with_dynamic_shape(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.leaky_relu(x)
+                return nn.functional.selu(x)
 
         input_specs = [
             InputTensorSpec(
@@ -28,13 +26,13 @@ class TestLeakyReLUConverter(DispatchTestCase):
             ),
         ]
         self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.leaky_relu.default}
+            TestModule(), input_specs, expected_ops={torch.ops.aten.elu.default}
         )
 
-    def test_leaky_relu_with_dynamic_shape_four_dimensions(self):
+    def test_selu_with_dynamic_shape_four_dimensions(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.leaky_relu(x)
+                return nn.functional.selu(x)
 
         input_specs = [
             InputTensorSpec(
@@ -45,7 +43,7 @@ class TestLeakyReLUConverter(DispatchTestCase):
         ]
 
         self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.leaky_relu.default}
+            TestModule(), input_specs, expected_ops={torch.ops.aten.elu.default}
         )
 
 

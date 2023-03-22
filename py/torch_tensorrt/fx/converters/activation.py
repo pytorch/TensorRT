@@ -184,25 +184,14 @@ def add_sigmoid(network, target, kwargs, name):
 
 def add_hard_tanh(network, target, kwargs, name):
     input_val = kwargs["input"]
-    operation_type = trt.ActivationType.TANH
-    return add_activation_layer(network, input_val, operation_type, target, name)
-
-
-def add_sigmoid(network, target, kwargs, name):
-    input_val = kwargs["input"]
-
+    alpha = kwargs["min_val"]
+    beta = kwargs["max_val"]
     if not isinstance(input_val, TRTTensor):
         raise RuntimeError(
-            f"Hard sigmoid received input {input_val} that is not part "
+            f"hardtanh received input {input_val} that is not part "
             "of the TensorRT region!"
         )
-
+    operation_type = trt.ActivationType.CLIP
     return add_activation_layer(
-        network,
-        input_val,
-        trt.ActivationType.HARD_SIGMOID,
-        target,
-        name,
-        alpha=1 / 6,
-        beta=0.5,
+        network, input_val, operation_type, target, name, alpha, beta
     )

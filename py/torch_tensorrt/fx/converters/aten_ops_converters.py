@@ -503,24 +503,17 @@ def aten_ops_elu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    kwargs_new = {
-        "input": args[0],
-    }
+    if len(args) > 2:
+        kwargs_new = {
+            "input": args[0],
+        }
+        return add_selu(network, target, kwargs_new, name)
+    else:
+        kwargs_new = {
+            "input": args[0],
+            "alpha": args[1],
+        }
     return add_elu(network, target, kwargs_new, name)
-
-
-@tensorrt_converter(torch.ops.aten.selu.default)
-def aten_ops_selu(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    kwargs_new = {
-        "input": args[0],
-    }
-    return add_selu(network, target, kwargs_new, name)
 
 
 @tensorrt_converter(torch.ops.aten.gelu.default)
@@ -551,7 +544,7 @@ def aten_ops_tanh(
     return add_tanh(network, target, kwargs_new, name)
 
 
-@tensorrt_converter(torch.ops.aten.sigmoid.default)
+@tensorrt_converter(torch.ops.aten.hardtanh.default)
 def aten_ops_hard_tanh(
     network: TRTNetwork,
     target: Target,
@@ -561,6 +554,8 @@ def aten_ops_hard_tanh(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     kwargs_new = {
         "input": args[0],
+        "min_val": args[1],
+        "max_val": args[2],
     }
     return add_hard_tanh(network, target, kwargs_new, name)
 
