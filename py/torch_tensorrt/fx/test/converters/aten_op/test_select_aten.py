@@ -13,21 +13,19 @@ class TestSelectConverter(DispatchTestCase):
             ("select_dim_index", 2, 1),
         ]
     )
-    def test_select(self, _, dim_test, index_test):
+    def test_select(self, _, dim, index):
         class TestModule(torch.nn.Module):
-            def __init__(self, dim, index):
+            def __init__(self):
                 super().__init__()
-                self.dim = dim
-                self.index = index
 
             def forward(self, input):
-                return torch.select(input, self.dim, self.index)
+                return torch.select(input, dim, index)
 
         input = [torch.randn(1, 3, 32)]
         self.run_test(
-            TestModule(dim_test, index_test),
+            TestModule(),
             input,
-            expected_ops={torch.ops.aten.select},
+            expected_ops={torch.ops.aten.select.int},
             test_explicit_precision=True,
         )
 
