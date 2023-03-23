@@ -1153,7 +1153,8 @@ def add_select(network, target, kwargs, name):
             assert (
                 input_val.shape[dim] != -1
             ), "Can't select on negative shape dimension!"
-    index = kwargs[2]
+    index = kwargs["index"]
+
     if index >= input_val.shape[dim]:
         raise RuntimeError(
             f"cannot have index greater than the dimension length! {input_val.shape[dim]}"
@@ -1164,8 +1165,11 @@ def add_select(network, target, kwargs, name):
         output_shape = get_shape_with_dynamic_shape(
             network, output_shape, input_val, target, name
         )
-    layer = network.add_gather(input_val, dim, index)
-    out = layer.getOutput(0)
+    input_shape = network.add_shape(input_val).get_output(0)
+    dim_value = torch.tensor(dim, dtype=torch.int32)
+    axis = network.add_constant(dim_value.shape, to_numpy(dim_value)).get_output(0)
+    layer = network.add_gather(input_shape, axis, index)
+    out = layer.get_output(0)
     if len(out.shape) != 1:
         layer = network.add_shuffle(out)
-    return layer.getOutput(0)
+    return layer.get_output(0)

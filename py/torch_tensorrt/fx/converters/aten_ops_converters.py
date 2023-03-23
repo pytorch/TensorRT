@@ -572,7 +572,7 @@ def aten_ops_sigmoid(
     return add_sigmoid(network, target, kwargs_new, name)
 
 
-@tensorrt_converter(torch.ops.aten.select)
+@tensorrt_converter(torch.ops.aten.select.int)
 def aten_ops_select(
     network: TRTNetwork,
     target: Target,
@@ -585,4 +585,4 @@ def aten_ops_select(
         "dim": args[1],
         "index": args[2],
     }
-    return add_select(network, target.kwargs_new, name)
+    return add_select(network, target, kwargs_new, name)
