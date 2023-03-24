@@ -586,3 +586,37 @@ def aten_ops_select(
         "index": args[2],
     }
     return add_select(network, target, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten.slice.Tensor)
+def aten_ops_slice(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "input": args[0],
+        "dim": args[1],
+        "start": args[2],
+        "stop": args[3],
+        "step": args[4],
+    }
+    return add_slice(network, target, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten.matmul)
+@tensorrt_converter(torch.ops.aten.mm.default)
+def aten_ops_matmul(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "input": args[0],
+        "other": args[1],
+    }
+    return add_matmul(network, target, kwargs_new, name)

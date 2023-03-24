@@ -1165,11 +1165,92 @@ def add_select(network, target, kwargs, name):
         output_shape = get_shape_with_dynamic_shape(
             network, output_shape, input_val, target, name
         )
-    input_shape = network.add_shape(input_val).get_output(0)
-    dim_value = torch.tensor(dim, dtype=torch.int32)
-    axis = network.add_constant(dim_value.shape, to_numpy(dim_value)).get_output(0)
-    layer = network.add_gather(input_shape, axis, index)
+    index_value = torch.tensor(index, dtype=torch.int32)
+    indices_tensor = network.add_constant(
+        index_value.shape, to_numpy(index_value)
+    ).get_output(0)
+    layer = network.add_gather(input_val, indices_tensor, dim)
     out = layer.get_output(0)
     if len(out.shape) != 1:
         layer = network.add_shuffle(out)
+    return layer.get_output(0)
+
+
+def add_slice(network, target, kwargs, name):
+    input_val = kwargs["input"]
+
+    if not isinstance(input_val, TRTTensor):
+        raise RuntimeError(
+            f"slice_tensor received input {input_val} that is not part "
+            "of the TensorRT region!"
+        )
+
+    ranks = len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0)
+    dim = get_positive_dim(cast(int, kwargs["dim"]), ranks)
+    dynamic_shape = has_dynamic_shape(input_val.shape)
+    if network.has_implicit_batch_dimension:
+        if dim == 0:
+            raise RuntimeError(
+                f"We do not support slice_tensor at batch dim when it's implicit, got {dim}!"
+            )
+        dim = dim - 1
+    else:
+        if dynamic_shape:
+            # Check whether slice target dim is dynamic shape dim
+            assert input_val.shape[dim] != -1, "Can't chunk on dynamic shape dimension!"
+
+    start_int = cast(int, kwargs["start"])
+    stop_int = cast(int, kwargs["stop"])
+    step_int = cast(int, kwargs["step"])
+    start = [0] * len(input_val.shape)
+    start[dim] = start_int
+    stride = [1] * len(start)
+    stride[dim] = step_int
+    output_shape = list(input_val.shape)
+    output_shape[dim] = (stop_int - start_int) // step_int + 1
+
+    if dynamic_shape > 0:
+        output_shape = get_shape_with_dynamic_shape(
+            network, output_shape, input_val, target, name
+        )
+    layer = network.add_slice(
+        input_val,
+        start=start,
+        shape=[] if dynamic_shape else output_shape,
+        stride=stride,
+    )
+    if dynamic_shape:
+        layer.set_input(2, output_shape)
+    set_layer_name(layer, target, name)
+    return layer.get_output(0)
+
+
+def add_matmul(network, target, kwargs, name):
+    input_val = get_trt_tensor(network, kwargs["input"], f"{name}_input")
+    other_val = get_trt_tensor(network, kwargs["other"], f"{name}_other")
+
+    for i in [input_val, other_val]:
+        if not isinstance(i, TRTTensor):
+            raise RuntimeError(
+                f"matmul received input {i} that is not part of the TensorRT region!"
+            )
+
+    input_matrix_op = other_matrix_op = trt.MatrixOperation.NONE
+    preset_diff = 0
+
+    if len(input_val.shape) == 1:
+        preset_diff -= 1
+        input_matrix_op = trt.MatrixOperation.VECTOR
+
+    if len(other_val.shape) == 1:
+        preset_diff += 1
+        other_matrix_op = trt.MatrixOperation.VECTOR
+
+    input_val, other_val = broadcast(
+        network, input_val, other_val, f"{name}_input", f"{name}_other", preset_diff
+    )
+    layer = network.add_matrix_multiply(
+        input_val, input_matrix_op, other_val, other_matrix_op
+    )
+    set_layer_name(layer, target, name)
     return layer.get_output(0)
