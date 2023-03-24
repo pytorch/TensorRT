@@ -99,10 +99,17 @@ void ReplaceAtenPad(std::shared_ptr<torch::jit::Graph>& graph) {
         } else if (mode_str == "constant") {
           // aten::constant_pad_nd(Tensor self, int[] pad, Scalar value=0) -> (Tensor)
           torch::jit::Node* new_node;
+          auto pad_value = it->inputs()[3];
+          auto is_pad_none = torch::jit::toIValue(it->inputs()[3])->isNone();
+          if (is_pad_none) {
+            pad_value = graph->insertConstant(0.0);
+          }
+
           new_node = graph->create(
               c10::Symbol::fromQualString("aten::constant_pad_nd"),
-              torch::jit::ArrayRef<torch::jit::Value*>({it->inputs()[0], it->inputs()[1], it->inputs()[3]}),
+              torch::jit::ArrayRef<torch::jit::Value*>({it->inputs()[0], it->inputs()[1], pad_value}),
               1);
+
           new_node->insertAfter(*it);
           new_node->outputs()[0]->setType(c10::TensorType::get());
           it->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);

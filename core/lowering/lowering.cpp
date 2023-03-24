@@ -32,7 +32,7 @@ int AutocastLongInputs(
     std::string target_device_name) {
   int num_autocasts = 0;
   // For each graph input, determine if it can be autocasted
-  for (int i = 0; i < g->inputs().size(); i++) {
+  for (size_t i = 0; i < g->inputs().size(); i++) {
     auto input = g->inputs()[i];
 
     // Autocasted inputs must be Tensor-type

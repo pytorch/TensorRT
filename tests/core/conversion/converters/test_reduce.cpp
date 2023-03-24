@@ -300,6 +300,50 @@ TEST(Converters, ATenMeanDimNegIndexKeepDimsConvertsCorrectly) {
   test_body(graph, in);
 }
 
+TEST(Converters, ATenAnyDimConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=1]()
+      %3 : bool = prim::Constant[value=0]()
+      %5 : Tensor = aten::any(%0, %1, %3)
+      return (%5))IR";
+  auto in = at::randint(0, 2, {4, 4, 4}, at::kCUDA);
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenAnyDimAllFalseConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=2]()
+      %3 : bool = prim::Constant[value=0]()
+      %5 : Tensor = aten::any(%0, %1, %3)
+      return (%5))IR";
+  auto in = at::zeros({3, 7, 4}, at::kCUDA).to(torch::kBool);
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenAnyDimKeepDimConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=1]()
+      %3 : bool = prim::Constant[value=1]()
+      %5 : Tensor = aten::any(%0, %1, %3)
+      return (%5))IR";
+  auto in = at::randint(0, 2, {4, 4, 4}, at::kCUDA).to(torch::kHalf);
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenAnyDimNegIndexConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=-1]()
+      %3 : bool = prim::Constant[value=1]()
+      %5 : Tensor = aten::any(%0, %1, %3)
+      return (%5))IR";
+  auto in = at::randint(-2, 2, {2, 32}, at::kCUDA);
+  test_body(graph, in);
+}
+
 TEST(Converters, UnpackVarLowersCorrectly) {
   const auto graph = R"IR(
       graph(%x.1 : Tensor):
