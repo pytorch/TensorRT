@@ -15,6 +15,8 @@ from torch_tensorrt.fx.tracer.dispatch_tracer import aten_tracer
 from torch_tensorrt.fx.trt_module import TRTModule
 from torch_tensorrt.fx.utils import LowerPrecision
 
+from torch._dynamo.backends.common import fake_tensor_unsupported
+
 from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
 
 from torch._inductor.decomposition import decompositions
@@ -99,6 +101,7 @@ def fx2trt(gm: torch.fx.GraphModule, example_inputs, **kwargs):
 
 
 @td.register_backend
+@fake_tensor_unsupported
 def fx2trt_compiler(gm: torch.fx.GraphModule, example_inputs):
     try:
         trt_compiled = fx2trt(gm, example_inputs)
