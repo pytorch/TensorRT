@@ -2,6 +2,9 @@
 ARG BASE_IMG=nvidia/cuda:11.7.1-devel-ubuntu20.04
 FROM ${BASE_IMG} as base
 
+ARG USE_CXX11_ABI
+ENV USE_CXX11=${USE_CXX11_ABI}
+
 # Install basic dependencies
 RUN apt-get update
 RUN DEBIAN_FRONTEND=noninteractive apt install -y build-essential manpages-dev wget zlib1g software-properties-common git
@@ -29,8 +32,7 @@ RUN apt-get update
 RUN apt-get install -y libnvinfer8=8.5.1* libnvinfer-plugin8=8.5.1* libnvinfer-dev=8.5.1* libnvinfer-plugin-dev=8.5.1* libnvonnxparsers8=8.5.1-1* libnvonnxparsers-dev=8.5.1-1* libnvparsers8=8.5.1-1*  libnvparsers-dev=8.5.1-1*
 
 # Setup Bazel
-ARG BAZEL_VERSION=5.2.0
-RUN wget -q https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-x86_64 -O /usr/bin/bazel \
+RUN wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.16.0/bazelisk-linux-amd64 -O /usr/bin/bazel \
  && chmod a+x /usr/bin/bazel
 
 # Build Torch-TensorRT in an auxillary container
@@ -41,7 +43,6 @@ ARG TARGETARCH="amd64"
 
 RUN apt-get install -y python3-setuptools
 RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
-RUN  apt-get update
 
 RUN apt-get update && apt-get install -y --no-install-recommends locales ninja-build && rm -rf /var/lib/apt/lists/* && locale-gen en_US.UTF-8
 
@@ -63,9 +64,6 @@ COPY --from=torch-tensorrt-builder  /workspace/torch_tensorrt/src/py/dist/ .
 RUN cp /opt/torch_tensorrt/docker/WORKSPACE.docker /opt/torch_tensorrt/WORKSPACE
 RUN pip install -r /opt/torch_tensorrt/py/requirements.txt
 RUN pip3 install *.whl && rm -fr /workspace/torch_tensorrt/py/dist/* *.whl
-
-# Install native tensorrt python package required by torch_tensorrt whl file
-RUN pip install tensorrt==8.5.1.7
 
 WORKDIR /opt/torch_tensorrt
 ENV LD_LIBRARY_PATH /usr/local/lib/python3.8/dist-packages/torch/lib:/usr/local/lib/python3.8/dist-packages/torch_tensorrt/lib:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}

@@ -6,7 +6,7 @@
 
 * This `Dockerfile` installs `pre-cxx11-abi` versions of Pytorch and builds Torch-TRT using `pre-cxx11-abi` libtorch as well.
 
-Note: Torch-TRT based on the C++11 ABI is not automatically installed in the build. To install it, modify the `WORKSPACE.docker` file to specify a C++11 ABI path, then enable the `USE_CXX11=1` flag so that `dist-build.sh` can build it accordingly. See the `WORKSPACE` file in the root of the repository for an example.
+Note: By default the container uses the `pre-cxx11-abi` version of Torch + Torch-TRT. If you are using a workflow that requires a build of PyTorch on the CXX11 ABI (e.g. using the PyTorch NGC containers as a base image), add the Docker build argument: `--build-arg USE_CXX11_ABI=1`
 
 ### Dependencies
 
