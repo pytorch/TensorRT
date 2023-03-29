@@ -23,6 +23,7 @@ target_link_libraries(${lib_name}
         TensorRT::nvinfer_plugin
         torch
         core_util
+        cuDNN::cuDNN
     PRIVATE
         Threads::Threads
 )

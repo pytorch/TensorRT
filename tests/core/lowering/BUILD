@@ -28,7 +28,7 @@ cc_test(
 )
 
 lowering_test(
-    name = "test_conv1d_pass",
+    name = "test_conv_pass",
 )
 
 lowering_test(
@@ -102,7 +102,7 @@ lowering_test(
 test_suite(
     name = "lowering_tests",
     tests = [
-        ":test_conv1d_pass",
+        ":test_conv_pass",
         ":test_device_casting",
         ":test_exception_elimination_pass",
         ":test_linear_to_addmm",
