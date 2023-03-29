@@ -49,7 +49,7 @@ def fx2trt(gm: torch.fx.GraphModule, example_inputs, **kwargs):
 
     splitter.node_support_preview()
     split_mod = splitter()
-    num_piece = 0
+    num_pieces = 0
 
     for name, _ in split_mod.named_children():
         print(f"Graph is split into {name}")
@@ -58,7 +58,7 @@ def fx2trt(gm: torch.fx.GraphModule, example_inputs, **kwargs):
     # Select threshold above which segmentation is not beneficial and run graph in Torch
     if num_pieces > MAX_SPLITS_THRESHOLD:
         raise AssertionError(
-            f"The graph module is split into {num_piece} which is large than the \
+            f"The graph module is split into {num_pieces} which is large than the \
             threshold={MAX_SPLITS_THRESHOLD}. Falling back to non-TRT module."
         )
 
