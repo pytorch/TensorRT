@@ -7,12 +7,12 @@ from torch.fx.passes.tools_common import get_acc_ops_name, Tensors
 
 from .. import (
     CONVERTERS,
+    InputTensorSpec
     NO_EXPLICIT_BATCH_DIM_SUPPORT,
     NO_IMPLICIT_BATCH_DIM_SUPPORT,
     TRTInterpreter,
     TRTModule,
 )
-from torch_tensorrt._Input import Input
 from ..tools.trt_minimizer import TensorRTMinimizer
 
 
@@ -88,7 +88,7 @@ class TRTSplitter(splitter_base._SplitterBase):
         """
         # Current code for lowering is place-holder, subject to future change
         # based on feeds model's actual status
-        interp = TRTInterpreter(mod, Input.from_tensors(inputs))
+        interp = TRTInterpreter(mod, InputTensorSpec.from_tensors(inputs))
         interpreter_result = interp.run(*inputs)
         if self.settings.use_experimental_rt:
             import io

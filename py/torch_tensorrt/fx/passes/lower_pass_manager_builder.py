@@ -10,7 +10,7 @@ from torch.fx.passes.shape_prop import ShapeProp
 from torch.fx.passes.splitter_base import generate_inputs_for_submodules, SplitResult
 from torch_tensorrt.fx.utils import LowerPrecision
 from torch_tensorrt import _Input
-from ..input_tensor_spec import InputTensorSpec
+from ..input_tensor_spec import generate_input_specs, InputTensorSpec
 
 from ..lower_setting import LowerSetting
 from ..observer import Observer
@@ -194,7 +194,16 @@ class LowerPassManagerBuilder:
                     _LOGGER.info(f"Now lowering submodule {submod_name}")
                     lowering_start_time = datetime.datetime.now()
 
-                    self.lower_setting.input_specs = self._trt_input
+                    if self._trt_input:
+                        self.lower_setting.input_specs = self._trt_input
+                    else:
+                        self.lower_setting.input_specs = generate_input_specs(
+                        submod_inputs,
+                        self.lower_setting,
+                        additional_submodule_inputs[submod_name]
+                        if additional_submodule_inputs
+                        else None,
+                    )
 
                     lowered_module = self._lower_func(
                         submod, submod_inputs, self.lower_setting, submod_name
@@ -265,12 +274,6 @@ class LowerPassManagerBuilder:
         for input_obj in input:
             if isinstance(input_obj, _Input.Input):
                 self._trt_input.append(InputTensorSpec.from_input(input_obj))
-            elif isinstance(input_obj, torch.Tensor):
-                self._trt_input.append(InputTensorSpec.from_tensor(input_obj))
-            else:
-                raise ValueError(
-                    "Invalid input type provided in the FX lowering. Expected type: torch_tensorrt.Input or torch.Tensor"
-                )
 
         self._additional_input = additional_input
         passes = []
@@ -293,12 +296,6 @@ class LowerPassManagerBuilder:
         for input_obj in input:
             if isinstance(input_obj, _Input.Input):
                 self._trt_input.append(InputTensorSpec.from_input(input_obj))
-            elif isinstance(input_obj, torch.Tensor):
-                self._trt_input.append(InputTensorSpec.from_tensor(input_obj))
-            else:
-                raise ValueError(
-                    "Invalid input type provided in the FX lowering. Expected type: torch_tensorrt.Input or torch.Tensor"
-                )
 
         self._additional_input = additional_input
         passes = []

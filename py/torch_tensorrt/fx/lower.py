@@ -23,14 +23,14 @@ from .trt_module import TRTModule
 from .utils import LowerPrecision
 
 logger = logging.getLogger(__name__)
-from torch_tensorrt._Input import Input
 
-# Input = Sequence[Any]
+Input = Sequence[Any]
 
 
 def compile(
     module: nn.Module,
     input,
+    max_batch_size: int = 2048,
     min_acc_module_size: int = 10,
     max_workspace_size=1 << 25,
     explicit_batch_dimension=False,
@@ -50,6 +50,7 @@ def compile(
     Args:
         module: Original module for lowering.
         input: Input for module.
+        max_batch_size: Maximum batch size (must be >= 1 to be set, 0 means not set)
         min_acc_module_size: Minimal number of nodes for an accelerated submodule
         max_workspace_size: Maximum size of workspace given to TensorRT.
         explicit_batch_dimension: Use explicit batch dimension in TensorRT if set True, otherwise use implicit batch dimension.
@@ -69,6 +70,7 @@ def compile(
         )
 
     lower_setting = LowerSetting(
+        max_batch_size=max_batch_size,
         min_acc_module_size=min_acc_module_size,
         max_workspace_size=max_workspace_size,
         explicit_batch_dimension=explicit_batch_dimension,
@@ -127,6 +129,7 @@ class LowerTrtInterpreter:
         )
 
         interp_result: TRTInterpreterResult = interpreter.run(
+            max_batch_size=self.lower_setting.max_batch_size,
             max_workspace_size=self.lower_setting.max_workspace_size,
             lower_precision=self.lower_setting.lower_precision,
             strict_type_constraints=self.lower_setting.strict_type_constraints,

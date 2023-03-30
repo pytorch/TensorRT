@@ -153,6 +153,7 @@ class TRTInterpreter(torch.fx.Interpreter):
 
     def run(
         self,
+        max_batch_size=64,
         max_workspace_size=1 << 25,
         lower_precision=LowerPrecision.FP16,
         sparse_weights=False,
@@ -166,6 +167,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         """
         Build TensorRT engine with some configs.
         Args:
+            max_batch_size: set accordingly for maximum batch size you will use.
             max_workspace_size: set to the maximum size we can afford for temporary buffer
             lower_precision: the precision model layers are running on (TensorRT will choose the best perforamnce precision).
             sparse_weights: allow the builder to examine weights and use optimized functions when weights have suitable sparsity
@@ -205,6 +207,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         )
         build_engine_start_time = datetime.now()
 
+        self.builder.max_batch_size = max_batch_size
         builder_config = self.builder.create_builder_config()
         builder_config.max_workspace_size = max_workspace_size
 

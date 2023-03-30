@@ -4,7 +4,7 @@ from typing import List, Optional, Set, Type
 from torch import nn
 from torch.fx.passes.pass_manager import PassManager
 
-from torch_tensorrt._Input import Input
+from .input_tensor_spec import InputTensorSpec
 from .passes.lower_basic_pass import fuse_permute_linear, fuse_permute_matmul
 from .utils import LowerPrecision
 
@@ -13,6 +13,13 @@ from .utils import LowerPrecision
 class LowerSettingBasic:
     """
     Basic class for lowering.
+    max_batch_size: The maximum batch size for lowering job.
+                    If run with TensorRT lowering, this is the maximum
+                    batch size which can be used at execution time,
+                    and also the batch size for which the ICudaEngine
+                    will be optimized.
+                    If run with AITemplate lowering, this the max batch_size
+                    for the model.
     lower_precision: lower precision dtype during lowering.
     min_acc_module_size(int): minimal number of nodes for an accelerate submodule.
     ast_rewriter_allow_list (Optional[Set[nn.Module]]): Optional allow list of
@@ -22,7 +29,7 @@ class LowerSettingBasic:
     modules will not be traced into.
     verbose_profile (bool): verbosity of profiler, default to False.
     """
-
+    max_batch_size: int = 2048
     lower_precision: LowerPrecision = LowerPrecision.FP32
     min_acc_module_size: int = 10
     ast_rewriter_allow_list: Optional[Set[Type[nn.Module]]] = None
@@ -68,7 +75,7 @@ class LowerSetting(LowerSettingBasic):
     use_experimental_rt: Uses the next generation TRTModule which supports both Python and TorchScript based execution (including in C++).
     """
 
-    input_specs: List[Input] = dc.field(default_factory=list)
+    input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
     explicit_batch_dimension: bool = True
     explicit_precision: bool = False
     max_workspace_size: int = 1 << 30
