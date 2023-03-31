@@ -198,12 +198,12 @@ class LowerPassManagerBuilder:
                         self.lower_setting.input_specs = self._trt_input
                     else:
                         self.lower_setting.input_specs = generate_input_specs(
-                        submod_inputs,
-                        self.lower_setting,
-                        additional_submodule_inputs[submod_name]
-                        if additional_submodule_inputs
-                        else None,
-                    )
+                            submod_inputs,
+                            self.lower_setting,
+                            additional_submodule_inputs[submod_name]
+                            if additional_submodule_inputs
+                            else None,
+                        )
 
                     lowered_module = self._lower_func(
                         submod, submod_inputs, self.lower_setting, submod_name

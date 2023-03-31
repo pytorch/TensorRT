@@ -87,7 +87,9 @@ class TensorRTMinimizer(net_min_base._MinimizerBase):
     def run_b(self, mod, inputs):
         mod.eval()
         try:
-            mod = self.lower_fn(mod, inputs, self.max_batch_size, self.use_experiemental_rt)
+            mod = self.lower_fn(
+                mod, inputs, self.max_batch_size, self.use_experiemental_rt
+            )
             output = mod(*inputs)
         except RuntimeError as e:
             raise net_min_base.FxNetMinimizerRunFuncError(

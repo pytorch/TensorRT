@@ -29,6 +29,7 @@ class LowerSettingBasic:
     modules will not be traced into.
     verbose_profile (bool): verbosity of profiler, default to False.
     """
+
     max_batch_size: int = 2048
     lower_precision: LowerPrecision = LowerPrecision.FP32
     min_acc_module_size: int = 10
