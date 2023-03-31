@@ -7,7 +7,7 @@ from torch.fx.passes.tools_common import get_acc_ops_name, Tensors
 
 from .. import (
     CONVERTERS,
-    InputTensorSpec
+    InputTensorSpec,
     NO_EXPLICIT_BATCH_DIM_SUPPORT,
     NO_IMPLICIT_BATCH_DIM_SUPPORT,
     TRTInterpreter,
