@@ -19,7 +19,6 @@ auto cat_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
               bool dynamic_shape = ctx->input_is_dynamic;
               int size = in->getDimensions().nbDims;
               int maxDim = static_cast<int32_t>(in->getDimensions().d[axis]);
-
               if(dim < 0) {
                 dim = tensors[0]->getDimensions().nbDims + dim;
               }
