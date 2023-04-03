@@ -26,7 +26,7 @@ auto cat_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
                 TORCHTRT_ASSERT(in.d[dim] != -1, "Can't chunk on dynamic shape dimension!");
               }
               if (chunks > in.d[dim]) {
-                LOG_WARNING("The chunks size" << chunks << "along dimension" << dim << "is greater than tensor with size" << in->getDimensions 
+                LOG_WARNING("The chunks size" << chunks << "along dimension" << dim << "is greater than tensor with size" << in->getDimensions
                             << "it will default to dimension" << in.d[dim])
               }
               int step = (input_val.shape[dim] + chunks - 1) / chunks

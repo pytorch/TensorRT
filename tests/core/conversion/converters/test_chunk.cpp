@@ -17,7 +17,7 @@ TEST(Converters, ATenChunkConvertsCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
 
   torch::jit::parseIR(graph, g.get());
-  auto in = at::randint(1, 10, {1,100}, {at::kCUDA});
+  auto in = at::randint(1, 10, {1, 100}, {at::kCUDA});
 
   auto jit_in = at::clone(in);
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
