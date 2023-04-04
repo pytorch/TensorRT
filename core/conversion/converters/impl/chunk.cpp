@@ -18,19 +18,25 @@ auto cat_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
               auto dim = args[2].unwrapToInt();
               bool dynamic_shape = ctx->input_is_dynamic;
               int size = in->getDimensions().nbDims;
-              int maxDim = static_cast<int32_t>(in->getDimensions().d[axis]);
+              int maxDim = static_cast<int32_t>(in->getDimensions().d[dim]);
+
+              c10::ListTypePtr lt = n->output()->type()->expect<c10::ListType>();
+              c10::TypePtr elementType = lt->getElementType();
+
+              int offset = 0;
               if(dim < 0) {
-                dim = tensors[0]->getDimensions().nbDims + dim;
+                dim = in->getDimensions().nbDims + dim;
               }
               if (dynamic_shape) {
-                TORCHTRT_ASSERT(in.d[dim] != -1, "Can't chunk on dynamic shape dimension!");
+                TORCHTRT_ASSERT(in->getDimensions().d[dim] != -1, "Can't chunk on dynamic shape dimension!");
               }
-              if (chunks > in.d[dim]) {
-                LOG_WARNING("The chunks size" << chunks << "along dimension" << dim << "is greater than tensor with size" << in->getDimensions
-                            << "it will default to dimension" << in.d[dim])
+              if (chunks > in->getDimensions().d[dim]) {
+                LOG_WARNING("The chunks size" << chunks << "along dimension" << dim << "is greater than tensor with size" << in->getDimensions().d[dim]
+                            << "it will default to dimension" << in->getDimensions().d[dim]);
               }
-              int step = (input_val.shape[dim] + chunks - 1) / chunks
+              int step = (maxDim + chunks - 1) / chunks;
               nvinfer1::Dims start_, size_, stride_;
+              int nbdims = in->getDimensions().nbDims;
               start_.nbDims = nbdims;
               size_.nbDims = nbdims;
               stride_.nbDims = nbdims;
@@ -39,25 +45,35 @@ auto cat_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
               int endIdx = maxDim;
 
               for (int i = 0; i < nbdims; i++) {
-                 if (i == axis) {
-                   start_.d[i] = startIdx;
-                   size_.d[i] = (endIdx - startIdx - 1) / step + 1;
-                   stride_.d[i] = step;
-                 } else {
-                   start_.d[i] = 0;
-                   size_.d[i] = in.d[i]; // for static
-                   stride_.d[i] = 1;
-                 }
+                start_.d[i] = 0;
+                size_.d[i] = 0;
+                stride_.d[i] = 1;
               }
               // update slice layer
-              if(!dynamic_shape):
-                 auto slice_layer = ctx->net->addSlice(*in, start_, size_, stride_);
-                 LOG_DEBUG("start_:" << start_);
-                 LOG_DEBUG("size_:" << size_);
-                 LOG_DEBUG("stride_:" << stride_);
-                 auto slice_out = slice_layer->getOutput(0);
-                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], slice_out);
-                 LOG_DEBUG("Slice layer output shape: " << out->getDimensions());
+              auto list = c10::impl::GenericList(elementType);
+              list.reserve(chunks);
+              if(!dynamic_shape) {
+                for (int chunk = 0; chunk < chunks; chunk++) {
+                  for (int i = 0; i < nbdims; i++) {
+                    if (i == dim) {
+                      start_.d[i] = offset;
+                      size_.d[i] = std::min(step, maxDim - offset);
+                    }
+                  }
+                  LOG_DEBUG("start_:" << start_);
+                  LOG_DEBUG("size_:" << size_);
+                  LOG_DEBUG("stride_:" << stride_);
+                  auto slice_layer = ctx->net->addSlice(*in, start_, size_, stride_);
+                  auto tensor_holder = TensorContainer();
+                  tensor_holder.hold_tensor(slice_layer->getOutput(0));
+                  auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));    
+                  list.emplace_back(ival);
+                  offset = offset + step;
+                }
+              }
+              auto split_output_ivalue = std::move(torch::jit::IValue(list));
+              ctx->AssociateValueAndIValue(n->outputs()[0], split_output_ivalue);
+              return true;
             }});
 // clang-format on
 } // namespace
