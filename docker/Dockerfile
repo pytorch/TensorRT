@@ -3,9 +3,9 @@ ARG BASE_IMG=nvidia/cuda:11.7.1-devel-ubuntu22.04
 FROM ${BASE_IMG} as base
 
 ARG TENSORRT_VERSION
-RUN test -n "$TENSORRT_VERSION" || (echo "No tensorrt version specified, please use --build-arg TENSORRT_VERSION==x.y.z to specify a version." && exit 1)
+RUN test -n "$TENSORRT_VERSION" || (echo "No tensorrt version specified, please use --build-arg TENSORRT_VERSION=x.y.z to specify a version." && exit 1)
 ARG CUDNN_VERSION
-RUN test -n "$CUDNN_VERSION" || (echo "No cudnn version specified, please use --build-arg CUDNN_VERSION==x.y.z to specify a version." && exit 1)
+RUN test -n "$CUDNN_VERSION" || (echo "No cudnn version specified, please use --build-arg CUDNN_VERSION=x.y.z to specify a version." && exit 1)
 
 ARG USE_CXX11_ABI
 ENV USE_CXX11=${USE_CXX11_ABI}
