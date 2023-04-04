@@ -1,13 +1,19 @@
 # Base image starts with CUDA
-ARG BASE_IMG=nvidia/cuda:11.7.1-devel-ubuntu20.04
+ARG BASE_IMG=nvidia/cuda:11.7.1-devel-ubuntu22.04
 FROM ${BASE_IMG} as base
+
+ARG TENSORRT_VERSION
+RUN test -n "$TENSORRT_VERSION" || (echo "No tensorrt version specified, please use --build-arg TENSORRT_VERSION==x.y.z to specify a version." && exit 1)
+ARG CUDNN_VERSION
+RUN test -n "$CUDNN_VERSION" || (echo "No cudnn version specified, please use --build-arg CUDNN_VERSION==x.y.z to specify a version." && exit 1)
 
 ARG USE_CXX11_ABI
 ENV USE_CXX11=${USE_CXX11_ABI}
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Install basic dependencies
 RUN apt-get update
-RUN DEBIAN_FRONTEND=noninteractive apt install -y build-essential manpages-dev wget zlib1g software-properties-common git
+RUN apt install -y build-essential manpages-dev wget zlib1g software-properties-common git
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt install -y python3.8 python3.8-distutils python3.8-dev
 RUN wget https://bootstrap.pypa.io/get-pip.py
@@ -16,20 +22,20 @@ RUN python get-pip.py
 RUN pip3 install wheel
 
 # Install CUDNN + TensorRT
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
-RUN mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
-RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-ubuntu2204.pin
+RUN mv cuda-ubuntu2204.pin /etc/apt/preferences.d/cuda-repository-pin-600
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/7fa2af80.pub
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 536F8F1DE80F6A35
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
-RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /"
 RUN apt-get update
-RUN apt-get install -y libcudnn8=8.5.0* libcudnn8-dev=8.5.0*
+RUN apt-get install -y libcudnn8=${CUDNN_VERSION}* libcudnn8-dev=${CUDNN_VERSION}*
 
-RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
-RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub
+RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /"
 RUN apt-get update
 
-RUN apt-get install -y libnvinfer8=8.5.1* libnvinfer-plugin8=8.5.1* libnvinfer-dev=8.5.1* libnvinfer-plugin-dev=8.5.1* libnvonnxparsers8=8.5.1-1* libnvonnxparsers-dev=8.5.1-1* libnvparsers8=8.5.1-1*  libnvparsers-dev=8.5.1-1*
+RUN apt-get install -y libnvinfer8=${TENSORRT_VERSION}* libnvinfer-plugin8=${TENSORRT_VERSION}* libnvinfer-dev=${TENSORRT_VERSION}* libnvinfer-plugin-dev=${TENSORRT_VERSION}* libnvonnxparsers8=${TENSORRT_VERSION}-1* libnvonnxparsers-dev=${TENSORRT_VERSION}-1* libnvparsers8=${TENSORRT_VERSION}-1*  libnvparsers-dev=${TENSORRT_VERSION}-1*
 
 # Setup Bazel
 RUN wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.16.0/bazelisk-linux-amd64 -O /usr/bin/bazel \
@@ -42,7 +48,7 @@ ARG ARCH="x86_64"
 ARG TARGETARCH="amd64"
 
 RUN apt-get install -y python3-setuptools
-RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub
 
 RUN apt-get update && apt-get install -y --no-install-recommends locales ninja-build && rm -rf /var/lib/apt/lists/* && locale-gen en_US.UTF-8
 
@@ -63,6 +69,7 @@ COPY --from=torch-tensorrt-builder  /workspace/torch_tensorrt/src/py/dist/ .
 
 RUN cp /opt/torch_tensorrt/docker/WORKSPACE.docker /opt/torch_tensorrt/WORKSPACE
 RUN pip install -r /opt/torch_tensorrt/py/requirements.txt
+RUN pip install tensorrt==${TENSORRT_VERSION}.*
 RUN pip3 install *.whl && rm -fr /workspace/torch_tensorrt/py/dist/* *.whl
 
 WORKDIR /opt/torch_tensorrt
