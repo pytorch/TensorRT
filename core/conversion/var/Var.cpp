@@ -147,11 +147,15 @@ bool Var::isITensor() const {
 }
 
 bool Var::isITensorList() {
-  if (isList() && ptr_.ivalue->isCustomClass()) {
-    return true;
-  } else {
-    return false;
+  // Unpack the Var as a List and check if each entry is a custom class since
+  // ITensors are stored in CustomClassHolder
+  auto ival_list = ptr_.ivalue->toList();
+  for (int i = 0; i < ival_list.size(); i++) {
+    if (!ival_list.get(i).isCustomClass()) {
+      return false;
+    }
   }
+  return true;
 }
 
 std::vector<nvinfer1::ITensor*> Var::unwrapToITensorList() {
