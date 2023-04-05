@@ -146,6 +146,31 @@ bool Var::isITensor() const {
   }
 }
 
+bool Var::isITensorList() {
+  // Unpack the Var as a List and check if each entry is a custom class since
+  // ITensors are stored in CustomClassHolder
+  auto ival_list = ptr_.ivalue->toList();
+  for (int i = 0; i < ival_list.size(); i++) {
+    if (!ival_list.get(i).isCustomClass()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+std::vector<nvinfer1::ITensor*> Var::unwrapToITensorList() {
+  TORCHTRT_CHECK(
+      isIValue(), "Requested unwrapping of arg assuming it was an IValue, however arg type is " << type_name());
+  TORCHTRT_CHECK(isITensorList(), "Expected IValue to be an ITensorList");
+  auto ivalue_list = ptr_.ivalue->toList();
+  std::vector<nvinfer1::ITensor*> outputs;
+  for (int i = 0; i < ivalue_list.size(); i++) {
+    auto element = ivalue_list.get(i).toCustomClass<TensorContainer>()->tensor();
+    outputs.push_back(std::move(element));
+  }
+  return outputs;
+}
+
 bool Var::isIValue() const {
   if (type_ == Type::kIValue) {
     return true;
