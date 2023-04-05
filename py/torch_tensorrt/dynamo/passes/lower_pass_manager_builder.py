@@ -268,7 +268,9 @@ class LowerPassManagerBuilder:
             elif isinstance(input_obj, torch.Tensor):
                 self._trt_input.append(InputTensorSpec.from_tensor(input_obj))
             else:
-                raise ValueError("Invalid input type provided in the FX lowering. Expected type: torch_tensorrt.Input or torch.Tensor")
+                raise ValueError(
+                    "Invalid input type provided in the FX lowering. Expected type: torch_tensorrt.Input or torch.Tensor"
+                )
 
         self._additional_input = additional_input
         passes = []
@@ -294,7 +296,9 @@ class LowerPassManagerBuilder:
             elif isinstance(input_obj, torch.Tensor):
                 self._trt_input.append(InputTensorSpec.from_tensor(input_obj))
             else:
-                raise ValueError("Invalid input type provided in the FX lowering. Expected type: torch_tensorrt.Input or torch.Tensor")
+                raise ValueError(
+                    "Invalid input type provided in the FX lowering. Expected type: torch_tensorrt.Input or torch.Tensor"
+                )
 
         self._additional_input = additional_input
         passes = []

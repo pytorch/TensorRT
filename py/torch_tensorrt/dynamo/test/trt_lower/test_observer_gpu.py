@@ -33,9 +33,7 @@ class ObserverGPUTests(TestCase):
 
         with execution_verifier() as verify_execution:
 
-            lowerer = lower.Lowerer.create(
-                lower_setting=LowerSetting(min_block_size=0)
-            )
+            lowerer = lower.Lowerer.create(lower_setting=LowerSetting(min_block_size=0))
 
             @verify_execution
             def observe_fuse_permute_linear_post(ctx: ob.ObserveContext):

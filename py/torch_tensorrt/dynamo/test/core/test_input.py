@@ -7,6 +7,7 @@ import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import run_tests, TestCase
 
+
 class TestInput(TestCase):
     def test_add_model(self):
         class TestModule(torch.nn.Module):

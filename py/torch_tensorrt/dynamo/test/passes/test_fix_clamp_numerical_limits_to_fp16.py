@@ -3,7 +3,9 @@ import unittest
 
 import torch
 import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
-from torch_tensorrt.dynamo.passes.lower_basic_pass import fix_clamp_numerical_limits_to_fp16
+from torch_tensorrt.dynamo.passes.lower_basic_pass import (
+    fix_clamp_numerical_limits_to_fp16,
+)
 
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

@@ -6,6 +6,7 @@ from .types import Shape, ShapeRange
 from .utils import get_dynamic_dims
 from torch_tensorrt._Input import Input
 
+
 class InputTensorSpec(NamedTuple):
     """
     This class contains the information of a input tensor.
