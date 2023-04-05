@@ -15,6 +15,7 @@ class _IRType(Enum):
 
     ts = 0
     fx = 1
+    dynamo = 2
 
 
 class _ModuleType(Enum):
@@ -45,11 +46,14 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
 
     ir_targets_torchscript = any([ir == opt for opt in ["torchscript", "ts"]])
     ir_targets_fx = ir == "fx"
+    ir_targets_dynamo = ir == "dynamo"
 
     if module_is_tsable and ir_targets_torchscript:
         return _IRType.ts
     elif module_is_fxable and ir_targets_fx:
         return _IRType.fx
+    elif module_is_fxable and ir_targets_dynamo:
+        return _IRType.dynamo
     else:
         if ir == "default":
             # Options are listed in order of preference
@@ -146,6 +150,26 @@ def compile(
             max_batch_size=inputs[0].size(0),
             explicit_batch_dimension=True,
             dynamic_batch=False,
+            **kwargs,
+        )
+    elif target_ir == _IRType.dynamo:
+        if (
+            torch.float16 in enabled_precisions
+            or torch_tensorrt.dtype.half in enabled_precisions
+        ):
+            lower_precision = LowerPrecision.FP16
+        elif (
+            torch.float32 in enabled_precisions
+            or torch_tensorrt.dtype.float in enabled_precisions
+        ):
+            lower_precision = LowerPrecision.FP32
+        else:
+            raise ValueError(f"Precision {enabled_precisions} not supported on FX")
+
+        return torch_tensorrt.dynamo.compile(
+            module,
+            inputs,
+            lower_precision=lower_precision,
             **kwargs,
         )
     else:
