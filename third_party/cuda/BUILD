@@ -23,6 +23,7 @@ cc_library(
         "include/**/*.h",
         "include/**/*.hpp",
         "include/**/*.inl",
+        "include/**/*",
     ]),
     includes = ["include/"],
 )
@@ -53,6 +54,7 @@ cc_library(
         "include/**/*.h",
         "include/**/*.hpp",
         "include/**/*.inl",
+        "include/**/*",
     ]),
     includes = ["include/"],
     linkopts = ["-Wl,-rpath,lib/"],
@@ -72,6 +74,7 @@ cc_library(
         "include/**/*cublas*.h",
         "include/**/*.hpp",
         "include/**/*.inl",
+        "include/**/*",
     ]),
     includes = ["include/"],
     linkopts = ["-Wl,-rpath,lib/"],
