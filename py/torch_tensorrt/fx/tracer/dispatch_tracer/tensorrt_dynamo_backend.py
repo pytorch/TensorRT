@@ -1,5 +1,6 @@
 import torch
 import traceback
+from typing import Sequence
 import torch._dynamo as td
 
 from torch_tensorrt.fx.fx2trt import (
@@ -7,22 +8,67 @@ from torch_tensorrt.fx.fx2trt import (
     TRTInterpreter,
 )
 import tensorrt as trt
-from torch_tensorrt.fx.tracer.dispatch_tracer import aten_tracer
 from torch_tensorrt.fx.trt_module import TRTModule
 from torch_tensorrt.fx.utils import LowerPrecision
 
+from torch import Tensor, SymInt
 from torch._dynamo.backends.common import fake_tensor_unsupported
-
 from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
+from torch._decomp import register_decomposition
+from torch._decomp import core_aten_decompositions
 
-from torch._inductor.decomposition import decompositions
+
+DECOMPOSITIONS = {**core_aten_decompositions()}
+aten = torch._ops.ops.aten
+
+
+def replace_inplace_op(aten_op, outplace_op):
+    """Replace inplace operation with functional equivalent
+
+    Adapted from:
+    https://github.com/pytorch/pytorch/blob/3344d79e3f732dadd5c85b99a7aa1a022f187929/torch/_decomp/decompositions.py#L3355-L3361
+    """
+
+    @register_decomposition(aten_op, registry=DECOMPOSITIONS)
+    def inplace_op(*args, **kwargs):
+        out = outplace_op(*args, **kwargs)
+        return args[0].copy_(out)
+
+    return inplace_op
+
+
+replace_inplace_op(aten.add_, aten.add)
+replace_inplace_op(aten.addbmm_, aten.addbmm)
+replace_inplace_op(aten.addmm_, aten.addmm)
+replace_inplace_op(aten.addmv_, aten.addmv)
+replace_inplace_op(aten.baddbmm_, aten.baddbmm)
+replace_inplace_op(aten.cumprod_, aten.cumprod)
+replace_inplace_op(aten.fill_, aten.fill)
+replace_inplace_op(aten.gelu_, aten.gelu)
+replace_inplace_op(aten.hardsigmoid_, aten.hardsigmoid)
+replace_inplace_op(aten.index_put_, aten.index_put)
+replace_inplace_op(aten.index_reduce_, aten.index_reduce)
+replace_inplace_op(aten.logit_, aten.logit)
+replace_inplace_op(aten.relu_, aten.relu)
+replace_inplace_op(aten.renorm_, aten.renorm)
+replace_inplace_op(aten.round_, aten.round)
+replace_inplace_op(aten.scatter_, aten.scatter)
+replace_inplace_op(aten.scatter_add_, aten.scatter_add)
+replace_inplace_op(aten.scatter_reduce_, aten.scatter_reduce)
+
+
+@register_decomposition(torch.ops.aten.clone.default, registry=DECOMPOSITIONS)
+def clone_removal(self: Tensor) -> Tensor:
+    return self
+
+
+@register_decomposition(torch.ops.aten._unsafe_view.default, registry=DECOMPOSITIONS)
+def unsafe_view_replacement(self: Tensor, size: Sequence[SymInt]) -> Tensor:
+    return torch.reshape(self, size)
 
 
 def partition(gm: torch.fx.GraphModule):
     pass
-
-
-DECOMPOSITIONS = decompositions.copy()
 
 
 def tensorrt_backend(gm, sample_inputs):
