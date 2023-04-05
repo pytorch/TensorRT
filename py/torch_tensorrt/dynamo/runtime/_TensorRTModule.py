@@ -9,8 +9,8 @@ from torch_tensorrt._Device import Device
 logger = logging.getLogger(__name__)
 
 
-class TRTModuleNext(torch.nn.Module):
-    """TRTModuleNext is a PyTorch module which encompasses an arbitrary TensorRT Engine.
+class TensorRTModule(torch.nn.Module):
+    """TensorRTModule is a PyTorch module which encompasses an arbitrary TensorRT Engine.
 
     This module is backed by the Torch-TensorRT runtime and is fully compatibile with both
     FX / Python deployments (just ``import torch_tensorrt`` as part of the application) as
@@ -20,7 +20,7 @@ class TRTModuleNext(torch.nn.Module):
     The forward function is simpily forward(*args: torch.Tensor) -> Tuple[torch.Tensor] where
     the internal implementation is ``return Tuple(torch.ops.tensorrt.execute_engine(list(inputs), self.engine))``
 
-    > Note: TRTModuleNext only supports engines built with explict batch
+    > Note: TensorRTModule only supports engines built with explict batch
 
     Attributes:
         name (str): Name of module (for easier debugging)
@@ -73,7 +73,7 @@ class TRTModuleNext(torch.nn.Module):
         logger.warning(
             "TRTModuleNext should be considered experimental stability, APIs are subject to change. Note: TRTModuleNext only supports engines built with explict batch"
         )
-        super(TRTModuleNext, self).__init__()
+        super(TensorRTModule, self).__init__()
 
         if not isinstance(serialized_engine, bytearray):
             ValueError("Expected serialized engine as bytearray")
@@ -89,8 +89,8 @@ class TRTModuleNext(torch.nn.Module):
                     self.name + "_engine" if self.name != "" else "tensorrt_engine",
                     target_device._to_serialized_rt_device(),
                     serialized_engine,
-                    TRTModuleNext._pack_binding_names(self.input_binding_names),
-                    TRTModuleNext._pack_binding_names(self.output_binding_names),
+                    TensorRTModule._pack_binding_names(self.input_binding_names),
+                    TensorRTModule._pack_binding_names(self.output_binding_names),
                 ]
             )
         else:
