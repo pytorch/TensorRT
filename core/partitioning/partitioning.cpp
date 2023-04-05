@@ -47,6 +47,21 @@ void setInputsOutputsConnectedNodes(PartitioningCtx* ctx, torch::jit::Block* blo
   }
 }
 
+// Need to check if this makes sense might be a root cause of some issues of over aggressive fallback
+bool checkLoopEvaluatable(torch::jit::Node* n) {
+  bool compile_to_trt = true;
+  for (auto bn : n->blocks()[0]->nodes()) {
+    if (bn->kind() == torch::jit::prim::Loop) {
+      compile_to_trt = compile_to_trt && checkLoopEvaluatable(bn);
+    } else if (bn->kind() == torch::jit::prim::If) {
+      compile_to_trt = compile_to_trt && containNonTensorOutputs(bn);
+    } else {
+      compile_to_trt = compile_to_trt && core::conversion::evaluators::shouldEvalAtConversionTime(bn);
+    }
+  }
+  return compile_to_trt;
+}
+
 // Find and set all explicit fallback nodes (nodes that are unsupported or forced fallback)
 // we use a map to indicate the reason why it's fallback to torch
 // For any node that's not explicitly fallback, we set it to run in TensorRT for now
@@ -59,7 +74,9 @@ void setExplicitFallbackNodes(PartitioningCtx* ctx, torch::jit::Block* block) {
       continue;
     }
 
-    if (!conversion::OpSupported(n)) {
+    if (n->kind() == torch::jit::prim::Loop && checkLoopEvaluatable(n)) {
+      ctx->setNodeExecutorDecision(n, NodeExecutorDecision::kCONVERT);
+    } else if (!conversion::OpSupported(n)) {
       // If the op is not supported by the conversion phase it should run in PyTorch
       ctx->setNodeExecutorDecision(n, NodeExecutorDecision::kUNSUPPORTED);
     } else if (ctx->forced_fallback_ops.find(n->kind().toQualString()) != ctx->forced_fallback_ops.end()) {
@@ -269,7 +286,8 @@ void resolveTRTNonTensorInputs(PartitioningCtx* ctx, torch::jit::Block* block) {
             dependency_nodes.end(),
             cur_partitioned_block[i].raw_nodes().begin(),
             cur_partitioned_block[i].raw_nodes().end());
-        cur_partitioned_block[i] = SegmentedBlock(SegmentedBlock::kTensorRT, dependency_nodes);
+        cur_partitioned_block[i] =
+            SegmentedBlock(cur_partitioned_block[i].get_id(), SegmentedBlock::kTensorRT, dependency_nodes);
       }
     }
   }
@@ -334,21 +352,6 @@ void registerSegmentsOutputs(PartitioningCtx* ctx, torch::jit::Block* block) {
       cur_partitioned_block.end());
 
   return;
-}
-
-// Need to check if this makes sense might be a root cause of some issues of over aggressive fallback
-bool checkLoopEvaluatable(torch::jit::Node* n) {
-  bool compile_to_trt = true;
-  for (auto bn : n->blocks()[0]->nodes()) {
-    if (bn->kind() == torch::jit::prim::Loop) {
-      compile_to_trt = compile_to_trt && checkLoopEvaluatable(bn);
-    } else if (bn->kind() == torch::jit::prim::If) {
-      compile_to_trt = compile_to_trt && containNonTensorOutputs(bn);
-    } else {
-      compile_to_trt = compile_to_trt && core::conversion::evaluators::shouldEvalAtConversionTime(bn);
-    }
-  }
-  return compile_to_trt;
 }
 
 void finalizeNewBlock(
@@ -499,20 +502,6 @@ void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block) {
         finalizeNewBlock(segmented_blocks, SegmentedBlock::kTorch, cond_node);
         segmented_blocks.back().do_not_merge(true);
         continue;
-      } else if (n->kind() == torch::jit::prim::Loop) {
-        if (!in_prog_pyt_blk_nodes.empty()) {
-          finalizeNewBlock(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
-          cur_pyt_nodes_uses.clear();
-        }
-        if (checkLoopEvaluatable(n)) {
-          in_prog_trt_blk_nodes.push_back(n);
-          cur_trt_nodes_uses.insert(dependent_nodes.begin(), dependent_nodes.end());
-        } else {
-          auto loop_node = std::vector<torch::jit::Node*>{n};
-          finalizeNewBlock(segmented_blocks, SegmentedBlock::kTorch, loop_node);
-          segmented_blocks.back().do_not_merge(true);
-        }
-        continue;
       }
       in_prog_pyt_blk_nodes.push_back(n);
       cur_pyt_nodes_uses.insert(dependent_nodes.begin(), dependent_nodes.end());
@@ -553,18 +542,44 @@ bool isInputDynamic(PartitioningCtx* ctx) {
 void populateInputIValues(PartitioningCtx* ctx) {
   if (isInputDynamic(ctx)) {
     ctx->min_input_ivalues_map = partitioning::generateRandomInputs(
-        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kMIN);
+        ctx->settings.collection_input_spec_map,
+        ctx->input_types_map,
+        ir::ShapeMode::kMIN,
+        ctx->settings.target_device.gpu_id);
     ctx->opt_input_ivalues_map = partitioning::generateRandomInputs(
-        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kOPT);
+        ctx->settings.collection_input_spec_map,
+        ctx->input_types_map,
+        ir::ShapeMode::kOPT,
+        ctx->settings.target_device.gpu_id);
     ctx->max_input_ivalues_map = partitioning::generateRandomInputs(
-        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kMAX);
+        ctx->settings.collection_input_spec_map,
+        ctx->input_types_map,
+        ir::ShapeMode::kMAX,
+        ctx->settings.target_device.gpu_id);
   } else {
     ctx->opt_input_ivalues_map = partitioning::generateRandomInputs(
-        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kOPT);
+        ctx->settings.collection_input_spec_map,
+        ctx->input_types_map,
+        ir::ShapeMode::kOPT,
+        ctx->settings.target_device.gpu_id);
   }
 }
 
-void partition(PartitioningCtx* ctx) {
+void partition(PartitioningCtx* ctx, bool expect_full_compilation) {
+  // If full compilation is expected, overwrite minimum block size
+  // Any nonzero block size is valid if full compilation to TRT is desired
+  // Override the default min_block_size to ensure all TRT-supported operations are
+  // executed in TRT, regardless of the size of the graph
+  if (expect_full_compilation) {
+    // If minimum block size is different from the default, the user must have specified it
+    if (ctx->settings.min_block_size != 3) {
+      LOG_WARNING(
+          "Detected user-specified min_block_size with require_full_compilation=True "
+          << "disregarding min_block_size.");
+    }
+    ctx->settings.min_block_size = 1;
+  }
+
   LOG_DEBUG(ctx->settings);
 
   // Go through all the blocks to do the partitioning

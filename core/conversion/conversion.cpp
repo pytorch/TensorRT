@@ -556,10 +556,20 @@ std::set<std::string> ConvertableOpsInBlock(const torch::jit::Block* b) {
   return convertable_ops;
 }
 
+bool InputIsCollection(const torch::jit::Block* b) {
+  for (auto in : b->inputs()) {
+    if (in->type()->kind() == torch::jit::TypeKind::TupleType || in->type()->kind() == torch::jit::TypeKind::ListType) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool OutputIsCollection(const torch::jit::Block* b) {
   for (auto out : b->outputs()) {
     if (out->type()->kind() == torch::jit::TypeKind::TupleType ||
-        out->type()->kind() == torch::jit::TypeKind::ListType) {
+        out->type()->kind() == torch::jit::TypeKind::ListType ||
+        out->type()->kind() == torch::jit::TypeKind::DictType) {
       return true;
     }
   }

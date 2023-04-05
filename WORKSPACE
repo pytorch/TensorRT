@@ -56,17 +56,17 @@ new_local_repository(
 http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "8b3b48615169c83c1b643c0efade078ea080b1da598e15fcf01bc59421f3095e",
+    sha256 = "7c4b8754830fef23ec19c5eaf414794cee9597b435df055f5c1d0471d3e81568",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu117/libtorch-cxx11-abi-shared-with-deps-2.0.0.dev20230219%2Bcu117.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu117/libtorch-cxx11-abi-shared-with-deps-2.1.0.dev20230314%2Bcu117.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "aa7fd06079d260ff83c344d043fb84fbd9cf831cf375ed8b5a1b62416817af31",
+    sha256 = "f1e64a75dd12d0ba4c8c1f61947299e0a9c50684dff64f0cfbf355aa7a13e8cf",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu117/libtorch-shared-with-deps-2.0.0.dev20230219%2Bcu117.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu117/libtorch-shared-with-deps-2.1.0.dev20230314%2Bcu117.zip"],
 )
 
 # Download these tarballs manually from the NVIDIA website

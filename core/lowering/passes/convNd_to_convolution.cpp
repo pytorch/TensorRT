@@ -82,6 +82,20 @@ void Conv2DToConvolution(std::shared_ptr<torch::jit::Graph>& graph) {
   LOG_GRAPH("Post map conv2d -> _convolution: " << *graph);
 }
 
+void ConvTransposed2DToConvolution(std::shared_ptr<torch::jit::Graph>& graph) {
+  const std::string conv_transpose2d_node_kind = "aten::conv_transpose2d";
+  const std::string convolution_pattern = R"IR(
+        graph(%x, %w, %b, %s, %p, %o, %g, %d):
+            %1 : bool = prim::Constant[value=1]()
+            %2 : bool = prim::Constant[value=1]()
+            %4 : Tensor = aten::_convolution(%x, %w, %b, %s, %p, %d, %1, %o, %g, %2, %2, %2, %2)
+            return (%4))IR";
+
+  // Schema is aten::conv_transpose2d(%x, %w, %b, %s, %p, %o, %g, %d) --> 8 inputs
+  replaceConv(graph->block(), conv_transpose2d_node_kind, convolution_pattern, 8);
+  LOG_GRAPH("Post map conv_transpose2d -> _convolution: " << *graph);
+}
+
 void Conv3DToConvolution(std::shared_ptr<torch::jit::Graph>& graph) {
   const std::string conv3d_node_kind = "aten::conv3d";
   const std::string convolution_pattern = R"IR(
@@ -94,6 +108,20 @@ void Conv3DToConvolution(std::shared_ptr<torch::jit::Graph>& graph) {
   // Schema is aten::conv3d(%x, %w, %b, %s, %p, %d, %g) --> 7 inputs
   replaceConv(graph->block(), conv3d_node_kind, convolution_pattern, 7);
   LOG_GRAPH("Post map conv3d -> _convolution: " << *graph);
+}
+
+void ConvTransposed3DToConvolution(std::shared_ptr<torch::jit::Graph>& graph) {
+  const std::string conv_transpose3d_node_kind = "aten::conv_transpose3d";
+  const std::string convolution_pattern = R"IR(
+        graph(%x, %w, %b, %s, %p, %o, %g, %d):
+            %1 : bool = prim::Constant[value=1]()
+            %2 : bool = prim::Constant[value=1]()
+            %4 : Tensor = aten::_convolution(%x, %w, %b, %s, %p, %d, %1, %o, %g, %2, %2, %2, %2)
+            return (%4))IR";
+
+  // Schema is aten::conv_transpose3d(%x, %w, %b, %s, %p, %o, %g, %d) --> 8 inputs
+  replaceConv(graph->block(), conv_transpose3d_node_kind, convolution_pattern, 8);
+  LOG_GRAPH("Post map conv_transpose3d -> _convolution: " << *graph);
 }
 
 } // namespace passes

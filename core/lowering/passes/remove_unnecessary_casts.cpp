@@ -138,6 +138,48 @@ void RemoveSingleUse0DTensors(std::shared_ptr<torch::jit::Graph>& g) {
                               user->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);
                               user->destroy();
                               break;
+                            case c10::aten::div:
+                              // If the first two entries to aten::div are non-Tensors,
+                              // there cannot be a rounding mode specified (3rd entry)
+                              if (!user->inputs()[0]->type()->isSubtypeOf(c10::TensorType::get()) &&
+                                  !user->inputs()[1]->type()->isSubtypeOf(c10::TensorType::get()) &&
+                                  user->inputs().size() == 3 &&
+                                  user->inputs()[2]->type()->isSubtypeOf(c10::StringType::get()) &&
+                                  torch::jit::toIValue(user->inputs()[2]).has_value()) {
+                                // Select the first 2 entries of the inputs, corresponding to the values
+                                auto div_args = user->inputs().slice(0, 2);
+
+                                // Depending on the rounding mode, create the appropriate nodes
+                                if (torch::jit::toIValue(user->inputs()[2]).value().toStringRef() == "trunc") {
+                                  // Truncate case (round result towards 0)
+                                  torch::jit::Node* new_node_div;
+                                  // Create node which simply divides the two entries
+                                  new_node_div = g->create(c10::aten::div, div_args, 1);
+                                  new_node_div->insertAfter(user);
+                                  new_node_div->outputs()[0]->setType(c10::FloatType::get());
+
+                                  // Create node which casts the result to an integer, effectively truncating
+                                  new_node = g->create(c10::aten::Int, new_node_div->outputs(), 1);
+                                  new_node->insertAfter(new_node_div);
+                                  new_node->outputs()[0]->setType(c10::IntType::get());
+
+                                  user->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);
+                                  user->destroy();
+                                  break;
+
+                                } else if (torch::jit::toIValue(user->inputs()[2]).value().toStringRef() == "floor") {
+                                  // Floor case (round result down)
+                                  // Replace aten::div with aten::floordiv
+                                  new_node = g->create(c10::aten::floordiv, div_args, 1);
+                                  new_node->insertAfter(user);
+                                  new_node->outputs()[0]->setType(c10::IntType::get());
+
+                                  user->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);
+                                  user->destroy();
+                                  break;
+                                }
+                              }
+
                             default:
                               new_node = g->create(user->kind(), user->inputs(), 1);
                               new_node->insertAfter(user);

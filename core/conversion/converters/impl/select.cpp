@@ -360,7 +360,7 @@ auto select_registrations TORCHTRT_UNUSED =
 
                  // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices
                  // from
-                 auto gather_layer = ctx->net->addGather(*in, *indicesTensor, 0);
+                 auto gather_layer = ctx->net->addGather(*in, *indicesTensor, adv_idx_indices[0]);
                  TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
                  auto gather_out = gather_layer->getOutput(0);
 

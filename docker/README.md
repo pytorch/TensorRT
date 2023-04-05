@@ -5,7 +5,8 @@
 * `Dockerfile` currently uses the exact library versions (Torch, CUDA, CUDNN, TensorRT) listed in <a href="https://github.com/pytorch/TensorRT#dependencies">dependencies</a> to build Torch-TensorRT.
 
 * This `Dockerfile` installs `pre-cxx11-abi` versions of Pytorch and builds Torch-TRT using `pre-cxx11-abi` libtorch as well.
-Note: To install `cxx11_abi` version of Torch-TensorRT, enable `USE_CXX11=1` flag so that `dist-build.sh` can build it accordingly.
+
+Note: By default the container uses the `pre-cxx11-abi` version of Torch + Torch-TRT. If you are using a workflow that requires a build of PyTorch on the CXX11 ABI (e.g. using the PyTorch NGC containers as a base image), add the Docker build argument: `--build-arg USE_CXX11_ABI=1`
 
 ### Dependencies
 
