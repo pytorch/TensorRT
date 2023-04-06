@@ -13,7 +13,7 @@ from torch_tensorrt import _Input
 from ..input_tensor_spec import InputTensorSpec
 
 from ..lower_setting import LowerSetting
-from ..observer import Observer
+from torch_tensorrt.fx.observer import Observer
 from ..passes.remove_duplicate_output_args import remove_duplicate_output_args
 from .graph_opts import common_subexpression_elimination
 from .pass_utils import extract_example_tensors_from_input
@@ -260,7 +260,7 @@ class LowerPassManagerBuilder:
         self, input: Input, additional_input: Optional[Input] = None
     ) -> PassManager:
 
-        self._input = extract_example_tensors_from_input(input)
+        self._input = extract_example_tensors_from_input(input, self.lower_setting.device)
         self._trt_input = []
         for input_obj in input:
             if isinstance(input_obj, _Input.Input):

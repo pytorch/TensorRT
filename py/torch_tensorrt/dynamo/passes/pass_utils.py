@@ -125,7 +125,7 @@ def chain_passes(*passes: PassFunc) -> PassFunc:
 
 # (TODO(shirongwu): Add exception notification for fblearner flow when available, notify oncall
 # on pass that failed accuracy check.
-def validate_inference(rtol=None, atol=None):
+def validate_inference(rtol=None, atol=None, device=torch.device(torch.cuda.current_device())):
     def _validate_inference(pass_: PassFunc) -> PassFunc:
         """
         Wraps a pass function to validate that its inference results before and
@@ -139,7 +139,7 @@ def validate_inference(rtol=None, atol=None):
             *args,
             **kwargs,
         ) -> fx.GraphModule:
-            input_tensors = extract_example_tensors_from_input(input)
+            input_tensors = extract_example_tensors_from_input(input, device)
             res0 = module(*input_tensors)
             processed_module = pass_(module, input, *args, **kwargs)
             res1 = processed_module(*input_tensors)

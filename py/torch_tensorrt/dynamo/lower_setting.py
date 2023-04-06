@@ -1,6 +1,6 @@
 import dataclasses as dc
 from typing import List, Optional, Set, Type
-
+import torch
 from torch import nn
 from torch.fx.passes.pass_manager import PassManager
 
@@ -24,6 +24,7 @@ class LowerSettingBasic:
     """
 
     lower_precision: LowerPrecision = LowerPrecision.FP32
+    device: torch.device = torch.device(torch.cuda.current_device())
     min_block_size: int = 3
     ast_rewriter_allow_list: Optional[Set[Type[nn.Module]]] = None
     leaf_module_list: Optional[Set[Type[nn.Module]]] = None

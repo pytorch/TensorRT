@@ -5,8 +5,8 @@ import typing as t
 from contextlib import contextmanager
 from unittest import TestCase
 
-import torch_tensorrt.dynamo.observer as ob
-from torch_tensorrt.dynamo.observer import observable
+import torch_tensorrt.fx.observer as ob
+from torch_tensorrt.fx.observer import observable
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

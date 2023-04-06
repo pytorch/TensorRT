@@ -18,7 +18,7 @@ from .tools.timing_cache_utils import TimingCacheManager
 from .tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 
 from torch_tensorrt.fx.tracer.acc_tracer import acc_tracer
-from .trt_module import TRTModule
+from torch_tensorrt.fx.trt_module import TRTModule
 from .utils import LowerPrecision
 
 logger = logging.getLogger(__name__)
@@ -29,8 +29,9 @@ Input = Sequence[Any]
 def compile(
     module: nn.Module,
     inputs,
+    device=torch.device(torch.cuda.current_device()),
     enabled_precisions=set(),
-    min_block_size: int = 10,
+    min_block_size: int = 3,
     max_workspace_size=1 << 25,
     verbose_log=False,
     timing_cache_prefix="",
@@ -70,6 +71,7 @@ def compile(
         raise ValueError(f"Precision {enabled_precisions} not supported on FX")
 
     lower_setting = LowerSetting(
+        device=device,
         min_block_size=min_block_size,
         max_workspace_size=max_workspace_size,
         lower_precision=lower_precision,
@@ -274,10 +276,12 @@ class Lowerer:
         lower_setting = self.lower_pass_manager_builder.lower_setting
         atol = lower_setting.correctness_atol
         rtol = lower_setting.correctness_rtol
+        device = lower_setting.device
 
         @validate_inference(
             atol=atol,
             rtol=rtol,
+            device=device,
         )
         def do_lower(module: nn.Module, inputs: Input) -> nn.Module:
             module.eval()

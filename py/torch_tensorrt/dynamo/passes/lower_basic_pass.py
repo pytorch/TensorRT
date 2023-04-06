@@ -10,7 +10,7 @@ import torch.fx as fx
 import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch.fx.experimental.const_fold import split_const_subgraphs
 
-from ..observer import observable
+from torch_tensorrt.fx.observer import observable
 
 from torch_tensorrt.fx.tracer.acc_tracer import acc_ops
 from torch_tensorrt.fx.tracer.acc_tracer.acc_utils import get_attr

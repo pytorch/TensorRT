@@ -8,7 +8,7 @@ import tempfile
 from typing import Union
 from unittest import TestCase
 
-import torch_tensorrt.dynamo.diagnostics as diag
+import torch_tensorrt.fx.diagnostics as diag
 
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

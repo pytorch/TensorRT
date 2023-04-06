@@ -1,21 +1,13 @@
-FX2TRT is merged as FX module in Torch-TensorRT
+The code in this directory is similar to `torch_tensorrrt.fx`. We intend to make changes under `dynamo` namespace to ensure we
+have the same top level API as `torch_tensorrt.ts.compile`. Right now, the usage is as follows
 
-- The user guide is in [link](../../../docsrc/tutorials/getting_started_with_fx_path.rst#installation)
-- The examples are moved to [link](../../../examples/fx)
-
-* Method 1. Follow the instrucions for Torch-TensorRT
-* Method 2. To install FX path only (Python path) and avoid the C++ build for torchscript path
 ```
-    $ conda create --name python_env python=3.8
-    $ conda activate python_env
-    # Recommend to install PyTorch 1.12 and later
-    $ conda install pytorch torchvision torchtext cudatoolkit=11.3 -c pytorch-nightly
-    # Install TensorRT python package
-    $ pip3 install nvidia-pyindex
-    $ pip3 install tensorrt==8.5.1.7
-    $ git clone https://github.com/pytorch/TensorRT.git
-    $ cd TensorRT/py && python setup.py install --fx-only && cd ..
-    $ pyton -c "import torch_tensorrt.fx"
-    # Test an example by
-    $ python py/torch_tensorrt/fx/example/lower_example.py
+import torch_tensorrt
+trt_module = torch_tensorrt.compile(
+        module,
+        ir="dynamo"
+        torchtrt_inputs,
+        enabled_precisions={torch.float32},
+    )
 ```
+This will internally call `torch_tensorrt.dynamo.compile` which has the same signature as `torch_tensorrt.ts.compile`. We intend to add features (existing in Torchscript backend for eg: torch_executed_ops, torch_executed_modules and many more) to this dynamo backend in the coming months.
