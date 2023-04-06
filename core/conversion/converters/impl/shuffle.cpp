@@ -70,25 +70,37 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                auto in = args[0].ITensorOrFreeze(ctx);
                auto in_shape = util::toVec(in->getDimensions());
                std::vector<int64_t> new_shape;
+               nvinfer1::ITensor* shape_tensor;
                if (ctx->input_is_dynamic) {
-                 new_shape = util::toVec(args[1].unwrapToIntList().vec());
-                 int nbDynamicDims = 0;
-                 for (size_t i = 0; i < new_shape.size(); i++) {
-                   if (in_shape[i] == -1)
-                     nbDynamicDims++;
-                 }
-                 if (nbDynamicDims > 1) {
-                   TORCHTRT_THROW_ERROR(
-                       "Resize is currently not supported when target shape contains more than one dynamic dimension");
+                 LOG_DEBUG("Using dynamic version of reshape layer");
+                 if (args[1].isITensorList()) {
+                   LOG_DEBUG("Shape tensor is an ITensorList");
+                   auto new_shape = args[1].unwrapToITensorList();
+                   auto concat_layer = ctx->net->addConcatenation(new_shape.data(), new_shape.size());
+                   TORCHTRT_CHECK(concat_layer, "Unable to create concatenation layer from node: " << *n);
+                   concat_layer->setAxis(static_cast<int32_t>(0));
+                   shape_tensor = concat_layer->getOutput(0);
+                 } else if (args[1].isIntList()) {
+                   LOG_DEBUG("Shape tensor is an IntList");
+                   auto shape_vec = args[1].unwrapToIntList().vec();
+                   shape_tensor = tensor_to_const(ctx, torch::tensor(shape_vec).to(torch::kI32));
+                 } else {
+                   LOG_ERROR(
+                       "Invalid IValue type of " << args[1].IValue()->type()
+                                                 << " detected for shape tensor from node: " << *n);
                  }
                } else {
                  new_shape = torch::reshape(torch::rand(in_shape), args[1].unwrapToIntList().vec()).sizes().vec();
                }
-
                auto shuffle = ctx->net->addShuffle(*in);
-               TORCHTRT_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
-               shuffle->setReshapeDimensions(util::toDims(new_shape));
                shuffle->setName(util::node_info(n).c_str());
+               TORCHTRT_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
+
+               if (ctx->input_is_dynamic) {
+                 shuffle->setInput(1, *shape_tensor);
+               } else {
+                 shuffle->setReshapeDimensions(util::toDims(new_shape));
+               }
 
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle->getOutput(0));
                LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
