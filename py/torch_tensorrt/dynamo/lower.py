@@ -29,9 +29,9 @@ Input = Sequence[Any]
 def compile(
     module: nn.Module,
     inputs,
+    enabled_precisions=set(),
     min_block_size: int = 10,
     max_workspace_size=1 << 25,
-    lower_precision=LowerPrecision.FP16,
     verbose_log=False,
     timing_cache_prefix="",
     save_timing_cache=False,
@@ -48,7 +48,6 @@ def compile(
         input: Input for module.
         min_block_size: Minimal number of nodes for an accelerated submodule
         max_workspace_size: Maximum size of workspace given to TensorRT.
-        lower_precision: lower_precision config given to TRTModule.
         verbose_log: Enable verbose log for TensorRT if set True.
         timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.
         save_timing_cache: Update timing cache with current timing cache data if set to True.
@@ -61,6 +60,14 @@ def compile(
         raise ValueError(
             "The experimental unifed runtime only supports explicit batch. Please make sure to set explicit_batch_dimension=True when use_experimental_fx_rt=True"
         )
+
+    lower_precision = LowerPrecision.FP32
+    if torch.float16 in enabled_precisions:
+        lower_precision = LowerPrecision.FP16
+    elif torch.float32 in enabled_precisions:
+        lower_precision = LowerPrecision.FP32
+    else:
+        raise ValueError(f"Precision {enabled_precisions} not supported on FX")
 
     lower_setting = LowerSetting(
         min_block_size=min_block_size,

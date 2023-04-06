@@ -93,7 +93,7 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._TRTModuleNext import TRTModuleNext
 
 from torch_tensorrt import fx
-
+from torch_tensorrt import dynamo
 
 def _register_with_torch():
     trtorch_dir = os.path.dirname(__file__)

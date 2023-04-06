@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
-from torch_tensorrt import _enums
 import torch_tensorrt.ts
+
 from torch_tensorrt import logging
 import torch
 import torch.fx
@@ -78,7 +78,7 @@ def compile(
     module: Any,
     ir="default",
     inputs=[],
-    enabled_precisions=set([_enums.dtype.float]),
+    enabled_precisions=set([torch.float]),
     **kwargs,
 ):
     """Compile a PyTorch module for NVIDIA GPUs using TensorRT
@@ -153,24 +153,8 @@ def compile(
             **kwargs,
         )
     elif target_ir == _IRType.dynamo:
-        if (
-            torch.float16 in enabled_precisions
-            or torch_tensorrt.dtype.half in enabled_precisions
-        ):
-            lower_precision = LowerPrecision.FP16
-        elif (
-            torch.float32 in enabled_precisions
-            or torch_tensorrt.dtype.float in enabled_precisions
-        ):
-            lower_precision = LowerPrecision.FP32
-        else:
-            raise ValueError(f"Precision {enabled_precisions} not supported on FX")
-
         return torch_tensorrt.dynamo.compile(
-            module,
-            inputs,
-            lower_precision=lower_precision,
-            **kwargs,
+            module, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs
         )
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
@@ -181,7 +165,7 @@ def convert_method_to_trt_engine(
     method_name: str,
     ir="default",
     inputs=[],
-    enabled_precisions=set([_enums.dtype.float]),
+    enabled_precisions=set([torch.float]),
     **kwargs,
 ):
     """Convert a TorchScript module method to a serialized TensorRT engine
