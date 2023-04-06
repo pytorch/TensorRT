@@ -244,7 +244,7 @@ class AccTestCase(TRTTestCase):
         unexpected_ops=None,
         apply_passes=None,
         test_explicit_batch_dim=True,
-        test_implicit_batch_dim=True,
+        test_implicit_batch_dim=False,
         test_explicit_precision=False,
         rtol=1e-03,
         atol=1e-03,

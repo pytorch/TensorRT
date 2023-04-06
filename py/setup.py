@@ -376,7 +376,9 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 if FX_ONLY:
-    package_data_list = ["_Input.py",]
+    package_data_list = [
+        "_Input.py",
+    ]
 else:
     package_data_list = [
         "lib/*",

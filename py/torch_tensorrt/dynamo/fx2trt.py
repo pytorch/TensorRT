@@ -37,7 +37,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         self,
         module: torch.fx.GraphModule,
         input_specs: List[InputTensorSpec],
-        explicit_batch_dimension: bool = False,
+        explicit_batch_dimension: bool = True,
         explicit_precision: bool = False,
         logger_level=None,
     ):
