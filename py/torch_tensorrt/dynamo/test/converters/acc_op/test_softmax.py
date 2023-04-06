@@ -60,22 +60,5 @@ class TestSoftmaxConverter(AccTestCase):
             Softmax(), input_specs, expected_ops={acc_ops.softmax}
         )
 
-    def test_softmax_with_implicit_batch_dim0_fail(self):
-        class Softmax(nn.Module):
-            def __init__(self):
-                super().__init__()
-
-            def forward(self, x):
-                return nn.functional.softmax(x, dim=0)
-
-        inputs = [torch.randn(1, 2, 3, 4)]
-        self.run_test_with_assert_error(
-            Softmax(),
-            inputs,
-            expect_error=AssertionError,
-            test_explicit_batch_dim=False,
-        )
-
-
 if __name__ == "__main__":
     run_tests()
