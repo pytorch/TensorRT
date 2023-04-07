@@ -208,8 +208,10 @@ class TRTInterpreter(torch.fx.Interpreter):
 
         builder_config = self.builder.create_builder_config()
 
-        if (workspace_size != 0):
-            builder_config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, workspace_size)
+        if workspace_size != 0:
+            builder_config.set_memory_pool_limit(
+                trt.MemoryPoolType.WORKSPACE, workspace_size
+            )
 
         builder_config.workspace_size = workspace_size
 
