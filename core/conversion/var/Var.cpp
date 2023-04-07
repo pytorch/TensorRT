@@ -92,8 +92,9 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
   }
 
   TORCHTRT_CHECK(
-      isITensor() || (isIValue() && (ptr_.ivalue->isTensor() || ptr_.ivalue->isCustomClass())),
-      "Requested either IValue containing a Tensor, or ITensor, however Var type is " << type_name());
+      isITensor() ||
+          (isIValue() && (ptr_.ivalue->isTensor() || ptr_.ivalue->isScalar() || ptr_.ivalue->isCustomClass())),
+      "Requested either IValue containing a Tensor, Scalar or ITensor, however Var type is " << type_name());
 
   nvinfer1::ITensor* out;
 
@@ -101,6 +102,8 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
     if (ptr_.ivalue->isTensor()) {
       auto tensor = ptr_.ivalue->toTensor();
       out = converters::tensor_to_const(ctx, tensor);
+    } else if (ptr_.ivalue->isScalar()) {
+      out = converters::scalar_to_tensor(ctx, ptr_.ivalue->toScalar());
     } else {
       // Split converter generates c10::IValue which hold TensorContainer.
       auto output_container = ptr_.ivalue->toCustomClass<TensorContainer>();
