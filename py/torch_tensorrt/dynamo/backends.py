@@ -6,11 +6,22 @@ import torch._dynamo as td
 from torch_tensorrt import EngineCapability, Device
 from torch_tensorrt.dynamo import compile
 
+from torch_tensorrt.dynamo.lowering._decompositions import get_decompositions
+from torch_tensorrt.dynamo.lowering._partition import partition, get_submod_inputs
+from torch_tensorrt.dynamo.conversion import convert_module
+
 from torch._dynamo.backends.common import fake_tensor_unsupported
 
 from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
 
-from torch_tensorrt.dynamo.lowering._decompositions import get_decompositions
+from torch_tensorrt.fx.fx2trt import (
+    InputTensorSpec,
+    TRTInterpreter,
+)
+import tensorrt as trt
+
+from torch_tensorrt.fx.trt_module import TRTModule
+from torch_tensorrt.fx.utils import LowerPrecision
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +108,7 @@ def fx_dynamo_backend(
 ):
     """Helper function to manage translation of FX module to TRT engines"""
     try:
-        trt_compiled = compile(gm, example_inputs)
+        trt_compiled = compile_module(gm, example_inputs)
         return trt_compiled
     except:
         traceback.print_exc()
@@ -106,3 +117,48 @@ def fx_dynamo_backend(
             + "Returning GraphModule forward instead."
         )
         return gm.forward
+
+
+def compile_module(
+    gm: torch.fx.GraphModule,
+    example_inputs,
+    debug: bool = False,
+    workspace_size: int = 20 << 30,
+    precision: LowerPrecision = LowerPrecision.FP32,
+) -> torch.fx.GraphModule:
+    """Convert an FX module to a TRT module
+    Args:
+        module: FX GraphModule to convert
+        inputs: Inputs to the module
+        debug: Whether to print out verbose debugging information
+        workspace_size: Maximum workspace TRT is allowed to use for the module
+        precision: Model Layer precision
+    Returns:
+        TRTModule or TRTModuleNext
+    """
+    # Partition module into components that can be TRT-accelerated
+    partitioned_module = partition(gm)
+
+    # Iterate over all components that can be accelerated
+    # Generate the corresponding TRT Module for those
+    for name, _ in partitioned_module.named_children():
+        submodule = getattr(partitioned_module, name)
+
+        # Get submodule inputs
+        submodule_inputs = get_submod_inputs(
+            partitioned_module, submodule, example_inputs
+        )
+
+        # Create TRT Module from submodule
+        trt_mod = convert_module(
+            submodule,
+            submodule_inputs,
+            debug=debug,
+            workspace_size=workspace_size,
+            precision=precision,
+        )
+
+        # Replace FX Module with TRT Module
+        setattr(partitioned_module, name, trt_mod)
+
+    return partitioned_module

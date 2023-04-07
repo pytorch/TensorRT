@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Optional, Sequence
 
 import torch
 
@@ -12,7 +12,7 @@ MAX_NUM_TRT_ENGINES = 10
 
 
 class TorchTensorRTOperatorSupport(OperatorSupport):
-    """Class to determine whether the aten operators have converters"""
+    """Class to determine whether operators within a module are supported"""
 
     def __init__(self, support_dict=None):
         super().__init__(support_dict)
@@ -38,7 +38,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):
 
             return False
 
-    def print_support_overview(self, num_trt_blocks=None):
+    def print_support_overview(self, num_trt_blocks: Optional[int] = None):
         if num_trt_blocks is not None:
             print(f"Number of TensorRT-Accelerated Subgraphs: {num_trt_blocks}\n")
 
@@ -51,9 +51,20 @@ class TorchTensorRTOperatorSupport(OperatorSupport):
             print(node_name)
 
 
-def partition(gm: torch.fx.GraphModule, verbose=True):
+def partition(
+    gm: torch.fx.GraphModule,
+    verbose: bool = True,
+    max_num_trt_engines: int = MAX_NUM_TRT_ENGINES,
+) -> torch.fx.GraphModule:
     """Partition an FX GraphModule with aten ops into TRT engines
-    Partitioning is based on operator support
+    Partitioning is based on converter operator support
+
+    Args:
+        gm: FX GraphModule to partition
+        verbose: Bool representing whether to print operator support
+        max_num_trt_engines: Maximum number of allowed TRT engines in partitioning
+    Returns:
+        torch.fx.GraphModule
     """
     supported_ops = TorchTensorRTOperatorSupport()
     partitioner = CapabilityBasedPartitioner(gm, supported_ops)
@@ -62,10 +73,10 @@ def partition(gm: torch.fx.GraphModule, verbose=True):
     # exceeds a specified threshold
     partitions = partitioner.propose_partitions()
     num_blocks = len(partitions)
-    if num_blocks > MAX_NUM_TRT_ENGINES:
+    if num_blocks > max_num_trt_engines:
         raise AssertionError(
             f"The graph module has {num_blocks} TRT Engines which is larger than the "
-            + f"threshold={MAX_NUM_TRT_ENGINES}. Falling back to non-TRT module."
+            + f"threshold={max_num_trt_engines}. Falling back to non-TRT module."
         )
 
     # Fuse partitions and display overview of supported/unsupported operators
@@ -76,3 +87,27 @@ def partition(gm: torch.fx.GraphModule, verbose=True):
         supported_ops.print_support_overview(num_blocks)
 
     return fused_graph
+
+
+def get_submod_inputs(
+    mod: torch.fx.GraphModule, submod: torch.fx.GraphModule, inputs
+) -> Sequence[torch.Tensor]:
+    """Helper function to get inputs to a Torch submodule
+
+    Args:
+        mod: Parent FX GraphModule
+        submod: Child FX GraphModule
+        inputs: Sample inputs to parent module
+    Returns:
+        Sequence of Tensors representing inputs to child module
+    """
+    acc_inputs = None
+
+    def get_input(self, inputs):
+        nonlocal acc_inputs
+        acc_inputs = inputs
+
+    handle = submod.register_forward_pre_hook(get_input)
+    mod(*inputs)
+    handle.remove()
+    return acc_inputs
