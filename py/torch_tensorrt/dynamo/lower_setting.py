@@ -29,6 +29,8 @@ class LowerSettingBasic:
     lower_precision: LowerPrecision = LowerPrecision.FP32
     device: torch.device = torch.device(torch.cuda.current_device())
     min_block_size: int = 3
+    disable_tf32: bool = False
+    sparse_weights: bool = False
     ast_rewriter_allow_list: Optional[Set[Type[nn.Module]]] = None
     leaf_module_list: Optional[Set[Type[nn.Module]]] = None
     verbose_profile: bool = False
@@ -43,7 +45,7 @@ class LowerSetting(LowerSettingBasic):
     input_specs: Specs for inputs to engine, can either be a single size or a
     range defined by Min, Optimal, Max sizes.
     explicit_precision: Use explicit precision during lowering.
-    max_workspace_size: The maximum workspace size. The maximum GPU temporary
+    workspace_size: The maximum workspace size. The maximum GPU temporary
     memory which the TensorRT engine can use at execution time.
     strict_type_constraints: Require TensorRT engine to strictly follow data type
     setting at execution time.
@@ -73,7 +75,7 @@ class LowerSetting(LowerSettingBasic):
     input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
     explicit_batch_dimension: bool = True
     explicit_precision: bool = False
-    max_workspace_size: int = 1 << 30
+    workspace_size: int = 0
     strict_type_constraints: bool = False
     customized_fuse_pass: PassManager = dc.field(
         default_factory=lambda: PassManager.build_from_passlist([])

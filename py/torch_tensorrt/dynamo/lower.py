@@ -30,9 +30,11 @@ def compile(
     module: nn.Module,
     inputs,
     device=torch.device(torch.cuda.current_device()),
+    disable_tf32=False,
+    sparse_weights=False,
     enabled_precisions=set(),
     min_block_size: int = 3,
-    max_workspace_size=1 << 25,
+    workspace_size=0,
     verbose_log=False,
     timing_cache_prefix="",
     save_timing_cache=False,
@@ -48,7 +50,7 @@ def compile(
         module: Original module for lowering.
         input: Input for module.
         min_block_size: Minimal number of nodes for an accelerated submodule
-        max_workspace_size: Maximum size of workspace given to TensorRT.
+        workspace_size: Maximum size of workspace given to TensorRT.
         verbose_log: Enable verbose log for TensorRT if set True.
         timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.
         save_timing_cache: Update timing cache with current timing cache data if set to True.
@@ -73,7 +75,9 @@ def compile(
     lower_setting = LowerSetting(
         device=device,
         min_block_size=min_block_size,
-        max_workspace_size=max_workspace_size,
+        disable_tf32=disable_tf32,
+        sparse_weights=sparse_weights,
+        workspace_size=workspace_size,
         lower_precision=lower_precision,
         verbose_log=verbose_log,
         timing_cache_prefix=timing_cache_prefix,
@@ -128,8 +132,10 @@ class LowerTrtInterpreter:
         )
 
         interp_result: TRTInterpreterResult = interpreter.run(
-            max_workspace_size=self.lower_setting.max_workspace_size,
+            workspace_size=self.lower_setting.workspace_size,
             lower_precision=self.lower_setting.lower_precision,
+            sparse_weights=self.lower_setting.sparse_weights,
+            disable_tf32=self.lower_setting.disable_tf32,
             strict_type_constraints=self.lower_setting.strict_type_constraints,
             algorithm_selector=algo_selector,
             timing_cache=cache_data,

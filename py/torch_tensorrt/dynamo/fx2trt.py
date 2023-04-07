@@ -153,9 +153,10 @@ class TRTInterpreter(torch.fx.Interpreter):
 
     def run(
         self,
-        max_workspace_size=1 << 25,
+        workspace_size=0,
         lower_precision=LowerPrecision.FP16,
         sparse_weights=False,
+        disable_tf32=False,
         force_fp32_output=False,
         strict_type_constraints=False,
         algorithm_selector=None,
@@ -166,7 +167,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         """
         Build TensorRT engine with some configs.
         Args:
-            max_workspace_size: set to the maximum size we can afford for temporary buffer
+            workspace_size: Amount of memory used by TensorRT to store intermediate buffers within an operation.
             lower_precision: the precision model layers are running on (TensorRT will choose the best perforamnce precision).
             sparse_weights: allow the builder to examine weights and use optimized functions when weights have suitable sparsity
             force_fp32_output: force output to be fp32
@@ -206,7 +207,11 @@ class TRTInterpreter(torch.fx.Interpreter):
         build_engine_start_time = datetime.now()
 
         builder_config = self.builder.create_builder_config()
-        builder_config.max_workspace_size = max_workspace_size
+
+        if (workspace_size != 0):
+            builder_config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, workspace_size)
+
+        builder_config.workspace_size = workspace_size
 
         cache = None
         if timing_cache:
@@ -230,6 +235,9 @@ class TRTInterpreter(torch.fx.Interpreter):
 
         if sparse_weights:
             builder_config.set_flag(trt.BuilderFlag.SPARSE_WEIGHTS)
+
+        if disable_tf32:
+            builder_config.clear_flag(trt.BuilderFlag.TF32)
 
         if strict_type_constraints:
             builder_config.set_flag(trt.BuilderFlag.STRICT_TYPES)
