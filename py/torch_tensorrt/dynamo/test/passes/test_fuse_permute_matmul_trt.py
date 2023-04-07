@@ -4,7 +4,7 @@ import torch
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.passes.lower_basic_pass import (
+from torch_tensorrt.fx.passes.lower_basic_pass import (
     fuse_permute_matmul,
     trt_transposed_matmul,
 )

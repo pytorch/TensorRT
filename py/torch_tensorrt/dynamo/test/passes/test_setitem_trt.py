@@ -3,7 +3,7 @@ import torch._dynamo as torchdynamo
 from parameterized import parameterized
 from torch._dynamo.optimizations import backends
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.passes.lower_basic_pass import transform_setitem
+from torch_tensorrt.fx.passes.lower_basic_pass import transform_setitem
 from torch_tensorrt.dynamo.tools.common_fx2trt import AccTestCase
 
 

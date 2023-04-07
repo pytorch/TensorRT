@@ -28,8 +28,9 @@ from torch.testing._internal.common_quantization import (
     QuantizationTestCase,
 )
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo import InputTensorSpec, TRTInterpreter, TRTModule
-from torch_tensorrt.dynamo.passes.lower_basic_pass import run_const_fold
+from torch_tensorrt.dynamo import InputTensorSpec, TRTInterpreter
+from torch_tensorrt.fx import TRTModule
+from torch_tensorrt.fx.passes.lower_basic_pass import run_const_fold
 from torch_tensorrt.fx.tracer.acc_tracer import acc_ops
 from torch_tensorrt.dynamo.utils import LowerPrecision
 

@@ -8,10 +8,8 @@ import torch.fx
 
 import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 from torch.testing._internal.common_utils import run_tests, TestCase
-from torch_tensorrt.dynamo import InputTensorSpec, TRTInterpreter, TRTModule
-
-# from torch_tensorrt import TRTModuleNext
-# from torch_tensorrt import Device
+from torch_tensorrt.fx import TRTModule
+from torch_tensorrt.dynamo import InputTensorSpec, TRTInterpreter
 from torch_tensorrt.dynamo.utils import LowerPrecision
 
 

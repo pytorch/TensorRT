@@ -14,7 +14,7 @@ from torch.fx.passes import shape_prop
 from torch.fx.passes.infra.pass_base import PassResult
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt.dynamo import InputTensorSpec, TRTInterpreter
-from torch_tensorrt.dynamo.passes.lower_basic_pass_aten import (
+from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
     compose_bmm,
     compose_chunk,
     compose_getitem_slice,

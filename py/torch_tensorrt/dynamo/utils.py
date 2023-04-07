@@ -7,7 +7,7 @@ import tensorrt as trt
 import torch
 from functorch import make_fx
 from functorch.experimental import functionalize
-from torch_tensorrt.dynamo.passes.lower_basic_pass import (
+from torch_tensorrt.fx.passes.lower_basic_pass import (
     replace_op_with_indices,
     run_const_fold,
 )

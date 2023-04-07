@@ -5,7 +5,7 @@ import logging
 import torch.fx as fx
 import torch.nn as nn
 
-import torch_tensorrt.dynamo.passes.remove_duplicate_output_args as dedup
+import torch_tensorrt.fx.passes.remove_duplicate_output_args as dedup
 from torch.testing._internal.common_utils import run_tests, TestCase
 
 _LOGGER = logging.getLogger(__name__)

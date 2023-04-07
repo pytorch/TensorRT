@@ -4,7 +4,7 @@ from typing import List, Optional
 
 import torch
 from torch.testing._internal.common_utils import run_tests, TestCase
-from torch_tensorrt.dynamo import generate_input_specs, InputTensorSpec, LowerSetting
+from torch_tensorrt.dynamo import InputTensorSpec, LowerSetting
 
 
 class TestTRTModule(TestCase):
@@ -62,32 +62,6 @@ class TestTRTModule(TestCase):
                 tensor_shape = list(tensor.shape)
                 tensor_shape[i] = batch_size
                 self.assertSequenceEqual(tensor_shape, shape)
-
-    def test_generate_input_specs(self):
-        lower_setting = LowerSetting(
-            explicit_batch_dimension=False, opt_profile_replica=2
-        )
-
-        # Implicit batch dim.
-        inputs = [torch.randn(1, 2, 3)]
-        specs = generate_input_specs(inputs, lower_setting)
-        for spec, tensor in zip(specs, inputs):
-            self._validate_spec(spec, tensor)
-
-        # Explicit batch dim without additional inputs.
-        lower_setting.explicit_batch_dimension = True
-        specs = generate_input_specs(inputs, lower_setting)
-        for spec, tensor in zip(specs, inputs):
-            self._validate_spec(spec, tensor, dynamic_dims=[0])
-            self.assertEqual(len(spec.shape_ranges), lower_setting.opt_profile_replica)
-
-        # Explicit batch dim with additional inputs.
-        additional_inputs = [torch.randn(1, 1, 3)]
-        specs = generate_input_specs(inputs, lower_setting, additional_inputs)
-        for spec, tensor in zip(specs, inputs):
-            self._validate_spec(spec, tensor, dynamic_dims=[1])
-            self.assertEqual(len(spec.shape_ranges), lower_setting.opt_profile_replica)
-
 
 if __name__ == "__main__":
     run_tests()

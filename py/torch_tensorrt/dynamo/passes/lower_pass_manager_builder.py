@@ -14,11 +14,11 @@ from ..input_tensor_spec import InputTensorSpec
 
 from ..lower_setting import LowerSetting
 from torch_tensorrt.fx.observer import Observer
-from ..passes.remove_duplicate_output_args import remove_duplicate_output_args
-from .graph_opts import common_subexpression_elimination
+from torch_tensorrt.fx.passes.remove_duplicate_output_args import remove_duplicate_output_args
+from torch_tensorrt.fx.passes.graph_opts import common_subexpression_elimination
 from .pass_utils import extract_example_tensors_from_input
 
-from .lower_basic_pass import (  # noqa
+from torch_tensorrt.fx.passes.lower_basic_pass import (  # noqa
     fix_clamp_numerical_limits_to_fp16,
     fix_reshape_batch_dim,
     replace_mutable_op,

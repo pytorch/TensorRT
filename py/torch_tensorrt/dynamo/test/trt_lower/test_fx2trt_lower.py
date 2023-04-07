@@ -7,7 +7,7 @@ import torch
 import torch.fx as fx
 import torch.nn as nn
 from torch_tensorrt.dynamo.lower import Lowerer, LowerSetting
-from torch_tensorrt.dynamo.passes.lower_basic_pass import replace_mutable_op
+from torch_tensorrt.fx.passes.lower_basic_pass import replace_mutable_op
 
 logger = logging.getLogger(__name__)
 
