@@ -11,8 +11,8 @@ from .. import (
     NO_EXPLICIT_BATCH_DIM_SUPPORT,
     NO_IMPLICIT_BATCH_DIM_SUPPORT,
     TRTInterpreter,
-    TRTModule,
 )
+from torch_tensorrt.fx import TRTModule
 from ..tools.trt_minimizer import TensorRTMinimizer
 
 

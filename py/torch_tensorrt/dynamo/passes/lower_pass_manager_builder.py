@@ -260,7 +260,9 @@ class LowerPassManagerBuilder:
         self, input: Input, additional_input: Optional[Input] = None
     ) -> PassManager:
 
-        self._input = extract_example_tensors_from_input(input, self.lower_setting.device)
+        self._input = extract_example_tensors_from_input(
+            input, self.lower_setting.device
+        )
         self._trt_input = []
         for input_obj in input:
             if isinstance(input_obj, _Input.Input):

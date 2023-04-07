@@ -8,11 +8,12 @@ import torch.fx
 
 import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 import torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer as aten_tracer
+from torch_tensorrt.fx import TRTModule
 from torch.fx.experimental.normalize import NormalizeArgs
 from torch.fx.passes import shape_prop
 from torch.fx.passes.infra.pass_base import PassResult
 from torch.testing._internal.common_utils import TestCase
-from torch_tensorrt.dynamo import InputTensorSpec, TRTInterpreter, TRTModule
+from torch_tensorrt.dynamo import InputTensorSpec, TRTInterpreter
 from torch_tensorrt.dynamo.passes.lower_basic_pass_aten import (
     compose_bmm,
     compose_chunk,

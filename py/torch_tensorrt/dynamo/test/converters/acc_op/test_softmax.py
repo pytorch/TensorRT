@@ -60,5 +60,6 @@ class TestSoftmaxConverter(AccTestCase):
             Softmax(), input_specs, expected_ops={acc_ops.softmax}
         )
 
+
 if __name__ == "__main__":
     run_tests()
