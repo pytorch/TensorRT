@@ -7,6 +7,41 @@ namespace core {
 namespace lowering {
 namespace passes {
 
+void MapPadToConstantPadND(std::shared_ptr<torch::jit::Graph>& graph) {
+  std::string pad_pattern = R"IR(
+        graph(%input, %pad, %value):
+            %mode : str = prim::Constant[value="constant"]()
+            %o : Tensor = aten::pad(%input, %pad, %mode, %value)
+            return (%o))IR";
+  std::string constant_pad_nd_pattern = R"IR(
+        graph(%input, %pad, %value):
+            %o : Tensor = aten::constant_pad_nd(%input, %pad, %value)
+            return (%o))IR";
+  torch::jit::SubgraphRewriter rewrite_pad;
+  rewrite_pad.RegisterRewritePattern(pad_pattern, constant_pad_nd_pattern);
+  rewrite_pad.runOnGraph(graph);
+
+  // aten::pad can take None for value which is not support by constant_pad_nd
+  // Legalize None to 0
+  torch::jit::Value* const_zero = nullptr;
+  for (auto n : graph->nodes()) {
+    if (n->kind() == torch::jit::aten::constant_pad_nd) {
+      if (n->inputs().size() < 3) {
+        continue;
+      }
+      auto pad_value = n->input(2);
+      if (pad_value->type()->isSubtypeOf(c10::NoneType::get())) {
+        if (const_zero == nullptr) {
+          const_zero = graph->insertConstant(0);
+        }
+        n->replaceInput(2, const_zero);
+      }
+    }
+  }
+
+  LOG_GRAPH("Post map pad(mode='constant') -> constant_pad_nd: " << *graph);
+}
+
 void AliasOperators(std::shared_ptr<torch::jit::Graph>& graph) {
   std::string true_divide_pattern = R"IR(
         graph(%s, %o):
@@ -49,6 +84,8 @@ void AliasOperators(std::shared_ptr<torch::jit::Graph>& graph) {
   rewrite_multiply.RegisterRewritePattern(multiply_pattern, mul_pattern);
   rewrite_multiply.runOnGraph(graph);
   LOG_GRAPH("Post map multiply -> mul: " << *graph);
+
+  MapPadToConstantPadND(graph);
 }
 
 } // namespace passes
