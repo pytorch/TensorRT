@@ -14,7 +14,9 @@ from ..input_tensor_spec import InputTensorSpec
 
 from ..lower_setting import LowerSetting
 from torch_tensorrt.fx.observer import Observer
-from torch_tensorrt.fx.passes.remove_duplicate_output_args import remove_duplicate_output_args
+from torch_tensorrt.fx.passes.remove_duplicate_output_args import (
+    remove_duplicate_output_args,
+)
 from torch_tensorrt.fx.passes.graph_opts import common_subexpression_elimination
 from .pass_utils import extract_example_tensors_from_input
 

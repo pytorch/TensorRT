@@ -63,5 +63,6 @@ class TestTRTModule(TestCase):
                 tensor_shape[i] = batch_size
                 self.assertSequenceEqual(tensor_shape, shape)
 
+
 if __name__ == "__main__":
     run_tests()
