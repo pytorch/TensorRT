@@ -1,15 +1,9 @@
+from typing import Sequence
 import torch
-import logging
 import traceback
 from functools import partial
 import torch._dynamo as td
 
-from torch_tensorrt.dynamo._defaults import (
-    PRECISION,
-    DEBUG,
-    MAX_WORKSPACE_SIZE,
-    MAX_NUM_TRT_ENGINES,
-)
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering._decompositions import get_decompositions
 from torch_tensorrt.dynamo.lowering._partition import partition, get_submod_inputs
@@ -19,49 +13,14 @@ from torch._dynamo.backends.common import fake_tensor_unsupported
 
 from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
 
-from torch_tensorrt.fx.utils import LowerPrecision
-
-logger = logging.getLogger(__name__)
-
-
-def create_backend(
-    precision: LowerPrecision = PRECISION,
-    debug: bool = DEBUG,
-    workspace_size: int = MAX_WORKSPACE_SIZE,
-    max_num_trt_engines: int = MAX_NUM_TRT_ENGINES,
-    **kwargs
-):
-    """Create torch.compile backend given specified arguments
-
-    Args:
-        precision:
-        debug: Whether to print out verbose debugging information
-        workspace_size: Maximum workspace TRT is allowed to use for the module
-        precision: Model Layer precision
-    Returns:
-        Backend for torch.compile
-    """
-    settings = CompilationSettings(
-        debug=debug,
-        precision=precision,
-        workspace_size=workspace_size,
-        max_num_trt_engines=max_num_trt_engines,
-    )
-
-    return partial(
-        tensorrt_backend,
-        settings=settings,
-    )
-
 
 @td.register_backend(name="tensorrt")
 @fake_tensor_unsupported
 def tensorrt_backend(
-    gm: torch.Module,
-    sample_inputs,
+    gm: torch.nn.Module,
+    sample_inputs: Sequence[torch.Tensor],
     settings: CompilationSettings = CompilationSettings(),
 ):
-
     custom_backend = partial(
         fx_dynamo_backend,
         settings=settings,
@@ -80,10 +39,18 @@ def tensorrt_backend(
 @fake_tensor_unsupported
 def fx_dynamo_backend(
     gm: torch.fx.GraphModule,
-    example_inputs,
+    example_inputs: Sequence[torch.Tensor],
     settings: CompilationSettings = CompilationSettings(),
 ):
-    """Helper function to manage translation of FX module to TRT engines"""
+    """Helper function to manage translation of FX module to TRT engines
+
+    Args:
+        module: FX GraphModule to convert
+        inputs: Inputs to the module
+        settings: Compilation settings
+    Returns:
+        Compiled FX GraphModule
+    """
     try:
         trt_compiled = compile_module(
             gm,
@@ -102,7 +69,7 @@ def fx_dynamo_backend(
 
 def compile_module(
     gm: torch.fx.GraphModule,
-    example_inputs,
+    example_inputs: Sequence[torch.Tensor],
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.fx.GraphModule:
     """Compile an FX module

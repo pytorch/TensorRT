@@ -38,15 +38,19 @@ class TorchTensorRTOperatorSupport(OperatorSupport):
 
     def print_support_overview(self, num_trt_blocks: Optional[int] = None):
         if num_trt_blocks is not None:
-            print(f"Number of TensorRT-Accelerated Subgraphs: {num_trt_blocks}\n")
+            print(f"\nNumber of TensorRT-Accelerated Subgraphs: {num_trt_blocks}")
 
-        print("Supported Nodes:")
+        print("\nSupported Nodes:")
         for node_name in self.supported_operators:
-            print(node_name)
+            print("-", node_name)
 
-        print("\nUnsupported Nodes:")
-        for node_name in self.unsupported_operators:
-            print(node_name)
+        if len(self.unsupported_operators) != 0:
+            print("\nUnsupported Nodes:")
+            for node_name in self.unsupported_operators:
+                print("-", node_name)
+            print("\n")
+        else:
+            print("\nAll Nodes Supported\n")
 
 
 def partition(
@@ -88,7 +92,9 @@ def partition(
 
 
 def get_submod_inputs(
-    mod: torch.fx.GraphModule, submod: torch.fx.GraphModule, inputs
+    mod: torch.fx.GraphModule,
+    submod: torch.fx.GraphModule,
+    inputs: Sequence[torch.Tensor],
 ) -> Sequence[torch.Tensor]:
     """Helper function to get inputs to a Torch submodule
 
