@@ -2,13 +2,11 @@ from typing import Dict, Optional, Sequence
 
 import torch
 
+from torch_tensorrt.dynamo._defaults import MAX_NUM_TRT_ENGINES
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner
 from torch.fx.passes.operator_support import OperatorSupport
 
 from torch_tensorrt.fx.converter_registry import CONVERTERS
-
-
-MAX_NUM_TRT_ENGINES = 10
 
 
 class TorchTensorRTOperatorSupport(OperatorSupport):
