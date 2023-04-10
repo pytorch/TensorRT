@@ -10,8 +10,7 @@ from typing import Tuple, List, Dict
 import warnings
 from copy import deepcopy
 from torch_tensorrt.ts.ts_input import TSInput
-
-# from torch_tensorrt.ts.ts_device import TSDevice
+import tensorrt as trt
 
 
 def _internal_input_to_torch_class_input(i: _C.Input) -> torch.classes.tensorrt._Input:
@@ -78,20 +77,24 @@ def _parse_enabled_precisions(precisions: Any) -> Set:
 def _parse_device_type(device: Any) -> _enums.DeviceType:
     if isinstance(device, torch.device):
         if device.type == "cuda":
-            return _enums.DeviceType.gpu
+            return _C.DeviceType.gpu
         else:
             ValueError(
                 "Got a device type other than GPU or DLA (type: "
                 + str(device.type)
                 + ")"
             )
-    elif isinstance(device, _enums.DeviceType):
+    elif isinstance(device, _C.DeviceType):
         return device
+    elif isinstance(device, trt.DeviceType):
+        if device == trt.DeviceType.DLA:
+            return _C.DeviceType.DLA
+        return _C.DeviceType.GPU
     elif isinstance(device, str):
         if device == "gpu" or device == "GPU":
-            return _enums.DeviceType.gpu
+            return _C.DeviceType.GPU
         elif device == "dla" or device == "DLA":
-            return _enums.DeviceType.dla
+            return _C.DeviceType.DLA
         else:
             ValueError(
                 "Got a device type other than GPU or DLA (type: " + str(device) + ")"
@@ -109,7 +112,6 @@ def _parse_device(device_info: Any) -> _C.Device:
         if "device_type" not in device_info:
             raise KeyError("Device type is required parameter")
         else:
-            assert isinstance(device_info["device_type"], _enums.DeviceType)
             info.device_type = _parse_device_type(device_info["device_type"])
 
         if "gpu_id" in device_info:
@@ -126,7 +128,6 @@ def _parse_device(device_info: Any) -> _C.Device:
 
         return info
     elif isinstance(device_info, Device):
-        # ts_device = TSDevice(gpu_id=device_info.gpu_id, dla_core=device_info.dla_core, allow_gpu_fallback=device_info.allow_gpu_fallback)
         return device_info._to_internal()
     elif isinstance(device_info, torch.device):
         return (Device._from_torch_device(device_info))._to_internal()
