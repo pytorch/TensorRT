@@ -10,6 +10,7 @@ from typing import Tuple, List, Dict
 import warnings
 from copy import deepcopy
 from torch_tensorrt.ts.ts_input import TSInput
+# from torch_tensorrt.ts.ts_device import TSDevice
 
 
 def _internal_input_to_torch_class_input(i: _C.Input) -> torch.classes.tensorrt._Input:
@@ -124,6 +125,7 @@ def _parse_device(device_info: Any) -> _C.Device:
 
         return info
     elif isinstance(device_info, Device):
+        # ts_device = TSDevice(gpu_id=device_info.gpu_id, dla_core=device_info.dla_core, allow_gpu_fallback=device_info.allow_gpu_fallback)
         return device_info._to_internal()
     elif isinstance(device_info, torch.device):
         return (Device._from_torch_device(device_info))._to_internal()

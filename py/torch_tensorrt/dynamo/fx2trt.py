@@ -213,8 +213,6 @@ class TRTInterpreter(torch.fx.Interpreter):
                 trt.MemoryPoolType.WORKSPACE, workspace_size
             )
 
-        builder_config.workspace_size = workspace_size
-
         cache = None
         if timing_cache:
             cache_file = numpy.array(timing_cache)
