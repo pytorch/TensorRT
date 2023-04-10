@@ -4,6 +4,13 @@ namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 
+#define DEFINE_IS_IVAL_TYPE(method_variant)                                                                        \
+  inline bool Var::is##method_variant() {                                                                          \
+    TORCHTRT_CHECK(                                                                                                \
+        isIValue(), "Requested unwrapping of arg assuming it was an IValue, however arg type is " << type_name()); \
+    return ptr_.ivalue->is##method_variant();                                                                      \
+  }
+
 #define DEFINE_UNWRAP_TO(ival_type, method_variant)                                                                \
   template <>                                                                                                      \
   inline ival_type Var::unwrapTo<ival_type>() {                                                                    \
@@ -33,6 +40,18 @@ namespace conversion {
   inline ival_type Var::unwrapTo##method_variant() {                                                               \
     return this->unwrapTo<ival_type>();                                                                            \
   }
+
+DEFINE_IS_IVAL_TYPE(Int)
+DEFINE_IS_IVAL_TYPE(Double)
+DEFINE_IS_IVAL_TYPE(Bool)
+DEFINE_IS_IVAL_TYPE(String)
+DEFINE_IS_IVAL_TYPE(Scalar)
+DEFINE_IS_IVAL_TYPE(Tensor)
+DEFINE_IS_IVAL_TYPE(IntList)
+DEFINE_IS_IVAL_TYPE(DoubleList)
+DEFINE_IS_IVAL_TYPE(BoolList)
+DEFINE_IS_IVAL_TYPE(TensorList)
+DEFINE_IS_IVAL_TYPE(List)
 
 DEFINE_UNWRAP_TO(at::Tensor, Tensor)
 DEFINE_UNWRAP_TO(int64_t, Int)
