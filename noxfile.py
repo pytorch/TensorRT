@@ -220,7 +220,8 @@ def run_fx_converter_tests(session):
     print("Running FX converter tests")
     session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
     tests = [
-        "converters",
+        "converters/acc_op",
+        "converters/vanilla",
     ]
     # Skipping this test as it fails inside NGC container with the following error.
     # Error Code 4: Internal Error (Could not find any implementation for node conv due to insufficient workspace. See verbose log for requested sizes.)
