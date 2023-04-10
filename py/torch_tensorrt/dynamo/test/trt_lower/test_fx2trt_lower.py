@@ -20,7 +20,7 @@ class Fx2trtLowerTests(unittest.TestCase):
 
         mod = _Mod()
         mod_traced = fx.symbolic_trace(mod)
-        input = [torch.rand(4)]
+        input = [torch.rand(4).cuda()]
         lower = Lowerer.create(LowerSetting())
         lower(mod_traced, input)
 
@@ -39,7 +39,7 @@ class Fx2trtLowerTests(unittest.TestCase):
                 return self.bn(x)
 
         module = TestModule()
-        inputs = [torch.randn(1, 3, 224, 224)]
+        inputs = [torch.randn(1, 3, 224, 224).cuda()]
         lower = Lowerer.create(LowerSetting(ast_rewriter_allow_list={MyBatchNorm}))
         lower(module, inputs)
 
@@ -53,7 +53,7 @@ class Fx2trtLowerTests(unittest.TestCase):
                 return (torch.sqrt(x), self.a)
 
         lower = Lowerer.create(LowerSetting())
-        lower(TestModule(), [torch.randn([2, 2])])
+        lower(TestModule(), [torch.randn([2, 2]).cuda()])
 
     def test_replace_mutable_op(self):
         class TestModule(torch.nn.Module):
@@ -65,7 +65,7 @@ class Fx2trtLowerTests(unittest.TestCase):
 
         lower = Lowerer.create(LowerSetting())
         mod_traced = fx.symbolic_trace(TestModule())
-        lower(mod_traced, [torch.randn(3, 4), torch.randn(3, 4)])
+        lower(mod_traced, [torch.randn(3, 4).cuda(), torch.randn(3, 4).cuda()])
 
     def test_replace_mutable_op_dont_apply(self):
         class TestModule(torch.nn.Module):

@@ -19,8 +19,8 @@ class ObserverGPUTests(TestCase):
         import torch
         import torch.nn as nn
 
-        import torch_tensorrt.fx.lower as lower
-        from torch_tensorrt.fx.lower_setting import LowerSetting
+        import torch_tensorrt.dynamo.lower as lower
+        from torch_tensorrt.dynamo.lower_setting import LowerSetting
 
         class Model(nn.Module):
             def forward(self, x, y):

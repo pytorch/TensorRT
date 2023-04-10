@@ -358,12 +358,12 @@ class TestSplit(TestCase):
 
         test_splitter(splitter)
 
-    def test_min_block_size(self):
+    def test_min_acc_module_size(self):
         """
            sin     relu     cos     sigmoid     tanh
         a ====> b =====> c ====> d ========> e =====> f
 
-        We set sin, cos and tanh as acc node but also set min_block_size to 2
+        We set sin, cos and tanh as acc node but also set min_acc_module_size to 2
         and expect the whole module stay on CPU.
         """
 
@@ -386,9 +386,9 @@ class TestSplit(TestCase):
                 "acc_ops.tanh": None,
             }
 
-        # Create splitter setting and set min_block_size to 2
+        # Create splitter setting and set min_acc_module_size to 2
         settings = splitter_base._SplitterSettingBase()
-        settings.min_block_size = 2
+        settings.min_acc_module_size = 2
         splitter = TRTSplitter(
             mod,
             (torch.randn(2, 3),),
@@ -815,7 +815,7 @@ class TestSplitNonTensorEdges(TestCase):
         # Making 'a', 'b1', 'b2', 'd' and 'e' run on ACC with limit on ACC
         # subgraph size
         settings = splitter_base._SplitterSettingBase()
-        settings.min_block_size = 2
+        settings.min_acc_module_size = 2
         splitter = TRTSplitter(
             module_nn,
             (test_data,),
@@ -912,7 +912,7 @@ class TestSplitNonTensorEdges(TestCase):
         # Making 'a', 'c', 'd' and 'e' run on ACC with limit on ACC
         # subgraph size
         settings = splitter_base._SplitterSettingBase()
-        settings.min_block_size = 2
+        settings.min_acc_module_size = 2
         splitter = TRTSplitter(
             module_nn,
             (test_data,),
@@ -1072,7 +1072,7 @@ class TestAccFusionsFinder(TestCase):
            sin     relu     cos     sigmoid     tanh
         a ====> b =====> c ====> d ========> e =====> f
 
-        We set sin, relu and cos as acc node but also set min_block_size to 2
+        We set sin, relu and cos as acc node but also set min_acc_module_size to 2
         and expect the whole module stay on CPU.
         """
 
@@ -1095,9 +1095,9 @@ class TestAccFusionsFinder(TestCase):
                 "acc_ops.relu": None,
             }
 
-        # Create splitter setting and set min_block_size to 2
+        # Create splitter setting and set min_acc_module_size to 2
         settings = splitter_base._SplitterSettingBase()
-        settings.min_block_size = 2
+        settings.min_acc_module_size = 2
         splitter = TRTSplitter(
             mod,
             (torch.randn(2, 3),),
