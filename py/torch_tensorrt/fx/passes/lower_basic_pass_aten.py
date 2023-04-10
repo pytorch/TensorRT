@@ -258,6 +258,7 @@ def remove_ops(
     for n in module.graph.nodes:
         if n.op == "call_function" and n.target in (
             torch.ops.aten._unsafe_view.default,
+            torch.ops.aten.view.default,
         ):
             modified = True
             node = n

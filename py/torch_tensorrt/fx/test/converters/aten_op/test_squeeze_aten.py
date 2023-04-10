@@ -10,8 +10,8 @@ class TestSqueezeConverter(DispatchTestCase):
         [
             ("2d_dim", (0), (2, 1)),
             ("3d_one_dim", (0), (2, 2, 1)),
-            # ("3d_two_dim", (0, 1), (2, 2, 1)),
-            # ("4d_dim", (0, 1, 2), (2, 2, 2, 1)),
+            ("3d_two_dim", (0, 1), (2, 1, 1)),
+            ("4d_dim", (0, 1, 2), (2, 2, 1, 1)),
         ]
     )
     def test_squeeze(self, _, dim, init_size):

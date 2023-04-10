@@ -15,6 +15,7 @@ from .converter_utils import get_trt_tensor
 from .converter_utils import set_layer_name
 from .converter_utils import get_trt_tensor
 from .converter_utils import broadcast
+from .converter_utils import broadcastable
 from .converter_utils import squeeze_left
 from .converter_utils import dtype_uniform
 from .converter_utils import get_trt_plugin
@@ -1119,7 +1120,6 @@ def add_expand(network, target, kwargs, name):
     # TRT does not support different dimension size
     assert len(shape) == ranks
     shape = [input_val.shape[i] if shape[i] == -1 else shape[i] for i in range(ranks)]
-
     inshape = tuple(input_val.shape)
     shape = tuple(shape)
     start = tuple([0] * ranks)
@@ -1299,27 +1299,36 @@ def add_squeeze(network, target, kwargs, name):
             f"squeeze received input {input_val} that is not part "
             "of the TensorRT region!"
         )
+    dims = []
+    if "dim" in kwargs:
+        if isinstance(kwargs["dim"], int):
+            dims.append(cast(Optional[int], kwargs["dim"]))
+        else:
+            for dim in kwargs["dim"]:
+                dims.append(cast(Optional[int], dim))
 
-    dim = cast(Optional[int], kwargs["dim"] if "dim" in kwargs else None)
+    # dim = cast(Optional[int], kwargs["dim"] if "dim" in kwargs else None)
     # Squeeze with dim=None would only work in explicit batch dim mode without any dynamic
     # dim, which is a very rare case. For now we just claim not supporting dim=None.
-    assert dim is not None, "We don't support dim=None right now for squeeze."
+    assert not (len(dims) == 0), "We don't support dim=None right now for squeeze."
 
-    dim = get_positive_dim(
-        dim, len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0)
-    )
-    if network.has_implicit_batch_dimension:
-        assert dim != 0, "We don't support squeeze batch dim when it's implicit."
-        dim -= 1
+    for dim in dims:
+        dim = get_positive_dim(
+            dim,
+            len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0),
+        )
+        if network.has_implicit_batch_dimension:
+            assert dim != 0, "We don't support squeeze batch dim when it's implicit."
+            dim -= 1
 
-    assert input_val.shape[dim] != -1, "We don't support squeeze dynamic dim."
-    assert (
-        len(get_dynamic_dims(input_val.shape)) <= 1
-    ), "Currently more than one dynamic dim for input to squeeze is not supported."
+        assert input_val.shape[dim] != -1, "We don't support squeeze dynamic dim."
+        assert (
+            len(get_dynamic_dims(input_val.shape)) <= 1
+        ), "Currently more than one dynamic dim for input to squeeze is not supported."
 
     output_shape = []
     for i, s in enumerate(input_val.shape):
-        if i == dim and s == 1:
+        if (i in dims) and s == 1:
             continue
         output_shape.append(s)
     layer = network.add_shuffle(input_val)
@@ -1392,14 +1401,32 @@ def add_where(network, target, kwargs, name):
     x_t = kwargs["x"]
     y_t = kwargs["y"]
 
+    x_t_dim = len(tuple(x_t.shape))
+    y_t_dim = len(tuple(y_t.shape))
+    condition_t_dim = len(tuple(condition_t.shape))
+
     if type(x_t) != TRTTensor:
         assert type(x_t) is torch.Tensor, f"value {x_t} is not torch.Tensor!"
 
     if type(y_t) != TRTTensor:
         assert type(y_t) is torch.Tensor, f"value {y_t} is not torch.Tensor!"
 
-    # get output shape
+    if not (broadcastable(x_t, y_t)):
+        assert f"The two torch tensors should be broadcastable"
 
+    # get output shape
+    # purpose of this is to bring x_t and y_t rank same as
+    # output_shape to input it to the add_expand operation
+    # condition_t will have dimension of either x_t or y_t
+    x_t, y_t = broadcast(network, x_t, y_t, f"{name}_x", f"{name}_y")
+    if len(tuple(condition_t.shape)) != len(tuple(x_t.shape)):
+        condition_t, x_t = broadcast(
+            network, condition_t, x_t, f"{name}_condition", f"{name}_x"
+        )
+
+    print("x_t shape", x_t.shape)
+    print("y_t shape", y_t.shape)
+    print("condition_t shape", condition_t.shape)
     x_shape = list(x_t.shape)
     y_shape = list(y_t.shape)
     condition_shape = list(condition_t.shape)
@@ -1418,11 +1445,10 @@ def add_where(network, target, kwargs, name):
         condition_val = condition_layer.get_output(0)
     else:
         assert condition_t.dtype == trt.bool, "mask dtype is not bool!"
-        if condition_shape != output_shape:
+        if condition_shape != condition_t_dim:
             condition_val = add_expand(
                 network,
                 target,
-                None,
                 {"input": condition_t, "sizes": output_shape},
                 name=f"{name}_expand",
             )
@@ -1430,7 +1456,7 @@ def add_where(network, target, kwargs, name):
             condition_val = condition_t
 
     if type(x_t) != TRTTensor:
-        if x_shape != output_shape:
+        if x_shape != x_t_dim:
             # special case where 1 element in x_t
             if len(x_t.shape) == 0:
                 x_t = x_t.unsqueeze(0)
@@ -1442,7 +1468,6 @@ def add_where(network, target, kwargs, name):
             x_val = add_expand(
                 network,
                 target,
-                None,
                 {"input": x_val, "sizes": output_shape},
                 name=f"{name}_x_expand",
             )
@@ -1456,11 +1481,10 @@ def add_where(network, target, kwargs, name):
         y_val = get_trt_tensor(network, y_t, f"{name}_y")
     else:
         y_val = y_t
-        if y_shape != output_shape:
+        if y_shape != y_t_dim:
             y_val = add_expand(
                 network,
                 target,
-                None,
                 {"input": y_val, "sizes": output_shape},
                 name=f"{name}_y_expand",
             )
