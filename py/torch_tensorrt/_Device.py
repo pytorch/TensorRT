@@ -8,8 +8,10 @@ import warnings
 try:
     from torch_tensorrt import _C
 except:
-    warnings.warn("Unable to import _C extension of Torch-TensorRT. Some methods might be unavailable. You can ignore this error if you're \
-                  not using any functions dependent on internal C++ APIs")
+    warnings.warn(
+        "Unable to import _C extension of Torch-TensorRT. Some methods might be unavailable. You can ignore this error if you're \
+                  not using any functions dependent on internal C++ APIs"
+    )
 
 
 class Device(object):
@@ -110,12 +112,14 @@ class Device(object):
 
     def _to_internal(self) -> _C.Device:
         internal_dev = _C.Device()
-        if (self.device_type == trt.DeviceType.GPU):
+        if self.device_type == trt.DeviceType.GPU:
             internal_dev.device_type = _C.DeviceType.GPU
-        elif (self.device_type == trt.DeviceType.DLA):
+        elif self.device_type == trt.DeviceType.DLA:
             internal_dev.device_type = _C.DeviceType.DLA
         else:
-            raise ValueError("Invalid DeviceType detected while parsing the Device class")
+            raise ValueError(
+                "Invalid DeviceType detected while parsing the Device class"
+            )
 
         internal_dev.gpu_id = self.gpu_id
         internal_dev.dla_core = self.dla_core

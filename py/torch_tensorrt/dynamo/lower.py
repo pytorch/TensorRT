@@ -21,6 +21,7 @@ from torch_tensorrt.fx.tracer.acc_tracer import acc_tracer
 from torch_tensorrt.fx.trt_module import TRTModule
 from .utils import LowerPrecision
 from torch_tensorrt._Device import Device
+
 logger = logging.getLogger(__name__)
 
 Input = Sequence[Any]
@@ -72,17 +73,19 @@ def compile(
         lower_precision = LowerPrecision.FP32
     else:
         raise ValueError(f"Precision {enabled_precisions} not supported on FX")
-    
+
     # Parse device
     if isinstance(device, Device):
-        if (device.gpu_id != -1):
+        if device.gpu_id != -1:
             device = torch.device(device.gpu_id)
         else:
             raise ValueError("Invalid GPU ID provided for the CUDA device provided")
     elif isinstance(device, torch.device):
         device = device
     else:
-        raise ValueError("Invalid device provided. Supported options: torch.device | torch_tensorrt.Device")
+        raise ValueError(
+            "Invalid device provided. Supported options: torch.device | torch_tensorrt.Device"
+        )
 
     lower_setting = LowerSetting(
         device=device,
