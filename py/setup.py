@@ -357,8 +357,9 @@ if FX_ONLY:
         "torch_tensorrt.fx.tracer.acc_tracer",
         "torch_tensorrt.fx.tracer.dispatch_tracer",
         "torch_tensorrt.dynamo",
-        "torch_tensorrt.dynamo.passes",
-        "torch_tensorrt.dynamo.tools",
+        "torch_tensorrt.dynamo.fx_ts_compat",
+        "torch_tensorrt.dynamo.fx_ts_compat.passes",
+        "torch_tensorrt.dynamo.fx_ts_compat.tools",
     ]
     package_dir = {
         "torch_tensorrt.fx": "torch_tensorrt/fx",
@@ -368,8 +369,9 @@ if FX_ONLY:
         "torch_tensorrt.fx.tracer.acc_tracer": "torch_tensorrt/fx/tracer/acc_tracer",
         "torch_tensorrt.fx.tracer.dispatch_tracer": "torch_tensorrt/fx/tracer/dispatch_tracer",
         "torch_tensorrt.dynamo": "torch_tensorrt/dynamo",
-        "torch_tensorrt.dynamo.passes": "torch_tensorrt/dynamo/passes",
-        "torch_tensorrt.dynamo.tools": "torch_tensorrt/dynamo/tools",
+        "torch_tensorrt.dynamo.fx_ts_compat": "torch_tensorrt/dynamo/fx_ts_compat",
+        "torch_tensorrt.dynamo.fx_ts_compat.passes": "torch_tensorrt/dynamo/fx_ts_compat/passes",
+        "torch_tensorrt.dynamo.fx_ts_compat.tools": "torch_tensorrt/dynamo/fx_ts_compat/tools",
     }
 
 with open("README.md", "r", encoding="utf-8") as fh:
