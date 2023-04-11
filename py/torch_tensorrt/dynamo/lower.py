@@ -82,6 +82,12 @@ def compile(
             raise ValueError("Invalid GPU ID provided for the CUDA device provided")
     elif isinstance(device, torch.device):
         device = device
+    elif isinstance(device, dict):
+        if "device_type" in device and device["device_type"] == trt.DeviceType.GPU:
+            if "gpu_id" in device:
+                device = torch.device(device["gpu_id"])
+            else:
+                device = torch.device("cuda:0")
     else:
         raise ValueError(
             "Invalid device provided. Supported options: torch.device | torch_tensorrt.Device"
