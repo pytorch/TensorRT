@@ -1,13 +1,15 @@
 import torch
 import logging
+import collections.abc
 import torch_tensorrt
 from functools import partial
 
-from typing import Sequence, Any
+from typing import Any
 from torch_tensorrt import EngineCapability, Device
 from torch_tensorrt.fx.utils import LowerPrecision
 
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.utils import prepare_inputs, prepare_device
 from torch_tensorrt.dynamo.backends import tensorrt_backend
 from torch_tensorrt.dynamo._defaults import (
     PRECISION,
@@ -22,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 def compile(
     gm: torch.nn.Module,
-    example_inputs: Sequence[Any],
+    inputs: Any,
     *,
     device=Device._current_device(),
     disable_tf32=False,
@@ -50,6 +52,11 @@ def compile(
         + "following arguments are supported: "
         + "{enabled_precisions, debug, workspace_size, max_num_trt_engines}"
     )
+
+    if not isinstance(inputs, collections.abc.Sequence):
+        inputs = [inputs]
+
+    inputs = prepare_inputs(inputs, prepare_device(device))
 
     if (
         torch.float16 in enabled_precisions
@@ -79,7 +86,7 @@ def compile(
     model = torch.compile(gm, backend=custom_backend)
 
     # Ensure compilation occurs by calling the function with provided inputs
-    model(*example_inputs)
+    model(*inputs)
 
     return model
 

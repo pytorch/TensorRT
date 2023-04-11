@@ -11,7 +11,7 @@ from torch_tensorrt.dynamo._defaults import (
 
 @dataclass(frozen=True)
 class CompilationSettings:
-    precision: LowerPrecision = (PRECISION,)
-    debug: bool = (DEBUG,)
-    workspace_size: int = (MAX_WORKSPACE_SIZE,)
-    max_num_trt_engines: int = (MAX_NUM_TRT_ENGINES,)
+    precision: LowerPrecision = PRECISION
+    debug: bool = DEBUG
+    workspace_size: int = MAX_WORKSPACE_SIZE
+    max_num_trt_engines: int = MAX_NUM_TRT_ENGINES

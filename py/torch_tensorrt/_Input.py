@@ -238,6 +238,27 @@ class Input(object):
             return False
 
     @staticmethod
+    def _dtype_to_torch_type(dtype: _enums.dtype) -> torch.dtype:
+        if isinstance(dtype, _enums.dtype):
+            if dtype == _enums.dtype.long:
+                return torch.long
+            elif dtype == _enums.dtype.int32:
+                return torch.int32
+            elif dtype == _enums.dtype.half:
+                return torch.half
+            elif dtype == _enums.dtype.float:
+                return torch.float
+            elif dtype == _enums.dtype.bool:
+                return torch.bool
+            else:
+                raise TypeError(
+                    "Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: "
+                    + str(dtype)
+                )
+        else:
+            raise ValueError("Did not provide an _enums.dtype type as input.")
+
+    @staticmethod
     def _parse_dtype(dtype: Any) -> _enums.dtype:
         if isinstance(dtype, torch.dtype):
             if dtype == torch.long:
@@ -416,8 +437,10 @@ class Input(object):
             )
 
         if self.shape_mode == Input._ShapeMode.STATIC:
-            return torch.randn(self.shape).to(dtype=self.dtype)
+            return torch.rand(self.shape).to(
+                dtype=Input._dtype_to_torch_type(self.dtype)
+            )
         else:
-            return torch.randn(self.shape[optimization_profile_field]).to(
-                dtype=self.dtype
+            return torch.rand(self.shape[optimization_profile_field]).to(
+                dtype=Input._dtype_to_torch_type(self.dtype)
             )
