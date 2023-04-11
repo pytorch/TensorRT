@@ -1207,7 +1207,7 @@ def add_slice(network, target, kwargs, name):
     stride = [1] * len(start)
     stride[dim] = step_int
     output_shape = list(input_val.shape)
-    output_shape[dim] = (stop_int - start_int) // step_int + 1
+    output_shape[dim] = (stop_int - start_int) // step_int
 
     if dynamic_shape > 0:
         output_shape = get_shape_with_dynamic_shape(
