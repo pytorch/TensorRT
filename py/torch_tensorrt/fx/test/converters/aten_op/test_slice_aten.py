@@ -34,6 +34,7 @@ class TestSelectConverterExplicitBatch(DispatchTestCase):
     @parameterized.expand(
         [
             ("select_dim_start_stop_step", 1, 0, 7, 2),
+            ("select_dim_start_stop_step_exact", 1, 0, 10, 2),
         ]
     )
     def test_slice(self, _, dim, start, stop, step):
@@ -51,6 +52,36 @@ class TestSelectConverterExplicitBatch(DispatchTestCase):
             input,
             expected_ops={torch.ops.aten.slice.Tensor},
             test_explicit_precision=True,
+        )
+
+
+class TestSelectConverterDynamicShape(DispatchTestCase):
+    @parameterized.expand(
+        [
+            ("select_dim_start_stop_step", 1, 0, 7, 2),
+            ("select_dim_start_stop_step", 1, 0, 10, 2),
+        ]
+    )
+    def test_slice(self, _, dim, start, stop, step):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, input):
+                out = torch.ops.aten.slice.Tensor(input, dim, start, stop, step)
+                return out
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(1, 10, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 10, 1), (1, 10, 10), (1, 10, 10))],
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            TestModule(),
+            input_specs,
+            expected_ops={torch.ops.aten.slice.Tensor},
         )
 
 
