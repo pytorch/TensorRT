@@ -9,7 +9,7 @@ def pytest_addoption(parser):
         type=str,
         required=True,
         help="IR to compile with",
-        choices=["torch_compile", "fx_ts_compat_compile"],
+        choices=["torch_compile", "fx_ts_compat"],
     )
 
 
