@@ -15,7 +15,7 @@ class _IRType(Enum):
 
     ts = 0
     fx = 1
-    dynamo = 2
+    fx_ts_compat = 2
 
 
 class _ModuleType(Enum):
@@ -46,14 +46,14 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
 
     ir_targets_torchscript = any([ir == opt for opt in ["torchscript", "ts"]])
     ir_targets_fx = ir == "fx"
-    ir_targets_dynamo = ir == "dynamo"
+    ir_targets_fx_ts_compat = ir == "fx_ts_compat"
 
     if module_is_tsable and ir_targets_torchscript:
         return _IRType.ts
     elif module_is_fxable and ir_targets_fx:
         return _IRType.fx
-    elif module_is_fxable and ir_targets_dynamo:
-        return _IRType.dynamo
+    elif module_is_fxable and ir_targets_fx_ts_compat:
+        return _IRType.fx_ts_compat
     else:
         if ir == "default":
             # Options are listed in order of preference
@@ -152,8 +152,8 @@ def compile(
             dynamic_batch=False,
             **kwargs,
         )
-    elif target_ir == _IRType.dynamo:
-        return torch_tensorrt.dynamo.compile(
+    elif target_ir == _IRType.fx_ts_compat:
+        return torch_tensorrt.dynamo.fx_ts_compat.compile(
             module, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs
         )
     else:

@@ -21,7 +21,7 @@ class TestInput(TestCase):
 
         trt_mod = torch_tensorrt.compile(
             mod,
-            ir="dynamo",
+            ir="fx_ts_compat",
             inputs=inputs,
             min_block_size=1,
         )
@@ -45,7 +45,7 @@ class TestInput(TestCase):
 
         trt_mod = torch_tensorrt.compile(
             mod,
-            ir="dynamo",
+            ir="fx_ts_compat",
             inputs=inputs,
             min_block_size=1,
         )
@@ -76,7 +76,7 @@ class TestInput(TestCase):
 
         trt_mod = torch_tensorrt.compile(
             mod,
-            ir="dynamo",
+            ir="fx_ts_compat",
             inputs=inputs,
             min_block_size=1,
         )
