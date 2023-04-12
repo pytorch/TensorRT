@@ -5,7 +5,9 @@ import torch.fx
 import torch.nn as nn
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops  # noqa: F401
 from torch.testing._internal.common_utils import run_tests, TestCase
-from torch_tensorrt.dynamo.fx_ts_compat.tools.trt_splitter import create_trt_operator_support
+from torch_tensorrt.dynamo.fx_ts_compat.tools.trt_splitter import (
+    create_trt_operator_support,
+)
 from torch_tensorrt.fx.tracer.acc_tracer import acc_ops, acc_tracer
 
 

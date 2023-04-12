@@ -4,7 +4,10 @@ import tensorrt as trt
 import torch
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.fx_ts_compat.tools.common_fx2trt import DispatchTestCase, InputTensorSpec
+from torch_tensorrt.dynamo.fx_ts_compat.tools.common_fx2trt import (
+    DispatchTestCase,
+    InputTensorSpec,
+)
 
 
 class TestReshapeConverter(DispatchTestCase):

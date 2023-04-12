@@ -10,7 +10,10 @@ import torch.fx.passes.shape_prop as shape_prop
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from torch.fx.passes import splitter_base
 from torch.testing._internal.common_utils import run_tests, TestCase
-from torch_tensorrt.dynamo.fx_ts_compat.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
+from torch_tensorrt.dynamo.fx_ts_compat.tools.trt_splitter import (
+    TRTSplitter,
+    TRTSplitterSetting,
+)
 from torch_tensorrt.fx.tracer.acc_tracer import acc_tracer
 
 ERROR_MSG_NO_ACC_MODULE = "FX split failed: Did not find any ACC submodule!"

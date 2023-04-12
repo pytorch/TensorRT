@@ -2,7 +2,10 @@ import torch
 from parameterized import parameterized
 from torch import nn
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.fx_ts_compat.tools.common_fx2trt import AccTestCase, InputTensorSpec
+from torch_tensorrt.dynamo.fx_ts_compat.tools.common_fx2trt import (
+    AccTestCase,
+    InputTensorSpec,
+)
 from torch_tensorrt.fx.tracer.acc_tracer import acc_ops
 
 

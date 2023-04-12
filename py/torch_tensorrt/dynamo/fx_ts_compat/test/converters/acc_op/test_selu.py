@@ -2,7 +2,10 @@ import torch
 import torch.nn as nn
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.fx_ts_compat.tools.common_fx2trt import AccTestCase, InputTensorSpec
+from torch_tensorrt.dynamo.fx_ts_compat.tools.common_fx2trt import (
+    AccTestCase,
+    InputTensorSpec,
+)
 
 
 class TestSeLUConverter(AccTestCase):
