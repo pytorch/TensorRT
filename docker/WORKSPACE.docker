@@ -50,13 +50,13 @@ new_local_repository(
 
 new_local_repository(
     name = "libtorch",
-    path = "/opt/site-packages/torch/",
+    path = "/opt/python3/site-packages/torch/",
     build_file = "third_party/libtorch/BUILD"
 )
 
 new_local_repository(
     name = "libtorch_pre_cxx11_abi",
-    path = "/opt/site-packages/torch/",
+    path = "/opt/python3/site-packages/torch/",
     build_file = "third_party/libtorch/BUILD"
 )
 

@@ -71,7 +71,7 @@ WORKDIR /workspace/torch_tensorrt/src
 RUN cp ./docker/WORKSPACE.docker WORKSPACE
 
 # Symlink the path pyenv is using for python with the /opt directory for package sourcing
-RUN ln -s "`pyenv which python | xargs dirname | xargs dirname`/lib/python$PYTHON_VERSION/site-packages" "/opt"
+RUN ln -s "`pyenv which python | xargs dirname | xargs dirname`/lib/python$PYTHON_VERSION/site-packages" "/opt/python3"
 
 # This script builds both libtorchtrt bin/lib/include tarball and the Python wheel, in dist/
 RUN bash ./docker/dist-build.sh
@@ -89,7 +89,7 @@ RUN pip install *.whl && rm -fr /workspace/torch_tensorrt/py/dist/* *.whl
 
 WORKDIR /opt/torch_tensorrt
 
-ENV LD_LIBRARY_PATH /opt/site-packages/torch/lib:/opt/site-packages/torch_tensorrt/lib:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
-ENV PATH /opt/site-packages/torch_tensorrt/bin:${PATH}
+ENV LD_LIBRARY_PATH /opt/python3/site-packages/torch/lib:/opt/python3/site-packages/torch_tensorrt/lib:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
+ENV PATH /opt/python3/site-packages/torch_tensorrt/bin:${PATH}
 
 CMD /bin/bash
