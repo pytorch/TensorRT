@@ -4,10 +4,15 @@ import traceback
 from functools import partial
 import torch._dynamo as td
 
-from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.lowering._decompositions import get_decompositions
-from torch_tensorrt.dynamo.lowering._partition import partition, get_submod_inputs
-from torch_tensorrt.dynamo.conversion import convert_module
+from torch_tensorrt.dynamo.torch_compile._settings import CompilationSettings
+from torch_tensorrt.dynamo.torch_compile.lowering._decompositions import (
+    get_decompositions,
+)
+from torch_tensorrt.dynamo.torch_compile.lowering._partition import (
+    partition,
+    get_submod_inputs,
+)
+from torch_tensorrt.dynamo.torch_compile.conversion import convert_module
 
 from torch._dynamo.backends.common import fake_tensor_unsupported
 

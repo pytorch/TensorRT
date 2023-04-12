@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from torch_tensorrt.fx.utils import LowerPrecision
-from torch_tensorrt.dynamo._defaults import (
+from torch_tensorrt.dynamo.torch_compile._defaults import (
     PRECISION,
     DEBUG,
     MAX_WORKSPACE_SIZE,

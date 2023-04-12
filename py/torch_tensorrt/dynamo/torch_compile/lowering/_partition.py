@@ -2,7 +2,7 @@ from typing import Dict, Optional, Sequence
 
 import torch
 
-from torch_tensorrt.dynamo._defaults import MAX_NUM_TRT_ENGINES
+from torch_tensorrt.dynamo.torch_compile._defaults import MAX_NUM_TRT_ENGINES
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner
 from torch.fx.passes.operator_support import OperatorSupport
 
