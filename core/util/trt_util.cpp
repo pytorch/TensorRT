@@ -161,8 +161,14 @@ nvinfer1::Dims unpadDims(const nvinfer1::Dims& d) {
 }
 
 nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos, int val, bool use_zeros) {
-  // acceptable range for pos is [0, d.nbDims]
-  TORCHTRT_ASSERT(pos >= 0 && pos <= d.nbDims, "ERROR: Index to unsqueeze is out of bounds.");
+  // Acceptable range for pos is [-d.nbDims - 1, d.nbDims]
+  TORCHTRT_ASSERT(
+      pos >= (-d.nbDims - 1) && pos <= d.nbDims,
+      "ERROR: Index to unsqueeze is out of bounds. "
+          << "Expected value in range [" << (-d.nbDims - 1) << ", " << d.nbDims << "], but got " << pos);
+
+  // Unsqueeze with negative dimensions creates a new dimension at that index
+  pos = (pos < 0) ? (pos + d.nbDims + 1) : pos;
 
   nvinfer1::Dims dims;
   for (int i = 0, j = 0; j <= d.nbDims; j++) {
