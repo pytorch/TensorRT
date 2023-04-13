@@ -16,6 +16,7 @@ class _IRType(Enum):
     ts = 0
     fx = 1
     fx_ts_compat = 2
+    torch_compile = 3
 
 
 class _ModuleType(Enum):
@@ -46,6 +47,7 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
 
     ir_targets_torchscript = any([ir == opt for opt in ["torchscript", "ts"]])
     ir_targets_fx = ir == "fx"
+    ir_targets_torch_compile = ir == "torch_compile"
     ir_targets_fx_ts_compat = ir == "fx_ts_compat"
 
     if module_is_tsable and ir_targets_torchscript:
@@ -54,6 +56,8 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
         return _IRType.fx
     elif module_is_fxable and ir_targets_fx_ts_compat:
         return _IRType.fx_ts_compat
+    elif module_is_fxable and ir_targets_torch_compile:
+        return _IRType.torch_compile
     else:
         if ir == "default":
             # Options are listed in order of preference
@@ -151,6 +155,10 @@ def compile(
             explicit_batch_dimension=True,
             dynamic_batch=False,
             **kwargs,
+        )
+    elif target_ir == _IRType.torch_compile:
+        return torch_tensorrt.dynamo.torch_compile(
+            module, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs
         )
     elif target_ir == _IRType.fx_ts_compat:
         return torch_tensorrt.dynamo.fx_ts_compat.compile(

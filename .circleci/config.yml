@@ -869,6 +869,24 @@ commands:
       - store_artifacts:
           path: /tmp/testlogs
 
+  test-dynamo-torch_compile:
+    description: "Test the Dynamo torch_compile path"
+    steps:
+      - run:
+          name: Run Dynamo torch_compile E2E tests
+          command: |
+            cd py/torch_tensorrt/dynamo/
+            pushd test/
+            pip3 install timm
+            pip3 install transformers
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/test_results.xml --ir torch_compile
+            popd
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
   test-dynamo-fx_ts:
     description: "Test the dynamo backend"
     steps:
@@ -1117,6 +1135,7 @@ jobs:
           command: pip3 install --pre /tmp/dist/x86_64-linux/*cp39-cp39*.whl
       # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - dump-test-env
+      - test-dynamo-torch_compile
       - test-dynamo-fx_ts
 
   test-py-dynamo-x86_64-linux-no-aten:
