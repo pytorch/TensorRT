@@ -195,6 +195,8 @@ void getSegmentsOutputByRunning(
       jit_inputs_ivalues.push_back(ivalues_maps[input].toBool());
     } else if (input->type()->isSubtypeOf(torch::jit::FloatType::get())) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toDouble());
+    } else if (input->type()->isSubtypeOf(torch::jit::StringType::get())) {
+      jit_inputs_ivalues.push_back(ivalues_maps[input].toString());
     } else if (input->type()->kind() == torch::jit::TypeKind::ListType) {
       // create list
       jit_inputs_ivalues.push_back(ivalues_maps[input].toList());
