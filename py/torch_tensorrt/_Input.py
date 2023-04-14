@@ -367,10 +367,10 @@ class Input(object):
             )
 
         if self.shape_mode == Input._ShapeMode.STATIC:
-            return torch.randn(self.shape).to(
+            return torch.rand(self.shape).to(
                 dtype=self.dtype if not self.torch_dtype else self.torch_dtype
             )
         else:
-            return torch.randn(self.shape[optimization_profile_field]).to(
+            return torch.rand(self.shape[optimization_profile_field]).to(
                 dtype=self.dtype if not self.torch_dtype else self.torch_dtype
             )
