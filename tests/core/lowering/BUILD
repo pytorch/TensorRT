@@ -28,6 +28,10 @@ cc_test(
 )
 
 lowering_test(
+    name = "test_autocast_long_inputs",
+)
+
+lowering_test(
     name = "test_conv_pass",
 )
 
