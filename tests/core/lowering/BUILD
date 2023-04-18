@@ -28,6 +28,10 @@ cc_test(
 )
 
 lowering_test(
+    name = "test_autocast_long_inputs",
+)
+
+lowering_test(
     name = "test_conv_pass",
 )
 
@@ -102,6 +106,7 @@ lowering_test(
 test_suite(
     name = "lowering_tests",
     tests = [
+        ":test_autocast_long_inputs",
         ":test_conv_pass",
         ":test_device_casting",
         ":test_exception_elimination_pass",
