@@ -72,7 +72,9 @@ class TestTRTModule(TestCase):
             self._validate_spec(spec, tensor)
 
     def test_from_dynamic_input(self):
-        inputs = torch_tensorrt.Input(min_shape=(2, 2, 3), opt_shape=(4, 2, 3), max_shape=(8, 2, 3))
+        inputs = torch_tensorrt.Input(
+            min_shape=(2, 2, 3), opt_shape=(4, 2, 3), max_shape=(8, 2, 3)
+        )
         example_tensor = inputs.example_tensor(optimization_profile_field="opt_shape")
         spec = InputTensorSpec.from_input(inputs)
         self._validate_spec(spec, example_tensor, dynamic_dims=[0])
