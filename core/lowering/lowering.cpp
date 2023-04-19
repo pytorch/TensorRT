@@ -31,6 +31,8 @@ int AutocastLongInputs(
     ir::TypeMap input_type_map,
     std::string target_device_name) {
   int num_autocasts = 0;
+  auto old_insert_point = g->insertPoint();
+  g->setInsertPoint(g->nodes().front());
   // For each graph input, determine if it can be autocasted
   for (size_t i = 0; i < g->inputs().size(); i++) {
     auto input = g->inputs()[i];
@@ -71,7 +73,7 @@ int AutocastLongInputs(
       auto cast_node = g->create(torch::jit::aten::to, {input, cuda, const_type, const_false, const_false, none_val});
 
       // Replace all uses of the original tensor with that of the casted tensor
-      g->prependNode(cast_node);
+      g->insertNode(cast_node);
       input->replaceAllUsesAfterNodeWith(cast_node, cast_node->outputs()[0]);
 
       // Mark the cast node to run in PyTorch for ease of casting
@@ -80,7 +82,7 @@ int AutocastLongInputs(
       num_autocasts++;
     }
   }
-
+  g->setInsertPoint(old_insert_point);
   LOG_GRAPH("Inserted " << num_autocasts << " autocasts");
 
   if (num_autocasts > 0) {
