@@ -417,11 +417,11 @@ def compose_bmm(
             input_n = node.all_input_nodes[0]
             other_n = node.all_input_nodes[1]
 
-             # If no input nodes are available, the bmm argument itself could be an input
+            # If no input nodes are available, the bmm argument itself could be an input
             # Alternatively, if the node has no users, it can be eliminated
             if len(input_n.all_input_nodes) == 0 or len(node.users) == 0:
                 return PassResult(module, modified)
-            
+
             output = next(iter(node.users))
             input_input_n = input_n.all_input_nodes[0]
             if (
@@ -434,7 +434,7 @@ def compose_bmm(
                     + "Skipping bmm lowering on this operation"
                 )
                 return PassResult(module, modified)
-            
+
             real_input = input_input_n.all_input_nodes[0]
             input_other_n = other_n.all_input_nodes[0]
             if (
@@ -447,7 +447,7 @@ def compose_bmm(
                     + "Skipping bmm lowering on this operation"
                 )
                 return PassResult(module, modified)
-            
+
             real_other = input_other_n.all_input_nodes[0]
             if len(real_other.meta["val"].size()) == 2:
                 new_func = aten_compose_bmm_2d

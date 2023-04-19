@@ -1118,17 +1118,17 @@ def add_expand(network, target, kwargs, name):
 
     ranks = len(input_val.shape)
     # TRT does not support different dimension size
-    #though this condition is not seen in the case of bmm 
+    # though this condition is not seen in the case of bmm
     # where input_t and shape dimensions are not equal
     assert len(shape) >= ranks
-    if(len(shape) != ranks):
-            shape_tuple = tuple([0] * len(shape))
-            shape_tensor = get_trt_tensor(network, input_t, f"{name}_shape")
-            input_val, shape_tensor = broadcast(network, input_val, shape_tensor, 
-                                  f"{name}_input_val",
-                                  f"{name}_shape_val")
-            ranks = len(shape)
-            
+    if len(shape) != ranks:
+        shape_tuple = tuple([0] * len(shape))
+        shape_tensor = get_trt_tensor(network, input_t, f"{name}_shape")
+        input_val, shape_tensor = broadcast(
+            network, input_val, shape_tensor, f"{name}_input_val", f"{name}_shape_val"
+        )
+        ranks = len(shape)
+
     shape = [input_val.shape[i] if shape[i] == -1 else shape[i] for i in range(ranks)]
 
     inshape = tuple(input_val.shape)

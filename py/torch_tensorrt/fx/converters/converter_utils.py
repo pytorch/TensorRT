@@ -87,7 +87,13 @@ def set_layer_name(layer: TRTLayer, target: Target, name: str, is_acc=True) -> N
             the node represents.
         name (str): Consists of fx node.name with optional suffix.
     """
-    target_name = target if isinstance(target, str) else f"acc_ops.{target.__name__}" if is_acc else f"aten_ops.{target.__name__}"
+    target_name = (
+        target
+        if isinstance(target, str)
+        else f"acc_ops.{target.__name__}"
+        if is_acc
+        else f"aten_ops.{target.__name__}"
+    )
     layer.name = f"[{layer.type.name}]-[{target_name}]-[{name}]"
 
 

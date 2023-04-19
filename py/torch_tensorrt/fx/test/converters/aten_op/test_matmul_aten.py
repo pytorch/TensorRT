@@ -19,13 +19,13 @@ class TestMatMulConverter(DispatchTestCase):
         [
             ("2_2", (2, 3), (3, 2)),
             ("2_2", (2, 3), (3, 1)),
-            #FIXME torch.ops.aten.mv.default for (2,3), (3,1) - should mv be lowered to mm?
+            # FIXME torch.ops.aten.mv.default for (2,3), (3,1) - should mv be lowered to mm?
             # (2,3), (3,) torch.ops.aten.mv.default
-            # Following cases use torch.ops.aten.bmm.defauly 
-            #("4_3", (3,1,3,2), (2,2,3)),
-            #("3_4", (3,1,3,2), (2,2,3)),
-            #("3_4", (2, 2, 3), (3, 1, 3, 3)),
-            #("4_2", (1, 2, 2, 3), (3, 2)),
+            # Following cases use torch.ops.aten.bmm.defauly
+            # ("4_3", (3,1,3,2), (2,2,3)),
+            # ("3_4", (3,1,3,2), (2,2,3)),
+            # ("3_4", (2, 2, 3), (3, 1, 3, 3)),
+            # ("4_2", (1, 2, 2, 3), (3, 2)),
         ]
     )
     def test_matmul_other_constant(self, _, input_shape, other_shape):
@@ -38,7 +38,7 @@ class TestMatMulConverter(DispatchTestCase):
                 return torch.matmul(input, self.other)
 
         inputs = [torch.randn(*input_shape)]
-        
+
         self.run_test(
             MatMul(),
             inputs,
@@ -50,14 +50,13 @@ class TestMatMulConverter(DispatchTestCase):
         [
             ("2_2", (2, 3), (3, 2)),
             ("1_2", (1, 3), (3, 2)),
-            #FIXME torch.ops.aten.mv.default for (2,3), (3,1) - should mv be lowered to mm?
+            # FIXME torch.ops.aten.mv.default for (2,3), (3,1) - should mv be lowered to mm?
             # (2,3), (3,) torch.ops.aten.mv.default
-            # Following cases use torch.ops.aten.bmm.defauly 
-            #("4_3", (3,1,3,2), (2,2,3)),
-            #("3_4", (3,1,3,2), (2,2,3)),
-            #("3_4", (2, 2, 3), (3, 1, 3, 3)),
-            #("4_2", (1, 2, 2, 3), (3, 2)),
-            
+            # Following cases use torch.ops.aten.bmm.defauly
+            # ("4_3", (3,1,3,2), (2,2,3)),
+            # ("3_4", (3,1,3,2), (2,2,3)),
+            # ("3_4", (2, 2, 3), (3, 1, 3, 3)),
+            # ("4_2", (1, 2, 2, 3), (3, 2)),
         ]
     )
     def test_matmul_input_constant(self, _, input_shape, other_shape):
@@ -75,8 +74,8 @@ class TestMatMulConverter(DispatchTestCase):
             MatMul(),
             inputs,
             expected_ops={torch.ops.aten.mm.default},
-            test_explicit_batch_dim=True 
-            #test_explicit_batch_dim=(len(other_shape) <= 2),
+            test_explicit_batch_dim=True
+            # test_explicit_batch_dim=(len(other_shape) <= 2),
         )
 
     @parameterized.expand(
@@ -96,7 +95,7 @@ class TestMatMulConverter(DispatchTestCase):
                 return torch.matmul(input, other)
 
         inputs = [torch.randn(*input_shape), torch.randn(*other_shape)]
-        test_explicit_batch_dim = not(
+        test_explicit_batch_dim = not (
             input_shape[0] == other_shape[0]
             and len(input_shape) > 2
             and len(other_shape) > 2
@@ -108,7 +107,8 @@ class TestMatMulConverter(DispatchTestCase):
             test_explicit_batch_dim=test_explicit_batch_dim,
         )
 
-    #FIXME: dynamic shape is giving bmm
+    # FIXME: dynamic shape is giving bmm
+
 
 if __name__ == "__main__":
     run_tests()
