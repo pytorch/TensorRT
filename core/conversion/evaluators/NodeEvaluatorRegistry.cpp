@@ -114,9 +114,9 @@ std::vector<std::string> getEvaluatorList() {
   return get_evaluator_registry().GetRegisteredEvaluatorList();
 }
 
-c10::optional<torch::jit::IValue> EvalNode(const torch::jit::Node* n, kwargs& args) {
+c10::optional<torch::jit::IValue> EvalNode(ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) {
   auto evaluator = get_evaluator_registry().GetEvaluator(n);
-  return evaluator(n, args);
+  return evaluator(ctx, n, args);
 }
 
 void register_node_evaluator(torch::jit::NodeKind node_kind, EvalRegistration eval_reg) {

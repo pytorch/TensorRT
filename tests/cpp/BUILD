@@ -16,6 +16,7 @@ test_suite(
         ":test_compiled_modules",
         ":test_default_input_types",
         ":test_dynamic_fallback",
+        ":test_dynamic_size",
         ":test_example_tensors",
         ":test_module_fallback",
         ":test_modules_as_engines",
@@ -32,6 +33,7 @@ test_suite(
         ":test_compiled_modules",
         ":test_default_input_types",
         ":test_dynamic_fallback",
+        ":test_dynamic_size",
         ":test_example_tensors",
         ":test_module_fallback",
         ":test_modules_as_engines",
@@ -133,6 +135,18 @@ cc_test(
     data = [
         "//tests/modules:jit_models",
     ],
+    deps = [
+        "//tests/util",
+        "@googletest//:gtest_main",
+    ] + select({
+        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@libtorch//:libtorch"],
+    }),
+)
+
+cc_test(
+    name = "test_dynamic_size",
+    srcs = ["test_dynamic_size.cpp"],
     deps = [
         "//tests/util",
         "@googletest//:gtest_main",
