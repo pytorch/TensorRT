@@ -264,7 +264,7 @@ auto reduce_registrations TORCHTRT_UNUSED =
         .pattern(
             {"aten::all.dim(Tensor self, int dim, bool keepdim=False) -> Tensor",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-              //use Not(Any(Not(input))) to calculate all without a direct all reduction
+               // use Not(Any(Not(input))) to calculate all without a direct all reduction
                auto in_tensor = args[0].ITensorOrFreeze(ctx);
                auto dim = args[1].unwrapToInt();
                auto keepdim = args[2].unwrapToBool();
