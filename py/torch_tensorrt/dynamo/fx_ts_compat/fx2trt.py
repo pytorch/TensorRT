@@ -16,7 +16,7 @@ from torch.fx.passes.shape_prop import TensorMetadata
 from torch_tensorrt.dynamo.fx_ts_compat import CONVERTERS
 from .input_tensor_spec import InputTensorSpec
 from torch_tensorrt.fx.observer import Observer
-from .utils import get_dynamic_dims, LowerPrecision, torch_dtype_to_trt
+from torch_tensorrt.fx.utils import get_dynamic_dims, LowerPrecision, torch_dtype_to_trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

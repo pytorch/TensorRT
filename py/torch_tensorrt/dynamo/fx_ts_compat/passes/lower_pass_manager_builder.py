@@ -8,7 +8,7 @@ from torch import nn
 from torch.fx.passes.pass_manager import inplace_wrapper, PassManager
 from torch.fx.passes.shape_prop import ShapeProp
 from torch.fx.passes.splitter_base import generate_inputs_for_submodules, SplitResult
-from torch_tensorrt.dynamo.fx_ts_compat.utils import LowerPrecision
+from torch_tensorrt.fx.utils import LowerPrecision
 from torch_tensorrt import _Input
 from ..input_tensor_spec import InputTensorSpec
 

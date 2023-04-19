@@ -9,7 +9,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
     fuse_permute_linear,
     fuse_permute_matmul,
 )
-from .utils import LowerPrecision
+from torch_tensorrt.fx.utils import LowerPrecision
 
 
 @dc.dataclass
@@ -54,7 +54,7 @@ class LowerSetting(LowerSettingBasic):
     as (a->b->c->d)=>(e). Current basic fuse patterns are:
     permute->linear
     permute->matmul
-    verbose_log: Enable TensorRT engine verbose log mode.
+    debug: Enable TensorRT engine verbose log mode.
     algo_selector: Enable TensorRT algorithm selector at execution time.
     timing_cache_prefix: TensorRT timing cache file path. TensorRT engine will use timing
     cache file at execution time if valid timing cache file is provided.
@@ -85,7 +85,7 @@ class LowerSetting(LowerSettingBasic):
             [fuse_permute_matmul, fuse_permute_linear]
         )
     )
-    verbose_log: bool = False
+    debug: bool = False
     algo_selector = None
     timing_cache_prefix: str = ""
     save_timing_cache: bool = False

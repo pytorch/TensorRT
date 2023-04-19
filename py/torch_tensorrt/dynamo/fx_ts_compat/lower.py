@@ -14,12 +14,12 @@ from .fx2trt import TRTInterpreter, TRTInterpreterResult
 from .lower_setting import LowerSetting
 from .passes.lower_pass_manager_builder import LowerPassManagerBuilder
 from .passes.pass_utils import PassFunc, validate_inference
-from .tools.timing_cache_utils import TimingCacheManager
-from .tools.trt_splitter import TRTSplitter, TRTSplitterSetting
+from torch_tensorrt.fx.tools.timing_cache_utils import TimingCacheManager
+from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 
 from torch_tensorrt.fx.tracer.acc_tracer import acc_tracer
 from torch_tensorrt.fx.trt_module import TRTModule
-from .utils import LowerPrecision
+from torch_tensorrt.fx.utils import LowerPrecision
 from torch_tensorrt._Device import Device
 
 logger = logging.getLogger(__name__)
@@ -36,12 +36,23 @@ def compile(
     enabled_precisions=set(),
     min_block_size: int = 3,
     workspace_size=0,
-    verbose_log=False,
+    dla_sram_size=1048576,
+    dla_local_dram_size=1073741824,
+    dla_global_dram_size=536870912,
+    calibrator=None,
+    truncate_long_and_double=False,
+    require_full_compilation=False,
+    debug=False,
+    refit=False,
     timing_cache_prefix="",
     save_timing_cache=False,
     cuda_graph_batch_size=-1,
     is_aten=False,
     use_experimental_fx_rt=False,
+    num_avg_timing_iters=1,
+    torch_executed_ops=[],
+    torch_executed_modules=[],
+    **kwargs,
 ) -> nn.Module:
     """
     Takes in original module, input and lowering setting, run lowering workflow to turn module
@@ -52,7 +63,7 @@ def compile(
         input: Input for module.
         min_block_size: Minimal number of nodes for an accelerated submodule
         workspace_size: Maximum size of workspace given to TensorRT.
-        verbose_log: Enable verbose log for TensorRT if set True.
+        debug: Enable verbose log for TensorRT if set True.
         timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.
         save_timing_cache: Update timing cache with current timing cache data if set to True.
         cuda_graph_batch_size: Cuda graph batch size, default to be -1.
@@ -64,6 +75,12 @@ def compile(
         raise ValueError(
             "The experimental unifed runtime only supports explicit batch. Please make sure to set explicit_batch_dimension=True when use_experimental_fx_rt=True"
         )
+
+    logger.warn(
+        "For ir=fx_ts_compat backend only the "
+        + "following arguments are supported: "
+        + "{enabled_precisions, debug, workspace_size, device, disable_tf32, sparse_weights, min_block_size}"
+    )
 
     # Parse precision into LowerPrecision
     lower_precision = LowerPrecision.FP32
@@ -100,7 +117,7 @@ def compile(
         sparse_weights=sparse_weights,
         workspace_size=workspace_size,
         lower_precision=lower_precision,
-        verbose_log=verbose_log,
+        debug=debug,
         timing_cache_prefix=timing_cache_prefix,
         save_timing_cache=save_timing_cache,
         cuda_graph_batch_size=cuda_graph_batch_size,
@@ -148,7 +165,7 @@ class LowerTrtInterpreter:
             explicit_batch_dimension=self.lower_setting.explicit_batch_dimension,
             explicit_precision=self.lower_setting.explicit_precision,
             logger_level=trt.Logger.VERBOSE
-            if self.lower_setting.verbose_log
+            if self.lower_setting.debug
             else trt.Logger.WARNING,
         )
 

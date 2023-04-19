@@ -40,7 +40,7 @@ class Input(object):
     DOMAIN_OFFSET = 2.0
     low_tensor_domain_incl = 0.0
     high_tensor_domain_excl = low_tensor_domain_incl + DOMAIN_OFFSET
-    torch_dtype = None
+    torch_dtype = torch.float32
 
     def __init__(self, *args, **kwargs):
         """__init__ Method for torch_tensorrt.Input
@@ -142,6 +142,7 @@ class Input(object):
                 self.torch_dtype = kwargs["dtype"]
 
             self.dtype = Input._parse_dtype(kwargs["dtype"])
+            self.torch_dtype = Input._to_torch_dtype(self.dtype)
             self._explicit_set_dtype = True
 
         if "format" in kwargs:
@@ -214,6 +215,22 @@ class Input(object):
                 "Input data type needs to be specified with a torch.dtype or a torch_tensorrt.dtype, got: "
                 + str(type(dtype))
             )
+
+    @staticmethod
+    def _to_torch_dtype(dtype: _enums.dtype) -> torch.dtype:
+        if dtype == _enums.dtype.long:
+            return torch.long
+        elif dtype == _enums.dtype.int32:
+            return torch.int32
+        elif dtype == _enums.dtype.half:
+            return torch.half
+        elif dtype == _enums.dtype.float:
+            return torch.float
+        elif dtype == _enums.dtype.bool:
+            return torch.bool
+        else:
+            # Default torch_dtype used in FX path
+            return torch.float32
 
     def is_trt_dtype(self) -> bool:
         return self.dtype != _enums.dtype.long
@@ -368,9 +385,9 @@ class Input(object):
 
         if self.shape_mode == Input._ShapeMode.STATIC:
             return torch.rand(self.shape).to(
-                dtype=self.dtype if not self.torch_dtype else self.torch_dtype
+                dtype=self.torch_dtype
             )
         else:
             return torch.rand(self.shape[optimization_profile_field]).to(
-                dtype=self.dtype if not self.torch_dtype else self.torch_dtype
+                dtype=self.torch_dtype
             )

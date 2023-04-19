@@ -3,6 +3,7 @@
 from typing import List, Optional
 
 import torch
+import torch_tensorrt
 from torch.testing._internal.common_utils import run_tests, TestCase
 from torch_tensorrt.dynamo.fx_ts_compat import InputTensorSpec, LowerSetting
 
@@ -62,6 +63,19 @@ class TestTRTModule(TestCase):
                 tensor_shape = list(tensor.shape)
                 tensor_shape[i] = batch_size
                 self.assertSequenceEqual(tensor_shape, shape)
+
+    def test_from_static_input(self):
+        tensors = [torch.randn(1, 2, 3), torch.randn(2, 1, 4)]
+        inputs = torch_tensorrt.Input.from_tensors(tensors)
+        specs = [InputTensorSpec.from_input(input) for input in inputs]
+        for spec, tensor in zip(specs, tensors):
+            self._validate_spec(spec, tensor)
+
+    def test_from_dynamic_input(self):
+        inputs = torch_tensorrt.Input(min_shape=(2, 2, 3), opt_shape=(4, 2, 3), max_shape=(8, 2, 3))
+        example_tensor = inputs.example_tensor(optimization_profile_field="opt_shape")
+        spec = InputTensorSpec.from_input(inputs)
+        self._validate_spec(spec, example_tensor, dynamic_dims=[0])
 
 
 if __name__ == "__main__":

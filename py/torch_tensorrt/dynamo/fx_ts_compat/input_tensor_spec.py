@@ -2,8 +2,8 @@ from typing import Iterable, List, NamedTuple, Optional, Sequence, Tuple
 
 import torch
 
-from .types import Shape, ShapeRange
-from .utils import get_dynamic_dims
+from torch_tensorrt.fx.types import Shape, ShapeRange
+from torch_tensorrt.fx.utils import get_dynamic_dims
 from torch_tensorrt._Input import Input
 
 

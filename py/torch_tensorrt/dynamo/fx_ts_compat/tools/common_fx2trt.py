@@ -27,7 +27,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
     run_const_fold,
 )
 from torch_tensorrt.dynamo.fx_ts_compat.passes.pass_utils import chain_passes
-from torch_tensorrt.dynamo.fx_ts_compat.utils import LowerPrecision, proxytensor_trace
+from torch_tensorrt.fx.utils import LowerPrecision, proxytensor_trace
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

@@ -711,15 +711,15 @@ commands:
 # =================== FX tests end ======================== #
 
 # =================== Dynamo tests start ======================== #
-  test-dynamo-fx_ts_core:
-    description: "Test the Dynamo core"
+  test-dynamo-fx_ts:
+    description: "Test the Dynamo fx_ts_compat path"
     steps:
       - run:
-          name: Run Dynamo core tests
+          name: Run Dynamo fx_ts_compat core tests
           command: |
             cd py/torch_tensorrt/dynamo/fx_ts_compat/test
             pushd core/
-            pytest --junitxml=/tmp/artifacts/test_results/dynamo/core/test_results.xml
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/fx_ts_compat/test_results.xml
             popd
 
       - store_test_results:
@@ -737,22 +737,9 @@ commands:
             pushd test/
             pip3 install timm
             pip3 install transformers
-            pytest --junitxml=/tmp/artifacts/test_results/dynamo/test_results.xml --ir torch_compile
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/torch_compile/test_results.xml --ir torch_compile
             popd
 
-      - store_test_results:
-          path: /tmp/artifacts
-      - store_artifacts:
-          path: /tmp/testlogs
-
-  test-dynamo-fx_ts:
-    description: "Test the dynamo backend"
-    steps:
-      - run:
-          name: Run dynamo tests
-          command: |
-            mkdir -p /tmp/artifacts/test_results
-      - test-dynamo-fx_ts_core
       - store_test_results:
           path: /tmp/artifacts
       - store_artifacts:
