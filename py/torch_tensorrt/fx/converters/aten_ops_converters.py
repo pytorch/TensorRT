@@ -672,23 +672,6 @@ def aten_ops_squeeze(
     return add_squeeze(network, target, kwargs_new, name)
 
 
-# FIXME: need to confirm lower basic passes
-# @tensorrt_converter(torch.ops.aten.chunk)
-# def aten_ops_chunk(
-#     network: TRTNetwork,
-#     target: Target,
-#     args: Tuple[Argument, ...],
-#     kwargs: Dict[str, Argument],
-#     name: str,
-# ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-#     kwargs_new = {
-#         "input": args[0],
-#         "chunks": args[1],
-#         "dim": args[2],
-#     }
-#     return add_chunk(network, target, kwargs_new, name)
-
-
 @tensorrt_converter(torch.ops.aten.where.self)
 def aten_ops_where(
     network: TRTNetwork,
@@ -705,7 +688,7 @@ def aten_ops_where(
     return add_where(network, target, kwargs_new, name)
 
 
-@tensorrt_converter(torch.ops.aten.rsub)
+@tensorrt_converter(torch.ops.aten.rsub.Tensor)
 def aten_ops_rsub(
     network: TRTNetwork,
     target: Target,
@@ -713,15 +696,17 @@ def aten_ops_rsub(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    if "alpha" in kwargs:
+        alpha = kwargs["alpha"]
     kwargs_new = {
         "input": args[0],
         "other": args[1],
-        "alpha": args[2],
+        "alpha": alpha,
     }
     return add_rsub(network, target, kwargs_new, name)
 
 
-@tensorrt_converter(torch.ops.aten.rsqrt)
+@tensorrt_converter(torch.ops.aten.rsqrt.default)
 def aten_ops_rsqrt(
     network: TRTNetwork,
     target: Target,

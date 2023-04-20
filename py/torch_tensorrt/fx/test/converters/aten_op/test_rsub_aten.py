@@ -15,7 +15,7 @@ class TestRSubConverter(DispatchTestCase):
     def test_rsub(self, _, x, alpha):
         class rsub(nn.Module):
             def forward(self, input):
-                return torch.rsub(input, input, alpha = alpha)
+                return torch.rsub(input, input, alpha=alpha)
 
         inputs = [torch.randn(x)]
         self.run_test(

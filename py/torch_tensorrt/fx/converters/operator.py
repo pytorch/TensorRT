@@ -1526,7 +1526,13 @@ def add_scale(network, target, kwargs, name):
 
 
 def add_rsub(network, target, kwargs, name):
-    scaled_tensor = add_scale(network, target, kwargs, name)
+    kwargs_new = {}
+    if "alpha" in kwargs:
+        kwargs_new["input"] = kwargs["other"]
+        kwargs_new["other"] = kwargs["alpha"]
+        scaled_tensor = add_mul(network, target, kwargs_new, name + "_mul")
+    else:
+        scaled_tensor = kwargs["other"]
     input = kwargs["input"]
     return add_binary_elementwise_layer(
         network,
@@ -1534,7 +1540,7 @@ def add_rsub(network, target, kwargs, name):
         scaled_tensor,
         trt.ElementWiseOperation.SUB,
         target,
-        name,
+        name + "_sub",
     )
 
 
@@ -1546,7 +1552,7 @@ def add_sqrt(network, target, kwargs, name):
 
 def add_rsqrt(network, target, kwargs, name):
     sqrt_trt = add_sqrt(network, target, kwargs, name)
-    div_trt = add_binary_elementwise_layer(
+    return add_binary_elementwise_layer(
         network,
         1,
         sqrt_trt,
