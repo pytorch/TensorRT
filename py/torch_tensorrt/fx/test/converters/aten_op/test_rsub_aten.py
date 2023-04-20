@@ -15,13 +15,13 @@ class TestRSubConverter(DispatchTestCase):
     def test_rsub(self, _, x, alpha):
         class rsub(nn.Module):
             def forward(self, input):
-                return torch.rsub(input, input, alpha)
+                return torch.rsub(input, input, alpha = alpha)
 
         inputs = [torch.randn(x)]
         self.run_test(
             rsub(),
             inputs,
-            expected_ops=torch.ops.aten.rsub,
+            expected_ops={torch.ops.aten.rsub.Tensor},
         )
 
 
