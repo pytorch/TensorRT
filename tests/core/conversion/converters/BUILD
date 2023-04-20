@@ -96,6 +96,10 @@ converter_test(
 )
 
 converter_test(
+    name = "test_masked_fill",
+)
+
+converter_test(
     name = "test_max",
 )
 
@@ -116,11 +120,19 @@ converter_test(
 )
 
 converter_test(
+    name = "test_roll",
+)
+
+converter_test(
     name = "test_reflection_pad",
 )
 
 converter_test(
     name = "test_replication_pad",
+)
+
+converter_test(
+    name = "test_scatter",
 )
 
 converter_test(
@@ -140,11 +152,23 @@ converter_test(
 )
 
 converter_test(
+    name = "test_index",
+)
+
+converter_test(
     name = "test_select",
 )
 
 converter_test(
     name = "test_stack",
+)
+
+converter_test(
+    name = "test_slice",
+)
+
+converter_test(
+    name = "test_split",
 )
 
 converter_test(
@@ -160,7 +184,19 @@ converter_test(
 )
 
 converter_test(
+    name = "test_unbind",
+)
+
+converter_test(
+    name = "test_unpack",
+)
+
+converter_test(
     name = "test_squeeze",
+)
+
+converter_test(
+    name = "test_where",
 )
 
 test_suite(
@@ -185,22 +221,31 @@ test_suite(
         ":test_expand",
         ":test_instance_norm",
         ":test_interpolate",
+        ":test_index",
         ":test_layer_norm",
         ":test_linear",
         ":test_lstm_cell",
         ":test_matrix_multiply",
+        ":test_masked_fill",
         ":test_max",
         ":test_normalize",
         ":test_pooling",
         ":test_reduce",
+        ":test_roll",
         ":test_replication_pad",
+        ":test_scatter",
         ":test_select",
         ":test_shuffle",
         ":test_softmax",
         ":test_squeeze",
         ":test_stack",
+        ":test_split",
+        ":test_slice",
         ":test_topk",
         ":test_unary",
         ":test_unsqueeze",
+        ":test_unbind",
+        ":test_unpack",
+        ":test_where",
     ],
 )
