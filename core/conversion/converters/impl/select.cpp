@@ -16,7 +16,7 @@ namespace impl {
 namespace {
 
 bool add_split(ConversionCtx* ctx, const torch::jit::Node* n, args& args, bool split_list, bool unbind) {
-  auto in = args[0].ITensor();
+  auto in = args[0].ITensorOrFreeze(ctx);
   auto numOutputs = 1, numRemainder = 0;
   std::vector<int64_t> sizes;
 
@@ -149,8 +149,26 @@ auto select_registrations TORCHTRT_UNUSED =
                  // IShuffleLayer removes redundant dimensions
                  auto shuffle_layer = ctx->net->addShuffle(*out);
                  TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
-                 shuffle_layer->setReshapeDimensions(
-                     util::squeezeDims(out->getDimensions(), dim, !ctx->input_is_dynamic));
+
+                 auto num_zero_dimensions =
+                     util::validateInputDimsForShuffle(out->getDimensions(), ctx->input_is_dynamic);
+                 TORCHTRT_CHECK(
+                     num_zero_dimensions >= 0,
+                     "Detected multiple zero dimensions and dynamic shape in aten::select, "
+                         << "which is not currently supported in TensorRT");
+
+                 // If the input is not dynamic, and the tensor is empty (has some dimension 0)
+                 // Then 0 is no longer a placeholder for inherited dimensions
+                 if (!ctx->input_is_dynamic && (num_zero_dimensions > 0)) {
+                   LOG_DEBUG("Setting zero as a true dimension (not placeholder) in aten::select");
+                   shuffle_layer->setZeroIsPlaceholder(false);
+                 }
+
+                 shuffle_layer->setReshapeDimensions(util::squeezeDims(
+                     out->getDimensions(),
+                     dim,
+                     ctx->input_is_dynamic,
+                     ctx->input_is_dynamic && (num_zero_dimensions > 0)));
                  shuffle_layer->setName(util::node_info(n).c_str());
                  out = shuffle_layer->getOutput(0);
                }
@@ -159,6 +177,29 @@ auto select_registrations TORCHTRT_UNUSED =
 
                LOG_DEBUG("Output tensor shape: " << out->getDimensions());
 
+               return true;
+             }})
+        .pattern(
+            {"aten::index_select(Tensor self, int dim, Tensor index) -> Tensor",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto in = args[0].ITensorOrFreeze(ctx);
+               auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
+               auto dim = args[1].unwrapToInt();
+               // Handle negative axis by refering to nbDims of input Tensor
+               dim = dim < 0 ? dim + maxDim : dim;
+               auto index = args[2].ITensorOrFreeze(ctx);
+
+               LOG_DEBUG("Gather input dimensions: " << in->getDimensions());
+               LOG_DEBUG("Dimension to select: " << dim);
+               LOG_DEBUG("Index dimensions: " << index->getDimensions());
+
+               auto gather_layer = ctx->net->addGather(*in, *index, dim);
+               TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+               auto out = gather_layer->getOutput(0);
+               LOG_DEBUG("Gather tensor shape: " << out->getDimensions());
+
+               out = ctx->AssociateValueAndTensor(n->outputs()[0], out);
+               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
                return true;
              }})
         .pattern(
@@ -319,7 +360,7 @@ auto select_registrations TORCHTRT_UNUSED =
 
                  // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices
                  // from
-                 auto gather_layer = ctx->net->addGather(*in, *indicesTensor, 0);
+                 auto gather_layer = ctx->net->addGather(*in, *indicesTensor, adv_idx_indices[0]);
                  TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
                  auto gather_out = gather_layer->getOutput(0);
 
@@ -736,8 +777,22 @@ auto select_registrations TORCHTRT_UNUSED =
             {"aten::where.self(Tensor condition, Tensor self, Tensor other) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto condition = args[0].ITensorOrFreeze(ctx);
+               auto condition_nbDims = condition->getDimensions().nbDims;
                auto x = args[1].ITensorOrFreeze(ctx);
+               auto x_nbDims = x->getDimensions().nbDims;
                auto y = args[2].ITensorOrFreeze(ctx);
+               auto y_nbDims = y->getDimensions().nbDims;
+
+               // Get maximum rank of all input tensors
+               auto max_nbDims = std::max(condition_nbDims, std::max(x_nbDims, y_nbDims));
+
+               // TensorRT requires all inputs to Select layers to have the same rank, so for each
+               // tensor input, ensure that its rank is equal to the maximum number of dimensions
+               // If not, left-pad the tensor dimension with 1s until the max rank is achieved
+               condition =
+                   addPadding(ctx, n, condition, max_nbDims, /*bool trailing =*/false, /*bool use_zeros =*/false);
+               x = addPadding(ctx, n, x, max_nbDims, /*bool trailing =*/false, /*bool use_zeros =*/false);
+               y = addPadding(ctx, n, y, max_nbDims, /*bool trailing =*/false, /*bool use_zeros =*/false);
 
                auto layer = ctx->net->addSelect(*condition, *x, *y);
 

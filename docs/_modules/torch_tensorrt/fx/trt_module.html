@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.fx.trt_module &mdash; Torch-TensorRT v1.4.0dev0+cc4e3e6 documentation</title>
+  <title>torch_tensorrt.fx.trt_module &mdash; Torch-TensorRT v1.4.0.dev0+d0af394 documentation</title>
   
 
   
@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+cc4e3e6
+                  v1.4.0.dev0+d0af394
                 </div>
               
             
@@ -573,7 +573,7 @@
             <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">outputs</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">enable_profiling</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">profiler</span><span class="p">:</span> <span class="s2">&quot;trt.IProfiler&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Enable TensorRT profiling. After calling this function, TensorRT will report</span>
 <span class="sd">        time spent on each layer in stdout for each forward run.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -583,7 +583,7 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">profiler</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Profiler</span><span class="p">()</span> <span class="k">if</span> <span class="n">profiler</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">profiler</span>
 
     <span class="k">def</span> <span class="nf">disable_profiling</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Disable TensorRT profiling.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_check_initialized</span><span class="p">()</span>
@@ -593,7 +593,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">create_execution_context</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">get_layer_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get layer info of the engine. Only support for TRT &gt; 8.2.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">inspector</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">create_engine_inspector</span><span class="p">()</span>

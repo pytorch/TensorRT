@@ -69,11 +69,16 @@ bool valid_input_dtype(nvinfer1::DataType dtype) {
   }
 }
 
+bool valid_input_domain(std::vector<double> domain) {
+  return (domain.size() == 2) && (domain[0] < domain[1]);
+}
+
 Input::Input(
     std::vector<int64_t> shape,
-    nvinfer1::DataType dtype,
+    at::ScalarType dtype,
     nvinfer1::TensorFormat format,
-    bool dtype_is_user_defined) {
+    bool dtype_is_user_defined,
+    std::vector<double> tensor_domain) {
   if (shape.size() > 5) {
     LOG_WARNING("Verify that this dim size is accepted");
   }
@@ -84,24 +89,30 @@ Input::Input(
   input_shape = util::toDims(shape);
   input_is_dynamic = false;
 
-  TORCHTRT_CHECK(valid_input_dtype(dtype), "Unsupported input data type: " << dtype);
+  TORCHTRT_CHECK(valid_input_dtype(util::ScalarTypeToTRTDataType(dtype)), "Unsupported input data type: " << dtype);
   this->dtype = dtype;
   TORCHTRT_CHECK(
-      valid_dtype_format_combo(dtype, format),
+      valid_dtype_format_combo(util::ScalarTypeToTRTDataType(dtype), format),
       "Unsupported combination of dtype and tensor format: ("
           << dtype << ", " << format
           << "), Torch-TensorRT only supports contiguous format (NCHW) except with input type Float32 where channel last (NHWC) is also supported");
   this->format = format;
   this->dtype_is_user_defined = dtype_is_user_defined;
+
+  TORCHTRT_CHECK(
+      valid_input_domain(tensor_domain),
+      "Unsupported tensor domain: [" << tensor_domain[0] << ", " << tensor_domain[1] << ")");
+  this->tensor_domain = tensor_domain;
 }
 
 Input::Input(
     std::vector<int64_t> min_shape,
     std::vector<int64_t> opt_shape,
     std::vector<int64_t> max_shape,
-    nvinfer1::DataType dtype,
+    at::ScalarType dtype,
     nvinfer1::TensorFormat format,
-    bool dtype_is_user_defined) {
+    bool dtype_is_user_defined,
+    std::vector<double> tensor_domain) {
   if (min_shape.size() > 5 || opt_shape.size() > 5 || max_shape.size() > 5) {
     LOG_WARNING("Verify that this dim size is accepted");
   }
@@ -137,15 +148,19 @@ Input::Input(
 
   input_shape = util::toDims(dyn_shape);
 
-  TORCHTRT_CHECK(valid_input_dtype(dtype), "Unsupported input data type: " << dtype);
+  TORCHTRT_CHECK(valid_input_dtype(util::ScalarTypeToTRTDataType(dtype)), "Unsupported input data type: " << dtype);
   this->dtype = dtype;
   TORCHTRT_CHECK(
-      valid_dtype_format_combo(dtype, format),
+      valid_dtype_format_combo(util::ScalarTypeToTRTDataType(dtype), format),
       "Unsupported combination of dtype and tensor format: ("
           << dtype << ", " << format
           << "), Torch-TensorRT only supports contiguous format (NCHW) except with input type Float32 where channel last (NHWC) is also supported");
   this->format = format;
   this->dtype_is_user_defined = dtype_is_user_defined;
+  TORCHTRT_CHECK(
+      valid_input_domain(tensor_domain),
+      "Unsupported tensor domain: [" << tensor_domain[0] << ", " << tensor_domain[1] << ")");
+  this->tensor_domain = tensor_domain;
 }
 
 std::ostream& operator<<(std::ostream& os, const Input& input) {

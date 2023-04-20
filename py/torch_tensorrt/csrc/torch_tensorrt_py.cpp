@@ -223,6 +223,7 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("input_is_dynamic", &Input::input_is_dynamic)
       .def_readwrite("_explicit_set_dtype", &Input::explicit_set_dtype)
       .def_readwrite("dtype", &Input::dtype)
+      .def_readwrite("tensor_domain", &Input::tensor_domain)
       .def_readwrite("format", &Input::format);
 
   py::class_<InputSignature>(m, "InputSignature")
@@ -242,6 +243,8 @@ PYBIND11_MODULE(_C, m) {
       .value("float16", DataType::kHalf, "16 bit floating point number")
       .value("int8", DataType::kChar, "8 bit integer number")
       .value("int32", DataType::kInt32, "32 bit integer number")
+      .value("long", DataType::kLong, "64 bit integer number")
+      .value("int64", DataType::kLong, "64 bit integer number")
       .value("bool", DataType::kBool, "Boolean value")
       .value("unknown", DataType::kUnknown, "Unknown data type")
       .export_values();

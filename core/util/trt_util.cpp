@@ -161,8 +161,14 @@ nvinfer1::Dims unpadDims(const nvinfer1::Dims& d) {
 }
 
 nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos, int val, bool use_zeros) {
-  // acceptable range for pos is [0, d.nbDims]
-  TORCHTRT_ASSERT(pos >= 0 && pos <= d.nbDims, "ERROR: Index to unsqueeze is out of bounds.");
+  // Acceptable range for pos is [-d.nbDims - 1, d.nbDims]
+  TORCHTRT_ASSERT(
+      pos >= (-d.nbDims - 1) && pos <= d.nbDims,
+      "ERROR: Index to unsqueeze is out of bounds. "
+          << "Expected value in range [" << (-d.nbDims - 1) << ", " << d.nbDims << "], but got " << pos);
+
+  // Unsqueeze with negative dimensions creates a new dimension at that index
+  pos = (pos < 0) ? (pos + d.nbDims + 1) : pos;
 
   nvinfer1::Dims dims;
   for (int i = 0, j = 0; j <= d.nbDims; j++) {
@@ -180,7 +186,25 @@ nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos, int val, bool use
   return dims;
 }
 
-nvinfer1::Dims squeezeDims(const nvinfer1::Dims& d, int pos, bool use_zeros) {
+int validateInputDimsForShuffle(const nvinfer1::Dims& d, bool input_is_dynamic) {
+  int num_zeros_detected = 0;
+
+  // For each dimension, increment counter if that dimension has value 0
+  for (int i = 0; i < d.nbDims; i++) {
+    if (d.d[i] == 0) {
+      num_zeros_detected++;
+    }
+  }
+
+  // If the tensor from which the dimensions originate has dynamic shape and more than 1
+  // zero dimension is detected, this constitutes an invalid shape to the TRT Shuffle Layer,
+  // since dynamic dimensions to Shuffle Layers are generally represented with a 0
+  // denoting to inherit the dimension from the input tensor, thus causing an
+  // overload of the "0" dimension
+  return (input_is_dynamic && num_zeros_detected > 1) ? -1 : num_zeros_detected;
+}
+
+nvinfer1::Dims squeezeDims(const nvinfer1::Dims& d, int pos, bool use_zeros, bool swap_existing_zeros) {
   // acceptable range for pos is [0, d.nbDims]
   TORCHTRT_ASSERT(pos >= 0 && pos <= d.nbDims, "ERROR: Index to squeeze is out of bounds.");
 
@@ -188,7 +212,24 @@ nvinfer1::Dims squeezeDims(const nvinfer1::Dims& d, int pos, bool use_zeros) {
   int j = 0;
   for (int i = 0; i < d.nbDims; i++) {
     if (i != pos) {
-      dims.d[j++] = (use_zeros && d.d[i] == -1) ? 0 : d.d[i];
+      // If zeros are replacing dynamic/existing dimensions,
+      // Replace all instances of -1, indicating dynamic dimension
+      // with 0, indicating copy the dimension from another tensor
+      // (Generally used for reshape operations)
+      if (use_zeros && d.d[i] == -1) {
+        dims.d[j] = 0;
+        // If zeros already exist in the dimensions (empty tensor),
+        // Replace all instances of 0, indicating empty dimension
+        // with -1, indicating inherit the dimension from reshape
+        // (Generally used for reshape operations)
+      } else if (swap_existing_zeros && d.d[i] == 0) {
+        dims.d[j] = -1;
+        // Otherwise, replace the dimension with the same value from the input
+      } else {
+        dims.d[j] = d.d[i];
+      }
+
+      j++;
     }
   }
   dims.nbDims = j;
@@ -251,7 +292,9 @@ const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_at_trt_type_ma
       {at::kFloat, nvinfer1::DataType::kFLOAT},
       {at::kHalf, nvinfer1::DataType::kHALF},
       {at::kInt, nvinfer1::DataType::kINT32},
+      {at::kLong, nvinfer1::DataType::kINT32},
       {at::kChar, nvinfer1::DataType::kINT8},
+      {at::kByte, nvinfer1::DataType::kINT8},
       {at::kBool, nvinfer1::DataType::kBOOL}};
   return at_trt_type_map;
 }

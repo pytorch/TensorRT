@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.ts._compile_spec &mdash; Torch-TensorRT v1.4.0dev0+cc4e3e6 documentation</title>
+  <title>torch_tensorrt.ts._compile_spec &mdash; Torch-TensorRT v1.4.0.dev0+d0af394 documentation</title>
   
 
   
@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+cc4e3e6
+                  v1.4.0.dev0+d0af394
                 </div>
               
             
@@ -378,6 +378,7 @@
     <span class="n">clone</span><span class="o">.</span><span class="n">_set_opt</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">opt</span><span class="p">)</span>
     <span class="n">clone</span><span class="o">.</span><span class="n">_set_max</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">max</span><span class="p">)</span>
     <span class="n">clone</span><span class="o">.</span><span class="n">_set_dtype</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+    <span class="n">clone</span><span class="o">.</span><span class="n">_set_tensor_domain</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">tensor_domain</span><span class="p">)</span>
     <span class="n">clone</span><span class="o">.</span><span class="n">_set_format</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">format</span><span class="p">)</span>
     <span class="n">clone</span><span class="o">.</span><span class="n">_set_input_is_dynamic</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">input_is_dynamic</span><span class="p">)</span>
     <span class="n">clone</span><span class="o">.</span><span class="n">_set_explicit_set_dtype</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">_explicit_set_dtype</span><span class="p">)</span>
@@ -554,17 +555,22 @@
     <span class="k">return</span> <span class="n">info</span>
 
 
-<span class="k">def</span> <span class="nf">_parse_input_signature</span><span class="p">(</span><span class="n">input_signature</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">_parse_input_signature</span><span class="p">(</span><span class="n">input_signature</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">depth</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">depth</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+            <span class="s2">&quot;Input nesting depth exceeds max supported depth, use 1 level: [A, B], or 2 level: [A, (B, C)]&quot;</span>
+        <span class="p">)</span>
+
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_signature</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
         <span class="n">input_list</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">input_signature</span><span class="p">:</span>
-            <span class="nb">input</span> <span class="o">=</span> <span class="n">_parse_input_signature</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+            <span class="nb">input</span> <span class="o">=</span> <span class="n">_parse_input_signature</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">depth</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
             <span class="n">input_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">input_list</span><span class="p">)</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_signature</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
         <span class="n">input_list</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">input_signature</span><span class="p">:</span>
-            <span class="nb">input</span> <span class="o">=</span> <span class="n">_parse_input_signature</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+            <span class="nb">input</span> <span class="o">=</span> <span class="n">_parse_input_signature</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">depth</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
             <span class="n">input_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">input_list</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_signature</span><span class="p">,</span> <span class="n">Input</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span>
@@ -575,6 +581,14 @@
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_signature</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span>
             <span class="k">else</span> <span class="n">input_signature</span>
         <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">i</span><span class="o">.</span><span class="n">is_trt_dtype</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="s2">&quot;Using non-TRT input types with input_signature is not currently &quot;</span>
+                <span class="o">+</span> <span class="s2">&quot;supported. Please specify inputs individually to use &quot;</span>
+                <span class="o">+</span> <span class="s2">&quot;non-TRT types.&quot;</span>
+            <span class="p">)</span>
+
         <span class="n">clone</span> <span class="o">=</span> <span class="n">_internal_input_to_torch_class_input</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">_to_internal</span><span class="p">())</span>
         <span class="k">return</span> <span class="n">clone</span>
     <span class="k">else</span><span class="p">:</span>
@@ -628,7 +642,7 @@
         <span class="p">)</span>
         <span class="n">log</span><span class="p">(</span>
             <span class="n">Level</span><span class="o">.</span><span class="n">Debug</span><span class="p">,</span>
-            <span class="sd">&quot;&quot;&quot;Adding the following ops to torch_executed_ops:</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;Adding the following ops to torch_executed_ops:</span>
 <span class="sd">    - aten::__getitem__</span>
 <span class="sd">    - prim::ListConstruct</span>
 <span class="sd">    - prim::ListUnpack</span>
@@ -738,7 +752,7 @@
     <span class="n">truncate_long_and_double</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">calibrator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">CompileSpec</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Utility to create a formated spec dictionary for using the PyTorch TensorRT backend</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Utility to create a formated spec dictionary for using the PyTorch TensorRT backend</span>
 
 <span class="sd">    Keyword Args:</span>
 <span class="sd">        inputs (List[Union(torch_tensorrt.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using</span>

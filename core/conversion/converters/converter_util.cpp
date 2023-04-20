@@ -13,7 +13,8 @@ nvinfer1::ITensor* addPadding(
     nvinfer1::ITensor* tensor,
     int nDim,
     bool trailing,
-    bool use_zeros) {
+    bool use_zeros,
+    const std::string& name) {
   const auto dims = tensor->getDimensions();
 
   if (dims.nbDims < nDim) {
@@ -27,7 +28,11 @@ nvinfer1::ITensor* addPadding(
     TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer");
     shuffle_layer->setReshapeDimensions(newDims);
     shuffle_layer->setZeroIsPlaceholder(use_zeros);
-    shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + ']').c_str());
+    if (name.size()) {
+      shuffle_layer->setName(name.c_str());
+    } else {
+      shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + ']').c_str());
+    }
     return shuffle_layer->getOutput(0);
   } else {
     return tensor;
@@ -40,7 +45,8 @@ nvinfer1::ITensor* addUnpadding(
     nvinfer1::ITensor* tensor,
     int nDim,
     bool trailing,
-    bool use_zeros) {
+    bool use_zeros,
+    const std::string& name) {
   const auto dims = tensor->getDimensions();
   if (dims.nbDims > nDim) {
     auto newDims = dims;
@@ -52,7 +58,11 @@ nvinfer1::ITensor* addUnpadding(
     TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer");
     shuffle_layer->setReshapeDimensions(newDims);
     shuffle_layer->setZeroIsPlaceholder(use_zeros);
-    shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + "]").c_str());
+    if (name.size()) {
+      shuffle_layer->setName(name.c_str());
+    } else {
+      shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + ']').c_str());
+    }
     return shuffle_layer->getOutput(0);
   } else {
     return tensor;
@@ -75,10 +85,10 @@ nvinfer1::ILayer* add_elementwise(
     const std::string& name) {
   if (self->getType() == nvinfer1::DataType::kFLOAT && other->getType() == nvinfer1::DataType::kINT32) {
     LOG_DEBUG("Type mismatch, casting other to " << self->getType());
-    other = castITensor(ctx, other, self->getType());
+    other = castITensor(ctx, other, self->getType(), name);
   } else if (self->getType() == nvinfer1::DataType::kINT32 && other->getType() == nvinfer1::DataType::kFLOAT) {
     LOG_DEBUG("Type mismatch, casting self to " << other->getType());
-    self = castITensor(ctx, self, other->getType());
+    self = castITensor(ctx, self, other->getType(), name);
   }
   // ensure self to have larger number of dimension
   bool swapSelfOther = false;
@@ -96,13 +106,13 @@ nvinfer1::ILayer* add_elementwise(
       LOG_DEBUG(
           "Element-wise op type promotion adding cast from " << self->getType() << " to " << promo_type << " for layer "
                                                              << name);
-      self = castITensor(ctx, self, promo_type);
+      self = castITensor(ctx, self, promo_type, name);
     }
     if (other->getType() != promo_type) {
       LOG_DEBUG(
           "Element-wise op type promotion adding cast from " << other->getType() << " to " << promo_type
                                                              << " for layer " << name);
-      other = castITensor(ctx, other, promo_type);
+      other = castITensor(ctx, other, promo_type, name);
     }
   }
 
@@ -195,7 +205,11 @@ nvinfer1::ITensor* applyIdentityOp(ConversionCtx* ctx, nvinfer1::ITensor* tensor
   return id_out_tensor;
 }
 
-nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nvinfer1::DataType dtype) {
+nvinfer1::ITensor* castITensor(
+    ConversionCtx* ctx,
+    nvinfer1::ITensor* tensor,
+    nvinfer1::DataType dtype,
+    const std::string& layer_name_prefix) {
   if (tensor->getType() != dtype) {
     std::ostringstream tensor_id;
     tensor_id << reinterpret_cast<int*>(tensor);
@@ -209,6 +223,9 @@ nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nv
     LOG_DEBUG(ctx->logger, "Casting ITensor " << tensor_id.str() << " from " << tensor->getType() << " to " << dtype);
 
     std::stringstream ss;
+    if (layer_name_prefix.size()) {
+      ss << layer_name_prefix << " ";
+    }
     ss << "[Cast ITensor " << tensor_id.str() << " from " << tensor->getType() << " to " << dtype << "]";
     id_layer->setName(ss.str().c_str());
     return casted_tensor;

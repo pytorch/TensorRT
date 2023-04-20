@@ -188,6 +188,7 @@ def run_configuration_benchmark(
             input,
             max_batch_size=conf.batch_size,
             lower_precision=LowerPrecision.FP16 if conf.fp16 else LowerPrecision.FP32,
+            explicit_batch_dimension=True,
         )
         time = benchmark_torch_function(conf.batch_iter, lambda: lowered_module(*input))
     else:

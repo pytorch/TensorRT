@@ -36,13 +36,15 @@ CompileSpec::CompileSpec(torch::jit::IValue input_signature) {
   graph_inputs.input_signature = input_signature;
 }
 
-void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IValue& converted_ivalue) {
+void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IValue& converted_ivalue, int depth = 0) {
+  TORCHTRT_CHECK(
+      depth <= 2, "Input nesting depth exceeds max supported depth, use 1 level: [A, B], or 2 level: [A, (B, C)]")
   if (input_ivalue.isTuple()) {
     auto input_tuple = input_ivalue.toTuple();
     std::vector<torch::jit::IValue> converted_elements;
     for (auto item : input_tuple->elements()) {
       torch::jit::IValue converted_item;
-      to_internal_input_signature(item, converted_item);
+      to_internal_input_signature(item, converted_item, depth++);
       converted_elements.push_back(converted_item);
       auto tuple_ptr = c10::ivalue::Tuple::create(converted_elements);
       converted_ivalue = torch::jit::IValue(tuple_ptr);
@@ -53,7 +55,7 @@ void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IV
     auto converted_elements = c10::impl::GenericList(type);
     for (auto item : input_list) {
       torch::jit::IValue converted_item;
-      to_internal_input_signature(item, converted_item);
+      to_internal_input_signature(item, converted_item, depth++);
       converted_elements.push_back(converted_item);
     }
     converted_ivalue = torch::jit::IValue(converted_elements);
@@ -72,27 +74,6 @@ torchtrt::core::CompileSpec init_compile_spec(CompileSpec& external) {
     LOG_WARNING("Input signature parsing is an experimental feature, behavior and APIs may change");
     to_internal_input_signature(external.graph_inputs.input_signature, converted_input_signature);
     torchtrt::core::CompileSpec internal(converted_input_signature);
-
-    TORCHTRT_CHECK(
-        !external.require_full_compilation,
-        "Grouped inputs currently requires partial compilation to be enabled, \
-      this restriction will be relaxed in a future release");
-
-    LOG_DEBUG("Grouped inputs currently requires additional settings to enable the feature");
-    LOG_DEBUG(
-        "Adding the following ops to torch_executed_ops:" << std::endl
-                                                          << "  - aten::__getitem__" << std::endl
-                                                          << "  - prim::ListConstruct" << std::endl
-                                                          << "  - prim::ListUnpack" << std::endl
-                                                          << "  - prim::TupleIndex" << std::endl
-                                                          << "  - prim::TupleConstruct" << std::endl
-                                                          << "  - prim::TupleUnpack");
-    external.torch_executed_ops.push_back("aten::__getitem__");
-    external.torch_executed_ops.push_back("prim::ListConstruct");
-    external.torch_executed_ops.push_back("prim::ListUnpack");
-    external.torch_executed_ops.push_back("prim::TupleIndex");
-    external.torch_executed_ops.push_back("prim::TupleConstruct");
-    external.torch_executed_ops.push_back("prim::TupleUnpack");
     return internal;
   }
 }
@@ -111,6 +92,7 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.convert_info.engine_settings.truncate_long_and_double = external.truncate_long_and_double;
   internal.convert_info.engine_settings.device.allow_gpu_fallback = external.device.allow_gpu_fallback;
   internal.lower_info.target_device.allow_gpu_fallback = external.device.allow_gpu_fallback;
+  internal.partitioning_info.target_device.allow_gpu_fallback = external.device.allow_gpu_fallback;
 
   TORCHTRT_CHECK(
       !(external.require_full_compilation && (external.torch_executed_ops.size() > 0)),
@@ -132,11 +114,13 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
     case Device::DeviceType::kDLA:
       internal.convert_info.engine_settings.device.device_type = nvinfer1::DeviceType::kDLA;
       internal.lower_info.target_device.device_type = nvinfer1::DeviceType::kDLA;
+      internal.partitioning_info.target_device.device_type = nvinfer1::DeviceType::kDLA;
       break;
     case Device::DeviceType::kGPU:
     default:
       internal.convert_info.engine_settings.device.device_type = nvinfer1::DeviceType::kGPU;
       internal.lower_info.target_device.device_type = nvinfer1::DeviceType::kGPU;
+      internal.partitioning_info.target_device.device_type = nvinfer1::DeviceType::kGPU;
   }
 
   switch (external.capability) {
@@ -155,14 +139,20 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.convert_info.engine_settings.device.dla_core = external.device.dla_core;
   internal.lower_info.target_device.gpu_id = external.device.gpu_id;
   internal.lower_info.target_device.dla_core = external.device.dla_core;
+  internal.partitioning_info.target_device.gpu_id = external.device.gpu_id;
+  internal.partitioning_info.target_device.dla_core = external.device.dla_core;
+
   internal.convert_info.engine_settings.num_avg_timing_iters = external.num_avg_timing_iters;
   internal.convert_info.engine_settings.workspace_size = external.workspace_size;
   internal.convert_info.engine_settings.dla_sram_size = external.dla_sram_size;
   internal.convert_info.engine_settings.dla_local_dram_size = external.dla_local_dram_size;
   internal.convert_info.engine_settings.dla_global_dram_size = external.dla_global_dram_size;
 
+  internal.partitioning_info.cast_int8_inputs = true;
+
   if (internal.convert_info.engine_settings.enabled_precisions.find(nvinfer1::DataType::kINT8) !=
       internal.convert_info.engine_settings.enabled_precisions.end()) {
+    internal.partitioning_info.cast_int8_inputs = false;
     if (external.ptq_calibrator) {
       internal.convert_info.engine_settings.calibrator = external.ptq_calibrator;
     } else {

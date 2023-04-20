@@ -58,6 +58,8 @@ class DataType {
    * ex. torch_tensorrt::DataType type = DataType::kFloat;
    */
   enum Value : int8_t {
+    /// INT64
+    kLong,
     /// FP32
     kFloat,
     /// FP16
@@ -379,6 +381,8 @@ struct Input : torch::CustomClassHolder {
   DataType dtype;
   /// Expected tensor format for the input
   TensorFormat format;
+  /// Expected allowed domain for tensor input
+  std::vector<double> tensor_domain;
 
   Input() {}
   /**
@@ -394,6 +398,22 @@ struct Input : torch::CustomClassHolder {
 
   /**
    * @brief Construct a new Input spec object for static input size from
+   * c10::ArrayRef (the type produced by tensor.sizes()), vector, optional arguments
+   * allow the user to configure expected input shape tensor format
+   * dtype (Expected data type for the input) defaults to PyTorch
+   * / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+   *
+   * @param shape Input tensor shape
+   * @param tensor_domain Allowed range for tensor inputs [low, high)
+   * @param format Expected tensor format for the input (Defaults to contiguous)
+   */
+  TORCHTRT_API Input(
+      std::vector<int64_t> shape,
+      std::vector<double> tensor_domain,
+      TensorFormat format = TensorFormat::kContiguous);
+
+  /**
+   * @brief Construct a new Input spec object for static input size from
    * vector, optional arguments allow the user to configure expected input shape
    * tensor format
    *
@@ -403,6 +423,23 @@ struct Input : torch::CustomClassHolder {
    * @param format Expected tensor format for the input (Defaults to contiguous)
    */
   TORCHTRT_API Input(std::vector<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
+
+  /**
+   * @brief Construct a new Input spec object for static input size from
+   * vector, optional arguments allow the user to configure expected input shape
+   * tensor format
+   *
+   * @param shape Input tensor shape
+   * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor
+   * calculation if detectable else Float32)
+   * @param tensor_domain Allowed range for tensor inputs [low, high)
+   * @param format Expected tensor format for the input (Defaults to contiguous)
+   */
+  TORCHTRT_API Input(
+      std::vector<int64_t> shape,
+      DataType dtype,
+      std::vector<double> tensor_domain,
+      TensorFormat format = TensorFormat::kContiguous);
 
   /**
    * @brief Construct a new Input spec object for static input size from
@@ -420,6 +457,22 @@ struct Input : torch::CustomClassHolder {
    * @brief Construct a new Input spec object for static input size from
    * c10::ArrayRef (the type produced by tensor.sizes()), vector, optional arguments
    * allow the user to configure expected input shape tensor format
+   * dtype (Expected data type for the input) defaults to PyTorch
+   * / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+   *
+   * @param shape Input tensor shape
+   * @param tensor_domain Allowed range for tensor inputs [low, high)
+   * @param format Expected tensor format for the input (Defaults to contiguous)
+   */
+  TORCHTRT_API Input(
+      c10::ArrayRef<int64_t> shape,
+      std::vector<double> tensor_domain,
+      TensorFormat format = TensorFormat::kContiguous);
+
+  /**
+   * @brief Construct a new Input spec object for static input size from
+   * c10::ArrayRef (the type produced by tensor.sizes()), vector, optional arguments
+   * allow the user to configure expected input shape tensor format
    *
    * @param shape Input tensor shape
    * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor
@@ -427,6 +480,23 @@ struct Input : torch::CustomClassHolder {
    * @param format Expected tensor format for the input (Defaults to contiguous)
    */
   TORCHTRT_API Input(c10::ArrayRef<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
+
+  /**
+   * @brief Construct a new Input spec object for static input size from
+   * c10::ArrayRef (the type produced by tensor.sizes()), vector, optional arguments
+   * allow the user to configure expected input shape tensor format
+   *
+   * @param shape Input tensor shape
+   * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor
+   * calculation if detectable else Float32)
+   * @param tensor_domain Allowed range for tensor inputs [low, high)
+   * @param format Expected tensor format for the input (Defaults to contiguous)
+   */
+  TORCHTRT_API Input(
+      c10::ArrayRef<int64_t> shape,
+      DataType dtype,
+      std::vector<double> tensor_domain,
+      TensorFormat format = TensorFormat::kContiguous);
 
   /**
    * @brief Construct a new Input spec object dynamic input size from
@@ -443,6 +513,24 @@ struct Input : torch::CustomClassHolder {
       std::vector<int64_t> min_shape,
       std::vector<int64_t> opt_shape,
       std::vector<int64_t> max_shape,
+      TensorFormat format = TensorFormat::kContiguous);
+  /**
+   * @brief Construct a new Input spec object dynamic input size from
+   * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
+   * supported sizes. dtype (Expected data type for the input) defaults to PyTorch
+   * / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+   *
+   * @param min_shape Minimum shape for input tensor
+   * @param opt_shape Target optimization shape for input tensor
+   * @param max_shape Maximum acceptible shape for input tensor
+   * @param tensor_domain Allowed range for tensor inputs [low, high)
+   * @param format Expected tensor format for the input (Defaults to contiguous)
+   */
+  TORCHTRT_API Input(
+      std::vector<int64_t> min_shape,
+      std::vector<int64_t> opt_shape,
+      std::vector<int64_t> max_shape,
+      std::vector<double> tensor_domain,
       TensorFormat format = TensorFormat::kContiguous);
 
   /**
@@ -465,6 +553,27 @@ struct Input : torch::CustomClassHolder {
       TensorFormat format = TensorFormat::kContiguous);
 
   /**
+   * @brief Construct a new Input spec object for a dynamic input size from vectors
+   * for minimum shape, optimal shape, and max shape supported sizes optional arguments
+   * allow the user to configure expected input shape tensor format
+   *
+   * @param min_shape Minimum shape for input tensor
+   * @param opt_shape Target optimization shape for input tensor
+   * @param max_shape Maximum acceptible shape for input tensor
+   * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor
+   * calculation if detectable else Float32)
+   * @param tensor_domain Allowed range for tensor inputs [low, high)
+   * @param format Expected tensor format for the input (Defaults to contiguous)
+   */
+  TORCHTRT_API Input(
+      std::vector<int64_t> min_shape,
+      std::vector<int64_t> opt_shape,
+      std::vector<int64_t> max_shape,
+      DataType dtype,
+      std::vector<double> tensor_domain,
+      TensorFormat format = TensorFormat::kContiguous);
+
+  /**
    * @brief Construct a new Input spec object dynamic input size from
    * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
    * supported sizes. dtype (Expected data type for the input) defaults to PyTorch
@@ -484,6 +593,25 @@ struct Input : torch::CustomClassHolder {
   /**
    * @brief Construct a new Input spec object dynamic input size from
    * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
+   * supported sizes. dtype (Expected data type for the input) defaults to PyTorch
+   * / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+   *
+   * @param min_shape Minimum shape for input tensor
+   * @param opt_shape Target optimization shape for input tensor
+   * @param max_shape Maximum acceptible shape for input tensor
+   * @param tensor_domain Allowed range for tensor inputs [low, high)
+   * @param format Expected tensor format for the input (Defaults to contiguous)
+   */
+  TORCHTRT_API Input(
+      c10::ArrayRef<int64_t> min_shape,
+      c10::ArrayRef<int64_t> opt_shape,
+      c10::ArrayRef<int64_t> max_shape,
+      std::vector<double> tensor_domain,
+      TensorFormat format = TensorFormat::kContiguous);
+
+  /**
+   * @brief Construct a new Input spec object dynamic input size from
+   * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
    * supported sizes
    *
    * @param min_shape Minimum shape for input tensor
@@ -498,6 +626,27 @@ struct Input : torch::CustomClassHolder {
       c10::ArrayRef<int64_t> opt_shape,
       c10::ArrayRef<int64_t> max_shape,
       DataType dtype,
+      TensorFormat format = TensorFormat::kContiguous);
+
+  /**
+   * @brief Construct a new Input spec object dynamic input size from
+   * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
+   * supported sizes
+   *
+   * @param min_shape Minimum shape for input tensor
+   * @param opt_shape Target optimization shape for input tensor
+   * @param max_shape Maximum acceptible shape for input tensor
+   * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor
+   * calculation if detectable else Float32)
+   * @param tensor_domain Allowed range for tensor inputs [low, high)
+   * @param format Expected tensor format for the input (Defaults to contiguous)
+   */
+  TORCHTRT_API Input(
+      c10::ArrayRef<int64_t> min_shape,
+      c10::ArrayRef<int64_t> opt_shape,
+      c10::ArrayRef<int64_t> max_shape,
+      DataType dtype,
+      std::vector<double> tensor_domain,
       TensorFormat format = TensorFormat::kContiguous);
 
   /**

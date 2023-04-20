@@ -92,8 +92,9 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
   }
 
   TORCHTRT_CHECK(
-      isITensor() || (isIValue() && (ptr_.ivalue->isTensor() || ptr_.ivalue->isCustomClass())),
-      "Requested either IValue containing a Tensor, or ITensor, however Var type is " << type_name());
+      isITensor() ||
+          (isIValue() && (ptr_.ivalue->isTensor() || ptr_.ivalue->isScalar() || ptr_.ivalue->isCustomClass())),
+      "Requested either IValue containing a Tensor, Scalar or ITensor, however Var type is " << type_name());
 
   nvinfer1::ITensor* out;
 
@@ -101,6 +102,8 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
     if (ptr_.ivalue->isTensor()) {
       auto tensor = ptr_.ivalue->toTensor();
       out = converters::tensor_to_const(ctx, tensor);
+    } else if (ptr_.ivalue->isScalar()) {
+      out = converters::scalar_to_tensor(ctx, ptr_.ivalue->toScalar());
     } else {
       // Split converter generates c10::IValue which hold TensorContainer.
       auto output_container = ptr_.ivalue->toCustomClass<TensorContainer>();
@@ -144,6 +147,31 @@ bool Var::isITensor() const {
   } else {
     return false;
   }
+}
+
+bool Var::isITensorList() {
+  // Unpack the Var as a List and check if each entry is a custom class since
+  // ITensors are stored in CustomClassHolder
+  auto ival_list = ptr_.ivalue->toList();
+  for (int i = 0; i < ival_list.size(); i++) {
+    if (!ival_list.get(i).isCustomClass()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+std::vector<nvinfer1::ITensor*> Var::unwrapToITensorList() {
+  TORCHTRT_CHECK(
+      isIValue(), "Requested unwrapping of arg assuming it was an IValue, however arg type is " << type_name());
+  TORCHTRT_CHECK(isITensorList(), "Expected IValue to be an ITensorList");
+  auto ivalue_list = ptr_.ivalue->toList();
+  std::vector<nvinfer1::ITensor*> outputs;
+  for (int i = 0; i < ivalue_list.size(); i++) {
+    auto element = ivalue_list.get(i).toCustomClass<TensorContainer>()->tensor();
+    outputs.push_back(std::move(element));
+  }
+  return outputs;
 }
 
 bool Var::isIValue() const {

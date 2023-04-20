@@ -15,7 +15,9 @@ void NotateModuleForFallback(
 void Conv1DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
 void ConvTransposed1DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
 void Conv2DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
+void ConvTransposed2DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
 void Conv3DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
+void ConvTransposed3DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseAddMMBranches(std::shared_ptr<torch::jit::Graph> graph);
 void LinearToAddMM(std::shared_ptr<torch::jit::Graph>& graph);
 void EliminateExceptionOrPassPattern(std::shared_ptr<torch::jit::Graph> graph);
@@ -45,6 +47,7 @@ void UnpackAndCastMaskedFill(std::shared_ptr<torch::jit::Graph>& graph, std::str
 void UnpackAndCastNumToTensor(std::shared_ptr<torch::jit::Graph>& graph, std::string target_device_name);
 void UnpackAndCastFull(std::shared_ptr<torch::jit::Graph>& graph, std::string target_device_name);
 void ReplaceScalarImplicit(std::shared_ptr<torch::jit::Graph>& graph);
+void ReplaceAtenPad(std::shared_ptr<torch::jit::Graph>& graph);
 
 // utility functions exposed for testing
 std::string unmangle_cls_name(const std::string& name);

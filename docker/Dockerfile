@@ -1,62 +1,95 @@
-ARG BASE=22.04
-ARG BASE_IMG=nvcr.io/nvidia/tensorrt:${BASE}-py3
+# Base image starts with CUDA
+ARG BASE_IMG=nvidia/cuda:11.7.1-devel-ubuntu22.04
 FROM ${BASE_IMG} as base
 
-FROM base as torch-tensorrt-builder-base
+ARG TENSORRT_VERSION
+RUN test -n "$TENSORRT_VERSION" || (echo "No tensorrt version specified, please use --build-arg TENSORRT_VERSION=x.y.z to specify a version." && exit 1)
+ARG CUDNN_VERSION
+RUN test -n "$CUDNN_VERSION" || (echo "No cudnn version specified, please use --build-arg CUDNN_VERSION=x.y.z to specify a version." && exit 1)
 
-# Removing any bazel or torch-tensorrt pre-installed from the base image
-RUN rm -rf /opt/pytorch/torch_tensorrt /usr/bin/bazel
+ARG PYTHON_VERSION=3.10
+ENV PYTHON_VERSION=${PYTHON_VERSION}
+
+ARG USE_CXX11_ABI
+ENV USE_CXX11=${USE_CXX11_ABI}
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install basic dependencies
+RUN apt-get update
+RUN apt install -y build-essential manpages-dev wget zlib1g software-properties-common git libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget ca-certificates curl llvm libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev mecab-ipadic-utf8
+
+# Install PyEnv and desired Python version
+ENV HOME="/root"
+ENV PYENV_DIR="$HOME/.pyenv"
+ENV PATH="$PYENV_DIR/shims:$PYENV_DIR/bin:$PATH"
+RUN wget -L https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer &&\
+    chmod 755 pyenv-installer &&\
+    bash pyenv-installer &&\
+    eval "$(pyenv init -)"
+
+RUN pyenv install -v ${PYTHON_VERSION}
+RUN pyenv global ${PYTHON_VERSION}
+
+# Install CUDNN + TensorRT + dependencies
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-ubuntu2204.pin
+RUN mv cuda-ubuntu2204.pin /etc/apt/preferences.d/cuda-repository-pin-600
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/7fa2af80.pub
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 536F8F1DE80F6A35
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
+RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /"
+RUN apt-get update
+RUN apt-get install -y libcudnn8=${CUDNN_VERSION}* libcudnn8-dev=${CUDNN_VERSION}*
+
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub
+RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /"
+RUN apt-get update
+
+RUN apt-get install -y libnvinfer8=${TENSORRT_VERSION}* libnvinfer-plugin8=${TENSORRT_VERSION}* libnvinfer-dev=${TENSORRT_VERSION}* libnvinfer-plugin-dev=${TENSORRT_VERSION}* libnvonnxparsers8=${TENSORRT_VERSION}-1* libnvonnxparsers-dev=${TENSORRT_VERSION}-1* libnvparsers8=${TENSORRT_VERSION}-1*  libnvparsers-dev=${TENSORRT_VERSION}-1*
+
+# Setup Bazel via Bazelisk
+RUN wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.16.0/bazelisk-linux-amd64 -O /usr/bin/bazel &&\
+    chmod a+x /usr/bin/bazel
+
+# Build Torch-TensorRT in an auxillary container
+FROM base as torch-tensorrt-builder-base
 
 ARG ARCH="x86_64"
 ARG TARGETARCH="amd64"
-ARG BAZEL_VERSION=5.2.0
 
-RUN [[ "$TARGETARCH" == "amd64" ]] && ARCH="x86_64" || ARCH="${TARGETARCH}" \
- && wget -q https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-${ARCH} -O /usr/bin/bazel \
- && chmod a+x /usr/bin/bazel
+RUN apt-get install -y python3-setuptools
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub
 
-# Workaround for bazel expecting both static and shared versions, we only use shared libraries inside container
-RUN touch /usr/lib/$HOSTTYPE-linux-gnu/libnvinfer_static.a
-
-RUN rm -rf /usr/local/cuda/lib* /usr/local/cuda/include \
-  && ln -sf /usr/local/cuda/targets/$HOSTTYPE-linux/lib /usr/local/cuda/lib64 \
-  && ln -sf /usr/local/cuda/targets/$HOSTTYPE-linux/include /usr/local/cuda/include
-
-RUN apt-get update && apt-get install -y --no-install-recommends locales ninja-build && rm -rf /var/lib/apt/lists/* && locale-gen en_US.UTF-8
+RUN apt-get update &&\
+    apt-get install -y --no-install-recommends locales ninja-build &&\
+    rm -rf /var/lib/apt/lists/* &&\
+    locale-gen en_US.UTF-8
 
 FROM torch-tensorrt-builder-base as torch-tensorrt-builder
-
-# Removing any bazel or torch-tensorrt pre-installed from the base image
-RUN rm -rf /opt/pytorch/torch_tensorrt
 
 COPY . /workspace/torch_tensorrt/src
 WORKDIR /workspace/torch_tensorrt/src
 RUN cp ./docker/WORKSPACE.docker WORKSPACE
 
-# This script builds both libtorchtrt bin/lib/include tarball and the Python wheel, in dist/
-RUN ./docker/dist-build.sh
+# Symlink the path pyenv is using for python with the /opt directory for package sourcing
+RUN ln -s "`pyenv which python | xargs dirname | xargs dirname`/lib/python$PYTHON_VERSION/site-packages" "/opt/python3"
 
+# This script builds both libtorchtrt bin/lib/include tarball and the Python wheel, in dist/
+RUN bash ./docker/dist-build.sh
+
+# Copy and install Torch-TRT into the main container
 FROM base as torch-tensorrt
 
-# Removing any bazel or torch-tensorrt pre-installed from the base image
-RUN rm -rf /opt/pytorch/torch_tensorrt
-
-# copy source repo
-COPY . /workspace/torch_tensorrt
+COPY . /opt/torch_tensorrt
 COPY --from=torch-tensorrt-builder  /workspace/torch_tensorrt/src/py/dist/ .
 
-RUN pip3 install ipywidgets --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org
-RUN jupyter nbextension enable --py widgetsnbextension
-
-RUN pip3 install *.whl && rm -fr /workspace/torch_tensorrt/py/dist/* *.whl
-
-ENV LD_LIBRARY_PATH /usr/local/lib/python3.8/dist-packages/torch/lib:/usr/local/lib/python3.8/dist-packages/torch_tensorrt/lib:${LD_LIBRARY_PATH}
-ENV PATH /usr/local/lib/python3.8/dist-packages/torch_tensorrt/bin:${PATH}
-#
-WORKDIR /workspace
-RUN mv /workspace/torch_tensorrt /opt/torch_tensorrt
 RUN cp /opt/torch_tensorrt/docker/WORKSPACE.docker /opt/torch_tensorrt/WORKSPACE
-RUN mkdir torch_tensorrt
-RUN ln -s /opt/torch_tensorrt/notebooks /workspace/torch_tensorrt/notebooks
+RUN pip install -r /opt/torch_tensorrt/py/requirements.txt
+RUN pip install tensorrt==${TENSORRT_VERSION}.*
+RUN pip install *.whl && rm -fr /workspace/torch_tensorrt/py/dist/* *.whl
+
+WORKDIR /opt/torch_tensorrt
+
+ENV LD_LIBRARY_PATH /opt/python3/site-packages/torch/lib:/opt/python3/site-packages/torch_tensorrt/lib:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
+ENV PATH /opt/python3/site-packages/torch_tensorrt/bin:${PATH}
 
 CMD /bin/bash

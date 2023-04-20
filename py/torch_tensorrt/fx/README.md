@@ -12,7 +12,7 @@ FX2TRT is merged as FX module in Torch-TensorRT
     $ conda install pytorch torchvision torchtext cudatoolkit=11.3 -c pytorch-nightly
     # Install TensorRT python package
     $ pip3 install nvidia-pyindex
-    $ pip3 install nvidia-tensorrt==8.2.4.2
+    $ pip3 install tensorrt==8.5.1.7
     $ git clone https://github.com/pytorch/TensorRT.git
     $ cd TensorRT/py && python setup.py install --fx-only && cd ..
     $ pyton -c "import torch_tensorrt.fx"

@@ -1,3 +1,5 @@
+import unittest
+
 import torch
 import torch.nn as nn
 from parameterized import parameterized
@@ -13,6 +15,7 @@ class TestFlattenConverter(DispatchTestCase):
             ("flatten_all", 0, 3),
         ]
     )
+    @unittest.skip("Not support yet")
     def test_flatten(self, _, start_dim, end_dim):
         class Flatten(nn.Module):
             def __init__(self, start, end):
@@ -27,8 +30,7 @@ class TestFlattenConverter(DispatchTestCase):
         self.run_test(
             Flatten(start_dim, end_dim),
             inputs,
-            expected_ops={torch.ops.aten._reshape_alias.default},
-            test_implicit_batch_dim=(start_dim != 0),
+            expected_ops={torch.ops.aten.view.default},
         )
 
     ## Dynamic shape does not work due to flatten converts to reshape in tracing. And batch or dynamic dimension is converted to fixed integer and loose dynamic

@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>DLA &mdash; Torch-TensorRT v1.4.0dev0+cc4e3e6 documentation</title>
+  <title>DLA &mdash; Torch-TensorRT v1.4.0.dev0+d0af394 documentation</title>
   
 
   
@@ -215,7 +215,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+cc4e3e6
+                  v1.4.0.dev0+d0af394
                 </div>
               
             
@@ -368,25 +368,25 @@
 <p><code class="docutils literal notranslate"><span class="pre">DLA</span></code> NVIDIA Deep Learning Accelerator is a fixed-function accelerator engine targeted for deep learning operations. DLA is designed to do full hardware acceleration of convolutional neural networks. DLA supports various layers such as convolution, deconvolution, fully-connected, activation, pooling, batch normalization, etc. <code class="docutils literal notranslate"><span class="pre">torch_tensorrt</span></code> supports compilation of TorchScript Module and deployment pipeline on the DLA hardware available on NVIDIA embedded platforms.</p>
 <p>NOTE: DLA supports fp16 and int8 precision only.</p>
 <p>Using DLA with torchtrtc</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>torchtrtc <span class="o">[</span>input_file_path<span class="o">]</span> <span class="o">[</span>output_file_path<span class="o">]</span> <span class="o">[</span>input_shapes...<span class="o">]</span> -p f16 -d dla <span class="o">{</span>OPTIONS<span class="o">}</span>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>torchtrtc<span class="w"> </span><span class="o">[</span>input_file_path<span class="o">]</span><span class="w"> </span><span class="o">[</span>output_file_path<span class="o">]</span><span class="w"> </span><span class="o">[</span>input_shapes...<span class="o">]</span><span class="w"> </span>-p<span class="w"> </span>f16<span class="w"> </span>-d<span class="w"> </span>dla<span class="w"> </span><span class="o">{</span>OPTIONS<span class="o">}</span>
 </pre></div>
 </div>
 <p>Using DLA in a C++ application</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">input_shape</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{{</span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">}};</span><span class="w"></span>
-<span class="k">auto</span><span class="w"> </span><span class="n">compile_spec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileSpec</span><span class="p">({</span><span class="n">input_shape</span><span class="p">});</span><span class="w"></span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">input_shape</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{{</span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">}};</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">compile_spec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileSpec</span><span class="p">({</span><span class="n">input_shape</span><span class="p">});</span>
 
 <span class="cp"># Set a precision. DLA supports fp16 or int8 only</span>
-<span class="n">compile_spec</span><span class="p">.</span><span class="n">enabled_precisions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">torch</span><span class="o">::</span><span class="n">kF16</span><span class="p">};</span><span class="w"></span>
-<span class="n">compile_spec</span><span class="p">.</span><span class="n">device</span><span class="p">.</span><span class="n">device_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileSpec</span><span class="o">::</span><span class="n">DeviceType</span><span class="o">::</span><span class="n">kDLA</span><span class="p">;</span><span class="w"></span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">enabled_precisions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">torch</span><span class="o">::</span><span class="n">kF16</span><span class="p">};</span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">device</span><span class="p">.</span><span class="n">device_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileSpec</span><span class="o">::</span><span class="n">DeviceType</span><span class="o">::</span><span class="n">kDLA</span><span class="p">;</span>
 
 <span class="cp"># Make sure the gpu id is set to Xavier id for DLA</span>
-<span class="n">compile_spec</span><span class="p">.</span><span class="n">device</span><span class="p">.</span><span class="n">gpu_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">device</span><span class="p">.</span><span class="n">gpu_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
 
 <span class="cp"># Set the DLA core id</span>
-<span class="n">compile_spec</span><span class="p">.</span><span class="n">device</span><span class="p">.</span><span class="n">dla_core</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">device</span><span class="p">.</span><span class="n">dla_core</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
 
 <span class="cp"># If a layer fails to run on DLA it will fallback to GPU</span>
-<span class="n">compile_spec</span><span class="p">.</span><span class="n">device</span><span class="p">.</span><span class="n">allow_gpu_fallback</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span><span class="w"></span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">device</span><span class="p">.</span><span class="n">allow_gpu_fallback</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
 </pre></div>
 </div>
 <p>Using DLA in a python application</p>

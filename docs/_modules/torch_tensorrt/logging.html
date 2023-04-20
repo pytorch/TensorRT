@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.logging &mdash; Torch-TensorRT v1.4.0dev0+cc4e3e6 documentation</title>
+  <title>torch_tensorrt.logging &mdash; Torch-TensorRT v1.4.0.dev0+d0af394 documentation</title>
   
 
   
@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+cc4e3e6
+                  v1.4.0.dev0+d0af394
                 </div>
               
             
@@ -373,7 +373,7 @@
 
 
 <div class="viewcode-block" id="Level"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.Level">[docs]</a><span class="k">class</span> <span class="nc">Level</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Enum to set the minimum required logging level to print a message to stdout&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enum to set the minimum required logging level to print a message to stdout&quot;&quot;&quot;</span>
 
     <span class="n">InternalError</span> <span class="o">=</span> <span class="n">LogLevel</span><span class="o">.</span><span class="n">INTERNAL_ERROR</span>
     <span class="n">Error</span> <span class="o">=</span> <span class="n">LogLevel</span><span class="o">.</span><span class="n">ERROR</span>
@@ -399,7 +399,7 @@
 
 
 <div class="viewcode-block" id="get_logging_prefix"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.get_logging_prefix">[docs]</a><span class="k">def</span> <span class="nf">get_logging_prefix</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Get the prefix set for logging messages</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get the prefix set for logging messages</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        str: Prefix used for logger</span>
@@ -408,7 +408,7 @@
 
 
 <div class="viewcode-block" id="set_logging_prefix"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.set_logging_prefix">[docs]</a><span class="k">def</span> <span class="nf">set_logging_prefix</span><span class="p">(</span><span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Set the prefix used when logging messages</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Set the prefix used when logging messages</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        prefix (str): Prefix to use for logging messages</span>
@@ -417,7 +417,7 @@
 
 
 <div class="viewcode-block" id="get_reportable_log_level"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.get_reportable_log_level">[docs]</a><span class="k">def</span> <span class="nf">get_reportable_log_level</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Level</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Get the level required for a message to be printed in the log</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get the level required for a message to be printed in the log</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        torch_tensorrt.logging.Level: The enum representing the level required to print</span>
@@ -426,7 +426,7 @@
 
 
 <div class="viewcode-block" id="set_reportable_log_level"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.set_reportable_log_level">[docs]</a><span class="k">def</span> <span class="nf">set_reportable_log_level</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="n">Level</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Set the level required for a message to be printed to the log</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Set the level required for a message to be printed to the log</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        level (torch_tensorrt.logging.Level): The enum representing the level required to print</span>
@@ -435,7 +435,7 @@
 
 
 <div class="viewcode-block" id="get_is_colored_output_on"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.get_is_colored_output_on">[docs]</a><span class="k">def</span> <span class="nf">get_is_colored_output_on</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Get if colored output is enabled for logging</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get if colored output is enabled for logging</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        bool: If colored output is one</span>
@@ -444,7 +444,7 @@
 
 
 <div class="viewcode-block" id="set_is_colored_output_on"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.set_is_colored_output_on">[docs]</a><span class="k">def</span> <span class="nf">set_is_colored_output_on</span><span class="p">(</span><span class="n">colored_output_on</span><span class="p">:</span> <span class="nb">bool</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Enable or disable color in the log output</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enable or disable color in the log output</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        colored_output_on (bool): If colored output should be enabled or not</span>
@@ -453,7 +453,7 @@
 
 
 <div class="viewcode-block" id="log"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.log">[docs]</a><span class="k">def</span> <span class="nf">log</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="n">Level</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Add a new message to the log</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Add a new message to the log</span>
 
 <span class="sd">    Adds a new message to the log at a specified level. The message</span>
 <span class="sd">    will only get printed out if Level &gt; reportable_log_level</span>
@@ -473,7 +473,7 @@
 
 
 <div class="viewcode-block" id="internal_errors"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.internal_errors">[docs]</a><span class="k">class</span> <span class="nc">internal_errors</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Context-manager to limit displayed log messages to just internal errors</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to limit displayed log messages to just internal errors</span>
 
 <span class="sd">    Example::</span>
 
@@ -490,7 +490,7 @@
 
 
 <div class="viewcode-block" id="errors"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.errors">[docs]</a><span class="k">class</span> <span class="nc">errors</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Context-manager to limit displayed log messages to just errors and above</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to limit displayed log messages to just errors and above</span>
 
 <span class="sd">    Example::</span>
 
@@ -507,7 +507,7 @@
 
 
 <div class="viewcode-block" id="warnings"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.warnings">[docs]</a><span class="k">class</span> <span class="nc">warnings</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Context-manager to limit displayed log messages to just warnings and above</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to limit displayed log messages to just warnings and above</span>
 
 <span class="sd">    Example::</span>
 
@@ -524,7 +524,7 @@
 
 
 <div class="viewcode-block" id="info"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.info">[docs]</a><span class="k">class</span> <span class="nc">info</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Context-manager to display all info and greater severity messages</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to display all info and greater severity messages</span>
 
 <span class="sd">    Example::</span>
 
@@ -541,7 +541,7 @@
 
 
 <div class="viewcode-block" id="debug"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.debug">[docs]</a><span class="k">class</span> <span class="nc">debug</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Context-manager to display full debug information through the logger</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to display full debug information through the logger</span>
 
 <span class="sd">    Example::</span>
 
@@ -558,7 +558,7 @@
 
 
 <div class="viewcode-block" id="graphs"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.graphs">[docs]</a><span class="k">class</span> <span class="nc">graphs</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Context-manager to display the results of intermediate lowering passes</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to display the results of intermediate lowering passes</span>
 <span class="sd">    as well as full debug information through the logger</span>
 
 <span class="sd">    Example::</span>

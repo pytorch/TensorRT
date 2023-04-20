@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.fx.lower &mdash; Torch-TensorRT v1.4.0dev0+cc4e3e6 documentation</title>
+  <title>torch_tensorrt.fx.lower &mdash; Torch-TensorRT v1.4.0.dev0+d0af394 documentation</title>
   
 
   
@@ -212,7 +212,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+cc4e3e6
+                  v1.4.0.dev0+d0af394
                 </div>
               
             
@@ -361,8 +361,6 @@
   <h1>Source code for torch_tensorrt.fx.lower</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">dataclasses</span> <span class="k">as</span> <span class="nn">dc</span>
 <span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">import</span> <span class="nn">dataclasses</span> <span class="k">as</span> <span class="nn">dc</span>
-<span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span>
 
 <span class="c1"># @manual=//deeplearning/trt/python:py_tensorrt</span>
@@ -370,6 +368,7 @@
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torch.fx</span> <span class="k">as</span> <span class="nn">fx</span>
 <span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
+<span class="kn">import</span> <span class="nn">torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer</span> <span class="k">as</span> <span class="nn">aten_tracer</span>
 <span class="kn">from</span> <span class="nn">torch.fx.passes.splitter_base</span> <span class="kn">import</span> <span class="n">SplitResult</span>
 
 <span class="kn">from</span> <span class="nn">.fx2trt</span> <span class="kn">import</span> <span class="n">TRTInterpreter</span><span class="p">,</span> <span class="n">TRTInterpreterResult</span>
@@ -381,8 +380,7 @@
 
 <span class="kn">from</span> <span class="nn">.tracer.acc_tracer</span> <span class="kn">import</span> <span class="n">acc_tracer</span>
 <span class="kn">from</span> <span class="nn">.trt_module</span> <span class="kn">import</span> <span class="n">TRTModule</span>
-<span class="kn">from</span> <span class="nn">.utils</span> <span class="kn">import</span> <span class="n">LowerPrecision</span><span class="p">,</span> <span class="n">proxytensor_trace</span>
-
+<span class="kn">from</span> <span class="nn">.utils</span> <span class="kn">import</span> <span class="n">LowerPrecision</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -405,7 +403,7 @@
     <span class="n">is_aten</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">use_experimental_fx_rt</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Takes in original module, input and lowering setting, run lowering workflow to turn module</span>
 <span class="sd">    into lowered module, or so called TRTModule.</span>
 
@@ -533,7 +531,7 @@
     <span class="k">def</span> <span class="nf">lower_pass</span><span class="p">(</span>
         <span class="n">mod</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">Input</span><span class="p">,</span> <span class="n">lower_setting</span><span class="p">:</span> <span class="n">LowerSetting</span><span class="p">,</span> <span class="n">module_name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Create a module transformation pass which lowers an `fx.GraphModule` into a</span>
 <span class="sd">        `TRTModule`</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -541,8 +539,9 @@
         <span class="n">interp_res</span><span class="p">:</span> <span class="n">TRTInterpreterResult</span> <span class="o">=</span> <span class="n">interpreter</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="nb">input</span><span class="p">,</span> <span class="n">module_name</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">use_experimental_rt</span><span class="p">:</span>
             <span class="kn">import</span> <span class="nn">io</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt._TRTModuleNext</span> <span class="kn">import</span> <span class="n">TRTModuleNext</span>
+
             <span class="kn">from</span> <span class="nn">torch_tensorrt._Device</span> <span class="kn">import</span> <span class="n">Device</span>
+            <span class="kn">from</span> <span class="nn">torch_tensorrt._TRTModuleNext</span> <span class="kn">import</span> <span class="n">TRTModuleNext</span>
 
             <span class="k">with</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span> <span class="k">as</span> <span class="n">engine_bytes</span><span class="p">:</span>
                 <span class="n">engine_bytes</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">interp_res</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">serialize</span><span class="p">())</span>
@@ -572,7 +571,7 @@
 
 <span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">Lowerer</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Lowers a module using fx2trt.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Lowers a module using fx2trt.</span>
 
 <span class="sd">    This is a composable class to facilitate fx2trt. A normal fx2trt process</span>
 <span class="sd">    composes of the following passes to transform an `fx.GraphModule`:</span>
@@ -601,7 +600,7 @@
         <span class="n">interpreter_builder</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="n">create_lower_trt_interpreter</span><span class="p">,</span>
         <span class="n">split_func</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="n">default_split_function</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Lowerer&quot;</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Instantiate a `Lowerer` instance.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Instantiate a `Lowerer` instance.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">is_aten</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
                 <span class="n">lower_pass_manager_builder</span><span class="o">=</span><span class="n">LowerPassManagerBuilder</span><span class="p">(</span>
@@ -621,7 +620,9 @@
             <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
                 <span class="n">lower_pass_manager_builder</span><span class="o">=</span><span class="n">LowerPassManagerBuilder</span><span class="p">(</span>
                     <span class="n">lower_setting</span><span class="o">=</span><span class="n">lower_setting</span><span class="p">,</span>
-                    <span class="n">trace_func</span><span class="o">=</span><span class="k">lambda</span> <span class="n">module</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">proxytensor_trace</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">inputs</span><span class="p">),</span>
+                    <span class="n">trace_func</span><span class="o">=</span><span class="k">lambda</span> <span class="n">module</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">aten_tracer</span><span class="o">.</span><span class="n">opt_trace</span><span class="p">(</span>
+                        <span class="n">module</span><span class="p">,</span> <span class="n">inputs</span>
+                    <span class="p">),</span>
                     <span class="n">split_func</span><span class="o">=</span><span class="n">split_func</span><span class="p">,</span>
                     <span class="n">lower_func</span><span class="o">=</span><span class="n">default_lower_pass</span><span class="p">(</span><span class="n">interpreter_builder</span><span class="p">),</span>
                 <span class="p">)</span>
@@ -662,14 +663,6 @@
                     <span class="n">conversion_fn</span> <span class="o">=</span> <span class="n">fp16_conversion_fn</span>
 
                 <span class="n">inputs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">conversion_fn</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">is_aten</span><span class="p">:</span>
-                <span class="n">pm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_pass_manager_builder</span><span class="o">.</span><span class="n">build_aten2trt_lower_pipeline</span><span class="p">(</span>
-                    <span class="n">inputs</span><span class="p">,</span> <span class="n">additional_inputs</span>
-                <span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">pm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_pass_manager_builder</span><span class="o">.</span><span class="n">build_trt_lower_pipeline</span><span class="p">(</span>
-                    <span class="n">inputs</span><span class="p">,</span> <span class="n">additional_inputs</span>
-                <span class="p">)</span>
             <span class="k">if</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">is_aten</span><span class="p">:</span>
                 <span class="n">pm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_pass_manager_builder</span><span class="o">.</span><span class="n">build_aten2trt_lower_pipeline</span><span class="p">(</span>
                     <span class="n">inputs</span><span class="p">,</span> <span class="n">additional_inputs</span>

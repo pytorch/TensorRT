@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt &mdash; Torch-TensorRT v1.4.0dev0+cc4e3e6 documentation</title>
+  <title>torch_tensorrt &mdash; Torch-TensorRT v1.4.0.dev0+d0af394 documentation</title>
   
 
   
@@ -215,7 +215,7 @@
               
               
                 <div class="version">
-                  v1.4.0dev0+cc4e3e6
+                  v1.4.0.dev0+d0af394
                 </div>
               
             
@@ -374,7 +374,7 @@
 
 <dl class="py function">
 <dt class="sig sig-object py" id="torch_tensorrt.compile">
-<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">compile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module:</span> <span class="pre">typing.Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ir='default'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs=[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enabled_precisions={&lt;dtype.float:</span> <span class="pre">0&gt;}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_compile.html#compile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.compile" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">compile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module:</span> <span class="pre">typing.Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ir='default'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs=[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enabled_precisions={&lt;dtype.float:</span> <span class="pre">1&gt;}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_compile.html#compile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.compile" title="Permalink to this definition">¶</a></dt>
 <dd><p>Compile a PyTorch module for NVIDIA GPUs using TensorRT</p>
 <p>Takes a existing PyTorch module and a set of settings to configure the compiler
 and using the path specified in <code class="docutils literal notranslate"><span class="pre">ir</span></code> lower and compile the module to TensorRT
@@ -419,7 +419,7 @@ to select device type.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="torch_tensorrt.convert_method_to_trt_engine">
-<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">convert_method_to_trt_engine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module:</span> <span class="pre">typing.Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method_name:</span> <span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ir='default'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs=[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enabled_precisions={&lt;dtype.float:</span> <span class="pre">0&gt;}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_compile.html#convert_method_to_trt_engine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.convert_method_to_trt_engine" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">convert_method_to_trt_engine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module:</span> <span class="pre">typing.Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method_name:</span> <span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ir='default'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs=[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enabled_precisions={&lt;dtype.float:</span> <span class="pre">1&gt;}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/_compile.html#convert_method_to_trt_engine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.convert_method_to_trt_engine" title="Permalink to this definition">¶</a></dt>
 <dd><p>Convert a TorchScript module method to a serialized TensorRT engine</p>
 <p>Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings</p>
 <dl class="field-list simple">
@@ -525,6 +525,8 @@ Note: All three of min_shape, opt_shape, max_shape must be provided, there must 
 Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implictly this sets Input’s shape_mode to DYNAMIC</p></li>
 <li><p><strong>dtype</strong> (<em>torch.dpython:type</em><em> or </em><em>torch_tensorrt.dpython:type</em>) – Expected data type for input tensor (default: torch_tensorrt.dtype.float32)</p></li>
 <li><p><strong>format</strong> (<em>torch.memory_format</em><em> or </em><a class="reference internal" href="#torch_tensorrt.TensorFormat" title="torch_tensorrt.TensorFormat"><em>torch_tensorrt.TensorFormat</em></a>) – The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)</p></li>
+<li><p><strong>tensor_domain</strong> (<em>Tuple</em><em>(</em><em>python:float</em><em>, </em><em>python:float</em><em>)</em><em>, </em><em>optional</em>) – The domain of allowed values for the tensor, as interval notation: [tensor_domain[0], tensor_domain[1]).
+Note: Entering “None” (or not specifying) will set the bound to [0, 2)</p></li>
 </ul>
 </dd>
 </dl>
@@ -538,7 +540,7 @@ Note: All three of min_shape, opt_shape, max_shape must be provided, there must 
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="torch_tensorrt.Input.dtype">
-<span class="sig-name descname"><span class="pre">dtype</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;dtype.unknown:</span> <span class="pre">5&gt;</span></em><a class="headerlink" href="#torch_tensorrt.Input.dtype" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">dtype</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;dtype.unknown:</span> <span class="pre">6&gt;</span></em><a class="headerlink" href="#torch_tensorrt.Input.dtype" title="Permalink to this definition">¶</a></dt>
 <dd><p>torch_tensorrt.dtype.float32)</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type</dt>
@@ -872,6 +874,8 @@ found within the <cite>state_dict</cite>. Implement this function and a correspo
 <p>float16 : 16 bit floating point number</p>
 <p>int8 : 8 bit integer number</p>
 <p>int32 : 32 bit integer number</p>
+<p>long : 64 bit integer number</p>
+<p>int64 : 64 bit integer number</p>
 <p>bool : Boolean value</p>
 <p>unknown : Unknown data type</p>
 </div></blockquote>

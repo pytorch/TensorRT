@@ -1,6 +1,7 @@
 import io
 import logging
 import tempfile
+from datetime import datetime
 from functools import wraps
 from typing import Any, Callable, List, Optional
 
@@ -243,13 +244,14 @@ def log_before_after(pass_: PassFunc) -> PassFunc:
         ) as f:
             print(f"[{pass_}] Before:\n{module.graph}", file=f)
             print(module.graph, file=before_io)
-
+            start_time = datetime.now()
             module = pass_(module, input)
+            t_elapsed = datetime.now() - start_time
             print(f"[{pass_}] After:\n{module.graph}", file=f)
             print(module.graph, file=after_io)
             t = before_io.getvalue() == after_io.getvalue()
             _LOGGER.info(
-                f"== Log pass {pass_} before/after graph to {f.name}, before/after are the same = {t}"
+                f"== Log pass {pass_} before/after graph to {f.name}, before/after are the same = {t}, time elapsed = {t_elapsed}"
             )
             return module
 

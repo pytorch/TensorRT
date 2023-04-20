@@ -5,14 +5,17 @@ import torchvision.models as models
 import timm
 
 BENCHMARK_MODELS = {
-    "vgg16": {"model": models.vgg16(pretrained=True), "path": "script"},
+    "vgg16": {
+        "model": models.vgg16(weights=models.VGG16_Weights.DEFAULT),
+        "path": ["script", "pytorch"],
+    },
     "resnet50": {
-        "model": torch.hub.load("pytorch/vision:v0.9.0", "resnet50", pretrained=True),
-        "path": "script",
+        "model": models.resnet50(weights=None),
+        "path": ["script", "pytorch"],
     },
     "efficientnet_b0": {
         "model": timm.create_model("efficientnet_b0", pretrained=True),
-        "path": "script",
+        "path": ["script", "pytorch"],
     },
     "vit": {
         "model": timm.create_model("vit_base_patch16_224", pretrained=True),

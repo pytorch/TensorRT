@@ -73,6 +73,7 @@ import torch_tensorrt
 ...
 
 trt_ts_module = torch_tensorrt.compile(torch_script_module,
+    # If the inputs to the module are plain Tensors, specify them via the `inputs` argument:
     inputs = [example_tensor, # Provide example tensor for input shape or...
         torch_tensorrt.Input( # Specify input object with shape and dtype
             min_shape=[1, 3, 224, 224],
@@ -81,6 +82,12 @@ trt_ts_module = torch_tensorrt.compile(torch_script_module,
             # For static size shape=[1, 3, 224, 224]
             dtype=torch.half) # Datatype of input tensor. Allowed options torch.(float|half|int8|int32|bool)
     ],
+
+    # For inputs containing tuples or lists of tensors, use the `input_signature` argument:
+    # Below, we have an input consisting of a Tuple of two Tensors (Tuple[Tensor, Tensor])
+    # input_signature = ( (torch_tensorrt.Input(shape=[1, 3, 224, 224], dtype=torch.half),
+    #                      torch_tensorrt.Input(shape=[1, 3, 224, 224], dtype=torch.half)), ),
+
     enabled_precisions = {torch.half}, # Run with FP16
 )
 
@@ -114,17 +121,17 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts") # save the TRT embedd
 These are the following dependencies used to verify the testcases. Torch-TensorRT can work with other versions, but the tests are not guaranteed to pass.
 
 - Bazel 5.2.0
-- Libtorch 1.12.1 (built with CUDA 11.6)
-- CUDA 11.6
-- cuDNN 8.4.1
-- TensorRT 8.4.3.1
+- Libtorch 2.1.0.dev20230314 (built with CUDA 11.7)
+- CUDA 11.7
+- cuDNN 8.5.0
+- TensorRT 8.5.1.7
 
 ## Prebuilt Binaries and Wheel files
 
 Releases: https://github.com/pytorch/TensorRT/releases
 
 ```
-pip install torch-tensorrt==1.2.0 --find-links https://github.com/pytorch/TensorRT/releases/expanded_assets/v1.2.0
+pip install torch-tensorrt
 ```
 
 ## Compiling Torch-TensorRT

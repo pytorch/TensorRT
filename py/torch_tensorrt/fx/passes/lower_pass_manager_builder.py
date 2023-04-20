@@ -8,6 +8,7 @@ from torch import nn
 from torch.fx.passes.pass_manager import inplace_wrapper, PassManager
 from torch.fx.passes.shape_prop import ShapeProp
 from torch.fx.passes.splitter_base import generate_inputs_for_submodules, SplitResult
+from torch_tensorrt.fx.utils import LowerPrecision
 
 from ..input_tensor_spec import generate_input_specs
 
@@ -16,7 +17,8 @@ from ..observer import Observer
 from ..passes.remove_duplicate_output_args import remove_duplicate_output_args
 from .graph_opts import common_subexpression_elimination
 
-from .lower_basic_pass import (
+from .lower_basic_pass import (  # noqa
+    fix_clamp_numerical_limits_to_fp16,
     fix_reshape_batch_dim,
     replace_mutable_op,
     replace_op_with_indices,
@@ -108,12 +110,45 @@ class LowerPassManagerBuilder:
             passes.append(wrapper(p, self._input))
         for p in self.lower_setting.lower_basic_fuse_pass.passes:
             passes.append(wrapper(p, self._input))
+        if (
+            hasattr(self.lower_setting, "lower_precision")
+            and self.lower_setting.lower_precision is LowerPrecision.FP16
+        ) or (
+            hasattr(self.lower_setting, "precision")
+            and self.lower_setting.precision is LowerPrecision.FP16
+        ):
+            passes.append(wrapper(fix_clamp_numerical_limits_to_fp16, self._input))
 
         passes.append(inplace_wrapper(common_subexpression_elimination))
         passes.append(
             inplace_wrapper(lambda m: FUSE_PASSES_POST_OBSERVER.observe(m, self._input))
         )
         passes.append(fix_reshape_batch_dim)
+
+        return PassManager.build_from_passlist(passes)
+
+    def graph_optimization_pass_aten(self) -> PassManager:
+        passes = []
+
+        for p in self.lower_setting.customized_fuse_pass.passes:
+            passes.append(wrapper(p, self._input))
+        for p in self.lower_setting.lower_basic_fuse_pass.passes:
+            passes.append(wrapper(p, self._input))
+        # TODO fix this pass for aten graph
+        # if (
+        #     hasattr(self.lower_setting, "lower_precision")
+        #     and self.lower_setting.lower_precision is LowerPrecision.FP16
+        # ) or (
+        #     hasattr(self.lower_setting, "precision")
+        #     and self.lower_setting.precision is LowerPrecision.FP16
+        # ):
+        #     passes.append(wrapper(fix_clamp_numerical_limits_to_fp16, self._input))
+
+        passes.append(
+            inplace_wrapper(lambda m: FUSE_PASSES_POST_OBSERVER.observe(m, self._input))
+        )
+        # TODO we most likely do not need it for aten
+        # passes.append(fix_reshape_batch_dim)
 
         return PassManager.build_from_passlist(passes)
 
@@ -249,8 +284,7 @@ class LowerPassManagerBuilder:
         passes.append(
             wrapper(self._trace_func, self._input),
         )
-        passes.append(self._default_replace_mutable_op_pass())
-        passes.append(self.graph_optimization_pass())
+        passes.append(self.graph_optimization_pass_aten())
         passes.append(self._split_pass())
         passes.append(self._trt_lower_pass())
 
