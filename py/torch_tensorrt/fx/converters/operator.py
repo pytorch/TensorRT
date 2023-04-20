@@ -2,6 +2,7 @@ import numpy as np
 import operator
 import warnings
 import logging
+import math
 from typing import Any, Callable, cast, Dict, List, Optional, Sequence, Tuple, Union
 
 import tensorrt as trt
@@ -1118,7 +1119,17 @@ def add_expand(network, target, kwargs, name):
 
     ranks = len(input_val.shape)
     # TRT does not support different dimension size
-    assert len(shape) == ranks
+    # though this condition is not seen in the case of bmm
+    # where input_t and shape dimensions are not equal
+    assert len(shape) >= ranks
+    if len(shape) != ranks:
+        shape_tuple = tuple([0] * len(shape))
+        shape_tensor = get_trt_tensor(network, input_t, f"{name}_shape")
+        input_val, shape_tensor = broadcast(
+            network, input_val, shape_tensor, f"{name}_input_val", f"{name}_shape_val"
+        )
+        ranks = len(shape)
+
     shape = [input_val.shape[i] if shape[i] == -1 else shape[i] for i in range(ranks)]
     inshape = tuple(input_val.shape)
     shape = tuple(shape)
@@ -1208,7 +1219,7 @@ def add_slice(network, target, kwargs, name):
     stride = [1] * len(start)
     stride[dim] = step_int
     output_shape = list(input_val.shape)
-    output_shape[dim] = (stop_int - start_int) // step_int + 1
+    output_shape[dim] = math.ceil((stop_int - start_int) / step_int)
 
     if dynamic_shape > 0:
         output_shape = get_shape_with_dynamic_shape(

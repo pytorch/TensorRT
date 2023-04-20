@@ -77,7 +77,7 @@ def get_positive_dim(dim: int, dim_size: int) -> int:
     return dim
 
 
-def set_layer_name(layer: TRTLayer, target: Target, name: str) -> None:
+def set_layer_name(layer: TRTLayer, target: Target, name: str, is_acc=True) -> None:
     """
     Set the TensorRT layer name to "[TensorRT Layer Type]_[Original Op Name]_[FX Node Name with Suffix]"
 
@@ -87,7 +87,13 @@ def set_layer_name(layer: TRTLayer, target: Target, name: str) -> None:
             the node represents.
         name (str): Consists of fx node.name with optional suffix.
     """
-    target_name = target if isinstance(target, str) else f"acc_ops.{target.__name__}"
+    target_name = (
+        target
+        if isinstance(target, str)
+        else f"acc_ops.{target.__name__}"
+        if is_acc
+        else f"aten_ops.{target.__name__}"
+    )
     layer.name = f"[{layer.type.name}]-[{target_name}]-[{name}]"
 
 
