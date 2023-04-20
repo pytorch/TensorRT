@@ -62,7 +62,7 @@ std::string gen_keepdim_graph(const std::string& op) {
         return (%5))IR";
 }
 
-void test_body(const std::string& graph, at::Tensor& in) {
+void test_body(const std::string& graph, at::Tensor& in, bool dynamic = false) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
@@ -71,7 +71,12 @@ void test_body(const std::string& graph, at::Tensor& in) {
 
   in = at::clone(in);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+  std::vector<at::Tensor> trt_results;
+  if (dynamic) {
+    trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in});
+  } else {
+    trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+  }
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 } // namespace

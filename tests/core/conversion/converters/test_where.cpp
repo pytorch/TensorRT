@@ -1,3 +1,4 @@
+#include <torch/torch.h>
 #include <string>
 #include "core/compiler.h"
 #include "core/lowering/passes/passes.h"
