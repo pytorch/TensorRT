@@ -352,8 +352,9 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
       // Determine if the block is convertible/has collection output, and based on the result,
       // whether full compilation can be expected
       auto isBlockConvertible = conversion::VerifyConverterSupportForBlock(g->block(), true);
+      auto inputIsCollection = conversion::InputIsCollection(g->block());
       auto outputIsCollection = conversion::OutputIsCollection(g->block());
-      auto requires_collection_handling = (isBlockConvertible && outputIsCollection);
+      auto requires_collection_handling = (isBlockConvertible && (inputIsCollection || outputIsCollection));
 
       // Determine whether user specifications necessitate partitioning
       auto isFallbackRequested = userRequestedFallback(cfg);

@@ -43,10 +43,9 @@ auto stack_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().patt
            auto cont = t.toCustomClass<TensorContainer>();
            itensor = cont->tensor();
          }
-
          auto shuffle_layer = ctx->net->addShuffle(*itensor);
          TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
-         shuffle_layer->setReshapeDimensions(util::unsqueezeDims(itensor->getDimensions(), dim));
+         shuffle_layer->setReshapeDimensions(util::unsqueezeDims(itensor->getDimensions(), dim, 1, false));
 
          tensors.push_back(shuffle_layer->getOutput(0));
        }

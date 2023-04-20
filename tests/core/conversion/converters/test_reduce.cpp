@@ -62,7 +62,7 @@ std::string gen_keepdim_graph(const std::string& op) {
         return (%5))IR";
 }
 
-void test_body(const std::string& graph, at::Tensor& in) {
+void test_body(const std::string& graph, at::Tensor& in, bool dynamic = false) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
@@ -71,7 +71,12 @@ void test_body(const std::string& graph, at::Tensor& in) {
 
   in = at::clone(in);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+  std::vector<at::Tensor> trt_results;
+  if (dynamic) {
+    trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in});
+  } else {
+    trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+  }
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 } // namespace
@@ -342,6 +347,50 @@ TEST(Converters, ATenAnyDimNegIndexConvertsCorrectly) {
       return (%5))IR";
   auto in = at::randint(-2, 2, {2, 32}, at::kCUDA);
   test_body(graph, in);
+}
+
+TEST(Converters, ATenAllDimConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=-1]()
+      %3 : bool = prim::Constant[value=0]()
+      %5 : Tensor = aten::all(%0, %1, %3)
+      return (%5))IR";
+  auto in = at::randint(0, 2, {64, 2}, at::kCUDA);
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenAllDimKeepDimConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=0]()
+      %3 : bool = prim::Constant[value=1]()
+      %5 : Tensor = aten::all(%0, %1, %3)
+      return (%5))IR";
+  auto in = at::randint(-2, 2, {2, 32}, at::kCUDA).to(torch::kBool);
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenAllDimAllTrueConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=1]()
+      %3 : bool = prim::Constant[value=0]()
+      %5 : Tensor = aten::all(%0, %1, %3)
+      return (%5))IR";
+  auto in = at::ones({2, 32}, at::kCUDA);
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenAllDimDynamicConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=-1]()
+      %3 : bool = prim::Constant[value=0]()
+      %5 : Tensor = aten::all(%0, %1, %3)
+      return (%5))IR";
+  auto in = at::randint(0, 2, {64, 2}, at::kCUDA).to(torch::kHalf);
+  test_body(graph, in, true);
 }
 
 TEST(Converters, UnpackVarLowersCorrectly) {
