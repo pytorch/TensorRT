@@ -125,6 +125,77 @@ DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(
     int64_t,
     {"aten::__round_to_zero_floordiv(int a, int b) -> (int)"});
 
+std::pair<std::vector<int64_t>, torch::TensorOptions> newTensorImplementation(const torch::jit::Node* n, kwargs& args) {
+  auto options = torch::TensorOptions().layout(torch::kStrided).device(torch::kCUDA);
+
+  // Input 2 is the dtype
+  if (!args.at(n->input(2)).isNone() && !args.at(n->input(2)).IValue()->isNone()) {
+    options = options.dtype(c10::ScalarType(args.at(n->input(2)).unwrapToInt()));
+  } else {
+    auto tensor_var = args.at(n->input(0));
+    if (tensor_var.isITensor()) {
+      auto tensor = tensor_var.ITensor();
+      options = options.dtype(scalarTypeToTypeMeta(util::TRTDataTypeToScalarType(tensor->getType())));
+    } else {
+      auto tensor = tensor_var.unwrapToTensor();
+      options = options.dtype(tensor.dtype());
+    }
+  }
+  return std::make_pair(args.at(n->input(1)).unwrapToIntList().vec(), options);
+}
+
+c10::optional<torch::jit::IValue> newTensorLikeImplementation(
+    ConversionCtx* ctx,
+    const torch::jit::Node* n,
+    kwargs& args,
+    const std::function<torch::Tensor(const std::vector<int64_t>&, const torch::TensorOptions&)>& tensor_builder) {
+  auto options = torch::TensorOptions().layout(torch::kStrided).device(torch::kCUDA);
+  auto tensor_var = args.at(n->input(0));
+
+  if (tensor_var.isITensor()) {
+    auto tensor = tensor_var.ITensor();
+    auto dtype = util::TRTDataTypeToScalarType(tensor->getType());
+    options = options.dtype(dtype);
+  } else {
+    auto tensor = tensor_var.unwrapToTensor();
+    options = options.dtype(tensor.dtype());
+  }
+
+  // Input 1 is the dtype
+  if (!args.at(n->input(1)).isNone() && !args.at(n->input(1)).IValue()->isNone()) {
+    options = options.dtype(c10::ScalarType(args.at(n->input(1)).unwrapToInt()));
+  }
+  std::vector<int64_t> tensor_dims;
+  if (tensor_var.isITensor()) {
+    auto tensor = tensor_var.ITensor();
+    tensor_dims = util::toVec(tensor->getDimensions());
+  } else {
+    auto tensor = tensor_var.unwrapToTensor();
+    tensor_dims = tensor.sizes().vec();
+  }
+  if (ctx->input_is_dynamic) {
+    auto self = args.at(n->input(0)).ITensorOrFreeze(ctx);
+    std::vector<int64_t> dims_vec(self->getDimensions().nbDims, 1);
+    auto zeros = tensor_builder(dims_vec, options);
+    auto zeros_itensor = converters::tensor_to_const(ctx, zeros);
+    // broadcast constant to output shape
+    std::vector<int64_t> start_vec(self->getDimensions().nbDims, 0);
+    auto start_offset = util::toDims(c10::IntArrayRef(start_vec));
+    auto shape_layer = ctx->net->addShape(*self);
+    TORCHTRT_CHECK(shape_layer, "Unable to create shape layer from node: " << *n);
+    shape_layer->setName((util::node_info(n) + "_shape").c_str());
+    // slice implements expand
+    auto slice_layer = ctx->net->addSlice(*zeros_itensor, start_offset, self->getDimensions(), start_offset);
+    TORCHTRT_CHECK(slice_layer, "Unable to create slice layer from node: " << *n);
+    slice_layer->setInput(2, *shape_layer->getOutput(0));
+    slice_layer->setName((util::node_info(n) + "_slice").c_str());
+    auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], slice_layer->getOutput(0));
+    LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+    return {};
+  }
+  return tensor_builder(tensor_dims, options);
+}
+
 auto aten_registrations TORCHTRT_UNUSED =
     RegisterNodeEvaluators()
         .evaluator(
@@ -155,6 +226,63 @@ auto aten_registrations TORCHTRT_UNUSED =
                }
 
                auto out_tensor = torch::ones(args.at(n->input(0)).unwrapToIntList().vec(), options);
+               return out_tensor;
+             }})
+        .evaluator(
+            {c10::Symbol::fromQualString("aten::new_zeros"),
+             // aten::new_zeros(Tensor self, int[] size, *, int? dtype=None, int? layout=None,
+             // Device? device=None, bool? pin_memory=None) -> (Tensor)
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               auto tensor_info = newTensorImplementation(n, args);
+               return torch::zeros(tensor_info.first, tensor_info.second);
+             }})
+        .evaluator(
+            {c10::Symbol::fromQualString("aten::new_ones"),
+             // aten::new_ones(Tensor self, int[] size, *, int? dtype=None, int? layout=None,
+             // Device? device=None, bool? pin_memory=None) -> (Tensor)
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               auto tensor_info = newTensorImplementation(n, args);
+               return torch::ones(tensor_info.first, tensor_info.second);
+             }})
+        .evaluator(
+            {c10::Symbol::fromQualString("aten::zeros_like"),
+             // aten::zeros_like(Tensor self, *, int? dtype=None, int? layout=None,
+             // Device? device=None, bool? pin_memory=None, int? memory_format=None) -> (Tensor)
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               return newTensorLikeImplementation(
+                   ctx, n, args, [](const std::vector<int64_t>& dims, const torch::TensorOptions& options) {
+                     return torch::zeros(dims, options);
+                   });
+             }})
+        .evaluator(
+            {c10::Symbol::fromQualString("aten::ones_like"),
+             // aten::ones_like(Tensor self, *, int? dtype=None, int? layout=None,
+             // Device? device=None, bool? pin_memory=None, int? memory_format=None) -> (Tensor)
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               return newTensorLikeImplementation(
+                   ctx, n, args, [](const std::vector<int64_t>& dims, const torch::TensorOptions& options) {
+                     return torch::ones(dims, options);
+                   });
+             }})
+        .evaluator(
+            {c10::Symbol::fromQualString("aten::fill_"),
+             // aten::fill_.Scalar(Tensor(a!) self, Scalar value) -> (Tensor(a!))
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               auto tensor_var = args.at(n->input(0));
+               auto options = torch::TensorOptions().layout(torch::kStrided).device(torch::kCUDA);
+               std::vector<int64_t> dims;
+               if (tensor_var.isITensor()) {
+                 auto tensor = tensor_var.ITensor();
+                 auto dtype = util::TRTDataTypeToScalarType(tensor->getType());
+                 options = options.dtype(dtype);
+                 dims = util::toVec(tensor->getDimensions());
+               } else {
+                 auto tensor = tensor_var.unwrapToTensor();
+                 options = options.dtype(tensor.dtype());
+                 dims = tensor.sizes().vec();
+               }
+               auto scalar_value = args.at(n->input(1)).unwrapToScalar();
+               auto out_tensor = torch::full(dims, scalar_value, options);
                return out_tensor;
              }})
         .evaluator(
