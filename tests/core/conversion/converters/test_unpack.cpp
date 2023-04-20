@@ -4,6 +4,8 @@
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
+#include "torch/csrc/jit/passes/common_subexpression_elimination.h"
+#include "torch/torch.h"
 
 TEST(Converters, UnpackVarLowersCorrectly) {
   const auto graph = R"IR(
