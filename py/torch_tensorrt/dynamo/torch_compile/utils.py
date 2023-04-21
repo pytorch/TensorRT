@@ -64,3 +64,5 @@ def prepare_device(device: Union[Device, torch.device]) -> torch.device:
         raise ValueError(
             "Invalid device provided. Supported options: torch.device | torch_tensorrt.Device"
         )
+
+    return device
