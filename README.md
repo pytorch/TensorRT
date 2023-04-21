@@ -116,10 +116,10 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts") # save the TRT embedd
 These are the following dependencies used to verify the testcases. Torch-TensorRT can work with other versions, but the tests are not guaranteed to pass.
 
 - Bazel 5.2.0
-- Libtorch 2.1.0.dev20230314 (built with CUDA 11.7)
-- CUDA 11.7
-- cuDNN 8.5.0
-- TensorRT 8.5.1.7
+- Libtorch 2.1.0.dev20230419 (built with CUDA 11.8)
+- CUDA 11.8
+- cuDNN 8.8.0
+- TensorRT 8.6.1
 
 ## Prebuilt Binaries and Wheel files
 
@@ -247,7 +247,7 @@ A tarball with the include files and library can then be found in bazel-bin
 ### Running Torch-TensorRT on a JIT Graph
 
 > Make sure to add LibTorch to your LD_LIBRARY_PATH <br>
-> `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/bazel-Torch-TensorRT/external/libtorch/lib`
+> `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/bazel-TensorRT/external/libtorch/lib`
 
 ``` shell
 bazel run //cpp/bin/torchtrtc -- $(realpath <PATH TO GRAPH>) out.ts <input-size>

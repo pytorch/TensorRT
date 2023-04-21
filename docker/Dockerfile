@@ -1,7 +1,7 @@
 # Base image starts with CUDA
-ARG BASE_IMG=nvidia/cuda:11.7.1-devel-ubuntu22.04
+ARG BASE_IMG=nvidia/cuda:11.8.0-devel-ubuntu22.04
 FROM ${BASE_IMG} as base
-ENV BASE_IMG=nvidia/cuda:11.7.1-devel-ubuntu22.04
+ENV BASE_IMG=nvidia/cuda:11.8.0-devel-ubuntu22.04
 
 ARG TENSORRT_VERSION
 ENV TENSORRT_VERSION=${TENSORRT_VERSION}

@@ -102,7 +102,7 @@ commands:
             sudo apt-get --purge remove "*nvidia*"
 
   install-cudnn:
-    description: "Install CUDNN 8.5.0"
+    description: "Install CUDNN 8.8.0"
     parameters:
       os:
         type: string
@@ -112,10 +112,10 @@ commands:
         default: "x86_64"
       cudnn-version:
         type: string
-        default: "8.5.0.96"
+        default: "8.8.0.121"
       cuda-version:
         type: string
-        default: "cuda11.7"
+        default: "cuda11.8"
     steps:
       - run:
           name: Install CUDNN
@@ -200,13 +200,13 @@ commands:
         default: "cuda11.8"
       cudnn-version:
         type: string
-        default: "8.5.0.96"
+        default: "8.8.0.121"
       trt-version-short:
         type: string
-        default: "8.6.0"
+        default: "8.6.1"
       trt-version-long:
         type: string
-        default: "8.6.0.12-1"
+        default: "8.6.1.6-1"
       bazel-version:
         type: string
         default: "5.2.0"
@@ -249,10 +249,10 @@ commands:
       parameters:
         trt-version-long:
           type: string
-          default: "8.6.0"
+          default: "8.6.1"
         cudnn-version-long:
           type: string
-          default: "8.5.0.96"
+          default: "8.8.0.121"
       steps:
         - run:
             name: Set up python environment
@@ -269,16 +269,19 @@ commands:
     parameters:
       torch-build:
         type: string
-        default: "2.1.0.dev20230421+cu118"
+        default: "2.1.0.dev20230419+cu118"
+      torchvision-build:
+        type: string
+        default: "0.16.0.dev20230419+cu118"
       torch-build-index:
         type: string
-        default: "https://download.pytorch.org/whl/cu118"
+        default: "https://download.pytorch.org/whl/nightly/cu118"
     steps:
       - run:
           name: Install Torch
           command: |
             pip3 install --upgrade pip
-            pip3 install torch==<< parameters.torch-build >>  torchvision torchaudio --extra-index-url << parameters.torch-build-index >>
+            pip3 install torch==<< parameters.torch-build >>  torchvision==<< parameters.torchvision-build >> --extra-index-url << parameters.torch-build-index >>
 
   build-py:
     description: "Build the torch-tensorrt python release (pre-cxx11-abi)"
@@ -474,6 +477,7 @@ commands:
       - run: mkdir -p /tmp/artifacts
       - run:
           name: Run core / C++ tests
+          no_output_timeout: 15m
           environment:
             LD_LIBRARY_PATH: "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch_tensorrt.libs:/home/circleci/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:/home/circleci/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda-11.8/lib64/:$LD_LIBRARY_PATH"
           command: |
@@ -974,11 +978,15 @@ jobs:
         type: string
       trt-version-long:
         type: string
+      python-version:
+        type: string
     machine:
-      image: ubuntu-2004-cuda-11.4:202110-01
+      image: linux-cuda-11:2023.02.1
     resource_class: gpu.nvidia.large
     steps:
       - checkout
+      - setup-py-version:
+          python-version: << parameters.python-version >>
       - attach_workspace:
           at: /tmp/dist/
       - install-torch-from-index:
@@ -1294,25 +1302,25 @@ parameters:
   # Nightly platform config
   torch-build:
     type: string
-    default: "2.1.0.dev20230421+cu118"
+    default: "2.1.0.dev20230419+cu118"
   torch-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/cu118"
+    default: "https://download.pytorch.org/whl/nightly/cu118"
   torch-build-legacy:
     type: string
-    default: "1.13.1+cu118"
+    default: "1.13.1+cu117"
   torch-build-index-legacy:
     type: string
-    default: "https://download.pytorch.org/whl/cu118"
+    default: "https://download.pytorch.org/whl/cu117"
   cudnn-version:
     type: string
-    default: "8.5.0.96"
+    default: "8.8.0.121"
   trt-version-short:
     type: string
-    default: "8.6.0"
+    default: "8.6.1"
   trt-version-long:
     type: string
-    default: "8.6.0"
+    default: "8.6.1"
 
   # Jetson platform config
   torch-jetson-build:
@@ -1392,6 +1400,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - build-x86_64-linux
 
@@ -1473,6 +1482,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - package-x86_64-linux
 
@@ -1513,6 +1523,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - build-x86_64-linux
 
