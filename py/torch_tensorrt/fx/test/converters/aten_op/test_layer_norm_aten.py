@@ -19,26 +19,26 @@ class TestLayerNormConverter(DispatchTestCase):
         )
 
 
-def test_layernorm_with_dynamic_shape(self):
-    class TestModule(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.ln = torch.nn.LayerNorm([3, 224, 224])
+    def test_layernorm_with_dynamic_shape(self):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.ln = torch.nn.LayerNorm([3, 224, 224])
 
-        def forward(self, x):
-            return self.ln(x)
+            def forward(self, x):
+                return self.ln(x)
 
-    input_specs = [
-        InputTensorSpec(
-            shape=(-1, 3, 224, 224),
-            dtype=torch.float32,
-            shape_ranges=[(1, 3, 1, 1)],
-        ),
-    ]
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, 3, 224, 224),
+                dtype=torch.float32,
+                shape_ranges=[(1, 3, 1, 1)],
+            ),
+        ]
 
-    self.run_test_with_dynamic_shape(
-        TestModule(), input_specs, expected_ops={torch.ops.aten.batch_norm}
-    )
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={torch.ops.aten.batch_norm}
+        )
 
 
 if __name__ == "__main__":
