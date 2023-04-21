@@ -12,7 +12,12 @@ class TestSqueeze(AccTestCase):
                 return x.squeeze(2)
 
         inputs = [torch.randn(1, 2, 1)]
-        self.run_test(Squeeze(), inputs, expected_ops={acc_ops.squeeze})
+        self.run_test(
+            Squeeze(),
+            inputs,
+            expected_ops={acc_ops.squeeze},
+            test_implicit_batch_dim=False,
+        )
 
     # Testing with shape=(-1, -1, -1, -1) results in error:
     # AssertionError: We don't support squeeze dynamic dim.

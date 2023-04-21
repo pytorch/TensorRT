@@ -416,29 +416,46 @@ def compose_bmm(
             node = n
             input_n = node.all_input_nodes[0]
             other_n = node.all_input_nodes[1]
+
+            # If no input nodes are available, the bmm argument itself could be an input
+            # Alternatively, if the node has no users, it can be eliminated
+            if len(input_n.all_input_nodes) == 0 or len(node.users) == 0:
+                return PassResult(module, modified)
+
             output = next(iter(node.users))
             input_input_n = input_n.all_input_nodes[0]
             if (
                 input_input_n.target != torch.ops.aten.expand.default
                 and input_n.target != torch.ops.aten.view.default
             ):
-                raise RuntimeError(
-                    "Bmm is addressed in fixed pattern. A new pattern is met!"
+                _LOGGER.warn(
+                    "Bmm is addressed in fixed pattern. "
+                    + f"A new pattern {input_input_n.target}, {input_n.target} is met! "
+                    + "Skipping bmm lowering on this operation"
                 )
+                return PassResult(module, modified)
+
             real_input = input_input_n.all_input_nodes[0]
             input_other_n = other_n.all_input_nodes[0]
             if (
                 input_other_n.target != torch.ops.aten.expand.default
                 and other_n.target != torch.ops.aten.view.default
             ):
-                raise RuntimeError(
-                    "Bmm is addressed in fixed pattern. A new pattern is met!"
+                _LOGGER.warn(
+                    "Bmm is addressed in fixed pattern. "
+                    + f"A new pattern {input_other_n.target}, {other_n.target} is met! "
+                    + "Skipping bmm lowering on this operation"
                 )
+                return PassResult(module, modified)
+
             real_other = input_other_n.all_input_nodes[0]
             if len(real_other.meta["val"].size()) == 2:
                 new_func = aten_compose_bmm_2d
-            if len(real_other.meta["val"].size()) == 3:
+            elif len(real_other.meta["val"].size()) == 3:
                 new_func = aten_compose_bmm_3d
+            else:
+                # No valid bmm replacement exists for the specified dimensions
+                return PassResult(module, modified)
 
             with module.graph.inserting_after(node):
                 new_args = (real_input, real_other)
@@ -449,6 +466,7 @@ def compose_bmm(
                     kwargs=None,
                 )
             output.replace_all_uses_with(new_node)
+            modified = True
 
     module.graph.eliminate_dead_code()
     module.recompile()

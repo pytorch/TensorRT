@@ -130,7 +130,7 @@ def trace(f, args, *rest):
 
 
 @req_torch_version("2.dev")
-def opt_trace(f, args, *rest):
+def opt_trace(f, args, perform_trace=True, *rest):
     """
     Optimized trace with necessary passes which re-compose some ops or replace some ops
     These passes should be general and functional purpose
@@ -148,7 +148,11 @@ def opt_trace(f, args, *rest):
         replace_inplace_ops,  # remove it once functionalization is enabled
     ]
 
-    fx_module, _ = trace(f, args)
+    if perform_trace:
+        fx_module, _ = trace(f, args)
+    else:
+        fx_module = f
+
     print(fx_module.graph)
     for passes in passes_list:
         pr: PassResult = passes(fx_module)

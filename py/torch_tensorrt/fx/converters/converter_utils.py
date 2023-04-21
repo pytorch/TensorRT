@@ -77,7 +77,7 @@ def get_positive_dim(dim: int, dim_size: int) -> int:
     return dim
 
 
-def set_layer_name(layer: TRTLayer, target: Target, name: str) -> None:
+def set_layer_name(layer: TRTLayer, target: Target, name: str, is_acc=True) -> None:
     """
     Set the TensorRT layer name to "[TensorRT Layer Type]_[Original Op Name]_[FX Node Name with Suffix]"
 
@@ -87,7 +87,13 @@ def set_layer_name(layer: TRTLayer, target: Target, name: str) -> None:
             the node represents.
         name (str): Consists of fx node.name with optional suffix.
     """
-    target_name = target if isinstance(target, str) else f"acc_ops.{target.__name__}"
+    target_name = (
+        target
+        if isinstance(target, str)
+        else f"acc_ops.{target.__name__}"
+        if is_acc
+        else f"aten_ops.{target.__name__}"
+    )
     layer.name = f"[{layer.type.name}]-[{target_name}]-[{name}]"
 
 
@@ -286,6 +292,39 @@ def prepend_ones(
 
     layer.name = name
     return layer.get_output(0)
+
+
+def broadcastable(
+    a: TRTTensor,
+    b: TRTTensor,
+) -> bool:
+    "Check if two tensors are broadcastable according to torch rules"
+    a_shape = tuple(a.shape)
+    b_shape = tuple(b.shape)
+    print("a shape is", a_shape)
+    print("b shape is", b_shape)
+    # check from the trailing
+    diff = len(a_shape) - len(b_shape)
+    if diff == 0:
+        return True
+    if diff > 0:
+        max = len(a_shape)
+        min = len(b_shape)
+        greater_tensor = a_shape
+        lesser_tensor = b_shape
+    elif diff < 0:
+        max = len(b_shape)
+        min = len(a_shape)
+        greater_tensor = b_shape
+        lesser_tensor = a_shape
+    j = min - 1
+    for i in range(max - 1, diff - 1, -1):
+        if not (
+            greater_tensor[i] != lesser_tensor[j]
+            and (greater_tensor[i] == 1 or lesser_tensor[i] == 1)
+        ):
+            return False
+    return True
 
 
 def broadcast(
