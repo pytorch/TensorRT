@@ -582,7 +582,7 @@ def layer_norm(
     set_layer_name(mean_expected_layer, target, f"{name}_mean_expected")
 
     # X-E[x]
-    sub_trt = operator.add_binary_elementwise_layer(
+    sub_trt = add_binary_elementwise_layer(
         network,
         input_val,
         mean_expected_layer.get_output(0),
@@ -596,7 +596,7 @@ def layer_norm(
         trt.Weights(np.ascontiguousarray([2.0], dtype=np.float32)),
     )
     pow_tensor.name = f"{name}_power"
-    pow_var = operator.add_binary_elementwise_layer(
+    pow_var = add_binary_elementwise_layer(
         network,
         sub_trt,
         pow_tensor.get_output(0),
@@ -741,6 +741,7 @@ def add_layer_norm(network, target, kwargs, name):
         _LOGGER.error(
             "Unable to find layer norm plugin, fall back to TensorRT implementation."
         )
+        args = []
         return layer_norm(network, target, args, kwargs, name)
     layer = network.add_plugin_v2([input_val], plugin)
     layer.name = name
@@ -1130,7 +1131,6 @@ def add_expand(network, target, kwargs, name):
         ranks = len(shape)
 
     shape = [input_val.shape[i] if shape[i] == -1 else shape[i] for i in range(ranks)]
-
     inshape = tuple(input_val.shape)
     shape = tuple(shape)
     start = tuple([0] * ranks)
@@ -1266,3 +1266,297 @@ def add_matmul(network, target, kwargs, name):
     )
     set_layer_name(layer, target, name)
     return layer.get_output(0)
+
+
+def add_softmax(network, target, kwargs, name):
+    input_val = kwargs["input"]
+    input_ranks = len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0)  # type: ignore[union-attr]
+
+    if not isinstance(input_val, TRTTensor):
+        raise RuntimeError(
+            f"softmax received input {input_val} that is not part "
+            "of the TensorRT region!"
+        )
+
+    # Used to get dim when dim is None. Copied from PyTorch softmax implementation.
+    def get_softmax_dim(ndim: int) -> int:
+        if ndim == 0 or ndim == 1 or ndim == 3:
+            ret = 0
+        else:
+            ret = 1
+        return ret
+
+    if kwargs["dim"] is None:
+        dim = get_softmax_dim(input_ranks)
+    else:
+        dim = cast(int, kwargs["dim"])
+
+    dim = get_positive_dim(dim, input_ranks)
+    if network.has_implicit_batch_dimension:
+        assert dim != 0, "Can't apply softmax on batch dimension when it's implicit."
+        dim -= 1
+
+    layer = network.add_softmax(input_val)
+    layer.axes = 1 << dim
+    set_layer_name(layer, target, name)
+    return layer.get_output(0)
+
+
+def add_squeeze(network, target, kwargs, name):
+    input_val = kwargs["input"]
+
+    if not isinstance(input_val, TRTTensor):
+        raise RuntimeError(
+            f"squeeze received input {input_val} that is not part "
+            "of the TensorRT region!"
+        )
+    dims = []
+    if "dim" in kwargs:
+        if isinstance(kwargs["dim"], int):
+            dims.append(cast(Optional[int], kwargs["dim"]))
+        else:
+            for dim in kwargs["dim"]:
+                dims.append(cast(Optional[int], dim))
+
+    # dim = cast(Optional[int], kwargs["dim"] if "dim" in kwargs else None)
+    # Squeeze with dim=None would only work in explicit batch dim mode without any dynamic
+    # dim, which is a very rare case. For now we just claim not supporting dim=None.
+    assert not (len(dims) == 0), "We don't support dim=None right now for squeeze."
+
+    for dim in dims:
+        dim = get_positive_dim(
+            dim,
+            len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0),
+        )
+        if network.has_implicit_batch_dimension:
+            assert dim != 0, "We don't support squeeze batch dim when it's implicit."
+            dim -= 1
+
+        assert input_val.shape[dim] != -1, "We don't support squeeze dynamic dim."
+        assert (
+            len(get_dynamic_dims(input_val.shape)) <= 1
+        ), "Currently more than one dynamic dim for input to squeeze is not supported."
+
+    output_shape = []
+    for i, s in enumerate(input_val.shape):
+        if (i in dims) and s == 1:
+            continue
+        output_shape.append(s)
+    layer = network.add_shuffle(input_val)
+    layer.reshape_dims = tuple(output_shape)
+    set_layer_name(layer, target, name)
+    return layer.get_output(0)
+
+
+def add_chunk(network, target, kwargs, name):
+    input_val = kwargs["input"]
+    chunks = cast(int, kwargs["chunks"])
+    dim = cast(int, kwargs["dim"])
+    input_dim_size = len(input_val.shape)  # type: ignore[union-attr]
+
+    if not isinstance(input_val, TRTTensor):
+        raise RuntimeError(
+            f"chunk received input {input_val} that is not part "
+            "of the TensorRT region!"
+        )
+
+    dynamic_shape = has_dynamic_shape(input_val.shape)
+    if network.has_implicit_batch_dimension:
+        input_dim_size += 1
+        dim = get_positive_dim(dim, input_dim_size)
+        assert dim != 0, "Can't chunk on batch dim when it's implicit!"
+        dim -= 1
+    else:
+        if dynamic_shape:
+            assert input_val.shape[dim] != -1, "Can't chunk on dynamic shape dimension!"
+        dim = get_positive_dim(dim, input_dim_size)
+
+    if chunks > input_val.shape[dim]:
+        warnings.warn(
+            f"Asked for {chunks} chunks along dimention "
+            f"{dim} on tensor with size {input_val.shape}, chunks "
+            f"will default to {input_val.shape[dim]}",
+            RuntimeWarning,
+        )
+        chunks = input_val.shape[dim]
+
+    start = [0] * len(input_val.shape)
+    stride = [1] * len(start)
+    offset = 0
+    split_size = (input_val.shape[dim] + chunks - 1) // chunks
+
+    max_offset = input_val.shape[dim]
+    # add slice layers
+    output = []
+    for i in range(chunks):
+        shape = list(input_val.shape)
+        shape[dim] = min(split_size, max_offset - offset)
+        if dynamic_shape:
+            shape = get_shape_with_dynamic_shape(
+                network, shape, input_val, target, f"{name}_{i}"
+            )
+        start[dim] = offset
+        layer = network.add_slice(
+            input_val, start=start, shape=[] if dynamic_shape else shape, stride=stride
+        )
+        if dynamic_shape:
+            layer.set_input(2, shape)
+        offset += split_size
+        set_layer_name(layer, target, f"{name}_{i}")
+        output.append(layer.get_output(0))
+    return output
+
+
+def add_where(network, target, kwargs, name):
+    condition_t = kwargs["condition"]
+    x_t = kwargs["x"]
+    y_t = kwargs["y"]
+
+    x_t_dim = len(tuple(x_t.shape))
+    y_t_dim = len(tuple(y_t.shape))
+    condition_t_dim = len(tuple(condition_t.shape))
+
+    if type(x_t) != TRTTensor:
+        assert type(x_t) is torch.Tensor, f"value {x_t} is not torch.Tensor!"
+
+    if type(y_t) != TRTTensor:
+        assert type(y_t) is torch.Tensor, f"value {y_t} is not torch.Tensor!"
+
+    if not (broadcastable(x_t, y_t)):
+        assert f"The two torch tensors should be broadcastable"
+
+    # get output shape
+    # purpose of this is to bring x_t and y_t rank same as
+    # output_shape to input it to the add_expand operation
+    # condition_t will have dimension of either x_t or y_t
+    x_t, y_t = broadcast(network, x_t, y_t, f"{name}_x", f"{name}_y")
+    if len(tuple(condition_t.shape)) != len(tuple(x_t.shape)):
+        condition_t, x_t = broadcast(
+            network, condition_t, x_t, f"{name}_condition", f"{name}_x"
+        )
+
+    print("x_t shape", x_t.shape)
+    print("y_t shape", y_t.shape)
+    print("condition_t shape", condition_t.shape)
+    x_shape = list(x_t.shape)
+    y_shape = list(y_t.shape)
+    condition_shape = list(condition_t.shape)
+    output_shape = list(torch.broadcast_shapes(condition_shape, x_shape, y_shape))
+
+    # expand shape
+    if type(condition_t) != TRTTensor:
+        assert condition_t.dtype == torch.bool, "condition dtype is not bool"
+        if condition_shape != output_shape:
+            condition_t.expand(output_shape)
+        condition_t = condition_t.to(torch.int32)
+        condition_const = get_trt_tensor(network, condition_t, f"{name}_condition")
+        condition_layer = network.add_identity(condition_const)
+        condition_layer.set_output_type(0, trt.bool)
+        set_layer_name(condition_layer, target, f"{name}_condition")
+        condition_val = condition_layer.get_output(0)
+    else:
+        assert condition_t.dtype == trt.bool, "mask dtype is not bool!"
+        if condition_shape != condition_t_dim:
+            condition_val = add_expand(
+                network,
+                target,
+                {"input": condition_t, "sizes": output_shape},
+                name=f"{name}_expand",
+            )
+        else:
+            condition_val = condition_t
+
+    if type(x_t) != TRTTensor:
+        if x_shape != x_t_dim:
+            # special case where 1 element in x_t
+            if len(x_t.shape) == 0:
+                x_t = x_t.unsqueeze(0)
+            x_t = x_t.expand(output_shape)
+        x_val = get_trt_tensor(network, x_t, f"{name}_x")
+    else:
+        x_val = x_t
+        if x_shape != output_shape:
+            x_val = add_expand(
+                network,
+                target,
+                {"input": x_val, "sizes": output_shape},
+                name=f"{name}_x_expand",
+            )
+
+    if type(y_t) != TRTTensor:
+        if y_shape != output_shape:
+            # special case where 1 element in y_t
+            if len(y_t.shape) == 0:
+                y_t = y_t.unsqueeze(0)
+            y_t = y_t.expand(output_shape)
+        y_val = get_trt_tensor(network, y_t, f"{name}_y")
+    else:
+        y_val = y_t
+        if y_shape != y_t_dim:
+            y_val = add_expand(
+                network,
+                target,
+                {"input": y_val, "sizes": output_shape},
+                name=f"{name}_y_expand",
+            )
+
+    select_layer = network.add_select(condition_val, x_val, y_val)
+
+    set_layer_name(select_layer, target, f"{name}_select")
+
+    return select_layer.get_output(0)
+
+
+def add_scale(network, target, kwargs, name):
+    other = kwargs["other"]
+    scale = kwargs["scale"]
+    if isinstance(other, TRTTensor):
+        other_dtype = torch_dtype_from_trt(other.dtype)
+        is_other_trt_tensor = True
+
+    if not is_other_trt_tensor:
+        warnings.warn(
+            f"The value to be scaled is constant"
+            "In this case, please consider constant fold the model first."
+        )
+        return other * scale
+    layer = network.add_scale(other, trt.ScaleMode.UNIFORM, 0, scale, 1)
+    set_layer_name(layer, target, name)
+    return layer.get_output(0)
+
+
+def add_rsub(network, target, kwargs, name):
+    kwargs_new = {}
+    if "alpha" in kwargs:
+        kwargs_new["input"] = kwargs["other"]
+        kwargs_new["other"] = kwargs["alpha"]
+        scaled_tensor = add_mul(network, target, kwargs_new, name + "_mul")
+    else:
+        scaled_tensor = kwargs["other"]
+    input = kwargs["input"]
+    return add_binary_elementwise_layer(
+        network,
+        kwargs["input"],
+        scaled_tensor,
+        trt.ElementWiseOperation.SUB,
+        target,
+        name + "_sub",
+    )
+
+
+def add_sqrt(network, target, kwargs, name):
+    input_val = kwargs["input"]
+    operation_type = trt.UnaryOperation.SQRT
+    return add_unary_layer(network, input_val, operation_type, target, name)
+
+
+def add_rsqrt(network, target, kwargs, name):
+    sqrt_trt = add_sqrt(network, target, kwargs, name)
+    return add_binary_elementwise_layer(
+        network,
+        1,
+        sqrt_trt,
+        trt.ElementWiseOperation.DIV,
+        target,
+        f"{name}_div_trt",
+    )

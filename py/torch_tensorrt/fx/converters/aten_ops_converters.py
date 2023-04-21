@@ -620,3 +620,101 @@ def aten_ops_matmul(
         "other": args[1],
     }
     return add_matmul(network, target, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten.layer_norm.default)
+def aten_ops_layernorm(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "input": args[0],
+        "normalized_shape": args[1],
+        "weight": args[2],
+        "bias": args[3],
+        "eps": args[4],
+    }
+    return add_layer_norm(network, target, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten._softmax.default)
+def aten_ops_softmax(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "input": args[0],
+        "dim": args[1],
+    }
+    return add_softmax(network, target, kwargs_new, name)
+
+
+# FIXME: need to look at case where dim is tuple
+@tensorrt_converter(torch.ops.aten.squeeze.dim)
+@tensorrt_converter(torch.ops.aten.squeeze.dims)
+def aten_ops_squeeze(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "input": args[0],
+        "dim": args[1],
+    }
+    return add_squeeze(network, target, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten.where.self)
+def aten_ops_where(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "condition": args[0],
+        "x": args[1],
+        "y": args[2],
+    }
+    return add_where(network, target, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten.rsub.Tensor)
+def aten_ops_rsub(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    if "alpha" in kwargs:
+        alpha = kwargs["alpha"]
+    kwargs_new = {
+        "input": args[0],
+        "other": args[1],
+        "alpha": alpha,
+    }
+    return add_rsub(network, target, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten.rsqrt.default)
+def aten_ops_rsqrt(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "input": args[0],
+    }
+    return add_rsqrt(network, target, kwargs_new, name)
