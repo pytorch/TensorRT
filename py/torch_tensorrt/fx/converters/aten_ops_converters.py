@@ -45,7 +45,6 @@ def aten_ops_add(
     return add_add(network, target, kwargs_new, name)
 
 
-@tensorrt_converter(torch.ops.aten.mean.dim)
 @tensorrt_converter(torch.ops.aten._adaptive_avg_pool3d.default)
 @tensorrt_converter(torch.ops.aten._adaptive_avg_pool2d.default)
 def aten_ops_adaptive_avg_poolnd(
@@ -55,20 +54,35 @@ def aten_ops_adaptive_avg_poolnd(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    if target == torch.ops.aten.mean.dim:
-        if list(args[1]) != [-1, -2]:
-            raise RuntimeError(f"We do not support {target} has dim={args[1]}")
-        else:
-            output_size = [1, 1]
-    else:
-        output_size = args[1]
-
     kwargs_new = {
         "input": args[0],
-        "output_size": output_size,
+        "output_size": args[1],
     }
     return acc_ops_converters.acc_ops_adaptive_avg_poolnd(
         network, target, None, kwargs_new, name
+    )
+
+
+@tensorrt_converter(torch.ops.aten.mean.default)
+@tensorrt_converter(torch.ops.aten.mean.dim)
+def aten_ops_mean(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> TRTTensor:
+    # Default invocation of aten.mean only uses first argument and
+    # averages over all elements (all dimensions)
+    # aten.mean.dim invocation allows specification of dimensions to average
+    # over, as well at the option to keep the dimension or not
+    kwargs_new = {
+        "input": args[0],
+        "dim": args[1] if len(args) >= 2 else list(range(len(args[0].shape))),
+        "keepdim": args[2] if len(args) >= 3 else False,
+    }
+    return add_reduce_layer(
+        network, target, args, kwargs_new, trt.ReduceOperation.AVG, name
     )
 
 
