@@ -18,7 +18,6 @@ class TestLayerNormConverter(DispatchTestCase):
             TestModule(), inputs, expected_ops={torch.ops.aten.layer_norm.default}
         )
 
-
     def test_layernorm_with_dynamic_shape(self):
         class TestModule(torch.nn.Module):
             def __init__(self):
