@@ -31,7 +31,7 @@ class TestReshapeConverter(DispatchTestCase):
         self.run_test(
             TestModule(target_shape),
             inputs,
-            expected_ops={torch.ops.aten.reshape},
+            expected_ops={torch.ops.aten.view.default},
         )
 
     @parameterized.expand(
@@ -64,7 +64,7 @@ class TestReshapeConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             TestModule(target_shape),
             input_specs,
-            expected_ops={torch.ops.aten.reshape},
+            expected_ops={torch.ops.aten.view.default},
         )
 
     @unittest.skipIf(
@@ -94,7 +94,7 @@ class TestReshapeConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             TestModule(),
             input_specs,
-            expected_ops={torch.ops.aten.reshape},
+            expected_ops={torch.ops.aten.view.default},
         )
 
 
