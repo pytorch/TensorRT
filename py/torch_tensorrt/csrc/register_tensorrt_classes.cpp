@@ -84,6 +84,7 @@ void RegisterTRTCompileSpec() {
       TRTCompileSpecTSRegistration, torch_tensorrt::pyapi::CompileSpec, dla_global_dram_size);
   ADD_FIELD_GET_SET_REGISTRATION(
       TRTCompileSpecTSRegistration, torch_tensorrt::pyapi::CompileSpec, truncate_long_and_double);
+  ADD_FIELD_GET_SET_REGISTRATION(TRTCompileSpecTSRegistration, torch_tensorrt::pyapi::CompileSpec, allow_shape_tensors);
 }
 
 struct TRTTSRegistrations {

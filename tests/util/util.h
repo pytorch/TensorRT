@@ -57,7 +57,8 @@ std::vector<at::Tensor> RunGraphEngineDynamic(
     std::shared_ptr<torch::jit::Graph>& g,
     core::ir::StaticParams& named_params,
     std::vector<at::Tensor> inputs,
-    bool dynamic_batch = false);
+    bool dynamic_batch = false,
+    bool allow_shape_tensors = false);
 
 // Run the forward method of a module and return results
 torch::jit::IValue RunModuleForward(torch::jit::Module& mod, std::vector<torch::jit::IValue> inputs);

@@ -270,7 +270,11 @@ auto aten_registrations TORCHTRT_UNUSED =
                  if (tensor_var.isITensor()) {
                    auto tensor = tensor_var.ITensor();
                    if (ctx->input_is_dynamic) {
-                     return dynamic_size_layer(ctx, n, args);
+                     if (ctx->settings.allow_shape_tensors) {
+                       return dynamic_size_layer(ctx, n, args);
+                     } else {
+                       LOG_WARNING("There may be undefined behavior using dynamic shape and aten::size ");
+                     }
                    }
                    return util::toVec(tensor->getDimensions());
                  } else if (tensor_var.IValue()->isTensor()) {
@@ -286,7 +290,11 @@ auto aten_registrations TORCHTRT_UNUSED =
                  auto dim = args.at(n->input(1)).unwrapToInt();
                  if (tensor_var.isITensor()) {
                    if (ctx->input_is_dynamic) {
-                     return dynamic_size_layer(ctx, n, args);
+                     if (ctx->settings.allow_shape_tensors) {
+                       return dynamic_size_layer(ctx, n, args);
+                     } else {
+                       LOG_WARNING("There may be undefined behavior using dynamic shape and aten::size ");
+                     }
                    }
                    auto tensor = tensor_var.ITensor();
                    auto dims = util::toVec(tensor->getDimensions());

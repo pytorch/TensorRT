@@ -371,7 +371,8 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("dla_local_dram_size", &CompileSpec::dla_local_dram_size)
       .def_readwrite("dla_global_dram_size", &CompileSpec::dla_global_dram_size)
       .def_readwrite("torch_fallback", &CompileSpec::torch_fallback)
-      .def_readwrite("truncate_long_and_double", &CompileSpec::truncate_long_and_double);
+      .def_readwrite("truncate_long_and_double", &CompileSpec::truncate_long_and_double)
+      .def_readwrite("allow_shape_tensors", &CompileSpec::allow_shape_tensors);
 
   py::class_<TorchFallback>(ts_sub_mod, "TorchFallback")
       .def(py::init<>())
