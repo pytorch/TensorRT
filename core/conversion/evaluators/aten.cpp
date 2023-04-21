@@ -176,8 +176,8 @@ c10::optional<torch::jit::IValue> newTensorLikeImplementation(
   if (ctx->input_is_dynamic) {
     auto self = args.at(n->input(0)).ITensorOrFreeze(ctx);
     std::vector<int64_t> dims_vec(self->getDimensions().nbDims, 1);
-    auto zeros = tensor_builder(dims_vec, options);
-    auto zeros_itensor = converters::tensor_to_const(ctx, zeros);
+    auto constant = tensor_builder(dims_vec, options);
+    auto constant_itensor = converters::tensor_to_const(ctx, constant);
     // broadcast constant to output shape
     std::vector<int64_t> start_vec(self->getDimensions().nbDims, 0);
     auto start_offset = util::toDims(c10::IntArrayRef(start_vec));
@@ -185,7 +185,7 @@ c10::optional<torch::jit::IValue> newTensorLikeImplementation(
     TORCHTRT_CHECK(shape_layer, "Unable to create shape layer from node: " << *n);
     shape_layer->setName((util::node_info(n) + "_shape").c_str());
     // slice implements expand
-    auto slice_layer = ctx->net->addSlice(*zeros_itensor, start_offset, self->getDimensions(), start_offset);
+    auto slice_layer = ctx->net->addSlice(*constant_itensor, start_offset, self->getDimensions(), start_offset);
     TORCHTRT_CHECK(slice_layer, "Unable to create slice layer from node: " << *n);
     slice_layer->setInput(2, *shape_layer->getOutput(0));
     slice_layer->setName((util::node_info(n) + "_slice").c_str());
