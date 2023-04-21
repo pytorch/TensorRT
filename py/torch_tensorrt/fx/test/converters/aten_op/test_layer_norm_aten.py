@@ -31,12 +31,12 @@ class TestLayerNormConverter(DispatchTestCase):
             InputTensorSpec(
                 shape=(-1, 3, 224, 224),
                 dtype=torch.float32,
-                shape_ranges=[(1, 3, 1, 1)],
+                shape_ranges=[((1, 3, 224, 224), (1, 3, 224, 224), (2, 3, 224, 224))],
             ),
         ]
 
         self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.batch_norm}
+            TestModule(), input_specs, expected_ops={torch.ops.aten.layer_norm.default}
         )
 
 
