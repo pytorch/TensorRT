@@ -24,7 +24,7 @@ We provide a `Dockerfile` in `docker/` directory. It expects a PyTorch NGC conta
 Please follow this instruction to build a Docker container.
 
 ```bash
-docker build --build-arg BASE=<CONTAINER VERSION e.g. 21.11> -f docker/Dockerfile -t torch_tensorrt:latest .
+docker build -f docker/Dockerfile -t torch_tensorrt:latest .
 ```
 
 In the case of building on top of a custom base container, you first must determine the
