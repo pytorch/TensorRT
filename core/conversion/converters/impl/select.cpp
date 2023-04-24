@@ -803,6 +803,39 @@ auto select_registrations TORCHTRT_UNUSED =
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
                LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
                return true;
+             }})
+        .pattern(
+            {"aten::where.ScalarOther(Tensor condition, Tensor self, Scalar other) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto condition = args[0].ITensorOrFreeze(ctx);
+               auto condition_nbDims = condition->getDimensions().nbDims;
+               auto self = args[1].ITensorOrFreeze(ctx);
+               auto x_nbDims = self->getDimensions().nbDims;
+
+               // Get maximum rank of all input tensors
+               auto max_nbDims = std::max(condition_nbDims, x_nbDims);
+
+               // TensorRT requires all inputs to Select layers to have the same rank, so for each
+               // tensor input, ensure that its rank is equal to the maximum number of dimensions
+               // If not, left-pad the tensor dimension with 1s until the max rank is achieved
+               condition =
+                   addPadding(ctx, n, condition, max_nbDims, /*bool trailing =*/false, /*bool use_zeros =*/false);
+               self = addPadding(ctx, n, self, max_nbDims, /*bool trailing =*/false, /*bool use_zeros =*/false);
+
+               // Create a scalar tensor of rank max_nbDims from scalar other
+               auto scalar_value = args[2].unwrapToScalar();
+               std::vector<int64_t> dims_vec(max_nbDims, 1);
+               auto self_dtype = util::TRTDataTypeToScalarType(self->getType());
+               auto constant_tensor = torch::full(dims_vec, scalar_value, {torch::dtype(self_dtype)});
+               auto constant_itensor = converters::tensor_to_const(ctx, constant_tensor);
+
+               auto layer = ctx->net->addSelect(*condition, *self, *constant_itensor);
+               TORCHTRT_CHECK(layer, "Unable to create select layer for aten::where.ScalarOther");
+               layer->setName(util::node_info(n).c_str());
+
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
              }});
 
 } // namespace
