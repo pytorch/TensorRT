@@ -54,11 +54,6 @@ class TestFusePermuteLinear(AccTestCase):
             apply_passes=[fuse_permute_linear],
         )
 
-    # TODO: The following test has been disabled due to a bug in TRT 8.5.1.7
-    # with self.linear2. Issue : https://github.com/pytorch/TensorRT/issues/1444
-    @unittest.skip(
-        reason="test_multi_fuse_permute_linear has been disabled due to a bug in TRT 8.5.1.7 https://github.com/pytorch/TensorRT/issues/1444"
-    )
     def test_multi_fuse_permute_linear(self):
         """
         Fusion when permute output is shared by multiple linears
