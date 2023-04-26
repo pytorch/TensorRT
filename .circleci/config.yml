@@ -727,6 +727,22 @@ commands:
       - store_artifacts:
           path: /tmp/testlogs
 
+  test-dynamo-torch_compile-core:
+    description: "Test the Dynamo torch_compile path"
+    steps:
+      - run:
+          name: Run Dynamo torch_compile core tests
+          command: |
+            cd py/torch_tensorrt/dynamo/torch_compile
+            pushd test/
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/torch_compile/test_results.xml
+            popd
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
   test-dynamo-torch_compile:
     description: "Test the Dynamo torch_compile path"
     steps:
@@ -953,6 +969,7 @@ jobs:
       # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - dump-test-env
       - test-dynamo-torch_compile
+      - test-dynamo-torch_compile-core
       - test-dynamo-fx_ts
 
   package-x86_64-linux:
