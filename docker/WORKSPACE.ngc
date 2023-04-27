@@ -33,7 +33,7 @@ git_repository(
 # This is currently used in pytorch NGC container CI testing.
 local_repository(
     name = "torch_tensorrt",
-    path = "/usr/local/lib/python3.8/dist-packages/torch_tensorrt/"
+    path = "/usr/local/lib/python3.10/dist-packages/torch_tensorrt/"
 )
 
 # CUDA should be installed on the system locally
@@ -55,13 +55,13 @@ new_local_repository(
 
 new_local_repository(
     name = "libtorch",
-    path = "/usr/local/lib/python3.8/dist-packages/torch/",
+    path = "/usr/local/lib/python3.10/dist-packages/torch/",
     build_file = "third_party/libtorch/BUILD"
 )
 
 new_local_repository(
     name = "libtorch_pre_cxx11_abi",
-    path = "/usr/local/lib/python3.8/dist-packages/torch/",
+    path = "/usr/local/lib/python3.10/dist-packages/torch/",
     build_file = "third_party/libtorch/BUILD"
 )
 
