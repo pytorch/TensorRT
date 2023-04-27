@@ -5,6 +5,7 @@ from packaging import version
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
+import logging
 from functorch import make_fx
 from functorch.experimental import functionalize
 from torch_tensorrt.fx.passes.lower_basic_pass import (
@@ -13,6 +14,9 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
 )
 
 from .types import Shape, TRTDataType
+
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 class LowerPrecision(Enum):
@@ -50,6 +54,11 @@ def torch_dtype_to_trt(dtype: torch.dtype) -> TRTDataType:
     elif dtype == torch.int8:
         return trt.int8
     elif dtype == torch.int32:
+        return trt.int32
+    elif dtype == torch.int64:
+        _LOGGER.warn(
+            "Detected Int64 Input, Casting to Int32 for TRT Engine Compatibility"
+        )
         return trt.int32
     elif dtype == torch.float16:
         return trt.float16

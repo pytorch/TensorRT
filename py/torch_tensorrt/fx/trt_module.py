@@ -137,7 +137,6 @@ class TRTModule(torch.nn.Module):
 
                 # This is only used when the trt engine is using implicit batch dim.
                 batch_size = inputs[0].shape[0]
-                contiguous_inputs: List[torch.Tensor] = [i.contiguous() for i in inputs]
                 bindings: List[Any] = [None] * (
                     len(self.input_names)
                     + len(self.output_names)
@@ -148,16 +147,27 @@ class TRTModule(torch.nn.Module):
                     assert inputs[
                         i
                     ].is_cuda, f"{i}th input({input_name}) is not on cuda device."
+
+                    # Intercept int64 inputs to TRT Engines and cast them to int32
+                    if (
+                        inputs[i].dtype == torch.int64
+                        and self.input_dtypes[i] == torch.int32
+                    ):
+                        inputs = (
+                            inputs[:i] + (inputs[i].to(torch.int32),) + inputs[i + 1 :]
+                        )
+
                     assert (
                         inputs[i].dtype == self.input_dtypes[i]
                     ), f"Dtype mismatch for {i}th input({input_name}). Expect {self.input_dtypes[i]}, got {inputs[i].dtype}."
 
+                    contiguous_input = inputs[i].contiguous()
                     idx = self.input_binding_indices_in_order[i]
-                    bindings[idx] = contiguous_inputs[i].data_ptr()
+                    bindings[idx] = contiguous_input.data_ptr()
 
                     if not self.engine.has_implicit_batch_dimension:
                         self.context.set_binding_shape(
-                            idx, tuple(contiguous_inputs[i].shape)
+                            idx, tuple(contiguous_input.shape)
                         )
                     else:
                         assert inputs[i].size()[1:] == self.input_shapes[i], (
