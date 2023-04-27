@@ -1389,3 +1389,33 @@ TEST(Converters, WhereConvertsMismatchedShapesCorrectly) {
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
+
+TEST(Converters, WhereScalarConvertsCorrectly) {
+  const auto graph = R"IR(
+         graph(%input : Tensor,
+               %condition : Tensor):
+           %scalar : int = prim::Constant[value=-1]()
+           %10 : Tensor = aten::where(%condition, %input, %scalar)
+           return (%10))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto condition = at::randint(0, 2, {1, 435, 1}, {at::kCUDA}).to(at::kBool);
+  auto input = at::randn({1, 435, 11}, {at::kCUDA});
+
+  auto jit_condition = at::clone(condition);
+  auto jit_input = at::clone(input);
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_input, jit_condition});
+
+  auto trt_condition = at::clone(condition);
+  auto trt_input = at::clone(input);
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {trt_input, trt_condition});
+
+  for (size_t i = 0; i < jit_results.size(); i++) {
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt_results[i], 2e-6));
+  }
+}
