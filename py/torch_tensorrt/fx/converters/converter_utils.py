@@ -28,6 +28,7 @@ class SourceIR(Enum):
     ACC = auto()
     ATEN = auto()
     PRIM = auto()
+    TORCHTRT_LOWERED = auto()
     UNKNOWN = auto()
 
     def __str__(self):
@@ -39,6 +40,8 @@ class SourceIR(Enum):
             return "aten"
         elif self == SourceIR.PRIM:
             return "prim"
+        elif self == SourceIR.TORCHTRT_LOWERED:
+            return "torchtrt_lowered"
         else:
             return "unknown_ir"
 
@@ -383,171 +386,6 @@ def broadcast(
     return a, b
 
 
-def get_shape_with_dynamic_shape(
-    network: TRTNetwork,
-    shape: Union[list, tuple, torch.Tensor],
-    input_val: TRTTensor,
-    target: Target,
-    name: str,
-) -> TRTTensor:
-    """
-    Prepare the real output tensor shape for dynamic shape mode tensor input.
-    How this functions works:
-    Assuming the input_val has actual shape [2048, 256, 512], expected reduce operation
-    output shape is [-1, 128, 256], this function should return [2048, 128, 256] as the actual
-    reduce operation output shape. Steps of calculations are:
-        1. get the actual tensor shape of input_val via add_shape layer;
-        2. create a all 0 tensor [0, 0, 0];
-        3. run elementwise comparision the [0, 0, 0] and [-1, 128, 256] tensor, get a condition tensor [True, False, False];
-        4. use the condition tensor [True, False, False] to do selection between [2048, 256, 512] and [-1, 128, 256], replace
-           all -1 dynamic shape dimensions with actual batch_size value;
-        5. output shape with actual batch_size as [2048, 128, 256]
-
-    Args:
-        network (TRTNetwork): TensorRT network object.
-        shape: calculated shape of the expected output tensor
-        input_val (TRTTensor): A TensorRT ITensor.
-        target (Target): Target of fx node.
-        name (str): The name we want to assign to the created TensorRT layer.
-    Returns:
-        TensorRT ITensors that represents the actual shape of the input_val
-    """
-    # Ger real shape info for input_val
-    input_shape = network.add_shape(input_val).get_output(0)
-
-    scale_layer = network.add_constant(
-        input_shape.shape, np.ascontiguousarray(shape, dtype=np.int32)
-    )
-    set_layer_name(scale_layer, target, f"{name}_scale")
-    scale_res = scale_layer.get_output(0)
-
-    length = input_shape.shape[0]
-    zero_layer = network.add_constant(
-        input_shape.shape, to_numpy(torch.zeros((length), dtype=torch.int32))
-    )
-    set_layer_name(zero_layer, target, f"{name}_zeros")
-
-    condition_val = add_binary_elementwise_layer(
-        network,
-        scale_res,
-        zero_layer.get_output(0),
-        trt.ElementWiseOperation.LESS,
-        target,
-        f"{name}_shape",
-    )
-    select_layer = network.add_select(condition_val, input_shape, scale_res)
-    set_layer_name(select_layer, target, f"{name}_select")
-    return select_layer.get_output(0)
-
-
-def add_binary_elementwise_layer(
-    network: TRTNetwork,
-    lhs_val: Union[int, float, TRTTensor, torch.Tensor],
-    rhs_val: Union[int, float, TRTTensor, torch.Tensor],
-    op_type: trt.ElementWiseOperation,
-    target: Target,
-    name: str,
-) -> TRTTensor:
-    """
-    This function adds a TensorRT elementwise layer. We allow both operands to be
-    constant (not a trt tensor) because in implicit batch dimension mode, we could
-    introduce constant via .size() op. Other scenario should be const folded first.
-    If any operand is not a trt tensor, we make it a trt constant layer while preserve
-    its dtype. Then we broadcast these two inputs to have the same number of dimensions.
-
-    Limitation:
-        If we are using implicit batch dim mode, the operand that is not a trt
-    tensor are not allowed to have larger ranks than the trt tensor operand.
-
-    Args:
-        network (TRTNetwork): TensorRT network object.
-        lhs_val (TRTTensor): Left operand of the binary operation. Could
-            be a TensorRT tensor, a PyTorch tensor or a simple value.
-        rhs_val (TRTTensor): Right operand of the binary operation. Similar
-            to lhs_val.
-        op_type (trt.ElementWiseOperation): Type of the TensorRT elementwise binary operation.
-        target (Target): Target of fx node.
-        name (str): The name we want to assign to the created TensorRT layer.
-
-    Returns:
-        The output of TensorRT Elementwise layer.
-    """
-    lhs_dtype = None
-    rhs_dtype = None
-    is_lhs_trt_tensor = False
-    is_rhs_trt_tensor = False
-
-    if isinstance(lhs_val, TRTTensor):
-        lhs_dtype = torch_dtype_from_trt(lhs_val.dtype)
-        is_lhs_trt_tensor = True
-    if isinstance(rhs_val, TRTTensor):
-        rhs_dtype = torch_dtype_from_trt(rhs_val.dtype)
-        is_rhs_trt_tensor = True
-
-    if not is_lhs_trt_tensor and not is_rhs_trt_tensor:
-        warnings.warn(
-            f"Both operands of the binary elementwise op {name} "
-            "are constant. In this case, please consider constant fold the model first."
-        )
-        return get_python_op_from_trt_elementwise_op(op_type)(lhs_val, rhs_val)
-
-    # If the following conditions are true:
-    #  1. the network has implicit batch dimension,
-    #  2. one operand has shape [] (real shape is [batch_size]),
-    #  3. another operand is a scalar,
-    # then the result should also have shape [] (real shape is [batch_size]).
-    #
-    # In such case, we need to convert the scalar operand to tensor, because
-    # this way the shape will become [1], and then will be properly squeezed
-    # into [], meaning that the result will have shape [], which is what we
-    # expect.
-    #
-    # Note that the dtype here is supposed to be the same as the scalar
-    # dtype but we don't have a way to detect whether it makes sense for the
-    # scalar to be float or half. Hence we go with the lhs dtype.
-    if is_lhs_trt_tensor and isinstance(rhs_val, (float, int)):
-        rhs_val = torch.tensor([rhs_val], dtype=lhs_dtype)
-    if is_rhs_trt_tensor and isinstance(lhs_val, (float, int)):
-        lhs_val = torch.tensor([lhs_val], dtype=rhs_dtype)
-
-    # When lhs is scalar, and rhs has shape [1,], then currently the assert
-    # will fail because lhs shape has fewer dimensions than rhs shape.  This
-    # happens when using implicit batch dimension, when we removed the 1st
-    # dimension from input tensor, causing it to have shape [] - a scalar.  We
-    # fix it by reducing the rhs constant with a squeeze_left, so it becomes a
-    # scalar too. More generally, we squeeze_left on input if it's a constant
-    # tensor. This is safe because broadcast will pad dimensions on the left
-    # (prepend) to make lhs and rhs shape compatible.
-    if network.has_implicit_batch_dimension:
-        if isinstance(lhs_val, torch.Tensor):
-            lhs_val = squeeze_left(lhs_val)
-        if isinstance(rhs_val, torch.Tensor):
-            rhs_val = squeeze_left(rhs_val)
-
-    lhs_val = get_trt_tensor(network, lhs_val, f"{name}_lhs", lhs_dtype)
-    rhs_val = get_trt_tensor(network, rhs_val, f"{name}_rhs", rhs_dtype)
-
-    # Check the limitation in the doc string.
-    if network.has_implicit_batch_dimension:
-        if is_lhs_trt_tensor and not is_rhs_trt_tensor:
-            assert len(lhs_val.shape) >= len(
-                rhs_val.shape
-            ), f"{lhs_val.shape} >= {rhs_val.shape}"
-        elif not is_lhs_trt_tensor and is_rhs_trt_tensor:
-            assert len(rhs_val.shape) >= len(
-                lhs_val.shape
-            ), f"{rhs_val.shape} >= {lhs_val.shape}"
-
-    lhs_val, rhs_val = broadcast(
-        network, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
-    )
-    layer = network.add_elementwise(lhs_val, rhs_val, op_type)
-    set_layer_name(layer, target, name)
-    output = layer.get_output(0)
-    output.name = output.name + "_" + target.__name__
-    return output
-
-
 def squeeze_left(const: torch.Tensor):
     """
     Squeeze the size-1 dimensions on the left side of the shape tuple.
@@ -557,38 +395,6 @@ def squeeze_left(const: torch.Tensor):
     while len(const.shape) > 0 and const.shape[0] == 1:
         const = const.squeeze(dim=0)
     return const
-
-
-def add_unary_layer(
-    network: TRTNetwork,
-    input_val: TRTTensor,
-    operation_type: trt.UnaryOperation,
-    target: Target,
-    name: str,
-) -> TRTTensor:
-    """
-    Add a TensorRT Unary layer to `network`.
-
-    Args:
-        network (TRTNetwork): TensorRT network object.
-        input_val (TRTTensor): Input to the unary op. Must be a TensorRT tensor.
-        op_type (trt.ElementWiseOperation): Type of the TensorRT unary operation.
-        target (Target): Target of fx node.
-        name (str): The name we want to assign to the created TensorRT layer.
-
-    Returns:
-        The output of TensorRT Unary layer.
-    """
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"{operation_type} received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
-    layer = network.add_unary(input_val, operation_type)
-    set_layer_name(layer, target, name)
-    output = layer.get_output(0)
-    output.name = output.name + "_" + target.__name__
-    return layer.get_output(0)
 
 
 def add_reduce_layer(
@@ -693,139 +499,6 @@ def get_inputs_from_args_and_kwargs(args, kwargs, input_names):
         else:
             inputs.append(kwargs[key])
     return inputs
-
-
-def sign(
-    network: TRTNetwork, input_val: TRTTensor, target: Target, name: str
-) -> TRTTensor:
-    """
-    Sign is calculated as below:
-       x = input
-       sign = (exp(x) // exp(abs(x))) * 2 - 1
-       For positive number and 0, (exp(x) // exp(abs(x))) yield 1; for negative number, (exp(x) // exp(abs(x))) yield 0.
-       With multiply 2, the value become 2(for pos and 0) and 0(for neg).
-       Finally minus 1, the value become 1(for pos and 0) and -1(for neg).
-
-    Args:
-        network (TRTNetwork): TensorRT network object.
-        input_val (TRTTensor): The input tensor.
-        target (Target): fx node target.
-        name (str): Name of the fx node with optional suffix.
-
-    Returns:
-        A TensorRT tensor represent the result of sign operator.
-    """
-    input_exp_output = add_unary_layer(
-        network, input_val, trt.UnaryOperation.EXP, target, f"{name}_prod_exp"
-    )
-    input_abs_output = add_unary_layer(
-        network, input_val, trt.UnaryOperation.ABS, target, f"{name}_prod_abs"
-    )
-    input_abs_exp_output = add_unary_layer(
-        network,
-        input_abs_output,
-        trt.UnaryOperation.EXP,
-        target,
-        f"{name}_prod_abs_exp",
-    )
-    floor_div_output = add_binary_elementwise_layer(
-        network,
-        input_exp_output,
-        input_abs_exp_output,
-        trt.ElementWiseOperation.FLOOR_DIV,
-        target,
-        f"{name}_exp_floor_div",
-    )
-    double_floor_div_output = add_binary_elementwise_layer(
-        network,
-        floor_div_output,
-        2,
-        trt.ElementWiseOperation.PROD,
-        target,
-        f"{name}_floor_div*2",
-    )
-    return add_binary_elementwise_layer(
-        network,
-        double_floor_div_output,
-        1,
-        trt.ElementWiseOperation.SUB,
-        target,
-        f"{name}_sign",
-    )
-
-
-def trunc_div(
-    input: TRTTensor, other: TRTTensor, network: TRTNetwork, target: Target, name: str
-) -> TRTTensor:
-    """
-    Perform trunc divide on Tensor, result of divide will be round toward zero.
-    This means for positive number, it will be floor round; for negative number,
-    it will be ceil round. Example: [2.1, 0.8, -3.2] -> [2, 0, -3].
-
-    Args:
-        input: divisor.
-        other: dividend.
-        network: INetworkDefinition.
-        target: node target.
-        name: namespace for the op
-
-    Returns:
-        A TensorRT tensor represent the result of trunc divide.
-    """
-    prod_output = add_binary_elementwise_layer(
-        network, input, other, trt.ElementWiseOperation.PROD, target, f"{name}_prod"
-    )
-    sign_output = sign(network, prod_output, target, name)
-
-    # Convert constant input into ITensor for UnaryOperation
-    if not isinstance(input, trt.tensorrt.ITensor):
-        input = get_trt_tensor(network, input, f"{name}_input")
-    if not isinstance(other, trt.tensorrt.ITensor):
-        other = get_trt_tensor(
-            network, other, f"{name}_other", dtype=torch_dtype_from_trt(input.dtype)
-        )
-
-    abs_input_output = add_unary_layer(
-        network, input, trt.UnaryOperation.ABS, target, f"{name}_abs_input"
-    )
-    abs_other_output = add_unary_layer(
-        network, other, trt.UnaryOperation.ABS, target, f"{name}_abs_other"
-    )
-    abs_floor_output = add_binary_elementwise_layer(
-        network,
-        abs_input_output,
-        abs_other_output,
-        trt.ElementWiseOperation.FLOOR_DIV,
-        target,
-        f"{name}_floor_div",
-    )
-    output = add_binary_elementwise_layer(
-        network,
-        abs_floor_output,
-        sign_output,
-        trt.ElementWiseOperation.PROD,
-        target,
-        f"{name}_output",
-    )
-
-    return output
-
-
-def get_python_op_from_trt_elementwise_op(
-    trt_op: TRTElementWiseOp,
-) -> Callable[[Any, Any], Any]:
-    if trt_op == trt.ElementWiseOperation.SUM:
-        return operator.add
-    elif trt_op == trt.ElementWiseOperation.PROD:
-        return operator.mul
-    elif trt_op == trt.ElementWiseOperation.SUB:
-        return operator.sub
-    elif trt_op == trt.ElementWiseOperation.DIV:
-        return operator.truediv
-    elif trt_op == trt.ElementWiseOperation.FLOOR_DIV:
-        return operator.floordiv
-    else:
-        raise RuntimeError(f"{trt_op} is not supported yet!")
 
 
 def dtype_uniform(
