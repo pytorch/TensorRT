@@ -20,7 +20,8 @@ from torch.fx.node import Argument, Target
 
 from .converter_utils import *  # noqa: F403
 import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
-from torch_tensorrt.fx.converters.impl import activation, convolution
+from torch_tensorrt.fx.converters.impl import activation
+from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -182,9 +183,7 @@ def aten_ops_div(
             network, target, None, kwargs_new, name
         )
     elif rounding_mode == "trunc":
-        return acc_ops_converters.acc_ops_trunc_div(
-            network, target, None, kwargs_new, name
-        )
+        return trunc_div(network, target, SourceIR.ATEN, name, args[0], args[1])
     else:
         raise RuntimeError(
             f"Target {target} does not support rounding mode {rounding_mode}"

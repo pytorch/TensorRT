@@ -26,7 +26,14 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
     trt_transposed_matmul,
 )
 from torch_tensorrt.fx.tracer.acc_tracer.acc_ops import contiguous
-from torch_tensorrt.fx.converters.impl import activation, convolution
+from torch_tensorrt.fx.converters.impl import activation
+from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
+from torch_tensorrt.fx.converters.impl.unary import sign
+from torch_tensorrt.fx.converters.impl.elementwise.base import (
+    convert_binary_elementwise,
+)
+from torch_tensorrt.fx.converters.impl.unary.base import convert_unary
+from torch_tensorrt.fx.converters.impl.shape import get_shape_with_dynamic_shape
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -78,13 +85,14 @@ def trt_transposed_linear_converter(network, target, args, kwargs, name):
         trt.MatrixOperation.NONE,
     )
     set_layer_name(layer, target, f"{name}_mm")
-    return add_binary_elementwise_layer(
+    return convert_binary_elementwise(
         network,
+        target,
+        SourceIR.TORCHTRT_LOWERED,
+        f"{name}_add",
+        trt.ElementWiseOperation.SUM,
         layer.get_output(0),
         bias,
-        trt.ElementWiseOperation.SUM,
-        target,
-        f"{name}_add",
     )
 
 
@@ -646,13 +654,14 @@ def layer_norm(
     set_layer_name(mean_expected_layer, target, f"{name}_mean_expected")
 
     # X-E[x]
-    sub_trt = add_binary_elementwise_layer(
+    sub_trt = convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        f"{name}_sub",
+        trt.ElementWiseOperation.SUB,
         input_val,
         mean_expected_layer.get_output(0),
-        trt.ElementWiseOperation.SUB,
-        target,
-        f"{name}_sub",
     )
     # Variance = mean(pow(x_sub_mean,2))
     pow_tensor = network.add_constant(
@@ -660,13 +669,14 @@ def layer_norm(
         trt.Weights(np.ascontiguousarray([2.0], dtype=np.float32)),
     )
     pow_tensor.name = f"{name}_power"
-    pow_var = add_binary_elementwise_layer(
+    pow_var = convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        f"{name}_pow_var",
+        trt.ElementWiseOperation.POW,
         sub_trt,
         pow_tensor.get_output(0),
-        trt.ElementWiseOperation.POW,
-        target,
-        f"{name}_pow_var",
     )
     mean_trt_layer = network.add_reduce(
         pow_var, trt.ReduceOperation.AVG, axes, keep_dims=True
@@ -678,26 +688,33 @@ def layer_norm(
         trt.Weights(np.ascontiguousarray([eps], dtype=np.float32)),
     )
     eps_tensor.name = f"{name}_eps"
-    add_trt = add_binary_elementwise_layer(
+    add_trt = convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        f"{name}_add",
+        trt.ElementWiseOperation.SUM,
         mean_trt_layer.get_output(0),
         eps_tensor.get_output(0),
-        trt.ElementWiseOperation.SUM,
-        target,
-        f"{name}_add",
     )
     # SQRT((Var + eps))
-    sqrt_trt = add_unary_layer(
-        network, add_trt, trt.UnaryOperation.SQRT, target, f"{name}_sqrt"
+    sqrt_trt = convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        f"{name}_sqrt",
+        trt.UnaryOperation.SQRT,
+        add_trt,
     )
     # (x - E[x]) / sqrt((var + eps))
-    div_trt = add_binary_elementwise_layer(
+    div_trt = convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        f"{name}_div_trt",
+        trt.ElementWiseOperation.DIV,
         sub_trt,
         sqrt_trt,
-        trt.ElementWiseOperation.DIV,
-        target,
-        f"{name}_div_trt",
     )
 
     assert gamma is not None
@@ -707,21 +724,23 @@ def layer_norm(
     beta_tensor = network.add_constant(gamma.shape, trt.Weights(np.ascontiguousarray(beta)))  # type: ignore[attr-defined]
     beta_tensor.name = f"{name}_beta"
     # y * gamma + beta
-    scale_layer = add_binary_elementwise_layer(
+    scale_layer = convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        f"{name}_scale",
+        trt.ElementWiseOperation.PROD,
         div_trt,
         gamma_tensor.get_output(0),
-        trt.ElementWiseOperation.PROD,
-        target,
-        f"{name}_scale",
     )
-    return add_binary_elementwise_layer(
+    return convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ElementWiseOperation.SUM,
         scale_layer,
         beta_tensor.get_output(0),
-        trt.ElementWiseOperation.SUM,
-        target,
-        name,
     )
 
 
@@ -824,13 +843,14 @@ def acc_ops_tile(
             else:
                 d = get_trt_tensor(network, d, f"{name}_{i}")
             shape.append(d)
-            mul = add_binary_elementwise_layer(
+            mul = convert_binary_elementwise(
                 network,
+                target,
+                SourceIR.ACC,
+                f"{name}_mul_{i}",
+                trt.ElementWiseOperation.PROD,
                 s,
                 d,
-                trt.ElementWiseOperation.PROD,
-                target,
-                f"{name}_mul_{i}",
             )
             shapes.append(mul)
         dims = shape
@@ -859,13 +879,14 @@ def acc_ops_tile(
             dims_tensor = concat_dims_layer.get_output(0)
         input_shape_layer = network.add_shape(input_val)
         input_shape_layer.name = f"{name}_slice_input_shape"
-        slice_shapes_tensor = add_binary_elementwise_layer(
+        slice_shapes_tensor = convert_binary_elementwise(
             network,
+            target,
+            SourceIR.ACC,
+            f"{name}_slice_shapes",
+            trt.ElementWiseOperation.PROD,
             input_shape_layer.get_output(0),
             dims_tensor,
-            trt.ElementWiseOperation.PROD,
-            target,
-            f"{name}_slice_shapes",
         )
         layer.set_input(1, starts_tensor)
         layer.set_input(2, slice_shapes_tensor)
@@ -886,9 +907,22 @@ def acc_ops_sign(
     if trt.__version__ >= "8.2" and not network.has_implicit_batch_dimension:
         input_val = kwargs["input"]
         operation_type = trt.UnaryOperation.SIGN
-        return add_unary_layer(network, input_val, operation_type, target, name)
+        return convert_unary(
+            network,
+            target,
+            SourceIR.ACC,
+            name,
+            operation_type,
+            input_val,
+        )
 
-    return sign(network, input_val, target, name)
+    return sign(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.relu)
@@ -990,7 +1024,14 @@ def acc_ops_sin(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.SIN
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.cos)
@@ -1003,7 +1044,14 @@ def acc_ops_cos(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.COS
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.tan)
@@ -1016,7 +1064,14 @@ def acc_ops_tan(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.TAN
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.sinh)
@@ -1029,7 +1084,14 @@ def acc_ops_sinh(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.SINH
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.cosh)
@@ -1042,7 +1104,14 @@ def acc_ops_cosh(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.COSH
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.tanh)
@@ -1072,7 +1141,14 @@ def acc_ops_asin(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.ASIN
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.acos)
@@ -1085,7 +1161,14 @@ def acc_ops_acos(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.ACOS
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.atan)
@@ -1098,7 +1181,14 @@ def acc_ops_atan(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.ATAN
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.exp)
@@ -1111,7 +1201,14 @@ def acc_ops_exp(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.EXP
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.log)
@@ -1124,7 +1221,14 @@ def acc_ops_log(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.LOG
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.sqrt)
@@ -1137,7 +1241,14 @@ def acc_ops_sqrt(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.SQRT
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.reciprocal)
@@ -1150,7 +1261,14 @@ def acc_ops_reciprocal(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.RECIP
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.abs)
@@ -1163,7 +1281,14 @@ def acc_ops_abs(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.ABS
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.neg)
@@ -1176,7 +1301,14 @@ def acc_ops_neg(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.NEG
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.floor)
@@ -1189,7 +1321,14 @@ def acc_ops_floor(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.FLOOR
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.ceil)
@@ -1202,7 +1341,14 @@ def acc_ops_ceil(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.CEIL
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.sum)
@@ -1377,13 +1523,14 @@ def acc_ops_maximum(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return add_binary_elementwise_layer(
+    return convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ElementWiseOperation.MAX,
         kwargs["input"],
         kwargs["other"],
-        trt.ElementWiseOperation.MAX,
-        target,
-        name,
     )
 
 
@@ -1395,13 +1542,14 @@ def acc_ops_minimum(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return add_binary_elementwise_layer(
+    return convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ElementWiseOperation.MIN,
         kwargs["input"],
         kwargs["other"],
-        trt.ElementWiseOperation.MIN,
-        target,
-        name,
     )
 
 
@@ -1460,7 +1608,14 @@ def acc_ops_logical_not(
     # cast to bool type
     if input_val.dtype in (trt.float32, trt.float16, trt.int32):
         input_val = type_cast(network, target, f"{name}_input", input_val, trt.bool)
-    return add_unary_layer(network, input_val, operation_type, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.logical_and, no_implicit_batch_dim=True)
@@ -1506,8 +1661,14 @@ def acc_ops_logical_and(
         input_t = type_cast(network, target, f"{name}_input", input_t, trt.bool)
     if other_t.dtype != trt.bool:
         other_t = type_cast(network, target, f"{name}_other", other_t, trt.bool)
-    return add_binary_elementwise_layer(
-        network, input_t, other_t, trt.ElementWiseOperation.AND, target, name
+    return convert_binary_elementwise(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ElementWiseOperation.AND,
+        input_t,
+        other_t,
     )
 
 
@@ -1531,11 +1692,24 @@ def acc_ops_ne(
     other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
 
     input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
-    eq_t = add_binary_elementwise_layer(
-        network, input_t, other_t, trt.ElementWiseOperation.EQUAL, target, name
+    eq_t = convert_binary_elementwise(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ElementWiseOperation.EQUAL,
+        input_t,
+        other_t,
     )
 
-    return add_unary_layer(network, eq_t, trt.UnaryOperation.NOT, target, name)
+    return convert_unary(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.UnaryOperation.NOT,
+        eq_t,
+    )
 
 
 @tensorrt_converter(acc_ops.eq, no_implicit_batch_dim=True)
@@ -1558,8 +1732,14 @@ def acc_ops_eq(
     other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
 
     input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
-    return add_binary_elementwise_layer(
-        network, input_t, other_t, trt.ElementWiseOperation.EQUAL, target, name
+    return convert_binary_elementwise(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ElementWiseOperation.EQUAL,
+        input_t,
+        other_t,
     )
 
 
@@ -1583,8 +1763,14 @@ def acc_ops_gt(
     other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
 
     input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
-    return add_binary_elementwise_layer(
-        network, input_t, other_t, trt.ElementWiseOperation.GREATER, target, name
+    return convert_binary_elementwise(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ElementWiseOperation.GREATER,
+        input_t,
+        other_t,
     )
 
 
@@ -1608,8 +1794,14 @@ def acc_ops_lt(
     other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
 
     input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
-    return add_binary_elementwise_layer(
-        network, input_t, other_t, trt.ElementWiseOperation.LESS, target, name
+    return convert_binary_elementwise(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ElementWiseOperation.LESS,
+        input_t,
+        other_t,
     )
 
 
@@ -1645,8 +1837,14 @@ def acc_ops_logical_or(
         set_layer_name(layer_o, target, f"{name}_other_dtype_change")
         other_t = layer_o.get_output(0)
 
-    return add_binary_elementwise_layer(
-        network, input_t, other_t, trt.ElementWiseOperation.OR, target, name
+    return convert_binary_elementwise(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ElementWiseOperation.OR,
+        input_t,
+        other_t,
     )
 
 
@@ -1682,8 +1880,14 @@ def acc_ops_logical_xor(
         set_layer_name(layer_o, target, f"{name}_other_dtype_change")
         other_t = layer_o.get_output(0)
 
-    return add_binary_elementwise_layer(
-        network, input_t, other_t, trt.ElementWiseOperation.XOR, target, name
+    return convert_binary_elementwise(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ElementWiseOperation.XOR,
+        input_t,
+        other_t,
     )
 
 
@@ -1780,23 +1984,30 @@ def acc_ops_fmod(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     # NOTE: TRT doesnt currently implement fmod so we need multiple operations to perform it
     trunc_div_value = trunc_div(
-        kwargs["input"], kwargs["other"], network, target, name + "_trunc_div"
-    )
-    prod_value = add_binary_elementwise_layer(
         network,
+        target,
+        SourceIR.ACC,
+        name + "_trunc_div",
+        kwargs["input"],
+        kwargs["other"],
+    )
+    prod_value = convert_binary_elementwise(
+        network,
+        target,
+        SourceIR.ACC,
+        name + "_prod",
+        trt.ElementWiseOperation.PROD,
         trunc_div_value,
         kwargs["other"],
-        trt.ElementWiseOperation.PROD,
-        target,
-        name + "_prod",
     )
-    sub_value = add_binary_elementwise_layer(
+    sub_value = convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        name + "_sub",
+        trt.ElementWiseOperation.SUB,
         kwargs["input"],
         prod_value,
-        trt.ElementWiseOperation.SUB,
-        target,
-        name + "_sub",
     )
     return sub_value
 
@@ -2027,13 +2238,14 @@ def acc_ops_add(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return add_binary_elementwise_layer(
+    return convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ElementWiseOperation.SUM,
         kwargs["input"],
         kwargs["other"],
-        trt.ElementWiseOperation.SUM,
-        target,
-        name,
     )
 
 
@@ -2045,13 +2257,14 @@ def acc_ops_sub(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return add_binary_elementwise_layer(
+    return convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ElementWiseOperation.SUB,
         kwargs["input"],
         kwargs["other"],
-        trt.ElementWiseOperation.SUB,
-        target,
-        name,
     )
 
 
@@ -2063,13 +2276,14 @@ def acc_ops_div(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return add_binary_elementwise_layer(
+    return convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ElementWiseOperation.DIV,
         kwargs["input"],
         kwargs["other"],
-        trt.ElementWiseOperation.DIV,
-        target,
-        name,
     )
 
 
@@ -2081,13 +2295,14 @@ def acc_ops_floor_div(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return add_binary_elementwise_layer(
+    return convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ElementWiseOperation.FLOOR_DIV,
         kwargs["input"],
         kwargs["other"],
-        trt.ElementWiseOperation.FLOOR_DIV,
-        target,
-        name,
     )
 
 
@@ -2099,7 +2314,14 @@ def acc_ops_trunc_div(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return trunc_div(kwargs["input"], kwargs["other"], network, target, name)
+    return trunc_div(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        kwargs["input"],
+        kwargs["other"],
+    )
 
 
 @tensorrt_converter(acc_ops.mul)
@@ -2110,13 +2332,14 @@ def acc_ops_mul(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return add_binary_elementwise_layer(
+    return convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ElementWiseOperation.PROD,
         kwargs["input"],
         kwargs["other"],
-        trt.ElementWiseOperation.PROD,
-        target,
-        name,
     )
 
 
@@ -2128,13 +2351,14 @@ def acc_ops_pow(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return add_binary_elementwise_layer(
+    return convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ElementWiseOperation.POW,
         kwargs["input"],
         kwargs["exponent"],
-        trt.ElementWiseOperation.POW,
-        target,
-        name,
     )
 
 
@@ -2440,7 +2664,12 @@ def acc_ops_slice_tensor(
 
     if dynamic_shape > 0:
         output_shape = get_shape_with_dynamic_shape(
-            network, output_shape, input_val, target, name
+            network,
+            target,
+            SourceIR.ACC,
+            name,
+            output_shape,
+            input_val,
         )
     layer = network.add_slice(
         input_val,
@@ -2684,7 +2913,12 @@ def acc_ops_split(
         start[dim] = offset
         if dynamic_shape:
             shape = get_shape_with_dynamic_shape(
-                network, shape, input_val, target, f"{name}_shape_{i}"
+                network,
+                target,
+                SourceIR.ACC,
+                f"{name}_shape_{i}",
+                shape,
+                input_val,
             )
         layer = network.add_slice(
             input_val, start=start, shape=[] if dynamic_shape else shape, stride=stride
@@ -2748,13 +2982,14 @@ def acc_ops_linear(
 
     if kwargs["bias"] is not None:
         bias = get_trt_tensor(network, kwargs["bias"], f"{name}_bias")  # type: ignore[arg-type]
-        res = add_binary_elementwise_layer(
+        res = convert_binary_elementwise(
             network,
+            target,
+            SourceIR.ACC,
+            f"{name}_add",
+            trt.ElementWiseOperation.SUM,
             matmul_layer.get_output(0),
             bias,
-            trt.ElementWiseOperation.SUM,
-            target,
-            f"{name}_add",
         )
     return res
 
@@ -2945,7 +3180,14 @@ def acc_ops_getitem(
         i += 1
 
     if dynamic_shape:
-        size = get_shape_with_dynamic_shape(network, size, input_val, target, name)
+        size = get_shape_with_dynamic_shape(
+            network,
+            target,
+            SourceIR.ACC,
+            name,
+            size,
+            input_val,
+        )
 
     layer = network.add_slice(
         input=input_val,
@@ -3370,7 +3612,12 @@ def acc_ops_chunk(
         shape[dim] = min(split_size, max_offset - offset)
         if dynamic_shape:
             shape = get_shape_with_dynamic_shape(
-                network, shape, input_val, target, f"{name}_{i}"
+                network,
+                target,
+                SourceIR.ACC,
+                f"{name}_{i}",
+                shape,
+                input_val,
             )
         start[dim] = offset
         layer = network.add_slice(
@@ -3435,13 +3682,14 @@ def acc_ops_cumsum(
     set_layer_name(running_sum, target, f"{name}_running_sum_1")
     running_sum_tensor = running_sum.get_output(0)
 
-    current_sum = add_binary_elementwise_layer(
+    current_sum = convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        f"{name}_sum_1",
+        trt.ElementWiseOperation.SUM,
         data,
         running_sum_tensor,
-        trt.ElementWiseOperation.SUM,
-        target,
-        f"{name}_sum_1",
     )
     running_sum.set_input(1, current_sum)
 
@@ -3449,13 +3697,14 @@ def acc_ops_cumsum(
     set_layer_name(running_sum, target, f"{name}_running_sum_2")
     running_sum_tensor = running_sum.get_output(0)
 
-    current_sum = add_binary_elementwise_layer(
+    current_sum = convert_binary_elementwise(
         network,
+        target,
+        SourceIR.ACC,
+        f"{name}_sum_2",
+        trt.ElementWiseOperation.SUM,
         data,
         running_sum_tensor,
-        trt.ElementWiseOperation.SUM,
-        target,
-        f"{name}_sum_2",
     )
     running_sum.set_input(1, current_sum)
 
