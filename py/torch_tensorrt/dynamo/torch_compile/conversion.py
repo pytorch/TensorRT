@@ -17,6 +17,8 @@ def convert_module(
     debug: bool = False,
     workspace_size: int = 20 << 30,
     precision: LowerPrecision = LowerPrecision.FP32,
+    explicit_batch_dim: bool = True,
+    explicit_precision: bool = True,
 ) -> Union[TRTModuleNext, TRTModule]:
     """Convert an FX module to a TRT module
     Args:
