@@ -69,6 +69,21 @@ def tanh(network, submod, args, kwargs, layer_name):
     )
 
 
+@tensorrt_converter(torch.nn.functional.gelu)
+@tensorrt_converter(torch.nn.modules.activation.GELU)
+def gelu(network, submod, args, kwargs, layer_name):
+    # args/kwargs should have already been normalized to kwargs
+    assert len(args) == 0
+
+    return activation.gelu(
+        network=network,
+        target="torch.nn.functional.gelu",
+        source_ir=SourceIR.NN,
+        name=layer_name,
+        input_val=kwargs["input"],
+    )
+
+
 @tensorrt_converter(torch.nn.functional.leaky_relu)
 @tensorrt_converter(torch.nn.modules.activation.LeakyReLU)
 def leaky_relu(network, submod, args, kwargs, layer_name):
