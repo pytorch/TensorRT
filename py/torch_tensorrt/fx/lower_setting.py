@@ -101,3 +101,4 @@ class LowerSetting(LowerSettingBasic):
     correctness_atol: float = 0.1
     correctness_rtol: float = 0.1
     use_experimental_rt: bool = False
+    truncate_long_and_double: bool = False

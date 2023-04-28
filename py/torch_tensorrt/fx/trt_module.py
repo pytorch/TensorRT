@@ -156,6 +156,15 @@ class TRTModule(torch.nn.Module):
                         inputs = (
                             inputs[:i] + (inputs[i].to(torch.int32),) + inputs[i + 1 :]
                         )
+                    elif (
+                        inputs[i].dtype == torch.float64
+                        and self.input_dtypes[i] == torch.float32
+                    ):
+                        inputs = (
+                            inputs[:i]
+                            + (inputs[i].to(torch.float32),)
+                            + inputs[i + 1 :]
+                        )
 
                     assert (
                         inputs[i].dtype == self.input_dtypes[i]

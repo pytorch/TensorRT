@@ -43,6 +43,7 @@ def compile(
     use_experimental_fx_rt=False,
     correctness_atol=1e-1,
     correctness_rtol=1e-1,
+    truncate_long_and_double=False,
 ) -> nn.Module:
     """
     Takes in original module, input and lowering setting, run lowering workflow to turn module
@@ -62,6 +63,7 @@ def compile(
         cuda_graph_batch_size: Cuda graph batch size, default to be -1.
         dynamic_batch: batch dimension (dim=0) is dynamic.
         use_experimental_fx_rt: Uses the next generation TRTModule which supports both Python and TorchScript based execution (including in C++).
+        truncate_long_and_double: Whether to automatically truncate long and double-type tensor inputs to TRT Engines
     Returns:
         A torch.nn.Module lowered by TensorRT.
     """
@@ -85,6 +87,7 @@ def compile(
         use_experimental_rt=use_experimental_fx_rt,
         correctness_atol=correctness_atol,
         correctness_rtol=correctness_rtol,
+        truncate_long_and_double=truncate_long_and_double,
     )
     lowerer = Lowerer.create(lower_setting=lower_setting)
     return lowerer(module, input)
@@ -129,6 +132,7 @@ class LowerTrtInterpreter:
             logger_level=trt.Logger.VERBOSE
             if self.lower_setting.verbose_log
             else trt.Logger.WARNING,
+            truncate_long_and_double=self.lower_setting.truncate_long_and_double,
         )
 
         interp_result: TRTInterpreterResult = interpreter.run(

@@ -41,6 +41,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         explicit_batch_dimension: bool = False,
         explicit_precision: bool = False,
         logger_level=None,
+        truncate_long_and_double=False,
     ):
         super().__init__(module)
 
@@ -70,6 +71,7 @@ class TRTInterpreter(torch.fx.Interpreter):
 
         self.optimization_profiles: Optional[List] = None
         self.input_specs = input_specs
+        self.truncate_long_and_double = truncate_long_and_double
         self.input_specs_iter = 0
         self.validate_input_specs()
         self._cur_node_name: Optional[str] = None
@@ -306,7 +308,9 @@ class TRTInterpreter(torch.fx.Interpreter):
                 self.optimization_profiles[i].set_shape(target, *shape_range)
 
         return self.network.add_input(
-            name=target, shape=tuple(shape), dtype=torch_dtype_to_trt(dtype)
+            name=target,
+            shape=tuple(shape),
+            dtype=torch_dtype_to_trt(dtype, self.truncate_long_and_double),
         )
 
     def call_module(self, target, args, kwargs):
