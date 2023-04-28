@@ -2,6 +2,7 @@ import operator
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
+from enum import Enum, auto
 import numpy as np
 
 # @manual=//deeplearning/trt/python:py_tensorrt
@@ -20,6 +21,26 @@ from ..types import (
     TRTTensor,
 )
 from ..utils import torch_dtype_from_trt
+
+
+class SourceIR(Enum):
+    NN = auto()
+    ACC = auto()
+    ATEN = auto()
+    PRIM = auto()
+    UNKNOWN = auto()
+
+    def __str__(self):
+        if self == SourceIR.NN:
+            return "nn"
+        elif self == SourceIR.ACC:
+            return "acc"
+        elif self == SourceIR.ATEN:
+            return "aten"
+        elif self == SourceIR.PRIM:
+            return "prim"
+        else:
+            return "unknown_ir"
 
 
 def get_trt_plugin(
@@ -77,7 +98,9 @@ def get_positive_dim(dim: int, dim_size: int) -> int:
     return dim
 
 
-def set_layer_name(layer: TRTLayer, target: Target, name: str) -> None:
+def set_layer_name(
+    layer: TRTLayer, target: Target, name: str, source_ir: Optional[SourceIR] = None
+) -> None:
     """
     Set the TensorRT layer name to "[TensorRT Layer Type]_[Original Op Name]_[FX Node Name with Suffix]"
 
@@ -86,8 +109,16 @@ def set_layer_name(layer: TRTLayer, target: Target, name: str) -> None:
         target (Target): A fx node.target. For call_function node, it's the function that
             the node represents.
         name (str): Consists of fx node.name with optional suffix.
+        source_ir: (Optional[SourceIR]): The IR producing the op.
     """
-    target_name = target if isinstance(target, str) else f"acc_ops.{target.__name__}"
+
+    source_ir = source_ir if source_ir is not None else SourceIR.UNKNOWN
+
+    target_name = (
+        f"{source_ir}_ops.{target}"
+        if isinstance(target, str)
+        else f"{source_ir}_ops.{target.__name__}"
+    )
     layer.name = f"[{layer.type.name}]-[{target_name}]-[{name}]"
 
 
@@ -557,48 +588,6 @@ def add_unary_layer(
     set_layer_name(layer, target, name)
     output = layer.get_output(0)
     output.name = output.name + "_" + target.__name__
-    return layer.get_output(0)
-
-
-def add_activation_layer(
-    network: TRTNetwork,
-    input_val: TRTTensor,
-    operation_type: trt.ActivationType,
-    target: Target,
-    name: str,
-    alpha: Optional[Any] = None,
-    beta: Optional[Any] = None,
-) -> TRTTensor:
-    """
-    Add a TensorRT Activation layer to `network`.
-
-    Args:
-        network (TRTNetwork): TensorRT network object.
-        input_val (TRTTensor): Input to the activation op.
-            Must be a TensorRT tensor.
-        op_type (trt.ElementWiseOperation): Type of the TensorRT activation
-            operation.
-        target (Target): Target of fx node.
-        name (str): The name we want to assign to the created TensorRT layer.
-        alpha (Optional[Any]): If not None, we will use it to set the alpha
-            attribute of the created TensorRT activation layer.
-        beta (Optional[Any]): If not None, we will use it to set the beta
-            attribute of the created TensorRT activation layer.
-
-    Returns:
-        The output of TensorRT Activation layer.
-    """
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"{operation_type} received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
-    layer = network.add_activation(input_val, operation_type)
-    if alpha is not None:
-        layer.alpha = alpha
-    if beta is not None:
-        layer.beta = beta
-    set_layer_name(layer, target, name)
     return layer.get_output(0)
 
 
