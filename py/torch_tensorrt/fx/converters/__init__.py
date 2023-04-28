@@ -2,7 +2,6 @@
 import tensorrt as trt
 
 if hasattr(trt, "__version__"):
-    from .activation import *  # noqa: F401 F403
     from .adaptive_avgpool import *  # noqa: F401 F403
     from .add import *  # noqa: F401 F403
     from .batchnorm import *  # noqa: F401 F403

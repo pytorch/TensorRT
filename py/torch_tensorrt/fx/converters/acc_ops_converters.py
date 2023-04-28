@@ -3195,21 +3195,13 @@ def acc_ops_sigmoid(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
 
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"Sigmoid received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
-
-    return activation.convert_activation(
+    return activation.sigmoid(
         network,
         target,
         SourceIR.ACC,
         name,
-        trt.ActivationType.SIGMOID,
-        input_val,
+        kwargs["input"],
     )
 
 

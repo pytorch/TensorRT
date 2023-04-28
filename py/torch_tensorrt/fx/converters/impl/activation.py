@@ -90,3 +90,30 @@ def relu(
         input_val,
         dyn_range_fn=relu_dyn_range_fn,
     )
+
+
+def sigmoid(
+    network: TRTNetwork,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+):
+    operation_type = trt.ActivationType.SIGMOID
+
+    def sigmoid_dyn_range_fn(dyn_range):
+        def sigmoid_fn(x):
+            # TODO: Can this just call torch.nn.functional.sigmoid?
+            return 1 / (1 + np.exp(-x))
+
+        return sigmoid_fn(dyn_range[0]), sigmoid_fn(dyn_range[1])
+
+    return convert_activation(
+        network,
+        target,
+        source_ir,
+        name,
+        operation_type,
+        input_val,
+        dyn_range_fn=sigmoid_dyn_range_fn,
+    )
