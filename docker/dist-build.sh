@@ -3,17 +3,15 @@
 TOP_DIR=$(cd $(dirname $0); pwd)/..
 
 if [[ -z "${USE_CXX11}" ]]; then
-    BUILD_CMD="python3 setup.py bdist_wheel"
+    BUILD_CMD="python setup.py bdist_wheel"
 else
-    BUILD_CMD="python3 setup.py bdist_wheel  --use-cxx11-abi"
+    BUILD_CMD="python setup.py bdist_wheel  --use-cxx11-abi"
 fi
 
 cd ${TOP_DIR} \
     && mkdir -p dist && cd py \
-    && pip install -r requirements.txt
-
-# Symlink the path pyenv is using for python with the /opt directory for package sourcing
-ln -s "`pyenv which python | xargs dirname | xargs dirname`/lib/python$PYTHON_VERSION/site-packages" "/opt/python3"
+    && pip install -r requirements.txt \
+    && pip install wheel
 
 # Build Torch-TRT
 MAX_JOBS=1 LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8 ${BUILD_CMD} $* || exit 1
