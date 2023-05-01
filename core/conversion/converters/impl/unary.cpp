@@ -34,6 +34,51 @@ auto reciprocal_registration TORCHTRT_UNUSED = RegisterNodeConversionPatterns().
        return true;
      }});
 
+auto log2_registration TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
+    {"aten::log2(Tensor self) -> Tensor", [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+       const static float ln2 = 0.693147180559945309; // same constant onnx uses
+       auto in = args[0].ITensorOrFreeze(ctx);
+       auto tensor_type = util::TRTDataTypeToScalarType(in->getType());
+       if (in->getType() == nvinfer1::DataType::kINT32) {
+         // pytorch implicitly casts to float for aten::log2(int)
+         in = castITensor(ctx, in, nvinfer1::DataType::kFLOAT);
+         tensor_type = at::kFloat;
+       }
+
+       auto log_layer = ctx->net->addUnary(*in, nvinfer1::UnaryOperation::kLOG);
+       TORCHTRT_CHECK(log_layer, "Unable to create log layer from node: " << *n);
+       log_layer->setName((util::node_info(n) + "_log").c_str());
+
+       std::vector<int64_t> ln2_dims(in->getDimensions().nbDims, 1);
+       auto ln2_tensor = at::full(ln2_dims, ln2, at::TensorOptions().dtype(tensor_type));
+       auto ln2_itensor = converters::tensor_to_const(ctx, ln2_tensor);
+
+       auto div_layer = add_elementwise(
+           ctx,
+           nvinfer1::ElementWiseOperation::kDIV,
+           log_layer->getOutput(0),
+           ln2_itensor,
+           (util::node_info(n) + "_div").c_str());
+       auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], div_layer->getOutput(0));
+       LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+       return true;
+     }});
+
+auto logical_not_registration TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
+    {"aten::logical_not(Tensor self) -> Tensor", [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+       auto in = args[0].ITensorOrFreeze(ctx);
+       if (in->getType() != nvinfer1::DataType::kBOOL) {
+         // unary not layer only supports bool inputs
+         in = castITensor(ctx, in, nvinfer1::DataType::kBOOL, util::node_info(n).c_str());
+       }
+       auto unary_layer = ctx->net->addUnary(*in, nvinfer1::UnaryOperation::kNOT);
+       TORCHTRT_CHECK(unary_layer, "Unable to create logical_not layer from node: " << *n);
+       unary_layer->setName(util::node_info(n).c_str());
+       auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], unary_layer->getOutput(0));
+       LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+       return true;
+     }});
+
 #define convert(unary, trt_type)                                                               \
   auto unary##_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(       \
       {"aten::" #unary "(Tensor self) -> Tensor",                                              \

@@ -15,7 +15,9 @@ void NotateModuleForFallback(
 void Conv1DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
 void ConvTransposed1DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
 void Conv2DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
+void ConvTransposed2DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
 void Conv3DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
+void ConvTransposed3DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseAddMMBranches(std::shared_ptr<torch::jit::Graph> graph);
 void LinearToAddMM(std::shared_ptr<torch::jit::Graph>& graph);
 void EliminateExceptionOrPassPattern(std::shared_ptr<torch::jit::Graph> graph);

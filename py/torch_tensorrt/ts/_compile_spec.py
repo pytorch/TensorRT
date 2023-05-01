@@ -194,17 +194,22 @@ def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> _ts_C.TorchFallback:
     return info
 
 
-def _parse_input_signature(input_signature: Any):
+def _parse_input_signature(input_signature: Any, depth: int = 0):
+    if depth > 2:
+        raise AssertionError(
+            "Input nesting depth exceeds max supported depth, use 1 level: [A, B], or 2 level: [A, (B, C)]"
+        )
+
     if isinstance(input_signature, tuple):
         input_list = []
         for item in input_signature:
-            input = _parse_input_signature(item)
+            input = _parse_input_signature(item, depth + 1)
             input_list.append(input)
         return tuple(input_list)
     elif isinstance(input_signature, list):
         input_list = []
         for item in input_signature:
-            input = _parse_input_signature(item)
+            input = _parse_input_signature(item, depth + 1)
             input_list.append(input)
         return input_list
     elif isinstance(input_signature, Input) or isinstance(
@@ -263,42 +268,7 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
             "Input signature parsing is an experimental feature, behavior and APIs may change",
         )
         signature = _parse_input_signature(compile_spec["input_signature"])
-        info.input_signature = _C.InputSignature(signature)  # py_object
-
-        if not compile_spec["torch_fallback"]["enabled"]:
-            raise ValueError(
-                "Grouped inputs currently requires partial compilation to be enabled, this restriction will be relaxed in a future release"
-            )
-
-        log(
-            Level.Debug,
-            "Grouped inputs currently requires additional settings to enable the feature",
-        )
-        log(
-            Level.Debug,
-            """Adding the following ops to torch_executed_ops:
-    - aten::__getitem__
-    - prim::ListConstruct
-    - prim::ListUnpack
-    - prim::TupleIndex
-    - prim::TupleConstruct
-    - prim::TupleUnpack
-""",
-        )
-        compile_spec["torch_fallback"]["forced_fallback_ops"].append(
-            "aten::__getitem__"
-        )
-        compile_spec["torch_fallback"]["forced_fallback_ops"].append(
-            "prim::ListConstruct"
-        )
-        compile_spec["torch_fallback"]["forced_fallback_ops"].append("prim::ListUnpack")
-        compile_spec["torch_fallback"]["forced_fallback_ops"].append("prim::TupleIndex")
-        compile_spec["torch_fallback"]["forced_fallback_ops"].append(
-            "prim::TupleConstruct"
-        )
-        compile_spec["torch_fallback"]["forced_fallback_ops"].append(
-            "prim::TupleUnpack"
-        )
+        info.input_signature = _C.InputSignature(signature)
 
     else:
         raise KeyError(

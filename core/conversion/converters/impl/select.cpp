@@ -180,6 +180,29 @@ auto select_registrations TORCHTRT_UNUSED =
                return true;
              }})
         .pattern(
+            {"aten::index_select(Tensor self, int dim, Tensor index) -> Tensor",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto in = args[0].ITensorOrFreeze(ctx);
+               auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
+               auto dim = args[1].unwrapToInt();
+               // Handle negative axis by refering to nbDims of input Tensor
+               dim = dim < 0 ? dim + maxDim : dim;
+               auto index = args[2].ITensorOrFreeze(ctx);
+
+               LOG_DEBUG("Gather input dimensions: " << in->getDimensions());
+               LOG_DEBUG("Dimension to select: " << dim);
+               LOG_DEBUG("Index dimensions: " << index->getDimensions());
+
+               auto gather_layer = ctx->net->addGather(*in, *index, dim);
+               TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+               auto out = gather_layer->getOutput(0);
+               LOG_DEBUG("Gather tensor shape: " << out->getDimensions());
+
+               out = ctx->AssociateValueAndTensor(n->outputs()[0], out);
+               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+               return true;
+             }})
+        .pattern(
             {"aten::narrow(Tensor(a) self, int dim, int start, int length) -> Tensor(a)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto in = args[0].ITensor();
@@ -337,7 +360,7 @@ auto select_registrations TORCHTRT_UNUSED =
 
                  // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices
                  // from
-                 auto gather_layer = ctx->net->addGather(*in, *indicesTensor, 0);
+                 auto gather_layer = ctx->net->addGather(*in, *indicesTensor, adv_idx_indices[0]);
                  TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
                  auto gather_out = gather_layer->getOutput(0);
 
@@ -775,6 +798,39 @@ auto select_registrations TORCHTRT_UNUSED =
 
                TORCHTRT_CHECK(layer, "Unable to create select layer for aten::where.self");
 
+               layer->setName(util::node_info(n).c_str());
+
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }})
+        .pattern(
+            {"aten::where.ScalarOther(Tensor condition, Tensor self, Scalar other) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto condition = args[0].ITensorOrFreeze(ctx);
+               auto condition_nbDims = condition->getDimensions().nbDims;
+               auto self = args[1].ITensorOrFreeze(ctx);
+               auto x_nbDims = self->getDimensions().nbDims;
+
+               // Get maximum rank of all input tensors
+               auto max_nbDims = std::max(condition_nbDims, x_nbDims);
+
+               // TensorRT requires all inputs to Select layers to have the same rank, so for each
+               // tensor input, ensure that its rank is equal to the maximum number of dimensions
+               // If not, left-pad the tensor dimension with 1s until the max rank is achieved
+               condition =
+                   addPadding(ctx, n, condition, max_nbDims, /*bool trailing =*/false, /*bool use_zeros =*/false);
+               self = addPadding(ctx, n, self, max_nbDims, /*bool trailing =*/false, /*bool use_zeros =*/false);
+
+               // Create a scalar tensor of rank max_nbDims from scalar other
+               auto scalar_value = args[2].unwrapToScalar();
+               std::vector<int64_t> dims_vec(max_nbDims, 1);
+               auto self_dtype = util::TRTDataTypeToScalarType(self->getType());
+               auto constant_tensor = torch::full(dims_vec, scalar_value, {torch::dtype(self_dtype)});
+               auto constant_itensor = converters::tensor_to_const(ctx, constant_tensor);
+
+               auto layer = ctx->net->addSelect(*condition, *self, *constant_itensor);
+               TORCHTRT_CHECK(layer, "Unable to create select layer for aten::where.ScalarOther");
                layer->setName(util::node_info(n).c_str());
 
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));

@@ -696,7 +696,6 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             return [extra_input]
 
         conv_add_config = {
-            "pattern_complex_format": (operator.add, torch.nn.Conv2d, MatchAllNode),
             "observation_type": ObservationType.OUTPUT_USE_DIFFERENT_OBSERVER_AS_INPUT,
             "dtype_configs": [
                 weighted_op_qint8_dtype_config,
@@ -706,6 +705,15 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             "root_module": torch.nn.Conv2d,
             "reference_quantized_module_for_root": torch.nn.quantized._reference.Conv2d,
         }
+
+        if torch.__version__.startswith("1"):
+            conv_add_config["pattern"] = (operator.add, torch.nn.Conv2d, MatchAllNode)
+        else:
+            conv_add_config["pattern_complex_format"] = (
+                operator.add,
+                torch.nn.Conv2d,
+                MatchAllNode,
+            )
 
         m = M().eval()
         modified_backend_config_dict = copy.deepcopy(self.trt_backend_config_dict)
@@ -764,10 +772,6 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
         }
 
         conv_add_config = {
-            "pattern_complex_format": (
-                torch.nn.ReLU,
-                (operator.add, torch.nn.Conv2d, MatchAllNode),
-            ),
             "observation_type": ObservationType.OUTPUT_USE_DIFFERENT_OBSERVER_AS_INPUT,
             "dtype_configs": [
                 weighted_op_quint8_dtype_config,
@@ -775,6 +779,17 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             "root_module": torch.nn.Conv2d,
             # "reference_quantized_module_for_root": torch.nn.quantized._reference.Conv2d,
         }
+
+        if torch.__version__.startswith("1"):
+            conv_add_config["pattern"] = (
+                torch.nn.ReLU,
+                (operator.add, torch.nn.Conv2d, MatchAllNode),
+            )
+        else:
+            conv_add_config["pattern_complex_format"] = (
+                torch.nn.ReLU,
+                (operator.add, torch.nn.Conv2d, MatchAllNode),
+            )
 
         conv_config = {
             "pattern": torch.nn.Conv2d,

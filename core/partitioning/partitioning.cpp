@@ -286,7 +286,8 @@ void resolveTRTNonTensorInputs(PartitioningCtx* ctx, torch::jit::Block* block) {
             dependency_nodes.end(),
             cur_partitioned_block[i].raw_nodes().begin(),
             cur_partitioned_block[i].raw_nodes().end());
-        cur_partitioned_block[i] = SegmentedBlock(SegmentedBlock::kTensorRT, dependency_nodes);
+        cur_partitioned_block[i] =
+            SegmentedBlock(cur_partitioned_block[i].get_id(), SegmentedBlock::kTensorRT, dependency_nodes);
       }
     }
   }
@@ -541,18 +542,44 @@ bool isInputDynamic(PartitioningCtx* ctx) {
 void populateInputIValues(PartitioningCtx* ctx) {
   if (isInputDynamic(ctx)) {
     ctx->min_input_ivalues_map = partitioning::generateRandomInputs(
-        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kMIN);
+        ctx->settings.collection_input_spec_map,
+        ctx->input_types_map,
+        ir::ShapeMode::kMIN,
+        ctx->settings.target_device.gpu_id);
     ctx->opt_input_ivalues_map = partitioning::generateRandomInputs(
-        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kOPT);
+        ctx->settings.collection_input_spec_map,
+        ctx->input_types_map,
+        ir::ShapeMode::kOPT,
+        ctx->settings.target_device.gpu_id);
     ctx->max_input_ivalues_map = partitioning::generateRandomInputs(
-        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kMAX);
+        ctx->settings.collection_input_spec_map,
+        ctx->input_types_map,
+        ir::ShapeMode::kMAX,
+        ctx->settings.target_device.gpu_id);
   } else {
     ctx->opt_input_ivalues_map = partitioning::generateRandomInputs(
-        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kOPT);
+        ctx->settings.collection_input_spec_map,
+        ctx->input_types_map,
+        ir::ShapeMode::kOPT,
+        ctx->settings.target_device.gpu_id);
   }
 }
 
-void partition(PartitioningCtx* ctx) {
+void partition(PartitioningCtx* ctx, bool expect_full_compilation) {
+  // If full compilation is expected, overwrite minimum block size
+  // Any nonzero block size is valid if full compilation to TRT is desired
+  // Override the default min_block_size to ensure all TRT-supported operations are
+  // executed in TRT, regardless of the size of the graph
+  if (expect_full_compilation) {
+    // If minimum block size is different from the default, the user must have specified it
+    if (ctx->settings.min_block_size != 3) {
+      LOG_WARNING(
+          "Detected user-specified min_block_size with require_full_compilation=True "
+          << "disregarding min_block_size.");
+    }
+    ctx->settings.min_block_size = 1;
+  }
+
   LOG_DEBUG(ctx->settings);
 
   // Go through all the blocks to do the partitioning

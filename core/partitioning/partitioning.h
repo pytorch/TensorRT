@@ -18,10 +18,24 @@ typedef std::unordered_map<const torch::jit::Value*, torch::jit::IValue> Example
 typedef std::pair<std::shared_ptr<torch::jit::Graph>, std::unordered_map<torch::jit::Value*, torch::jit::Value*>>
     GraphAndMapping;
 
+// Set of schemas allowed to be executed in Torch, even with require_full_compilation=true,
+// as necessary for returning collections of Tensors or other complex constructs, and for
+// processing inputs to TRT engines
+const std::unordered_set<c10::Symbol> CollectionNodeKinds = {
+    c10::Symbol::fromQualString("prim::Constant"),
+    c10::Symbol::fromQualString("aten::__getitem__"),
+    c10::Symbol::fromQualString("prim::ListConstruct"),
+    c10::Symbol::fromQualString("prim::ListUnpack"),
+    c10::Symbol::fromQualString("prim::TupleIndex"),
+    c10::Symbol::fromQualString("prim::TupleConstruct"),
+    c10::Symbol::fromQualString("prim::TupleUnpack"),
+};
+
 ExampleIValues generateRandomInputs(
     ir::CollectionInputSpecMap& input_ranges,
     ir::CollectionTypeMap& input_types,
-    const ir::ShapeMode& shape_mode = ir::ShapeMode::kOPT);
+    const ir::ShapeMode& shape_mode = ir::ShapeMode::kOPT,
+    int64_t gpu_id = 0);
 
 void populateInputIValues(PartitioningCtx* ctx);
 
@@ -35,7 +49,7 @@ void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block);
 
 GraphAndMapping stitch(PartitioningCtx* ctx, torch::jit::Block* block);
 
-void partition(PartitioningCtx* ctx);
+void partition(PartitioningCtx* ctx, bool expect_full_compilation = false);
 
 } // namespace partitioning
 } // namespace core

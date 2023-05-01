@@ -130,7 +130,7 @@ auto aten_registrations TORCHTRT_UNUSED =
             {c10::Symbol::fromQualString("aten::zeros"),
              // aten::zeros(int[] size, *, int? dtype=None, int? layout=None,
              // Device? device=None, bool? pin_memory=None) -> (Tensor)
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto options = torch::TensorOptions().layout(torch::kStrided).device(torch::kCUDA);
 
                // Input 1 here is the dtype
@@ -145,7 +145,7 @@ auto aten_registrations TORCHTRT_UNUSED =
             {c10::Symbol::fromQualString("aten::ones"),
              // aten::ones(int[] size, *, int? dtype=None, int? layout=None,
              // Device? device=None, bool? pin_memory=None) -> (Tensor)
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto options = torch::TensorOptions().layout(torch::kStrided).device(torch::kCUDA);
 
                // Input 1 here is the dtype
@@ -160,7 +160,7 @@ auto aten_registrations TORCHTRT_UNUSED =
             {c10::Symbol::fromQualString("aten::full"),
              // aten::full(int[] size, Scalar fill_value, *, int? dtype=None, int? layout=None,
              // Device? device=None, bool? pin_memory=None) -> (Tensor)
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto options = torch::TensorOptions().layout(torch::kStrided).device(torch::kCUDA);
 
                // Input 2 here is the dtype
@@ -176,7 +176,7 @@ auto aten_registrations TORCHTRT_UNUSED =
             {c10::Symbol::fromQualString("aten::full_like"),
              // aten::full_like(Tensor self, Scalar fill_value, *, ScalarType? dtype=None, Layout? layout=None,
              // Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> (Tensor)
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                // Override options related to layout and device for TensorRT
                auto options = torch::TensorOptions().layout(torch::kStrided).device(torch::kCUDA);
                auto input_tensor_var = args.at(n->input(0));
@@ -221,7 +221,7 @@ auto aten_registrations TORCHTRT_UNUSED =
                  MemoryFormat? memory_format=None) -> (Tensor))SIG"})})
         .evaluator(
             {c10::Symbol::fromQualString("aten::slice"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                c10::List<c10::IValue> list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
                int64_t start = 0;
                int64_t end = 9223372036854775807;
@@ -265,19 +265,21 @@ auto aten_registrations TORCHTRT_UNUSED =
         //     {"aten::slice.t(t[] l, int start, int end=9223372036854775807, int step=1) -> (t[])"})})
         .evaluator(
             {c10::Symbol::fromQualString("aten::len"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                c10::List<c10::IValue> list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
                return static_cast<int64_t>(list.size());
              },
              EvalOptions().validSchemas({"aten::len.t(t[] a) -> (int)"})})
         .evaluator(
             {c10::Symbol::fromQualString("aten::size"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-               LOG_WARNING("There may be undefined behavior using dynamic shape and aten::size");
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto tensor_var = args.at(n->input(0));
                if (n->inputs().size() == 1) {
                  if (tensor_var.isITensor()) {
                    auto tensor = tensor_var.ITensor();
+                   if (ctx->input_is_dynamic) {
+                     return dynamic_size_layer(ctx, n, args);
+                   }
                    return util::toVec(tensor->getDimensions());
                  } else if (tensor_var.IValue()->isTensor()) {
                    auto tensor = tensor_var.unwrapToTensor();
@@ -291,6 +293,9 @@ auto aten_registrations TORCHTRT_UNUSED =
                } else {
                  auto dim = args.at(n->input(1)).unwrapToInt();
                  if (tensor_var.isITensor()) {
+                   if (ctx->input_is_dynamic) {
+                     return dynamic_size_layer(ctx, n, args);
+                   }
                    auto tensor = tensor_var.ITensor();
                    auto dims = util::toVec(tensor->getDimensions());
                    auto nbDims = tensor->getDimensions().nbDims;
@@ -322,22 +327,30 @@ auto aten_registrations TORCHTRT_UNUSED =
                  {"aten::size(Tensor self) -> (int[])", "aten::size.int(Tensor self, int dim) -> (int)"})})
         .evaluator(
             {c10::Symbol::fromQualString("aten::__getitem__"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-               auto list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               auto list_input = args.at(n->input(0));
                auto idx = args.at(n->input(1)).unwrapToInt();
-
-               const int64_t list_size = list.size();
-               const int64_t normalized_idx = normalizeIndex(idx, list_size);
-               TORCHTRT_CHECK(
-                   normalized_idx >= 0 || normalized_idx < list_size, "List index out of range (aten::__getitem__)");
-               return list.get(normalized_idx);
+               if (list_input.isIValue()) {
+                 auto list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
+                 const int64_t list_size = list.size();
+                 const int64_t normalized_idx = normalizeIndex(idx, list_size);
+                 TORCHTRT_CHECK(
+                     normalized_idx >= 0 || normalized_idx < list_size, "List index out of range (aten::__getitem__)");
+                 return list.get(normalized_idx);
+               } else if (list_input.isITensor()) {
+                 auto indexed_tensor = index_layer(ctx, n, list_input.ITensorOrFreeze(ctx), idx);
+                 auto tensor_holder = TensorContainer();
+                 tensor_holder.hold_tensor(indexed_tensor);
+                 auto indexed_ivalue = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                 return indexed_ivalue;
+               }
              },
              EvalOptions().validSchemas({
                  "aten::__getitem__.t(t[](a) list, int idx) -> (t(*))",
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::append"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
 
                if (args.at(n->input(1)).isITensor()) {
@@ -357,7 +370,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::extend"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                if (args.at(n->input(0)).IValue()->isList() && args.at(n->input(1)).IValue()->isList()) {
                  c10::IValue* self_ptr = args.at(n->input(0)).IValueMut();
                  auto self = self_ptr->to<c10::List<c10::IValue>>();
@@ -383,7 +396,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::neg"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto el = args.at(n->input(0)).unwrapToInt();
 
                return el * -1;
@@ -393,7 +406,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::add"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                if (args.at(n->input(0)).IValue()->isInt()) {
                  auto a = args.at(n->input(0)).unwrapToInt();
                  auto b = args.at(n->input(1)).unwrapToInt();
@@ -419,7 +432,7 @@ auto aten_registrations TORCHTRT_UNUSED =
                   "aten::add.str(str a, str b) -> (str)"})})
         .evaluator(
             {c10::Symbol::fromQualString("aten::add_"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                if (args.at(n->input(0)).IValue()->isList()) {
                  auto a = args.at(n->input(0)).IValue()->toListRef();
                  auto b = args.at(n->input(1)).IValue()->toListRef();
@@ -449,7 +462,17 @@ auto aten_registrations TORCHTRT_UNUSED =
              EvalOptions().validSchemas({"aten::add_.t(t[](a!) self, t[] b) -> (t[])"})})
         .evaluator(
             {c10::Symbol::fromQualString("aten::mul"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               if (!constTypesOnly(args)) {
+                 auto a = args.at(n->input(0)).ITensorOrFreeze(ctx);
+                 auto b = args.at(n->input(1)).ITensorOrFreeze(ctx);
+                 auto mul =
+                     converters::add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, a, b, util::node_info(n));
+                 TORCHTRT_CHECK(mul, "Unable to create mul layer from node: " << *n);
+                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], mul->getOutput(0));
+                 LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                 return {};
+               }
                if (args.at(n->input(0)).IValue()->isInt()) {
                  auto a = args.at(n->input(0)).unwrapToInt();
                  auto b = args.at(n->input(1)).unwrapToInt();
@@ -469,7 +492,7 @@ auto aten_registrations TORCHTRT_UNUSED =
                  {"aten::mul.int(int a, int b) -> (int)", "aten::mul.float(float a, float b) -> (float)"})})
         .evaluator(
             {c10::Symbol::fromQualString("aten::sub"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                if (args.at(n->input(0)).IValue()->isInt()) {
                  auto a = args.at(n->input(0)).unwrapToInt();
                  auto b = args.at(n->input(1)).unwrapToInt();
@@ -491,7 +514,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::Bool"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                if (args.at(n->input(0)).IValue()->isInt()) {
                  auto a = args.at(n->input(0)).unwrapToInt();
                  return (bool)a;
@@ -508,7 +531,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              EvalOptions().validSchemas({"aten::Bool.int(int a) -> (bool)", "aten::Bool.float(float b) -> (bool)"})})
         .evaluator(
             {c10::Symbol::fromQualString("aten::Float"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                if (args.at(n->input(0)).IValue()->isInt()) {
                  auto a = args.at(n->input(0)).unwrapToInt();
                  return (float)a;
@@ -532,7 +555,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::Int"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                if (args.at(n->input(0)).IValue()->isInt()) {
                  auto a = args.at(n->input(0)).unwrapToInt();
                  return (int)a;
@@ -557,7 +580,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::__not__"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto el = args.at(n->input(0)).unwrapToBool();
 
                return !el;
@@ -567,7 +590,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::__is__"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto self = args.at(n->input(0)).IValue();
                auto obj = args.at(n->input(1)).IValue();
 
@@ -578,7 +601,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::__isnot__"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto self = args.at(n->input(0)).IValue();
                auto obj = args.at(n->input(1)).IValue();
 
@@ -589,7 +612,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::numel"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                LOG_WARNING("There may be undefined behavior using dynamic shape and aten::numel");
                auto tensor_var = args.at(n->input(0));
                if (tensor_var.isITensor()) {
@@ -605,7 +628,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::dim"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto tensor_var = args.at(n->input(0));
                if (tensor_var.isITensor()) {
                  auto tensor = tensor_var.ITensor();
@@ -620,7 +643,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::div"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                if (args.at(n->input(0)).IValue()->isInt()) {
                  auto a = args.at(n->input(0)).unwrapToInt();
                  auto b = args.at(n->input(1)).unwrapToInt();
@@ -642,7 +665,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::floordiv"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                if (args.at(n->input(0)).IValue()->isInt()) {
                  auto a = args.at(n->input(0)).unwrapToInt();
                  auto b = args.at(n->input(1)).unwrapToInt();
@@ -664,7 +687,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::floor"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                if (args.at(n->input(0)).IValue()->isInt()) {
                  auto el = args.at(n->input(0)).unwrapToInt();
                  return static_cast<int64_t>(std::floor(el));
@@ -684,7 +707,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::sqrt"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                if (args.at(n->input(0)).IValue()->isInt()) {
                  auto a = args.at(n->input(0)).unwrapToInt();
                  return std::sqrt(static_cast<double>(a));
@@ -704,7 +727,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::warn"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto warning = args.at(n->input(0)).IValue();
                LOG_WARNING("Warning from TorchScript: " << *warning);
                return {};
@@ -712,7 +735,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              EvalOptions()})
         .evaluator(
             {c10::Symbol::fromQualString("aten::is_floating_point"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto tensor_var = args.at(n->input(0));
                if (tensor_var.isITensor()) {
                  auto tensor = tensor_var.ITensor();
@@ -729,7 +752,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::tensor"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto data = args.at(n->input(0)).IValue();
                auto dtype = args.at(n->input(1)).IValue();
                auto device = args.at(n->input(2)).IValue();
@@ -740,7 +763,7 @@ auto aten_registrations TORCHTRT_UNUSED =
                  {"aten::tensor(t[] data, *, int? dtype=None, Device? device=None, bool requires_grad=False) -> (Tensor)"})})
         .evaluator(
             {c10::Symbol::fromQualString("aten::arange"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto schema = n->maybeSchema();
                TORCHTRT_CHECK(schema, "Unable to get schema for node: " << *n);
                auto name = schema->operator_name();
@@ -791,7 +814,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::clone"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                if (args.at(n->input(0)).isITensor()) {
                  auto source_tensor = args.at(n->input(0)).ITensor();
                  auto tensor_holder = TensorContainer();
@@ -809,7 +832,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::copy_"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                if (args.at(n->input(1)).isITensor()) {
                  auto source_tensor = args.at(n->input(1)).ITensor();
                  auto tensor_holder = TensorContainer();
@@ -828,7 +851,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::format"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                int64_t input_num = n->inputs().size();
                std::vector<torch::jit::IValue> stack;
                for (auto v : n->inputs()) {
@@ -845,7 +868,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              EvalOptions().validSchemas({"aten::format(str self, ...) -> (str)"})})
         .evaluator(
             {c10::Symbol::fromQualString("aten::__range_length"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto lo = args.at(n->input(0)).unwrapToInt();
                auto hi = args.at(n->input(1)).unwrapToInt();
                auto step = args.at(n->input(2)).unwrapToInt();
@@ -864,7 +887,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              EvalOptions().validSchemas({"aten::__range_length(int lo, int hi, int step) -> int"})})
         .evaluator(
             {c10::Symbol::fromQualString("aten::__derive_index"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                auto idx = args.at(n->input(0)).unwrapToInt();
                auto start = args.at(n->input(1)).unwrapToInt();
                auto step = args.at(n->input(2)).unwrapToInt();
