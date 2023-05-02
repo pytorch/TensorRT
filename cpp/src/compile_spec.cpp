@@ -74,27 +74,6 @@ torchtrt::core::CompileSpec init_compile_spec(CompileSpec& external) {
     LOG_WARNING("Input signature parsing is an experimental feature, behavior and APIs may change");
     to_internal_input_signature(external.graph_inputs.input_signature, converted_input_signature);
     torchtrt::core::CompileSpec internal(converted_input_signature);
-
-    TORCHTRT_CHECK(
-        !external.require_full_compilation,
-        "Grouped inputs currently requires partial compilation to be enabled, \
-      this restriction will be relaxed in a future release");
-
-    LOG_DEBUG("Grouped inputs currently requires additional settings to enable the feature");
-    LOG_DEBUG(
-        "Adding the following ops to torch_executed_ops:" << std::endl
-                                                          << "  - aten::__getitem__" << std::endl
-                                                          << "  - prim::ListConstruct" << std::endl
-                                                          << "  - prim::ListUnpack" << std::endl
-                                                          << "  - prim::TupleIndex" << std::endl
-                                                          << "  - prim::TupleConstruct" << std::endl
-                                                          << "  - prim::TupleUnpack");
-    external.torch_executed_ops.push_back("aten::__getitem__");
-    external.torch_executed_ops.push_back("prim::ListConstruct");
-    external.torch_executed_ops.push_back("prim::ListUnpack");
-    external.torch_executed_ops.push_back("prim::TupleIndex");
-    external.torch_executed_ops.push_back("prim::TupleConstruct");
-    external.torch_executed_ops.push_back("prim::TupleUnpack");
     return internal;
   }
 }

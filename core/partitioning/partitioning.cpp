@@ -542,14 +542,26 @@ bool isInputDynamic(PartitioningCtx* ctx) {
 void populateInputIValues(PartitioningCtx* ctx) {
   if (isInputDynamic(ctx)) {
     ctx->min_input_ivalues_map = partitioning::generateRandomInputs(
-        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kMIN);
+        ctx->settings.collection_input_spec_map,
+        ctx->input_types_map,
+        ir::ShapeMode::kMIN,
+        ctx->settings.target_device.gpu_id);
     ctx->opt_input_ivalues_map = partitioning::generateRandomInputs(
-        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kOPT);
+        ctx->settings.collection_input_spec_map,
+        ctx->input_types_map,
+        ir::ShapeMode::kOPT,
+        ctx->settings.target_device.gpu_id);
     ctx->max_input_ivalues_map = partitioning::generateRandomInputs(
-        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kMAX);
+        ctx->settings.collection_input_spec_map,
+        ctx->input_types_map,
+        ir::ShapeMode::kMAX,
+        ctx->settings.target_device.gpu_id);
   } else {
     ctx->opt_input_ivalues_map = partitioning::generateRandomInputs(
-        ctx->settings.collection_input_spec_map, ctx->input_types_map, ir::ShapeMode::kOPT);
+        ctx->settings.collection_input_spec_map,
+        ctx->input_types_map,
+        ir::ShapeMode::kOPT,
+        ctx->settings.target_device.gpu_id);
   }
 }
 

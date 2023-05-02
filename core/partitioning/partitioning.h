@@ -34,7 +34,8 @@ const std::unordered_set<c10::Symbol> CollectionNodeKinds = {
 ExampleIValues generateRandomInputs(
     ir::CollectionInputSpecMap& input_ranges,
     ir::CollectionTypeMap& input_types,
-    const ir::ShapeMode& shape_mode = ir::ShapeMode::kOPT);
+    const ir::ShapeMode& shape_mode = ir::ShapeMode::kOPT,
+    int64_t gpu_id = 0);
 
 void populateInputIValues(PartitioningCtx* ctx);
 

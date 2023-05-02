@@ -810,6 +810,29 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                return true;
              }})
         .pattern(
+            {"aten::logical_and(Tensor self, Tensor other) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               // torch.logical_and autocasts inputs to bool
+               auto input_as_bool = [&](int idx) {
+                 auto x = args[idx].ITensorOrFreeze(ctx);
+                 if (x->getType() != nvinfer1::DataType::kBOOL) {
+                   x = castITensor(
+                       ctx, x, nvinfer1::DataType::kBOOL, (util::node_info(n) + "_bool_" + str(idx)).c_str());
+                 }
+                 return x;
+               };
+               auto self = input_as_bool(0);
+               auto other = input_as_bool(1);
+
+               auto and_layer =
+                   add_elementwise(ctx, nvinfer1::ElementWiseOperation::kAND, self, other, util::node_info(n) + "_and");
+               TORCHTRT_CHECK(and_layer, "Unable to create and layer from node: " << *n);
+               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], and_layer->getOutput(0));
+
+               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+               return true;
+             }})
+        .pattern(
             {"aten::atan2(Tensor self, Tensor other) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                // Element-wise divide input Tensors, apply atan unary, apply quadrant correction
