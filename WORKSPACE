@@ -51,17 +51,17 @@ new_local_repository(
 http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "292b3f81e7c857fc102be93e2e44c40cdb4d8ef03d98121bc6af434c66e8490b",
+    sha256 = "c5174f18c0866421a5738d389aaea0c02f32a1a5be5f0747dc8dd0d96034c9b0",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu118/libtorch-cxx11-abi-shared-with-deps-2.0.0%2Bcu118.zip"],
+    urls = ["https://download.pytorch.org/libtorch/test/cu118/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "f3cbd7e9593f0c64b8671d02a21d562c98b60ef1abf5898c0ee9acfbc5a6b5d2",
+    sha256 = "cc19b398cf435e0e34f347ef90fc11c2a42703998330a9c4a9fb0d2291737df7",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu118/libtorch-shared-with-deps-2.0.0%2Bcu118.zip"],
+    urls = ["https://download.pytorch.org/libtorch/test/cu118/libtorch-shared-with-deps-latest.zip"],
 )
 
 # Download these tarballs manually from the NVIDIA website
@@ -71,10 +71,10 @@ http_archive(
 http_archive(
     name = "cudnn",
     build_file = "@//third_party/cudnn/archive:BUILD",
-    sha256 = "5454a6fd94f008728caae9adad993c4e85ef36302e26bce43bea7d458a5e7b6d",
-    strip_prefix = "cudnn-linux-x86_64-8.5.0.96_cuda11-archive",
+    sha256 = "36fff137153ef73e6ee10bfb07f4381240a86fb9fb78ce372414b528cbab2293",
+    strip_prefix = "cudnn-linux-x86_64-8.8.0.121_cuda11-archive",
     urls = [
-        "https://developer.nvidia.com/compute/cudnn/secure/8.5.0/local_installers/11.7/cudnn-linux-x86_64-8.5.0.96_cuda11-archive.tar.xz",
+        "https://developer.download.nvidia.com/compute/cudnn/secure/8.8.0/local_installers/11.8/cudnn-linux-x86_64-8.8.0.121_cuda11-archive.tar.xz",
     ],
 )
 

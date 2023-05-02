@@ -102,7 +102,7 @@ commands:
             sudo apt-get --purge remove "*nvidia*"
 
   install-cudnn:
-    description: "Install CUDNN 8.5.0"
+    description: "Install CUDNN 8.8.0"
     parameters:
       os:
         type: string
@@ -112,10 +112,10 @@ commands:
         default: "x86_64"
       cudnn-version:
         type: string
-        default: "8.5.0.96"
+        default: "8.8.0.121"
       cuda-version:
         type: string
-        default: "cuda11.7"
+        default: "cuda11.8"
     steps:
       - run:
           name: Install CUDNN
@@ -200,7 +200,7 @@ commands:
         default: "cuda11.8"
       cudnn-version:
         type: string
-        default: "8.5.0.96"
+        default: "8.8.0.121"
       trt-version-short:
         type: string
         default: "8.6.0"
@@ -252,7 +252,7 @@ commands:
           default: "8.6.0"
         cudnn-version-long:
           type: string
-          default: "8.5.0.96"
+          default: "8.8.0.121"
       steps:
         - run:
             name: Set up python environment
@@ -269,10 +269,10 @@ commands:
     parameters:
       torch-build:
         type: string
-        default: "2.0.0"
+        default: "2.0.1"
       torch-build-index:
         type: string
-        default: "https://download.pytorch.org/whl/cu118"
+        default: "https://download.pytorch.org/whl/test/cu118"
     steps:
       - run:
           name: Install Torch
@@ -474,6 +474,7 @@ commands:
       - run: mkdir -p /tmp/artifacts
       - run:
           name: Run core / C++ tests
+          no_output_timeout: 15m
           environment:
             LD_LIBRARY_PATH: "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch_tensorrt.libs:/home/circleci/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:/home/circleci/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda-11.8/lib64/:$LD_LIBRARY_PATH"
           command: |
@@ -1205,10 +1206,10 @@ parameters:
   # Nightly platform config
   torch-build:
     type: string
-    default: "2.0.0"
+    default: "2.0.1"
   torch-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/cu118"
+    default: "https://download.pytorch.org/whl/test/cu118"
   torch-build-legacy:
     type: string
     default: "1.13.1+cu117"
@@ -1217,7 +1218,7 @@ parameters:
     default: "https://download.pytorch.org/whl/cu117"
   cudnn-version:
     type: string
-    default: "8.5.0.96"
+    default: "8.8.0.121"
   trt-version-short:
     type: string
     default: "8.6.0"
@@ -1412,4 +1413,3 @@ workflows:
           trt-version-short: << pipeline.parameters.trt-version-short >>
           cudnn-version: << pipeline.parameters.cudnn-version >>
           python-version: << pipeline.parameters.python-version >>
-
