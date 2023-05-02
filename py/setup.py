@@ -362,6 +362,10 @@ if FX_ONLY:
         "torch_tensorrt.fx.tools",
         "torch_tensorrt.fx.tracer.acc_tracer",
         "torch_tensorrt.fx.tracer.dispatch_tracer",
+        "torch_tensorrt.dynamo",
+        "torch_tensorrt.dynamo.fx_ts_compat",
+        "torch_tensorrt.dynamo.fx_ts_compat.passes",
+        "torch_tensorrt.dynamo.fx_ts_compat.tools",
     ]
     package_dir = {
         "torch_tensorrt.fx": "torch_tensorrt/fx",
@@ -370,10 +374,46 @@ if FX_ONLY:
         "torch_tensorrt.fx.tools": "torch_tensorrt/fx/tools",
         "torch_tensorrt.fx.tracer.acc_tracer": "torch_tensorrt/fx/tracer/acc_tracer",
         "torch_tensorrt.fx.tracer.dispatch_tracer": "torch_tensorrt/fx/tracer/dispatch_tracer",
+        "torch_tensorrt.dynamo": "torch_tensorrt/dynamo",
+        "torch_tensorrt.dynamo.fx_ts_compat": "torch_tensorrt/dynamo/fx_ts_compat",
+        "torch_tensorrt.dynamo.fx_ts_compat.passes": "torch_tensorrt/dynamo/fx_ts_compat/passes",
+        "torch_tensorrt.dynamo.fx_ts_compat.tools": "torch_tensorrt/dynamo/fx_ts_compat/tools",
     }
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
+
+if FX_ONLY:
+    package_data_list = [
+        "_Input.py",
+    ]
+else:
+    package_data_list = [
+        "lib/*",
+        "include/torch_tensorrt/*.h",
+        "include/torch_tensorrt/core/*.h",
+        "include/torch_tensorrt/core/conversion/*.h",
+        "include/torch_tensorrt/core/conversion/conversionctx/*.h",
+        "include/torch_tensorrt/core/conversion/converters/*.h",
+        "include/torch_tensorrt/core/conversion/evaluators/*.h",
+        "include/torch_tensorrt/core/conversion/tensorcontainer/*.h",
+        "include/torch_tensorrt/core/conversion/var/*.h",
+        "include/torch_tensorrt/core/ir/*.h",
+        "include/torch_tensorrt/core/lowering/*.h",
+        "include/torch_tensorrt/core/lowering/passes/*.h",
+        "include/torch_tensorrt/core/partitioning/*.h",
+        "include/torch_tensorrt/core/partitioning/segmentedblock/*.h",
+        "include/torch_tensorrt/core/partitioning/partitioninginfo/*.h",
+        "include/torch_tensorrt/core/partitioning/partitioningctx/*.h",
+        "include/torch_tensorrt/core/plugins/*.h",
+        "include/torch_tensorrt/core/plugins/impl/*.h",
+        "include/torch_tensorrt/core/runtime/*.h",
+        "include/torch_tensorrt/core/util/*.h",
+        "include/torch_tensorrt/core/util/logging/*.h",
+        "bin/*",
+        "BUILD",
+        "WORKSPACE",
+    ]
 
 setup(
     name="torch_tensorrt",
@@ -418,32 +458,7 @@ setup(
     python_requires=">=3.8",
     include_package_data=True,
     package_data={
-        "torch_tensorrt": [
-            "lib/*",
-            "include/torch_tensorrt/*.h",
-            "include/torch_tensorrt/core/*.h",
-            "include/torch_tensorrt/core/conversion/*.h",
-            "include/torch_tensorrt/core/conversion/conversionctx/*.h",
-            "include/torch_tensorrt/core/conversion/converters/*.h",
-            "include/torch_tensorrt/core/conversion/evaluators/*.h",
-            "include/torch_tensorrt/core/conversion/tensorcontainer/*.h",
-            "include/torch_tensorrt/core/conversion/var/*.h",
-            "include/torch_tensorrt/core/ir/*.h",
-            "include/torch_tensorrt/core/lowering/*.h",
-            "include/torch_tensorrt/core/lowering/passes/*.h",
-            "include/torch_tensorrt/core/partitioning/*.h",
-            "include/torch_tensorrt/core/partitioning/segmentedblock/*.h",
-            "include/torch_tensorrt/core/partitioning/partitioninginfo/*.h",
-            "include/torch_tensorrt/core/partitioning/partitioningctx/*.h",
-            "include/torch_tensorrt/core/plugins/*.h",
-            "include/torch_tensorrt/core/plugins/impl/*.h",
-            "include/torch_tensorrt/core/runtime/*.h",
-            "include/torch_tensorrt/core/util/*.h",
-            "include/torch_tensorrt/core/util/logging/*.h",
-            "bin/*",
-            "BUILD",
-            "WORKSPACE",
-        ],
+        "torch_tensorrt": package_data_list,
     },
     exclude_package_data={
         "": ["*.cpp"],

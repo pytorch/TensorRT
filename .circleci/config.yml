@@ -521,6 +521,7 @@ commands:
       - store_artifacts:
           path: /tmp/testlogs
 
+# =================== FX tests start ======================== #
   test-fx_core:
     description: "Test the fx core"
     steps:
@@ -720,6 +721,61 @@ commands:
       - store_artifacts:
           path: /tmp/testlogs
 
+# =================== FX tests end ======================== #
+
+# =================== Dynamo tests start ======================== #
+  test-dynamo-fx_ts:
+    description: "Test the Dynamo fx_ts_compat path"
+    steps:
+      - run:
+          name: Run Dynamo fx_ts_compat core tests
+          command: |
+            cd py/torch_tensorrt/dynamo/fx_ts_compat/test
+            pushd core/
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/fx_ts_compat/test_results.xml
+            popd
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-dynamo-torch_compile-core:
+    description: "Test the Dynamo torch_compile path"
+    steps:
+      - run:
+          name: Run Dynamo torch_compile core tests
+          command: |
+            cd py/torch_tensorrt/dynamo/torch_compile
+            pushd test/
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/torch_compile/test_results.xml
+            popd
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-dynamo-torch_compile:
+    description: "Test the Dynamo torch_compile path"
+    steps:
+      - run:
+          name: Run Dynamo torch_compile E2E tests
+          command: |
+            cd py/torch_tensorrt/dynamo/
+            pushd test/
+            pip3 install timm
+            pip3 install transformers
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/torch_compile/test_results.xml --ir torch_compile
+            popd
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+# =================== Dynamo tests end ======================== #
+
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
@@ -910,6 +966,39 @@ jobs:
       # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - dump-test-env
       - test-fx-no-aten
+
+  test-py-dynamo-x86_64-linux:
+    parameters:
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+      trt-version-long:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: gpu.nvidia.large
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/dist/
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
+      - create-py-env:
+          trt-version-long: << parameters.trt-version-long >>
+      - install-cudnn
+      # - run:
+      #     name: "Set LD_LIBRARY_PATH path to include the installed CUDNN"
+      #     command: export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH
+      - run:
+          name: "Install torch-tensorrt"
+          command: pip3 install --pre /tmp/dist/x86_64-linux/*cp39-cp39*.whl
+      # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
+      - dump-test-env
+      - test-dynamo-torch_compile
+      - test-dynamo-torch_compile-core
+      - test-dynamo-fx_ts
 
   package-x86_64-linux:
     parameters:
@@ -1300,6 +1389,13 @@ workflows:
           requires:
             - build-x86_64-linux
 
+      - test-py-dynamo-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          requires:
+            - build-x86_64-linux
+
       - build-x86_64-linux:
           name: build-x86_64-linux-legacy
           torch-build: << pipeline.parameters.torch-build-legacy >>
@@ -1374,6 +1470,13 @@ workflows:
           requires:
             - package-x86_64-linux
 
+      - test-py-dynamo-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          requires:
+            - package-x86_64-linux
+
   on-push:
     jobs:
       - build-x86_64-linux:
@@ -1404,6 +1507,13 @@ workflows:
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
+          requires:
+            - build-x86_64-linux
+
+      - test-py-dynamo-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
           requires:
             - build-x86_64-linux
 
