@@ -9,8 +9,7 @@ try:
     from torch_tensorrt import _C
 except:
     warnings.warn(
-        "Unable to import _C extension of Torch-TensorRT. Some methods might be unavailable. You can ignore this error if you're \
-                  not using any functions dependent on internal C++ APIs"
+        "Unable to import torchscript frontend core and torch-tensorrt runtime. Some dependent features may be unavailable."
     )
 
 
