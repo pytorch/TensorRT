@@ -527,16 +527,15 @@ void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block) {
 
 bool isInputDynamic(PartitioningCtx* ctx) {
   // Check if inputs have dynamic shapes
-  bool input_is_dynamic = true;
   auto inputs_map = ctx->settings.collection_input_spec_map;
   for (auto inputs : inputs_map) {
     for (auto input : inputs.second) {
-      if (!input.input_is_dynamic) {
-        input_is_dynamic = false;
+      if (input.input_is_dynamic) {
+        return true;
       }
     }
   }
-  return input_is_dynamic;
+  return false;
 }
 
 void populateInputIValues(PartitioningCtx* ctx) {
