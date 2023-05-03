@@ -4,6 +4,7 @@ import os
 import sys
 import platform
 import warnings
+from packaging import version
 from torch_tensorrt._version import (
     __version__,
     __cuda_version__,
@@ -93,8 +94,10 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._TRTModuleNext import TRTModuleNext
 
 from torch_tensorrt import fx
-from torch_tensorrt import dynamo
-from torch_tensorrt.dynamo import torch_compile
+
+if version.parse(torch.__version__) >= version.parse("2.dev"):
+    from torch_tensorrt import dynamo
+    from torch_tensorrt.dynamo import torch_compile
 
 
 def _register_with_torch():
