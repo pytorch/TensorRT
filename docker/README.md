@@ -3,7 +3,7 @@
 * Use `Dockerfile` to build a container which provides the exact development environment that our master branch is usually tested against.
 
 * The `Dockerfile` currently uses <a href="https://github.com/bazelbuild/bazelisk">Bazelisk</a> to select the Bazel version, and uses the exact library versions of Torch and CUDA listed in <a href="https://github.com/pytorch/TensorRT#dependencies">dependencies</a>.
-  * The desired versions of CUDNN and TensorRT must be specified as build-args, with major, minor, and patch versions as in: `--build-arg TENSORRT_VERSION=a.b.c --build-arg CUDNN_VERSION=x.y.z`
+  * The desired versions of CUDNN and TensorRT must be specified as build-args, with major and minor versions as in: `--build-arg TENSORRT_VERSION=a.b --build-arg CUDNN_VERSION=x.y`
   * [**Optional**] The desired base image be changed by explicitly setting a base image, as in `--build-arg BASE_IMG=nvidia/cuda:11.8.0-devel-ubuntu22.04`, though this is optional
   * [**Optional**] Additionally, the desired Python version can be changed by explicitly setting a version, as in `--build-arg PYTHON_VERSION=3.10`, though this is optional as well.
 
@@ -17,14 +17,14 @@ Note: By default the container uses the `pre-cxx11-abi` version of Torch + Torch
 
 ### Instructions
 
-- The example below uses CUDNN 8.8.0 and TensorRT 8.6.0
+- The example below uses CUDNN 8.8 and TensorRT 8.6
 - See <a href="https://github.com/pytorch/TensorRT#dependencies">dependencies</a> for a list of current default dependencies.
 
 > From root of Torch-TensorRT repo
 
 Build:
 ```
-DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=8.6.0 --build-arg CUDNN_VERSION=8.8.0 -f docker/Dockerfile -t torch_tensorrt:latest .
+DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=8.6 --build-arg CUDNN_VERSION=8.8 -f docker/Dockerfile -t torch_tensorrt:latest .
 ```
 
 Run:
