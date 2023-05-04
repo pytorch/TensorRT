@@ -31,6 +31,8 @@ JETPACK_VERSION = None
 
 FX_ONLY = False
 
+LEGACY = False
+
 RELEASE = False
 
 CI_RELEASE = False
@@ -47,6 +49,10 @@ def get_git_revision_short_hash() -> str:
 if "--fx-only" in sys.argv:
     FX_ONLY = True
     sys.argv.remove("--fx-only")
+
+if "--legacy" in sys.argv:
+    LEGACY = True
+    sys.argv.remove("--legacy")
 
 if "--release" not in sys.argv:
     __version__ = __version__ + "+" + get_git_revision_short_hash()
@@ -380,7 +386,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        "torch>=1.13.1",
+        "torch >=2.0.1,<2.1" if not LEGACY else "torch >=1.13.0,<2.0",
     ],
     setup_requires=[],
     cmdclass={
@@ -409,7 +415,7 @@ setup(
         "Topic :: Software Development",
         "Topic :: Software Development :: Libraries",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     include_package_data=True,
     package_data={
         "torch_tensorrt": [

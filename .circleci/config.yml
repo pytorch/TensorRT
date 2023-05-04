@@ -102,7 +102,7 @@ commands:
             sudo apt-get --purge remove "*nvidia*"
 
   install-cudnn:
-    description: "Install CUDNN 8.5.0"
+    description: "Install CUDNN 8.8.0"
     parameters:
       os:
         type: string
@@ -112,10 +112,10 @@ commands:
         default: "x86_64"
       cudnn-version:
         type: string
-        default: "8.5.0.96"
+        default: "8.8.0.121"
       cuda-version:
         type: string
-        default: "cuda11.7"
+        default: "cuda11.8"
     steps:
       - run:
           name: Install CUDNN
@@ -149,13 +149,13 @@ commands:
         default: "amd64"
       cuda-pkg-name:
         type: string
-        default: "cuda-toolkit-11-7"
+        default: "cuda-toolkit-11-8"
       cuda-pkg-version:
         type: string
-        default: "11-7"
+        default: "11-8"
       cuda-version:
         type: string
-        default: "11.7.1"
+        default: "11.8.0"
     steps:
       - run:
           name: Install CUDA
@@ -163,8 +163,8 @@ commands:
             cd ~
             wget https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/cuda-<< parameters.os >>.pin
             sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
-            wget https://developer.download.nvidia.com/compute/cuda/<< parameters.cuda-version >>/local_installers/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-515.65.01-1_<< parameters.architecture >>.deb
-            sudo dpkg -i cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-515.65.01-1_<< parameters.architecture >>.deb
+            wget https://developer.download.nvidia.com/compute/cuda/<< parameters.cuda-version >>/local_installers/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-520.61.05-1_<< parameters.architecture >>.deb
+            sudo dpkg -i cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local_<< parameters.cuda-version >>-520.61.05-1_<< parameters.architecture >>.deb
             sudo cp /var/cuda-repo-ubuntu2004-<< parameters.cuda-pkg-version >>-local/cuda-*-keyring.gpg /usr/share/keyrings/
             sudo apt-get update
             sudo apt-get install -y cuda
@@ -188,22 +188,25 @@ commands:
         default: "amd64"
       cuda-pkg-name:
         type: string
-        default: "cuda-toolkit-11-7"
+        default: "cuda-toolkit-11-8"
       cuda-pkg-version:
         type: string
-        default: "11-7"
+        default: "11-8"
       cuda-version:
         type: string
-        default: "11.7.1"
+        default: "11.8.0"
       cuda-string-version:
         type: string
-        default: "cuda11.7"
+        default: "cuda11.8"
       cudnn-version:
         type: string
-        default: "8.5.0.96"
+        default: "8.8.0.121"
       trt-version-short:
         type: string
-        default: "8.5.1"
+        default: "8.6.0"
+      trt-version-long:
+        type: string
+        default: "8.6.0.12-1"
       bazel-version:
         type: string
         default: "5.2.0"
@@ -211,19 +214,10 @@ commands:
         type: string
         default: "x86_64"
     steps:
-      - uninstall-cuda
-      - install-cuda:
-          os: << parameters.os >>
-          platform: << parameters.platform >>
-          architecture: << parameters.architecture >>
-          cuda-pkg-name: << parameters.cuda-pkg-name >>
-          cuda-pkg-version: << parameters.cuda-pkg-version >>
-          cuda-version: << parameters.cuda-version >>
       - install-cudnn:
           os: << parameters.os >>
           platform: << parameters.platform >>
           cudnn-version: << parameters.cudnn-version >>
-          cuda-version: << parameters.cuda-string-version >>
       - run:
           name: Install Tensorrt
           command: |
@@ -232,21 +226,33 @@ commands:
             sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/ /"
             sudo apt-get update
 
-            sudo apt-get install libnvinfer8=<< parameters.trt-version-short >>* libnvinfer-plugin8=<< parameters.trt-version-short>>* libnvinfer-dev=<< parameters.trt-version-short>>* libnvinfer-plugin-dev=<< parameters.trt-version-short>>*
+            sudo apt-get install libnvinfer8=<< parameters.trt-version-long >>+<< parameters.cuda-string-version >> libnvinfer-plugin8=<< parameters.trt-version-long>>+<< parameters.cuda-string-version >> libnvinfer-dev=<< parameters.trt-version-long >>+<< parameters.cuda-string-version >> libnvinfer-plugin-dev=<< parameters.trt-version-long>>+<< parameters.cuda-string-version >> libnvinfer-headers-dev=<< parameters.trt-version-long>>+<< parameters.cuda-string-version >> libnvinfer-headers-plugin-dev=<< parameters.trt-version-long>>+<< parameters.cuda-string-version >>
       - install-bazel:
           platform: << parameters.bazel-platform >>
           version: << parameters.bazel-version >>
 
+  setup-py-version:
+      description: "Set python version"
+      parameters:
+        python-version:
+          type: string
+          default: "3.9.4"
+      steps:
+        - run:
+            name: Set python version
+            command: |
+              pyenv install << parameters.python-version >>
+              pyenv global << parameters.python-version >>
 
   create-py-env:
       description: "Install python dependencies"
       parameters:
         trt-version-long:
           type: string
-          default: "8.5.1.7"
+          default: "8.6.0"
         cudnn-version-long:
           type: string
-          default: "8.5.0.96"
+          default: "8.8.0.121"
       steps:
         - run:
             name: Set up python environment
@@ -263,16 +269,16 @@ commands:
     parameters:
       torch-build:
         type: string
-        default: "2.1.0.dev20230314+cu117"
+        default: "2.0.1"
       torch-build-index:
         type: string
-        default: "https://download.pytorch.org/whl/nightly/cu117"
+        default: "https://download.pytorch.org/whl/test/cu118"
     steps:
       - run:
           name: Install Torch
           command: |
             pip3 install --upgrade pip
-            pip3 install --pre torch==<< parameters.torch-build >>  torchvision torchaudio --extra-index-url << parameters.torch-build-index >>
+            pip3 install torch==<< parameters.torch-build >>  torchvision torchaudio --extra-index-url << parameters.torch-build-index >>
 
   build-py:
     description: "Build the torch-tensorrt python release (pre-cxx11-abi)"
@@ -284,6 +290,7 @@ commands:
       - run:
           name: Build torch-tensorrt python release (pre-cxx11-abi)
           command: |
+            export CUDA_HOME=/usr/local/cuda-11.8/
             mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
             cd py
             python3 -m pip install wheel setuptools
@@ -315,6 +322,7 @@ commands:
             - run:
                 name: Build torch-tensorrt python release package
                 command: |
+                  export CUDA_HOME=/usr/local/cuda-11.8/
                   cd ~/project/py
                   python3 setup.py bdist_wheel --use-cxx11-abi --release
                   python3 setup.py install --use-cxx11-abi --release
@@ -326,6 +334,7 @@ commands:
             - run:
                 name: Build torch-tensorrt python package
                 command: |
+                  export CUDA_HOME=/usr/local/cuda-11.8/
                   cd ~/project/py
                   python3 setup.py bdist_wheel --use-cxx11-abi
                   python3 setup.py install --use-cxx11-abi
@@ -339,9 +348,11 @@ commands:
         type: string
         default: "x86_64"
     steps:
+      - setup-py-version
       - run:
           name: Build torch-tensorrt python release with only the fx backend
           command: |
+            export CUDA_HOME=/usr/local/cuda-11.8/
             mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
             cd py
             python3 -m pip install wheel setuptools
@@ -361,6 +372,7 @@ commands:
         type: string
         default: nvcr.io/nvidia/pytorch:latest
     steps:
+      - setup-py-version
       - run:
           name: Log into docker
           command: |
@@ -412,7 +424,7 @@ commands:
           name: Build torch-tensorrt library with CMake
           command: |
             mkdir build
-            export PATH=$PATH:/usr/local/cuda/bin
+            export PATH=$PATH:/usr/local/cuda-11.8/bin
             ~/cmake/bin/cmake -S. -Bbuild \
               -DCMAKE_MODULE_PATH=cmake/Module \
               -DTorch_DIR=/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch/share/cmake/Torch \
@@ -462,14 +474,15 @@ commands:
       - run: mkdir -p /tmp/artifacts
       - run:
           name: Run core / C++ tests
+          no_output_timeout: 15m
           environment:
-            LD_LIBRARY_PATH: "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch_tensorrt.libs:/home/circleci/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:/home/circleci/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
+            LD_LIBRARY_PATH: "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch_tensorrt.libs:/home/circleci/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:/home/circleci/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda-11.8/lib64/:$LD_LIBRARY_PATH"
           command: |
             set -e
             mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
             bazel query 'kind(cc_*, tests(//tests))' --noshow_progress >> /tmp/test_manifest.txt
             circleci tests split < /tmp/test_manifest.txt > /tmp/node_test_manifest.txt
-            bazel test $(cat /tmp/node_test_manifest.txt) --test_arg=--gtest_output=xml:/tmp/artifacts/test_results/ --jobs 4 --config ci_testing --config pre_cxx11_abi --noshow_progress --test_timeout=8000
+            bazel test $(cat /tmp/node_test_manifest.txt) --test_arg=--gtest_output=xml:/tmp/artifacts/test_results/ --jobs 4 --config ci_testing --config pre_cxx11_abi --noshow_progress --test_timeout=20000
       - run:
           name: Collect logs
           when: on_fail
@@ -493,7 +506,7 @@ commands:
           environment:
             USE_HOST_DEPS: "1"
             PYT_PATH: "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/"
-            LD_LIBRARY_PATH: "/usr/lib/x86_64-linux-gnu/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
+            LD_LIBRARY_PATH: "/usr/lib/x86_64-linux-gnu/:/usr/local/cuda-11.8/lib64/:$LD_LIBRARY_PATH"
           command: |
             set -e
             mkdir -p /tmp/artifacts/test_results
@@ -716,14 +729,18 @@ jobs:
         type: string
       torch-build-index:
         type: string
+      python-version:
+        type: string
       cxx11-abi:
         type: boolean
         default: false
     machine:
-      image: ubuntu-2004-cuda-11.4:202110-01
-    resource_class: xlarge
+      image: linux-cuda-11:2023.02.1
+    resource_class: gpu.nvidia.small
     steps:
       - checkout
+      - setup-py-version:
+          python-version: << parameters.python-version >>
       - create-env:
           os: "ubuntu2004"
           platform: "x86_64"
@@ -759,6 +776,8 @@ jobs:
     parameters:
       torch-build:
         type: string
+      python-version:
+        type: string
       torch-build-index:
         type: string
       trt-version-short:
@@ -768,11 +787,13 @@ jobs:
       cudnn-version:
         type: string
     machine:
-      image: ubuntu-2004-cuda-11.4:202110-01
+      image: linux-cuda-11:2023.02.1
     resource_class: gpu.nvidia.large
     parallelism: 4
     steps:
       - checkout
+      - setup-py-version:
+          python-version: << parameters.python-version >>
       - create-env:
           os: "ubuntu2004"
           platform: "x86_64"
@@ -801,13 +822,15 @@ jobs:
         type: string
       trt-version-long:
         type: string
+      python-version:
+        type: string
     machine:
-      image: ubuntu-2004-cuda-11.4:202110-01
+      image: linux-cuda-11:2023.02.1
     resource_class: gpu.nvidia.large
     steps:
       - checkout
-      - uninstall-cuda
-      - install-cuda
+      - setup-py-version:
+          python-version: << parameters.python-version >>
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
       - attach_workspace:
@@ -829,11 +852,15 @@ jobs:
         type: string
       trt-version-long:
         type: string
+      python-version:
+        type: string
     machine:
-      image: ubuntu-2004-cuda-11.4:202110-01
+      image: linux-cuda-11:2023.02.1
     resource_class: gpu.nvidia.large
     steps:
       - checkout
+      - setup-py-version:
+          python-version: << parameters.python-version >>
       - attach_workspace:
           at: /tmp/dist/
       - install-torch-from-index:
@@ -842,9 +869,6 @@ jobs:
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
       - install-cudnn
-      # - run:
-      #     name: "Set LD_LIBRARY_PATH path to include the installed CUDNN"
-      #     command: export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install --pre /tmp/dist/x86_64-linux/*cp39-cp39*.whl
@@ -860,11 +884,15 @@ jobs:
         type: string
       trt-version-long:
         type: string
+      python-version:
+        type: string
     machine:
-      image: ubuntu-2004-cuda-11.4:202110-01
+      image: linux-cuda-11:2023.02.1
     resource_class: gpu.nvidia.large
     steps:
       - checkout
+      - setup-py-version:
+          python-version: << parameters.python-version >>
       - attach_workspace:
           at: /tmp/dist/
       - install-torch-from-index:
@@ -894,7 +922,7 @@ jobs:
         type: string
     parallelism: 4
     machine:
-      image: ubuntu-2004-cuda-11.4:202110-01
+      image: linux-cuda-11:2023.02.1
     resource_class: gpu.nvidia.small
     steps:
       - when:
@@ -942,8 +970,8 @@ jobs:
       torch-build-index:
         type: string
     machine:
-      image: ubuntu-2004-cuda-11.4:202110-01
-    resource_class: xlarge
+      image: linux-cuda-11:2023.02.1
+    resource_class: gpu.nvidia.small
     steps:
       - when:
           condition: << parameters.enabled >>
@@ -1075,11 +1103,15 @@ jobs:
         type: string
       torch-build-index:
         type: string
+      python-version:
+        type: string
     machine:
-      image: ubuntu-2004-cuda-11.4:202110-01
-    resource_class: xlarge
+      image: linux-cuda-11:2023.02.1
+    resource_class: gpu.nvidia.small
     steps:
       - checkout
+      - setup-py-version:
+          python-version: << parameters.python-version >>
       - create-env:
           os: "ubuntu2004"
           platform: "x86_64"
@@ -1110,8 +1142,8 @@ jobs:
       torch-base-image:
         type: string
     machine:
-      image: ubuntu-2004-cuda-11.4:202110-01
-    resource_class: xlarge
+      image: linux-cuda-11:2023.02.1
+    resource_class: gpu.nvidia.small
     steps:
       - checkout
       - build-py-ngc:
@@ -1138,8 +1170,8 @@ jobs:
       torch-base-image:
         type: string
     machine:
-      image: ubuntu-2004-cuda-11.4:202110-01
-    resource_class: xlarge
+      image: linux-cuda-11:2023.02.1
+    resource_class: gpu.nvidia.small
     steps:
       - when:
           condition: << parameters.enabled >>
@@ -1167,14 +1199,17 @@ parameters:
   bazel-version:
     type: string
     default: "5.2.0"
+  python-version:
+    type: string
+    default: "3.9.4"
 
   # Nightly platform config
   torch-build:
     type: string
-    default: "2.1.0.dev20230314+cu117"
+    default: "2.0.1"
   torch-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/nightly/cu117"
+    default: "https://download.pytorch.org/whl/test/cu118"
   torch-build-legacy:
     type: string
     default: "1.13.1+cu117"
@@ -1183,13 +1218,13 @@ parameters:
     default: "https://download.pytorch.org/whl/cu117"
   cudnn-version:
     type: string
-    default: "8.5.0.96"
+    default: "8.8.0.121"
   trt-version-short:
     type: string
-    default: "8.5.1"
+    default: "8.6.0"
   trt-version-long:
     type: string
-    default: "8.5.1.7"
+    default: "8.6.0"
 
   # Jetson platform config
   torch-jetson-build:
@@ -1237,6 +1272,7 @@ workflows:
           name: build-x86_64-linux
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
+          python-version: << pipeline.parameters.python-version >>
 
       - test-core-cpp-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
@@ -1244,6 +1280,7 @@ workflows:
           trt-version-short: << pipeline.parameters.trt-version-short >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           cudnn-version: << pipeline.parameters.cudnn-version >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - build-x86_64-linux
 
@@ -1251,6 +1288,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - build-x86_64-linux
 
@@ -1258,6 +1296,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - build-x86_64-linux
 
@@ -1265,6 +1304,7 @@ workflows:
           name: build-x86_64-linux-legacy
           torch-build: << pipeline.parameters.torch-build-legacy >>
           torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
+          python-version: << pipeline.parameters.python-version >>
 
       - test-core-cpp-x86_64-linux:
           name: test-core-cpp-x86_64-linux-legacy
@@ -1273,6 +1313,7 @@ workflows:
           trt-version-short: << pipeline.parameters.trt-version-short >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           cudnn-version: << pipeline.parameters.cudnn-version >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - build-x86_64-linux-legacy
 
@@ -1281,6 +1322,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build-legacy >>
           torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - build-x86_64-linux-legacy
 
@@ -1288,6 +1330,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build-legacy >>
           torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - build-x86_64-linux-legacy
 
@@ -1311,6 +1354,7 @@ workflows:
           trt-version-short: << pipeline.parameters.trt-version-short >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           cudnn-version: << pipeline.parameters.cudnn-version >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - package-x86_64-linux
 
@@ -1318,6 +1362,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - package-x86_64-linux
 
@@ -1325,6 +1370,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - package-x86_64-linux
 
@@ -1333,12 +1379,14 @@ workflows:
       - build-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
+          python-version: << pipeline.parameters.python-version >>
 
       - test-core-cpp-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-short: << pipeline.parameters.trt-version-short >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
           cudnn-version: << pipeline.parameters.cudnn-version >>
           requires:
             - build-x86_64-linux
@@ -1347,6 +1395,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - build-x86_64-linux
 
@@ -1354,6 +1403,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - build-x86_64-linux
 
@@ -1362,3 +1412,4 @@ workflows:
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-short: << pipeline.parameters.trt-version-short >>
           cudnn-version: << pipeline.parameters.cudnn-version >>
+          python-version: << pipeline.parameters.python-version >>

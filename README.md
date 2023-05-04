@@ -31,12 +31,7 @@ In the case of building on top of a custom base container, you first must determ
 version of the PyTorch C++ ABI. If your source of PyTorch is pytorch.org, likely this is the pre-cxx11-abi in which case you must modify `//docker/dist-build.sh` to not build the
 C++11 ABI version of Torch-TensorRT.
 
-You can then build the container using:
-
-
-```bash
-docker build --build-arg BASE_IMG=<IMAGE> -f docker/Dockerfile -t torch_tensorrt:latest .
-```
+You can then build the container using the build command in the [docker README](docker/README.md#instructions)
 
 If you would like to build outside a docker container, please follow the section [Compiling Torch-TensorRT](#compiling-torch-tensorrt)
 
@@ -121,17 +116,17 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts") # save the TRT embedd
 These are the following dependencies used to verify the testcases. Torch-TensorRT can work with other versions, but the tests are not guaranteed to pass.
 
 - Bazel 5.2.0
-- Libtorch 2.0.0.dev20230103 (built with CUDA 11.7)
-- CUDA 11.7
-- cuDNN 8.5.0
-- TensorRT 8.5.1.7
+- Libtorch 2.0.1 (built with CUDA 11.8)
+- CUDA 11.8
+- cuDNN 8.8.0
+- TensorRT 8.6.0
 
 ## Prebuilt Binaries and Wheel files
 
 Releases: https://github.com/pytorch/TensorRT/releases
 
 ```
-pip install torch-tensorrt==1.2.0 --find-links https://github.com/pytorch/TensorRT/releases/expanded_assets/v1.2.0
+pip install torch-tensorrt
 ```
 
 ## Compiling Torch-TensorRT
@@ -252,7 +247,7 @@ A tarball with the include files and library can then be found in bazel-bin
 ### Running Torch-TensorRT on a JIT Graph
 
 > Make sure to add LibTorch to your LD_LIBRARY_PATH <br>
-> `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/bazel-Torch-TensorRT/external/libtorch/lib`
+> `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/bazel-TensorRT/external/libtorch/lib`
 
 ``` shell
 bazel run //cpp/bin/torchtrtc -- $(realpath <PATH TO GRAPH>) out.ts <input-size>
