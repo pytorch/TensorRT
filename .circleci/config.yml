@@ -975,11 +975,15 @@ jobs:
         type: string
       trt-version-long:
         type: string
+      python-version:
+        type: string
     machine:
-      image: ubuntu-2004-cuda-11.4:202110-01
+      image: linux-cuda-11:2023.02.1
     resource_class: gpu.nvidia.large
     steps:
       - checkout
+      - setup-py-version:
+          python-version: << parameters.python-version >>
       - attach_workspace:
           at: /tmp/dist/
       - install-torch-from-index:
@@ -1393,6 +1397,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - build-x86_64-linux
 
@@ -1474,6 +1479,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - package-x86_64-linux
 
@@ -1514,6 +1520,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
           requires:
             - build-x86_64-linux
 
