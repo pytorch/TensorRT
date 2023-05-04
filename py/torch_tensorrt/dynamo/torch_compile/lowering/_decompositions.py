@@ -1,0 +1,45 @@
+import torch
+from torch._decomp import register_decomposition, core_aten_decompositions
+
+
+DECOMPOSITIONS = {**core_aten_decompositions()}
+
+aten = torch.ops.aten
+
+
+def replace_inplace_op(aten_op, outplace_op):
+    """Replace inplace operation with functional equivalent
+    Adapted from:
+    https://github.com/pytorch/pytorch/blob/3344d79e3f732dadd5c85b99a7aa1a022f187929/torch/_decomp/decompositions.py#L3355-L3361
+    """
+
+    @register_decomposition(aten_op, registry=DECOMPOSITIONS)
+    def inplace_op(*args, **kwargs):
+        out = outplace_op(*args, **kwargs)
+        return args[0].copy_(out)
+
+    return inplace_op
+
+
+replace_inplace_op(aten.add_, aten.add)
+replace_inplace_op(aten.addbmm_, aten.addbmm)
+replace_inplace_op(aten.addmm_, aten.addmm)
+replace_inplace_op(aten.addmv_, aten.addmv)
+replace_inplace_op(aten.baddbmm_, aten.baddbmm)
+replace_inplace_op(aten.cumprod_, aten.cumprod)
+replace_inplace_op(aten.fill_, aten.fill)
+replace_inplace_op(aten.gelu_, aten.gelu)
+replace_inplace_op(aten.hardsigmoid_, aten.hardsigmoid)
+replace_inplace_op(aten.index_put_, aten.index_put)
+replace_inplace_op(aten.index_reduce_, aten.index_reduce)
+replace_inplace_op(aten.logit_, aten.logit)
+replace_inplace_op(aten.relu_, aten.relu)
+replace_inplace_op(aten.renorm_, aten.renorm)
+replace_inplace_op(aten.round_, aten.round)
+replace_inplace_op(aten.scatter_, aten.scatter)
+replace_inplace_op(aten.scatter_add_, aten.scatter_add)
+replace_inplace_op(aten.scatter_reduce_, aten.scatter_reduce)
+
+
+def get_decompositions():
+    return DECOMPOSITIONS

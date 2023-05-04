@@ -4,7 +4,6 @@ from typing import List, Dict, Any, Tuple, Optional
 import torch
 
 from torch_tensorrt import _enums
-from torch_tensorrt import _C
 
 
 class Input(object):
@@ -41,6 +40,7 @@ class Input(object):
     DOMAIN_OFFSET = 2.0
     low_tensor_domain_incl = 0.0
     high_tensor_domain_excl = low_tensor_domain_incl + DOMAIN_OFFSET
+    torch_dtype = torch.float32
 
     def __init__(self, *args, **kwargs):
         """__init__ Method for torch_tensorrt.Input
@@ -138,7 +138,11 @@ class Input(object):
             )
 
         if "dtype" in kwargs:
+            if isinstance(kwargs["dtype"], torch.dtype):
+                self.torch_dtype = kwargs["dtype"]
+
             self.dtype = Input._parse_dtype(kwargs["dtype"])
+            self.torch_dtype = Input._to_torch_dtype(self.dtype)
             self._explicit_set_dtype = True
 
         if "format" in kwargs:
@@ -172,59 +176,6 @@ class Input(object):
             )
         else:
             raise RuntimeError("Unknown input shape mode")
-
-    def _to_internal(self) -> _C.Input:
-        internal_in = _C.Input()
-        if self.shape_mode == Input._ShapeMode.DYNAMIC:
-            if not Input._supported_input_size_type(self.shape["min_shape"]):
-                raise TypeError(
-                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
-                    + str(type(self.shape["min_shape"]))
-                    + " for min_shape"
-                )
-            else:
-                internal_in.min = self.shape["min_shape"]
-
-            if not Input._supported_input_size_type(self.shape["opt_shape"]):
-                raise TypeError(
-                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
-                    + str(type(self.shape["opt_shape"]))
-                    + " for opt_shape"
-                )
-            else:
-                internal_in.opt = self.shape["opt_shape"]
-
-            if not Input._supported_input_size_type(self.shape["max_shape"]):
-                raise TypeError(
-                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
-                    + str(type(self.shape["max_shape"]))
-                    + " for max_shape"
-                )
-            else:
-                internal_in.max = self.shape["max_shape"]
-            internal_in.input_is_dynamic = True
-        else:
-            if not Input._supported_input_size_type(self.shape):
-                raise TypeError(
-                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
-                    + str(type(self.shape))
-                    + " for shape"
-                )
-            else:
-                internal_in.opt = self.shape
-            internal_in.input_is_dynamic = False
-
-        if self.dtype != _enums.dtype.unknown:
-            self._explicit_set_dtype = True
-        else:
-            self._explicit_set_dtype = False
-
-        internal_in.dtype = Input._parse_dtype(self.dtype)
-        internal_in._explicit_set_dtype = self._explicit_set_dtype
-        internal_in.format = Input._parse_format(self.format)
-
-        internal_in.tensor_domain = Input._parse_tensor_domain(self.tensor_domain)
-        return internal_in
 
     @staticmethod
     def _supported_input_size_type(input_size: Any) -> bool:
@@ -265,6 +216,22 @@ class Input(object):
                 + str(type(dtype))
             )
 
+    @staticmethod
+    def _to_torch_dtype(dtype: _enums.dtype) -> torch.dtype:
+        if dtype == _enums.dtype.long:
+            return torch.long
+        elif dtype == _enums.dtype.int32:
+            return torch.int32
+        elif dtype == _enums.dtype.half:
+            return torch.half
+        elif dtype == _enums.dtype.float:
+            return torch.float
+        elif dtype == _enums.dtype.bool:
+            return torch.bool
+        else:
+            # Default torch_dtype used in FX path
+            return torch.float32
+
     def is_trt_dtype(self) -> bool:
         return self.dtype != _enums.dtype.long
 
@@ -304,6 +271,7 @@ class Input(object):
                 Input.low_tensor_domain_incl,
                 Input.high_tensor_domain_excl,
             )
+
         elif len(domain) == 2:
             domain_lo, domain_hi = domain
 
@@ -416,8 +384,8 @@ class Input(object):
             )
 
         if self.shape_mode == Input._ShapeMode.STATIC:
-            return torch.randn(self.shape).to(dtype=self.dtype)
+            return torch.rand(self.shape).to(dtype=self.torch_dtype)
         else:
-            return torch.randn(self.shape[optimization_profile_field]).to(
-                dtype=self.dtype
+            return torch.rand(self.shape[optimization_profile_field]).to(
+                dtype=self.torch_dtype
             )
