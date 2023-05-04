@@ -31,12 +31,7 @@ In the case of building on top of a custom base container, you first must determ
 version of the PyTorch C++ ABI. If your source of PyTorch is pytorch.org, likely this is the pre-cxx11-abi in which case you must modify `//docker/dist-build.sh` to not build the
 C++11 ABI version of Torch-TensorRT.
 
-You can then build the container using:
-
-
-```bash
-docker build --build-arg BASE_IMG=<IMAGE> -f docker/Dockerfile -t torch_tensorrt:latest .
-```
+You can then build the container using the build command in the [docker README](docker/README.md#instructions)
 
 If you would like to build outside a docker container, please follow the section [Compiling Torch-TensorRT](#compiling-torch-tensorrt)
 

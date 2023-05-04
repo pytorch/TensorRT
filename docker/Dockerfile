@@ -1,10 +1,13 @@
 # Base image starts with CUDA
 ARG BASE_IMG=nvidia/cuda:11.7.1-devel-ubuntu22.04
 FROM ${BASE_IMG} as base
+ENV BASE_IMG=nvidia/cuda:11.7.1-devel-ubuntu22.04
 
 ARG TENSORRT_VERSION
+ENV TENSORRT_VERSION=${TENSORRT_VERSION}
 RUN test -n "$TENSORRT_VERSION" || (echo "No tensorrt version specified, please use --build-arg TENSORRT_VERSION=x.y.z to specify a version." && exit 1)
 ARG CUDNN_VERSION
+ENV CUDNN_VERSION=${CUDNN_VERSION}
 RUN test -n "$CUDNN_VERSION" || (echo "No cudnn version specified, please use --build-arg CUDNN_VERSION=x.y.z to specify a version." && exit 1)
 
 ARG PYTHON_VERSION=3.10
@@ -44,7 +47,7 @@ RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/
 RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /"
 RUN apt-get update
 
-RUN apt-get install -y libnvinfer8=${TENSORRT_VERSION}* libnvinfer-plugin8=${TENSORRT_VERSION}* libnvinfer-dev=${TENSORRT_VERSION}* libnvinfer-plugin-dev=${TENSORRT_VERSION}* libnvonnxparsers8=${TENSORRT_VERSION}-1* libnvonnxparsers-dev=${TENSORRT_VERSION}-1* libnvparsers8=${TENSORRT_VERSION}-1*  libnvparsers-dev=${TENSORRT_VERSION}-1*
+RUN apt-get install -y libnvinfer8=${TENSORRT_VERSION}.* libnvinfer-plugin8=${TENSORRT_VERSION}.* libnvinfer-dev=${TENSORRT_VERSION}.* libnvinfer-plugin-dev=${TENSORRT_VERSION}.* libnvonnxparsers8=${TENSORRT_VERSION}.* libnvonnxparsers-dev=${TENSORRT_VERSION}.* libnvparsers8=${TENSORRT_VERSION}.*  libnvparsers-dev=${TENSORRT_VERSION}.*
 
 # Setup Bazel via Bazelisk
 RUN wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.16.0/bazelisk-linux-amd64 -O /usr/bin/bazel &&\
@@ -71,7 +74,18 @@ WORKDIR /workspace/torch_tensorrt/src
 RUN cp ./docker/WORKSPACE.docker WORKSPACE
 
 # Symlink the path pyenv is using for python with the /opt directory for package sourcing
-RUN ln -s "`pyenv which python | xargs dirname | xargs dirname`/lib/python$PYTHON_VERSION/site-packages" "/opt/python3"
+RUN mkdir -p "/opt/python3/" &&\
+    ln -s "`pyenv which python | xargs dirname | xargs dirname`/lib/python$PYTHON_VERSION/site-packages" "/opt/python3/"
+
+# Extract base image cuda version (everything after :, before -, before final ., in BASE_IMG)
+# Ensure the default cuda folder agrees with the version in the base image
+RUN CUDA_BASE_IMG_VERSION_INTERMEDIATE=`echo ${BASE_IMG#*:}` &&\
+    CUDA_BASE_IMG_VERSION=`echo ${CUDA_BASE_IMG_VERSION_INTERMEDIATE%%-*}` &&\
+    CUDA_MAJOR_MINOR_VERSION=`echo ${CUDA_BASE_IMG_VERSION%.*}` &&\
+    rm -fr /usr/local/cuda &&\
+    ln -s /usr/local/cuda-${CUDA_MAJOR_MINOR_VERSION} /usr/local/cuda
+
+ENV CUDA_HOME=/usr/local/cuda
 
 # This script builds both libtorchtrt bin/lib/include tarball and the Python wheel, in dist/
 RUN bash ./docker/dist-build.sh
