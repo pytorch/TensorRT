@@ -32,6 +32,7 @@ docsrc/_build
 docsrc/_notebooks
 docsrc/_cpp_api
 docsrc/_tmp
+docsrc/tutorials/_rendered_examples
 *.so
 __pycache__
 *.egg-info
