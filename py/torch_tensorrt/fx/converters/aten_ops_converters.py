@@ -24,6 +24,7 @@ from .converter_utils import *  # noqa: F403
 import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch_tensorrt.fx.converters.impl import activation
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
+from torch_tensorrt.fx.converters.impl.elementwise import fmod
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -220,11 +221,7 @@ def aten_ops_fmod(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    kwargs_new = {
-        "input": args[0],
-        "other": args[1],
-    }
-    return acc_ops_converters.acc_ops_fmod(network, target, None, kwargs_new, name)
+    return fmod(network, target, SourceIR.ATEN, name, args[0], args[1])
 
 
 @tensorrt_converter(torch.ops.aten.hardtanh.default)

@@ -109,3 +109,41 @@ def trunc_div(
     )
 
     return output
+
+
+def fmod(
+    network: TRTNetwork,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    other: TRTTensor,
+) -> TRTTensor:
+    # NOTE: TRT doesnt currently implement fmod so we need multiple operations to perform it
+    trunc_div_value = trunc_div(
+        network,
+        target,
+        source_ir,
+        name + "_trunc_div",
+        input,
+        other,
+    )
+    prod_value = convert_binary_elementwise(
+        network,
+        target,
+        source_ir,
+        name + "_prod",
+        trt.ElementWiseOperation.PROD,
+        trunc_div_value,
+        other,
+    )
+    sub_value = convert_binary_elementwise(
+        network,
+        target,
+        SourceIR.ACC,
+        name + "_sub",
+        trt.ElementWiseOperation.SUB,
+        input,
+        prod_value,
+    )
+    return sub_value    

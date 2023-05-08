@@ -28,6 +28,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
 from torch_tensorrt.fx.tracer.acc_tracer.acc_ops import contiguous
 from torch_tensorrt.fx.converters.impl import activation
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
+from torch_tensorrt.fx.converters.impl.elementwise import fmod
 from torch_tensorrt.fx.converters.impl.unary import sign
 from torch_tensorrt.fx.converters.impl.elementwise.base import (
     convert_binary_elementwise,
@@ -2091,35 +2092,15 @@ def acc_ops_fmod(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    # NOTE: TRT doesnt currently implement fmod so we need multiple operations to perform it
-    trunc_div_value = trunc_div(
+    return fmod(
         network,
         target,
         SourceIR.ACC,
-        name + "_trunc_div",
+        name,
         kwargs["input"],
         kwargs["other"],
     )
-    prod_value = convert_binary_elementwise(
-        network,
-        target,
-        SourceIR.ACC,
-        name + "_prod",
-        trt.ElementWiseOperation.PROD,
-        trunc_div_value,
-        kwargs["other"],
-    )
-    sub_value = convert_binary_elementwise(
-        network,
-        target,
-        SourceIR.ACC,
-        name + "_sub",
-        trt.ElementWiseOperation.SUB,
-        kwargs["input"],
-        prod_value,
-    )
-    return sub_value
-
+    
 
 # T113156424 embedding implemenatation is very limited and shows no usage in hf models due to the indices are int64.
 # if we cast to int32, it will create accuracy issues. We'd better leave it to future implementation.
