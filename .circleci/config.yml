@@ -203,10 +203,10 @@ commands:
         default: "8.8.0.121"
       trt-version-short:
         type: string
-        default: "8.6.0"
+        default: "8.6.1"
       trt-version-long:
         type: string
-        default: "8.6.0.12-1"
+        default: "8.6.1.6-1"
       bazel-version:
         type: string
         default: "5.2.0"
@@ -249,7 +249,7 @@ commands:
       parameters:
         trt-version-long:
           type: string
-          default: "8.6.0"
+          default: "8.6.1"
         cudnn-version-long:
           type: string
           default: "8.8.0.121"
@@ -272,7 +272,7 @@ commands:
         default: "2.0.1"
       torch-build-index:
         type: string
-        default: "https://download.pytorch.org/whl/test/cu118"
+        default: "https://download.pytorch.org/whl/cu118"
     steps:
       - run:
           name: Install Torch
@@ -1302,7 +1302,7 @@ parameters:
     default: "2.0.1"
   torch-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/test/cu118"
+    default: "https://download.pytorch.org/whl/cu118"
   torch-build-legacy:
     type: string
     default: "1.13.1+cu117"
@@ -1314,10 +1314,10 @@ parameters:
     default: "8.8.0.121"
   trt-version-short:
     type: string
-    default: "8.6.0"
+    default: "8.6.1"
   trt-version-long:
     type: string
-    default: "8.6.0"
+    default: "8.6.1"
 
   # Jetson platform config
   torch-jetson-build:
