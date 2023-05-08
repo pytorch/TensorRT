@@ -148,3 +148,30 @@ def sigmoid(
         input_val,
         dyn_range_fn=sigmoid_dyn_range_fn,
     )
+
+
+def tanh(
+    network: TRTNetwork,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+):
+    operation_type = trt.ActivationType.TANH
+
+    def tanh_dyn_range_fn(dyn_range):
+        def tanh_fn(x):
+            # TODO: Can this just call torch.nn.functional.tanh?
+            return (np.exp(x) - np.exp(-x)) / (np.exp(x) + np.exp(-x))
+
+        return tanh_fn(dyn_range[0]), tanh_fn(dyn_range[1])
+
+    return convert_activation(
+        network,
+        target,
+        source_ir,
+        name,
+        operation_type,
+        input_val,
+        dyn_range_fn=tanh_dyn_range_fn,
+    )
