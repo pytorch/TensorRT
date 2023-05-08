@@ -170,6 +170,33 @@ def aten_ops_div(
         )
 
 
+@tensorrt_converter(torch.ops.aten.elu.default)
+def aten_ops_elu(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+
+    if len(args) > 2:
+        return activation.selu(
+            network,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+        )
+    return activation.elu(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
 @tensorrt_converter(torch.ops.aten.floor_divide.default)
 def aten_ops_floor_div(
     network: TRTNetwork,

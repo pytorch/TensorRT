@@ -1040,11 +1040,14 @@ def acc_ops_elu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-    alpha = kwargs["alpha"]
-    operation_type = trt.ActivationType.ELU
-    return activation.convert_activation(
-        network, target, SourceIR.ACC, name, operation_type, input_val, alpha=alpha
+
+    return activation.elu(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        kwargs["input"],
+        kwargs["alpha"],
     )
 
 
@@ -1056,15 +1059,13 @@ def acc_ops_selu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-    operation_type = trt.ActivationType.SELU
-    return activation.convert_activation(
+
+    return activation.selu(
         network,
         target,
         SourceIR.ACC,
         name,
-        operation_type,
-        input_val,
+        kwargs["input"],
     )
 
 

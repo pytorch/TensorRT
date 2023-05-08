@@ -202,3 +202,51 @@ def leaky_relu(
         alpha,
         dyn_range_fn=leaky_relu_dyn_range_fn,
     )
+
+
+def elu(
+    network: TRTNetwork,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+    alpha: Optional[Any],
+):
+    operation_type = trt.ActivationType.ELU
+
+    def elu_dyn_range_fn(dyn_range):
+        return (torch.nn.ELU(dyn_range[0]), torch.nn.ELU(dyn_range[1]))
+
+    return convert_activation(
+        network,
+        target,
+        source_ir,
+        name,
+        operation_type,
+        input_val,
+        alpha,
+        dyn_range_fn=elu_dyn_range_fn,
+    )
+
+
+def selu(
+    network: TRTNetwork,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+):
+    operation_type = trt.ActivationType.SELU
+
+    def elu_dyn_range_fn(dyn_range):
+        return (torch.nn.SELU(dyn_range[0]), torch.nn.ELU(dyn_range[1]))
+
+    return convert_activation(
+        network,
+        target,
+        source_ir,
+        name,
+        operation_type,
+        input_val,
+        dyn_range_fn=elu_dyn_range_fn,
+    )

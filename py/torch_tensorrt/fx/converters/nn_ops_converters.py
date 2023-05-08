@@ -82,3 +82,34 @@ def leaky_relu(network, submod, args, kwargs, layer_name):
         input_val=kwargs["input"],
         alpha=kwargs["negative_slope"],
     )
+
+
+@tensorrt_converter(torch.nn.functional.elu)
+@tensorrt_converter(torch.nn.modules.activation.ELU)
+def elu(network, submod, args, kwargs, layer_name):
+    # args/kwargs should have already been normalized to kwargs
+    assert len(args) == 0
+
+    return activation.elu(
+        network=network,
+        target="torch.nn.functional.elu",
+        source_ir=SourceIR.NN,
+        name=layer_name,
+        input_val=kwargs["input"],
+    )
+
+
+@tensorrt_converter(torch.nn.functional.selu)
+@tensorrt_converter(torch.nn.modules.activation.SELU)
+def selu(network, submod, args, kwargs, layer_name):
+    # args/kwargs should have already been normalized to kwargs
+    assert len(args) == 0
+
+    return activation.selu(
+        network=network,
+        target="torch.nn.functional.selu",
+        source_ir=SourceIR.NN,
+        name=layer_name,
+        input_val=kwargs["input"],
+        alpha=kwargs["alpha"],
+    )
