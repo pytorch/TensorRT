@@ -28,6 +28,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
 from torch_tensorrt.fx.tracer.acc_tracer.acc_ops import contiguous
 from torch_tensorrt.fx.converters.impl import activation
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
+from torch_tensorrt.fx.converters.impl.normalization import batch_norm
 from torch_tensorrt.fx.converters.impl.unary import sign
 from torch_tensorrt.fx.converters.impl.elementwise.base import (
     convert_binary_elementwise,
@@ -629,58 +630,20 @@ def acc_ops_batch_norm(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"BatchNorm2d received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
-
-    if has_dynamic_shape(input_val.shape):
-        assert input_val.shape[1] != -1, "Channel dim can't be dynamic for batch norm."
-
-    scale = cast(
-        torch.Tensor, to_numpy(cast(torch.Tensor, kwargs["weight"]))
-    ) / np.sqrt(
-        cast(torch.Tensor, to_numpy(cast(torch.Tensor, kwargs["running_var"])))
-        + cast(float, kwargs["eps"])
+    return batch_norm(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        kwargs["input"],
+        kwargs["weight"],
+        kwargs["bias"],
+        kwargs["running_mean"],
+        kwargs["running_var"],
+        kwargs["training"],
+        kwargs["momentum"],
+        kwargs["eps"],
     )
-
-    bias = (
-        to_numpy(cast(torch.Tensor, kwargs["bias"]))
-        - to_numpy(cast(torch.Tensor, kwargs["running_mean"])) * scale
-    )
-    power = np.ones_like(scale)
-
-    # For BatchNorm1d, reshape 1d to 2d
-    output_shape = input_val.shape
-    if not network.has_implicit_batch_dimension and len(input_val.shape) < 4:
-        assert (
-            len(get_dynamic_dims(input_val.shape)) <= 1
-        ), "BatchNorm1D with more than one dynamic dims is not currently supported."
-        reshape_layer = network.add_shuffle(input_val)
-        if len(input_val.shape) == 2:
-            reshape_layer.reshape_dims = (input_val.shape[0], input_val.shape[1], 1, 1)
-        else:  # len(input_val.shape) == 3
-            reshape_layer.reshape_dims = (
-                input_val.shape[0],
-                input_val.shape[1],
-                input_val.shape[2],
-                1,
-            )
-        set_layer_name(reshape_layer, target, f"{name}_reshape_2d")
-        input_val = reshape_layer.get_output(0)
-    layer = network.add_scale(input_val, trt.ScaleMode.CHANNEL, bias, scale, power)
-    set_layer_name(layer, target, name)
-
-    # For BatchNorm1d, reshape output back to 1d
-    if not network.has_implicit_batch_dimension and len(output_shape) < 4:
-        reshape_output_layer = network.add_shuffle(layer.get_output(0))
-        reshape_output_layer.reshape_dims = tuple(output_shape)
-        set_layer_name(reshape_output_layer, target, f"{name}_reshape_1d")
-        layer = reshape_output_layer
-    return layer.get_output(0)
 
 
 @tensorrt_converter(acc_ops.layer_norm)

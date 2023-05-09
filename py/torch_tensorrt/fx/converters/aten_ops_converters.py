@@ -25,6 +25,7 @@ import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch_tensorrt.fx.converters.impl import activation
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
 from torch_tensorrt.fx.converters.impl.elementwise import rsqrt
+from torch_tensorrt.fx.converters.impl.normalization import batch_norm
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -93,18 +94,19 @@ def aten_ops_batch_norm(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    kwargs_new = {
-        "input": args[0],
-        "weight": args[1],
-        "bias": args[2],
-        "running_mean": args[3],
-        "running_var": args[4],
-        "training": args[5],
-        "momentum": args[6],
-        "eps": args[7],
-    }
-    return acc_ops_converters.acc_ops_batch_norm(
-        network, target, None, kwargs_new, name
+    return batch_norm(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+        args[4],
+        args[5],
+        args[6],
+        args[7],
     )
 
 
