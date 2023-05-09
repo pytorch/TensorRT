@@ -25,6 +25,7 @@ import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch_tensorrt.fx.converters.impl import activation
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
 from torch_tensorrt.fx.converters.impl.elementwise import rsqrt
+from torch_tensorrt.fx.converters.impl.normalization import softmax
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -387,6 +388,17 @@ def aten_ops_reshape(
 
     set_layer_name(layer, target, name)
     return layer.get_output(0)
+
+
+@tensorrt_converter(torch.ops.aten._softmax.default)
+def aten_ops_softmax(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return softmax(network, target, SourceIR.ATEN, name, args[0], args[1])
 
 
 @tensorrt_converter(torch.ops.aten.cat.default)
