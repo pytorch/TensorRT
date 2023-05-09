@@ -109,3 +109,33 @@ def trunc_div(
     )
 
     return output
+
+
+def rsqrt(
+    network: TRTNetwork,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    other: TRTTensor,
+) -> TRTTensor:
+    
+    sqrt_trt_output = convert_unary(
+        network,
+        target,
+        source_ir,
+        f"{name}"_sqrt,
+        trt.UnaryOperation.SQRT,
+        input,
+    )
+
+    output = convert_binary_elementwise(
+        network,
+        1,
+        sqrt_trt_output,
+        trt.ElementWiseOperation.DIV,
+        target,
+        f"{name}_outpur",
+    )
+    
+    return output

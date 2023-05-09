@@ -24,6 +24,7 @@ from .converter_utils import *  # noqa: F403
 import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch_tensorrt.fx.converters.impl import activation
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
+from torch_tensorrt.fx.converters.impl.elementwise import rsqrt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -295,6 +296,42 @@ def aten_ops_relu(
         network,
         target,
         SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@tensorrt_converter(torch.ops.aten.relu.default)
+def aten_ops_relu(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+
+    return activation.relu(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@tensorrt_converter(torch.ops.aten.rsqrt.default)
+def aten_ops_rsqrt(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    
+    return rsqrt(
+        network, 
+        target, 
+        SourceIR.ATEN, 
         name,
         args[0],
     )
