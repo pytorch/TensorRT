@@ -25,6 +25,7 @@ import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch_tensorrt.fx.converters.impl import activation
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
 from torch_tensorrt.fx.converters.impl.elementwise import rsqrt
+from torch_tensorrt.fx.converters.impl.elementwise import rsub
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -457,6 +458,20 @@ def aten_ops_reshape(
     return layer.get_output(0)
 
 
+@tensorrt_converter(torch.ops.aten.rsub.Tensor)
+def aten_ops_rsub(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    alpha = None
+    if "alpha" in kwargs:
+        alpha = kwargs["alpha"]
+    return rsub(network, target, SourceIR.ATEN, name, args[0], args[1], alpha)
+
+
 @tensorrt_converter(torch.ops.aten.tanh.default)
 def aten_ops_tanh(
     network: TRTNetwork,
@@ -465,7 +480,6 @@ def aten_ops_tanh(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return activation.tanh(
         network,
         target,
