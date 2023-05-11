@@ -25,6 +25,7 @@ import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch_tensorrt.fx.converters.impl import activation
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
 from torch_tensorrt.fx.converters.impl.elementwise import rsqrt
+from torch_tensorrt.fx.converters.impl.slice import slice_op
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -499,6 +500,27 @@ def aten_ops_sym_numel(
     )
     set_layer_name(reduce_layer, target, "_reduce_layer")
     return reduce_layer.get_output(0)
+
+
+@tensorrt_converter(torch.ops.aten.slice.Tensor)
+def aten_ops_slice(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return slice_op(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+        args[4],
+    )
 
 
 @tensorrt_converter(torch.ops.aten.sym_size)
