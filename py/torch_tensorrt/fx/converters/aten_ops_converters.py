@@ -25,6 +25,7 @@ import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch_tensorrt.fx.converters.impl import activation
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
 from torch_tensorrt.fx.converters.impl.elementwise import rsqrt
+from torch_tensorrt.fx.converters.impl.elementwise import matrix_multiply
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -236,12 +237,23 @@ def aten_ops_hardtanh(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return activation.hardtanh(
         network, target, SourceIR.ATEN, name, args[0], args[1], args[2]
     )
 
 
+@tensorrt_converter(torch.ops.aten.matmul)
+@tensorrt_converter(torch.ops.aten.mm.default)
+def aten_ops_matmul(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return matrix_multiply(network, target, SourceIR.ATEN, name, args[0], args[1])
+
+    
 @tensorrt_converter(torch.ops.aten.fmod.Tensor)
 def aten_ops_fmod(
     network: TRTNetwork,
@@ -267,7 +279,7 @@ def aten_ops_leaky_relu(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
 
     return activation.leaky_relu(network, target, SourceIR.ATEN, name, args[0], args[1])
-
+    
 
 @tensorrt_converter(torch.ops.aten.linear)
 def aten_ops_linear(
