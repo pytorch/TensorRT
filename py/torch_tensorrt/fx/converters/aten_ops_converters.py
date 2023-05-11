@@ -25,6 +25,7 @@ import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch_tensorrt.fx.converters.impl import activation
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
 from torch_tensorrt.fx.converters.impl.elementwise import rsqrt
+from torch_tensorrt.fx.converters.impl.squeeze import squeeze
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -350,6 +351,18 @@ def aten_ops_sub(
         "other": args[1],
     }
     return acc_ops_converters.acc_ops_sub(network, target, None, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten.squeeze.dim)
+@tensorrt_converter(torch.ops.aten.squeeze.dims)
+def aten_ops_squeeze(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return squeeze(network, target, SourceIR.ATEN, name, args[0], args[1])
 
 
 @tensorrt_converter(torch.ops.aten.view.default)
