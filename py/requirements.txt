@@ -5,4 +5,4 @@ pybind11==2.6.2
 torch==2.1.0.dev20230419+cu118
 torchvision==0.16.0.dev20230419+cu118
 --extra-index-url https://pypi.ngc.nvidia.com
-tensorrt==8.6.1
+tensorrt==8.6.0

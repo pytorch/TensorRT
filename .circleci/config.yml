@@ -203,10 +203,10 @@ commands:
         default: "8.8.0.121"
       trt-version-short:
         type: string
-        default: "8.6.1"
+        default: "8.6.0"
       trt-version-long:
         type: string
-        default: "8.6.1.6-1"
+        default: "8.6.0.12-1"
       bazel-version:
         type: string
         default: "5.2.0"
@@ -249,7 +249,7 @@ commands:
       parameters:
         trt-version-long:
           type: string
-          default: "8.6.1"
+          default: "8.6.0"
         cudnn-version-long:
           type: string
           default: "8.8.0.121"
@@ -1317,10 +1317,10 @@ parameters:
     default: "8.8.0.121"
   trt-version-short:
     type: string
-    default: "8.6.1"
+    default: "8.6.0"
   trt-version-long:
     type: string
-    default: "8.6.1"
+    default: "8.6.0"
 
   # Jetson platform config
   torch-jetson-build:
