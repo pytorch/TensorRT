@@ -2100,7 +2100,7 @@ def acc_ops_fmod(
         kwargs["input"],
         kwargs["other"],
     )
-    
+
 
 # T113156424 embedding implemenatation is very limited and shows no usage in hf models due to the indices are int64.
 # if we cast to int32, it will create accuracy issues. We'd better leave it to future implementation.

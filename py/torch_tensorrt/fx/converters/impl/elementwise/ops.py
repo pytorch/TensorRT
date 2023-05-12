@@ -146,4 +146,4 @@ def fmod(
         input,
         prod_value,
     )
-    return sub_value    
+    return sub_value
