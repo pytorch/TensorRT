@@ -1,14 +1,14 @@
 # Base image starts with CUDA
-ARG BASE_IMG=nvidia/cuda:11.7.1-devel-ubuntu22.04
+ARG BASE_IMG=nvidia/cuda:11.8.0-devel-ubuntu22.04
 FROM ${BASE_IMG} as base
-ENV BASE_IMG=nvidia/cuda:11.7.1-devel-ubuntu22.04
+ENV BASE_IMG=nvidia/cuda:11.8.0-devel-ubuntu22.04
 
 ARG TENSORRT_VERSION
 ENV TENSORRT_VERSION=${TENSORRT_VERSION}
-RUN test -n "$TENSORRT_VERSION" || (echo "No tensorrt version specified, please use --build-arg TENSORRT_VERSION=x.y.z to specify a version." && exit 1)
+RUN test -n "$TENSORRT_VERSION" || (echo "No tensorrt version specified, please use --build-arg TENSORRT_VERSION=x.y to specify a version." && exit 1)
 ARG CUDNN_VERSION
 ENV CUDNN_VERSION=${CUDNN_VERSION}
-RUN test -n "$CUDNN_VERSION" || (echo "No cudnn version specified, please use --build-arg CUDNN_VERSION=x.y.z to specify a version." && exit 1)
+RUN test -n "$CUDNN_VERSION" || (echo "No cudnn version specified, please use --build-arg CUDNN_VERSION=x.y to specify a version." && exit 1)
 
 ARG PYTHON_VERSION=3.10
 ENV PYTHON_VERSION=${PYTHON_VERSION}

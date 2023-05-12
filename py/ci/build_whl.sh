@@ -3,7 +3,7 @@
 # Example usage: docker run -it -v$(pwd)/..:/workspace/TRTorch build_trtorch_wheel /bin/bash /workspace/TRTorch/py/build_whl.sh
 
 export CXX=g++
-export CUDA_HOME=/usr/local/cuda-11.7
+export CUDA_HOME=/usr/local/cuda-11.8
 export PROJECT_DIR=/workspace/project
 
 cp -r $CUDA_HOME /usr/local/cuda
