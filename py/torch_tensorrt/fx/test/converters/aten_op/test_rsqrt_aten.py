@@ -5,7 +5,7 @@ from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.fx.tools.common_fx2trt import DispatchTestCase, InputTensorSpec
 
 
-class TestRSubConverter(DispatchTestCase):
+class TestRSqrtConverter(DispatchTestCase):
     @parameterized.expand(
         [
             ("2d_dim_alpha", (2, 1), 2),

@@ -327,11 +327,11 @@ def aten_ops_rsqrt(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    
+
     return rsqrt(
-        network, 
-        target, 
-        SourceIR.ATEN, 
+        network,
+        target,
+        SourceIR.ATEN,
         name,
         args[0],
     )
