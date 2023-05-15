@@ -792,6 +792,11 @@ struct CompileSpec {
   bool truncate_long_and_double = false;
 
   /**
+   * Allow shape tensors (from IShape layer) in the graph
+   */
+  bool allow_shape_tensors = false;
+
+  /**
    * Target Device
    */
   Device device;

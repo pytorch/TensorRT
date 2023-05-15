@@ -90,6 +90,7 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.convert_info.engine_settings.refit = external.refit;
   internal.convert_info.engine_settings.debug = external.debug;
   internal.convert_info.engine_settings.truncate_long_and_double = external.truncate_long_and_double;
+  internal.convert_info.engine_settings.allow_shape_tensors = external.allow_shape_tensors;
   internal.convert_info.engine_settings.device.allow_gpu_fallback = external.device.allow_gpu_fallback;
   internal.lower_info.target_device.allow_gpu_fallback = external.device.allow_gpu_fallback;
   internal.partitioning_info.target_device.allow_gpu_fallback = external.device.allow_gpu_fallback;

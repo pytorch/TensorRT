@@ -298,6 +298,10 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
         assert isinstance(compile_spec["debug"], bool)
         info.debug = compile_spec["debug"]
 
+    if "allow_shape_tensors" in compile_spec:
+        assert isinstance(compile_spec["allow_shape_tensors"], bool)
+        info.allow_shape_tensors = compile_spec["allow_shape_tensors"]
+
     if "device" in compile_spec:
         info.device = _parse_device(compile_spec["device"])
 
@@ -354,6 +358,7 @@ def TensorRTCompileSpec(
     dla_global_dram_size=536870912,
     truncate_long_and_double=False,
     calibrator=None,
+    allow_shape_tensors=False,
 ) -> torch.classes.tensorrt.CompileSpec:
     """Utility to create a formated spec dictionary for using the PyTorch TensorRT backend
 
@@ -388,6 +393,7 @@ def TensorRTCompileSpec(
         workspace_size (int): Maximum size of workspace given to TensorRT
         truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
+        allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
 
       Returns:
         torch.classes.tensorrt.CompileSpec: List of methods and formated spec objects to be provided to ``torch._C._jit_to_tensorrt``
@@ -410,6 +416,7 @@ def TensorRTCompileSpec(
         "dla_global_dram_size": dla_global_dram_size,  # Host RAM used by DLA to store weights and metadata for execution
         "calibrator": calibrator,
         "truncate_long_and_double": truncate_long_and_double,
+        "allow_shape_tensors": allow_shape_tensors,
     }
 
     parsed_spec = _parse_compile_spec(compile_spec)
@@ -461,6 +468,7 @@ def TensorRTCompileSpec(
     backend_spec._set_dla_local_dram_size(parsed_spec.dla_local_dram_size)
     backend_spec._set_dla_global_dram_size(parsed_spec.dla_global_dram_size)
     backend_spec._set_truncate_long_and_double(parsed_spec.truncate_long_and_double)
+    backend_spec._set_allow_shape_tensors(parsed_spec.allow_shape_tensors)
     backend_spec._set_ptq_calibrator(parsed_spec._get_calibrator_handle())
 
     return backend_spec

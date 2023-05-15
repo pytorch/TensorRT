@@ -31,6 +31,7 @@ def compile(
     min_block_size=3,
     torch_executed_ops=[],
     torch_executed_modules=[],
+    allow_shape_tensors=False,
 ) -> torch.jit.ScriptModule:
     """Compile a TorchScript module for NVIDIA GPUs using TensorRT
 
@@ -94,6 +95,7 @@ def compile(
         min_block_size (int): The minimum number of contiguous TensorRT convertable operations in order to run a set of operations in TensorRT
         torch_executed_ops (List[str]): List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
         torch_executed_modules (List[str]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+        allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
 
     Returns:
         torch.jit.ScriptModule: Compiled TorchScript Module, when run it will execute via TensorRT
@@ -131,6 +133,7 @@ def compile(
             "forced_fallback_modules": torch_executed_modules,
             "min_block_size": min_block_size,
         },
+        "allow_shape_tensors": allow_shape_tensors,
     }
 
     compiled_cpp_mod = _C.compile_graph(module._c, _parse_compile_spec(spec))
@@ -156,6 +159,7 @@ def convert_method_to_trt_engine(
     dla_global_dram_size=536870912,
     truncate_long_and_double=False,
     calibrator=None,
+    allow_shape_tensors=False,
 ) -> bytearray:
     """Convert a TorchScript module method to a serialized TensorRT engine
 
@@ -214,6 +218,7 @@ def convert_method_to_trt_engine(
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
+        allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
 
     Returns:
         bytearray: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
@@ -236,6 +241,7 @@ def convert_method_to_trt_engine(
         "workspace_size": workspace_size,  # Maximum size of workspace given to TensorRT
         "calibrator": calibrator,
         "truncate_long_and_double": truncate_long_and_double,
+        "allow_shape_tensors": allow_shape_tensors,
     }
 
     engine_str = _C.convert_graph_to_trt_engine(

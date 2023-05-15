@@ -23,6 +23,7 @@ struct BuilderSettings {
   bool refit = false;
   bool debug = false;
   bool truncate_long_and_double = false;
+  bool allow_shape_tensors = false;
   ir::Device device;
   nvinfer1::EngineCapability capability = TRT_ENGINE_CAPABILITY_STANDARD;
   nvinfer1::IInt8Calibrator* calibrator = nullptr;
