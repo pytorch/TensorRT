@@ -27,7 +27,8 @@ TEST(Converters, ATenResizeDynamicShapeCorrectly) {
 
   auto trt_in = at::clone(in);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in}, true);
+  auto trt_results =
+      torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in}, true, /*allow_shape_tensors=*/true);
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
@@ -53,7 +54,8 @@ TEST(Converters, ATenResizeDynamicInputCorrectly) {
 
   auto trt_in = at::clone(in);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in}, true);
+  auto trt_results =
+      torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in}, true, /*allow_shape_tensors=*/true);
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
@@ -83,7 +85,8 @@ TEST(Converters, ATenResizeGetItemDynShapeCorrectly) {
 
   auto trt_in = at::clone(in);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in}, true);
+  auto trt_results =
+      torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in}, true, /*allow_shape_tensors=*/true);
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
@@ -115,7 +118,8 @@ TEST(Converters, ATenResizeGetItemDynShapeMulCorrectly) {
 
   auto trt_in = at::clone(in);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in}, true);
+  auto trt_results =
+      torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in}, true, /*allow_shape_tensors=*/true);
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 

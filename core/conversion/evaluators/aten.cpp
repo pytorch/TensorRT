@@ -270,7 +270,12 @@ auto aten_registrations TORCHTRT_UNUSED =
                  if (tensor_var.isITensor()) {
                    auto tensor = tensor_var.ITensor();
                    if (ctx->input_is_dynamic) {
-                     return dynamic_size_layer(ctx, n, args);
+                     if (ctx->settings.allow_shape_tensors) {
+                       return dynamic_size_layer(ctx, n, args);
+                     } else {
+                       LOG_WARNING(
+                           "There may be undefined behavior using dynamic shape and aten::size without setting allow_shape_tensors");
+                     }
                    }
                    return util::toVec(tensor->getDimensions());
                  } else if (tensor_var.IValue()->isTensor()) {
@@ -286,7 +291,12 @@ auto aten_registrations TORCHTRT_UNUSED =
                  auto dim = args.at(n->input(1)).unwrapToInt();
                  if (tensor_var.isITensor()) {
                    if (ctx->input_is_dynamic) {
-                     return dynamic_size_layer(ctx, n, args);
+                     if (ctx->settings.allow_shape_tensors) {
+                       return dynamic_size_layer(ctx, n, args);
+                     } else {
+                       LOG_WARNING(
+                           "There may be undefined behavior using dynamic shape and aten::size without setting allow_shape_tensors");
+                     }
                    }
                    auto tensor = tensor_var.ITensor();
                    auto dims = util::toVec(tensor->getDimensions());
@@ -605,7 +615,8 @@ auto aten_registrations TORCHTRT_UNUSED =
         .evaluator(
             {c10::Symbol::fromQualString("aten::numel"),
              [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-               LOG_WARNING("There may be undefined behavior using dynamic shape and aten::numel");
+               LOG_WARNING(
+                   "There may be undefined behavior using dynamic shape and aten::numel without setting allow_shape_tensors");
                auto tensor_var = args.at(n->input(0));
                if (tensor_var.isITensor()) {
                  auto tensor = tensor_var.ITensor();

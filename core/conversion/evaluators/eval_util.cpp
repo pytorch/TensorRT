@@ -32,7 +32,9 @@ nvinfer1::ITensor* index_layer(
 c10::IValue dynamic_size_layer(ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) {
   LOG_DEBUG("Using dynamic version of aten::size evaluator");
   auto in = args.at(n->input(0)).ITensorOrFreeze(ctx);
-  LOG_DEBUG("Input dimensions: " << in->getDimensions());
+  auto input_dims = in->getDimensions();
+  LOG_DEBUG("Input dimensions: " << input_dims);
+
   auto shape_layer = ctx->net->addShape(*in);
   TORCHTRT_CHECK(shape_layer, "Unable to create shape layer from node: " << *n);
   auto shape_1d_tensor = shape_layer->getOutput(0);
@@ -44,15 +46,31 @@ c10::IValue dynamic_size_layer(ConversionCtx* ctx, const torch::jit::Node* n, kw
     dim = dim < 0 ? dim + maxDim : dim;
     LOG_DEBUG("Dimension to select: " << dim);
     shape_1d_tensor = index_layer(ctx, n, shape_1d_tensor, dim);
+    LOG_DEBUG("Output tensor shape: " << shape_1d_tensor->getDimensions());
+
+    auto tensor_holder = TensorContainer();
+    tensor_holder.hold_tensor(shape_1d_tensor);
+    auto shape_1d_ivalue = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+
+    return shape_1d_ivalue;
+
+  } else {
+    auto input_size = c10::impl::GenericList(c10::AnyType::get());
+    // Only express the dynamic dimension with a shape layer output.
+    // The static dimensions are preserved in the input size.
+    for (int32_t i = 0; i < input_dims.nbDims; i++) {
+      if (input_dims.d[i] == -1) {
+        auto dynamic_dim_tensor = index_layer(ctx, n, shape_1d_tensor, i);
+        auto dynamic_dim_holder = TensorContainer();
+        dynamic_dim_holder.hold_tensor(dynamic_dim_tensor);
+        auto dynamic_dim_ivalue = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(dynamic_dim_holder)));
+        input_size.emplace_back(std::move(dynamic_dim_ivalue));
+      } else {
+        input_size.emplace_back(input_dims.d[i]);
+      }
+    }
+    return c10::IValue(input_size);
   }
-
-  LOG_DEBUG("Output tensor shape: " << shape_1d_tensor->getDimensions());
-
-  auto tensor_holder = TensorContainer();
-  tensor_holder.hold_tensor(shape_1d_tensor);
-  auto shape_1d_ivalue = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
-
-  return shape_1d_ivalue;
 }
 
 int64_t normalizeIndex(int64_t idx, int64_t list_size) {

@@ -168,6 +168,12 @@ int main(int argc, char** argv) {
       "Truncate weights that are provided in 64bit to 32bit (Long, Double to Int, Float)",
       {"truncate", "truncate-long-double", "truncate-64bit"});
 
+  args::Flag allow_shape_tensors(
+      parser,
+      "allow-shape-tensors",
+      "(Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT",
+      {"allow-shape-tensors"});
+
   args::Flag save_engine(
       parser,
       "save_engine",
@@ -441,6 +447,10 @@ int main(int argc, char** argv) {
 
   if (truncate_long_and_double) {
     compile_settings.truncate_long_and_double = true;
+  }
+
+  if (allow_shape_tensors) {
+    compile_settings.allow_shape_tensors = true;
   }
 
   torch::jit::Module mod;

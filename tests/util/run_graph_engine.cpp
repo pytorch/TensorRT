@@ -94,12 +94,14 @@ std::vector<at::Tensor> RunGraphEngineDynamic(
     std::shared_ptr<torch::jit::Graph>& g,
     core::ir::StaticParams& named_params,
     std::vector<at::Tensor> inputs,
-    bool dynamic_batch) {
+    bool dynamic_batch = false,
+    bool allow_shape_tensors = false) {
   LOG_DEBUG("Running TRT version");
   auto var_ins = get_var_inputs(g->inputs(), named_params);
   auto in = core::ir::pair_input_vals_with_specs(var_ins, toInputsDynamic(inputs, dynamic_batch));
   auto info = core::conversion::ConversionInfo();
   info.inputs = std::move(in);
+  info.engine_settings.allow_shape_tensors = allow_shape_tensors;
   std::string eng = core::conversion::ConvertBlockToEngine(g->block(), info, named_params);
   return RunEngine(eng, inputs);
 }

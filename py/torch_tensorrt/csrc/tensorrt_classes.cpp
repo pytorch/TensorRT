@@ -373,6 +373,7 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.partitioning_info.truncate_long_and_double = truncate_long_and_double;
   info.lower_info.forced_fallback_modules = torch_fallback.forced_fallback_modules;
   info.convert_info.engine_settings.truncate_long_and_double = truncate_long_and_double;
+  info.convert_info.engine_settings.allow_shape_tensors = allow_shape_tensors;
 
   info.convert_info.engine_settings.capability = toTRTEngineCapability(capability);
   TORCHTRT_CHECK(num_avg_timing_iters >= 0, "num_avg_timing_iters must be 0 or greater");
@@ -423,6 +424,7 @@ std::string CompileSpec::stringify() {
   ss << "    \"DLA Local DRAM Size\": " << dla_local_dram_size << std::endl;
   ss << "    \"DLA Global DRAM Size\": " << dla_global_dram_size << std::endl;
   ss << "    \"Truncate long and double\": " << truncate_long_and_double << std::endl;
+  ss << "    \"Allow Shape tensors\": " << allow_shape_tensors << std::endl;
   ss << "    \"Torch Fallback\": " << torch_fallback.to_str();
   ss << "}";
   return ss.str();
