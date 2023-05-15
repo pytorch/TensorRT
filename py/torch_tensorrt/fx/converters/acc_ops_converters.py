@@ -116,7 +116,7 @@ def acc_ops_conv1d(
     # right now
     if kwargs["bias"] is not None and not isinstance(kwargs["bias"], torch.Tensor):
         raise RuntimeError(
-            f"linear {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tenosr]"
+            f"linear {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tensor]"
         )
     bias = to_numpy(kwargs["bias"])  # type: ignore[arg-type]
     if bias is not None:
@@ -146,7 +146,7 @@ def acc_ops_conv1d(
     else:
         if not isinstance(kwargs["weight"], torch.Tensor):
             raise RuntimeError(
-                f"linear {name} has weight of type {type(kwargs['weight'])}, Expect Optional[Tenosr]"
+                f"linear {name} has weight of type {type(kwargs['weight'])}, Expect Optional[Tensor]"
             )
         weight = to_numpy(weight)
         weight = np.expand_dims(weight, -1)
@@ -202,11 +202,11 @@ def acc_ops_convnd(
     # right now
     if kwargs["bias"] is not None and not isinstance(kwargs["bias"], torch.Tensor):
         raise RuntimeError(
-            f"linear {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tenosr]"
+            f"linear {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tensor]"
         )
     bias = to_numpy(kwargs["bias"])  # type: ignore[arg-type]
 
-    if network.has_explicit_precision:
+    if network.has_explicit_precision or isinstance(kwargs["weight"], TRTTensor):
         weight = get_trt_tensor(network, kwargs["weight"], f"{name}_weight")
         weight_shape = tuple(kwargs["weight"].shape)  # type: ignore[union-attr]
         # will need to use uninitialized weight and set it later to support
@@ -224,7 +224,7 @@ def acc_ops_convnd(
     else:
         if not isinstance(kwargs["weight"], torch.Tensor):
             raise RuntimeError(
-                f"linear {name} has weight of type {type(kwargs['weight'])}, Expect Optional[Tenosr]"
+                f"linear {name} has weight of type {type(kwargs['weight'])}, Expect Optional[Tensor]"
             )
         weight = to_numpy(kwargs["weight"])
         layer = network.add_convolution_nd(
@@ -276,7 +276,7 @@ def acc_ops_conv_transposend(
         )
     bias = to_numpy(kwargs["bias"])  # type: ignore[arg-type]
 
-    if network.has_explicit_precision:
+    if network.has_explicit_precision or isinstance(kwargs["weight"], TRTTensor):
         weight = get_trt_tensor(network, kwargs["weight"], f"{name}_weight")
         weight_shape = tuple(kwargs["weight"].shape)  # type: ignore[union-attr]
         # will need to use uninitialized weight and set it later to support
