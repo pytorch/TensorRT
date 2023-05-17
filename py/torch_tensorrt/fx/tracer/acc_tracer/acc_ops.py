@@ -1,9 +1,10 @@
 # encoding: utf-8
+import logging
 import operator
 import warnings
 
 import torch  # isort:skip
-from typing import cast, Iterable, List, Sequence
+from typing import cast, Iterable, List, Optional, Sequence
 
 import torch.nn as nn
 from torch.fx.passes.shape_prop import _extract_tensor_metadata, TensorMetadata
@@ -15,6 +16,8 @@ from .acc_normalizer import (
     register_custom_acc_mapper_fn,
 )
 from .acc_op_properties import AccOpProperty, register_acc_op_properties
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 this_arg_is_optional = True
 move_to_qparams = True
@@ -158,6 +161,18 @@ def max_pool3d(
         dilation=dilation,
         ceil_mode=ceil_mode,
         return_indices=return_indices,
+    )
+
+
+@register_acc_op_mapping(op_and_target=("call_function", nn.functional.normalize))
+@register_acc_op
+def normalize(*, input, p, dim, eps, out):
+    return nn.functional.normalize(
+        input=input,
+        p=p,
+        dim=dim,
+        eps=eps,
+        out=out,
     )
 
 
@@ -364,9 +379,10 @@ def custom_getattr_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
             getitem_node.meta = node.meta.copy()
             return getitem_node
 
-    assert (
-        input_obj_type == torch.Tensor
-    ), f"Expected torch.Tensor type for {input_obj_type}"
+    assert input_obj_type in [
+        torch.Tensor,
+        torch.nn.parameter.Parameter,
+    ], f"Expected torch.Tensor type for {input_obj_type}"
     assert (
         attr_name == "shape" or attr_name == "device" or attr_name == "dtype"
     ), f"Only supporting shape, device and dtype getattr for now, not {attr_name}"
@@ -417,7 +433,10 @@ def tensor_size_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
 @register_acc_op_mapping(op_and_target=("call_method", "add"))
 @register_acc_op
 def add(*, input, other):
-    return input + other
+    if not (isinstance(input, torch.Tensor) or isinstance(other, torch.Tensor)):
+        return operator.add(input, other)
+    else:
+        return input + other
 
 
 @register_acc_op_properties(AccOpProperty.unary)
@@ -442,14 +461,27 @@ def tile(*, input, dims):
         ("input", "input"),
         ("*", "sizes"),
     ],
+    skip_normalization_if_none=True,
 )
-def repeat_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
+def repeat_mapper(node: torch.fx.Node, _: nn.Module) -> Optional[torch.fx.Node]:
     """
     Map repeat to tile.
     """
     with node.graph.inserting_before(node):
         inputs = node.kwargs["input"]
         dims = node.kwargs["sizes"]
+        # Skip repeat mapping when the list of dims is not all ints (ie. contains
+        # some calculated value). torch.tile cannot support cases where dims
+        # are Proxy nodes
+        if (
+            isinstance(dims, (list, tuple))
+            and len(dims) > 0
+            and not all(isinstance(x, int) for x in dims)
+        ):
+            logger.info(
+                "Not mapping repeat to an acc op. We can't handle variable dims."
+            )
+            return
         new_node = node.graph.create_node(
             "call_function",
             tile,
@@ -468,6 +500,7 @@ def repeat_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
         ("dim", "dim", this_arg_is_optional),
         ("output_size", "output_size", this_arg_is_optional),
     ],
+    skip_normalization_if_none=True,
 )
 @register_custom_acc_mapper_fn(
     op_and_target=("call_function", torch.repeat_interleave),
@@ -477,14 +510,17 @@ def repeat_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
         ("dim", "dim", this_arg_is_optional),
         ("output_size", "output_size", this_arg_is_optional),
     ],
+    skip_normalization_if_none=True,
 )
 def repeat_interleave_mapper(node: torch.fx.Node, _: nn.Module):
     input_node = node.kwargs["input"]
     repeats = cast(int, node.kwargs["repeats"])
     dim = node.kwargs["dim"]
-    assert (
-        type(repeats) is int
-    ), "We currently only support `repeat_interleave` with int repeats"
+    if not (type(repeats) is int):
+        logger.info(
+            "Not mapping repeat_interleave to an acc op. We currently only support `repeat_interleave` with int repeats"
+        )
+        return
     rank = node.meta["tensor_rank"]
     if dim is None:
         repeat_dim = rank - 1
@@ -826,6 +862,18 @@ def matmul(*, input, other):
     arg_replacement_tuples=[("input", "input")],
 )
 @register_custom_acc_mapper_fn(
+    op_and_target=("call_function", nn.functional.dropout1d),
+    arg_replacement_tuples=[("input", "input")],
+)
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_function", nn.functional.dropout2d),
+    arg_replacement_tuples=[("input", "input")],
+)
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_function", nn.functional.dropout3d),
+    arg_replacement_tuples=[("input", "input")],
+)
+@register_custom_acc_mapper_fn(
     op_and_target=("call_method", "detach"), arg_replacement_tuples=[("input", "input")]
 )
 @register_custom_acc_mapper_fn(
@@ -1055,7 +1103,10 @@ def rescale_quantize_per_channel(*, input, acc_out_ty=None):
 @register_acc_op_mapping(op_and_target=("call_method", "sub"))
 @register_acc_op
 def sub(*, input, other):
-    return input - other
+    if not (isinstance(input, torch.Tensor) or isinstance(other, torch.Tensor)):
+        return operator.sub(input, other)
+    else:
+        return input - other
 
 
 @register_acc_op_properties(AccOpProperty.pointwise)
@@ -1065,6 +1116,19 @@ def sub(*, input, other):
 @register_acc_op
 def mul(*, input, other):
     return input * other
+
+
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.ops.aten.threshold_backward.default),
+    arg_replacement_tuples=[
+        ("grad", "grad"),
+        ("self", "input"),
+        ("threshold", "threshold"),
+    ],
+)
+@register_acc_op
+def threshold_backward(*, grad, input, threshold):
+    return torch.ops.aten.threshold_backward.default(grad, input, threshold)
 
 
 @register_custom_acc_mapper_fn(
@@ -1367,7 +1431,7 @@ def std_mapper(node, mod):
         mean_kwargs = {
             "input": input_node,
             "dim": dim,
-            "keepdim": keepdim,
+            "keepdim": True,
         }
         mean_node = node.graph.call_function(mean, kwargs=mean_kwargs)
         mean_node.meta["type"] = torch.Tensor
@@ -1385,7 +1449,7 @@ def std_mapper(node, mod):
         }
         pow_node = node.graph.call_function(pow, kwargs=pow_kwargs)
         pow_node.meta["type"] = torch.Tensor
-        # sum(pow(X-mean(X))))/N
+        # mean(pow(X-mean(X)))
         post_mean_kwargs = {
             "input": pow_node,
             "dim": dim,
@@ -1393,7 +1457,7 @@ def std_mapper(node, mod):
         }
         post_mean_node = node.graph.call_function(mean, kwargs=post_mean_kwargs)
         post_mean_node.meta["type"] = torch.Tensor
-        # sqrt(sum(pow(X-mean(X))))/N)
+        # sqrt( mean(pow(X-mean(X))) )
         sqrt_kwargs = {
             "input": post_mean_node,
         }
@@ -1653,10 +1717,24 @@ def fmod(*, input, other):
 
 @register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
 @register_acc_op_mapping(op_and_target=("call_function", torch.sigmoid))
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.ops.aten.sigmoid.default)
+)
 @register_acc_op_mapping(op_and_target=("call_method", "sigmoid"))
 @register_acc_op
 def sigmoid(*, input):
     return torch.sigmoid(input=input)
+
+
+@register_acc_op_properties(AccOpProperty.pointwise)
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.ops.aten.sigmoid_backward.default)
+)
+@register_acc_op_mapping(op_and_target=("call_method", "sigmoid_backward"))
+@register_acc_op
+# first argument's name needs to be input to use same_shape_and_dtype_as_input
+def sigmoid_backward(*, input, dest):
+    return torch.ops.aten.sigmoid_backward(grad_output=input, output=dest)
 
 
 @register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
@@ -1716,6 +1794,23 @@ def log(*, input):
     return torch.log(input=input)
 
 
+@register_acc_op_properties(AccOpProperty.unary)
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.nn.functional.log_softmax),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("dim", "dim"),
+        ("dtype", "dtype", this_arg_is_optional),
+    ],
+)
+@register_acc_op
+def log_softmax(*, input, dim, dtype=None):
+    """
+    _stacklevel are ignored here.
+    """
+    return torch.nn.functional.log_softmax(input=input, dim=dim, dtype=dtype)
+
+
 @register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
 @register_acc_op_mapping(op_and_target=("call_function", torch.sqrt))
 @register_acc_op_mapping(op_and_target=("call_method", "sqrt"))
@@ -1773,7 +1868,10 @@ def abs(*, input):
 @register_acc_op_mapping(op_and_target=("call_function", torch.neg))
 @register_acc_op
 def neg(*, input):
-    return torch.neg(input=input)
+    if not isinstance(input, torch.Tensor):
+        return operator.neg(input)
+    else:
+        return torch.neg(input=input)
 
 
 @register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
@@ -2282,6 +2380,7 @@ def embedding_bag_4bit_rowwise_offsets(
 
 @register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
 @register_acc_op_mapping(op_and_target=("call_function", torch.sin))
+@register_acc_op_mapping(op_and_target=("call_method", "sin"))
 @register_acc_op
 def sin(*, input):
     return torch.sin(input=input)
@@ -2289,6 +2388,7 @@ def sin(*, input):
 
 @register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
 @register_acc_op_mapping(op_and_target=("call_function", torch.cos))
+@register_acc_op_mapping(op_and_target=("call_method", "cos"))
 @register_acc_op
 def cos(*, input):
     return torch.cos(input=input)
@@ -2314,11 +2414,51 @@ def getitem(*, input, idx):
     return input[idx]
 
 
-@register_acc_op_mapping(op_and_target=("call_function", torch.nan_to_num))
-@register_acc_op_mapping(op_and_target=("call_method", "nan_to_num"))
 @register_acc_op
-def nan_to_num(*, input, nan=0.0, posinf=None, neginf=None):
+def nan_to_num(*, input, nan=None, posinf=None, neginf=None):
     return torch.nan_to_num(input, nan=nan, posinf=posinf, neginf=neginf)
+
+
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_function", torch.nan_to_num),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("nan", "nan"),
+        ("posinf", "posinf"),
+        ("neginf", "neginf"),
+    ],
+)
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_method", "nan_to_num"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("nan", "nan"),
+        ("posinf", "posinf"),
+        ("neginf", "neginf"),
+    ],
+)
+def custom_nan_to_num_mapper(node: torch.fx.Node, mod: nn.Module) -> torch.fx.Node:
+    nan_val, posinf, neginf = (
+        node.kwargs["nan"],
+        node.kwargs["posinf"],
+        node.kwargs["neginf"],
+    )
+    if nan_val is None:
+        nan_val = 0
+    if posinf is None:
+        posinf = torch.finfo(torch.float16).max
+    if neginf is None:
+        neginf = torch.finfo(torch.float16).min
+    kwargs = {
+        "input": node.kwargs["input"],
+        "nan": nan_val,
+        "posinf": posinf,
+        "neginf": neginf,
+    }
+    with node.graph.inserting_before(node):
+        new_node = node.graph.call_function(nan_to_num, kwargs=kwargs)
+    new_node.meta = node.meta.copy()
+    return new_node
 
 
 @register_acc_op_properties(AccOpProperty.unary)
@@ -2422,7 +2562,10 @@ def custom_narrow_mapper(node: torch.fx.Node, mod: nn.Module) -> torch.fx.Node:
 @register_acc_op
 def reshape(*, input, acc_out_ty=None):
     assert acc_out_ty is not None
-    return input.reshape(acc_out_ty.shape)
+    shape = acc_out_ty.shape
+    if len(shape) == 1 and not isinstance(shape[0], int):
+        return input.reshape(shape[0])
+    return input.reshape(shape)
 
 
 @register_custom_acc_mapper_fn(
@@ -2978,22 +3121,6 @@ def tensor_split(*, input, indices_or_sections, dim=0):
 
 
 @register_acc_op_mapping(
-    op_and_target=("call_method", "new_ones"),
-    arg_replacement_tuples=[
-        ("input", "input"),
-        ("size", "size"),
-        ("dtype", "dtype", this_arg_is_optional),
-        ("device", "device", this_arg_is_optional),
-        ("requires_grad", "requires_grad", this_arg_is_optional),
-    ],
-)
-@register_acc_op
-def new_ones(*, input, size, dtype=None, device=None, requires_grad=False):
-    assert requires_grad is False, f"requires_grad != False, it is {requires_grad}"
-    return input.new_ones(size, dtype=dtype, device=device)
-
-
-@register_acc_op_mapping(
     op_and_target=("call_method", "new_empty"),
     arg_replacement_tuples=[
         ("input", "input"),
@@ -3078,33 +3205,6 @@ def xl_weight(weight_id: str, metadata: TensorMetadata, proxy_shape, dtype):
         dtype: dtype of substitute tensor
     """
     return torch.zeros(proxy_shape, dtype=dtype)
-
-
-@register_custom_acc_mapper_fn(
-    op_and_target=("call_function", torch.nn.functional.log_softmax),
-    arg_replacement_tuples=[
-        ("input", "input"),
-        ("dim", "dim"),
-        ("dtype", "dtype"),
-    ],
-)
-def log_softmax_mapper(node: torch.fx.Node, _: torch.nn.Module) -> torch.fx.Node:
-    with node.graph.inserting_after(node):
-
-        softmax_kwargs = {
-            "input": node.kwargs["input"],
-            "dim": node.kwargs["dim"],
-            "dtype": node.kwargs["dtype"],
-        }
-        softmax_node = node.graph.call_function(softmax, kwargs=softmax_kwargs)
-        softmax_node.meta = node.meta.copy()
-
-    with softmax_node.graph.inserting_after(softmax_node):
-        log_kwargs = {"input": softmax_node}
-        log_node = node.graph.call_function(log, kwargs=log_kwargs)
-        log_node.meta = node.meta.copy()
-
-        return log_node
 
 
 @register_custom_acc_mapper_fn(
@@ -3254,6 +3354,124 @@ def baddbmm_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
         )
         add_node.meta = node.meta.copy()
         return add_node
+
+
+@register_acc_op_mapping(op_and_target=("call_function", torch.clone))
+@register_acc_op_mapping(op_and_target=("call_method", "clone"))
+@register_acc_op
+def clone(*, input):
+    return torch.clone(input)
+
+
+@register_acc_op_mapping(op_and_target=("call_function", torch.unbind))
+@register_acc_op
+def unbind(*, input, dim=0):
+    return torch.unbind(input, dim=dim)
+
+
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.nn.functional.group_norm),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("num_groups", "num_groups"),
+        ("weight", "weight"),
+        ("bias", "bias"),
+        ("eps", "eps"),
+    ],
+)
+@register_acc_op
+def group_norm(*, input, num_groups, weight=None, bias=None, eps=1e-05):
+    return torch.nn.functional.group_norm(
+        input, num_groups, weight=weight, bias=bias, eps=eps
+    )
+
+
+@register_acc_op_mapping(op_and_target=("call_method", "long"))
+@register_acc_op
+def long(*, input):
+    return input.long()
+
+
+@register_acc_op_mapping(
+    op_and_target=("call_method", "new_full"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("size", "size"),
+        ("fill_value", "fill_value"),
+        ("dtype", "dtype", this_arg_is_optional),
+        ("device", "device", this_arg_is_optional),
+        ("requires_grad", "requires_grad", this_arg_is_optional),
+    ],
+)
+@register_acc_op
+def new_full(*, input, size, fill_value, dtype=None, device=None, requires_grad=False):
+    return input.new_full(size, fill_value=fill_value, dtype=dtype, device=device)
+
+
+@register_acc_op_mapping(op_and_target=("call_function", torch.full_like))
+@register_acc_op
+def full_like(*, input, fill_value, dtype=None, device=None):
+    return torch.full_like(
+        input=input, fill_value=fill_value, dtype=dtype, device=device
+    )
+
+
+@register_acc_op_mapping(
+    op_and_target=("call_method", "new_ones"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("size", "size"),
+        ("dtype", "dtype", this_arg_is_optional),
+        ("device", "device", this_arg_is_optional),
+        ("requires_grad", "requires_grad", this_arg_is_optional),
+    ],
+)
+@register_acc_op
+def new_ones(*, input, size, dtype=None, device=None, requires_grad=False):
+    assert requires_grad is False, f"requires_grad != False, it is {requires_grad}"
+    return input.new_ones(size, dtype=dtype, device=device)
+
+
+@register_acc_op_mapping(op_and_target=("call_function", torch.ones_like))
+@register_acc_op
+def ones_like(*, input, dtype=None, device=None):
+    return torch.ones_like(input=input, dtype=dtype, device=device)
+
+
+@register_acc_op_mapping(
+    op_and_target=("call_method", "new_zeros"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("size", "size"),
+        ("dtype", "dtype", this_arg_is_optional),
+        ("device", "device", this_arg_is_optional),
+        ("requires_grad", "requires_grad", this_arg_is_optional),
+    ],
+)
+@register_acc_op
+def new_zeros(*, input, size, dtype=None, device=None, requires_grad=False):
+    return input.new_zeros(size, dtype=dtype, device=device)
+
+
+@register_acc_op_mapping(op_and_target=("call_function", torch.zeros_like))
+@register_acc_op
+def zeros_like(*, input, dtype=None, device=None):
+    return torch.zeros_like(input=input, dtype=dtype, device=device)
+
+
+@register_acc_op_mapping(
+    op_and_target=("call_method", "index_add_"),
+)
+@register_acc_op_mapping(op_and_target=("call_function", torch.index_add))
+@register_acc_op
+def index_add(*, input, dim, index, source, alpha=1):
+    return torch.index_add(input, dim, index, source, alpha=alpha)
+
+
+@register_acc_op_mapping(op_and_target=("call_function", torch.masked_select))
+@register_acc_op
+def masked_select(*, input, mask):
+    return torch.masked_select(input=input, mask=mask)
 
 
 ###############################################################################

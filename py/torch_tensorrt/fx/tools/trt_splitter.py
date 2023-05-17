@@ -34,8 +34,9 @@ def create_trt_operator_support(
 
     return ops.chain(
         ops.OpSupports.decline_if_node_in_names(exclude_support_node_name),
-        # 1. Node is not supported if it has args with int64 dtype:
+        # 1. Node is not supported if it has args with int64 or float64 dtype:
         ops.OpSupports.decline_if_input_dtype(torch.int64),
+        ops.OpSupports.decline_if_input_dtype(torch.float64),
         # 2. Node is supported if it has TRT converter:
         supported_if_converter_registered,
     )

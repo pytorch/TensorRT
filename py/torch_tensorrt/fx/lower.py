@@ -41,6 +41,8 @@ def compile(
     dynamic_batch=True,
     is_aten=False,
     use_experimental_fx_rt=False,
+    correctness_atol=1e-1,
+    correctness_rtol=1e-1,
 ) -> nn.Module:
     """
     Takes in original module, input and lowering setting, run lowering workflow to turn module
@@ -81,6 +83,8 @@ def compile(
         dynamic_batch=dynamic_batch,
         is_aten=is_aten,
         use_experimental_rt=use_experimental_fx_rt,
+        correctness_atol=correctness_atol,
+        correctness_rtol=correctness_rtol,
     )
     lowerer = Lowerer.create(lower_setting=lower_setting)
     return lowerer(module, input)
