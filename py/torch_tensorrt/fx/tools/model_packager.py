@@ -51,12 +51,34 @@ def generate_standalone_repro(
         "",
         "import torch",
         "from torch import nn",
+    ]
+    code = str(model.code)
+
+    import_modules = set()
+    import_map = {
+        "torch_tensorrt_fx_tracer_acc_tracer_acc_ops": "torch_tensorrt.fx.tracer.acc_tracer.acc_ops",
+        "torch_tensorrt_fx_passes_lower_basic_pass": "torch_tensorrt.fx.passes.lower_basic_pass",
+    }
+    for line in code.split("\n"):
+        for k, v in import_map.items():
+            if k in line:
+                sub_string = line.split("(")[0].split()[-1]
+                if sub_string.startswith(k):
+                    mod = sub_string.replace(k + "_", "")
+                    import_modules.add(
+                        "from " + v + " import " + mod + " as " + sub_string
+                    )
+    for mod in sorted(import_modules):
+        lines.append(mod)
+
+    lines += [
         "",
         "",
         "class ExportedModule(nn.Module):",
         f"{INDENT}def __init__(self):",
         f"{INDENT * 2}super().__init__()",
     ]
+
     for k, v in model._holder.named_parameters():
         shape = ", ".join([str(i) for i in v.shape])
         rand_func = "randn" if torch.is_floating_point(v) else "randint"
@@ -64,7 +86,6 @@ def generate_standalone_repro(
         lines.append(
             f"{INDENT * 2}self.{k} = nn.Parameter(torch.{rand_func}({int_range}{shape}, dtype={v.dtype}))"
         )
-    code = str(model.code)
 
     def dump(f):
         f.write(prelude)

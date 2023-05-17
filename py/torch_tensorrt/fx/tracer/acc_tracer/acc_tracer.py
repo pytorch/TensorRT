@@ -581,9 +581,15 @@ def _replace_transpose_last_dims(gm: torch.fx.GraphModule):
                 gm.recompile()
 
 
-def rewriter_base_trace(mod, ast_rewriter_allow_list, leaf_module_list):
+def rewriter_base_trace(
+    mod,
+    ast_rewriter_allow_list,
+    leaf_module_list,
+    concrete_args: Optional[Dict[str, Any]] = None,
+):
     rewritten_graph, rewritten_mod = AccRewritingTracer().trace(
         mod,
+        concrete_args,
         ast_rewriter_allow_list=ast_rewriter_allow_list,
         leaf_module_list=leaf_module_list,
     )
@@ -605,6 +611,8 @@ def trace(
     acc_normalization_block_list: Optional[
         Set[Tuple[str, Union[str, Callable]]]
     ] = None,
+    dont_retrace_gm: bool = False,
+    concrete_args: Optional[Dict[str, Any]] = None,
 ) -> torch.fx.GraphModule:
     """
     Performs tracing and arg normalization specialized for accelerator lowering.
@@ -653,6 +661,10 @@ def trace(
                                     normalization to. Just like the register_acc_op decarators,
                                     the target can either be a string (e.g. for op == "call_method")
                                     or a callable (e.g. for op == "call_function").
+
+        dont_retrace_gm (bool): Optional bool for whether to re-trace the provided
+                                module if it's a graph module already.
+
     """
     if mod.training:
         warnings.warn(
@@ -664,7 +676,12 @@ def trace(
     assert isinstance(sample_inputs, (list, tuple))
 
     # Rewrite the module to make it symbolic traceable, and then trace it.
-    traced = rewriter_base_trace(mod, ast_rewriter_allow_list, leaf_module_list)
+    if dont_retrace_gm and isinstance(mod, torch.fx.GraphModule):
+        traced = mod
+    else:
+        traced = rewriter_base_trace(
+            mod, ast_rewriter_allow_list, leaf_module_list, concrete_args
+        )
 
     # Now remove all assertions and exceptions if requested.
     if remove_assertions:

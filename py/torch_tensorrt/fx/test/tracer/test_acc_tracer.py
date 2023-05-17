@@ -1494,6 +1494,21 @@ class AccTracerTest(unittest.TestCase):
             lambda x: nn.functional.dropout(x, training=False),
             input_shape=(1, 2, 3),
         )
+        self._make_acc_op_function_test(
+            None,
+            lambda x: nn.functional.dropout1d(x, training=False),
+            input_shape=(4, 2, 3),
+        )
+        self._make_acc_op_function_test(
+            None,
+            lambda x: nn.functional.dropout2d(x, training=False),
+            input_shape=(4, 2, 3),
+        )
+        self._make_acc_op_function_test(
+            None,
+            lambda x: nn.functional.dropout3d(x, training=False),
+            input_shape=(4, 2, 3),
+        )
 
     def test_stochastic_depth(self):
         self._make_acc_op_function_test(
@@ -1726,6 +1741,11 @@ class AccTracerTest(unittest.TestCase):
 
     def test_softmax(self):
         self._make_acc_op_function_test(acc_ops.softmax, torch.nn.functional.softmax)
+
+    def test_normalize(self):
+        self._make_acc_op_function_test(
+            acc_ops.normalize, torch.nn.functional.normalize
+        )
 
     def test_tensor_squeeze(self):
         self._make_acc_op_function_test(acc_ops.squeeze, lambda x: x.squeeze())
@@ -2628,6 +2648,40 @@ class AccTracerTest(unittest.TestCase):
             self.assertIsNotNone(getitem)
         self.assertTrue(torch.equal(m(x), traced(x)))
 
+    def test_skip_normalization_if_none_repeat_interleave(self):
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+                repeats = y[0]
+                return torch.repeat_interleave(x, repeats, 1)
+
+        # TODO: finish test later
+        m = TestModule()
+        inputs = (torch.randn(3, 4), torch.tensor([1]))
+        traced = acc_tracer.trace(m, inputs)
+        # Make sure repeat_interleave wasn't mapped into tiles
+        self.assertTrue("torch.repeat_interleave" in str(traced.graph))
+        self.assertFalse("tile" in str(traced.graph))
+
+    def test_skip_normalization_if_none_repeat(self):
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+                repeats = [y[0], y[2], 3]
+                return x.repeat(repeats)
+
+        # TODO: finish test later
+        m = TestModule()
+        inputs = (torch.randn(3, 4, 5), torch.tensor([1, 2, 3]))
+        traced = acc_tracer.trace(m, inputs)
+        # Make sure repeat wasn't mapped into tiles
+        self.assertTrue("repeat" in str(traced.graph))
+        self.assertFalse("tile" in str(traced.graph))
+
     def test_acc_normalization_block_list(self):
         class TestModule(nn.Module):
             def forward(self, x: List[torch.Tensor]) -> torch.Tensor:
@@ -2668,6 +2722,32 @@ class AccTracerTest(unittest.TestCase):
 
         self.assertTrue(torch.equal(m(*sample_inputs), traced(*sample_inputs)))
 
+    def test_threshold_bwd(self):
+        class TestModule(nn.Module):
+            def __init__(self, threshold):
+                super().__init__()
+                self._threshold = threshold
+
+            def forward(self, grad: torch.Tensor, input: torch.Tensor) -> torch.Tensor:
+                return torch.ops.aten.threshold_backward.default(
+                    grad, input, self._threshold
+                )
+
+        m = TestModule(0.0)
+        grad = torch.randn(4096)
+        sample_inputs = torch.randn(4096)
+        traced = acc_tracer.trace(m, [grad, sample_inputs])
+
+        output = None
+        for node in traced.graph.nodes:
+            if node.op == "output":
+                assert output is None
+                output = node
+
+        ref = m(grad, sample_inputs)
+        res = traced(grad, sample_inputs)
+        self.assertTrue(torch.equal(ref, res))
+
     def test_all_acc_ops_registered(self):
         self.assertEqual(
             acc_normalizer._acc_ops,
@@ -2689,6 +2769,7 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.minimum,
                 acc_ops.cat,
                 acc_ops.softmax,
+                acc_ops.normalize,
                 acc_ops.sign,
                 acc_ops.permute,
                 acc_ops.matmul,
@@ -2713,6 +2794,8 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.tuple_construct,
                 acc_ops.unsqueeze,
                 acc_ops.sigmoid,
+                acc_ops.sigmoid_backward,
+                acc_ops.threshold_backward,
                 acc_ops.sum,
                 acc_ops.prod,
                 acc_ops.max_full_reduce,
@@ -2726,6 +2809,7 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.atan,
                 acc_ops.exp,
                 acc_ops.log,
+                acc_ops.log_softmax,
                 acc_ops.sqrt,
                 acc_ops.reciprocal,
                 acc_ops.abs,
@@ -2797,5 +2881,16 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.var,
                 acc_ops.grid_sample,
                 acc_ops.xl_weight,
+                acc_ops.clone,
+                acc_ops.unbind,
+                acc_ops.group_norm,
+                acc_ops.long,
+                acc_ops.full_like,
+                acc_ops.new_full,
+                acc_ops.ones_like,
+                acc_ops.zeros_like,
+                acc_ops.new_zeros,
+                acc_ops.index_add,
+                acc_ops.masked_select,
             },
         )

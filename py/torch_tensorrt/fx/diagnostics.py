@@ -87,12 +87,14 @@ class DiagnosticsWriter:
 
     def __init__(self):
         self._root_dir = tempfile.mkdtemp(prefix="fx2trt.")
+        self._data = ""
         _LOGGER.info(f"Initializing DiagnosticsWriter with root_dir: {self._root_dir}")
 
     def write(self, file_name: str, data: WriteObj):
         """
         TODO: Can be disabled by regex on file_name
         """
+        self._data = data
         # Only write if we are inside a collect_when() context.
         if not _IS_IN_COLLECT_CONTEXT.get(False):
             return
@@ -116,6 +118,9 @@ class DiagnosticsWriter:
 
     def root_dir(self) -> str:
         return self._root_dir
+
+    def data(self) -> WriteObj:
+        return self._data
 
     def _write(self, file_name: str, to_write: bytes):
         # ms granularity - no naming collash, otherwise file will be
@@ -270,6 +275,9 @@ class ZipDiagnosticsCollector(DiagnosticsCollector):
             return zip_path
         finally:
             os.remove(fp)
+
+    def data(self) -> WriteObj:
+        return self._write.data()
 
 
 def _res_or_err(data: WriteObj) -> t.Tuple[TWrite, str]:
