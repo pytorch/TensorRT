@@ -1,4 +1,4 @@
-from torch_tensorrt.dynamo.torch_compile.utils import prepare_device, prepare_inputs
+from torch_tensorrt.dynamo.backend.utils import prepare_device, prepare_inputs
 from utils import same_output_format
 import torch_tensorrt
 import unittest

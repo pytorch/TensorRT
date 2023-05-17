@@ -8,10 +8,10 @@ from typing import Any
 from torch_tensorrt import EngineCapability, Device
 from torch_tensorrt.fx.utils import LowerPrecision
 
-from torch_tensorrt.dynamo.torch_compile._settings import CompilationSettings
-from torch_tensorrt.dynamo.torch_compile.utils import prepare_inputs, prepare_device
-from torch_tensorrt.dynamo.torch_compile.backends import tensorrt_backend
-from torch_tensorrt.dynamo.torch_compile._defaults import (
+from torch_tensorrt.dynamo.backend._settings import CompilationSettings
+from torch_tensorrt.dynamo.backend.utils import prepare_inputs, prepare_device
+from torch_tensorrt.dynamo.backend.backends import torch_tensorrt_backend
+from torch_tensorrt.dynamo.backend._defaults import (
     PRECISION,
     DEBUG,
     MAX_WORKSPACE_SIZE,
@@ -121,6 +121,6 @@ def create_backend(
     )
 
     return partial(
-        tensorrt_backend,
+        torch_tensorrt_backend,
         settings=settings,
     )
