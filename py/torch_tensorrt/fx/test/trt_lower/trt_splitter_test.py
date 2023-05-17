@@ -10,7 +10,11 @@ import torch.fx.passes.shape_prop as shape_prop
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from torch.fx.passes import splitter_base
 from torch.testing._internal.common_utils import run_tests, TestCase
-from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
+from torch_tensorrt.fx.tools.trt_splitter import (
+    create_trt_operator_support,
+    TRTSplitter,
+    TRTSplitterSetting,
+)
 from torch_tensorrt.fx.tracer.acc_tracer import acc_tracer
 
 ERROR_MSG_NO_ACC_MODULE = "FX split failed: Did not find any ACC submodule!"
@@ -624,6 +628,50 @@ class TestSplit(TestCase):
             self.assertTrue(torch.equal(result_original, result_split))
 
         test_splitter(splitter)
+
+    def test_decline_if_input_dtype(self):
+        operator_support = create_trt_operator_support()
+
+        class TestModule(torch.nn.Module):
+            def forward(self, a):
+                b = torch.relu(a)
+                return b
+
+        test_mod = TestModule().cuda().eval()
+        x = torch.randn(2, 3)
+        mod = acc_tracer.trace(test_mod, [x])
+        settings = TRTSplitterSetting()
+        settings.min_acc_module_size = 0
+        # nodes w/ float16 input should be lowered
+        splitter = TRTSplitter(
+            mod,
+            (x.half().cuda(),),
+            operator_support,
+            settings,
+        )
+        split_results_half = splitter.generate_split_results()
+        self.assertTrue(len(split_results_half), 1)
+        self.assertEqual(
+            dict(split_results_half.split_module.named_children()).keys(),
+            {"_run_on_acc_0"},
+        )
+
+        # nodes w/ float64 input should not be lowered
+        mod = acc_tracer.trace(test_mod, [x])
+        splitter = TRTSplitter(
+            mod,
+            (x.double().cuda(),),
+            operator_support,
+            settings,
+        )
+
+        split_results_double = splitter.generate_split_results()
+
+        self.assertTrue(len(split_results_double), 1)
+        self.assertEqual(
+            dict(split_results_double.split_module.named_children()).keys(),
+            {"_run_on_gpu_0"},
+        )
 
 
 class TestSplitComplexGraph(TestCase):

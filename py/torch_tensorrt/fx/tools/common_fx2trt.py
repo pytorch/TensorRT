@@ -3,6 +3,8 @@ import time
 import unittest
 from typing import Callable, List, Optional, Set, Tuple
 
+# @manual=//deeplearning/trt/python:py_tensorrt
+import tensorrt as trt
 import torch
 import torch.fx
 
@@ -257,6 +259,8 @@ class AccTestCase(TRTTestCase):
             pass_tracer = chain_passes(*apply_passes)
             mod = pass_tracer(mod, inputs)
 
+        if trt.__version__ >= "8.6":
+            test_implicit_batch_dim = False
         if test_implicit_batch_dim:
             interp = TRTInterpreter(mod, InputTensorSpec.from_tensors(inputs))
             super().run_test(

@@ -54,10 +54,14 @@ def replace_mutable_op(module: torch.fx.GraphModule) -> torch.fx.GraphModule:
 
 
 def run_const_fold(traced_mod: torch.fx.GraphModule) -> torch.fx.GraphModule:
-    # Now we do constant folding on traced module. We want to skip pattern like
-    # weights -> quant -> dequant -> op during constant folding when the model is
-    # a quantized int8 model.
-    def skip_folding_quant_dequant(node: torch.fx.Node):
+    def skip_folding_ops(node: torch.fx.Node):
+        # dtype op
+        if node.target == acc_ops.dtype:
+            return True
+        # Now we do constant folding on traced module. We want to skip pattern like
+        # weights -> quant -> dequant -> op during constant folding when the model is
+        # a quantized int8 model.
+        # quant_dequant
         if node.target != acc_ops.quantize_per_tensor:
             return False
         # If quantize_per_node -> dequantize, then skip folding.
@@ -66,7 +70,7 @@ def run_const_fold(traced_mod: torch.fx.GraphModule) -> torch.fx.GraphModule:
                 return True
         return False
 
-    const_split_mod = split_const_subgraphs(traced_mod, skip_folding_quant_dequant)
+    const_split_mod = split_const_subgraphs(traced_mod, skip_folding_ops)
     const_split_mod.run_folding()
     return const_split_mod
 
@@ -628,5 +632,37 @@ def fix_clamp_numerical_limits_to_fp16(
                 }
                 node.kwargs = new_kwargs
 
+    mod.recompile()
+    return mod
+
+
+@log_before_after
+@validate_inference(atol=1e-3, rtol=1e-2)
+def remove_dtype_and_to_pattern(
+    mod: torch.fx.GraphModule, input: Input
+) -> torch.fx.GraphModule:
+    """
+    Remove this pattern since it is unnecessary to cast to dtype
+        %dtype : [#users=1] = call_function[target=torch_tensorrt.fx.tracer.acc_tracer.acc_ops.dtype](args = (), kwargs = {input: %_attention_layers_0__uva})
+        %to_18 : [#users=2] = call_function[target=torch_tensorrt.fx.tracer.acc_tracer.acc_ops.to_dtype](args = (), kwargs = {input: %x})
+    """
+    for node in mod.graph.nodes:
+        if node.op == "call_function" and node.target == acc_ops.dtype:
+            # find its first user
+            next_node = next(iter(node.users))
+            # acc_op or pt op is treated differently
+            input = (
+                next_node.kwargs["input"]
+                if "input" in next_node.kwargs
+                else next_node.args[0]
+            )
+            if len(node.users) == 1 and (
+                next_node.target == acc_ops.to_dtype or next_node.target == "to"
+            ):
+                next_node.replace_all_uses_with(input)
+                mod.graph.erase_node(next_node)
+                mod.graph.erase_node(node)
+
+    mod.graph.eliminate_dead_code()
     mod.recompile()
     return mod

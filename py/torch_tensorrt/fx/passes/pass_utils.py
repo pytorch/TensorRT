@@ -1,12 +1,17 @@
+import contextlib
 import io
+import json
 import logging
 import tempfile
 from datetime import datetime
 from functools import wraps
+from traceback import TracebackException
 from typing import Any, Callable, List, Optional
 
 import torch
+import torch_tensorrt.fx.diagnostics as diagnostics
 from torch import fx
+from torch.fx.node import Node
 from torch.fx.passes.shape_prop import ShapeProp
 
 # Create an alias for module input type to avoid littering pyre-ignore for Any
@@ -19,6 +24,11 @@ PassFunc = Callable[[fx.GraphModule, Input], fx.GraphModule]
 RELAX_ACCURACY_FAILURE: bool = False
 FINAL_CHECK_ATOL_MULTIPLIER: float = 10
 FINAL_CHECK_RTOL_MULTIPLIER: float = 10
+
+# A global override of the alternative batch size used in validate_variable_batch_sizes
+ALTERNATIVE_BATCH_SIZE_OVERRIDE: Optional[int] = None
+# If exception during validate_variable_batch_sizes should be thrown
+ALTERNATIVE_BATCH_SIZE_EXCEPTION_SHOULD_THROW: bool = False
 
 
 class RelaxAccuracyCheckMode:
@@ -83,6 +93,46 @@ class RelaxAccuracyCheckMode:
         )
 
 
+@contextlib.contextmanager
+def override_alternative_batch_size(alternative_batch_size: int = -1):
+    """
+    A context manager to override alternative_batch_size
+
+    Example:
+
+    >>> # disables run_alternative_batch_size verification
+    >>> with override_alternative_batch_size(-1):
+    >>>     fx2ait()
+    """
+
+    global ALTERNATIVE_BATCH_SIZE_OVERRIDE
+    old_value = ALTERNATIVE_BATCH_SIZE_OVERRIDE
+    ALTERNATIVE_BATCH_SIZE_OVERRIDE = alternative_batch_size
+    _LOGGER.info(f"Override {ALTERNATIVE_BATCH_SIZE_OVERRIDE=} ({old_value=})")
+    try:
+        yield
+    finally:
+        ALTERNATIVE_BATCH_SIZE_OVERRIDE = old_value
+        _LOGGER.info(f"Restored old value: {ALTERNATIVE_BATCH_SIZE_OVERRIDE=})")
+
+
+@contextlib.contextmanager
+def override_alternative_batch_size_exception_should_throw(
+    exception_should_throw: bool,
+):
+    """
+    A context manager to set if exception during alternative batch size verification
+    should be thrown.
+    """
+    global ALTERNATIVE_BATCH_SIZE_EXCEPTION_SHOULD_THROW
+    old_value = ALTERNATIVE_BATCH_SIZE_EXCEPTION_SHOULD_THROW
+    ALTERNATIVE_BATCH_SIZE_EXCEPTION_SHOULD_THROW = exception_should_throw
+    try:
+        yield
+    finally:
+        ALTERNATIVE_BATCH_SIZE_EXCEPTION_SHOULD_THROW = old_value
+
+
 def chain_passes(*passes: PassFunc) -> PassFunc:
     """
     Chains a sequence of pass functions to form a single pass function
@@ -100,11 +150,27 @@ def chain_passes(*passes: PassFunc) -> PassFunc:
 
 # (TODO(shirongwu): Add exception notification for fblearner flow when available, notify oncall
 # on pass that failed accuracy check.
-def validate_inference(rtol=None, atol=None, suppress_accuracy_check_failure=True):
+def validate_inference(rtol=None, atol=None, suppress_accuracy_check_failure=True, run_alternative_batch_size: int = -1)-> "Decorator":
+    """
+    Returns a decorator on a PassFunc to sanity check the model outputs
+    difference before/after the transformation is within tolerance.
+
+    Args:
+        rtol: reletive tolerance
+        atol: absoluate tolerance
+        suppress_accuracy_check_failure: accuracy check failure
+        run_alternative_batch_size (int):
+            In addition to running inference at original batch size in the
+            input, also run at an alternative batch size. If set to -1, do not
+            run at alternative batch size. It must be smaller than the original
+            batch size. This is useful to check the model can run at different
+            batch sizes. Usually we can set this to 1.
+    """
+
     def _validate_inference(pass_: PassFunc) -> PassFunc:
         """
-        Wraps a pass function to validate that its inference results before and
-        after the pass run should be `close`.
+        A decorator to wrap a pass function to validate that its inference
+        results before and after the pass run should be `close`.
         """
 
         @wraps(pass_)
@@ -163,6 +229,120 @@ def validate_inference(rtol=None, atol=None, suppress_accuracy_check_failure=Tru
         return pass_with_validation
 
     return _validate_inference
+
+
+def validate_variable_batch_sizes(run_alternative_batch_size: int = -1) -> "Decorator":
+    """
+    Returns a decorator on a PassFunc to verify the model can run with
+    different batch sizes before/after the transformation is within tolerance.
+
+    Args:
+        run_alternative_batch_size (int):
+            In addition to running inference at original batch size in the
+            input, also run at an alternative batch size. If set to -1, do not
+            run at alternative batch size. It must be smaller than the original
+            batch size. This is useful to check the model can run at different
+            batch sizes. Usually we can set this to 1.
+
+            If the global variable `ALTERNATIVE_BATCH_SIZE_OVERRIDE` is set, it
+            overrides `run_alternative_batch_size`.
+            `ALTERNATIVE_BATCH_SIZE_OVERRIDE` can be set via:
+
+                with override_alternative_batch_size(...): ...
+    """
+
+    def _run_alternative_batch_size(pass_: PassFunc) -> PassFunc:
+        """
+        A decorator for PassFunc to check that the model (both before and after
+        the transformation by pass func) can run at alternative batch size.
+        """
+
+        @wraps(pass_)
+        def pass_with_validation(
+            module: fx.GraphModule,
+            input: Input,
+            *args,
+            **kwargs,
+        ) -> fx.GraphModule:
+            _run_alternative_batch_size = (
+                ALTERNATIVE_BATCH_SIZE_OVERRIDE
+                if ALTERNATIVE_BATCH_SIZE_OVERRIDE is not None
+                else run_alternative_batch_size
+            )
+
+            if _run_alternative_batch_size < 0:
+                return pass_(module, input, *args, **kwargs)
+
+            if not isinstance(input, (list, tuple)):
+                _LOGGER.info(
+                    f"Skip run_alternative_batch_size: input must be list, tuple. Actual: {type(input)}"
+                )
+                return pass_(module, input, *args, **kwargs)
+
+            if not all(isinstance(x, torch.Tensor) for x in input):
+                _LOGGER.info(
+                    "Skip run_alternative_batch_size: input elements must all be tensors"
+                )
+                return pass_(module, input, *args, **kwargs)
+
+            if not all(len(x.shape) > 0 for x in input):
+                _LOGGER.info(
+                    "Skip run_alternative_batch_size: some input tensor(s) are scalar"
+                )
+                return pass_(module, input, *args, **kwargs)
+
+            batch_size_candidates = {x.shape[0] for x in input}
+            if len(batch_size_candidates) > 1:
+                _LOGGER.info(
+                    f"Skip run_alternative_batch_size: input tensors' first dim must be the same, actual: {batch_size_candidates}"
+                )
+                return pass_(module, input, *args, **kwargs)
+
+            batch_size = next(iter(batch_size_candidates))
+            assert (
+                _run_alternative_batch_size <= batch_size
+            ), f"{_run_alternative_batch_size=} must be smaller or equal to {batch_size=}"
+
+            input_alt_bs = [x[:_run_alternative_batch_size, ...] for x in input]
+
+            def run_module(mod, stage: str):
+                """Run module with full bs and alternative bs"""
+                _LOGGER.info(
+                    f"Running {stage} model at alternative batch size: {_run_alternative_batch_size}"
+                )
+                try:
+                    mod(*input)
+                    mod(*input_alt_bs)
+                except Exception as e:
+                    _LOGGER.warning(
+                        f"Failed running {stage} module at full or alternative batch size: {e}"
+                    )
+                    diagnostics.write(
+                        "lowering_diagnostics",
+                        json.dumps(
+                            {
+                                "validate_variable_batch_sizes_exception": repr(e),
+                                "validate_variable_batch_sizes_exception_type": type(
+                                    e
+                                ).__name__,
+                                "validate_variable_batch_sizes_exception_traceback": "".join(
+                                    TracebackException.from_exception(e).format()
+                                ),
+                            }
+                        ),
+                    )
+                    if ALTERNATIVE_BATCH_SIZE_EXCEPTION_SHOULD_THROW:
+                        raise
+
+            run_module(module, "original")
+            module_after = pass_(module, input, *args, **kwargs)
+            run_module(module_after, "transformed")
+
+            return module_after
+
+        return pass_with_validation
+
+    return _run_alternative_batch_size
 
 
 Decorator = Callable[[Callable], Callable]
@@ -272,3 +452,67 @@ def _collect_tensors(arg: fx.node.Argument) -> List[torch.Tensor]:
 
     fx.node.map_aggregate(arg, collect)
     return res
+
+
+class InputOutputDtypeInferInterpreter(torch.fx.Interpreter):
+    """
+    Interprete a graph to propagate the output tensor dtype from its inputs, extracing
+    input and output graph node that need dtype cast to float32/bfloat16.
+    """
+
+    def __init__(self, module: torch.fx.GraphModule):
+        super().__init__(module)
+        self.need_cast_to_float32 = []
+        self.need_cast_to_bfloat = []
+
+    def _need_cast(self, node: Node, run_result) -> None:
+        if node.op == "placeholder" and (
+            run_result.dtype not in (torch.int32, torch.int64)
+        ):
+            _LOGGER.info(
+                f"Encountered node: {node.format_node()} need dtype cast to float32."
+            )
+            self.need_cast_to_float32.append(node)
+        # Process node that will be used as final output
+        elif "output" in set(i.name for i in node.users.keys()):
+            if run_result.dtype not in (torch.int32, torch.int64):
+                _LOGGER.info(
+                    f"Encountered node: {node.format_node()} need dtype cast to bfloat16."
+                )
+                self.need_cast_to_bfloat.append(node)
+
+    def run_node(self, n: Node) -> Any:
+        run_result = super().run_node(n)
+
+        if torch.is_tensor(run_result):
+            n.meta["tensor_dtype"] = run_result.dtype
+            self._need_cast(n, run_result)
+        return run_result
+
+
+def apply_bfloat_float_conversion(
+    gm: torch.fx.GraphModule, inputs: Any, name: str
+) -> None:
+    _LOGGER.info("Apply bfloat-float32 conversion on {name}")
+    interpreter = InputOutputDtypeInferInterpreter(gm)
+    interpreter.run(*inputs)
+
+    def to_bfloat(x):
+        return x.to(torch.bfloat16)
+
+    def to_float(x):
+        return x.to(torch.float32)
+
+    for node in interpreter.need_cast_to_float32:
+        with gm.graph.inserting_after(node):
+            cast = gm.graph.call_function(
+                to_float,
+                (node,),
+                {},
+            )
+            node.replace_all_uses_with(cast)
+
+    for node in interpreter.need_cast_to_bfloat:
+        with gm.graph.inserting_after(node):
+            cast = gm.graph.call_function(to_bfloat, (node,), {})
+            node.replace_all_uses_with(cast)

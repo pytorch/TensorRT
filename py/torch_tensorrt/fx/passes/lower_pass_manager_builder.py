@@ -8,6 +8,7 @@ from torch import nn
 from torch.fx.passes.pass_manager import inplace_wrapper, PassManager
 from torch.fx.passes.shape_prop import ShapeProp
 from torch.fx.passes.splitter_base import generate_inputs_for_submodules, SplitResult
+from torch_tensorrt.fx.passes.pass_utils import apply_bfloat_float_conversion
 from torch_tensorrt.fx.utils import LowerPrecision
 
 from ..input_tensor_spec import generate_input_specs
@@ -229,10 +230,9 @@ class LowerPassManagerBuilder:
                 submod = getattr(split_result.split_module, submod_name)
 
                 LOWER_SPLIT_PRE_OBSERVER.observe(submod_name, submod, submod_inputs)
-
                 # Only acc submodules will be lowered.
                 if not submod_name.startswith(split_result.non_acc_submodule_prefix):
-                    _LOGGER.info(f"Now lowering submodule {submod_name}")
+                    _LOGGER.info(f"ACC submodule graph: {submod.graph}")
                     lowering_start_time = datetime.datetime.now()
 
                     self.lower_setting.additional_inputs = (
@@ -251,6 +251,9 @@ class LowerPassManagerBuilder:
                     _LOGGER.info(
                         f"Lowering submodule {submod_name} elapsed time {datetime.datetime.now() - lowering_start_time}"
                     )
+                else:
+                    _LOGGER.info(f"GPU submodule graph: {submod.graph}")
+                    apply_bfloat_float_conversion(submod, submod_inputs, submod_name)
 
             return split_result.split_module
 

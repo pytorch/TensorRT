@@ -691,10 +691,13 @@ def acc_ops_layer_norm(network, target, args, kwargs, name):
     eps_field = trt.PluginField(
         "eps", np.array([kwargs["eps"]], dtype=np.float32), trt.PluginFieldType.FLOAT32
     )
+    normalized_shape = kwargs["normalized_shape"]
     try:
-        normalized_shape = np.array(kwargs["normalized_shape"], dtype=np.int32)
+        normalized_shape = np.array(normalized_shape, dtype=np.int32)
     except TypeError:
-        _LOGGER.error("Unable to convert normalized_shape to a field, fall back to []")
+        _LOGGER.error(
+            f"Unable to convert normalized_shape with value {normalized_shape} to a field, fall back to []"
+        )
         normalized_shape = np.array([], dtype=np.int32)
 
     normalized_shape_filed = trt.PluginField(
