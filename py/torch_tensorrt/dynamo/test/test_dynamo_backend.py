@@ -24,6 +24,7 @@ def test_resnet18(ir):
         "device": torchtrt.Device("cuda:0"),
         "enabled_precisions": {torch.float},
         "ir": ir,
+        "max_num_trt_engines": 200,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -32,6 +33,12 @@ def test_resnet18(ir):
         cos_sim > COSINE_THRESHOLD,
         f"Resnet50 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
+
+    # Clean up model env
+    torch._dynamo.reset()
+
+    with torch.no_grad():
+        torch.cuda.empty_cache()
 
 
 @pytest.mark.unit
@@ -48,6 +55,7 @@ def test_mobilenet_v2(ir):
         "device": torchtrt.Device("cuda:0"),
         "enabled_precisions": {torch.float},
         "ir": ir,
+        "max_num_trt_engines": 200,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -56,6 +64,12 @@ def test_mobilenet_v2(ir):
         cos_sim > COSINE_THRESHOLD,
         f"Mobilenet v2 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
+
+    # Clean up model env
+    torch._dynamo.reset()
+
+    with torch.no_grad():
+        torch.cuda.empty_cache()
 
 
 @pytest.mark.unit
@@ -72,6 +86,7 @@ def test_efficientnet_b0(ir):
         "device": torchtrt.Device("cuda:0"),
         "enabled_precisions": {torch.float},
         "ir": ir,
+        "max_num_trt_engines": 200,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -80,6 +95,12 @@ def test_efficientnet_b0(ir):
         cos_sim > COSINE_THRESHOLD,
         f"EfficientNet-B0 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
+
+    # Clean up model env
+    torch._dynamo.reset()
+
+    with torch.no_grad():
+        torch.cuda.empty_cache()
 
 
 @pytest.mark.unit
@@ -104,8 +125,8 @@ def test_bert_base_uncased(ir):
         "device": torchtrt.Device("cuda:0"),
         "enabled_precisions": {torch.float},
         "truncate_long_and_double": True,
-        "debug": True,
         "ir": ir,
+        "max_num_trt_engines": 200,
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
 
@@ -118,6 +139,12 @@ def test_bert_base_uncased(ir):
             cos_sim > COSINE_THRESHOLD,
             f"HF BERT base-uncased TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
+
+    # Clean up model env
+    torch._dynamo.reset()
+
+    with torch.no_grad():
+        torch.cuda.empty_cache()
 
 
 @pytest.mark.unit
@@ -142,3 +169,9 @@ def test_resnet18_half(ir):
         cos_sim > COSINE_THRESHOLD,
         f"Resnet50 Half TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
+
+    # Clean up model env
+    torch._dynamo.reset()
+
+    with torch.no_grad():
+        torch.cuda.empty_cache()
