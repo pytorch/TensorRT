@@ -569,7 +569,7 @@ commands:
           command: |
             set -e
             cd py/torch_tensorrt/fx/test
-            TESTS_TO_RUN=$(circleci tests glob "converters/acc_op/test_*.py" | circleci tests split --split-by=timings)
+            TESTS_TO_RUN=$(circleci tests glob "converters/acc_op/test_*.py" | circleci tests split --split-by=filesize)
             pytest --junitxml=/tmp/artifacts/test_results/fx/converters/acc_op/test_results.xml $TESTS_TO_RUN
 
       - store_test_results:
@@ -583,10 +583,10 @@ commands:
       - run:
           name: Run FX converter tests
           command: |
+            set -e
             cd py/torch_tensorrt/fx/test
-            pushd converters/aten_op/
-            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/aten_op/test_results.xml
-            popd
+            TESTS_TO_RUN=$(circleci tests glob "converters/aten_op/test_*.py" | circleci tests split --split-by=filesize)
+            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/aten_op/test_results.xml $TESTS_TO_RUN
 
       - store_test_results:
           path: /tmp/artifacts
