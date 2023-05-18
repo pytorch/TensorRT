@@ -954,7 +954,7 @@ jobs:
         type: string
       python-version:
         type: string
-    parallelism: 4
+    parallelism: 8
     machine:
       image: linux-cuda-11:2023.02.1
     resource_class: gpu.nvidia.large
@@ -990,7 +990,7 @@ jobs:
         type: string
       python-version:
         type: string
-    parallelism: 4
+    parallelism: 8
     machine:
       image: linux-cuda-11:2023.02.1
     resource_class: gpu.nvidia.large
