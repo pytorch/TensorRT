@@ -36,7 +36,7 @@ class TestPartitioning(TestCase):
                 return pow_
 
         fx_graph = torch.fx.symbolic_trace(FullySupportedMultiOp())
-        partitioned_graph = partition(deepcopy(fx_graph))
+        partitioned_graph = partition(deepcopy(fx_graph), min_block_size=2)
         self.assertEquals(
             len(list(partitioned_graph.named_children())),
             1,
