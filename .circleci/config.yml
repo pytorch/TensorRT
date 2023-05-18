@@ -740,15 +740,15 @@ commands:
       - store_artifacts:
           path: /tmp/testlogs
 
-  test-dynamo-torch_compile-core:
-    description: "Test the Dynamo torch_compile path"
+  test-dynamo-compile-core:
+    description: "Test the Dynamo compile path"
     steps:
       - run:
-          name: Run Dynamo torch_compile core tests
+          name: Run Dynamo compile core tests
           command: |
-            cd py/torch_tensorrt/dynamo/torch_compile
+            cd py/torch_tensorrt/dynamo/backend
             pushd test/
-            pytest --junitxml=/tmp/artifacts/test_results/dynamo/torch_compile/test_results.xml
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/backend/test_results.xml
             popd
 
       - store_test_results:
@@ -756,17 +756,17 @@ commands:
       - store_artifacts:
           path: /tmp/testlogs
 
-  test-dynamo-torch_compile:
-    description: "Test the Dynamo torch_compile path"
+  test-dynamo-compile:
+    description: "Test the Dynamo compile path"
     steps:
       - run:
-          name: Run Dynamo torch_compile E2E tests
+          name: Run Dynamo compile E2E tests
           command: |
             cd py/torch_tensorrt/dynamo/
             pushd test/
             pip3 install timm
             pip3 install transformers
-            pytest --junitxml=/tmp/artifacts/test_results/dynamo/torch_compile/test_results.xml --ir torch_compile
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/backend/test_results.xml --ir dynamo_compile
             popd
 
       - store_test_results:
@@ -1000,8 +1000,8 @@ jobs:
           command: pip3 install --pre /tmp/dist/x86_64-linux/*cp39-cp39*.whl
       # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - dump-test-env
-      - test-dynamo-torch_compile
-      - test-dynamo-torch_compile-core
+      - test-dynamo-compile
+      - test-dynamo-compile-core
       - test-dynamo-fx_ts
 
   package-x86_64-linux:

@@ -97,7 +97,7 @@ from torch_tensorrt import fx
 
 if version.parse(torch.__version__) >= version.parse("2.dev"):
     from torch_tensorrt import dynamo
-    from torch_tensorrt.dynamo import torch_compile
+    from torch_tensorrt.dynamo import backend
 
 
 def _register_with_torch():

@@ -45,7 +45,7 @@ def prepare_inputs(
 
     else:
         raise ValueError(
-            f"Invalid input type {type(inputs)} encountered in the torch_compile input parsing. "
+            f"Invalid input type {type(inputs)} encountered in the dynamo_compile input parsing. "
             + "Allowed input types: {torch_tensorrt.Input, torch.Tensor, list, tuple, dict}"
         )
 
