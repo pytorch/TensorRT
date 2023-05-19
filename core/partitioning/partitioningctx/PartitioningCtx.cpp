@@ -15,7 +15,8 @@ PartitioningCtx::PartitioningCtx(torch::jit::Block* b, PartitioningInfo info)
 }
 
 void PartitioningCtx::_load_nodes_into_decision_map(torch::jit::Block* b) {
-  if (b->owningNode() && b->owningNode()->kind() == torch::jit::prim::Loop)
+  // won't load nodes if these nodes are in prim::loop or if these nodes are 2-level nested
+  if (b->owningNode() && (b->owningNode()->kind() == torch::jit::prim::Loop || b->owningNode()->owningBlock()->owningNode()))
     return;
 
   original_blocks.push_back(b);
