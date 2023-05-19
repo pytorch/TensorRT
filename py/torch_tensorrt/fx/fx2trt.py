@@ -272,8 +272,6 @@ class TRTInterpreter(torch.fx.Interpreter):
         engine = self.builder.build_engine(self.network, builder_config)
         assert engine
 
-
-
         serialized_cache = (
             bytearray(cache.serialize())
             if builder_config.get_timing_cache()
