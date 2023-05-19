@@ -100,7 +100,10 @@ def _compile_module(
     """
     # Partition module into components that can be TRT-accelerated
     partitioned_module = partition(
-        gm, verbose=settings.debug, max_num_trt_engines=settings.max_num_trt_engines
+        gm,
+        verbose=settings.debug,
+        min_block_size=settings.min_block_size,
+        torch_executed_ops=settings.torch_executed_ops,
     )
 
     # Iterate over all components that can be accelerated

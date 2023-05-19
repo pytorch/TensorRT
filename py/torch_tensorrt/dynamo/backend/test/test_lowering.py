@@ -1,12 +1,12 @@
 from functools import partial
-from utils import fx_dynamo_testing_backend
+from utils import lower_graph_testing
 from torch.testing._internal.common_utils import run_tests, TestCase
 import torch
 
 
 class TestLowering(TestCase):
     def test_lowering_inplace_op(self):
-        class FullySupported(torch.nn.Module):
+        class InPlace(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:
                 super().__init__(*args, **kwargs)
 
@@ -18,35 +18,95 @@ class TestLowering(TestCase):
         # Operations expected to be included in the traced graph after decompositions
         expected_ops = {torch.ops.aten.add.Tensor, torch.ops.aten.relu.default}
 
-        # Trace module and set up custom backend to track intermediate graphs
-        fx_graph = torch.fx.symbolic_trace(FullySupported())
-        partitioned_graphs = []
-        custom_backend = partial(
-            fx_dynamo_testing_backend,
-            store_intermediate_graphs=partitioned_graphs,
-        )
-
-        # Invoke compilation
-        compiled_graph = torch.compile(fx_graph, backend=custom_backend)
-        compiled_graph(
+        inputs = [
             torch.rand(
                 5,
-            ).cuda(),
+            ),
             torch.rand(
                 5,
-            ).cuda(),
+            ),
+        ]
+
+        fx_graph = torch.fx.symbolic_trace(InPlace())
+        _, expected_ops_unseen = lower_graph_testing(
+            fx_graph, inputs, expected_ops=expected_ops, min_block_size=2
         )
 
-        # Iterate over intermediate graphs, attempt to match nodes
-        for fx_module in partitioned_graphs:
-            for _, submodule in fx_module.named_children():
-                for node in submodule.graph.nodes:
+        self.assertEquals(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
 
-                    if node.op == "call_function" and node.target in expected_ops:
-                        expected_ops.remove(node.target)
+    def test_lowering_alias_replacement(self):
+        class Alias(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
 
-        self.assertEqual(
-            len(expected_ops), 0, "All operators should have been decomposed"
+            def forward(self, x):
+                y = torch.ops.aten.alias.default(x)
+                return y
+
+        # Operations expected to be removed in the traced graph after decompositions
+        unexpected_ops = {torch.ops.aten.alias.default}
+
+        inputs = [
+            torch.rand(
+                5,
+            ),
+        ]
+
+        fx_graph = torch.fx.symbolic_trace(Alias())
+        unexpected_ops_seen, _ = lower_graph_testing(
+            fx_graph, inputs, unexpected_ops=unexpected_ops, min_block_size=1
+        )
+
+        self.assertEquals(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+    def test_lowering_rsqrt(self):
+        class Rsqrt(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+
+            def forward(self, x):
+                y = torch.ops.aten.rsqrt.default(x)
+                return y
+
+        # Operations expected to be removed in the traced graph after decompositions
+        expected_ops = {torch.ops.aten.sqrt.default, torch.ops.aten.reciprocal.default}
+        unexpected_ops = {torch.ops.aten.rsqrt.default}
+
+        inputs = [
+            torch.randint(
+                1,
+                10,
+                (5,),
+            ),
+        ]
+
+        fx_graph = torch.fx.symbolic_trace(Rsqrt())
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEquals(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEquals(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
         )
 
 
