@@ -203,10 +203,10 @@ commands:
         default: "8.8.0.121"
       trt-version-short:
         type: string
-        default: "8.6.0"
+        default: "8.6.1"
       trt-version-long:
         type: string
-        default: "8.6.0.12-1"
+        default: "8.6.1.6-1"
       bazel-version:
         type: string
         default: "5.2.0"
@@ -249,7 +249,7 @@ commands:
       parameters:
         trt-version-long:
           type: string
-          default: "8.6.0"
+          default: "8.6.1"
         cudnn-version-long:
           type: string
           default: "8.8.0.121"
@@ -567,10 +567,10 @@ commands:
       - run:
           name: Run FX converter tests
           command: |
+            set -e
             cd py/torch_tensorrt/fx/test
-            pushd converters/acc_op/
-            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/acc_op/test_results.xml
-            popd
+            TESTS_TO_RUN=$(circleci tests glob "converters/acc_op/test_*.py" | circleci tests split --split-by=timings)
+            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/acc_op/test_results.xml $TESTS_TO_RUN
 
       - store_test_results:
           path: /tmp/artifacts
@@ -583,10 +583,10 @@ commands:
       - run:
           name: Run FX converter tests
           command: |
+            set -e
             cd py/torch_tensorrt/fx/test
-            pushd converters/aten_op/
-            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/aten_op/test_results.xml
-            popd
+            TESTS_TO_RUN=$(circleci tests glob "converters/aten_op/test_*.py" | circleci tests split --split-by=timings)
+            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/aten_op/test_results.xml $TESTS_TO_RUN
 
       - store_test_results:
           path: /tmp/artifacts
@@ -954,6 +954,7 @@ jobs:
         type: string
       python-version:
         type: string
+    parallelism: 8
     machine:
       image: linux-cuda-11:2023.02.1
     resource_class: gpu.nvidia.large
@@ -989,6 +990,7 @@ jobs:
         type: string
       python-version:
         type: string
+    parallelism: 8
     machine:
       image: linux-cuda-11:2023.02.1
     resource_class: gpu.nvidia.large
@@ -1374,10 +1376,10 @@ parameters:
     default: "8.8.0.121"
   trt-version-short:
     type: string
-    default: "8.6.0"
+    default: "8.6.1"
   trt-version-long:
     type: string
-    default: "8.6.0"
+    default: "8.6.1"
 
   # Jetson platform config
   torch-jetson-build:
