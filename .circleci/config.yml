@@ -203,10 +203,10 @@ commands:
         default: "8.8.0.121"
       trt-version-short:
         type: string
-        default: "8.6.0"
+        default: "8.6.1"
       trt-version-long:
         type: string
-        default: "8.6.0.12-1"
+        default: "8.6.1.6-1"
       bazel-version:
         type: string
         default: "5.2.0"
@@ -249,7 +249,7 @@ commands:
       parameters:
         trt-version-long:
           type: string
-          default: "8.6.0"
+          default: "8.6.1"
         cudnn-version-long:
           type: string
           default: "8.8.0.121"
@@ -270,15 +270,18 @@ commands:
       torch-build:
         type: string
         default: "2.0.1"
+      torchvision-build:
+        type: string
+        default: "0.15.2"
       torch-build-index:
         type: string
-        default: "https://download.pytorch.org/whl/test/cu118"
+        default: "https://download.pytorch.org/whl/cu118"
     steps:
       - run:
           name: Install Torch
           command: |
             pip3 install --upgrade pip
-            pip3 install torch==<< parameters.torch-build >>  torchvision torchaudio --extra-index-url << parameters.torch-build-index >>
+            pip3 install torch==<< parameters.torch-build >>  torchvision==<< parameters.torchvision-build >> --extra-index-url << parameters.torch-build-index >>
 
   build-py:
     description: "Build the torch-tensorrt python release (pre-cxx11-abi)"
@@ -297,6 +300,26 @@ commands:
             python3 -m pip install pybind11==2.6.2
             python3 setup.py bdist_wheel
             python3 setup.py install
+            mkdir -p /tmp/dist/builds
+            cp dist/* /tmp/dist/builds
+
+  build-py-legacy:
+    description: "Build the torch-tensorrt python legacy release (pre-cxx11-abi)"
+    parameters:
+      platform:
+        type: string
+        default: "x86_64"
+    steps:
+      - run:
+          name: Build torch-tensorrt python legacy release (pre-cxx11-abi)
+          command: |
+            export CUDA_HOME=/usr/local/cuda-11.8/
+            mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
+            cd py
+            python3 -m pip install wheel setuptools
+            python3 -m pip install pybind11==2.6.2
+            python3 setup.py bdist_wheel --legacy
+            python3 setup.py install --legacy
             mkdir -p /tmp/dist/builds
             cp dist/* /tmp/dist/builds
 
@@ -544,10 +567,10 @@ commands:
       - run:
           name: Run FX converter tests
           command: |
+            set -e
             cd py/torch_tensorrt/fx/test
-            pushd converters/acc_op/
-            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/acc_op/test_results.xml
-            popd
+            TESTS_TO_RUN=$(circleci tests glob "converters/acc_op/test_*.py" | circleci tests split --split-by=timings)
+            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/acc_op/test_results.xml $TESTS_TO_RUN
 
       - store_test_results:
           path: /tmp/artifacts
@@ -560,10 +583,10 @@ commands:
       - run:
           name: Run FX converter tests
           command: |
+            set -e
             cd py/torch_tensorrt/fx/test
-            pushd converters/aten_op/
-            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/aten_op/test_results.xml
-            popd
+            TESTS_TO_RUN=$(circleci tests glob "converters/aten_op/test_*.py" | circleci tests split --split-by=timings)
+            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/aten_op/test_results.xml $TESTS_TO_RUN
 
       - store_test_results:
           path: /tmp/artifacts
@@ -783,11 +806,16 @@ jobs:
     parameters:
       torch-build:
         type: string
+      torchvision-build:
+        type: string
       torch-build-index:
         type: string
       python-version:
         type: string
       cxx11-abi:
+        type: boolean
+        default: false
+      legacy:
         type: boolean
         default: false
     machine:
@@ -806,6 +834,7 @@ jobs:
           bazel-platform: "x86_64"
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
+          torchvision-build: << parameters.torchvision-build >>
           torch-build-index: << parameters.torch-build-index >>
       - when:
           condition: << parameters.cxx11-abi >>
@@ -814,7 +843,14 @@ jobs:
       - unless:
           condition: << parameters.cxx11-abi >>
           steps:
-            - build-py
+            - when:
+                condition: << parameters.legacy >>
+                steps:
+                  - build-py-legacy
+            - unless:
+                condition: << parameters.legacy >>
+                steps:
+                  - build-py
       - run:
           name: Move to build dir
           command: |
@@ -835,6 +871,8 @@ jobs:
       python-version:
         type: string
       torch-build-index:
+        type: string
+      torchvision-build:
         type: string
       trt-version-short:
         type: string
@@ -861,6 +899,7 @@ jobs:
           trt-version-long: << parameters.trt-version-long >>
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
+          torchvision-build:  << parameters.torchvision-build >>
           torch-build-index: << parameters.torch-build-index >>
       - attach_workspace:
           at: /tmp/dist
@@ -873,6 +912,8 @@ jobs:
   test-py-ts-x86_64-linux:
     parameters:
       torch-build:
+        type: string
+      torchvision-build:
         type: string
       torch-build-index:
         type: string
@@ -893,6 +934,7 @@ jobs:
           at: /tmp/dist
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
+          torchvision-build:  << parameters.torchvision-build >>
           torch-build-index: << parameters.torch-build-index >>
       - run:
           name: "Install torch-tensorrt"
@@ -904,12 +946,15 @@ jobs:
     parameters:
       torch-build:
         type: string
+      torchvision-build:
+        type: string
       torch-build-index:
         type: string
       trt-version-long:
         type: string
       python-version:
         type: string
+    parallelism: 8
     machine:
       image: linux-cuda-11:2023.02.1
     resource_class: gpu.nvidia.large
@@ -921,6 +966,7 @@ jobs:
           at: /tmp/dist/
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
+          torchvision-build:  << parameters.torchvision-build >>
           torch-build-index: << parameters.torch-build-index >>
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
@@ -936,12 +982,15 @@ jobs:
     parameters:
       torch-build:
         type: string
+      torchvision-build:
+        type: string
       torch-build-index:
         type: string
       trt-version-long:
         type: string
       python-version:
         type: string
+    parallelism: 8
     machine:
       image: linux-cuda-11:2023.02.1
     resource_class: gpu.nvidia.large
@@ -953,6 +1002,7 @@ jobs:
           at: /tmp/dist/
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
+          torchvision-build:  << parameters.torchvision-build >>
           torch-build-index: << parameters.torch-build-index >>
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
@@ -971,6 +1021,8 @@ jobs:
     parameters:
       torch-build:
         type: string
+      torchvision-build:
+        type: string
       torch-build-index:
         type: string
       trt-version-long:
@@ -988,6 +1040,7 @@ jobs:
           at: /tmp/dist/
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
+          torchvision-build:  << parameters.torchvision-build >>
           torch-build-index: << parameters.torch-build-index >>
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
@@ -1300,24 +1353,33 @@ parameters:
   torch-build:
     type: string
     default: "2.0.1"
+  torchvision-build:
+    type: string
+    default: "0.15.2"
   torch-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/test/cu118"
+    default: "https://download.pytorch.org/whl/cu118"
   torch-build-legacy:
     type: string
     default: "1.13.1+cu117"
+  torchvision-build-legacy:
+    type: string
+    default: "0.14.1+cu117"
   torch-build-index-legacy:
     type: string
     default: "https://download.pytorch.org/whl/cu117"
+  enable-legacy:
+    type: boolean
+    default: true
   cudnn-version:
     type: string
     default: "8.8.0.121"
   trt-version-short:
     type: string
-    default: "8.6.0"
+    default: "8.6.1"
   trt-version-long:
     type: string
-    default: "8.6.0"
+    default: "8.6.1"
 
   # Jetson platform config
   torch-jetson-build:
@@ -1364,11 +1426,13 @@ workflows:
       - build-x86_64-linux:
           name: build-x86_64-linux
           torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           python-version: << pipeline.parameters.python-version >>
 
       - test-core-cpp-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-short: << pipeline.parameters.trt-version-short >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
@@ -1379,6 +1443,7 @@ workflows:
 
       - test-py-ts-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
@@ -1387,6 +1452,7 @@ workflows:
 
       - test-py-fx-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
@@ -1395,6 +1461,7 @@ workflows:
 
       - test-py-dynamo-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
@@ -1404,12 +1471,15 @@ workflows:
       - build-x86_64-linux:
           name: build-x86_64-linux-legacy
           torch-build: << pipeline.parameters.torch-build-legacy >>
+          torchvision-build: << pipeline.parameters.torchvision-build-legacy >>
           torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
           python-version: << pipeline.parameters.python-version >>
+          legacy: << pipeline.parameters.enable-legacy >>
 
       - test-core-cpp-x86_64-linux:
           name: test-core-cpp-x86_64-linux-legacy
           torch-build: << pipeline.parameters.torch-build-legacy >>
+          torchvision-build: << pipeline.parameters.torchvision-build-legacy >>
           torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
           trt-version-short: << pipeline.parameters.trt-version-short >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
@@ -1421,6 +1491,7 @@ workflows:
       - test-py-ts-x86_64-linux:
           name: test-py-ts-x86_64-linux-legacy
           torch-build: << pipeline.parameters.torch-build-legacy >>
+          torchvision-build: << pipeline.parameters.torchvision-build-legacy >>
           torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
@@ -1429,6 +1500,7 @@ workflows:
 
       - test-py-fx-x86_64-linux-no-aten:
           torch-build: << pipeline.parameters.torch-build-legacy >>
+          torchvision-build: << pipeline.parameters.torchvision-build-legacy >>
           torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
@@ -1451,6 +1523,7 @@ workflows:
 
       - test-core-cpp-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-short: << pipeline.parameters.trt-version-short >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
@@ -1461,6 +1534,7 @@ workflows:
 
       - test-py-ts-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
@@ -1469,6 +1543,7 @@ workflows:
 
       - test-py-fx-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
@@ -1477,6 +1552,7 @@ workflows:
 
       - test-py-dynamo-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
@@ -1487,11 +1563,13 @@ workflows:
     jobs:
       - build-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           python-version: << pipeline.parameters.python-version >>
 
       - test-core-cpp-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-short: << pipeline.parameters.trt-version-short >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
@@ -1502,6 +1580,7 @@ workflows:
 
       - test-py-ts-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
@@ -1510,6 +1589,7 @@ workflows:
 
       - test-py-fx-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
@@ -1518,6 +1598,7 @@ workflows:
 
       - test-py-dynamo-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
