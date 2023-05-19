@@ -76,6 +76,8 @@ class TestFusePermuteLinear(AccTestCase):
             inputs,
             {trt_transposed_linear},
             apply_passes=[fuse_permute_linear],
+            rtol=5e-3,
+            atol=2e-3,
         )
 
 

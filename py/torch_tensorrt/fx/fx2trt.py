@@ -1,4 +1,5 @@
 import logging
+import os
 import warnings
 from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence
@@ -213,6 +214,11 @@ class TRTInterpreter(torch.fx.Interpreter):
         self.builder.max_batch_size = max_batch_size
         builder_config = self.builder.create_builder_config()
         builder_config.max_workspace_size = max_workspace_size
+
+        # Speed up TRT build time in the test environment
+        if trt.__version__ >= "8.6" and os.environ.get("TRT_TEST_ENV", "0") == "1":
+            _LOGGER.info("Set TRT optimization level to 0")
+            builder_config.builder_optimization_level = 0
 
         cache = None
         if timing_cache:
