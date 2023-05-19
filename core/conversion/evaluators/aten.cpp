@@ -907,7 +907,7 @@ auto aten_registrations TORCHTRT_UNUSED =
              EvalOptions().validSchemas({"aten::__derive_index(int idx, int start, int step) -> int"})})
         .evaluator(
             {c10::Symbol::fromQualString("aten::list"),
-             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+             [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                c10::List<c10::IValue> list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
                return list.copy();
              },
