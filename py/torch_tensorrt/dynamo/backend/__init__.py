@@ -4,18 +4,18 @@ import collections.abc
 import torch_tensorrt
 from functools import partial
 
-from typing import Any
+from typing import Any, Sequence
 from torch_tensorrt import EngineCapability, Device
 from torch_tensorrt.fx.utils import LowerPrecision
 
-from torch_tensorrt.dynamo.torch_compile._settings import CompilationSettings
-from torch_tensorrt.dynamo.torch_compile.utils import prepare_inputs, prepare_device
-from torch_tensorrt.dynamo.torch_compile.backends import tensorrt_backend
-from torch_tensorrt.dynamo.torch_compile._defaults import (
+from torch_tensorrt.dynamo.backend._settings import CompilationSettings
+from torch_tensorrt.dynamo.backend.utils import prepare_inputs, prepare_device
+from torch_tensorrt.dynamo.backend.backends import torch_tensorrt_backend
+from torch_tensorrt.dynamo.backend._defaults import (
     PRECISION,
     DEBUG,
     MAX_WORKSPACE_SIZE,
-    MAX_NUM_TRT_ENGINES,
+    MIN_BLOCK_SIZE,
 )
 
 
@@ -41,7 +41,7 @@ def compile(
     calibrator=None,
     truncate_long_and_double=False,
     require_full_compilation=False,
-    min_block_size=3,
+    min_block_size=MIN_BLOCK_SIZE,
     torch_executed_ops=[],
     torch_executed_modules=[],
     **kwargs,
@@ -50,7 +50,7 @@ def compile(
     logger.warn(
         "The Dynamo backend is an experimental feature, for which only the "
         + "following arguments are supported: "
-        + "{enabled_precisions, debug, workspace_size, max_num_trt_engines}"
+        + "{enabled_precisions, debug, workspace_size, min_block_size, torch_executed_ops}"
     )
 
     if not isinstance(inputs, collections.abc.Sequence):
@@ -80,6 +80,8 @@ def compile(
         precision=lower_precision,
         debug=debug,
         workspace_size=workspace_size,
+        min_block_size=min_block_size,
+        torch_executed_ops=torch_executed_ops,
         **kwargs,
     )
 
@@ -100,7 +102,8 @@ def create_backend(
     precision: LowerPrecision = PRECISION,
     debug: bool = DEBUG,
     workspace_size: int = MAX_WORKSPACE_SIZE,
-    max_num_trt_engines: int = MAX_NUM_TRT_ENGINES,
+    min_block_size: int = MIN_BLOCK_SIZE,
+    torch_executed_ops: Sequence[str] = set(),
     **kwargs,
 ):
     """Create torch.compile backend given specified arguments
@@ -117,10 +120,11 @@ def create_backend(
         debug=debug,
         precision=precision,
         workspace_size=workspace_size,
-        max_num_trt_engines=max_num_trt_engines,
+        min_block_size=min_block_size,
+        torch_executed_ops=torch_executed_ops,
     )
 
     return partial(
-        tensorrt_backend,
+        torch_tensorrt_backend,
         settings=settings,
     )

@@ -4,30 +4,42 @@ import traceback
 from functools import partial
 import torch._dynamo as td
 
-from torch_tensorrt.dynamo.torch_compile._settings import CompilationSettings
-from torch_tensorrt.dynamo.torch_compile.lowering._decompositions import (
+from torch_tensorrt.dynamo.backend._settings import CompilationSettings
+from torch_tensorrt.dynamo.backend.lowering._decompositions import (
     get_decompositions,
 )
-from torch_tensorrt.dynamo.torch_compile.lowering._partition import (
+from torch_tensorrt.dynamo.backend.lowering._partition import (
     partition,
     get_submod_inputs,
 )
-from torch_tensorrt.dynamo.torch_compile.conversion import convert_module
+from torch_tensorrt.dynamo.backend.conversion import convert_module
 
 from torch._dynamo.backends.common import fake_tensor_unsupported
 
 from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
 
 
-@td.register_backend(name="tensorrt")
+@td.register_backend(name="torch_tensorrt")
 @fake_tensor_unsupported
-def tensorrt_backend(
-    gm: torch.nn.Module,
+def torch_tensorrt_backend(
+    gm: torch.fx.GraphModule,
+    sample_inputs: Sequence[torch.Tensor],
+    settings: CompilationSettings = CompilationSettings(),
+):
+    DEFAULT_BACKEND = aot_torch_tensorrt_aten_backend
+
+    return DEFAULT_BACKEND(gm, sample_inputs, settings=settings)
+
+
+@td.register_backend(name="aot_torch_tensorrt_aten")
+@fake_tensor_unsupported
+def aot_torch_tensorrt_aten_backend(
+    gm: torch.fx.GraphModule,
     sample_inputs: Sequence[torch.Tensor],
     settings: CompilationSettings = CompilationSettings(),
 ):
     custom_backend = partial(
-        fx_dynamo_backend,
+        _pretraced_backend,
         settings=settings,
     )
 
@@ -40,14 +52,12 @@ def tensorrt_backend(
     )
 
 
-@td.register_backend(name="fx_tensorrt")
-@fake_tensor_unsupported
-def fx_dynamo_backend(
+def _pretraced_backend(
     gm: torch.fx.GraphModule,
-    example_inputs: Sequence[torch.Tensor],
+    sample_inputs: Sequence[torch.Tensor],
     settings: CompilationSettings = CompilationSettings(),
 ):
-    """Helper function to manage translation of FX module to TRT engines
+    """Helper function to manage translation of traced FX module to TRT engines
 
     Args:
         module: FX GraphModule to convert
@@ -57,9 +67,9 @@ def fx_dynamo_backend(
         Compiled FX GraphModule
     """
     try:
-        trt_compiled = compile_module(
+        trt_compiled = _compile_module(
             gm,
-            example_inputs,
+            sample_inputs,
             settings=settings,
         )
         return trt_compiled
@@ -72,12 +82,12 @@ def fx_dynamo_backend(
         return gm.forward
 
 
-def compile_module(
+def _compile_module(
     gm: torch.fx.GraphModule,
-    example_inputs: Sequence[torch.Tensor],
+    sample_inputs: Sequence[torch.Tensor],
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.fx.GraphModule:
-    """Compile an FX module
+    """Compile a traced FX module
 
     Includes: Partitioning + Conversion Phases
 
@@ -90,7 +100,10 @@ def compile_module(
     """
     # Partition module into components that can be TRT-accelerated
     partitioned_module = partition(
-        gm, verbose=settings.debug, max_num_trt_engines=settings.max_num_trt_engines
+        gm,
+        verbose=settings.debug,
+        min_block_size=settings.min_block_size,
+        torch_executed_ops=settings.torch_executed_ops,
     )
 
     # Iterate over all components that can be accelerated
@@ -100,7 +113,7 @@ def compile_module(
 
         # Get submodule inputs
         submodule_inputs = get_submod_inputs(
-            partitioned_module, submodule, example_inputs
+            partitioned_module, submodule, sample_inputs
         )
 
         # Create TRT Module from submodule

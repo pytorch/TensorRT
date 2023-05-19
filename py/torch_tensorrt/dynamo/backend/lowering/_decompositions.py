@@ -41,5 +41,20 @@ replace_inplace_op(aten.scatter_add_, aten.scatter_add)
 replace_inplace_op(aten.scatter_reduce_, aten.scatter_reduce)
 
 
+@register_decomposition(aten.std, registry=DECOMPOSITIONS)
+def std_replacement(*args, **kwargs) -> torch.Tensor:
+    return torch.sqrt(torch.var(*args, **kwargs))
+
+
+@register_decomposition(aten.rsqrt, registry=DECOMPOSITIONS)
+def rsqrt_replacement(*args, **kwargs) -> torch.Tensor:
+    return torch.reciprocal(torch.sqrt(*args, **kwargs))
+
+
+@register_decomposition(aten.alias, registry=DECOMPOSITIONS)
+def alias_replacement(x: torch.Tensor) -> torch.Tensor:
+    return x
+
+
 def get_decompositions():
     return DECOMPOSITIONS
