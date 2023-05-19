@@ -70,6 +70,9 @@ class LowerSetting(LowerSettingBasic):
     correctness_atol: absolute tolerance for correctness check
     correctness_rtol: relative tolerance for correctness check
     use_experimental_rt: Uses the next generation TRTModule which supports both Python and TorchScript based execution (including in C++).
+    max_aux_streams: max number of aux stream to use
+    version_compatible: enable version compatible feature
+    optimization_level: builder optimization level
     """
 
     input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
@@ -96,3 +99,6 @@ class LowerSetting(LowerSettingBasic):
     correctness_atol: float = 0.1
     correctness_rtol: float = 0.1
     use_experimental_rt: bool = False
+    max_aux_streams: Optional[int] = None
+    version_compatible: bool = False
+    optimization_level: Optional[int] = None
