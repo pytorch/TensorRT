@@ -126,7 +126,7 @@ def chain_passes(*passes: PassFunc) -> PassFunc:
 # (TODO(shirongwu): Add exception notification for fblearner flow when available, notify oncall
 # on pass that failed accuracy check.
 def validate_inference(
-    rtol=None, atol=None, device=torch.device(torch.cuda.current_device(), suppress_accuracy_check_failure=True)
+    rtol=None, atol=None, device=torch.device(torch.cuda.current_device()), suppress_accuracy_check_failure=True
 ):
     def _validate_inference(pass_: PassFunc) -> PassFunc:
         """
