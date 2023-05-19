@@ -266,33 +266,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         engine = self.builder.build_engine(self.network, builder_config)
         assert engine
 
-        import os
-        def get_file_name(org):
-            file_name = org
-            i = 0
-            while os.path.exists(os.path.abspath(file_name)):
-                i += 1
-                file_name = org + str(i)
-            return file_name
 
-        engine_file = os.environ.get('TORCH_FX_DUMP_ENGINE')
-        if engine_file:
-            dump_file = get_file_name(engine_file)
-            print(f'Dumping engine to {dump_file}')
-            s = engine.serialize()
-            with open(dump_file, 'wb') as f:
-                f.write(s)
-        engine_info_file = os.environ.get('TORCH_FX_DUMP_ENGINE_INFO')
-        if engine_info_file:
-            inspector = engine.create_engine_inspector()
-            engine_info = inspector.get_engine_information(trt.LayerInformationFormat.JSON)
-            if engine_info is None or len(engine_info) == 0:
-                raise Exception('Engine info is empty')
-            else:
-                dump_file = get_file_name(engine_info_file)
-                print(f'Dumping engine info to {dump_file}')
-                with open(dump_file, 'w') as f:
-                    f.write(engine_info)
 
         serialized_cache = (
             bytearray(cache.serialize())
