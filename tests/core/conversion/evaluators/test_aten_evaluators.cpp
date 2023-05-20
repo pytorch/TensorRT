@@ -935,7 +935,7 @@ TEST(Evaluators, IsNotTrueEvaluatesCorrectly) {
 TEST(Evaluators, IsAtenSliceEvaluateCorrectly) {
   const auto graph = R"IR(
       graph():
-        %1 : int[] = prim::Constant[value= 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]()
+        %1 : int[] = prim::Constant[value= [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]()
         %2 : int = prim::Constant[value = 0]()
         %3 : int = prim::Constant[value = 7]()
         %4 : int = prim::Constant[value = 2]()
@@ -954,7 +954,7 @@ TEST(Evaluators, IsAtenSliceEvaluateCorrectly) {
 TEST(Evaluators, IsAtenListEvaluateCorrectly) {
   const auto graph = R"IR(
       graph():
-        %1 : int[] = prim::Constant[value= 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]()
+        %1 : int[] = prim::Constant[value= [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]()
         %2 : int[] = aten::list(%1)
         return (%2))IR";
 
