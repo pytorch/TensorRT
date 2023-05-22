@@ -150,7 +150,10 @@ def chain_passes(*passes: PassFunc) -> PassFunc:
 
 # (TODO(shirongwu): Add exception notification for fblearner flow when available, notify oncall
 # on pass that failed accuracy check.
-def validate_inference(rtol=None, atol=None, suppress_accuracy_check_failure=True, run_alternative_batch_size: int = -1)-> "Decorator":
+def validate_inference(
+    rtol=None, atol=None, suppress_accuracy_check_failure=True, 
+    run_alternative_batch_size: int = -1
+)-> "Decorator":
     """
     Returns a decorator on a PassFunc to sanity check the model outputs
     difference before/after the transformation is within tolerance.
