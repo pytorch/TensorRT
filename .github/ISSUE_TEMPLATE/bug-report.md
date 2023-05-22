@@ -16,8 +16,8 @@ assignees: ''
 Steps to reproduce the behavior:
 
 1.
-1.
-1.
+2.
+3.
 
 <!-- If you have a code sample, error messages, stack traces, please provide it here as well -->
 
