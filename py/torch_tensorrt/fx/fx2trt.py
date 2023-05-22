@@ -280,9 +280,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
-        _LOGGER.info(
-            f"TRT Engine uses: {engine.device_memory_size} bytes of Memory"
-        )
+        _LOGGER.info(f"TRT Engine uses: {engine.device_memory_size} bytes of Memory")
 
         return TRTInterpreterResult(
             engine, self._input_names, self._output_names, serialized_cache
