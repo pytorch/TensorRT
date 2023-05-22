@@ -126,7 +126,10 @@ def chain_passes(*passes: PassFunc) -> PassFunc:
 # (TODO(shirongwu): Add exception notification for fblearner flow when available, notify oncall
 # on pass that failed accuracy check.
 def validate_inference(
-    rtol=None, atol=None, device=torch.device(torch.cuda.current_device()), suppress_accuracy_check_failure=True
+    rtol=None,
+    atol=None,
+    device=torch.device(torch.cuda.current_device()),
+    suppress_accuracy_check_failure=True,
 ):
     def _validate_inference(pass_: PassFunc) -> PassFunc:
         """
@@ -141,7 +144,7 @@ def validate_inference(
             *args,
             **kwargs,
         ) -> fx.GraphModule:
-            if  suppress_accuracy_check_failure:
+            if suppress_accuracy_check_failure:
                 return pass_(module, input, *args, **kwargs)
             else:
                 input_tensors = extract_example_tensors_from_input(input, device)
