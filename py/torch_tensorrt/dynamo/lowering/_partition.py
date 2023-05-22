@@ -10,7 +10,7 @@ from torch.fx.graph_module import GraphModule
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.operator_support import OperatorSupport
 
-from torch_tensorrt.fx.converter_registry import CONVERTERS
+from torch_tensorrt.dynamo import DYNAMO_CONVERTERS as CONVERTERS
 
 
 logger = logging.getLogger(__name__)

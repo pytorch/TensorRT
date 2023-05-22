@@ -14,7 +14,7 @@ from torch._ops import OpOverload
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 
-from torch_tensorrt.fx import CONVERTERS
+from torch_tensorrt.dynamo import DYNAMO_CONVERTERS as CONVERTERS
 from torch_tensorrt import Input
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.fx.utils import (
