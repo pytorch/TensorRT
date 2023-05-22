@@ -1,3 +1,4 @@
+#include "core/conversion/converters/converter_util.h"
 #include "core/conversion/converters/converters.h"
 #include "core/conversion/tensorcontainer/TensorContainer.h"
 #include "core/util/prelude.h"
@@ -24,6 +25,17 @@ auto cat_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
                 } else {
                   auto cont = t.toCustomClass<TensorContainer>();
                   tensors.push_back(cont->tensor());
+                }
+              }
+
+              auto promo_dtype = tensors[0]->getType();
+              for(size_t idx = 1UL; idx < tensors.size(); ++idx){
+                promo_dtype = promote_types(promo_dtype, tensors[idx]->getType());
+              }
+
+              for(size_t idx = 0UL; idx < tensors.size(); ++idx){
+                if(tensors[idx]->getType() != promo_dtype){
+                  tensors[idx] = castITensor(ctx, tensors[idx], promo_dtype, util::node_info(n) + "_cast_" + std::to_string(idx));
                 }
               }
 

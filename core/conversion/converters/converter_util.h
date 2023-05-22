@@ -96,6 +96,8 @@ nvinfer1::ITensor* get_slice_size(
 
 nvinfer1::ITensor* scalar_to_tensor(ConversionCtx* ctx, at::Scalar s);
 
+nvinfer1::DataType promote_types(nvinfer1::DataType type_a, nvinfer1::DataType type_b);
+
 } // namespace converters
 } // namespace conversion
 } // namespace core
