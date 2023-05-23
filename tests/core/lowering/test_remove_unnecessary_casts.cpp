@@ -589,3 +589,89 @@ TEST(LoweringPasses, RemoveAtenIntConstTensorValuesAgree) {
   // Validate identical graphs after pooling constants and canonicalizing
   ASSERT_TRUE((tg->toString() == sg->toString()));
 }
+
+TEST(LoweringPasses, RemoveCollectionCastTuple) {
+  // Ensure the lowering pass transforms the first graph into the second
+  std::string source_graph = R"IR(
+    graph(%x.1 : Tensor):
+      %3 : int = prim::Constant[value=1]()
+      %2 : int = prim::Constant[value=2]()
+      %a.1 : Tensor = aten::mul(%x.1, %2)
+      %b.1 : Tensor = aten::add(%a.1, %2, %3)
+      %c.1 : Tensor = aten::relu(%b.1)
+      %d.1 : Tensor = aten::sqrt(%c.1)
+      %8 : (Tensor, Tensor, Tensor) = prim::TupleConstruct(%c.1, %d.1, %b.1)
+      return (%8))IR";
+
+  std::string target_graph = R"IR(
+    graph(%x.1 : Tensor):
+      %3 : int = prim::Constant[value=1]()
+      %2 : int = prim::Constant[value=2]()
+      %a.1 : Tensor = aten::mul(%x.1, %2)
+      %b.1 : Tensor = aten::add(%a.1, %2, %3)
+      %c.1 : Tensor = aten::relu(%b.1)
+      %d.1 : Tensor = aten::sqrt(%c.1)
+      return (%c.1, %d.1, %b.1))IR";
+
+  // Ensure the lowering pass transforms the first graph into the second
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(
+      torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
+  auto sg = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(source_graph, sg.get());
+
+  torch_tensorrt::core::lowering::passes::RemoveCollectionCast(sg);
+  torch::jit::ConstantPooling(sg);
+  sg = torch::jit::Canonicalize(sg, false);
+
+  auto tg = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(target_graph, tg.get());
+
+  torch::jit::ConstantPooling(tg);
+  tg = torch::jit::Canonicalize(tg, false);
+
+  // Validate identical graphs after pooling constants and canonicalizing
+  ASSERT_TRUE((tg->toString() == sg->toString()));
+}
+
+TEST(LoweringPasses, RemoveCollectionCastList) {
+  // Ensure the lowering pass transforms the first graph into the second
+  std::string source_graph = R"IR(
+    graph(%x.1 : Tensor):
+      %3 : int = prim::Constant[value=1]()
+      %2 : int = prim::Constant[value=2]()
+      %a.1 : Tensor = aten::mul(%x.1, %2)
+      %b.1 : Tensor = aten::add(%a.1, %2, %3)
+      %c.1 : Tensor = aten::relu(%b.1)
+      %d.1 : Tensor = aten::sqrt(%c.1)
+      %8 : (Tensor, Tensor, Tensor) = prim::ListConstruct(%b.1, %c.1, %d.1)
+      return (%8))IR";
+
+  std::string target_graph = R"IR(
+    graph(%x.1 : Tensor):
+      %3 : int = prim::Constant[value=1]()
+      %2 : int = prim::Constant[value=2]()
+      %a.1 : Tensor = aten::mul(%x.1, %2)
+      %b.1 : Tensor = aten::add(%a.1, %2, %3)
+      %c.1 : Tensor = aten::relu(%b.1)
+      %d.1 : Tensor = aten::sqrt(%c.1)
+      return (%b.1, %c.1, %d.1))IR";
+
+  // Ensure the lowering pass transforms the first graph into the second
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(
+      torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
+  auto sg = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(source_graph, sg.get());
+
+  torch_tensorrt::core::lowering::passes::RemoveCollectionCast(sg);
+  torch::jit::ConstantPooling(sg);
+  sg = torch::jit::Canonicalize(sg, false);
+
+  auto tg = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(target_graph, tg.get());
+
+  torch::jit::ConstantPooling(tg);
+  tg = torch::jit::Canonicalize(tg, false);
+
+  // Validate identical graphs after pooling constants and canonicalizing
+  ASSERT_TRUE((tg->toString() == sg->toString()));
+}

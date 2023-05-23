@@ -326,8 +326,10 @@ core::CompileSpec init_compile_spec(CompileSpec external) {
   }
 }
 
-core::CompileSpec CompileSpec::toInternalCompileSpec() {
+core::CompileSpec CompileSpec::toInternalCompileSpec(bool converting_to_trt_engine) {
   core::CompileSpec info = init_compile_spec(*this);
+
+  info.lower_info.converting_to_trt_engine = converting_to_trt_engine;
 
   for (auto p : enabled_precisions) {
     info.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));
