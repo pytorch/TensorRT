@@ -26,6 +26,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
     trt_transposed_matmul,
 )
 from torch_tensorrt.fx.tracer.acc_tracer.acc_ops import contiguous
+from torch_tensorrt.fx.converters.impl import activation
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -1007,9 +1008,14 @@ def acc_ops_relu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-    operation_type = trt.ActivationType.RELU
-    return add_activation_layer(network, input_val, operation_type, target, name)
+
+    return activation.relu(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        kwargs["input"],
+    )
 
 
 @tensorrt_converter(acc_ops.leaky_relu)
@@ -1023,8 +1029,14 @@ def acc_ops_leaky_relu(
     input_val = kwargs["input"]
     negative_slope = kwargs["negative_slope"]
     operation_type = trt.ActivationType.LEAKY_RELU
-    return add_activation_layer(
-        network, input_val, operation_type, target, name, negative_slope
+    return activation.convert_activation(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+        alpha=negative_slope,
     )
 
 
@@ -1039,7 +1051,9 @@ def acc_ops_elu(
     input_val = kwargs["input"]
     alpha = kwargs["alpha"]
     operation_type = trt.ActivationType.ELU
-    return add_activation_layer(network, input_val, operation_type, target, name, alpha)
+    return activation.convert_activation(
+        network, target, SourceIR.ACC, name, operation_type, input_val, alpha=alpha
+    )
 
 
 @tensorrt_converter(acc_ops.selu)
@@ -1052,7 +1066,14 @@ def acc_ops_selu(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.ActivationType.SELU
-    return add_activation_layer(network, input_val, operation_type, target, name)
+    return activation.convert_activation(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.softsign)
@@ -1065,7 +1086,14 @@ def acc_ops_softsign(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.ActivationType.SOFTSIGN
-    return add_activation_layer(network, input_val, operation_type, target, name)
+    return activation.convert_activation(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.sin)
@@ -1143,7 +1171,14 @@ def acc_ops_tanh(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.ActivationType.TANH
-    return add_activation_layer(network, input_val, operation_type, target, name)
+    return activation.convert_activation(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.asin)
@@ -3140,12 +3175,13 @@ def acc_ops_hard_sigmoid(
             "of the TensorRT region!"
         )
 
-    return add_activation_layer(
+    return activation.convert_activation(
         network,
-        input_val,
-        trt.ActivationType.HARD_SIGMOID,
         target,
+        SourceIR.ACC,
         name,
+        trt.ActivationType.HARD_SIGMOID,
+        input_val,
         alpha=1 / 6,
         beta=0.5,
     )
@@ -3167,8 +3203,13 @@ def acc_ops_sigmoid(
             "of the TensorRT region!"
         )
 
-    return add_activation_layer(
-        network, input_val, trt.ActivationType.SIGMOID, target, name
+    return activation.convert_activation(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        trt.ActivationType.SIGMOID,
+        input_val,
     )
 
 
@@ -3560,12 +3601,13 @@ def acc_ops_hardtanh(
             "of the TensorRT region!"
         )
 
-    return add_activation_layer(
+    return activation.convert_activation(
         network,
-        input_val,
-        trt.ActivationType.CLIP,
         target,
+        SourceIR.ACC,
         name,
+        trt.ActivationType.CLIP,
+        input_val,
         alpha=kwargs["min_val"],
         beta=kwargs["max_val"],
     )
