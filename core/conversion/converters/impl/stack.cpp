@@ -19,12 +19,12 @@ auto stack_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().patt
      [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        auto in = args[0].IValue()->toListRef();
        auto dim = args[1].unwrapToInt();
-       if (-1 == dim) {
+       if (dim < 0) {
          auto first_in = in[0];
          if (first_in.isTensor()) {
-           dim = first_in.toTensor().ndimension();
+           dim = first_in.toTensor().ndimension() + dim + 1;
          } else {
-           dim = first_in.toCustomClass<TensorContainer>()->tensor()->getDimensions().nbDims;
+           dim = first_in.toCustomClass<TensorContainer>()->tensor()->getDimensions().nbDims + dim + 1;
          }
        }
 
