@@ -52,6 +52,7 @@ def aot_torch_tensorrt_aten_backend(
     )
 
 
+@fake_tensor_unsupported
 def _pretraced_backend(
     gm: torch.fx.GraphModule,
     sample_inputs: Sequence[torch.Tensor],
@@ -120,9 +121,7 @@ def _compile_module(
         trt_mod = convert_module(
             submodule,
             submodule_inputs,
-            debug=settings.debug,
-            workspace_size=settings.workspace_size,
-            precision=settings.precision,
+            settings=settings,
         )
 
         # Replace FX Module with TRT Module
