@@ -17,6 +17,7 @@ from torch_tensorrt.dynamo.backend._defaults import (
     MAX_WORKSPACE_SIZE,
     MIN_BLOCK_SIZE,
     PASS_THROUGH_BUILD_FAILURES,
+    TRUNCATE_LONG_AND_DOUBLE,
 )
 
 
@@ -40,7 +41,7 @@ def compile(
     dla_local_dram_size=1073741824,
     dla_global_dram_size=536870912,
     calibrator=None,
-    truncate_long_and_double=False,
+    truncate_long_and_double=TRUNCATE_LONG_AND_DOUBLE,
     require_full_compilation=False,
     min_block_size=MIN_BLOCK_SIZE,
     torch_executed_ops=[],
@@ -54,7 +55,7 @@ def compile(
         "The Dynamo backend is an experimental feature, for which only the "
         + "following arguments are supported: "
         + "{enabled_precisions, debug, workspace_size, min_block_size, "
-        + "torch_executed_ops, pass_through_build_failures}"
+        + "truncate_long_and_double, torch_executed_ops, pass_through_build_failures}"
     )
 
     if not isinstance(inputs, collections.abc.Sequence):
@@ -86,6 +87,7 @@ def compile(
         workspace_size=workspace_size,
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
+        truncate_long_and_double=truncate_long_and_double,
         **kwargs,
     )
 
@@ -109,6 +111,7 @@ def create_backend(
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Sequence[str] = set(),
     pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES,
+    truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE,
     **kwargs,
 ):
     """Create torch.compile backend given specified arguments
@@ -131,6 +134,7 @@ def create_backend(
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
         pass_through_build_failures=pass_through_build_failures,
+        truncate_long_and_double=truncate_long_and_double,
     )
 
     return partial(
