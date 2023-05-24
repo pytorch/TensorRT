@@ -363,7 +363,7 @@ def aten_ops_cat(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     kwargs_new = {
         "tensors": args[0],
-        "dim": args[1],
+        "dim": args[1] if len(args) >= 2 else 0,
     }
     return acc_ops_converters.acc_ops_cat(network, target, None, kwargs_new, name)
 
