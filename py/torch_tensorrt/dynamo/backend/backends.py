@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.backend.lowering._partition import (
     get_submod_inputs,
 )
 from torch_tensorrt.dynamo.backend.utils import parse_dynamo_kwargs
+from torch_tensorrt.dynamo.common import repair_long_or_double_inputs
 from torch_tensorrt.dynamo.backend.conversion import convert_module
 
 from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
@@ -133,6 +134,16 @@ def _compile_module(
         submodule_inputs = get_submod_inputs(
             partitioned_module, submodule, sample_inputs
         )
+
+        # Ensure all submodule inputs do not require a gradient
+        for param in submodule_inputs:
+            param.requires_grad = False
+
+        # Handle long/double inputs if requested by the user
+        if settings.truncate_long_and_double:
+            submodule_inputs = repair_long_or_double_inputs(
+                partitioned_module, submodule, submodule_inputs, name
+            )
 
         # Create TRT Module from submodule
         trt_mod = convert_module(

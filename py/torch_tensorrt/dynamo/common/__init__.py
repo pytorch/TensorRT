@@ -4,6 +4,7 @@ from typing import Optional
 from ._settings import CompilationSettings
 from .input_tensor_spec import InputTensorSpec
 from .fx2trt import TRTInterpreter, TRTInterpreterResult
+from .truncate_long_and_double import repair_long_or_double_inputs
 
 
 logger = logging.getLogger(__name__)

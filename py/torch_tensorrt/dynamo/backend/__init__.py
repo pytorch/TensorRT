@@ -20,6 +20,7 @@ from torch_tensorrt.dynamo._defaults import (
     VERSION_COMPATIBLE,
     OPTIMIZATION_LEVEL,
     USE_PYTHON_RUNTIME,
+    TRUNCATE_LONG_AND_DOUBLE,
 )
 
 
@@ -43,7 +44,7 @@ def compile(
     dla_local_dram_size=1073741824,
     dla_global_dram_size=536870912,
     calibrator=None,
-    truncate_long_and_double=False,
+    truncate_long_and_double=TRUNCATE_LONG_AND_DOUBLE,
     require_full_compilation=False,
     min_block_size=MIN_BLOCK_SIZE,
     torch_executed_ops=[],
@@ -62,7 +63,7 @@ def compile(
         "The Dynamo backend is an experimental feature, for which only the "
         + "following arguments are supported: "
         + "{enabled_precisions, debug, workspace_size, min_block_size, "
-        + "torch_executed_ops, pass_through_build_failures}"
+        + "truncate_long_and_double, torch_executed_ops, pass_through_build_failures}"
     )
 
     if not isinstance(inputs, collections.abc.Sequence):
@@ -103,6 +104,7 @@ def compile(
         version_compatible=version_compatible,
         optimization_level=optimization_level,
         use_python_runtime=use_python_runtime,
+        truncate_long_and_double=truncate_long_and_double,
         **kwargs,
     )
 
@@ -130,6 +132,7 @@ def create_backend(
     version_compatible: bool = VERSION_COMPATIBLE,
     optimization_level: Optional[int] = OPTIMIZATION_LEVEL,
     use_python_runtime: Optional[bool] = USE_PYTHON_RUNTIME,
+    truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE,
     **kwargs,
 ):
     """Create torch.compile backend given specified arguments
@@ -163,5 +166,6 @@ def create_backend(
         version_compatible=version_compatible,
         optimization_level=optimization_level,
         use_python_runtime=use_python_runtime,
+        truncate_long_and_double=truncate_long_and_double,
         **kwargs,
     )
