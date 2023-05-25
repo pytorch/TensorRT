@@ -1,6 +1,7 @@
 import torch
 
 COSINE_THRESHOLD = 0.99
+DECIMALS_OF_AGREEMENT = 5
 
 
 def cosine_similarity(gt_tensor, pred_tensor):

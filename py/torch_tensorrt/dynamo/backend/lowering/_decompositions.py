@@ -56,5 +56,14 @@ def alias_replacement(x: torch.Tensor) -> torch.Tensor:
     return x
 
 
+@register_decomposition(torch.ops.aten.addmm, registry=DECOMPOSITIONS)
+def addmm_replacement(
+    input_: torch.Tensor, mat1: torch.Tensor, mat2: torch.Tensor, *, beta=1, alpha=1
+) -> torch.Tensor:
+    return torch.add(
+        torch.mul(input_, beta), torch.mul(torch.matmul(mat1, mat2), alpha)
+    )
+
+
 def get_decompositions():
     return DECOMPOSITIONS
