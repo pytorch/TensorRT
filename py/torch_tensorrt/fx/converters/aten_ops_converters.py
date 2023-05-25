@@ -484,3 +484,21 @@ def aten_ops_sym_size(
     )
     set_layer_name(slice_layer, target, "_slice_layer")
     return slice_layer.get_output(0)
+
+
+@tensorrt_converter(torch.ops.aten.sigmoid.default)
+def aten_ops_sigmoid(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+
+    return activation.sigmoid(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
