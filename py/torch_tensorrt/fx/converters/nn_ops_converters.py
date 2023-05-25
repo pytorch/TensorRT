@@ -22,3 +22,17 @@ def relu(network, submod, args, kwargs, layer_name):
         name=layer_name,
         input_val=kwargs["input"],
     )
+
+
+@tensorrt_converter(torch.nn.modules.activation.Sigmoid)
+def sigmoid(network, submod, args, kwargs, layer_name):
+    # args/kwargs should have already been normalized to kwargs
+    assert len(args) == 0
+
+    activation.sigmoid(
+        network=network,
+        target="torch.nn.modules.activation.Sigmoid",
+        source_ir=SourceIR.NN,
+        name=layer_name,
+        input_val=kwargs["input"],
+    )
