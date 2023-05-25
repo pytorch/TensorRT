@@ -50,9 +50,6 @@ def compile(
     if debug:
         logger.setLevel(logging.DEBUG)
 
-    if debug:
-        logger.setLevel(logging.DEBUG)
-
     logger.warn(
         "The Dynamo backend is an experimental feature, for which only the "
         + "following arguments are supported: "
