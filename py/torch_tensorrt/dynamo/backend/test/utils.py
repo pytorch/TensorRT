@@ -124,7 +124,7 @@ def lower_graph_testing(
     torch_executed_ops: Sequence[str] = set(),
     testing_partitioning: bool = False,
 ):
-    """Helper function to assist with graph lowering for testing of Dynamo torch_compile
+    """Helper function to assist with graph lowering for testing of Dynamo compile
 
     Args:
         fx_graph: Graph to lower

@@ -7,6 +7,7 @@ from torch_tensorrt.dynamo.backend._defaults import (
     DEBUG,
     MAX_WORKSPACE_SIZE,
     MIN_BLOCK_SIZE,
+    PASS_THROUGH_BUILD_FAILURES,
 )
 
 
@@ -17,3 +18,4 @@ class CompilationSettings:
     workspace_size: int = MAX_WORKSPACE_SIZE
     min_block_size: int = MIN_BLOCK_SIZE
     torch_executed_ops: Sequence[str] = field(default_factory=set)
+    pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES
