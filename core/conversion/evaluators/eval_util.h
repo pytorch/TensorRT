@@ -2,6 +2,7 @@
 
 #include "core/conversion/evaluators/evaluators.h"
 #include "torch/csrc/jit/ir/ir.h"
+#include "torch/torch.h"
 
 namespace torch_tensorrt {
 namespace core {
