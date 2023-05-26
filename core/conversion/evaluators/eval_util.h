@@ -26,6 +26,13 @@ int64_t normalizeIndex(int64_t idx, int64_t list_size);
 
 at::Tensor scalar_to_tensor(const at::Scalar& s, const at::Device device = at::kCPU);
 
+std::pair<std::vector<int64_t>, torch::TensorOptions> newTensorImplementation(const torch::jit::Node* n, kwargs& args);
+c10::optional<torch::jit::IValue> newTensorLikeImplementation(
+    ConversionCtx* ctx,
+    const torch::jit::Node* n,
+    kwargs& args,
+    const std::function<torch::Tensor(const std::vector<int64_t>&, const torch::TensorOptions&)>& tensor_builder);
+
 } // namespace evaluators
 } // namespace conversion
 } // namespace core
