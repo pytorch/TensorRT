@@ -151,28 +151,37 @@ def extend_mod_attr_to_tuple(mod: torch.nn.Module, name: str, size: int):
     return extend_attr_to_tuple(val, size)
 
 
-def to_numpy(tensor: Optional[torch.Tensor]) -> Optional[np.ndarray]:
+def to_numpy(value: Optional[Union[torch.Tensor, int, float]]) -> Optional[np.ndarray]:
     """
     Convert a PyTorch Tensor to a Numpy Array. If the tensor is
     quantized it will be dequantized first.
 
     Args:
-        tensor (Optional[torch.Tensor]): A PyTorch tensor or None.
+        value (Optional[Union[torch.Tensor, int, float]]): A PyTorch tensor, int, or float
 
     Returns:
         A Numpy array.
     """
 
-    if tensor is None:
-        return tensor
+    if value is None:
+        return value
 
-    assert isinstance(
-        tensor, torch.Tensor
-    ), f"to_numpy can only be called on None or a torch.Tensor, got: {tensor}"
-    if tensor.is_quantized:
-        tensor = tensor.dequantize()
+    elif isinstance(value, torch.Tensor):
+        if value.is_quantized:
+            value = value.dequantize()
 
-    return tensor.cpu().detach().contiguous().numpy()
+        return value.cpu().detach().contiguous().numpy()
+
+    elif isinstance(value, int):
+        return np.array([value], dtype=np.int32)
+
+    elif isinstance(value, float):
+        return np.array([value], dtype=np.float32)
+
+    else:
+        raise AssertionError(
+            f"to_numpy can only be called on None, int, float, or torch.Tensor, got: {value}"
+        )
 
 
 def has_dynamic_shape(shape: Shape) -> bool:
@@ -244,11 +253,6 @@ def create_constant(
     Returns:
         A TensorRT ITensor that represents the given value.
     """
-    if isinstance(value, int):
-        value = torch.IntTensor([value])
-
-    if isinstance(value, float):
-        value = torch.Tensor([value])
 
     if dtype:
         value = value.to(dtype)
