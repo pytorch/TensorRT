@@ -20,7 +20,7 @@ from ..types import (
     TRTPluginFieldCollection,
     TRTTensor,
 )
-from ..utils import torch_dtype_from_trt
+from ..utils import unified_dtype_converter, Frameworks
 
 
 class SourceIR(Enum):
@@ -151,37 +151,50 @@ def extend_mod_attr_to_tuple(mod: torch.nn.Module, name: str, size: int):
     return extend_attr_to_tuple(val, size)
 
 
-def to_numpy(value: Optional[Union[torch.Tensor, int, float]]) -> Optional[np.ndarray]:
+def to_numpy(
+    value: Optional[Union[torch.Tensor, np.ndarray, int, float]],
+    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]] = None,
+) -> Optional[np.ndarray]:
     """
-    Convert a PyTorch Tensor to a Numpy Array. If the tensor is
+    Convert a PyTorch Tensor, Numpy array, or scalar to a Numpy Array. If the tensor is
     quantized it will be dequantized first.
 
     Args:
-        value (Optional[Union[torch.Tensor, int, float]]): A PyTorch tensor, int, or float
+        value (Optional[Union[torch.Tensor, np.ndarray, int, float]]):
+            A PyTorch tensor, Numpy array, int, or float
+        dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
+            If a dtype is given, we will convert the type of the given `value` to this dtype.
 
     Returns:
         A Numpy array.
     """
+    output = None
 
-    if value is None:
-        return value
+    if value is None or isinstance(value, np.ndarray):
+        output = value
 
     elif isinstance(value, torch.Tensor):
         if value.is_quantized:
             value = value.dequantize()
 
-        return value.cpu().detach().contiguous().numpy()
+        output = value.cpu().detach().contiguous().numpy()
 
     elif isinstance(value, int):
-        return np.array([value], dtype=np.int32)
+        output = np.array([value], dtype=np.int32)
 
     elif isinstance(value, float):
-        return np.array([value], dtype=np.float32)
+        output = np.array([value], dtype=np.float32)
 
     else:
         raise AssertionError(
-            f"to_numpy can only be called on None, int, float, or torch.Tensor, got: {value}"
+            f"to_numpy can only be called on None, int, float, np.ndarray, or torch.Tensor, got: {value}"
         )
+
+    return (
+        output
+        if dtype is None
+        else output.astype(unified_dtype_converter(dtype, Frameworks.NUMPY))
+    )
 
 
 def has_dynamic_shape(shape: Shape) -> bool:
@@ -234,9 +247,9 @@ def get_axes_for_reduce_op(
 
 def create_constant(
     network: TRTNetwork,
-    value: Union[int, float, torch.Tensor],
+    value: Union[int, float, np.ndarray, torch.Tensor],
     name: str,
-    dtype: Optional[torch.dtype],
+    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]],
 ) -> TRTTensor:
     """
     Add a TensorRT constant layer whose value is `value` to `network`.
@@ -244,25 +257,28 @@ def create_constant(
     Args:
         network (TRTNetwork): A TensorRT network to which we want to add
             a constant layer.
-        value (Union[int, float, torch.Tensor]): A literal value or a PyTorch tensor
-            that will be used as value of the added TensorRT Constant layer.
+        value (Union[int, float, np.ndarray, torch.Tensor]): A literal value, Numpy array,
+            or a PyTorch tensor that will be used as value of the added TensorRT Constant layer.
         name (str): Name of the added TensorRT Constant layer.
-        dtype (Optional[torch.dtype]): If a dtype is given, we will convert the type
-            of the given `value` to this dtype.
+        dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
+            If a dtype is given, we will convert the type of the given `value` to this dtype.
 
     Returns:
         A TensorRT ITensor that represents the given value.
     """
-
-    if dtype:
-        value = value.to(dtype)
-    constant = network.add_constant(value.shape, to_numpy(value))
+    constant = network.add_constant(
+        (1,) if isinstance(value, (int, float)) else value.shape,
+        to_numpy(value, dtype),
+    )
     constant.name = name
     return constant.get_output(0)
 
 
 def get_trt_tensor(
-    network: TRTNetwork, input_val: Any, name: str, dtype: Optional[torch.dtype] = None
+    network: TRTNetwork,
+    input_val: Any,
+    name: str,
+    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]] = None,
 ) -> TRTTensor:
     """
     Given a value of random type, we try to convert it to a TensorRT ITensor.
@@ -274,32 +290,35 @@ def get_trt_tensor(
         input_val (Any): An value that we want to convert to a TensorRT ITensor.
         name (str): The name of the created TensorRT Constant layer if there's
             one.
-        dtype (Optional[torch.dtype]): If dtype is provided, the given value
-            will be converted to this dtype.
+        dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
+            If dtype is provided, the given value will be converted to this dtype.
 
     Returns:
         A TensorRT ITensor that represents the given value.
     """
     # TRT can not add constant for bool type. We do a work around to 1) cast it to int and 2)cast to bool later
     # This is useful for logical operations which require input to be bool type
-    if isinstance(input_val, np.ndarray):
-        input_val = torch.from_numpy(input_val)
     if isinstance(input_val, bool):
         input_val = int(input_val)
-    if isinstance(input_val, torch.Tensor) and input_val.dtype == torch.bool:
-        input_val = input_val.to(torch.int32)
-    if isinstance(input_val, torch.Tensor) and input_val.dtype == torch.int64:
-        input_val = input_val.to(torch.int32)
 
-    if isinstance(input_val, (torch.Tensor, int, float)):
+    if isinstance(input_val, torch.Tensor) and (
+        input_val.dtype == torch.bool or input_val.dtype == torch.int64
+    ):
+        input_val = input_val.to(torch.int32)
+    elif isinstance(input_val, np.ndarray) and (
+        input_val.dtype == np.bool_ or input_val.dtype == np.int64
+    ):
+        input_val = input_val.to(np.int32)
+
+    if isinstance(input_val, (torch.Tensor, np.ndarray, int, float)):
         return create_constant(network, input_val, name, dtype)
-    elif not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"Received input {input_val} of name {name} that "
-            "is not part of the TensorRT region!"
-        )
-    else:
+    elif isinstance(input_val, TRTTensor):
         return input_val
+
+    raise RuntimeError(
+        f"Received input {input_val} of name {name} that "
+        "is not part of the TensorRT region!"
+    )
 
 
 def prepend_ones(
@@ -482,10 +501,10 @@ def add_binary_elementwise_layer(
     is_rhs_trt_tensor = False
 
     if isinstance(lhs_val, TRTTensor):
-        lhs_dtype = torch_dtype_from_trt(lhs_val.dtype)
+        lhs_dtype = unified_dtype_converter(lhs_val.dtype, Frameworks.TORCH)
         is_lhs_trt_tensor = True
     if isinstance(rhs_val, TRTTensor):
-        rhs_dtype = torch_dtype_from_trt(rhs_val.dtype)
+        rhs_dtype = unified_dtype_converter(rhs_val.dtype, Frameworks.TORCH)
         is_rhs_trt_tensor = True
 
     if not is_lhs_trt_tensor and not is_rhs_trt_tensor:
@@ -510,9 +529,13 @@ def add_binary_elementwise_layer(
     # dtype but we don't have a way to detect whether it makes sense for the
     # scalar to be float or half. Hence we go with the lhs dtype.
     if is_lhs_trt_tensor and isinstance(rhs_val, (float, int)):
-        rhs_val = torch.tensor([rhs_val], dtype=lhs_dtype)
+        rhs_val = np.array(
+            [rhs_val], dtype=unified_dtype_converter(lhs_val.dtype, Frameworks.NUMPY)
+        )
     if is_rhs_trt_tensor and isinstance(lhs_val, (float, int)):
-        lhs_val = torch.tensor([lhs_val], dtype=rhs_dtype)
+        lhs_val = np.array(
+            [lhs_val], dtype=unified_dtype_converter(rhs_val.dtype, Frameworks.NUMPY)
+        )
 
     # When lhs is scalar, and rhs has shape [1,], then currently the assert
     # will fail because lhs shape has fewer dimensions than rhs shape.  This
@@ -523,9 +546,9 @@ def add_binary_elementwise_layer(
     # tensor. This is safe because broadcast will pad dimensions on the left
     # (prepend) to make lhs and rhs shape compatible.
     if network.has_implicit_batch_dimension:
-        if isinstance(lhs_val, torch.Tensor):
+        if isinstance(lhs_val, (torch.Tensor, np.ndarray)):
             lhs_val = squeeze_left(lhs_val)
-        if isinstance(rhs_val, torch.Tensor):
+        if isinstance(rhs_val, (torch.Tensor, np.ndarray)):
             rhs_val = squeeze_left(rhs_val)
 
     lhs_val = get_trt_tensor(network, lhs_val, f"{name}_lhs", lhs_dtype)
@@ -552,14 +575,19 @@ def add_binary_elementwise_layer(
     return output
 
 
-def squeeze_left(const: torch.Tensor):
+def squeeze_left(const: Union[torch.Tensor, np.ndarray]):
     """
     Squeeze the size-1 dimensions on the left side of the shape tuple.
     PyTorch's `squeeze()` doesn't support passing multiple `dim`s at once, so
     we do it iteratively.
     """
     while len(const.shape) > 0 and const.shape[0] == 1:
-        const = const.squeeze(dim=0)
+        if isinstance(const, torch.Tensor):
+            const = const.squeeze(dim=0)
+        elif isinstance(const, np.ndarray):
+            const = const.squeeze(axis=0)
+        else:
+            raise AssertionError(f"Expected torch Tensor or Numpy array, got: {const}")
     return const
 
 
@@ -786,7 +814,10 @@ def trunc_div(
         input = get_trt_tensor(network, input, f"{name}_input")
     if not isinstance(other, trt.tensorrt.ITensor):
         other = get_trt_tensor(
-            network, other, f"{name}_other", dtype=torch_dtype_from_trt(input.dtype)
+            network,
+            other,
+            f"{name}_other",
+            dtype=unified_dtype_converter(input.dtype, Frameworks.TORCH),
         )
 
     abs_input_output = add_unary_layer(
@@ -875,13 +906,3 @@ def type_cast(
     layer_i.set_output_type(0, cast_type)
     set_layer_name(layer_i, target, f"{name}_dtype_change")
     return layer_i.get_output(0)
-
-
-def trt_dtype_to_torch_dtype(trt_dtype):
-    table = {
-        trt.bool: torch.bool,
-        trt.int32: torch.int32,
-        trt.float16: torch.float16,
-        trt.float32: torch.float32,
-    }
-    return table[trt_dtype]

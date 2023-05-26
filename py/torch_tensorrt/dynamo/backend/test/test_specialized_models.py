@@ -54,6 +54,7 @@ class TestFakeTensors(TestCase):
             0,
             msg=f"MulInt TRT outputs don't match with the original model.",
         )
+        torch._dynamo.reset()
 
     def test_lowering_add_float(self):
         class AddFloat(torch.nn.Module):
@@ -105,6 +106,8 @@ class TestFakeTensors(TestCase):
             0,
             msg=f"AddFloat TRT outputs don't match with the original model.",
         )
+
+        torch._dynamo.reset()
 
 
 if __name__ == "__main__":
