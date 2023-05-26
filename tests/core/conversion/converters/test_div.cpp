@@ -18,6 +18,7 @@ TEST(Converters, ATenDivConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kInt, at::kInt);
 }
 
 TEST(Converters, ATenDivWithScalarConvertsCorrectly) {
@@ -27,6 +28,16 @@ TEST(Converters, ATenDivWithScalarConvertsCorrectly) {
         %1 : Tensor = aten::div(%0, %scalar)
         return (%1))IR";
   pointwise_test_helper(graph, true);
+}
+
+TEST(Converters, ATenDivWithScalarIntConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %scalar : int = prim::Constant[value=2]()
+        %1 : Tensor = aten::div(%0, %scalar)
+        return (%1))IR";
+  pointwise_test_helper(graph, true);
+  pointwise_test_helper(graph, true, false, {5}, {1}, false, at::kInt);
 }
 
 TEST(Converters, ATenDivRoundingFloorConvertsCorrectly) {
@@ -42,6 +53,7 @@ TEST(Converters, ATenDivRoundingFloorConvertsCorrectly) {
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3}, true);
   pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kFloat, at::kInt);
   pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kInt, at::kFloat);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kInt, at::kInt);
 }
 
 TEST(Converters, ATenDivRoundingTruncConvertsCorrectly) {
@@ -57,6 +69,7 @@ TEST(Converters, ATenDivRoundingTruncConvertsCorrectly) {
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3}, true);
   pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kFloat, at::kInt);
   pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kInt, at::kFloat);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kInt, at::kInt);
 }
 
 TEST(Converters, ATenDivRoundingNoneConvertsCorrectly) {
@@ -70,6 +83,7 @@ TEST(Converters, ATenDivRoundingNoneConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4}, true);
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3}, true);
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3}, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kInt, at::kInt);
 }
 
 TEST(Converters, ATenDivRoundingTruncWithIntsConvertsCorrectly) {
@@ -107,6 +121,7 @@ TEST(Converters, ATenFloorDivideConvertsCorrectly) {
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
   pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kFloat, at::kInt);
   pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kInt, at::kFloat);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kInt, at::kInt);
 }
 
 TEST(Converters, ATenFloorDivideWithScalarConvertsCorrectly) {
