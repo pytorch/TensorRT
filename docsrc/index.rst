@@ -70,7 +70,9 @@ Tutorials
 
    tutorials/serving_torch_tensorrt_with_triton
    tutorials/notebooks
-   tutorials/_rendered_examples/index
+   tutorials/_rendered_examples/dynamo_compile_resnet_example
+   tutorials/_rendered_examples/dynamo_compile_transformers_example
+   tutorials/_rendered_examples/dynamo_compile_advanced_usage
 
 Python API Documenation
 ------------------------
