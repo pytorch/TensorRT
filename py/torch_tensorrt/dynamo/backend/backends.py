@@ -1,6 +1,6 @@
+import logging
 from typing import Sequence
 import torch
-import traceback
 from functools import partial
 import torch._dynamo as td
 
@@ -17,6 +17,9 @@ from torch_tensorrt.dynamo.backend.conversion import convert_module
 from torch._dynamo.backends.common import fake_tensor_unsupported
 
 from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
+
+
+logger = logging.getLogger(__name__)
 
 
 @td.register_backend(name="torch_tensorrt")
@@ -52,6 +55,7 @@ def aot_torch_tensorrt_aten_backend(
     )
 
 
+@fake_tensor_unsupported
 def _pretraced_backend(
     gm: torch.fx.GraphModule,
     sample_inputs: Sequence[torch.Tensor],
@@ -74,12 +78,22 @@ def _pretraced_backend(
         )
         return trt_compiled
     except:
-        traceback.print_exc()
-        print(
+        logger.error(
             "FX2TRT conversion failed on the subgraph. See trace above. "
-            + "Returning GraphModule forward instead."
+            + "Returning GraphModule forward instead.",
+            exc_info=True,
         )
-        return gm.forward
+
+        if not settings.pass_through_build_failures:
+            return gm.forward
+        else:
+            raise AssertionError(
+                "Halting compilation on build failure since "
+                + "pass_through_build_failures was specified as True. "
+                + "To return the default Torch implementation and avoid "
+                + "halting compilation on engine build failures, "
+                + "specify pass_through_build_failures=False."
+            )
 
 
 def _compile_module(
@@ -120,9 +134,7 @@ def _compile_module(
         trt_mod = convert_module(
             submodule,
             submodule_inputs,
-            debug=settings.debug,
-            workspace_size=settings.workspace_size,
-            precision=settings.precision,
+            settings=settings,
         )
 
         # Replace FX Module with TRT Module

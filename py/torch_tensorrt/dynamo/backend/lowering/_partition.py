@@ -136,15 +136,18 @@ class TorchTensorRTOperatorSupport(OperatorSupport):
                 f"\nNumber of TensorRT-Accelerated Engines Generated: {num_trt_blocks}"
             )
 
-        logger.debug("\nSupported Nodes:")
+        # Reformat support messages for debugger to print node overview as a single string
+        supported_nodes_str = "\nSupported Nodes:\n"
         for node_name in self.supported_operators:
-            logger.debug("-", node_name)
+            supported_nodes_str += f"- {node_name}\n"
+
+        logger.debug(supported_nodes_str)
 
         if len(self.unsupported_operators) != 0:
-            logger.debug("\nUnsupported or Excluded Nodes:")
+            unsupported_nodes_str = "\nUnsupported or Excluded Nodes:\n"
             for node_name in self.unsupported_operators:
-                logger.debug("-", node_name)
-            logger.debug("\n")
+                unsupported_nodes_str += f"- {node_name}\n"
+            logger.debug(unsupported_nodes_str)
         else:
             logger.debug("\nAll Nodes Supported\n")
 

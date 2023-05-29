@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.backend._defaults import (
     DEBUG,
     MAX_WORKSPACE_SIZE,
     MIN_BLOCK_SIZE,
+    PASS_THROUGH_BUILD_FAILURES,
 )
 
 
@@ -46,11 +47,14 @@ def compile(
     torch_executed_modules=[],
     **kwargs,
 ):
+    if debug:
+        logger.setLevel(logging.DEBUG)
 
     logger.warn(
         "The Dynamo backend is an experimental feature, for which only the "
         + "following arguments are supported: "
-        + "{enabled_precisions, debug, workspace_size, min_block_size, torch_executed_ops}"
+        + "{enabled_precisions, debug, workspace_size, min_block_size, "
+        + "torch_executed_ops, pass_through_build_failures}"
     )
 
     if not isinstance(inputs, collections.abc.Sequence):
@@ -104,6 +108,7 @@ def create_backend(
     workspace_size: int = MAX_WORKSPACE_SIZE,
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Sequence[str] = set(),
+    pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES,
     **kwargs,
 ):
     """Create torch.compile backend given specified arguments
@@ -116,12 +121,16 @@ def create_backend(
     Returns:
         Backend for torch.compile
     """
+    if debug:
+        logger.setLevel(logging.DEBUG)
+
     settings = CompilationSettings(
         debug=debug,
         precision=precision,
         workspace_size=workspace_size,
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
+        pass_through_build_failures=pass_through_build_failures,
     )
 
     return partial(

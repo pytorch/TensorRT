@@ -7,7 +7,10 @@ import torchvision.models as models
 
 from transformers import BertModel
 
-from utils import COSINE_THRESHOLD, cosine_similarity
+from torch_tensorrt.dynamo.common_utils.test_utils import (
+    COSINE_THRESHOLD,
+    cosine_similarity,
+)
 
 
 @pytest.mark.unit
@@ -30,7 +33,7 @@ def test_resnet18(ir):
     cos_sim = cosine_similarity(model(input), trt_mod(input))
     assert (
         cos_sim > COSINE_THRESHOLD,
-        f"Resnet50 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        f"Resnet18 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
 
     # Clean up model env
@@ -163,7 +166,7 @@ def test_resnet18_half(ir):
     cos_sim = cosine_similarity(model(input), trt_mod(input))
     assert (
         cos_sim > COSINE_THRESHOLD,
-        f"Resnet50 Half TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        f"Resnet18 Half TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
 
     # Clean up model env
