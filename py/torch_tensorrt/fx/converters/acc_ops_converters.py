@@ -26,7 +26,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
     trt_transposed_matmul,
 )
 from torch_tensorrt.fx.tracer.acc_tracer.acc_ops import contiguous
-from torch_tensorrt.fx.converters.impl import activation
+from torch_tensorrt.fx.converters.impl import activation, shuffle, einsum
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -2103,39 +2103,15 @@ def acc_ops_squeeze(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
-
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"squeeze received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
-
     dim = cast(Optional[int], kwargs["dim"] if "dim" in kwargs else None)
-    # Squeeze with dim=None would only work in explicit batch dim mode without any dynamic
-    # dim, which is a very rare case. For now we just claim not supporting dim=None.
-    assert dim is not None, "We don't support dim=None right now for squeeze."
-
-    dim = get_positive_dim(
-        dim, len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0)
+    return shuffle.convert_squeeze(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        input_val,
+        dim,
     )
-    if network.has_implicit_batch_dimension:
-        assert dim != 0, "We don't support squeeze batch dim when it's implicit."
-        dim -= 1
-
-    assert input_val.shape[dim] != -1, "We don't support squeeze dynamic dim."
-    assert (
-        len(get_dynamic_dims(input_val.shape)) <= 1
-    ), "Currently more than one dynamic dim for input to squeeze is not supported."
-
-    output_shape = []
-    for i, s in enumerate(input_val.shape):
-        if i == dim and s == 1:
-            continue
-        output_shape.append(s)
-    layer = network.add_shuffle(input_val)
-    layer.reshape_dims = tuple(output_shape)
-    set_layer_name(layer, target, name)
-    return layer.get_output(0)
 
 
 @tensorrt_converter(acc_ops.add)
@@ -2265,36 +2241,14 @@ def acc_ops_unsqueeze(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_t = kwargs["input"]
-    input_val = get_trt_tensor(network, input_t, f"{name}_input_t")
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"unsqueeze received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
-
-    dim = cast(int, kwargs["dim"])
-    input_shape = input_val.shape
-    input_shape_size = (
-        len(input_val.shape) + 1
-        if network.has_implicit_batch_dimension
-        else len(input_val.shape)
+    return shuffle.convert_unsqueeze(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        input_t=kwargs["input"],
+        dim=kwargs["dim"],
     )
-    dim = get_positive_dim(dim, input_shape_size + 1)
-
-    if network.has_implicit_batch_dimension:
-        assert dim != 0
-        dim -= 1
-
-    assert (
-        len(get_dynamic_dims(input_val.shape)) <= 1
-    ), "Currently we don't support unsqueeze with more than one dynamic dims."
-    layer = network.add_shuffle(input_val)
-    layer.reshape_dims = (
-        tuple(input_val.shape)[:dim] + (1,) + tuple(input_val.shape)[dim:]
-    )
-    set_layer_name(layer, target, name)
-    return layer.get_output(0)
 
 
 @tensorrt_converter(acc_ops.topk)
@@ -3214,27 +3168,10 @@ def acc_ops_permute(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
-    ranks = len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0)  # type: ignore[union-attr]
-    if len(kwargs["permutation"]) == 1:
-        index = kwargs["permutation"][0]
-    else:
-        index = kwargs["permutation"]
-    permutation = [get_positive_dim(i, ranks) for i in cast(Sequence[int], index)]
-
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"permute received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
-
-    if network.has_implicit_batch_dimension:
-        assert permutation[0] == 0, "Can't permute batch dimension when it's implicit."
-        permutation = [i - 1 for i in permutation[1:]]
-
-    layer = network.add_shuffle(input_val)
-    layer.second_transpose = tuple(permutation)
-    set_layer_name(layer, target, name)
-    return layer.get_output(0)
+    index = kwargs["permutation"]
+    return shuffle.convert_permute(
+        network, target, SourceIR.ACC, name, input_val=input_val, index=index
+    )
 
 
 @tensorrt_converter(acc_ops.quantize_per_tensor)
@@ -3732,26 +3669,14 @@ def acc_ops_einsum(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = list(kwargs["operands"])
-    equation = kwargs["equation"]
-    assert type(equation) is str, "equation type is not str"
-    const_flag = False
-    for i, input_source in enumerate(input_val):
-        if type(input_source) == torch.Tensor:
-            # const change to TRTensor always output with dtype FLOAT even though stored memory is other type
-            # so we cast to float first. And we need other inputs to be the same float type
-            input_source = input_source.to(torch.float)
-            const_flag = True
-        input_val[i] = get_trt_tensor(network, input_source, name + f"_input_source{i}")
-
-    if const_flag:
-        for i, input_source in enumerate(input_val):
-            if input_source.dtype != trt.float32:
-                input_val[i] = type_cast(
-                    network, target, f"{name}_input_cast{i}", input_source, trt.float32
-                )
-    einsum_layer = network.add_einsum(inputs=input_val, equation=equation)
-    return einsum_layer.get_output(0)
+    return einsum.convert_einsum(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        input_val=list(kwargs["operands"]),
+        equation=kwargs["equation"],
+    )
 
 
 @tensorrt_converter(acc_ops.as_strided)

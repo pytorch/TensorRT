@@ -22,7 +22,7 @@ from ..utils import get_dynamic_dims, torch_dtype_from_trt, torch_dtype_to_trt
 
 from .converter_utils import *  # noqa: F403
 import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
-from torch_tensorrt.fx.converters.impl import activation
+from torch_tensorrt.fx.converters.impl import activation, shuffle, einsum
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -501,4 +501,72 @@ def aten_ops_sigmoid(
         SourceIR.ATEN,
         name,
         args[0],
+    )
+
+
+@tensorrt_converter(torch.ops.aten.einsum.default)
+def aten_ops_einsum(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    print("ATen args: ", args)
+    print("ATen kwargs: ", kwargs)
+    return einsum.convert_einsum(
+        network, target, SourceIR.ACC, name, input_val=args[1:], equation=args[0]
+    )
+
+
+@tensorrt_converter(torch.ops.aten.permute.default)
+# TODO: fix transpose
+@tensorrt_converter(torch.ops.aten.transpose.int)
+def aten_ops_permute_default(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return shuffle.convert_permute(
+        network,
+        target,
+        SourceIR.ATEN,
+        name=name,
+        input_val=args[0],
+        index=args[1:],
+    )
+
+
+@tensorrt_converter(torch.ops.aten.squeeze.dim)
+@tensorrt_converter(torch.ops.aten.squeeze.default)
+def aten_ops_squeeze(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    dim = args[1] if len(args) > 1 else None
+    return shuffle.convert_squeeze(
+        network, target, SourceIR.ACC, name, input_val=args[0], dim=dim
+    )
+
+
+@tensorrt_converter(torch.ops.aten.unsqueeze.default)
+def aten_ops_unsqueeze(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return shuffle.convert_unsqueeze(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        input_t=args[0],
+        dim=args[1],
     )
