@@ -26,6 +26,31 @@ nvinfer1::ITensor* clamp_util(
   return clamp_layer_out;
 }
 
+void cast_int_int_div_tensors(
+    ConversionCtx* ctx,
+    const torch::jit::Node* n,
+    nvinfer1::ITensor*& a,
+    nvinfer1::ITensor*& b) {
+  // Torch automatically produces a float for int/int division
+  if (a->getType() == nvinfer1::DataType::kINT32 && b->getType() == nvinfer1::DataType::kINT32) {
+    a = castITensor(ctx, a, nvinfer1::DataType::kFLOAT, util::node_info(n) + "_a_cast");
+    b = castITensor(ctx, b, nvinfer1::DataType::kFLOAT, util::node_info(n) + "_b_cast");
+  }
+}
+
+bool element_wise_divide_implementation(
+    ConversionCtx* ctx,
+    const torch::jit::Node* n,
+    nvinfer1::ITensor* a,
+    nvinfer1::ITensor* b) {
+  cast_int_int_div_tensors(ctx, n, a, b);
+  auto element_wise = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, a, b, util::node_info(n));
+  TORCHTRT_CHECK(element_wise, "Unable to create element_wise layer from node: " << *n);
+  auto out = ctx->AssociateValueAndTensor(n->outputs()[0], element_wise->getOutput(0));
+  LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+  return true;
+}
+
 auto element_wise_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern(
@@ -296,18 +321,9 @@ auto element_wise_registrations TORCHTRT_UNUSED =
         .pattern(
             {"aten::div.Tensor(Tensor self, Tensor other) -> Tensor",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               // Should implement self / other
                auto self = args[0].ITensorOrFreeze(ctx);
                auto other = args[1].ITensorOrFreeze(ctx);
-               auto div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
-
-               TORCHTRT_CHECK(div, "Unable to create div layer from node: " << *n);
-
-               div->setName(util::node_info(n).c_str());
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
-
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-               return true;
+               return element_wise_divide_implementation(ctx, n, self, other);
              }})
         .pattern(
             {"aten::div.Tensor_mode(Tensor self, Tensor other, *, str? rounding_mode) -> (Tensor)",
@@ -349,6 +365,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                  div = add_elementwise(
                      ctx, nvinfer1::ElementWiseOperation::kPROD, floor, sign->getOutput(0), util::node_info(n));
                } else {
+                 cast_int_int_div_tensors(ctx, n, self, other);
                  div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
                }
 
@@ -365,42 +382,21 @@ auto element_wise_registrations TORCHTRT_UNUSED =
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto self = args[0].ITensorOrFreeze(ctx);
                auto other = scalar_to_tensor(ctx, args[1].unwrapToScalar());
-               auto div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
-               TORCHTRT_CHECK(div, "Unable to create div layer from node: " << *n);
-
-               div->setName(util::node_info(n).c_str());
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-               return true;
+               return element_wise_divide_implementation(ctx, n, self, other);
              }})
         .pattern(
             {"aten::div_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               // TODO: Remove with functionalization
                auto self = args[0].ITensorOrFreeze(ctx);
                auto other = args[1].ITensorOrFreeze(ctx);
-               auto div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
-
-               TORCHTRT_CHECK(div, "Unable to create div layer from node: " << *n);
-
-               div->setName(util::node_info(n).c_str());
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
-
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-               return true;
+               return element_wise_divide_implementation(ctx, n, self, other);
              }})
         .pattern(
             {"aten::div_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto self = args[0].ITensorOrFreeze(ctx);
                auto other = scalar_to_tensor(ctx, args[1].unwrapToScalar());
-               auto div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
-               TORCHTRT_CHECK(div, "Unable to create div layer from node: " << *n);
-
-               div->setName(util::node_info(n).c_str());
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-               return true;
+               return element_wise_divide_implementation(ctx, n, self, other);
              }})
         .pattern(
             {"aten::square(Tensor self) -> Tensor",
