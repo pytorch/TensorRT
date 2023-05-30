@@ -215,6 +215,33 @@ def aten_ops_hardtanh(
     )
 
 
+@tensorrt_converter(torch.ops.aten.fmod.Tensor)
+def aten_ops_fmod(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "input": args[0],
+        "other": args[1],
+    }
+    return acc_ops_converters.acc_ops_fmod(network, target, None, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten.leaky_relu.default)
+def aten_ops_leaky_relu(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+
+    return activation.leaky_relu(network, target, SourceIR.ATEN, name, args[0], args[1])
+
+
 @tensorrt_converter(torch.ops.aten.linear)
 def aten_ops_linear(
     network: TRTNetwork,
