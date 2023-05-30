@@ -201,6 +201,20 @@ def aten_ops_fmod(
     return acc_ops_converters.acc_ops_fmod(network, target, None, kwargs_new, name)
 
 
+@tensorrt_converter(torch.ops.aten.hardtanh.default)
+def aten_ops_hardtanh(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+
+    return activation.hardtanh(
+        network, target, SourceIR.ATEN, name, args[0], args[1], args[2]
+    )
+
+
 @tensorrt_converter(torch.ops.aten.linear)
 def aten_ops_linear(
     network: TRTNetwork,
