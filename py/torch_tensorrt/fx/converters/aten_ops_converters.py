@@ -367,6 +367,24 @@ def aten_ops_reshape(
     return layer.get_output(0)
 
 
+@tensorrt_converter(torch.ops.aten.tanh.default)
+def aten_ops_tanh(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+
+    return activation.tanh(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
 @tensorrt_converter(torch.ops.aten.cat.default)
 def aten_ops_cat(
     network: TRTNetwork,

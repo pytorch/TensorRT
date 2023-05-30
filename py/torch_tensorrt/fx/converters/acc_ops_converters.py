@@ -1169,15 +1169,12 @@ def acc_ops_tanh(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-    operation_type = trt.ActivationType.TANH
-    return activation.convert_activation(
+    return activation.tanh(
         network,
         target,
         SourceIR.ACC,
         name,
-        operation_type,
-        input_val,
+        kwargs["input"],
     )
 
 

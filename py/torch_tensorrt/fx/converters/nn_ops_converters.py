@@ -51,3 +51,18 @@ def hardtanh(network, submod, args, kwargs, layer_name):
         name=layer_name,
         input_val=kwargs["input"],
     )
+
+
+@tensorrt_converter(torch.nn.functional.tanh)
+@tensorrt_converter(torch.nn.modules.activation.Tanh)
+def tanh(network, submod, args, kwargs, layer_name):
+    # args/kwargs should have already been normalized to kwargs
+    assert len(args) == 0
+
+    return activation.tanh(
+        network=network,
+        target="torch.nn.modules.activation.Tanh",
+        source_ir=SourceIR.NN,
+        name=layer_name,
+        input_val=kwargs["input"],
+    )
