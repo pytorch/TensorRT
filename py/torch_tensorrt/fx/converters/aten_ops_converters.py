@@ -22,7 +22,10 @@ from ..utils import get_dynamic_dims, torch_dtype_from_trt, torch_dtype_to_trt
 
 from .converter_utils import *  # noqa: F403
 import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
-from torch_tensorrt.fx.converters.impl import activation, shuffle, einsum
+from torch_tensorrt.fx.converters.impl import activation, elementwise, einsum, scatter, shuffle
+
+def or_none(args, i):
+    return args[i] if len(args) > i else None
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -59,6 +62,17 @@ def aten_ops_adaptive_avg_poolnd(
         network, target, None, kwargs_new, name
     )
 
+@tensorrt_converter(torch.ops.aten.clamp.default)
+def aten_ops_clamp(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return elementwise.convert_clamp(
+        network, target, SourceIR.ACC, name, input_val=args[0], min_val=or_none(args,1), max_val=or_none(args,2)
+)
 
 @tensorrt_converter(torch.ops.aten.mean.default)
 @tensorrt_converter(torch.ops.aten.mean.dim)
@@ -367,6 +381,25 @@ def aten_ops_cat(
     }
     return acc_ops_converters.acc_ops_cat(network, target, None, kwargs_new, name)
 
+@tensorrt_converter(torch.ops.aten._to_copy.default)
+def aten_ops_to_copy(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = args[0]
+    input_dtype = or_none(args,1)
+    input_layout = or_none(args,2)
+    input_device = or_none(args,3)
+    # TODO: bool? pin_memory=None, bool non_blocking=False, MemoryFormat? memory_format=None
+    input_t = get_trt_tensor(network, input_val, f"{name}_input_t")
+    if input_dtype:
+        if isinstance(input_dtype, torch.dtype):
+            input_dtype = torch_dtype_to_trt(input_dtype)
+        input_t = type_cast(network, target, f"{name}_input", input_t, input_dtype)
+    return input_t
 
 @tensorrt_converter(torch.ops.aten.expand.default)
 def aten_ops_expand(
@@ -504,7 +537,7 @@ def aten_ops_sigmoid(
     )
 
 
-@tensorrt_converter(torch.ops.aten.einsum.default)
+# @tensorrt_converter(torch.ops.aten.einsum.default)
 def aten_ops_einsum(
     network: TRTNetwork,
     target: Target,
@@ -515,13 +548,11 @@ def aten_ops_einsum(
     print("ATen args: ", args)
     print("ATen kwargs: ", kwargs)
     return einsum.convert_einsum(
-        network, target, SourceIR.ACC, name, input_val=args[1:], equation=args[0]
+        network, target, SourceIR.ATEN, name, input_val=args[1:], equation=args[0]
     )
 
 
 @tensorrt_converter(torch.ops.aten.permute.default)
-# TODO: fix transpose
-@tensorrt_converter(torch.ops.aten.transpose.int)
 def aten_ops_permute_default(
     network: TRTNetwork,
     target: Target,
@@ -538,6 +569,49 @@ def aten_ops_permute_default(
         index=args[1:],
     )
 
+@tensorrt_converter(torch.ops.aten.transpose.int)
+def aten_ops_transpose_int(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val=args[0]
+    ndim = len(input_val.shape)
+    if len(args)==1:
+        # default is to reverse dimensions
+        new_order = torch.arange(0, start=ndim-1, step=-1)
+    else:
+        assert len==3, f"Wrong number of arguments to transpose(): {len(args)-1}"
+        new_order = torch.arange(ndim)
+        dim0 = args[1] + ndim if args[1] < 0 else args[1]
+        dim1 = args[2] + ndim if args[2] < 0 else args[2]
+        tmp = new_order[dim0]
+        new_order[dim0] = new_order[dim1]
+        new_order[dim1] = tmp
+    return shuffle.convert_permute(
+        network,
+        target,
+        SourceIR.ATEN,
+        name=name,
+        input_val=input_val,
+        index=new_order
+    )
+
+# TODO: this may not work for reduce=add
+@tensorrt_converter(torch.ops.aten.scatter_add.default)
+def aten_ops_scatter(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return scatter.convert_scatter(
+        network, target, SourceIR.ATEN, name,
+        args[0], args[1], args[2], args[3] 
+    )
 
 @tensorrt_converter(torch.ops.aten.squeeze.dim)
 @tensorrt_converter(torch.ops.aten.squeeze.default)
@@ -548,11 +622,21 @@ def aten_ops_squeeze(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    dim = args[1] if len(args) > 1 else None
     return shuffle.convert_squeeze(
-        network, target, SourceIR.ACC, name, input_val=args[0], dim=dim
+        network, target, SourceIR.ATEN, name, input_val=args[0], dim=or_none(args,1)
     )
 
+@tensorrt_converter(torch.ops.aten.sum.default)
+def aten_ops_sum(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> TRTTensor:
+    return add_reduce_layer(
+        network, target, args[0], or_none(args,1), bool(or_none(args,2)), trt.ReduceOperation.SUM, name
+    )
 
 @tensorrt_converter(torch.ops.aten.unsqueeze.default)
 def aten_ops_unsqueeze(
