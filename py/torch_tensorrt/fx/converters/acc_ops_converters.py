@@ -34,6 +34,7 @@ from torch_tensorrt.fx.converters.impl.elementwise.base import (
 )
 from torch_tensorrt.fx.converters.impl.unary.base import convert_unary
 from torch_tensorrt.fx.converters.impl.shape import get_shape_with_dynamic_shape
+from torch_tensorrt.fx.converters.impl.unary import sqrt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -1359,13 +1360,11 @@ def acc_ops_sqrt(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
-    operation_type = trt.UnaryOperation.SQRT
-    return convert_unary(
+    return sqrt(
         network,
         target,
         SourceIR.ACC,
         name,
-        operation_type,
         input_val,
     )
 

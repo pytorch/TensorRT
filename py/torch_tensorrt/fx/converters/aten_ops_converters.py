@@ -25,6 +25,7 @@ import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch_tensorrt.fx.converters.impl import activation
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
 from torch_tensorrt.fx.converters.impl.elementwise import rsqrt
+from torch_tensorrt.fx.converters.impl.unary import sqrt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -351,6 +352,24 @@ def aten_ops_sub(
     }
     return acc_ops_converters.acc_ops_sub(network, target, None, kwargs_new, name)
 
+
+@tensorrt_converter(torch.ops.aten.sqrt.default)
+def aten_ops_sqrt(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = args[0]
+    return sqrt(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        input_val,
+    )
+    
 
 @tensorrt_converter(torch.ops.aten.view.default)
 def aten_ops_reshape(
