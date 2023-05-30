@@ -70,5 +70,12 @@ def addmm_replacement(
     )
 
 
+@register_decomposition(torch.ops.aten.reciprocal.default, registry=DECOMPOSITIONS)
+def reciprocal_replacement(
+    input_: torch.Tensor,
+) -> torch.Tensor:
+    return torch.div(1, input_)
+
+
 def get_decompositions():
     return DECOMPOSITIONS

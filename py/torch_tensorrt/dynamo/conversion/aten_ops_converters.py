@@ -8,6 +8,8 @@ from torch.fx.node import Argument, Target, Node
 
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 from torch_tensorrt.dynamo.conversion import SourceIR, impl
+from torch_tensorrt.dynamo.conversion.converter_utils import cast_trt_tensor
+from torch_tensorrt.dynamo.conversion.converter_utils import cast_int_int_div_trt_tensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -54,6 +56,20 @@ def aten_ops_div(
         "input": args[0],
         "other": args[1],
     }
+    # If both are TRTTensor, both are cast to float32
+    if isinstance(args[0], TRTTensor) and isinstance(args[1], TRTTensor):
+        kwargs_new["input"], kwargs_new["other"] = cast_int_int_div_trt_tensor(
+            network, kwargs_new["input"], kwargs_new["other"]
+        )
+    # If one is TRTTensor, it is cast to float32
+    elif isinstance(args[0], TRTTensor) and (
+        kwargs_new["input"].dtype == trt.int8 or kwargs_new["input"].dtype == trt.int32
+    ):
+        kwargs_new["input"] = cast_trt_tensor(network, kwargs_new["input"], trt.float32)
+    elif isinstance(args[1], TRTTensor) and (
+        kwargs_new["other"].dtype == trt.int8 or kwargs_new["other"].dtype == trt.int32
+    ):
+        kwargs_new["other"] = cast_trt_tensor(network, kwargs_new["other"], trt.float32)
     rounding_mode = kwargs.get("rounding_mode")
     if rounding_mode is None:
         return acc_ops_converters.acc_ops_div(network, target, None, kwargs_new, name)
