@@ -69,6 +69,37 @@ def convert_activation(
     return layer.get_output(0)
 
 
+def hardtanh(
+    network: TRTNetwork,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+    alpha: Optional[Any] = None,
+    beta: Optional[Any] = None,
+):
+    operation_type = trt.ActivationType.CLIP
+
+    def hardtanh_dyn_range_fn(dyn_range):
+        def hardtanh_fn(x):
+            # TODO: Called torch.nn.functional.hardtanh
+            return torch.nn.functional.hardtanh(x)
+
+        return hardtanh_dyn_range_fn(dyn_range[0]), hardtanh_dyn_range_fn(dyn_range[1])
+
+    return convert_activation(
+        network,
+        target,
+        source_ir,
+        name,
+        operation_type,
+        input_val,
+        alpha,
+        beta,
+        dyn_range_fn=hardtanh_dyn_range_fn,
+    )
+
+
 def relu(
     network: TRTNetwork,
     target: Target,
