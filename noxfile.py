@@ -5,7 +5,7 @@ import sys
 
 # Use system installed Python packages
 PYT_PATH = (
-    "/usr/local/lib/python3.8/dist-packages"
+    "/usr/local/lib/python3.10/dist-packages"
     if not "PYT_PATH" in os.environ
     else os.environ["PYT_PATH"]
 )
