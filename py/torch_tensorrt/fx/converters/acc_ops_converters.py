@@ -1026,17 +1026,9 @@ def acc_ops_leaky_relu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-    negative_slope = kwargs["negative_slope"]
-    operation_type = trt.ActivationType.LEAKY_RELU
-    return activation.convert_activation(
-        network,
-        target,
-        SourceIR.ACC,
-        name,
-        operation_type,
-        input_val,
-        alpha=negative_slope,
+
+    return activation.leaky_relu(
+        network, target, SourceIR.ACC, name, kwargs["input"], kwargs["negative_slope"]
     )
 
 
