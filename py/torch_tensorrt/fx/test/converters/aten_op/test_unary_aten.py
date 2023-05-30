@@ -9,6 +9,8 @@ from torch_tensorrt.fx.tools.common_fx2trt import DispatchTestCase, InputTensorS
 unary_ops = [
     (torch.sqrt, torch.ops.aten.sqrt.default, False),
 ]
+
+
 class TestRSqrtConverter(DispatchTestCase):
     @parameterized.expand([(op[1].__name__, op[0], op[1], op[2]) for op in unary_ops])
     def test_unary_ops(
@@ -20,17 +22,17 @@ class TestRSqrtConverter(DispatchTestCase):
                 self.orig_op = orig_op
 
             def forward(self, x):
-                return self.orig_op(x)  
-        
+                return self.orig_op(x)
+
         m = TestModule(orig_op)
-        if(orig_op.__name__ == "sqrt"):
+        if orig_op.__name__ == "sqrt":
             inputs = [torch.randn((2, 1)) + 1]
         else:
             inputs = (
                 [torch.distributions.uniform.Uniform(-1, 1).sample([2, 2, 3])]
                 if range_req
                 else [torch.randn(2, 2, 3)]
-            ) 
+            )
         self.run_test(m, inputs, expected_ops={expected_op})
 
 

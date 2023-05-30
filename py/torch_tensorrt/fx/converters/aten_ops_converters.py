@@ -369,7 +369,7 @@ def aten_ops_sqrt(
         name,
         input_val,
     )
-    
+
 
 @tensorrt_converter(torch.ops.aten.view.default)
 def aten_ops_reshape(
