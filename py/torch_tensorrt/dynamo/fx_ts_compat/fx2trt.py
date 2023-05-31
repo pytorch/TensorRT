@@ -163,6 +163,9 @@ class TRTInterpreter(torch.fx.Interpreter):
         timing_cache=None,
         profiling_verbosity=None,
         tactic_sources=None,
+        max_aux_streams=None,
+        version_compatible=False,
+        optimization_level=None,
     ) -> TRTInterpreterResult:
         """
         Build TensorRT engine with some configs.
@@ -227,6 +230,18 @@ class TRTInterpreter(torch.fx.Interpreter):
                 if profiling_verbosity
                 else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
             )
+
+        if trt.__version__ >= "8.6":
+            if max_aux_streams is not None:
+                _LOGGER.info(f"Setting max aux streams to {max_aux_streams}")
+                builder_config.max_aux_streams = max_aux_streams
+            if version_compatible:
+                _LOGGER.info(f"Using version compatible")
+                builder_config.set_flag(trt.BuilderFlag.VERSION_COMPATIBLE)
+            if optimization_level is not None:
+                _LOGGER.info(f"Using optimization level {optimization_level}")
+                builder_config.builder_optimization_level = optimization_level
+
         if lower_precision == LowerPrecision.FP16:
             builder_config.set_flag(trt.BuilderFlag.FP16)
 
@@ -264,6 +279,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
+        _LOGGER.info(f"TRT Engine uses: {engine.device_memory_size} bytes of Memory")
 
         return TRTInterpreterResult(
             engine, self._input_names, self._output_names, serialized_cache
