@@ -400,8 +400,9 @@ def squeeze_left(const: torch.Tensor):
 def add_reduce_layer(
     network: TRTNetwork,
     target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
+    input_val,
+    dim: Optional[int],
+    keepdim: bool,
     operation_type: trt.ActivationType,
     name: str,
 ) -> TRTTensor:
@@ -411,8 +412,9 @@ def add_reduce_layer(
     Args:
         network (TRTNetwork): TensorRT network object.
         target (Target): Target of fx node.
-        args (Tuple[Argument, ...]): Args of the fx node.
-        kwargs (Dict[str, Argument]): Kwargs of the fx node.
+        input_val : input
+        dim : dim
+        keepdim: kepdim
         operation_type (trt.ElementWiseOperation): Type of the TensorRT activation
             operation.
         name (str): The name we want to assign to the created TensorRT layer.
@@ -420,7 +422,7 @@ def add_reduce_layer(
     Returns:
         The output of TensorRT Reduce layer.
     """
-    input_val = kwargs["input"]
+
     if not isinstance(input_val, TRTTensor):
         raise RuntimeError(
             f"{name} received input {input_val} that is not part "
@@ -430,13 +432,11 @@ def add_reduce_layer(
     # If dim is specified, then the op is reducing over certain dimensions.
     # Otherwise, it's reducing over all elements, which is only supported in
     # explicit batch dimension.
-    if "dim" not in kwargs:
+    if dim is None:
         assert (
             not network.has_implicit_batch_dimension
         ), f"We don't support reduce({name}) over all the elements if batch dim is implicit."
         dim = range(0, len(input_val.shape))
-    else:
-        dim = kwargs["dim"]  # type: ignore[assignment]
 
     if not isinstance(dim, Sequence):
         dim = (dim,)
@@ -446,7 +446,6 @@ def add_reduce_layer(
     else:
         dim = tuple(len(input_val.shape) + i + 1 if i < 0 else i for i in dim)
 
-    keepdim = False if "keepdim" not in kwargs else kwargs["keepdim"]
     layer = network.add_reduce(
         input_val,
         operation_type,
