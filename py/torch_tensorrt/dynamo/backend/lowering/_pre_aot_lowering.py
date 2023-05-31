@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Type
 import torch
 import logging
 
@@ -23,11 +23,11 @@ class ModuleReplacement:
 
 
 # Dictionary mapping module to ModuleReplacement instance
-MODULE_SUBSTITUTION_REGISTRY: Dict[torch.nn.Module, ModuleReplacement] = dict()
+MODULE_SUBSTITUTION_REGISTRY: Dict[Type[torch.nn.Module], ModuleReplacement] = dict()
 
 
 def module_substitution(
-    module_to_replace: torch.nn.Module,
+    module_to_replace: Type[torch.nn.Module],
     new_operator: torch._ops.OpOverload,
     enabled: bool = True,
 ) -> Callable[[Any], Any]:
@@ -102,6 +102,7 @@ def pre_aot_module_replacement(gm: torch.fx.GraphModule):
                     # Replace all original node uses and clean up graph
                     n.replace_all_uses_with(new_node)
                     gm.graph.eliminate_dead_code()
+                    gm.graph.lint()
                     gm.recompile()
 
                 # A module replacement can fail in the event that the specific instance of the submodule cannot
@@ -115,5 +116,6 @@ def pre_aot_module_replacement(gm: torch.fx.GraphModule):
 
     # Perform cleanup and recompilation before returning module
     gm.graph.eliminate_dead_code()
+    gm.graph.lint()
     gm.recompile()
     return gm
