@@ -34,7 +34,7 @@ from torch_tensorrt.fx.converters.impl.elementwise.base import (
 )
 from torch_tensorrt.fx.converters.impl.unary.base import convert_unary
 from torch_tensorrt.fx.converters.impl.shape import get_shape_with_dynamic_shape
-from torch_tensorrt.fx.converters.impl import einsum, scatter, shuffle
+from torch_tensorrt.fx.converters.impl import shuffle
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

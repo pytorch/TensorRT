@@ -22,7 +22,7 @@ from ..utils import get_dynamic_dims, torch_dtype_from_trt, torch_dtype_to_trt
 
 from .converter_utils import *  # noqa: F403
 import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
-from torch_tensorrt.fx.converters.impl import activation, einsum, scatter, shuffle
+from torch_tensorrt.fx.converters.impl import activation, shuffle
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div, rsqrt, clamp
 
 
@@ -579,22 +579,6 @@ def aten_ops_sigmoid(
         args[0],
     )
 
-
-# @tensorrt_converter(torch.ops.aten.einsum.default)
-def aten_ops_einsum(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    print("ATen args: ", args)
-    print("ATen kwargs: ", kwargs)
-    return einsum.convert_einsum(
-        network, target, SourceIR.ATEN, name, input_val=args[1:], equation=args[0]
-    )
-
-
 @tensorrt_converter(torch.ops.aten.permute.default)
 def aten_ops_permute_default(
     network: TRTNetwork,
@@ -641,21 +625,6 @@ def aten_ops_transpose_int(
     return shuffle.convert_permute(
         network, target, SourceIR.ATEN, name=name, input_val=input_val, index=new_order
     )
-
-
-# TODO: this may not work for reduce=add
-@tensorrt_converter(torch.ops.aten.scatter_add.default)
-def aten_ops_scatter(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return scatter.convert_scatter(
-        network, target, SourceIR.ATEN, name, args[0], args[1], args[2], args[3]
-    )
-
 
 @tensorrt_converter(torch.ops.aten.squeeze.dim)
 @tensorrt_converter(torch.ops.aten.squeeze.default)
