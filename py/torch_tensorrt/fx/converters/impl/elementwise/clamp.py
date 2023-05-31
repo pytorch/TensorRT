@@ -8,8 +8,8 @@ import tensorrt as trt
 import torch
 from torch.fx.node import Argument, Target
 
-from ..converter_utils import *  # noqa: F403
-from ...utils import get_dynamic_dims, torch_dtype_from_trt, torch_dtype_to_trt
+from ...converter_utils import *  # noqa: F403
+from ....utils import get_dynamic_dims, torch_dtype_from_trt, torch_dtype_to_trt
 
 from torch_tensorrt.fx.types import (
     TRTNetwork,
