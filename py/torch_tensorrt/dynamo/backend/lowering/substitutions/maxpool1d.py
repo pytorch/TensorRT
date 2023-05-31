@@ -7,7 +7,7 @@ from torch_tensorrt.fx.converter_registry import tensorrt_converter
 from torch_tensorrt.fx.converters import acc_ops_converters
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 
-from torch_tensorrt.dynamo.backend.lowering import module_substitution
+from torch_tensorrt.dynamo.backend.lowering import register_substitution
 
 
 # This file serves as an example and a tutorial for excluding custom modules from
@@ -71,9 +71,11 @@ def maxpool1d_generic(
 #               "bias": bias,
 #               ...
 #
-@module_substitution(torch.nn.MaxPool1d, torch.ops.tensorrt.maxpool1d)
+@register_substitution(torch.nn.MaxPool1d, torch.ops.tensorrt.maxpool1d)
 def maxpool1d_insertion_fn(
-    gm: torch.fx.GraphModule, submodule: torch.nn.Module, node: torch.fx.Node
+    gm: torch.fx.GraphModule,
+    node: torch.fx.Node,
+    submodule: torch.nn.Module,
 ) -> torch.fx.Node:
     # Defines insertion function for new node
     new_node = gm.graph.call_function(

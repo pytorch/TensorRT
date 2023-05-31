@@ -9,7 +9,7 @@ from torch_tensorrt.dynamo.backend.lowering._decompositions import (
     get_decompositions,
 )
 from torch_tensorrt.dynamo.backend.lowering._pre_aot_lowering import (
-    pre_aot_module_replacement,
+    pre_aot_substitutions,
 )
 from torch_tensorrt.dynamo.backend.lowering._partition import (
     partition,
@@ -49,7 +49,7 @@ def aot_torch_tensorrt_aten_backend(
     )
 
     # Perform Pre-AOT Lowering for Module-Level Replacement
-    gm = pre_aot_module_replacement(gm)
+    gm = pre_aot_substitutions(gm)
 
     # Invoke AOTAutograd to translate operators to aten
     return aot_module_simplified(
