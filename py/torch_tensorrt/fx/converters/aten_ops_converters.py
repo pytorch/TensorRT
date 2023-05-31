@@ -98,13 +98,9 @@ def aten_ops_mean(
     # averages over all elements (all dimensions)
     # aten.mean.dim invocation allows specification of dimensions to average
     # over, as well at the option to keep the dimension or not
-    kwargs_new = {
-        "input": args[0],
-        "dim": args[1] if len(args) >= 2 else list(range(len(args[0].shape))),
-        "keepdim": args[2] if len(args) >= 3 else False,
-    }
+    dims=args[1] if len(args) >= 2 else list(range(len(args[0].shape)))
     return add_reduce_layer(
-        network, target, args, kwargs_new, trt.ReduceOperation.AVG, name
+        network, target, args[0], dims, bool(or_none(args,2)), trt.ReduceOperation.AVG, name
     )
 
 
@@ -631,13 +627,17 @@ def aten_ops_transpose_int(
         # default is to reverse dimensions
         new_order = torch.arange(0, start=ndim - 1, step=-1)
     else:
-        assert len == 3, f"Wrong number of arguments to transpose(): {len(args)-1}"
+        assert len(args)==3, f"Wrong number of arguments to transpose(): {len(args)-1}"
         new_order = torch.arange(ndim)
-        dim0 = args[1] + ndim if args[1] < 0 else args[1]
-        dim1 = args[2] + ndim if args[2] < 0 else args[2]
-        tmp = new_order[dim0]
-        new_order[dim0] = new_order[dim1]
-        new_order[dim1] = tmp
+        dim0 = args[1]
+        if args[1] < 0:
+            dim0 = dim0+ ndim
+        dim1 = args[2]
+        if args[2] < 0:
+            dim1 = dim1 + ndim 
+        new_order[dim0] = dim1
+        new_order[dim1] = dim0
+        print("New order: ", new_order)
     return shuffle.convert_permute(
         network, target, SourceIR.ATEN, name=name, input_val=input_val, index=new_order
     )
@@ -688,7 +688,6 @@ def aten_ops_sum(
         trt.ReduceOperation.SUM,
         name,
     )
-
 
 @tensorrt_converter(torch.ops.aten.unsqueeze.default)
 def aten_ops_unsqueeze(
