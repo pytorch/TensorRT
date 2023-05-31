@@ -28,6 +28,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
 from torch_tensorrt.fx.tracer.acc_tracer.acc_ops import contiguous
 from torch_tensorrt.fx.converters.impl import activation
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
+from torch_tensorrt.fx.converters.impl.elementwise import clamp
 from torch_tensorrt.fx.converters.impl.unary import sign
 from torch_tensorrt.fx.converters.impl.elementwise.base import (
     convert_binary_elementwise,
@@ -38,6 +39,8 @@ from torch_tensorrt.fx.converters.impl import shuffle
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
+def val_dim(args, kwargs):
+    return kwargs["input"], kwargs.get("dim"), bool(kwargs.get("keepdim"))
 
 @tensorrt_converter(trt_transposed_matmul)
 def trt_transposed_matmul_converter(network, target, args, kwargs, name):
@@ -1470,7 +1473,6 @@ def acc_ops_ceil(
         input_val,
     )
 
-
 @tensorrt_converter(acc_ops.sum)
 def acc_ops_sum(
     network: TRTNetwork,
@@ -1479,18 +1481,9 @@ def acc_ops_sum(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> TRTTensor:
-    input_val = kwargs["input"]
-    keepdim = False if "keepdim" not in kwargs else kwargs["keepdim"]
     return add_reduce_layer(
-        network,
-        target,
-        input_val,
-        kwargs.get("dim"),
-        keepdim,
-        trt.ReduceOperation.SUM,
-        name,
+        network, target, *val_dim(args,kwargs), trt.ReduceOperation.SUM, name
     )
-
 
 @tensorrt_converter(acc_ops.prod)
 def acc_ops_prod(
@@ -1501,7 +1494,7 @@ def acc_ops_prod(
     name: str,
 ) -> TRTTensor:
     return add_reduce_layer(
-        network, target, args, kwargs, trt.ReduceOperation.PROD, name
+        network, target, *val_dim(args,kwargs), trt.ReduceOperation.PROD, name
     )
 
 
@@ -1514,7 +1507,7 @@ def acc_ops_mean(
     name: str,
 ) -> TRTTensor:
     return add_reduce_layer(
-        network, target, args, kwargs, trt.ReduceOperation.AVG, name
+        network, target, *val_dim(args,kwargs), trt.ReduceOperation.AVG, name
     )
 
 
@@ -3084,7 +3077,7 @@ def acc_ops_clamp(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return elementwise.convert_clamp(
+    return clamp.convert_clamp(
         network,
         target,
         SourceIR.ACC,
