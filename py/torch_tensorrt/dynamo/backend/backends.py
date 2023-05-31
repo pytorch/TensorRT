@@ -12,6 +12,8 @@ from torch_tensorrt.dynamo.backend.lowering._partition import (
     partition,
     get_submod_inputs,
 )
+
+from torch_tensorrt.dynamo.backend.utils import repair_long_or_double_input
 from torch_tensorrt.dynamo.backend.conversion import convert_module
 
 from torch._dynamo.backends.common import fake_tensor_unsupported
@@ -129,6 +131,40 @@ def _compile_module(
         submodule_inputs = get_submod_inputs(
             partitioned_module, submodule, sample_inputs
         )
+
+        # Ensure all submodule inputs do not require a gradient
+        for param in submodule_inputs:
+            param.requires_grad = False
+
+        # Handle long/double inputs if requested by the user
+        if settings.truncate_long_and_double:
+            num_submodule_inputs = len(submodule_inputs)
+
+            # For each input to the TRT subgraph, check if its type is long/double
+            for position in range(num_submodule_inputs):
+                param = submodule_inputs[position]
+
+                # If the data type of the input is long/double, insert necessary
+                # casts to replace the operation
+                if param.dtype in (torch.int64, torch.float64):
+                    submodule_outputs = submodule(*submodule_inputs)
+                    repair_long_or_double_input(
+                        partitioned_module,
+                        position,
+                        name,
+                        submodule_outputs,
+                        param.dtype,
+                    )
+
+                    # Repair submodule inputs in accordance with inserted casts
+                    dtype_32bit = (
+                        torch.int32 if (param.dtype == torch.int64) else torch.float32
+                    )
+                    submodule_inputs = (
+                        submodule_inputs[:position]
+                        + (param.to(dtype_32bit),)
+                        + submodule_inputs[position + 1 :]
+                    )
 
         # Create TRT Module from submodule
         trt_mod = convert_module(
