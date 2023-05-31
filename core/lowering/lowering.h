@@ -16,6 +16,10 @@ struct LowerInfo {
   // Since these QDQ nodes will be identical as they share same input, one of them is eliminated due to CSE lowering
   // pass. Disable this in order to not disturb TensorRT's QAT optimizations.
   bool disable_cse = false;
+
+  // Whether the originating caller is `convert_method_to_trt_engine` (true) or `compile` (false)
+  bool converting_to_trt_engine = false;
+
   ir::Device target_device;
   std::vector<std::string> forced_fallback_modules;
   friend std::ostream& operator<<(std::ostream& os, const LowerInfo& l);

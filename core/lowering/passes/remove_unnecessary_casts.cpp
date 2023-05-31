@@ -356,6 +356,45 @@ void ReplaceAtenInt(std::shared_ptr<torch::jit::Graph>& g) {
   LOG_GRAPH("Post removing aten.Int.Tensor operations: " << *g);
 }
 
+void RemoveCollectionCast(std::shared_ptr<torch::jit::Graph>& g) {
+  // Removes unnecessary collection-casting of graph outputs
+  // Only to be used if the overall output is intended to be a TRT Engine
+  // Will cause errors if used directly as a TorchScript graph
+
+  // Validate the output is a single value with type Tuple or List
+  if (!(g->outputs().size() == 1 &&
+        (g->outputs()[0]->node()->kind() == torch::jit::prim::TupleConstruct ||
+         g->outputs()[0]->node()->kind() == torch::jit::prim::ListConstruct))) {
+    return;
+  }
+
+  // Ensure all inputs to the Tuple/List Construct operator are regular Tensors
+  // (nested structures cannot be preserved in TensorRT)
+  auto all_tensors = true;
+  auto collection_inputs = g->outputs()[0]->node()->inputs();
+
+  for (size_t i = 0; i < collection_inputs.size(); ++i) {
+    all_tensors &= collection_inputs[i]->type()->isSubtypeOf(c10::TensorType::get());
+  }
+
+  if (!all_tensors) {
+    return;
+  }
+
+  // For each input to the collection packing operator, add its value directly
+  // as an output of the graph
+  for (size_t i = 0; i < collection_inputs.size(); ++i) {
+    g->registerOutput(collection_inputs[i]);
+  }
+
+  // Remove the original output value of the graph (the collection object)
+  g->eraseOutput(0);
+
+  // Clean up remnant collection node in graph
+  torch::jit::EliminateDeadCode(g);
+  LOG_GRAPH("Post removing collection casting operations: " << *g);
+}
+
 } // namespace passes
 } // namespace lowering
 } // namespace core
