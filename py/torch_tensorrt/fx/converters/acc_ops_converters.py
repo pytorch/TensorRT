@@ -33,14 +33,17 @@ from torch_tensorrt.fx.converters.impl.unary import sign
 from torch_tensorrt.fx.converters.impl.elementwise.base import (
     convert_binary_elementwise,
 )
+from torch_tensorrt.fx.converters.impl import einsum
 from torch_tensorrt.fx.converters.impl.unary.base import convert_unary
 from torch_tensorrt.fx.converters.impl.shape import get_shape_with_dynamic_shape
 from torch_tensorrt.fx.converters.impl import shuffle
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
+
 def val_dim(args, kwargs):
     return kwargs["input"], kwargs.get("dim"), bool(kwargs.get("keepdim"))
+
 
 @tensorrt_converter(trt_transposed_matmul)
 def trt_transposed_matmul_converter(network, target, args, kwargs, name):
@@ -1473,6 +1476,7 @@ def acc_ops_ceil(
         input_val,
     )
 
+
 @tensorrt_converter(acc_ops.sum)
 def acc_ops_sum(
     network: TRTNetwork,
@@ -1482,8 +1486,9 @@ def acc_ops_sum(
     name: str,
 ) -> TRTTensor:
     return add_reduce_layer(
-        network, target, *val_dim(args,kwargs), trt.ReduceOperation.SUM, name
+        network, target, *val_dim(args, kwargs), trt.ReduceOperation.SUM, name
     )
+
 
 @tensorrt_converter(acc_ops.prod)
 def acc_ops_prod(
@@ -1494,7 +1499,7 @@ def acc_ops_prod(
     name: str,
 ) -> TRTTensor:
     return add_reduce_layer(
-        network, target, *val_dim(args,kwargs), trt.ReduceOperation.PROD, name
+        network, target, *val_dim(args, kwargs), trt.ReduceOperation.PROD, name
     )
 
 
@@ -1507,7 +1512,7 @@ def acc_ops_mean(
     name: str,
 ) -> TRTTensor:
     return add_reduce_layer(
-        network, target, *val_dim(args,kwargs), trt.ReduceOperation.AVG, name
+        network, target, *val_dim(args, kwargs), trt.ReduceOperation.AVG, name
     )
 
 
