@@ -627,11 +627,7 @@ def aten_ops_transpose_int(
         # default is to reverse dimensions
         new_order = torch.arange(0, start=ndim - 1, step=-1)
     else:
-<<<<<<< HEAD
-        assert len == 3, f"Wrong number of arguments to transpose(): {len(args)-1}"
-=======
         assert len(args)==3, f"Wrong number of arguments to transpose(): {len(args)-1}"
->>>>>>> 139f80375... After-merge fixes
         new_order = torch.arange(ndim)
         dim0 = args[1]
         if args[1] < 0:
@@ -692,7 +688,6 @@ def aten_ops_sum(
         trt.ReduceOperation.SUM,
         name,
     )
-
 
 @tensorrt_converter(torch.ops.aten.unsqueeze.default)
 def aten_ops_unsqueeze(
