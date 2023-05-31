@@ -1,12 +1,11 @@
 .. _dynamo_compile:
 
-Dynamo Compile Examples
-================
+Dynamo / ``torch.compile``
+----------------------------
 
-This document contains examples of usage of the `torch_tensorrt.dynamo.compile` API which integrates with `torch.compile` functionality
+Torch-TensorRT provides a backend for the new ``torch.compile`` API released in PyTorch 2.0. In the following examples we describe
+a number of ways you can leverage this backend to accelerate inference.
 
-Overview of Available Scripts
------------------------------------------------
-- `dynamo_compile_resnet_example.py <./dynamo_compile_resnet_example.html>`_: Example showcasing compilation of ResNet model
-- `dynamo_compile_transformers_example.py <./dynamo_compile_transformers_example.html>`_: Example showcasing compilation of transformer-based model
-- `dynamo_compile_advanced_usage.py <./dynamo_compile_advanced_usage.html>`_: Advanced usage including making a custom backend to use directly with the `torch.compile` API
+* :ref:`dynamo_compile_resnet`: Compiling a ResNet model using the Dyanmo Compile Frontend for ``torch_tensorrt.compile``
+* :ref:`torch_compile_transformer`: Compiling a Transformer model using ``torch.compile``
+* :ref:`dynamo_compile_advanced_usage`: Advanced usage including making a custom backend to use directly with the ``torch.compile`` API

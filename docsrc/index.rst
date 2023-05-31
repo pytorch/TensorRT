@@ -59,9 +59,9 @@ User Guide
 
 Tutorials
 ------------
+* :ref:`torch_tensorrt_tutorials`
 * :ref:`serving_torch_tensorrt_with_triton`
 * :ref:`notebooks`
-* :ref:`dynamo_compile`
 
 .. toctree::
    :caption: Tutorials
@@ -70,9 +70,9 @@ Tutorials
 
    tutorials/serving_torch_tensorrt_with_triton
    tutorials/notebooks
-   tutorials/_rendered_examples/dynamo_compile_resnet_example
-   tutorials/_rendered_examples/dynamo_compile_transformers_example
-   tutorials/_rendered_examples/dynamo_compile_advanced_usage
+   tutorials/_rendered_examples/dynamo/dynamo_compile_resnet_example
+   tutorials/_rendered_examples/dynamo/dynamo_compile_transformers_example
+   tutorials/_rendered_examples/dynamo/dynamo_compile_advanced_usage
 
 Python API Documenation
 ------------------------

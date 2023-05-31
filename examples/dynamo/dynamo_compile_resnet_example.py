@@ -1,6 +1,8 @@
 """
-Dynamo Compile ResNet Example
-=========================
+.. _dynamo_compile_resnet:
+
+Compiling ResNet using the Torch-TensorRT Dyanmo Frontend
+==========================================================
 
 This interactive script is intended as a sample of the `torch_tensorrt.compile` workflow with `torch.compile` on a ResNet model."""
 

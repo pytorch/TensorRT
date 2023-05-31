@@ -35,6 +35,7 @@ endif
 	rm -rf $(SOURCEDIR)/_py_api
 	rm -rf $(SOURCEDIR)/_build
 	rm -rf $(SOURCEDIR)/_tmp
+	rm -rf $(SOURCEDIR)/tutorials/_rendered_examples
 
 html:
 #	mkdir -p $(SOURCEDIR)/_notebooks
