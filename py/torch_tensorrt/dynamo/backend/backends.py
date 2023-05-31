@@ -139,6 +139,7 @@ def _compile_module(
         # Handle long/double inputs if requested by the user
         if settings.truncate_long_and_double:
             num_submodule_inputs = len(submodule_inputs)
+            repaired_outputs_once = False
 
             # For each input to the TRT subgraph, check if its type is long/double
             for position in range(num_submodule_inputs):
@@ -147,14 +148,20 @@ def _compile_module(
                 # If the data type of the input is long/double, insert necessary
                 # casts to replace the operation
                 if param.dtype in (torch.int64, torch.float64):
-                    submodule_outputs = submodule(*submodule_inputs)
+                    # Ensure outputs are only repaired once per submodule to avoid
+                    # unnecessary ops showing up in the graph
+                    if not repaired_outputs_once:
+                        submodule_outputs = submodule(*submodule_inputs)
+
                     repair_long_or_double_input(
                         partitioned_module,
                         position,
                         name,
-                        submodule_outputs,
+                        None if repaired_outputs_once else submodule_outputs,
                         param.dtype,
                     )
+
+                    repaired_outputs_once = True
 
                     # Repair submodule inputs in accordance with inserted casts
                     dtype_32bit = (

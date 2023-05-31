@@ -1,6 +1,6 @@
 import torch
 from torch.fx.node import _get_qualified_name
-from typing import Any, Union, Sequence, Dict
+from typing import Any, Optional, Union, Sequence, Dict
 from torch_tensorrt import _Input, Device
 
 
@@ -100,7 +100,7 @@ def repair_long_or_double_input(
     gm: torch.fx.GraphModule,
     position: int,
     submodule_name: str,
-    submodule_outputs: Union[torch.Tensor, Sequence[torch.Tensor]],
+    submodule_outputs: Optional[Union[torch.Tensor, Sequence[torch.Tensor]]],
     dtype: torch.dtype,
 ):
     """Fixes Long/Double type inputs to TRT-accelerated subgraphs
@@ -162,19 +162,20 @@ def repair_long_or_double_input(
     )
 
     # Determine if any outputs of the model are 64-bit type and store their indices
-    for output_position, output in enumerate(outputs_list):
-        if output.dtype == dtype_64bit:
-            output_positions_64bit.add(output_position)
+    if submodule_outputs is not None:
+        for output_position, output in enumerate(outputs_list):
+            if output.dtype == dtype_64bit:
+                output_positions_64bit.add(output_position)
 
     # Only enter this code block if there exists a 64-bit output
     # This implies a cast is needed, since TRT cannot output 64-bit tensors
     if output_positions_64bit:
         # Determine whther the outputs of the module are tuple-type or not
-        is_tuple_output = False
+        is_collection_output = False
         if isinstance(submodule_outputs, tuple):
-            is_tuple_output = True
+            is_collection_output = True
 
-        if not is_tuple_output:
+        if not is_collection_output:
             # If the output is a single tensor, insert a cast back to int64
             with gm.graph.inserting_after(module_node):
                 cast_node_64bit = gm.graph.call_function(
