@@ -16,7 +16,7 @@ from torch_tensorrt.fx.converter_registry import CONVERTERS
 logger = logging.getLogger(__name__)
 
 DEFAULT_SINGLE_NODE_PARTITIONS: Set[str] = set(
-    "torch.ops." + str(module.new_operator)
+    _get_qualified_name(module.new_operator)
     for module in MODULE_SUBSTITUTION_REGISTRY.values()
 )
 
