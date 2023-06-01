@@ -64,7 +64,7 @@ jobs:
           apt-get install -y libnvinfer8 libnvinfer-plugin8 libnvinfer-dev libnvinfer-plugin-dev
       - name: Install Torch
         run: |
-          python3 -m pip install -r py/requirements.txt
+          python3 -m pip install -r py/requirements.txt --user
       - name: Build Python Package
         run: |
           cp toolchains/ci_workspaces/WORKSPACE.x86_64 WORKSPACE
