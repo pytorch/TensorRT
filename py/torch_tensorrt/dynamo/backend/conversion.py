@@ -42,6 +42,9 @@ def convert_module(
             if settings.debug
             else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
         ),
+        max_aux_streams=settings.max_aux_streams,
+        version_compatible=settings.version_compatible,
+        optimization_level=settings.optimization_level,
     )
 
     if settings.use_experimental_rt:
