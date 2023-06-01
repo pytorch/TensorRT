@@ -4,7 +4,7 @@ import collections.abc
 import torch_tensorrt
 from functools import partial
 
-from typing import Any, Sequence
+from typing import Any, Optional, Sequence
 from torch_tensorrt import EngineCapability, Device
 from torch_tensorrt.fx.utils import LowerPrecision
 
@@ -14,9 +14,13 @@ from torch_tensorrt.dynamo.backend.backends import torch_tensorrt_backend
 from torch_tensorrt.dynamo.backend._defaults import (
     PRECISION,
     DEBUG,
-    MAX_WORKSPACE_SIZE,
+    WORKSPACE_SIZE,
     MIN_BLOCK_SIZE,
     PASS_THROUGH_BUILD_FAILURES,
+    MAX_AUX_STREAMS,
+    VERSION_COMPATIBLE,
+    OPTIMIZATION_LEVEL,
+    USE_EXPERIMENTAL_RT,
 )
 
 
@@ -35,7 +39,7 @@ def compile(
     debug=DEBUG,
     capability=EngineCapability.default,
     num_avg_timing_iters=1,
-    workspace_size=MAX_WORKSPACE_SIZE,
+    workspace_size=WORKSPACE_SIZE,
     dla_sram_size=1048576,
     dla_local_dram_size=1073741824,
     dla_global_dram_size=536870912,
@@ -45,6 +49,10 @@ def compile(
     min_block_size=MIN_BLOCK_SIZE,
     torch_executed_ops=[],
     torch_executed_modules=[],
+    max_aux_streams=MAX_AUX_STREAMS,
+    version_compatible=VERSION_COMPATIBLE,
+    optimization_level=OPTIMIZATION_LEVEL,
+    use_experimental_rt=USE_EXPERIMENTAL_RT,
     **kwargs,
 ):
     if debug:
@@ -86,6 +94,10 @@ def compile(
         workspace_size=workspace_size,
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
+        max_aux_streams=max_aux_streams,
+        version_compatible=version_compatible,
+        optimization_level=optimization_level,
+        use_experimental_rt=use_experimental_rt,
         **kwargs,
     )
 
@@ -105,10 +117,14 @@ logger = logging.getLogger(__name__)
 def create_backend(
     precision: LowerPrecision = PRECISION,
     debug: bool = DEBUG,
-    workspace_size: int = MAX_WORKSPACE_SIZE,
+    workspace_size: int = WORKSPACE_SIZE,
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Sequence[str] = set(),
     pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES,
+    max_aux_streams: Optional[int] = MAX_AUX_STREAMS,
+    version_compatible: bool = VERSION_COMPATIBLE,
+    optimization_level: Optional[int] = OPTIMIZATION_LEVEL,
+    use_experimental_rt: bool = USE_EXPERIMENTAL_RT,
     **kwargs,
 ):
     """Create torch.compile backend given specified arguments
@@ -116,8 +132,15 @@ def create_backend(
     Args:
         precision:
         debug: Whether to print out verbose debugging information
-        workspace_size: Maximum workspace TRT is allowed to use for the module
-        precision: Model Layer precision
+        workspace_size: Workspace TRT is allowed to use for the module (0 is default)
+        min_block_size: Minimum number of operators per TRT-Engine Block
+        torch_executed_ops: Sequence of operations to run in Torch, regardless of converter coverage
+        pass_through_build_failures: Whether to fail on TRT engine build errors (True) or not (False)
+        max_aux_streams: Maximum number of allowed auxiliary TRT streams for each engine
+        version_compatible: Provide version forward-compatibility for engine plan files
+        optimization_level: Builder optimization 0-5, higher levels imply longer build time,
+            searching for more optimization options. TRT defaults to 3
+        use_experimental_rt: Whether to use the new experimental TRTModuleNext for TRT engines
     Returns:
         Backend for torch.compile
     """
@@ -131,6 +154,10 @@ def create_backend(
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
         pass_through_build_failures=pass_through_build_failures,
+        max_aux_streams=max_aux_streams,
+        version_compatible=version_compatible,
+        optimization_level=optimization_level,
+        use_experimental_rt=use_experimental_rt,
     )
 
     return partial(

@@ -1,9 +1,10 @@
 from typing import Sequence, Union
 import torch
+import io
 from torch_tensorrt.fx.trt_module import TRTModule
 from torch_tensorrt import TRTModuleNext
 from torch_tensorrt.dynamo.backend._settings import CompilationSettings
-from torch_tensorrt.fx.fx2trt import (
+from torch_tensorrt.dynamo.fx_ts_compat.fx2trt import (
     InputTensorSpec,
     TRTInterpreter,
 )
@@ -15,30 +16,50 @@ def convert_module(
     module: torch.fx.GraphModule,
     inputs: Sequence[torch.Tensor],
     settings: CompilationSettings = CompilationSettings(),
+    name: str = "",
 ) -> Union[TRTModuleNext, TRTModule]:
     """Convert an FX module to a TRT module
     Args:
         module: FX GraphModule to convert
         inputs: Sequence of Tensors representing inputs to the module
         settings: Compilation settings
+        name: TRT engine name
     Returns:
         TRTModule or TRTModuleNext
     """
-    interp = TRTInterpreter(
+    interpreter = TRTInterpreter(
         module,
         InputTensorSpec.from_tensors(inputs),
         explicit_batch_dimension=True,
         logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
     )
 
-    r = interp.run(
-        max_workspace_size=settings.workspace_size,
+    interpreter_result = interpreter.run(
+        workspace_size=settings.workspace_size,
         lower_precision=settings.precision,
         profiling_verbosity=(
             trt.ProfilingVerbosity.VERBOSE
             if settings.debug
             else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
         ),
+        max_aux_streams=settings.max_aux_streams,
+        version_compatible=settings.version_compatible,
+        optimization_level=settings.optimization_level,
     )
 
-    return TRTModule(*r)
+    if settings.use_experimental_rt:
+        with io.BytesIO() as engine_bytes:
+            engine_bytes.write(interpreter_result.engine.serialize())
+            engine_str = engine_bytes.getvalue()
+        return TRTModuleNext(
+            serialized_engine=engine_str,
+            name=name,
+            input_binding_names=interpreter_result.input_names,
+            output_binding_names=interpreter_result.output_names,
+        )
+    else:
+        return TRTModule(
+            engine=interpreter_result.engine,
+            input_names=interpreter_result.input_names,
+            output_names=interpreter_result.output_names,
+        )
