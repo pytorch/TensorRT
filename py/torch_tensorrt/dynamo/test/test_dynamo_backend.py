@@ -30,6 +30,7 @@ def test_resnet18(ir):
         "device": torchtrt.Device("cuda:0"),
         "enabled_precisions": {torch.float},
         "ir": ir,
+        "pass_through_build_failures": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -60,6 +61,7 @@ def test_mobilenet_v2(ir):
         "device": torchtrt.Device("cuda:0"),
         "enabled_precisions": {torch.float},
         "ir": ir,
+        "pass_through_build_failures": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -90,6 +92,7 @@ def test_efficientnet_b0(ir):
         "device": torchtrt.Device("cuda:0"),
         "enabled_precisions": {torch.float},
         "ir": ir,
+        "pass_through_build_failures": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -129,6 +132,7 @@ def test_bert_base_uncased(ir):
         "enabled_precisions": {torch.float},
         "truncate_long_and_double": True,
         "ir": ir,
+        "pass_through_build_failures": True,
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
 
@@ -163,6 +167,7 @@ def test_resnet18_half(ir):
         "device": torchtrt.Device("cuda:0"),
         "enabled_precisions": {torch.half},
         "ir": ir,
+        "pass_through_build_failures": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)

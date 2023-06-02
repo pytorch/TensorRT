@@ -1,12 +1,13 @@
-import numpy as np
-
-# @manual=//deeplearning/trt/python:py_tensorrt
-import tensorrt as trt
 import torch
 
+# @manual=//deeplearning/trt/python:py_tensorrt
+import logging
+
 from torch_tensorrt.fx.converter_registry import tensorrt_converter
-from torch_tensorrt.fx.converters.impl import activation
+from torch_tensorrt.fx.converters.impl import activation, convolution
 from torch_tensorrt.fx.converters.converter_utils import SourceIR
+
+logger = logging.getLogger(__name__)
 
 
 @tensorrt_converter(torch.nn.functional.relu)
@@ -112,4 +113,113 @@ def selu(network, submod, args, kwargs, layer_name):
         name=layer_name,
         input_val=kwargs["input"],
         alpha=kwargs["alpha"],
+    )
+
+
+@tensorrt_converter(torch.nn.modules.conv.Conv1d)
+def conv1d(network, submod, args, kwargs, layer_name):
+    # args/kwargs should have already been normalized to kwargs
+    assert len(args) == 0
+
+    if layer_name is None:
+        raise RuntimeError("layer name is none")
+    return convolution.convNd(
+        network,
+        submod._get_name(),
+        source_ir=SourceIR.NN,
+        name=layer_name,
+        is_conv1d=True,
+        input_val=kwargs["input"],
+        weight=submod.weight,
+        bias=submod.bias,
+        stride=getattr(submod, "stride"),
+        padding=getattr(submod, "padding"),
+        dilation=getattr(submod, "dilation"),
+        groups=submod.groups,
+    )
+
+
+@tensorrt_converter(torch.nn.modules.conv.Conv2d)
+def conv2d(network, submod, args, kwargs, layer_name):
+    # args/kwargs should have already been normalized to kwargs
+    assert len(args) == 0
+    return convolution.convNd(
+        network,
+        submod._get_name(),
+        source_ir=SourceIR.NN,
+        name=layer_name,
+        is_conv1d=False,
+        input_val=kwargs["input"],
+        weight=submod.weight,
+        bias=submod.bias,
+        stride=getattr(submod, "stride"),
+        padding=getattr(submod, "padding"),
+        dilation=getattr(submod, "dilation"),
+        groups=submod.groups,
+    )
+
+
+@tensorrt_converter(torch.nn.modules.conv.Conv3d)
+def conv3d(network, submod, args, kwargs, layer_name):
+    # args/kwargs should have already been normalized to kwargs
+    assert len(args) == 0
+    return convolution.convNd(
+        network,
+        submod._get_name(),
+        source_ir=SourceIR.NN,
+        name=layer_name,
+        is_conv1d=False,
+        input_val=kwargs["input"],
+        weight=submod.weight,
+        bias=submod.bias,
+        stride=getattr(submod, "stride"),
+        padding=getattr(submod, "padding"),
+        dilation=getattr(submod, "dilation"),
+        groups=submod.groups,
+    )
+
+
+@tensorrt_converter(torch.nn.quantized.modules.conv.Conv2d)
+def quantized_conv2d(network, submod, args, kwargs, layer_name):
+    input_val = args[0]
+    return convolution.convNd(
+        network,
+        submod._get_name(),
+        source_ir=SourceIR.NN,
+        name=layer_name,
+        is_conv1d=False,
+        input_val=input_val,
+        weight=submod.weight(),
+        bias=submod.bias(),
+        stride=getattr(submod, "stride"),
+        padding=getattr(submod, "padding"),
+        dilation=getattr(submod, "dilation"),
+        groups=submod.groups,
+        scale=submod.scale,
+        zero_point=submod.zero_point,
+    )
+
+
+@tensorrt_converter(torch.nn.intrinsic.quantized.modules.ConvReLU2d)
+def quantized_conv_relu2d(network, submod, args, kwargs, layer_name):
+    input_val = args[0]
+    conv_out = convolution.convNd(
+        network,
+        submod._get_name(),
+        source_ir=SourceIR.NN,
+        name=layer_name,
+        is_conv1d=False,
+        input_val=input_val,
+        weight=submod.weight(),
+        bias=submod.bias(),
+        stride=getattr(submod, "stride"),
+        padding=getattr(submod, "padding"),
+        dilation=getattr(submod, "dilation"),
+        groups=submod.groups,
+        scale=submod.scale,
+        zero_point=submod.zero_point,
+    )
+
+    return activation.relu(
+        network, submod._get_name(), SourceIR.NN, layer_name + "_relu", conv_out
     )

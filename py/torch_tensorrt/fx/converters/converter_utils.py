@@ -99,14 +99,17 @@ def get_positive_dim(dim: int, dim_size: int) -> int:
 
 
 def set_layer_name(
-    layer: TRTLayer, target: Target, name: str, source_ir: Optional[SourceIR] = None
+    layer: TRTLayer,
+    target: Union[Target, torch.nn.Module, str],
+    name: str,
+    source_ir: Optional[SourceIR] = None,
 ) -> None:
     """
     Set the TensorRT layer name to "[TensorRT Layer Type]_[Original Op Name]_[FX Node Name with Suffix]"
 
     Args:
         layer (TRTLayer): A TensorRT layer of which we want to set the name.
-        target (Target): A fx node.target. For call_function node, it's the function that
+        target (Target): A fx node.target or submodule. For call_function node, it's the function that
             the node represents.
         name (str): Consists of fx node.name with optional suffix.
         source_ir: (Optional[SourceIR]): The IR producing the op.
