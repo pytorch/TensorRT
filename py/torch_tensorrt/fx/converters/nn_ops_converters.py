@@ -29,7 +29,7 @@ def sigmoid(network, submod, args, kwargs, layer_name):
     # args/kwargs should have already been normalized to kwargs
     assert len(args) == 0
 
-    activation.sigmoid(
+    return activation.sigmoid(
         network=network,
         target="torch.nn.modules.activation.Sigmoid",
         source_ir=SourceIR.NN,
