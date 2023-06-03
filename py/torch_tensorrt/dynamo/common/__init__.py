@@ -1,6 +1,10 @@
 import logging
 from typing import Optional
 
+from ._settings import CompilationSettings
+from .input_tensor_spec import InputTensorSpec
+from .fx2trt import TRTInterpreter, TRTInterpreterResult
+
 
 logger = logging.getLogger(__name__)
 

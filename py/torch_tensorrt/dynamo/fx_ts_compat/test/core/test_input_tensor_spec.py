@@ -5,7 +5,7 @@ from typing import List, Optional
 import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import run_tests, TestCase
-from torch_tensorrt.dynamo.fx_ts_compat import InputTensorSpec, LowerSetting
+from torch_tensorrt.dynamo.common import InputTensorSpec
 
 
 class TestTRTModule(TestCase):
