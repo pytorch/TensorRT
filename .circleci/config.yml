@@ -1140,6 +1140,11 @@ jobs:
           condition: << parameters.enabled >>
           steps:
             - checkout
+            - run:
+                name: Change Python Version
+                command: |
+                  pyenv install 3.10.4
+                  pyenv global 3.10.4
             - create-env:
                 os: "ubuntu2004"
                 platform: "x86_64"
