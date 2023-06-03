@@ -4,7 +4,7 @@ import torch
 from functools import partial
 import torch._dynamo as td
 
-from torch_tensorrt.dynamo.backend._settings import CompilationSettings
+from torch_tensorrt.dynamo.common import CompilationSettings
 from torch_tensorrt.dynamo.backend.lowering._decompositions import (
     get_decompositions,
 )

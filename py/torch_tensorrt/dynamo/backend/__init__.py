@@ -10,7 +10,7 @@ from torch_tensorrt.fx.utils import LowerPrecision
 
 from torch_tensorrt.dynamo.backend.utils import prepare_inputs, prepare_device
 from torch_tensorrt.dynamo.backend.backends import torch_tensorrt_backend
-from torch_tensorrt.dynamo.backend._defaults import (
+from torch_tensorrt.dynamo._defaults import (
     PRECISION,
     DEBUG,
     WORKSPACE_SIZE,

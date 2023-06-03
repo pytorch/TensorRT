@@ -10,7 +10,7 @@ from torch.fx.passes.shape_prop import ShapeProp
 from torch.fx.passes.splitter_base import generate_inputs_for_submodules, SplitResult
 from torch_tensorrt.fx.utils import LowerPrecision
 from torch_tensorrt import _Input
-from ..input_tensor_spec import InputTensorSpec
+from torch_tensorrt.dynamo.common import InputTensorSpec
 
 from ..lower_setting import LowerSetting
 from torch_tensorrt.fx.observer import Observer

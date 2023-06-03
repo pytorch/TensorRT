@@ -2,7 +2,7 @@ import torch
 import logging
 from dataclasses import replace, fields
 
-from torch_tensorrt.dynamo.backend._settings import CompilationSettings
+from torch_tensorrt.dynamo.common import CompilationSettings
 from typing import Any, Union, Sequence, Dict
 from torch_tensorrt import _Input, Device
 

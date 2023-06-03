@@ -13,7 +13,7 @@ from torch.fx.experimental.normalize import NormalizeArgs
 from torch.fx.passes import shape_prop
 from torch.fx.passes.infra.pass_base import PassResult
 from torch.testing._internal.common_utils import TestCase
-from torch_tensorrt.dynamo.fx_ts_compat import InputTensorSpec, TRTInterpreter
+from torch_tensorrt.dynamo.common import InputTensorSpec, TRTInterpreter
 from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
     compose_bmm,
     compose_chunk,
