@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer as aten_tracer
 from torch.fx.passes.splitter_base import SplitResult
 
-from .fx2trt import TRTInterpreter, TRTInterpreterResult
+from torch_tensorrt.dynamo.common import TRTInterpreter, TRTInterpreterResult
 from .lower_setting import LowerSetting
 from .passes.lower_pass_manager_builder import LowerPassManagerBuilder
 from .passes.pass_utils import PassFunc, validate_inference
@@ -21,6 +21,17 @@ from torch_tensorrt.fx.tracer.acc_tracer import acc_tracer
 from torch_tensorrt.fx.trt_module import TRTModule
 from torch_tensorrt.fx.utils import LowerPrecision
 from torch_tensorrt._Device import Device
+from torch_tensorrt.dynamo._defaults import (
+    PRECISION,
+    DEBUG,
+    WORKSPACE_SIZE,
+    MIN_BLOCK_SIZE,
+    PASS_THROUGH_BUILD_FAILURES,
+    MAX_AUX_STREAMS,
+    VERSION_COMPATIBLE,
+    OPTIMIZATION_LEVEL,
+    USE_EXPERIMENTAL_RT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,21 +45,25 @@ def compile(
     disable_tf32=False,
     sparse_weights=False,
     enabled_precisions=set(),
-    min_block_size: int = 3,
-    workspace_size=0,
+    min_block_size: int = MIN_BLOCK_SIZE,
+    workspace_size=WORKSPACE_SIZE,
     dla_sram_size=1048576,
     dla_local_dram_size=1073741824,
     dla_global_dram_size=536870912,
     calibrator=None,
     truncate_long_and_double=False,
     require_full_compilation=False,
-    debug=False,
+    explicit_batch_dimension=False,
+    debug=DEBUG,
     refit=False,
     timing_cache_prefix="",
     save_timing_cache=False,
     cuda_graph_batch_size=-1,
     is_aten=False,
-    use_experimental_fx_rt=False,
+    use_experimental_rt=USE_EXPERIMENTAL_RT,
+    max_aux_streams=MAX_AUX_STREAMS,
+    version_compatible=VERSION_COMPATIBLE,
+    optimization_level=OPTIMIZATION_LEVEL,
     num_avg_timing_iters=1,
     torch_executed_ops=[],
     torch_executed_modules=[],
@@ -67,11 +82,14 @@ def compile(
         timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.
         save_timing_cache: Update timing cache with current timing cache data if set to True.
         cuda_graph_batch_size: Cuda graph batch size, default to be -1.
-        use_experimental_fx_rt: Uses the next generation TRTModule which supports both Python and TorchScript based execution (including in C++).
+        use_experimental_rt: Uses the next generation TRTModule which supports both Python and TorchScript based execution (including in C++).
+        max_aux_streams: max number of aux stream to use
+        version_compatible: enable version compatible feature
+        optimization_level: builder optimization level
     Returns:
         A torch.nn.Module lowered by TensorRT.
     """
-    if use_experimental_fx_rt and not explicit_batch_dimension:
+    if use_experimental_rt and not explicit_batch_dimension:
         raise ValueError(
             "The experimental unifed runtime only supports explicit batch. Please make sure to set explicit_batch_dimension=True when use_experimental_fx_rt=True"
         )
@@ -122,7 +140,10 @@ def compile(
         save_timing_cache=save_timing_cache,
         cuda_graph_batch_size=cuda_graph_batch_size,
         is_aten=is_aten,
-        use_experimental_rt=use_experimental_fx_rt,
+        use_experimental_rt=use_experimental_rt,
+        max_aux_streams=max_aux_streams,
+        version_compatible=version_compatible,
+        optimization_level=optimization_level,
     )
     lowerer = Lowerer.create(lower_setting=lower_setting)
     return lowerer(module, inputs)

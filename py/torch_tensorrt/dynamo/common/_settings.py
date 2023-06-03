@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Sequence
 
 from torch_tensorrt.fx.utils import LowerPrecision
-from torch_tensorrt.dynamo.backend._defaults import (
+from torch_tensorrt.dynamo._defaults import (
     PRECISION,
     DEBUG,
     WORKSPACE_SIZE,

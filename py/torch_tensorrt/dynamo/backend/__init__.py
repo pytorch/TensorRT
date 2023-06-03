@@ -8,10 +8,10 @@ from typing import Any, Optional, Sequence
 from torch_tensorrt import EngineCapability, Device
 from torch_tensorrt.fx.utils import LowerPrecision
 
-from torch_tensorrt.dynamo.backend._settings import CompilationSettings
+from torch_tensorrt.dynamo.common import CompilationSettings
 from torch_tensorrt.dynamo.backend.utils import prepare_inputs, prepare_device
 from torch_tensorrt.dynamo.backend.backends import torch_tensorrt_backend
-from torch_tensorrt.dynamo.backend._defaults import (
+from torch_tensorrt.dynamo._defaults import (
     PRECISION,
     DEBUG,
     WORKSPACE_SIZE,

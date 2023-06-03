@@ -4,7 +4,7 @@ import torch
 from copy import deepcopy
 from torch_tensorrt.dynamo import compile
 from utils import lower_graph_testing
-from torch_tensorrt.dynamo.common_utils.test_utils import DECIMALS_OF_AGREEMENT
+from torch_tensorrt.dynamo.common.test_utils import DECIMALS_OF_AGREEMENT
 
 
 class TestTRTModuleNextCompilation(TestCase):

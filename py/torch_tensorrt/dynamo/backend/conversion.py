@@ -3,8 +3,8 @@ import torch
 import io
 from torch_tensorrt.fx.trt_module import TRTModule
 from torch_tensorrt.dynamo import TorchTensorRTModule
-from torch_tensorrt.dynamo.backend._settings import CompilationSettings
-from torch_tensorrt.dynamo.fx_ts_compat.fx2trt import (
+from torch_tensorrt.dynamo.common import (
+    CompilationSettings,
     InputTensorSpec,
     TRTInterpreter,
 )

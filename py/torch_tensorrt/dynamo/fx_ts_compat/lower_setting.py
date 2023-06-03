@@ -4,7 +4,7 @@ import torch
 from torch import nn
 from torch.fx.passes.pass_manager import PassManager
 
-from .input_tensor_spec import InputTensorSpec
+from torch_tensorrt.dynamo.common import InputTensorSpec
 from torch_tensorrt.fx.passes.lower_basic_pass import (
     fuse_permute_linear,
     fuse_permute_matmul,
