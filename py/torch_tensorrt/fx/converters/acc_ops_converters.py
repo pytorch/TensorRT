@@ -35,6 +35,7 @@ from torch_tensorrt.fx.converters.impl.elementwise.base import (
 from torch_tensorrt.fx.converters.impl.unary.base import convert_unary
 from torch_tensorrt.fx.converters.impl.shape import get_shape_with_dynamic_shape
 from torch_tensorrt.fx.converters.impl.squeeze import squeeze
+from torch_tensorrt.fx.converters.impl.unsqueeze import unsqueeze
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -2464,36 +2465,14 @@ def acc_ops_unsqueeze(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_t = kwargs["input"]
-    input_val = get_trt_tensor(network, input_t, f"{name}_input_t")
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"unsqueeze received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
-
-    dim = cast(int, kwargs["dim"])
-    input_shape = input_val.shape
-    input_shape_size = (
-        len(input_val.shape) + 1
-        if network.has_implicit_batch_dimension
-        else len(input_val.shape)
+    return unsqueeze(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        input_t=kwargs["input"],
+        dim=kwargs["dim"],
     )
-    dim = get_positive_dim(dim, input_shape_size + 1)
-
-    if network.has_implicit_batch_dimension:
-        assert dim != 0
-        dim -= 1
-
-    assert (
-        len(get_dynamic_dims(input_val.shape)) <= 1
-    ), "Currently we don't support unsqueeze with more than one dynamic dims."
-    layer = network.add_shuffle(input_val)
-    layer.reshape_dims = (
-        tuple(input_val.shape)[:dim] + (1,) + tuple(input_val.shape)[dim:]
-    )
-    set_layer_name(layer, target, name)
-    return layer.get_output(0)
 
 
 @tensorrt_converter(acc_ops.topk)

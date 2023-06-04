@@ -26,6 +26,7 @@ from torch_tensorrt.fx.converters.impl import activation
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
 from torch_tensorrt.fx.converters.impl.elementwise import rsqrt
 from torch_tensorrt.fx.converters.impl.squeeze import squeeze
+from torch_tensorrt.fx.converters.impl.unsqueeze import unsqueeze
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -363,6 +364,17 @@ def aten_ops_squeeze(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return squeeze(network, target, SourceIR.ATEN, name, args[0], args[1])
+
+
+@tensorrt_converter(torch.ops.aten.unsqueeze.default)
+def aten_ops_unsqueeze(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return unsqueeze(network, target, SourceIR.ATEN, name, input_t=args[0], dim=args[1])
 
 
 @tensorrt_converter(torch.ops.aten.view.default)
