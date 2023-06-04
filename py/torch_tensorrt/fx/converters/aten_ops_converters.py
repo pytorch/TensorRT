@@ -25,8 +25,14 @@ import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch_tensorrt.fx.converters.impl import activation
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
 from torch_tensorrt.fx.converters.impl.elementwise import rsqrt
+from torch_tensorrt.fx.converters.impl.elementwise import clamp
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+def or_none(args, i):
+    return args[i] if len(args) > i else None
+
 
 ## converter list in alphabetic order
 @tensorrt_converter(torch.ops.aten.add.Tensor)
@@ -402,6 +408,25 @@ def aten_ops_cat(
         "dim": args[1] if len(args) >= 2 else 0,
     }
     return acc_ops_converters.acc_ops_cat(network, target, None, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten.clamp.default)
+def aten_ops_clamp(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return clamp.clamp(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        input_val=args[0],
+        min_val=or_none(args, 1),
+        max_val=or_none(args, 2),
+    )
 
 
 @tensorrt_converter(torch.ops.aten.expand.default)
