@@ -788,7 +788,7 @@ commands:
             cd py/torch_tensorrt/dynamo/
             pushd test/
             pip3 install timm
-            pip3 install transformers
+            pip3 install git+https://github.com/huggingface/transformers.git@80ca92470938bbcc348e2d9cf4734c7c25cb1c43
             pytest --junitxml=/tmp/artifacts/test_results/dynamo/backend/test_results.xml --ir dynamo_compile
             popd
 
