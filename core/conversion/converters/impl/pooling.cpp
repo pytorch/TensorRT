@@ -30,10 +30,11 @@ bool GlobalPoolingConverter(
       /*keepDimensions=*/true);
 
   new_layer->setName(util::node_info(n).c_str());
+  new_layer->setOutputType(0, in->getType());
 
   auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
 
-  LOG_DEBUG("GlobalPoolingConverter: Output tensor shape: " << out_tensor->getDimensions());
+  LOG_DEBUG("GlobalPoolingConverter: Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
   return true;
 }
 
@@ -103,10 +104,11 @@ bool AdaptivePoolingConverter(
   TORCHTRT_CHECK(new_layer, "Unable to create pooling (interpolation) plugin from node" << *n);
 
   new_layer->setName(util::node_info(n).c_str());
+  new_layer->setOutputType(0, in->getType());
   auto layer_output = new_layer->getOutput(0);
 
   ctx->AssociateValueAndTensor(n->outputs()[0], layer_output);
-  LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
+  LOG_DEBUG("Output tensor: " << layer_output->getDimensions() << "/" << layer_output->getType());
 
   return true;
 }
@@ -178,6 +180,7 @@ bool PoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,
       ceil_mode ? nvinfer1::PaddingMode::kEXPLICIT_ROUND_UP : nvinfer1::PaddingMode::kEXPLICIT_ROUND_DOWN;
 
   new_layer->setName(util::node_info(n).c_str());
+  new_layer->setOutputType(0, in->getType());
   new_layer->setPaddingMode(padding_mode);
   new_layer->setPaddingNd(padding);
   new_layer->setStrideNd(stride);
@@ -193,7 +196,7 @@ bool PoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,
   auto out_tensor = addUnpadding(ctx, n, new_layer->getOutput(0), orig_dims.nbDims, false, true);
   ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
 
-  LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+  LOG_DEBUG("Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
   return true;
 } // namespace
 

@@ -16,8 +16,9 @@ namespace {
     TORCHTRT_CHECK(new_layer, "Unable to create " #act " layer from node: " << *n);                                  \
                                                                                                                      \
     new_layer->setName(util::node_info(n).c_str());                                                                  \
+    new_layer->setOutputType(0, in->getType());                                                                      \
     ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));                                          \
-    LOG_DEBUG("Output tensor shape: " << new_layer->getOutput(0)->getDimensions());                                  \
+    LOG_DEBUG("Output tensor: " << new_layer->getOutput(0)->getDimensions() << "/" << in->getType());                \
                                                                                                                      \
     return true;                                                                                                     \
   }                                                                                                                  \
@@ -56,9 +57,10 @@ auto acthardtanh TORCHTRT_UNUSED =
                new_layer->setBeta(max);
 
                new_layer->setName(util::node_info(n).c_str());
+               new_layer->setOutputType(0, in->getType());
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
 
-               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               LOG_DEBUG("Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
                return true;
              }})
         .pattern({// TODO: Remove after functionalization
@@ -75,9 +77,10 @@ auto acthardtanh TORCHTRT_UNUSED =
                     new_layer->setBeta(max);
 
                     new_layer->setName(util::node_info(n).c_str());
+                    new_layer->setOutputType(0, in->getType());
                     auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
 
-                    LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+                    LOG_DEBUG("Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
                     return true;
                   }})
         .pattern(
@@ -132,6 +135,7 @@ auto acthardtanh TORCHTRT_UNUSED =
                auto slope_tensor = tensor_to_const(ctx, slopes);
                auto new_layer = ctx->net->addParametricReLU(*in, *slope_tensor);
                new_layer->setName(util::node_info(n).c_str());
+               new_layer->setOutputType(0, in->getType());
                auto out_tensor = new_layer->getOutput(0);
 
                if (to_reshape) {
@@ -144,7 +148,7 @@ auto acthardtanh TORCHTRT_UNUSED =
                }
 
                out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
-               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               LOG_DEBUG("Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
                return true;
              }})
         .pattern(
@@ -157,9 +161,10 @@ auto acthardtanh TORCHTRT_UNUSED =
                new_layer->setAlpha(negative_slopeScalar);
 
                new_layer->setName(util::node_info(n).c_str());
+               new_layer->setOutputType(0, self->getType());
                auto out_tensor = new_layer->getOutput(0);
                out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
-               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               LOG_DEBUG("Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
                return true;
              }})
         .pattern(
@@ -171,9 +176,10 @@ auto acthardtanh TORCHTRT_UNUSED =
                auto new_layer = ctx->net->addActivation(*self, nvinfer1::ActivationType::kLEAKY_RELU);
                new_layer->setAlpha(negative_slopeScalar);
                new_layer->setName(util::node_info(n).c_str());
+               new_layer->setOutputType(0, self->getType());
                auto out_tensor = new_layer->getOutput(0);
                out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
-               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               LOG_DEBUG("Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
                return true;
              }})
         .pattern(
@@ -187,9 +193,10 @@ auto acthardtanh TORCHTRT_UNUSED =
                new_layer->setAlpha(alpha);
 
                new_layer->setName(util::node_info(n).c_str());
+               new_layer->setOutputType(0, in->getType());
 
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
-               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               LOG_DEBUG("Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
                return true;
              }});
 } // namespace

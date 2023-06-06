@@ -45,9 +45,12 @@ auto cat_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
 
               auto cat_layer = ctx->net->addConcatenation(tensors.data(), tensors.size());
               cat_layer->setAxis(static_cast<int>(dim));
+              cat_layer->setOutputType(0, promo_dtype);
+
+
               auto cat_out = ctx->AssociateValueAndTensor(n->outputs()[0], cat_layer->getOutput(0));
 
-              LOG_DEBUG("Output tensor shape: " << cat_out->getDimensions());
+              LOG_DEBUG("Output tensor: " << cat_out->getDimensions() << "/" << cat_out->getType());
 
               return true;
             }});

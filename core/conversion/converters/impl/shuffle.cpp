@@ -58,10 +58,11 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                auto shuffle = ctx->net->addShuffle(*in);
                TORCHTRT_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
                shuffle->setReshapeDimensions(util::toDims(out_shape));
+               shuffle->setOutputType(0, in->getType());
                shuffle->setName(util::node_info(n).c_str());
 
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+               LOG_DEBUG("Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
                return true;
              }})
         .pattern(
@@ -94,6 +95,8 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                }
                auto shuffle = ctx->net->addShuffle(*in);
                shuffle->setName(util::node_info(n).c_str());
+               LOG_DEBUG(" setting input type: " << in->getType());
+               shuffle->setOutputType(0, in->getType());
                TORCHTRT_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
 
                if (ctx->input_is_dynamic) {
@@ -103,7 +106,7 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                }
 
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+               LOG_DEBUG("Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
 
                return true;
              }})
@@ -117,9 +120,10 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                TORCHTRT_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
                shuffle->setReshapeDimensions(util::toDims(args[1].unwrapToIntList().vec()));
                shuffle->setName(util::node_info(n).c_str());
+               shuffle->setOutputType(0, in->getType());
 
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+               LOG_DEBUG("Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
 
                return true;
              }})
@@ -138,9 +142,10 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                std::copy(new_order.begin(), new_order.end(), permute.order);
                shuffle->setSecondTranspose(permute);
                shuffle->setName(util::node_info(n).c_str());
+               shuffle->setOutputType(0, in->getType());
 
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+               LOG_DEBUG("Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
 
                return true;
              }})
@@ -172,9 +177,10 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
 
                shuffle->setSecondTranspose(permute);
                shuffle->setName(util::node_info(n).c_str());
+               shuffle->setOutputType(0, in->getType());
 
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+               LOG_DEBUG("Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
 
                return true;
              }})
@@ -200,9 +206,10 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                shuffle_layer->setFirstTranspose(firstPerm);
                shuffle_layer->setZeroIsPlaceholder(false);
                shuffle_layer->setName(util::node_info(n).c_str());
+               shuffle_layer->setOutputType(0, in->getType());
 
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle_layer->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+               LOG_DEBUG("Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
 
                return true;
              }})
@@ -275,9 +282,10 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                TORCHTRT_CHECK(last_view_layer, "Unable to create shuffle layer from node: " << *n);
                last_view_layer->setReshapeDimensions(util::toDims(final_shape));
                last_view_layer->setName(util::node_info(n).c_str());
+               last_view_layer->setOutputType(0, self->getType());
 
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], last_view_layer->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+               LOG_DEBUG("Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
 
                return true;
              }});

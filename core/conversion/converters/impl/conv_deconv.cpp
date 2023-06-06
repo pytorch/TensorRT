@@ -123,7 +123,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   }
   auto dims = in->getDimensions();
   auto orig_dims = dims;
-  LOG_DEBUG("Input dims: " << orig_dims);
+  LOG_DEBUG("Input :" << orig_dims << "/" << in->getType());
   LOG_DEBUG("Weights: " << w);
   LOG_DEBUG("stride: " << stride);
   LOG_DEBUG("padding: " << padding);
@@ -253,13 +253,14 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   }
 
   new_layer->setName(util::node_info(n).c_str());
+  new_layer->setOutputType(0, in->getType());
 
   // Un-expand spatial dims back to 1D if needed
   auto out = addUnpadding(ctx, n, new_layer->getOutput(0), orig_dims.nbDims);
 
   ctx->AssociateValueAndTensor(n->outputs()[0], out);
 
-  LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+  LOG_DEBUG("Output tensor:" << out->getDimensions() << "/" << out->getType());
 
   return true;
 }

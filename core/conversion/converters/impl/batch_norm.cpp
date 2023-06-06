@@ -45,11 +45,12 @@ void _batch_norm(
   auto bn =
       ctx->net->addScaleNd(*input, nvinfer1::ScaleMode::kCHANNEL, bias_weights.data, scale_weights.data, power.data, 1);
   bn->setName(util::node_info(n).c_str());
+  bn->setOutputType(0, input->getType());
 
   // Un-pad bn output if needed
   auto out_tensor = addUnpadding(ctx, n, bn->getOutput(0), orig_shape.nbDims);
   ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
-  LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+  LOG_DEBUG("Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
 }
 
 auto batch_norm_registrations TORCHTRT_UNUSED =
@@ -192,8 +193,10 @@ auto batch_norm_registrations TORCHTRT_UNUSED =
                   ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&input), 1, *instance_norm_plugin);
 
               new_layer->setName(util::node_info(n).c_str());
+              new_layer->setOutputType(0, input->getType());
+
               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
-              LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+              LOG_DEBUG("Output tensor: " << out_tensor->getDimensions() << "/" << out_tensor->getType());
               return true;
             }});
 } // namespace
