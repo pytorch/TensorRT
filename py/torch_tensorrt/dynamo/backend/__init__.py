@@ -45,6 +45,7 @@ def compile(
     min_block_size=MIN_BLOCK_SIZE,
     torch_executed_ops=[],
     torch_executed_modules=[],
+    pass_through_build_failures=PASS_THROUGH_BUILD_FAILURES,
     **kwargs,
 ):
     if debug:
@@ -86,6 +87,7 @@ def compile(
         workspace_size=workspace_size,
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
+        pass_through_build_failures=pass_through_build_failures,
         **kwargs,
     )
 

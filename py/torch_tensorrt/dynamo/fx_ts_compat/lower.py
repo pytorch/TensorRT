@@ -49,6 +49,9 @@ def compile(
     cuda_graph_batch_size=-1,
     is_aten=False,
     use_experimental_fx_rt=False,
+    max_aux_streams=None,
+    version_compatible=False,
+    optimization_level=None,
     num_avg_timing_iters=1,
     torch_executed_ops=[],
     torch_executed_modules=[],
@@ -68,14 +71,12 @@ def compile(
         save_timing_cache: Update timing cache with current timing cache data if set to True.
         cuda_graph_batch_size: Cuda graph batch size, default to be -1.
         use_experimental_fx_rt: Uses the next generation TRTModule which supports both Python and TorchScript based execution (including in C++).
+        max_aux_streams: max number of aux stream to use
+        version_compatible: enable version compatible feature
+        optimization_level: builder optimization level
     Returns:
         A torch.nn.Module lowered by TensorRT.
     """
-    if use_experimental_fx_rt and not explicit_batch_dimension:
-        raise ValueError(
-            "The experimental unifed runtime only supports explicit batch. Please make sure to set explicit_batch_dimension=True when use_experimental_fx_rt=True"
-        )
-
     logger.warn(
         "For ir=fx_ts_compat backend only the "
         + "following arguments are supported: "
@@ -123,6 +124,9 @@ def compile(
         cuda_graph_batch_size=cuda_graph_batch_size,
         is_aten=is_aten,
         use_experimental_rt=use_experimental_fx_rt,
+        max_aux_streams=max_aux_streams,
+        version_compatible=version_compatible,
+        optimization_level=optimization_level,
     )
     lowerer = Lowerer.create(lower_setting=lower_setting)
     return lowerer(module, inputs)
@@ -162,8 +166,6 @@ class LowerTrtInterpreter:
         interpreter = TRTInterpreter(
             mod,
             input_specs=self.lower_setting.input_specs,
-            explicit_batch_dimension=self.lower_setting.explicit_batch_dimension,
-            explicit_precision=self.lower_setting.explicit_precision,
             logger_level=trt.Logger.VERBOSE
             if self.lower_setting.debug
             else trt.Logger.WARNING,
@@ -198,7 +200,7 @@ def default_split_function(
     model: fx.GraphModule, inputs: Input, lower_setting: LowerSetting
 ) -> SplitResult:
     splitter_setting = TRTSplitterSetting()
-    splitter_setting.use_implicit_batch_dim = not lower_setting.explicit_batch_dimension
+    splitter_setting.use_implicit_batch_dim = False
     splitter_setting.min_block_size = lower_setting.min_block_size
     splitter_setting.use_experimental_rt = lower_setting.use_experimental_rt
     splitter = TRTSplitter(model, inputs, settings=splitter_setting)
