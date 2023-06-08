@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.backend._defaults import (
     WORKSPACE_SIZE,
     MIN_BLOCK_SIZE,
     PASS_THROUGH_BUILD_FAILURES,
+    USE_EXPERIMENTAL_RT,
 )
 
 
@@ -45,6 +46,7 @@ def compile(
     torch_executed_ops=[],
     torch_executed_modules=[],
     pass_through_build_failures=PASS_THROUGH_BUILD_FAILURES,
+    use_experimental_rt=USE_EXPERIMENTAL_RT,
     **kwargs,
 ):
     if debug:
@@ -56,6 +58,11 @@ def compile(
         + "{enabled_precisions, debug, workspace_size, min_block_size, "
         + "torch_executed_ops, pass_through_build_failures}"
     )
+
+    if "use_experimental_fx_rt" in kwargs:
+        use_experimental_rt = kwargs["use_experimental_fx_rt"]
+
+    logger.info(f"Using {'C++' if use_experimental_rt else 'Python'} TRT Runtime")
 
     if not isinstance(inputs, collections.abc.Sequence):
         inputs = [inputs]
@@ -91,6 +98,7 @@ def compile(
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
         pass_through_build_failures=pass_through_build_failures,
+        use_experimental_rt=use_experimental_rt,
         **kwargs,
     )
 
@@ -114,6 +122,7 @@ def create_backend(
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Sequence[str] = set(),
     pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES,
+    use_experimental_rt: bool = USE_EXPERIMENTAL_RT,
     **kwargs,
 ):
     """Create torch.compile backend given specified arguments
@@ -125,6 +134,7 @@ def create_backend(
         min_block_size: Minimum number of operators per TRT-Engine Block
         torch_executed_ops: Sequence of operations to run in Torch, regardless of converter coverage
         pass_through_build_failures: Whether to fail on TRT engine build errors (True) or not (False)
+        use_experimental_rt: Whether to use the new experimental TRTModuleNext for TRT engines
     Returns:
         Backend for torch.compile
     """
@@ -136,4 +146,5 @@ def create_backend(
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
         pass_through_build_failures=pass_through_build_failures,
+        use_experimental_rt=use_experimental_rt,
     )
