@@ -14,8 +14,7 @@ If given a ``torch.nn.Module`` and the ``ir`` flag is set to either ``default`` 
 
 To compile your input ``torch.nn.Module`` with Torch-TensorRT, all you need to do is provide the module and inputs
 to Torch-TensorRT and you will be returned an optimized TorchScript module to run or add into another PyTorch module. Inputs
-is a list of ``torch_tensorrt.Input`` classes which define input's shape, datatype and memory format. You can also specify settings such as
-operating precision for the engine or target device. After compilation you can save the module just like any other module
+is a list of ``torch_tensorrt.Input`` classes which define input Tensors' shape, datatype and memory format. Alternatively, if your input is a more complex data type, such as a tuple or list of Tensors, you can use the ``input_signature`` argument to specify a collection-based input, such as ``(List[Tensor], Tuple[Tensor, Tensor])``. See the second sample below for an example. You can also specify settings such as operating precision for the engine or target device. After compilation you can save the module just like any other module
 to load in a deployment application. In order to load a TensorRT/TorchScript module, make sure you first import ``torch_tensorrt``.
 
 .. code-block:: python
@@ -46,6 +45,32 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
 
 .. code-block:: python
 
+    # Sample using collection-based inputs via the input_signature argument
+    import torch_tensorrt
+
+    ...
+
+    model = MyModel().eval()
+
+    # input_signature expects a tuple of individual input arguments to the module
+    # The module below, for example, would have a docstring of the form:
+    # def forward(self, input0: List[torch.Tensor], input1: Tuple[torch.Tensor, torch.Tensor])
+    input_signature = (
+        [torch_tensorrt.Input(shape=[64, 64], dtype=torch.half), torch_tensorrt.Input(shape=[64, 64], dtype=torch.half)],
+        (torch_tensorrt.Input(shape=[64, 64], dtype=torch.half), torch_tensorrt.Input(shape=[64, 64], dtype=torch.half)),
+    )
+    enabled_precisions = {torch.float, torch.half}
+
+    trt_ts_module = torch_tensorrt.compile(
+        model, input_signature=input_signature, enabled_precisions=enabled_precisions
+    )
+
+    input_data = input_data.to("cuda").half()
+    result = trt_ts_module(input_data)
+    torch.jit.save(trt_ts_module, "trt_ts_module.ts")
+
+.. code-block:: python
+
     # Deployment application
     import torch
     import torch_tensorrt
@@ -55,4 +80,3 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
     result = trt_ts_module(input_data)
 
 Torch-TensorRT Python API also provides ``torch_tensorrt.ts.compile`` which accepts a TorchScript module as input and ``torch_tensorrt.fx.compile`` which accepts a FX GraphModule as input.
-

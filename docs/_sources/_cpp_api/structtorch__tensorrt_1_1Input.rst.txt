@@ -12,7 +12,7 @@ Inheritance Relationships
 Base Type
 *********
 
-- ``public CustomClassHolder``
+- ``public torch::CustomClassHolder``
 
 
 Struct Documentation

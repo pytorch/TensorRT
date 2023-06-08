@@ -135,6 +135,7 @@ html_theme_options = {
     "master_doc": True,
     "version_info": {
         "main": "https://pytorch.org/TensorRT/",
+        "v1.4.0": "https://pytorch.org/TensorRT/v1.4.0",
         "v1.3.0": "https://pytorch.org/TensorRT/v1.3.0",
         "v1.2.0": "https://pytorch.org/TensorRT/v1.2.0",
         "v1.1.1": "https://nvidia.github.io/Torch-TensorRT/v1.1.1",
