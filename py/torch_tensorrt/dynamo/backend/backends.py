@@ -134,6 +134,7 @@ def _compile_module(
             submodule,
             submodule_inputs,
             settings=settings,
+            name=name,
         )
 
         # Replace FX Module with TRT Module

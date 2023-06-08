@@ -184,13 +184,13 @@ def default_lower_pass(
             import io
 
             from torch_tensorrt._Device import Device
-            from torch_tensorrt._TRTModuleNext import TRTModuleNext
+            from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule
 
             with io.BytesIO() as engine_bytes:
                 engine_bytes.write(interp_res.engine.serialize())
                 engine_str = engine_bytes.getvalue()
 
-            trt_module = TRTModuleNext(
+            trt_module = TorchTensorRTModule(
                 engine_str,
                 name=module_name,
                 input_binding_names=interp_res.input_names,

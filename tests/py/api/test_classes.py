@@ -1,5 +1,6 @@
 import unittest
 import torch_tensorrt as torchtrt
+from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule
 import torch
 import torchvision.models as models
 import copy
@@ -238,7 +239,7 @@ class TestInput(unittest.TestCase):
         self.assertTrue(self._verify_correctness(ts_i, target))
 
 
-class TestTRTModuleNext(unittest.TestCase):
+class TestTorchTensorRTModule(unittest.TestCase):
     @staticmethod
     def _get_trt_mod():
         class Test(torch.nn.Module):
@@ -255,7 +256,7 @@ class TestTRTModuleNext(unittest.TestCase):
         test_mod_engine_str = torchtrt.ts.convert_method_to_trt_engine(
             mod, "forward", inputs=[torchtrt.Input((2, 10))]
         )
-        return torchtrt.TRTModuleNext(
+        return TorchTensorRTModule(
             name="test",
             serialized_engine=test_mod_engine_str,
             input_binding_names=["input_0"],
@@ -278,7 +279,7 @@ class TestTRTModuleNext(unittest.TestCase):
             mod, "forward", inputs=[torchtrt.Input((2, 10))]
         )
         with self.assertRaises(RuntimeError):
-            torchtrt.TRTModuleNext(
+            TorchTensorRTModule(
                 name="test",
                 serialized_engine=test_mod_engine_str,
                 input_binding_names=["x.1"],
@@ -301,7 +302,7 @@ class TestTRTModuleNext(unittest.TestCase):
             mod, "forward", inputs=[torchtrt.Input((2, 10))]
         )
         with self.assertRaises(RuntimeError):
-            torchtrt.TRTModuleNext(
+            TorchTensorRTModule(
                 name="test",
                 serialized_engine=test_mod_engine_str,
                 input_binding_names=["input_0"],
@@ -309,7 +310,7 @@ class TestTRTModuleNext(unittest.TestCase):
             )
 
     def test_set_get_profile_path_prefix(self):
-        trt_mod = TestTRTModuleNext._get_trt_mod()
+        trt_mod = TestTorchTensorRTModule._get_trt_mod()
         trt_mod.engine.profile_path_prefix = "/tmp/"
         self.assertTrue(trt_mod.engine.profile_path_prefix == "/tmp/")
 
@@ -331,7 +332,7 @@ class TestTRTModuleNext(unittest.TestCase):
 
         import json
 
-        trt_mod = TestTRTModuleNext._get_trt_mod()
+        trt_mod = TestTorchTensorRTModule._get_trt_mod()
         trt_json = json.loads(trt_mod.get_layer_info())
         [self.assertTrue(k in trt_json.keys()) for k in ["Layers", "Bindings"]]
         self.assertTrue(len(trt_json["Layers"]) == 4)

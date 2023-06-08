@@ -1,6 +1,5 @@
 import logging
-from operator import truediv
-from typing import Any, List, Sequence, Tuple
+from typing import Any, List, Tuple
 
 import torch
 from torch_tensorrt import _C
@@ -9,8 +8,8 @@ from torch_tensorrt._Device import Device
 logger = logging.getLogger(__name__)
 
 
-class TRTModuleNext(torch.nn.Module):
-    """TRTModuleNext is a PyTorch module which encompasses an arbitrary TensorRT Engine.
+class TorchTensorRTModule(torch.nn.Module):
+    """TorchTensorRTModule is a PyTorch module which encompasses an arbitrary TensorRT Engine.
 
     This module is backed by the Torch-TensorRT runtime and is fully compatibile with both
     FX / Python deployments (just ``import torch_tensorrt`` as part of the application) as
@@ -20,7 +19,7 @@ class TRTModuleNext(torch.nn.Module):
     The forward function is simpily forward(*args: torch.Tensor) -> Tuple[torch.Tensor] where
     the internal implementation is ``return Tuple(torch.ops.tensorrt.execute_engine(list(inputs), self.engine))``
 
-    > Note: TRTModuleNext only supports engines built with explict batch
+    > Note: TorchTensorRTModule only supports engines built with explict batch
 
     Attributes:
         name (str): Name of module (for easier debugging)
@@ -37,7 +36,7 @@ class TRTModuleNext(torch.nn.Module):
         output_binding_names: List[str] = [],
         target_device: Device = Device._current_device(),
     ):
-        """__init__ method for torch_tensorrt.TRTModuleNext
+        """__init__ method for torch_tensorrt.TorchTensorRTModule
 
         Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it.
@@ -71,9 +70,9 @@ class TRTModuleNext(torch.nn.Module):
 
         """
         logger.warning(
-            "TRTModuleNext should be considered experimental stability, APIs are subject to change. Note: TRTModuleNext only supports engines built with explict batch"
+            "TorchTensorRTModule should be considered experimental stability, APIs are subject to change. Note: TorchTensorRTModule only supports engines built with explict batch"
         )
-        super(TRTModuleNext, self).__init__()
+        super(TorchTensorRTModule, self).__init__()
 
         if not isinstance(serialized_engine, bytearray):
             ValueError("Expected serialized engine as bytearray")
@@ -89,8 +88,8 @@ class TRTModuleNext(torch.nn.Module):
                     self.name + "_engine" if self.name != "" else "tensorrt_engine",
                     target_device._to_serialized_rt_device(),
                     serialized_engine,
-                    TRTModuleNext._pack_binding_names(self.input_binding_names),
-                    TRTModuleNext._pack_binding_names(self.output_binding_names),
+                    TorchTensorRTModule._pack_binding_names(self.input_binding_names),
+                    TorchTensorRTModule._pack_binding_names(self.output_binding_names),
                 ]
             )
         else:
@@ -154,7 +153,7 @@ class TRTModuleNext(torch.nn.Module):
 
             non_tensors = [i[0] for i in filter(zip(inputs, types), is_non_tensor)]
             raise RuntimeError(
-                f"TRTModuleNext expects a flattened list of tensors as input, found non tensors: {non_tensors}"
+                f"TorchTensorRTModule expects a flattened list of tensors as input, found non tensors: {non_tensors}"
             )
 
         outputs = torch.ops.tensorrt.execute_engine(list(inputs), self.engine)
