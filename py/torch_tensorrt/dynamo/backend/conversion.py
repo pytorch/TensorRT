@@ -1,7 +1,7 @@
 from typing import Sequence, Union
 import torch
+import io
 from torch_tensorrt.fx.trt_module import TRTModule
-from torch_tensorrt import TRTModuleNext
 from torch_tensorrt.dynamo.backend._settings import CompilationSettings
 from torch_tensorrt.dynamo.fx_ts_compat.fx2trt import (
     InputTensorSpec,
@@ -15,12 +15,14 @@ def convert_module(
     module: torch.fx.GraphModule,
     inputs: Sequence[torch.Tensor],
     settings: CompilationSettings = CompilationSettings(),
-) -> Union[TRTModuleNext, TRTModule]:
+    name: str = "",
+):
     """Convert an FX module to a TRT module
     Args:
         module: FX GraphModule to convert
         inputs: Sequence of Tensors representing inputs to the module
         settings: Compilation settings
+        name: TRT engine name
     Returns:
         TRTModule or TRTModuleNext
     """
@@ -50,8 +52,21 @@ def convert_module(
         ),
     )
 
-    return TRTModule(
-        engine=interpreter_result.engine,
-        input_names=interpreter_result.input_names,
-        output_names=interpreter_result.output_names,
-    )
+    if settings.use_experimental_rt:
+        from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule
+
+        with io.BytesIO() as engine_bytes:
+            engine_bytes.write(interpreter_result.engine.serialize())
+            engine_str = engine_bytes.getvalue()
+        return TorchTensorRTModule(
+            serialized_engine=engine_str,
+            name=name,
+            input_binding_names=interpreter_result.input_names,
+            output_binding_names=interpreter_result.output_names,
+        )
+    else:
+        return TRTModule(
+            engine=interpreter_result.engine,
+            input_names=interpreter_result.input_names,
+            output_names=interpreter_result.output_names,
+        )

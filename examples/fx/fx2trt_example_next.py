@@ -8,7 +8,10 @@ from torch_tensorrt.fx.utils import LowerPrecision
 import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter
 from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
-from torch_tensorrt import TRTModuleNext as TRTModule, Device
+from torch_tensorrt.dynamo._TorchTensorRTModule import (
+    TorchTensorRTModule as TRTModule,
+    Device,
+)
 
 # The purpose of this example is to demonstrate the overall flow of lowering a PyTorch
 # model to TensorRT via FX with existing FX based tooling. The general lowering flow

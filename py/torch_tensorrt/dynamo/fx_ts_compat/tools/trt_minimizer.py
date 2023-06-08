@@ -25,13 +25,13 @@ def lower_mod_default(
         import io
 
         from torch_tensorrt._Device import Device
-        from torch_tensorrt._TRTModuleNext import TRTModuleNext
+        from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule
 
         with io.BytesIO() as engine_bytes:
             engine_bytes.write(interpreter_result.engine.serialize())
             engine_str = engine_bytes.getvalue()
 
-        res_mod = TRTModuleNext(
+        res_mod = TorchTensorRTModule(
             engine_str,
             name=str(type(mod)),
             input_binding_names=interpreter_result.input_names,

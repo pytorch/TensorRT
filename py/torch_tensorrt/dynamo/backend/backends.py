@@ -139,6 +139,7 @@ def _compile_module(
             submodule,
             submodule_inputs,
             settings=settings,
+            name=name,
         )
 
         trt_modules[name] = trt_mod
