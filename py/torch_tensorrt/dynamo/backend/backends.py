@@ -2,6 +2,7 @@ import logging
 from typing import Sequence
 import torch
 from functools import partial
+from dataclasses import replace, fields
 import torch._dynamo as td
 
 from torch_tensorrt.dynamo.backend._settings import CompilationSettings
@@ -28,6 +29,22 @@ logger = logging.getLogger(__name__)
 def torch_tensorrt_backend(
     gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor], **kwargs
 ):
+    # If the user specifies keyword args, overwrite those fields in settings
+    # Validate all specified kwargs to ensure they are true fields of the dataclass
+    #
+    # Note: kwargs provided by torch.compile are wrapped in the "options" key
+    if kwargs:
+        if "options" in kwargs and len(kwargs) == 1:
+            kwargs = kwargs["options"]
+
+        valid_attrs = {attr.name for attr in fields(settings)}
+        valid_kwargs = {k: v for k, v in kwargs.items() if k in valid_attrs}
+        settings = replace(settings, **valid_kwargs)
+
+    # Enable debug/verbose mode if requested
+    if settings.debug:
+        logger.setLevel(logging.DEBUG)
+
     DEFAULT_BACKEND = aot_torch_tensorrt_aten_backend
 
     return DEFAULT_BACKEND(gm, sample_inputs, **kwargs)
