@@ -20,8 +20,8 @@ auto layer_norm_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
 
       /* Layer_Norm normalizes over last N dimensions.
          normalizaed_shape could be (C,H,W), (H,W), or (W). */
-      auto normalized_shape = args[1].unwrapToIntList();
-      auto normalized_shape_vec = util::toVec(util::toDims(normalized_shape));
+      // This could be an IntList or ITensorList. We only need the size of this list.
+      auto normalized_shape = args[1].IValue()->toList();
 
       // Unwrap eps.
       auto eps = args[4].unwrapToDouble();
@@ -30,7 +30,7 @@ auto layer_norm_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
 
       // Set up  axis_ask for E[x].
       uint32_t axis_mask = 0;
-      for (size_t i = 0; i < normalized_shape_vec.size(); i++) {
+      for (size_t i = 0; i < normalized_shape.size(); i++) {
         axis_mask |= 1 << (shape.size() - i - 1);
       }
       LOG_DEBUG("Axis Mask for E[x]" << std::bitset<32>(axis_mask));

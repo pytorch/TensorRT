@@ -9,6 +9,7 @@
 #include "torch/csrc/jit/ir/ir.h"
 #include "torch/torch.h"
 
+#include "core/conversion/converters/converter_util.h"
 #include "core/conversion/evaluators/eval_macros.h"
 #include "core/conversion/evaluators/eval_util.h"
 #include "core/conversion/evaluators/evaluators.h"
@@ -677,6 +678,25 @@ auto aten_registrations TORCHTRT_UNUSED =
         .evaluator(
             {c10::Symbol::fromQualString("aten::floordiv"),
              [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               // Dynamic version of aten::floordiv
+               if (args.at(n->input(0)).isITensor()) {
+                 if (args.at(n->input(1)).IValue()->isInt()) {
+                   auto int_tensor = scalar_to_tensor(args.at(n->input(1)).IValue()->toInt());
+                   auto int_itensor = converters::tensor_to_const(ctx, int_tensor, util::node_info(n) + "_constant");
+                   auto elementwise_layer = converters::add_elementwise(
+                       ctx,
+                       nvinfer1::ElementWiseOperation::kFLOOR_DIV,
+                       args.at(n->input(0)).ITensor(),
+                       int_itensor,
+                       util::node_info(n));
+                   auto output_tensor = elementwise_layer->getOutput(0);
+                   auto tensor_holder = TensorContainer();
+                   tensor_holder.hold_tensor(output_tensor);
+                   auto output_ivalue = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                   return output_ivalue;
+                 }
+               }
+               // Static version
                if (args.at(n->input(0)).IValue()->isInt()) {
                  auto a = args.at(n->input(0)).unwrapToInt();
                  auto b = args.at(n->input(1)).unwrapToInt();
