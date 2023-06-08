@@ -3,7 +3,7 @@ import torch
 from torch_tensorrt.fx.trt_module import TRTModule
 from torch_tensorrt import TRTModuleNext
 from torch_tensorrt.dynamo.backend._settings import CompilationSettings
-from torch_tensorrt.fx.fx2trt import (
+from torch_tensorrt.dynamo.fx_ts_compat.fx2trt import (
     InputTensorSpec,
     TRTInterpreter,
 )
@@ -24,15 +24,15 @@ def convert_module(
     Returns:
         TRTModule or TRTModuleNext
     """
-    interp = TRTInterpreter(
+    interpreter = TRTInterpreter(
         module,
         InputTensorSpec.from_tensors(inputs),
         explicit_batch_dimension=True,
         logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
     )
 
-    r = interp.run(
-        max_workspace_size=settings.workspace_size,
+    interpreter_result = interpreter.run(
+        workspace_size=settings.workspace_size,
         lower_precision=settings.precision,
         profiling_verbosity=(
             trt.ProfilingVerbosity.VERBOSE
@@ -41,4 +41,8 @@ def convert_module(
         ),
     )
 
-    return TRTModule(*r)
+    return TRTModule(
+        engine=interpreter_result.engine,
+        input_names=interpreter_result.input_names,
+        output_names=interpreter_result.output_names,
+    )
