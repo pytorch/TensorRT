@@ -27,6 +27,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
 )
 from torch_tensorrt.fx.tracer.acc_tracer.acc_ops import contiguous
 from torch_tensorrt.fx.converters.impl import activation
+from torch_tensorrt.fx.converters.impl import permute
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
 from torch_tensorrt.fx.converters.impl.unary import sign
 from torch_tensorrt.fx.converters.impl.elementwise.base import (
@@ -3456,27 +3457,10 @@ def acc_ops_permute(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
-    ranks = len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0)  # type: ignore[union-attr]
-    if len(kwargs["permutation"]) == 1:
-        index = kwargs["permutation"][0]
-    else:
-        index = kwargs["permutation"]
-    permutation = [get_positive_dim(i, ranks) for i in cast(Sequence[int], index)]
-
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"permute received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
-
-    if network.has_implicit_batch_dimension:
-        assert permutation[0] == 0, "Can't permute batch dimension when it's implicit."
-        permutation = [i - 1 for i in permutation[1:]]
-
-    layer = network.add_shuffle(input_val)
-    layer.second_transpose = tuple(permutation)
-    set_layer_name(layer, target, name)
-    return layer.get_output(0)
+    index = kwargs["permutation"]
+    return permute.permute(
+        network, target, SourceIR.ACC, name, input_val=input_val, index=index
+    )
 
 
 @tensorrt_converter(acc_ops.quantize_per_tensor)

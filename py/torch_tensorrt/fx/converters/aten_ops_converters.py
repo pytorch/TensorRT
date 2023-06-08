@@ -23,6 +23,7 @@ from ..utils import get_dynamic_dims, torch_dtype_from_trt, torch_dtype_to_trt
 from .converter_utils import *  # noqa: F403
 import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch_tensorrt.fx.converters.impl import activation
+from torch_tensorrt.fx.converters.impl import permute
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
 from torch_tensorrt.fx.converters.impl.elementwise import rsqrt
 
@@ -267,6 +268,24 @@ def aten_ops_mul(
     return acc_ops_converters.acc_ops_mul(network, target, None, kwargs_new, name)
 
 
+@tensorrt_converter(torch.ops.aten.permute.default)
+def aten_ops_permute_default(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return permute.permute(
+        network,
+        target,
+        SourceIR.ATEN,
+        name=name,
+        input_val=args[0],
+        index=args[1:],
+    )
+
+
 @tensorrt_converter(torch.ops.aten.pow.Tensor_Scalar)
 @tensorrt_converter(torch.ops.aten.pow.Tensor_Tensor)
 def aten_ops_pow(
@@ -350,6 +369,38 @@ def aten_ops_sub(
         "other": args[1],
     }
     return acc_ops_converters.acc_ops_sub(network, target, None, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten.transpose.int)
+def aten_ops_transpose_int(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = args[0]
+    ndim = len(input_val.shape)
+    if len(args) == 1:
+        # default is to reverse dimensions
+        new_order = torch.arange(0, start=ndim - 1, step=-1)
+    else:
+        assert (
+            len(args) == 3
+        ), f"Wrong number of arguments to transpose(): {len(args)-1}"
+        new_order = torch.arange(ndim)
+        dim0 = args[1]
+        if args[1] < 0:
+            dim0 = dim0 + ndim
+        dim1 = args[2]
+        if args[2] < 0:
+            dim1 = dim1 + ndim
+        new_order[dim0] = dim1
+        new_order[dim1] = dim0
+        print("New order: ", new_order)
+    return permute.permute(
+        network, target, SourceIR.ATEN, name=name, input_val=input_val, index=new_order
+    )
 
 
 @tensorrt_converter(torch.ops.aten.view.default)
