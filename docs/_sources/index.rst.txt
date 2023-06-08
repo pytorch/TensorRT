@@ -33,6 +33,7 @@ Getting Started
    getting_started/installation
    getting_started/getting_started_with_python_api
    getting_started/getting_started_with_cpp_api
+   getting_started/getting_started_with_windows
 
 
 Tutorials

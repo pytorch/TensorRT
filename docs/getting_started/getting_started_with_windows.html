@@ -9,22 +9,22 @@
   <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  <title>Building Torch-TensorRT on Windows &mdash; Torch-TensorRT v1.4.0.dev0+d0af394 documentation</title>
-  
 
-  
-  
-  
-  
+  <title>Building Torch-TensorRT on Windows &mdash; Torch-TensorRT v1.4.0+7d1d80773 documentation</title>
 
-  
 
-  
-  
-    
 
-  
+
+
+
+
+
+
+
+
+
+
+
 
   <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!-- <link rel="stylesheet" href="../_static/pygments.css" type="text/css" /> -->
@@ -33,12 +33,14 @@
   <link rel="stylesheet" href="../_static/collapsible-lists/css/tree_view.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Creating a TorchScript Module" href="../tutorials/creating_torchscript_module_in_python.html" />
+    <link rel="prev" title="Using Torch-TensorRT in C++" href="getting_started_with_cpp_api.html" />
   <!-- Google Analytics -->
-  
-  <!-- End Google Analytics -->
-  
 
-  
+  <!-- End Google Analytics -->
+
+
+
   <script src="../_static/js/modernizr.min.js"></script>
 
   <!-- Preload the theme fonts -->
@@ -194,9 +196,9 @@
 
 <body class="pytorch-body">
 
-   
 
-    
+
+
 
     <div class="table-of-contents-link-wrapper">
       <span>Table of Contents</span>
@@ -207,21 +209,21 @@
       <div class="pytorch-side-scroll">
         <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           <div class="pytorch-left-menu-search">
-            
 
-            
-              
-              
+
+
+
+
                 <div class="version">
-                  v1.4.0.dev0+d0af394
+                  v1.4.0+7d1d80773
                 </div>
-              
-            
-
-            
 
 
-  
+
+
+
+
+
 
 
 <div role="search">
@@ -232,20 +234,22 @@
   </form>
 </div>
 
-            
+
           </div>
 
-          
-            
-            
-              
-            
-            
+
+
+
+
+
+
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
 <li class="toctree-l1"><a class="reference internal" href="getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Building Torch-TensorRT on Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
@@ -291,8 +295,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
 </ul>
 
-            
-          
+
+
         </div>
       </div>
     </nav>
@@ -300,7 +304,7 @@
     <div class="pytorch-container">
       <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
         <div class="pytorch-breadcrumbs-wrapper">
-          
+
 
 
 
@@ -319,30 +323,30 @@
 <div role="navigation" aria-label="breadcrumbs navigation">
 
   <ul class="pytorch-breadcrumbs">
-    
+
       <li>
         <a href="../index.html">
-          
+
             Docs
-          
+
         </a> &gt;
       </li>
 
-        
+
       <li>Building Torch-TensorRT on Windows</li>
-    
-    
+
+
       <li class="pytorch-breadcrumbs-aside">
-        
-            
+
+
             <a href="../_sources/getting_started/getting_started_with_windows.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
-          
-        
+
+
       </li>
-    
+
   </ul>
 
-  
+
 </div>
         </div>
 
@@ -354,13 +358,13 @@
       <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
         <div class="pytorch-content-left">
 
-        
-          
+
+
           <div class="rst-content">
-          
+
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
-              
+
   <section id="building-torch-tensorrt-on-windows">
 <span id="getting-started-windows"></span><h1>Building Torch-TensorRT on Windows<a class="headerlink" href="#building-torch-tensorrt-on-windows" title="Permalink to this headline">¶</a></h1>
 <p>Torch-TensorRT has community support for Windows platform using CMake</p>
@@ -435,19 +439,114 @@
 <p>Note: After successful installation, the artifacts will be present at installRoot.</p>
 </section>
 </section>
+<section id="building-with-visual-studio-code">
+<h1>Building With Visual Studio Code<a class="headerlink" href="#building-with-visual-studio-code" title="Permalink to this headline">¶</a></h1>
+<ol class="arabic">
+<li><p>Install Visual Studio Code</p></li>
+<li><p>Install Build Tools for Visual Studio 2022</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Select “Desktop Development with C++”
+&gt; Currently, this installs MSVC v143 - 2022. There are also options to install previous 2019/2017/2015 editions of MSVC
+&gt; License term “1b Build Tools additional use right” allows using Build Tools to compile Open Source Dependencies
+&gt; Also allows using Build Tools to develop and test Open Source Dependencies, to the minor extend of ensuring compatibility with Build Tools</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Install CUDA (e.g. 11.7.1)</p></li>
+<li><p>Install cuDNN (e.g. 8.5.0.96)</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Set <code class="docutils literal notranslate"><span class="pre">cuDNN_ROOT_DIR</span></code></p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Install <cite>TensorRT</cite> (e.g 8.5.1.7)</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Set <code class="docutils literal notranslate"><span class="pre">TensorRT_ROOT</span></code></p></li>
+<li><p>Add <code class="docutils literal notranslate"><span class="pre">TensorRT_ROOT\lib</span></code> to <code class="docutils literal notranslate"><span class="pre">PATH</span></code></p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Install “libtorch-win-shared-with-deps-latest.zip”</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Select build targeting the appropriate CUDA version</p></li>
+<li><p>Set <code class="docutils literal notranslate"><span class="pre">Torch_DIR</span></code></p></li>
+<li><p>Add <code class="docutils literal notranslate"><span class="pre">Torch_DIR\lib</span></code> to <code class="docutils literal notranslate"><span class="pre">PATH</span></code></p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Clone TensorRT repo</p></li>
+<li><p>Install C++ and CMake Tools extensions from MS</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Change build to <code class="docutils literal notranslate"><span class="pre">RelWithDebInfo</span></code></p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Update <code class="docutils literal notranslate"><span class="pre">.vscode\settings.json</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Clean, configure, build</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ol>
+<p>e.g. /.vscode/settings.json</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;cmake.generator&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Ninja&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;cmake.configureSettings&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;CMAKE_MODULE_PATH&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;FILEPATH&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;$PWD\\cmake\\Modules&quot;</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="nt">&quot;CMAKE_CXX_FLAGS&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;-D_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING&quot;</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="nt">&quot;Torch_DIR&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;FILEPATH&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;X:\\libtorch\\share\\cmake\\Torch&quot;</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="nt">&quot;TensorRT_ROOT&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;FILEPATH&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;X:\\path\\to\\tensorrt&quot;</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="nt">&quot;cuDNN_ROOT_DIR&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;FILEPATH&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;X:\\path\\to\\cudnn&quot;</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="nt">&quot;CMAKE_CUDA_FLAGS&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;-allow-unsupported-compiler&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;cmake.buildDirectory&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;${workspaceFolder}/torch_tensorrt_build&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
 
 
              </article>
-             
+
             </div>
             <footer>
-  
 
-  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+
+        <a href="../tutorials/creating_torchscript_module_in_python.html" class="btn btn-neutral float-right" title="Creating a TorchScript Module" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+
+
+        <a href="getting_started_with_cpp_api.html" class="btn btn-neutral" title="Using Torch-TensorRT in C++" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+
+    </div>
+
+
+
 
     <hr>
 
-  
+
 
   <div role="contentinfo">
     <p>
@@ -455,11 +554,11 @@
 
     </p>
   </div>
-    
+
       <div>
         Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
       </div>
-     
+
 
 </footer>
 
@@ -476,6 +575,7 @@
 <li><a class="reference internal" href="#installation">Installation</a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
 </ul>
 
             </div>
@@ -484,12 +584,12 @@
       </section>
     </div>
 
-  
 
 
-  
 
-     
+
+
+
        <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
          <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
          <script src="../_static/jquery.js"></script>
@@ -498,9 +598,9 @@
          <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
          <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
          <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-     
 
-  
+
+
 
   <script type="text/javascript" src="../_static/js/vendor/popper.min.js"></script>
   <script type="text/javascript" src="../_static/js/vendor/bootstrap.min.js"></script>
@@ -511,7 +611,7 @@
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script> 
+  </script>
 
   <!-- Begin Footer -->
 
@@ -575,7 +675,7 @@
             <li><a href="https://twitter.com/pytorch" target="_blank">Twitter</a></li>
             <li><a href="https://www.youtube.com/pytorch" target="_blank">YouTube</a></li>
             <li><a href="https://www.linkedin.com/company/pytorch" target="_blank">LinkedIn</a></li>
-          </ul>  
+          </ul>
           </div>
 
         <div class="footer-links-col">
@@ -588,7 +688,7 @@
           </ul>
          </div>
         </div>
-        
+
         <div class="privacy-policy">
           <ul>
             <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/terms/" target="_blank">Terms</a></li>
@@ -638,7 +738,7 @@
           <li>
             <a href="https://pytorch.org/ecosystem">Ecosystem</a>
           </li>
-            
+
           <li>
             <a href="https://pytorch.org/mobile">Mobile</a>
           </li>
@@ -700,7 +800,7 @@
           <li class="resources-mobile-menu-title">
             Resources
           </li>
-            
+
            <ul class="resources-mobile-menu-items">
 
             <li>
