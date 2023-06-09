@@ -64,5 +64,39 @@ def addmm_replacement(
     )
 
 
+@register_decomposition(torch.ops.aten.var_mean, registry=DECOMPOSITIONS)
+def var_mean_replacement(input_: torch.Tensor, unbiased: True) -> torch.Tensor:
+    mean = torch.mean(input_)
+    variance = torch.mean(torch.pow(torch.sub(input_, mean), 2))
+    return mean, variance
+
+
+@register_decomposition(torch.ops.aten.var_mean.dim, registry=DECOMPOSITIONS)
+def var_mean_dim_replacement(
+    input_: torch.Tensor, dim: list(int), unbiased: True, keepdim=False
+) -> torch.Tensor:
+    mean = torch.mean(input_, dim)
+    variance = torch.mean(torch.pow(torch.sub(input_, mean), 2), dim)
+    return mean, variance
+
+
+@register_decomposition(torch.ops.aten.var_mean.correction, registry=DECOMPOSITIONS)
+def var_mean_correction_replacement(
+    input_: torch.Tensor, dim: list(int), correction=None, keepdim=False
+) -> torch.Tensor:
+    input_size = input_.size()
+    input_copy = input_
+    for axes in dim:
+        n = input_size[axes]
+        mean = torch.div(torch.add(input_), n - 1)
+        input_ = mean
+    for axes in dim:
+        n = input_size[axes]
+        variance = torch.div(
+            torch.add(torch.pow(torch.sub(input_copy, mean), 2), dim), n - 1
+        )
+        input_copy = variance
+
+
 def get_decompositions():
     return DECOMPOSITIONS
