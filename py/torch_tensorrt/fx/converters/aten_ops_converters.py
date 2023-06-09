@@ -25,6 +25,7 @@ import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch_tensorrt.fx.converters.impl import activation
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
 from torch_tensorrt.fx.converters.impl.elementwise import rsqrt
+from torch_tensorrt.fx.converters.impl.embedding import embedding
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -403,6 +404,17 @@ def aten_ops_cat(
     }
     return acc_ops_converters.acc_ops_cat(network, target, None, kwargs_new, name)
 
+
+@tensorrt_converter(torch.ops.aten.embedding.default)
+def aten_ops_embedding(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return embedding(network, target, SourceIR.ATEN, name, args[0], args[1], args[2], args[3], args[4], args[5])
+    
 
 @tensorrt_converter(torch.ops.aten.expand.default)
 def aten_ops_expand(
