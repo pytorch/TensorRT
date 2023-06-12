@@ -140,7 +140,6 @@ def opt_trace(f, args, *rest):
     These passes should be general and functional purpose
     """
     passes_list = [
-        compose_bmm,
         compose_chunk,
         compose_getitem_slice,
         replace_aten_reshape_alias_with_replace,
