@@ -3122,7 +3122,7 @@ def acc_ops_clamp(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return clamp.convert_clamp(
+    return clamp.clamp(
         network,
         target,
         SourceIR.ACC,
