@@ -74,6 +74,7 @@ class LowerSetting(LowerSettingBasic):
     correctness_atol: absolute tolerance for correctness check
     correctness_rtol: relative tolerance for correctness check
     use_experimental_rt: Uses the next generation TRTModule which supports both Python and TorchScript based execution (including in C++).
+    truncate_long_and_double: Whether to truncate long and double inputs to TRT engines automatically
     """
 
     input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
@@ -101,3 +102,4 @@ class LowerSetting(LowerSettingBasic):
     correctness_atol: float = 0.1
     correctness_rtol: float = 0.1
     use_experimental_rt: bool = False
+    truncate_long_and_double: bool = False

@@ -19,6 +19,7 @@ from ..tools.trt_minimizer import TensorRTMinimizer
 def create_trt_operator_support(
     use_implicit_batch_dim=True,
     exclude_support_node_name: set = (),
+    truncate_long_and_double: bool = False,
 ) -> ops.OperatorSupportBase:
     """Creates an `OperatorSupportBase` instance used for TRT splitting purpose."""
     # Create an `OperatorSupport` that declares a node supported if it
@@ -32,14 +33,17 @@ def create_trt_operator_support(
             support_dict[get_acc_ops_name(k)] = None
     supported_if_converter_registered = ops.OperatorSupport(support_dict=support_dict)
 
-    return ops.chain(
-        ops.OpSupports.decline_if_node_in_names(exclude_support_node_name),
-        # 1. Node is not supported if it has args with int64 or float64 dtype:
-        ops.OpSupports.decline_if_input_dtype(torch.int64),
-        ops.OpSupports.decline_if_input_dtype(torch.float64),
-        # 2. Node is supported if it has TRT converter:
-        supported_if_converter_registered,
-    )
+    op_support_checks = [
+        ops.OpSupports.decline_if_node_in_names(exclude_support_node_name)
+    ]
+
+    if not truncate_long_and_double:
+        op_support_checks.append(ops.OpSupports.decline_if_input_dtype(torch.int64))
+        op_support_checks.append(ops.OpSupports.decline_if_input_dtype(torch.float64))
+
+    op_support_checks.append(supported_if_converter_registered)
+
+    return ops.chain(*op_support_checks)
 
 
 class TRTSplitterSetting(splitter_base._SplitterSettingBase):
@@ -52,6 +56,7 @@ class TRTSplitterSetting(splitter_base._SplitterSettingBase):
         self.use_implicit_batch_dim: bool = True
         self.exclude_support_node_name: set = set()
         self.use_experimental_rt: bool = False
+        self.truncate_long_and_double: bool = False
 
         if self.use_experimental_rt and self.use_implicit_batch_dim:
             raise ValueError(
@@ -71,7 +76,9 @@ class TRTSplitter(splitter_base._SplitterBase):
             settings = TRTSplitterSetting()
         if not operator_support:
             operator_support = create_trt_operator_support(
-                settings.use_implicit_batch_dim, settings.exclude_support_node_name
+                settings.use_implicit_batch_dim,
+                settings.exclude_support_node_name,
+                settings.truncate_long_and_double,
             )
         super().__init__(
             module,

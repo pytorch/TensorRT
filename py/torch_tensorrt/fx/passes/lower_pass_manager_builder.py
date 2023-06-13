@@ -10,6 +10,9 @@ from torch.fx.passes.shape_prop import ShapeProp
 from torch.fx.passes.splitter_base import generate_inputs_for_submodules, SplitResult
 from torch_tensorrt.fx.passes.pass_utils import apply_bfloat_float_conversion
 from torch_tensorrt.fx.utils import LowerPrecision
+from torch_tensorrt.dynamo.common import (
+    repair_long_or_double_inputs,
+)
 
 from ..input_tensor_spec import generate_input_specs
 
@@ -192,6 +195,14 @@ class LowerPassManagerBuilder:
                 if not submod_name.startswith(split_result.non_acc_submodule_prefix):
                     _LOGGER.info(f"Now lowering submodule {submod_name}")
                     lowering_start_time = datetime.datetime.now()
+
+                    if self.lower_setting.truncate_long_and_double:
+                        submod_inputs = repair_long_or_double_inputs(
+                            parent_graph=split_result.split_module,
+                            submodule=submod,
+                            submodule_inputs=submod_inputs,
+                            submodule_name=submod_name,
+                        )
 
                     self.lower_setting.input_specs = generate_input_specs(
                         submod_inputs,

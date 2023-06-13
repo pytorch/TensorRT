@@ -4,7 +4,8 @@ from dataclasses import replace, fields
 
 from torch_tensorrt.dynamo.common import CompilationSettings, use_python_runtime_parser
 from typing import Any, Union, Sequence, Dict
-from torch_tensorrt import _Input, Device
+from torch_tensorrt import _Input
+from torch_tensorrt._Device import Device
 
 
 logger = logging.getLogger(__name__)

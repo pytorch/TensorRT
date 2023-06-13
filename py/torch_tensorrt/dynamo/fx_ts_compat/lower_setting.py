@@ -73,6 +73,7 @@ class LowerSetting(LowerSettingBasic):
     max_aux_streams: max number of aux stream to use
     version_compatible: enable version compatible feature
     optimization_level: builder optimization level
+    truncate_long_and_double: Whether to truncate long and double inputs to TRT engines automatically
     """
 
     input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
@@ -100,3 +101,4 @@ class LowerSetting(LowerSettingBasic):
     max_aux_streams: Optional[int] = None
     version_compatible: bool = False
     optimization_level: Optional[int] = None
+    truncate_long_and_double: bool = False

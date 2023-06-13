@@ -35,6 +35,7 @@ from torch_tensorrt.dynamo._defaults import (
     VERSION_COMPATIBLE,
     OPTIMIZATION_LEVEL,
     USE_PYTHON_RUNTIME,
+    TRUNCATE_LONG_AND_DOUBLE,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,7 +56,7 @@ def compile(
     dla_local_dram_size=1073741824,
     dla_global_dram_size=536870912,
     calibrator=None,
-    truncate_long_and_double=False,
+    truncate_long_and_double=TRUNCATE_LONG_AND_DOUBLE,
     require_full_compilation=False,
     explicit_batch_dimension=False,
     debug=DEBUG,
@@ -92,6 +93,7 @@ def compile(
         max_aux_streams: max number of aux stream to use
         version_compatible: enable version compatible feature
         optimization_level: builder optimization level
+        truncate_long_and_double: Whether to truncate long and double inputs to TRT engines automatically
     Returns:
         A torch.nn.Module lowered by TensorRT.
     """
@@ -148,6 +150,7 @@ def compile(
         max_aux_streams=max_aux_streams,
         version_compatible=version_compatible,
         optimization_level=optimization_level,
+        truncate_long_and_double=truncate_long_and_double,
     )
     lowerer = Lowerer.create(lower_setting=lower_setting)
     return lowerer(module, inputs)
@@ -224,6 +227,7 @@ def default_split_function(
     splitter_setting.use_implicit_batch_dim = False
     splitter_setting.min_block_size = lower_setting.min_block_size
     splitter_setting.use_experimental_rt = not lower_setting.use_python_runtime
+    splitter_setting.truncate_long_and_double = lower_setting.truncate_long_and_double
     splitter = TRTSplitter(model, inputs, settings=splitter_setting)
     splitter.node_support_preview()
     return splitter.generate_split_results()

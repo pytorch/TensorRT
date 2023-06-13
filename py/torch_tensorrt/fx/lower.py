@@ -43,6 +43,7 @@ def compile(
     use_experimental_fx_rt=False,
     correctness_atol=1e-1,
     correctness_rtol=1e-1,
+    truncate_long_and_double=False,
 ) -> nn.Module:
     """
     Takes in original module, input and lowering setting, run lowering workflow to turn module
@@ -62,6 +63,7 @@ def compile(
         cuda_graph_batch_size: Cuda graph batch size, default to be -1.
         dynamic_batch: batch dimension (dim=0) is dynamic.
         use_experimental_fx_rt: Uses the next generation TRTModule which supports both Python and TorchScript based execution (including in C++).
+        truncate_long_and_double: Whether to truncate long and double inputs to TRT engines automatically
     Returns:
         A torch.nn.Module lowered by TensorRT.
     """
@@ -85,6 +87,7 @@ def compile(
         use_experimental_rt=use_experimental_fx_rt,
         correctness_atol=correctness_atol,
         correctness_rtol=correctness_rtol,
+        truncate_long_and_double=truncate_long_and_double,
     )
     lowerer = Lowerer.create(lower_setting=lower_setting)
     return lowerer(module, input)
@@ -159,6 +162,7 @@ def default_split_function(
     splitter_setting.use_implicit_batch_dim = not lower_setting.explicit_batch_dimension
     splitter_setting.min_acc_module_size = lower_setting.min_acc_module_size
     splitter_setting.use_experimental_rt = lower_setting.use_experimental_rt
+    splitter_setting.truncate_long_and_double = lower_setting.truncate_long_and_double
     splitter = TRTSplitter(model, inputs, settings=splitter_setting)
     splitter.node_support_preview()
     return splitter.generate_split_results()

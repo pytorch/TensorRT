@@ -5,7 +5,8 @@ import torch_tensorrt
 from functools import partial
 
 from typing import Any, Optional, Sequence
-from torch_tensorrt import EngineCapability, Device
+from torch_tensorrt._Device import Device
+from torch_tensorrt._enums import EngineCapability
 from torch_tensorrt.fx.utils import LowerPrecision
 
 from torch_tensorrt.dynamo.backend.utils import prepare_inputs, prepare_device
