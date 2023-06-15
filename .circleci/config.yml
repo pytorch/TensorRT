@@ -94,7 +94,7 @@ commands:
                         - << parameters.install-dir >>
 
   install-cudnn:
-    description: "Install CUDNN 8.9.1"
+    description: "Install CUDNN 8.9.0"
     parameters:
       os:
         type: string
@@ -104,7 +104,7 @@ commands:
         default: "x86_64"
       cudnn-version:
         type: string
-        default: "8.9.1.23"
+        default: "8.9.0.131"
       cuda-version:
         type: string
         default: "cuda12.1"
@@ -183,7 +183,7 @@ commands:
         default: "cuda12.0"
       cudnn-version:
         type: string
-        default: "8.9.1.23"
+        default: "8.9.0.131"
       trt-version-short:
         type: string
         default: "8.6.1"
@@ -235,7 +235,7 @@ commands:
           default: "8.6.1"
         cudnn-version-long:
           type: string
-          default: "8.9.1.23"
+          default: "8.9.0.131"
       steps:
         - run:
             name: Set up python environment
@@ -252,11 +252,14 @@ commands:
     parameters:
       torch-build:
         type: string
-        default: "2.1.0.dev20230613+cu121"
+        default: "2.1.0.dev20230613+cu121.with.pypi.cudnn.with.pypi.cudnn"
       torchvision-build:
         type: string
         default: "0.16.0.dev20230613+cu121"
       torch-build-index:
+        type: string
+        default: "https://download.pytorch.org/whl/nightly/cu121_pypi_cudnn"
+      torchvision-build-index:
         type: string
         default: "https://download.pytorch.org/whl/nightly/cu121"
     steps:
@@ -264,7 +267,7 @@ commands:
           name: Install Torch
           command: |
             pip3 install --upgrade pip
-            pip3 install torch==<< parameters.torch-build >>  torchvision==<< parameters.torchvision-build >> --extra-index-url << parameters.torch-build-index >>
+            pip3 install torch==<< parameters.torch-build >>  torchvision==<< parameters.torchvision-build >> --extra-index-url << parameters.torch-build-index >> --extra-index-url << parameters.torchvision-build-index >>
 
   build-py:
     description: "Build the torch-tensorrt python release (pre-cxx11-abi)"
@@ -1335,13 +1338,13 @@ parameters:
   # Nightly platform config
   torch-build:
     type: string
-    default: "2.1.0.dev20230613+cu121"
+    default: "2.1.0.dev20230613+cu121.with.pypi.cudnn"
   torchvision-build:
     type: string
     default: "0.16.0.dev20230613+cu121"
   torch-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/nightly/cu121"
+    default: "https://download.pytorch.org/whl/nightly/cu121_pypi_cudnn"
   torch-build-legacy:
     type: string
     default: "1.13.1+cu117"
@@ -1356,7 +1359,7 @@ parameters:
     default: true
   cudnn-version:
     type: string
-    default: "8.9.1.23"
+    default: "8.9.0.131"
   trt-version-short:
     type: string
     default: "8.6.1"
