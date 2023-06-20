@@ -1,7 +1,13 @@
 import torch
+import logging
+from dataclasses import replace, fields
 
+from torch_tensorrt.dynamo.backend._settings import CompilationSettings
 from typing import Any, Union, Sequence, Dict
 from torch_tensorrt import _Input, Device
+
+
+logger = logging.getLogger(__name__)
 
 
 def prepare_inputs(
@@ -66,3 +72,36 @@ def prepare_device(device: Union[Device, torch.device]) -> torch.device:
         )
 
     return device
+
+
+def parse_dynamo_kwargs(kwargs: Dict) -> CompilationSettings:
+    """Parses the kwargs field of a Dynamo backend
+
+    Args:
+        kwargs: Keyword arguments dictionary provided to the backend
+    Returns:
+        CompilationSettings object with relevant kwargs
+    """
+
+    # Initialize an empty CompilationSettings object
+    settings = CompilationSettings()
+
+    # If the user specifies keyword args, overwrite those fields in settings
+    # Validate all specified kwargs to ensure they are true fields of the dataclass
+    #
+    # Note: kwargs provided by torch.compile are wrapped in the "options" key
+    if kwargs:
+        if "options" in kwargs and len(kwargs) == 1:
+            kwargs = kwargs["options"]
+
+        valid_attrs = {attr.name for attr in fields(settings)}
+        valid_kwargs = {k: v for k, v in kwargs.items() if k in valid_attrs}
+        settings = replace(settings, **valid_kwargs)
+
+    # Enable debug/verbose mode if requested
+    if settings.debug:
+        logger.setLevel(logging.DEBUG)
+
+    logger.debug(f"Compiling with Settings:\n{settings}")
+
+    return settings
