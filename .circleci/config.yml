@@ -11,7 +11,7 @@ commands:
         default: "x86_64"
       version:
         type: string
-        default: "5.2.0"
+        default: "6.2.1"
     steps:
       - run:
           name: Install bazel
@@ -192,7 +192,7 @@ commands:
         default: "8.6.1.6-1"
       bazel-version:
         type: string
-        default: "5.2.0"
+        default: "6.2.1"
       bazel-platform:
         type: string
         default: "x86_64"
@@ -1330,7 +1330,7 @@ jobs:
 parameters:
   bazel-version:
     type: string
-    default: "5.2.0"
+    default: "6.2.1"
   python-version:
     type: string
     default: "3.9.4"
