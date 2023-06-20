@@ -1,6 +1,7 @@
 import logging
 import warnings
 from datetime import datetime
+from packaging import version
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence
 
 import numpy
@@ -40,6 +41,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         explicit_batch_dimension: bool = False,
         explicit_precision: bool = False,
         logger_level=None,
+        output_dtypes=None,
     ):
         super().__init__(module)
 
@@ -77,7 +79,8 @@ class TRTInterpreter(torch.fx.Interpreter):
         self._itensor_to_tensor_meta: Dict[
             trt.tensorrt.ITensor, TensorMetadata
         ] = dict()
-
+        # Data types for TRT Module output Tensors
+        self.output_dtypes = output_dtypes
     def validate_input_specs(self):
         for shape, _, _, shape_ranges, has_batch_dim in self.input_specs:
             if not self.network.has_implicit_batch_dimension:
@@ -163,6 +166,11 @@ class TRTInterpreter(torch.fx.Interpreter):
         timing_cache=None,
         profiling_verbosity=None,
         tactic_sources=None,
+        max_aux_streams=None,
+        version_compatible=False,
+        tactic_heuristic=False,
+        optimization_level=None,
+        faster_dynamic_shapes=None,
     ) -> TRTInterpreterResult:
         """
         Build TensorRT engine with some configs.
@@ -182,7 +190,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         TRT_INTERPRETER_CALL_PRE_OBSERVER.observe(self.module)
 
         # For float outputs, we set their dtype to fp16 only if lower_precision == LowerPrecision.FP16 and
-        # force_fp32_output=False.
+        # force_fp32_output=False. Overriden by specifying output_dtypes
         self.output_fp16 = (
             not force_fp32_output and lower_precision == LowerPrecision.FP16
         )
@@ -219,12 +227,31 @@ class TRTInterpreter(torch.fx.Interpreter):
             cache = builder_config.create_timing_cache(b"")
         builder_config.set_timing_cache(cache, False)
 
-        if trt.__version__ >= "8.2":
+        if version.parse(trt.__version__) >= version.parse("8.2"):
             builder_config.profiling_verbosity = (
                 profiling_verbosity
                 if profiling_verbosity
                 else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
             )
+
+        if version.parse(trt.__version__) >= version.parse("8.6"):
+            if max_aux_streams is not None:
+                _LOGGER.info(f"Setting max aux streams to {max_aux_streams}")
+                builder_config.max_aux_streams = max_aux_streams
+            if version_compatible:
+                _LOGGER.info(f"Using version compatible")
+                builder_config.set_flag(trt.BuilderFlag.VERSION_COMPATIBLE)
+            if optimization_level is not None:
+                _LOGGER.info(f"Using optimization level {optimization_level}")
+                builder_config.builder_optimization_level = optimization_level
+            if faster_dynamic_shapes is not None:
+                builder_config.set_preview_feature(trt.PreviewFeature.FASTER_DYNAMIC_SHAPES_0805, faster_dynamic_shapes);
+
+        if version.parse(trt.__version__) >= version.parse("8.5"):
+            if tactic_heuristic:
+                _LOGGER.info(f"Setting builder flag ENABLE_TACTIC_HEURISTIC")
+                builder_config.set_flag(trt.BuilderFlag.ENABLE_TACTIC_HEURISTIC)
+
         if lower_precision == LowerPrecision.FP16:
             builder_config.set_flag(trt.BuilderFlag.FP16)
 
@@ -251,6 +278,34 @@ class TRTInterpreter(torch.fx.Interpreter):
         engine = self.builder.build_engine(self.network, builder_config)
         assert engine
 
+        import os
+        def get_file_name(org):
+            file_name = org
+            i = 0
+            while os.path.exists(os.path.abspath(file_name)):
+                i += 1
+                file_name = org + str(i)
+            return file_name
+
+        engine_file = os.environ.get('TORCH_FX_DUMP_ENGINE')
+        if engine_file:
+            dump_file = get_file_name(engine_file)
+            print(f'Dumping engine to {dump_file}')
+            s = engine.serialize()
+            with open(dump_file, 'wb') as f:
+                f.write(s)
+        engine_info_file = os.environ.get('TORCH_FX_DUMP_ENGINE_INFO')
+        if engine_info_file:
+            inspector = engine.create_engine_inspector()
+            engine_info = inspector.get_engine_information(trt.LayerInformationFormat.JSON)
+            if engine_info is None or len(engine_info) == 0:
+                raise Exception('Engine info is empty')
+            else:
+                dump_file = get_file_name(engine_info_file)
+                print(f'Dumping engine info to {dump_file}')
+                with open(dump_file, 'w') as f:
+                    f.write(engine_info)
+
         serialized_cache = (
             bytearray(cache.serialize())
             if builder_config.get_timing_cache()
@@ -258,6 +313,9 @@ class TRTInterpreter(torch.fx.Interpreter):
         )
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
+        )
+        _LOGGER.info(
+            f"TRT Engine uses: {engine.device_memory_size} Memory"
         )
 
         return TRTInterpreterResult(
@@ -346,6 +404,11 @@ class TRTInterpreter(torch.fx.Interpreter):
         if not all(isinstance(output, trt.tensorrt.ITensor) for output in outputs):
             raise RuntimeError("TensorRT requires all outputs to be Tensor!")
 
+        if self.output_dtypes is not None and len(self.output_dtypes) != len(outputs):
+            raise RuntimeError(
+                f"Specified output dtypes ({len(self.output_dtypes)}) differ from number of outputs ({len(outputs)})"
+            )
+
         for i, output in enumerate(outputs):
             if any(
                 op_name in output.name.split("_")
@@ -370,6 +433,8 @@ class TRTInterpreter(torch.fx.Interpreter):
             self.network.mark_output(output)
             if output_bool:
                 output.dtype = trt.bool
+            elif self.output_dtypes is not None:
+                output.dtype = torch_dtype_to_trt(self.output_dtypes[i])
             elif self.output_fp16 and output.dtype == trt.float32:
                 output.dtype = trt.float16
             self._output_names.append(name)
