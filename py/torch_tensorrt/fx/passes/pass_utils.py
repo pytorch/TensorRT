@@ -217,7 +217,7 @@ def validate_inference(
                         _LOGGER.info(
                             f"Do a sanity check to see whether things are completely wrong with {new_atol=}, {new_rtol=}"
                         )
-                torch.testing.assert_close(x, y, **kwargs2)
+                        torch.testing.assert_close(x, y, **kwargs2)
                         return processed_module
                     else:
                         raise e
