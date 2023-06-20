@@ -160,7 +160,8 @@ c10::optional<at::ScalarType> get_value_first_calc_dtype_opt(torch::jit::Block* 
         LOG_GRAPH("Input outputs a Tensor");
         if (in->node()->kind() == torch::jit::prim::Constant) {
           LOG_GRAPH("Input is a constant");
-          auto const_val = in->node()->t(c10::attr::value);
+          auto const_val =
+              in->node()->t(c10::Symbol::fromDomainAndUnqualString(c10::attr::value.domainString(), "value"));
           LOG_GRAPH("Found that constant tensor has type: " << const_val.scalar_type());
           dtype = {const_val.scalar_type()};
           goto exit_first_calc_dtype;

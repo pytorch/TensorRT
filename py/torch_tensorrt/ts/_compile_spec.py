@@ -9,6 +9,8 @@ from torch_tensorrt.logging import Level, log
 from typing import Tuple, List, Dict
 import warnings
 from copy import deepcopy
+from torch_tensorrt.ts.ts_input import TSInput
+import tensorrt as trt
 
 
 def _internal_input_to_torch_class_input(i: _C.Input) -> torch.classes.tensorrt._Input:
@@ -17,6 +19,7 @@ def _internal_input_to_torch_class_input(i: _C.Input) -> torch.classes.tensorrt.
     clone._set_opt(i.opt)
     clone._set_max(i.max)
     clone._set_dtype(i.dtype)
+    clone._set_tensor_domain(i.tensor_domain)
     clone._set_format(i.format)
     clone._set_input_is_dynamic(i.input_is_dynamic)
     clone._set_explicit_set_dtype(i._explicit_set_dtype)
@@ -35,46 +38,6 @@ def _supported_input_size_type(input_size: Any) -> bool:
             "Input sizes for inputs are required to be a List, tuple or torch.Size or a Dict of three sizes (min, opt, max), found type: "
             + str(type(input_size))
         )
-
-
-def _parse_input_ranges(input_sizes: List) -> List:
-
-    if any(
-        not isinstance(i, dict) and not _supported_input_size_type(i)
-        for i in input_sizes
-    ):
-        raise KeyError(
-            "An input size must either be a static size or a range of three sizes (min, opt, max) as Dict"
-        )
-
-    parsed_input_sizes = []
-    for i in input_sizes:
-        if isinstance(i, dict):
-            if all(k in i for k in ["min", "opt", "min"]):
-                parsed_input_sizes.append(
-                    Input(
-                        min_shape=i["min"], opt_shape=i["opt"], max_shape=i["max"]
-                    )._to_internal()
-                )
-
-            elif "opt" in i:
-                parsed_input_sizes.append(Input(shape=i["opt"])._to_internal())
-
-            else:
-                raise KeyError(
-                    "An input size must either be a static size or a range of three sizes (min, opt, max) as Dict"
-                )
-
-        elif isinstance(i, list):
-            parsed_input_sizes.append(Input(shape=i)._to_internal())
-
-        elif isinstance(i, tuple):
-            parsed_input_sizes.append(Input(shape=i)._to_internal())
-
-        elif isinstance(i, torch.Size):
-            parsed_input_sizes.append(Input(shape=i)._to_internal())
-
-    return parsed_input_sizes
 
 
 def _parse_op_precision(precision: Any) -> _enums.dtype:
@@ -114,20 +77,24 @@ def _parse_enabled_precisions(precisions: Any) -> Set:
 def _parse_device_type(device: Any) -> _enums.DeviceType:
     if isinstance(device, torch.device):
         if device.type == "cuda":
-            return _enums.DeviceType.gpu
+            return _C.DeviceType.gpu
         else:
             ValueError(
                 "Got a device type other than GPU or DLA (type: "
                 + str(device.type)
                 + ")"
             )
-    elif isinstance(device, _enums.DeviceType):
+    elif isinstance(device, _C.DeviceType):
         return device
+    elif isinstance(device, trt.DeviceType):
+        if device == trt.DeviceType.DLA:
+            return _C.DeviceType.DLA
+        return _C.DeviceType.GPU
     elif isinstance(device, str):
         if device == "gpu" or device == "GPU":
-            return _enums.DeviceType.gpu
+            return _C.DeviceType.GPU
         elif device == "dla" or device == "DLA":
-            return _enums.DeviceType.dla
+            return _C.DeviceType.DLA
         else:
             ValueError(
                 "Got a device type other than GPU or DLA (type: " + str(device) + ")"
@@ -145,7 +112,6 @@ def _parse_device(device_info: Any) -> _C.Device:
         if "device_type" not in device_info:
             raise KeyError("Device type is required parameter")
         else:
-            assert isinstance(device_info["device_type"], _enums.DeviceType)
             info.device_type = _parse_device_type(device_info["device_type"])
 
         if "gpu_id" in device_info:
@@ -193,17 +159,22 @@ def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> _ts_C.TorchFallback:
     return info
 
 
-def _parse_input_signature(input_signature: Any):
+def _parse_input_signature(input_signature: Any, depth: int = 0):
+    if depth > 2:
+        raise AssertionError(
+            "Input nesting depth exceeds max supported depth, use 1 level: [A, B], or 2 level: [A, (B, C)]"
+        )
+
     if isinstance(input_signature, tuple):
         input_list = []
         for item in input_signature:
-            input = _parse_input_signature(item)
+            input = _parse_input_signature(item, depth + 1)
             input_list.append(input)
         return tuple(input_list)
     elif isinstance(input_signature, list):
         input_list = []
         for item in input_signature:
-            input = _parse_input_signature(item)
+            input = _parse_input_signature(item, depth + 1)
             input_list.append(input)
         return input_list
     elif isinstance(input_signature, Input) or isinstance(
@@ -214,7 +185,31 @@ def _parse_input_signature(input_signature: Any):
             if isinstance(input_signature, torch.Tensor)
             else input_signature
         )
-        clone = _internal_input_to_torch_class_input(i._to_internal())
+
+        if not i.is_trt_dtype():
+            raise TypeError(
+                "Using non-TRT input types with input_signature is not currently "
+                + "supported. Please specify inputs individually to use "
+                + "non-TRT types."
+            )
+
+        ts_i = i
+        if i.shape_mode == Input._ShapeMode.STATIC:
+            ts_i = TSInput(shape=i.shape, dtype=i.dtype, format=i.format)
+        elif i.shape_mode == Input._ShapeMode.DYNAMIC:
+            ts_i = TSInput(
+                min_shape=i.shape["min_shape"],
+                opt_shape=i.shape["opt_shape"],
+                max_shape=i.shape["max_shape"],
+                dtype=i.dtype,
+                format=i.format,
+            )
+        else:
+            raise ValueError(
+                "Invalid shape mode detected for input while parsing the input_signature"
+            )
+
+        clone = _internal_input_to_torch_class_input(ts_i._to_internal())
         return clone
     else:
         raise KeyError(
@@ -246,7 +241,25 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
             Input.from_tensor(i) if isinstance(i, torch.Tensor) else i
             for i in compile_spec["inputs"]
         ]
-        info.inputs = [i._to_internal() for i in inputs]
+        ts_inputs = []
+        for i in inputs:
+            if i.shape_mode == Input._ShapeMode.STATIC:
+                ts_inputs.append(
+                    TSInput(
+                        shape=i.shape, dtype=i.dtype, format=i.format
+                    )._to_internal()
+                )
+            elif i.shape_mode == Input._ShapeMode.DYNAMIC:
+                ts_inputs.append(
+                    TSInput(
+                        min_shape=i.shape["min_shape"],
+                        opt_shape=i.shape["opt_shape"],
+                        max_shape=i.shape["max_shape"],
+                        dtype=i.dtype,
+                        format=i.format,
+                    )._to_internal()
+                )
+        info.inputs = ts_inputs
 
     elif compile_spec["input_signature"] is not None:
         log(
@@ -255,41 +268,6 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
         )
         signature = _parse_input_signature(compile_spec["input_signature"])
         info.input_signature = _C.InputSignature(signature)  # py_object
-
-        if not compile_spec["torch_fallback"]["enabled"]:
-            raise ValueError(
-                "Grouped inputs currently requires partial compilation to be enabled, this restriction will be relaxed in a future release"
-            )
-
-        log(
-            Level.Debug,
-            "Grouped inputs currently requires additional settings to enable the feature",
-        )
-        log(
-            Level.Debug,
-            """Adding the following ops to torch_executed_ops:
-    - aten::__getitem__
-    - prim::ListConstruct
-    - prim::ListUnpack
-    - prim::TupleIndex
-    - prim::TupleConstruct
-    - prim::TupleUnpack
-""",
-        )
-        compile_spec["torch_fallback"]["forced_fallback_ops"].append(
-            "aten::__getitem__"
-        )
-        compile_spec["torch_fallback"]["forced_fallback_ops"].append(
-            "prim::ListConstruct"
-        )
-        compile_spec["torch_fallback"]["forced_fallback_ops"].append("prim::ListUnpack")
-        compile_spec["torch_fallback"]["forced_fallback_ops"].append("prim::TupleIndex")
-        compile_spec["torch_fallback"]["forced_fallback_ops"].append(
-            "prim::TupleConstruct"
-        )
-        compile_spec["torch_fallback"]["forced_fallback_ops"].append(
-            "prim::TupleUnpack"
-        )
 
     else:
         raise KeyError(
@@ -319,6 +297,10 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
     if "debug" in compile_spec:
         assert isinstance(compile_spec["debug"], bool)
         info.debug = compile_spec["debug"]
+
+    if "allow_shape_tensors" in compile_spec:
+        assert isinstance(compile_spec["allow_shape_tensors"], bool)
+        info.allow_shape_tensors = compile_spec["allow_shape_tensors"]
 
     if "device" in compile_spec:
         info.device = _parse_device(compile_spec["device"])
@@ -376,6 +358,7 @@ def TensorRTCompileSpec(
     dla_global_dram_size=536870912,
     truncate_long_and_double=False,
     calibrator=None,
+    allow_shape_tensors=False,
 ) -> torch.classes.tensorrt.CompileSpec:
     """Utility to create a formated spec dictionary for using the PyTorch TensorRT backend
 
@@ -410,6 +393,7 @@ def TensorRTCompileSpec(
         workspace_size (int): Maximum size of workspace given to TensorRT
         truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
+        allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
 
       Returns:
         torch.classes.tensorrt.CompileSpec: List of methods and formated spec objects to be provided to ``torch._C._jit_to_tensorrt``
@@ -432,6 +416,7 @@ def TensorRTCompileSpec(
         "dla_global_dram_size": dla_global_dram_size,  # Host RAM used by DLA to store weights and metadata for execution
         "calibrator": calibrator,
         "truncate_long_and_double": truncate_long_and_double,
+        "allow_shape_tensors": allow_shape_tensors,
     }
 
     parsed_spec = _parse_compile_spec(compile_spec)
@@ -483,6 +468,7 @@ def TensorRTCompileSpec(
     backend_spec._set_dla_local_dram_size(parsed_spec.dla_local_dram_size)
     backend_spec._set_dla_global_dram_size(parsed_spec.dla_global_dram_size)
     backend_spec._set_truncate_long_and_double(parsed_spec.truncate_long_and_double)
+    backend_spec._set_allow_shape_tensors(parsed_spec.allow_shape_tensors)
     backend_spec._set_ptq_calibrator(parsed_spec._get_calibrator_handle())
 
     return backend_spec

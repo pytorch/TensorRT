@@ -85,10 +85,10 @@ nvinfer1::ILayer* add_elementwise(
     const std::string& name) {
   if (self->getType() == nvinfer1::DataType::kFLOAT && other->getType() == nvinfer1::DataType::kINT32) {
     LOG_DEBUG("Type mismatch, casting other to " << self->getType());
-    other = castITensor(ctx, other, self->getType());
+    other = castITensor(ctx, other, self->getType(), name);
   } else if (self->getType() == nvinfer1::DataType::kINT32 && other->getType() == nvinfer1::DataType::kFLOAT) {
     LOG_DEBUG("Type mismatch, casting self to " << other->getType());
-    self = castITensor(ctx, self, other->getType());
+    self = castITensor(ctx, self, other->getType(), name);
   }
   // ensure self to have larger number of dimension
   bool swapSelfOther = false;
@@ -106,13 +106,13 @@ nvinfer1::ILayer* add_elementwise(
       LOG_DEBUG(
           "Element-wise op type promotion adding cast from " << self->getType() << " to " << promo_type << " for layer "
                                                              << name);
-      self = castITensor(ctx, self, promo_type);
+      self = castITensor(ctx, self, promo_type, name);
     }
     if (other->getType() != promo_type) {
       LOG_DEBUG(
           "Element-wise op type promotion adding cast from " << other->getType() << " to " << promo_type
                                                              << " for layer " << name);
-      other = castITensor(ctx, other, promo_type);
+      other = castITensor(ctx, other, promo_type, name);
     }
   }
 

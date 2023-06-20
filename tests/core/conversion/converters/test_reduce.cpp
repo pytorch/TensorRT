@@ -62,7 +62,7 @@ std::string gen_keepdim_graph(const std::string& op) {
         return (%5))IR";
 }
 
-void test_body(const std::string& graph, at::Tensor& in) {
+void test_body(const std::string& graph, at::Tensor& in, bool dynamic = false) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
@@ -71,7 +71,12 @@ void test_body(const std::string& graph, at::Tensor& in) {
 
   in = at::clone(in);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+  std::vector<at::Tensor> trt_results;
+  if (dynamic) {
+    trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in});
+  } else {
+    trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+  }
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 } // namespace
@@ -300,239 +305,90 @@ TEST(Converters, ATenMeanDimNegIndexKeepDimsConvertsCorrectly) {
   test_body(graph, in);
 }
 
-TEST(Converters, UnpackVarLowersCorrectly) {
+TEST(Converters, ATenAnyDimConvertsCorrectly) {
   const auto graph = R"IR(
-      graph(%x.1 : Tensor):
-        %5 : bool = prim::Constant[value=0]() # test_zeros.py:10:65
-        %4 : bool = prim::Constant[value=1]() # test_zeros.py:10:50
-        %3 : int = prim::Constant[value=0]() # test_zeros.py:10:39
-        %6 : int[] = prim::ListConstruct(%3)
-        %7 : Tensor = aten::var(%x.1, %6, %5, %4) # test_zeros.py:10:26
-        return (%7))IR";
-
-  auto in = at::randint(-5, 5, {4, 4, 4}, at::kCUDA);
-
-  auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, g.get());
-
-  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
-
-  in = at::clone(in);
-  torch_tensorrt::core::lowering::passes::UnpackVar(g);
-  torch::jit::EliminateCommonSubexpression(g);
-  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=1]()
+      %3 : bool = prim::Constant[value=0]()
+      %5 : Tensor = aten::any(%0, %1, %3)
+      return (%5))IR";
+  auto in = at::randint(0, 2, {4, 4, 4}, at::kCUDA);
+  test_body(graph, in);
 }
 
-TEST(Converters, UnpackVarKeepDimsLowersCorrectly) {
+TEST(Converters, ATenAnyDimAllFalseConvertsCorrectly) {
   const auto graph = R"IR(
-      graph(%x.1 : Tensor):
-        %5 : bool = prim::Constant[value=0]() # test_zeros.py:10:65
-        %4 : bool = prim::Constant[value=1]() # test_zeros.py:10:50
-        %3 : int = prim::Constant[value=0]() # test_zeros.py:10:39
-        %6 : int[] = prim::ListConstruct(%3)
-        %7 : Tensor = aten::var(%x.1, %6, %5, %5) # test_zeros.py:10:26
-        return (%7))IR";
-
-  auto in = at::randint(-5, 5, {4, 4, 4}, at::kCUDA);
-
-  auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, g.get());
-
-  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
-
-  in = at::clone(in);
-  torch_tensorrt::core::lowering::passes::UnpackVar(g);
-  torch::jit::EliminateCommonSubexpression(g);
-  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=2]()
+      %3 : bool = prim::Constant[value=0]()
+      %5 : Tensor = aten::any(%0, %1, %3)
+      return (%5))IR";
+  auto in = at::zeros({3, 7, 4}, at::kCUDA).to(torch::kBool);
+  test_body(graph, in);
 }
 
-TEST(Converters, UnpackVarUnbiasedLowersCorrectly) {
+TEST(Converters, ATenAnyDimKeepDimConvertsCorrectly) {
   const auto graph = R"IR(
-      graph(%x.1 : Tensor):
-        %5 : bool = prim::Constant[value=0]() # test_zeros.py:10:65
-        %4 : bool = prim::Constant[value=1]() # test_zeros.py:10:50
-        %3 : int = prim::Constant[value=0]() # test_zeros.py:10:39
-        %6 : int[] = prim::ListConstruct(%3)
-        %7 : Tensor = aten::var(%x.1, %6, %4, %4) # test_zeros.py:10:26
-        return (%7))IR";
-
-  auto in = at::randint(-5, 5, {4, 4, 4}, at::kCUDA);
-
-  auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, g.get());
-
-  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
-
-  in = at::clone(in);
-  torch_tensorrt::core::lowering::passes::UnpackVar(g);
-  torch::jit::EliminateCommonSubexpression(g);
-  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=1]()
+      %3 : bool = prim::Constant[value=1]()
+      %5 : Tensor = aten::any(%0, %1, %3)
+      return (%5))IR";
+  auto in = at::randint(0, 2, {4, 4, 4}, at::kCUDA).to(torch::kHalf);
+  test_body(graph, in);
 }
 
-TEST(Converters, UnpackVarUnbiasedKeepDimsLowersCorrectly) {
+TEST(Converters, ATenAnyDimNegIndexConvertsCorrectly) {
   const auto graph = R"IR(
-      graph(%x.1 : Tensor):
-        %5 : bool = prim::Constant[value=0]() # test_zeros.py:10:65
-        %4 : bool = prim::Constant[value=1]() # test_zeros.py:10:50
-        %3 : int = prim::Constant[value=0]() # test_zeros.py:10:39
-        %6 : int[] = prim::ListConstruct(%3)
-        %7 : Tensor = aten::var(%x.1, %6, %4, %5) # test_zeros.py:10:26
-        return (%7))IR";
-
-  auto in = at::randint(-5, 5, {4, 4, 4}, at::kCUDA);
-
-  auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, g.get());
-
-  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
-
-  in = at::clone(in);
-  torch_tensorrt::core::lowering::passes::UnpackVar(g);
-  torch::jit::EliminateCommonSubexpression(g);
-  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=-1]()
+      %3 : bool = prim::Constant[value=1]()
+      %5 : Tensor = aten::any(%0, %1, %3)
+      return (%5))IR";
+  auto in = at::randint(-2, 2, {2, 32}, at::kCUDA);
+  test_body(graph, in);
 }
 
-TEST(Converters, UnpackStdLowersCorrectly) {
+TEST(Converters, ATenAllDimConvertsCorrectly) {
   const auto graph = R"IR(
-      graph(%x.1 : Tensor):
-        %5 : bool = prim::Constant[value=0]() # test_zeros.py:10:65
-        %4 : bool = prim::Constant[value=1]() # test_zeros.py:10:50
-        %3 : int = prim::Constant[value=0]() # test_zeros.py:10:39
-        %6 : int[] = prim::ListConstruct(%3)
-        %7 : Tensor = aten::std(%x.1, %6, %5, %4) # test_zeros.py:10:26
-        return (%7))IR";
-
-  auto in = at::randint(-5, 5, {4, 4, 4}, at::kCUDA);
-
-  auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, g.get());
-
-  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
-
-  in = at::clone(in);
-  torch_tensorrt::core::lowering::passes::UnpackStd(g);
-  torch_tensorrt::core::lowering::passes::UnpackVar(g);
-  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=-1]()
+      %3 : bool = prim::Constant[value=0]()
+      %5 : Tensor = aten::all(%0, %1, %3)
+      return (%5))IR";
+  auto in = at::randint(0, 2, {64, 2}, at::kCUDA);
+  test_body(graph, in);
 }
 
-TEST(Converters, UnpackStdKeepDimsLowersCorrectly) {
+TEST(Converters, ATenAllDimKeepDimConvertsCorrectly) {
   const auto graph = R"IR(
-      graph(%x.1 : Tensor):
-        %5 : bool = prim::Constant[value=0]() # test_zeros.py:10:65
-        %4 : bool = prim::Constant[value=1]() # test_zeros.py:10:50
-        %3 : int = prim::Constant[value=0]() # test_zeros.py:10:39
-        %6 : int[] = prim::ListConstruct(%3)
-        %7 : Tensor = aten::std(%x.1, %6, %5, %5) # test_zeros.py:10:26
-        return (%7))IR";
-
-  auto in = at::randint(-5, 5, {4, 4, 4}, at::kCUDA);
-
-  auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, g.get());
-
-  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
-
-  in = at::clone(in);
-  torch_tensorrt::core::lowering::passes::UnpackStd(g);
-  torch_tensorrt::core::lowering::passes::UnpackVar(g);
-  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=0]()
+      %3 : bool = prim::Constant[value=1]()
+      %5 : Tensor = aten::all(%0, %1, %3)
+      return (%5))IR";
+  auto in = at::randint(-2, 2, {2, 32}, at::kCUDA).to(torch::kBool);
+  test_body(graph, in);
 }
 
-TEST(Converters, UnpackStdUnbiasedLowersCorrectly) {
+TEST(Converters, ATenAllDimAllTrueConvertsCorrectly) {
   const auto graph = R"IR(
-      graph(%x.1 : Tensor):
-        %5 : bool = prim::Constant[value=0]() # test_zeros.py:10:65
-        %4 : bool = prim::Constant[value=1]() # test_zeros.py:10:50
-        %3 : int = prim::Constant[value=0]() # test_zeros.py:10:39
-        %6 : int[] = prim::ListConstruct(%3)
-        %7 : Tensor = aten::std(%x.1, %6, %4, %4) # test_zeros.py:10:26
-        return (%7))IR";
-
-  auto in = at::randint(-5, 5, {4, 4, 4}, at::kCUDA);
-
-  auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, g.get());
-
-  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
-
-  in = at::clone(in);
-  torch_tensorrt::core::lowering::passes::UnpackStd(g);
-  torch_tensorrt::core::lowering::passes::UnpackVar(g);
-  torch::jit::EliminateCommonSubexpression(g);
-  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=1]()
+      %3 : bool = prim::Constant[value=0]()
+      %5 : Tensor = aten::all(%0, %1, %3)
+      return (%5))IR";
+  auto in = at::ones({2, 32}, at::kCUDA);
+  test_body(graph, in);
 }
 
-TEST(Converters, UnpackStdUnbiasedKeepDimsLowersCorrectly) {
+TEST(Converters, ATenAllDimDynamicConvertsCorrectly) {
   const auto graph = R"IR(
-      graph(%x.1 : Tensor):
-        %5 : bool = prim::Constant[value=0]() # test_zeros.py:10:65
-        %4 : bool = prim::Constant[value=1]() # test_zeros.py:10:50
-        %3 : int = prim::Constant[value=0]() # test_zeros.py:10:39
-        %one : int = prim::Constant[value=1]()
-        %6 : int[] = prim::ListConstruct(%3, %one)
-        %7 : Tensor = aten::std(%x.1, %6, %4, %5) # test_zeros.py:10:26
-        return (%7))IR";
-
-  auto in = at::randint(-5, 5, {4, 4, 4}, at::kCUDA);
-
-  auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, g.get());
-
-  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
-
-  in = at::clone(in);
-  torch_tensorrt::core::lowering::passes::UnpackStd(g);
-  torch_tensorrt::core::lowering::passes::UnpackVar(g);
-  torch::jit::EliminateCommonSubexpression(g);
-  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
-}
-
-TEST(Converters, UnpackVarUnbiasedNegAxisLowersCorrectly) {
-  const auto graph = R"IR(
-      graph(%x.1 : Tensor):
-        %37 : bool = prim::Constant[value=1]()
-        %53 : int[] = prim::Constant[value=[-1]]()
-        %69 : Tensor = aten::var(%x.1, %53, %37, %37)
-        return (%69))IR";
-
-  auto in = at::randint(-5, 5, {2, 20, 768}, at::kCUDA).to(at::kFloat);
-
-  auto jit_in = at::clone(in);
-  auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, g.get());
-
-  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
-
-  in = at::clone(in);
-  torch_tensorrt::core::lowering::passes::UnpackVar(g);
-  torch::jit::EliminateCommonSubexpression(g);
-  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {jit_in});
-
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=-1]()
+      %3 : bool = prim::Constant[value=0]()
+      %5 : Tensor = aten::all(%0, %1, %3)
+      return (%5))IR";
+  auto in = at::randint(0, 2, {64, 2}, at::kCUDA).to(torch::kHalf);
+  test_body(graph, in, true);
 }

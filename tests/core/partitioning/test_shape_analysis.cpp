@@ -137,3 +137,37 @@ TEST(Partitioning, InferBranchModelSegmentedBlockShapeCorrectly) {
        {{3, 32, 16, 16}},
        {{3, 32, 16, 16}, {16, 32, 3, 3}, {16}, {3, 16, 16, 16}}}));
 }
+
+TEST(Partitioning, PopulateInputIValuesDynamic) {
+  const auto graph = R"IR(
+          graph(%0 : Tensor, %1 : Tensor):
+            %2 : float = prim::Constant[value=1]()
+            %30 : Tensor = aten::add(%0, %1, %2)
+            return (%30))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get(), true);
+
+  torch_tensorrt::core::partitioning::PartitioningInfo partitioning_info;
+  partitioning_info.enabled = true;
+  partitioning_info.truncate_long_and_double = true;
+  std::vector<torch_tensorrt::core::ir::Input> inputs;
+
+  inputs.push_back(torch_tensorrt::core::ir::Input({1}, {2}, {3}));
+  inputs.push_back(torch_tensorrt::core::ir::Input({1}));
+
+  std::unordered_map<const torch::jit::Value*, std::vector<torch_tensorrt::core::ir::Input>> inputs_map;
+  std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>> input_types;
+  inputs_map.insert({g->inputs()[0], {inputs[0]}});
+  inputs_map.insert({g->inputs()[1], {inputs[1]}});
+  input_types.insert({g->inputs()[0], {{at::kFloat}}});
+  input_types.insert({g->inputs()[1], {{at::kFloat}}});
+
+  partitioning_info.collection_input_spec_map = inputs_map;
+  torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
+  ctx.input_types_map = input_types;
+
+  torch_tensorrt::core::partitioning::populateInputIValues(&ctx);
+  ASSERT_EQ(ctx.min_input_ivalues_map.size(), 2UL);
+  ASSERT_EQ(ctx.max_input_ivalues_map.size(), 2UL);
+}

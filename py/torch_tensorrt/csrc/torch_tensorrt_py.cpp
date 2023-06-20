@@ -158,7 +158,8 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec& info
 
 py::bytes ConvertGraphToTRTEngine(const torch::jit::Module& mod, const std::string& method_name, CompileSpec& info) {
   py::gil_scoped_acquire gil;
-  auto trt_engine = core::ConvertGraphToTRTEngine(mod, method_name, info.toInternalCompileSpec());
+  auto trt_engine = core::ConvertGraphToTRTEngine(
+      mod, method_name, info.toInternalCompileSpec(/*bool converting_to_trt_engine=*/true));
   return py::bytes(trt_engine);
 }
 
@@ -223,6 +224,7 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("input_is_dynamic", &Input::input_is_dynamic)
       .def_readwrite("_explicit_set_dtype", &Input::explicit_set_dtype)
       .def_readwrite("dtype", &Input::dtype)
+      .def_readwrite("tensor_domain", &Input::tensor_domain)
       .def_readwrite("format", &Input::format);
 
   py::class_<InputSignature>(m, "InputSignature")
@@ -242,6 +244,8 @@ PYBIND11_MODULE(_C, m) {
       .value("float16", DataType::kHalf, "16 bit floating point number")
       .value("int8", DataType::kChar, "8 bit integer number")
       .value("int32", DataType::kInt32, "32 bit integer number")
+      .value("long", DataType::kLong, "64 bit integer number")
+      .value("int64", DataType::kLong, "64 bit integer number")
       .value("bool", DataType::kBool, "Boolean value")
       .value("unknown", DataType::kUnknown, "Unknown data type")
       .export_values();
@@ -368,7 +372,8 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("dla_local_dram_size", &CompileSpec::dla_local_dram_size)
       .def_readwrite("dla_global_dram_size", &CompileSpec::dla_global_dram_size)
       .def_readwrite("torch_fallback", &CompileSpec::torch_fallback)
-      .def_readwrite("truncate_long_and_double", &CompileSpec::truncate_long_and_double);
+      .def_readwrite("truncate_long_and_double", &CompileSpec::truncate_long_and_double)
+      .def_readwrite("allow_shape_tensors", &CompileSpec::allow_shape_tensors);
 
   py::class_<TorchFallback>(ts_sub_mod, "TorchFallback")
       .def(py::init<>())

@@ -47,6 +47,23 @@ class TestTRTModule(TestCase):
                 self.assertEqual(batch_size, shape[0])
                 self.assertSequenceEqual(tensor.shape[1:], shape[1:])
 
+    def test_from_tensors_with_dynamic_batch_size_no_bs_input(self):
+        tensors = [torch.randn(1, 2, 3), torch.randn(1, 4), torch.randn(72, 16)]
+        batch_size_range = [2, 3, 4]
+        specs = InputTensorSpec.from_tensors_with_dynamic_batch_size(
+            tensors, batch_size_range
+        )
+        for index, (spec, tensor) in enumerate(zip(specs, tensors)):
+            if index == 2:
+                for a, b in zip(spec.shape, tensor.shape):
+                    self.assertEqual(a, b)
+            else:
+                self._validate_spec(spec, tensor, dynamic_dims=[0])
+
+                for batch_size, shape in zip(batch_size_range, spec.shape_ranges[0]):
+                    self.assertEqual(batch_size, shape[0])
+                    self.assertSequenceEqual(tensor.shape[1:], shape[1:])
+
     def test_from_tensors_with_dynamic_batch_size_different_batch_dims(self):
         tensors = [torch.randn(1, 2, 3), torch.randn(2, 1, 4)]
         batch_size_range = [2, 3, 4]
@@ -86,6 +103,22 @@ class TestTRTModule(TestCase):
         specs = generate_input_specs(inputs, lower_setting, additional_inputs)
         for spec, tensor in zip(specs, inputs):
             self._validate_spec(spec, tensor, dynamic_dims=[1])
+            self.assertEqual(len(spec.shape_ranges), lower_setting.opt_profile_replica)
+
+        # Explicit batch dim with inputs w/ different batch dims.
+        bs = 10
+        inputs = [
+            torch.randn(bs, 1, 2),
+            torch.randn(bs, 10, 3),
+            torch.randn(4, bs, 5),
+            torch.randn(bs, 2, 5),
+        ]
+        specs = generate_input_specs(inputs, lower_setting)
+        for idx, (spec, tensor) in enumerate(zip(specs, inputs)):
+            if idx == 2:
+                self._validate_spec(spec, tensor, dynamic_dims=[1])
+            else:
+                self._validate_spec(spec, tensor, dynamic_dims=[0])
             self.assertEqual(len(spec.shape_ranges), lower_setting.opt_profile_replica)
 
 

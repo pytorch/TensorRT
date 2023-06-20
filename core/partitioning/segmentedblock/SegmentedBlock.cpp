@@ -62,13 +62,13 @@ std::vector<ir::Input> SegmentedBlock::construct_inputs_spec() const {
   if (min_shapes_.size() == opt_shapes_.size() && opt_shapes_.size() == max_shapes_.size()) {
     for (uint64_t i = 0; i < opt_shapes_.size(); i++) {
       auto in = ir::Input(min_shapes_[i], opt_shapes_[i], max_shapes_[i]);
-      in.dtype = util::ScalarTypeToTRTDataType(in_types_[i]);
+      in.dtype = in_types_[i];
       inputs.push_back(in);
     }
   } else {
     for (uint64_t i = 0; i < opt_shapes_.size(); i++) {
       auto in = ir::Input(opt_shapes_[i]);
-      in.dtype = util::ScalarTypeToTRTDataType(in_types_[i]);
+      in.dtype = in_types_[i];
       inputs.push_back(in);
     }
   }

@@ -86,7 +86,7 @@ class TestModels(unittest.TestCase):
 
     def test_bert_base_uncased(self):
         self.model = cm.BertModule().cuda()
-        self.input = torch.randint(0, 5, (1, 14), dtype=torch.int32).to("cuda")
+        self.input = torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda")
 
         compile_spec = {
             "inputs": [

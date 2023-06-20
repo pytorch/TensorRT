@@ -16,6 +16,13 @@ import subprocess
 import platform
 import warnings
 
+from versions import (
+    __version__,
+    __cuda_version__,
+    __cudnn_version__,
+    __tensorrt_version__,
+)
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 CXX11_ABI = False
@@ -24,14 +31,11 @@ JETPACK_VERSION = None
 
 FX_ONLY = False
 
+LEGACY = False
+
 RELEASE = False
 
 CI_RELEASE = False
-
-__version__ = "1.4.0dev0"
-__cuda_version__ = "11.6"
-__cudnn_version__ = "8.4"
-__tensorrt_version__ = "8.4"
 
 
 def get_git_revision_short_hash() -> str:
@@ -45,6 +49,10 @@ def get_git_revision_short_hash() -> str:
 if "--fx-only" in sys.argv:
     FX_ONLY = True
     sys.argv.remove("--fx-only")
+
+if "--legacy" in sys.argv:
+    LEGACY = True
+    sys.argv.remove("--legacy")
 
 if "--release" not in sys.argv:
     __version__ = __version__ + "+" + get_git_revision_short_hash()
@@ -353,6 +361,11 @@ if FX_ONLY:
         "torch_tensorrt.fx.passes",
         "torch_tensorrt.fx.tools",
         "torch_tensorrt.fx.tracer.acc_tracer",
+        "torch_tensorrt.fx.tracer.dispatch_tracer",
+        "torch_tensorrt.dynamo",
+        "torch_tensorrt.dynamo.fx_ts_compat",
+        "torch_tensorrt.dynamo.fx_ts_compat.passes",
+        "torch_tensorrt.dynamo.fx_ts_compat.tools",
     ]
     package_dir = {
         "torch_tensorrt.fx": "torch_tensorrt/fx",
@@ -360,10 +373,47 @@ if FX_ONLY:
         "torch_tensorrt.fx.passes": "torch_tensorrt/fx/passes",
         "torch_tensorrt.fx.tools": "torch_tensorrt/fx/tools",
         "torch_tensorrt.fx.tracer.acc_tracer": "torch_tensorrt/fx/tracer/acc_tracer",
+        "torch_tensorrt.fx.tracer.dispatch_tracer": "torch_tensorrt/fx/tracer/dispatch_tracer",
+        "torch_tensorrt.dynamo": "torch_tensorrt/dynamo",
+        "torch_tensorrt.dynamo.fx_ts_compat": "torch_tensorrt/dynamo/fx_ts_compat",
+        "torch_tensorrt.dynamo.fx_ts_compat.passes": "torch_tensorrt/dynamo/fx_ts_compat/passes",
+        "torch_tensorrt.dynamo.fx_ts_compat.tools": "torch_tensorrt/dynamo/fx_ts_compat/tools",
     }
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
+
+if FX_ONLY:
+    package_data_list = [
+        "_Input.py",
+    ]
+else:
+    package_data_list = [
+        "lib/*",
+        "include/torch_tensorrt/*.h",
+        "include/torch_tensorrt/core/*.h",
+        "include/torch_tensorrt/core/conversion/*.h",
+        "include/torch_tensorrt/core/conversion/conversionctx/*.h",
+        "include/torch_tensorrt/core/conversion/converters/*.h",
+        "include/torch_tensorrt/core/conversion/evaluators/*.h",
+        "include/torch_tensorrt/core/conversion/tensorcontainer/*.h",
+        "include/torch_tensorrt/core/conversion/var/*.h",
+        "include/torch_tensorrt/core/ir/*.h",
+        "include/torch_tensorrt/core/lowering/*.h",
+        "include/torch_tensorrt/core/lowering/passes/*.h",
+        "include/torch_tensorrt/core/partitioning/*.h",
+        "include/torch_tensorrt/core/partitioning/segmentedblock/*.h",
+        "include/torch_tensorrt/core/partitioning/partitioninginfo/*.h",
+        "include/torch_tensorrt/core/partitioning/partitioningctx/*.h",
+        "include/torch_tensorrt/core/plugins/*.h",
+        "include/torch_tensorrt/core/plugins/impl/*.h",
+        "include/torch_tensorrt/core/runtime/*.h",
+        "include/torch_tensorrt/core/util/*.h",
+        "include/torch_tensorrt/core/util/logging/*.h",
+        "bin/*",
+        "BUILD",
+        "WORKSPACE",
+    ]
 
 setup(
     name="torch_tensorrt",
@@ -376,7 +426,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        "torch>=1.14.0.dev0",
+        "torch >=2.1.dev,<2.2" if not LEGACY else "torch >=1.13.0,<2.0",
     ],
     setup_requires=[],
     cmdclass={
@@ -391,7 +441,7 @@ setup(
     packages=packages if FX_ONLY else find_packages(),
     package_dir=package_dir if FX_ONLY else {},
     classifiers=[
-        "Development Status :: 5 - Stable",
+        "Development Status :: 5 - Production/Stable",
         "Environment :: GPU :: NVIDIA CUDA",
         "License :: OSI Approved :: BSD License",
         "Intended Audience :: Developers",
@@ -405,35 +455,10 @@ setup(
         "Topic :: Software Development",
         "Topic :: Software Development :: Libraries",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     include_package_data=True,
     package_data={
-        "torch_tensorrt": [
-            "lib/*",
-            "include/torch_tensorrt/*.h",
-            "include/torch_tensorrt/core/*.h",
-            "include/torch_tensorrt/core/conversion/*.h",
-            "include/torch_tensorrt/core/conversion/conversionctx/*.h",
-            "include/torch_tensorrt/core/conversion/converters/*.h",
-            "include/torch_tensorrt/core/conversion/evaluators/*.h",
-            "include/torch_tensorrt/core/conversion/tensorcontainer/*.h",
-            "include/torch_tensorrt/core/conversion/var/*.h",
-            "include/torch_tensorrt/core/ir/*.h",
-            "include/torch_tensorrt/core/lowering/*.h",
-            "include/torch_tensorrt/core/lowering/passes/*.h",
-            "include/torch_tensorrt/core/partitioning/*.h",
-            "include/torch_tensorrt/core/partitioning/segmentedblock/*.h",
-            "include/torch_tensorrt/core/partitioning/partitioninginfo/*.h",
-            "include/torch_tensorrt/core/partitioning/partitioningctx/*.h",
-            "include/torch_tensorrt/core/plugins/*.h",
-            "include/torch_tensorrt/core/plugins/impl/*.h",
-            "include/torch_tensorrt/core/runtime/*.h",
-            "include/torch_tensorrt/core/util/*.h",
-            "include/torch_tensorrt/core/util/logging/*.h",
-            "bin/*",
-            "BUILD",
-            "WORKSPACE",
-        ],
+        "torch_tensorrt": package_data_list,
     },
     exclude_package_data={
         "": ["*.cpp"],

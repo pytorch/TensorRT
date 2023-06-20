@@ -29,6 +29,29 @@ TEST(Converters, ATenMaxDimConvertsCorrectly) {
       torch_tensorrt::tests::util::almostEqual(jit_results[1], trt_results[1].reshape_as(jit_results[1]), 2e-6));
 }
 
+TEST(Converters, ATenMaxDimIntInputConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+      %2 : int = prim::Constant[value=0]()
+      %3 : bool = prim::Constant[value=0]()
+      %4 : Tensor, %5 : Tensor = aten::max(%x.1, %2, %3)
+      return (%4, %5))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(-5, 5, {5, 5}, {at::kCUDA});
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[1], trt_results[1], 2e-6));
+}
+
 TEST(Converters, ATenMinDimConvertsCorrectly) {
   const auto graph = R"IR(
     graph(%x.1 : Tensor):
@@ -75,6 +98,28 @@ TEST(Converters, ATenArgMaxConvertsCorrectly) {
 
   ASSERT_TRUE(
       torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+}
+
+TEST(Converters, ATenArgMaxIntInputConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+      %2 : int = prim::Constant[value=0]()
+      %3 : bool = prim::Constant[value=0]()
+      %4 : Tensor = aten::argmax(%x.1, %2, %3)
+      return (%4))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(-5, 5, {5, 5}, {at::kCUDA});
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenArgMaxKeepdimConvertsCorrectly) {

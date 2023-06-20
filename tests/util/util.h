@@ -8,17 +8,20 @@
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/ir/irparser.h"
 
+const float ATOL = 1e-8;
+const float RTOL = 1e-5;
+const float COSINE_THRESHOLD = 0.99f;
+const float THRESHOLD_E5 = 1e-5;
+
 namespace torch_tensorrt {
 namespace tests {
 namespace util {
 
-const float ATOL = 1e-8;
-const float RTOL = 1e-5;
-const float COSINE_THRESHOLD = 0.99f;
-
 bool cosineSimEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float threshold = COSINE_THRESHOLD);
 
 bool almostEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float atol = ATOL, float rtol = RTOL);
+
+bool sameShape(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor);
 
 bool exactlyEqual(const at::Tensor& a, const at::Tensor& b);
 
@@ -54,7 +57,8 @@ std::vector<at::Tensor> RunGraphEngineDynamic(
     std::shared_ptr<torch::jit::Graph>& g,
     core::ir::StaticParams& named_params,
     std::vector<at::Tensor> inputs,
-    bool dynamic_batch = false);
+    bool dynamic_batch = false,
+    bool allow_shape_tensors = false);
 
 // Run the forward method of a module and return results
 torch::jit::IValue RunModuleForward(torch::jit::Module& mod, std::vector<torch::jit::IValue> inputs);

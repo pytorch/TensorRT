@@ -10,7 +10,7 @@ namespace torch_tensorrt {
 torch_tensorrt::core::runtime::RTDevice to_internal_rt_device(Device device);
 namespace torchscript {
 // Defined in compile_spec.cpp
-torch_tensorrt::core::CompileSpec to_internal_compile_spec(CompileSpec external);
+torch_tensorrt::core::CompileSpec to_internal_compile_spec(CompileSpec external, bool converting_to_trt_engine = false);
 
 bool check_method_operator_support(const torch::jit::script::Module& module, std::string method_name) {
   return torch_tensorrt::core::CheckMethodOperatorSupport(module, method_name);
@@ -23,7 +23,8 @@ std::string convert_method_to_trt_engine(
   LOG_DEBUG(get_build_info());
   // Want to export a much simpler (non TRT header dependent) API so doing the
   // type conversion here
-  return torch_tensorrt::core::ConvertGraphToTRTEngine(module, method_name, to_internal_compile_spec(info));
+  return torch_tensorrt::core::ConvertGraphToTRTEngine(
+      module, method_name, to_internal_compile_spec(info, /*bool converting_to_trt_engine=*/true));
 }
 
 torch::jit::script::Module compile(const torch::jit::script::Module& module, CompileSpec info) {

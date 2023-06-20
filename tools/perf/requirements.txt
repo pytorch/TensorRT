@@ -2,4 +2,4 @@ timeit
 numpy
 argparse
 yaml
-pandas
+pandas==2.0.1

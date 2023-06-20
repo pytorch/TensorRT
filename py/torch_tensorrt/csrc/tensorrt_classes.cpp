@@ -16,6 +16,8 @@ std::string to_str(DataType value) {
       return "Bool";
     case DataType::kFloat:
       return "Float";
+    case DataType::kLong:
+      return "Long";
     default:
       return "Unknown data type";
   }
@@ -29,12 +31,35 @@ nvinfer1::DataType toTRTDataType(DataType value) {
       return nvinfer1::DataType::kHALF;
     case DataType::kInt32:
       return nvinfer1::DataType::kINT32;
+    case DataType::kLong:
+      return nvinfer1::DataType::kINT32;
     case DataType::kBool:
       return nvinfer1::DataType::kBOOL;
     case DataType::kFloat:
       return nvinfer1::DataType::kFLOAT;
     case DataType::kUnknown:
       return nvinfer1::DataType::kFLOAT;
+    default:
+      TORCHTRT_THROW_ERROR("Unknown data type: " << to_str(value));
+  }
+}
+
+at::ScalarType toAtenDataType(DataType value) {
+  switch (value) {
+    case DataType::kChar:
+      return at::kChar;
+    case DataType::kHalf:
+      return at::kHalf;
+    case DataType::kInt32:
+      return at::kInt;
+    case DataType::kLong:
+      return at::kLong;
+    case DataType::kBool:
+      return at::kBool;
+    case DataType::kFloat:
+      return at::kFloat;
+    case DataType::kUnknown:
+      return at::kFloat;
     default:
       TORCHTRT_THROW_ERROR("Unknown data type: " << to_str(value));
   }
@@ -70,9 +95,10 @@ std::string to_str(TensorFormat value) {
 
 core::ir::Input Input::toInternalInput() {
   if (!input_is_dynamic) {
-    return core::ir::Input(opt, toTRTDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype);
+    return core::ir::Input(opt, toAtenDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype, tensor_domain);
   } else {
-    return core::ir::Input(min, opt, max, toTRTDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype);
+    return core::ir::Input(
+        min, opt, max, toAtenDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype, tensor_domain);
   }
 }
 
@@ -84,6 +110,12 @@ std::string Input::to_str() {
       ss << i << ',';
     }
     ss << ')';
+    return ss.str();
+  };
+
+  auto domain_to_str = [](std::vector<double> domain) -> std::string {
+    std::stringstream ss;
+    ss << "[" << domain[0] << ", " << domain[1] << ")";
     return ss.str();
   };
 
@@ -99,7 +131,8 @@ std::string Input::to_str() {
   }
 
   ss << "dtype=" << pyapi::to_str(dtype) << ", ";
-  ss << "format=" << pyapi::to_str(format) << ')';
+  ss << "format=" << pyapi::to_str(format) << ", ";
+  ss << "tensor_domain=" << domain_to_str(tensor_domain) << ")";
 
   return ss.str();
 }
@@ -293,8 +326,10 @@ core::CompileSpec init_compile_spec(CompileSpec external) {
   }
 }
 
-core::CompileSpec CompileSpec::toInternalCompileSpec() {
+core::CompileSpec CompileSpec::toInternalCompileSpec(bool converting_to_trt_engine) {
   core::CompileSpec info = init_compile_spec(*this);
+
+  info.lower_info.converting_to_trt_engine = converting_to_trt_engine;
 
   for (auto p : enabled_precisions) {
     info.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));
@@ -340,6 +375,7 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.partitioning_info.truncate_long_and_double = truncate_long_and_double;
   info.lower_info.forced_fallback_modules = torch_fallback.forced_fallback_modules;
   info.convert_info.engine_settings.truncate_long_and_double = truncate_long_and_double;
+  info.convert_info.engine_settings.allow_shape_tensors = allow_shape_tensors;
 
   info.convert_info.engine_settings.capability = toTRTEngineCapability(capability);
   TORCHTRT_CHECK(num_avg_timing_iters >= 0, "num_avg_timing_iters must be 0 or greater");
@@ -390,6 +426,7 @@ std::string CompileSpec::stringify() {
   ss << "    \"DLA Local DRAM Size\": " << dla_local_dram_size << std::endl;
   ss << "    \"DLA Global DRAM Size\": " << dla_global_dram_size << std::endl;
   ss << "    \"Truncate long and double\": " << truncate_long_and_double << std::endl;
+  ss << "    \"Allow Shape tensors\": " << allow_shape_tensors << std::endl;
   ss << "    \"Torch Fallback\": " << torch_fallback.to_str();
   ss << "}";
   return ss.str();

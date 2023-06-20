@@ -1,4 +1,5 @@
 import logging
+import os
 import warnings
 from datetime import datetime
 from packaging import version
@@ -219,6 +220,11 @@ class TRTInterpreter(torch.fx.Interpreter):
         builder_config = self.builder.create_builder_config()
         builder_config.max_workspace_size = max_workspace_size
 
+        # Speed up TRT build time in the test environment
+        if trt.__version__ >= "8.6" and os.environ.get("TRT_TEST_ENV", "0") == "1":
+            _LOGGER.info("Set TRT optimization level to 0")
+            builder_config.builder_optimization_level = 0
+
         cache = None
         if timing_cache:
             cache_file = numpy.array(timing_cache)
@@ -399,7 +405,12 @@ class TRTInterpreter(torch.fx.Interpreter):
 
     def output(self, target, args, kwargs):
         assert len(args) == 1
-        outputs = args[0] if isinstance(args[0], tuple) else (args[0],)
+        if isinstance(args[0], tuple):
+            outputs = args[0]
+        elif isinstance(args[0], list):
+            outputs = tuple(args[0])
+        else:
+            outputs = (args[0],)
 
         if not all(isinstance(output, trt.tensorrt.ITensor) for output in outputs):
             raise RuntimeError("TensorRT requires all outputs to be Tensor!")

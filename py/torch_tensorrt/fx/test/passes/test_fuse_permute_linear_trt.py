@@ -1,5 +1,7 @@
 # Owner(s): ["oncall: gpu_enablement"]
 
+import unittest
+
 import torch
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from torch.testing._internal.common_utils import run_tests
@@ -74,6 +76,8 @@ class TestFusePermuteLinear(AccTestCase):
             inputs,
             {trt_transposed_linear},
             apply_passes=[fuse_permute_linear],
+            rtol=5e-3,
+            atol=2e-3,
         )
 
 

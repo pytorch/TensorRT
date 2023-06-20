@@ -1,7 +1,6 @@
 import torch
 import torch._dynamo as torchdynamo
 from parameterized import parameterized
-from torch._dynamo.optimizations import backends
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.fx.passes.lower_basic_pass import transform_setitem
 from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
@@ -507,93 +506,93 @@ class TestTransformSetitem(AccTestCase):
         optimize_mod(*inputs)
 
     # test with torchdynamo
-    def test_setitem1d_trt(self):
-        class TestModule(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
+    # def test_setitem1d_trt(self):
+    #     class TestModule(torch.nn.Module):
+    #         def __init__(self):
+    #             super().__init__()
 
-            def forward(self, x, y):
-                y[1] = x
-                return y
+    #         def forward(self, x, y):
+    #             y[1] = x
+    #             return y
 
-        inputs = [torch.randn(1), torch.randn(3)]
-        m = TestModule()
+    #     inputs = [torch.randn(1), torch.randn(3)]
+    #     m = TestModule()
 
-        inputs = [i.cuda() for i in inputs]
-        m.cuda()
-        ref_output = m(*inputs)
+    #     inputs = [i.cuda() for i in inputs]
+    #     m.cuda()
+    #     ref_output = m(*inputs)
 
-        optimize_mod = torchdynamo.optimize(backends.fx2trt_compiler, nopython=True)(m)
+    #     optimize_mod = torchdynamo.optimize(backends.fx2trt_compiler, nopython=True)(m)
 
-        output = optimize_mod(*inputs)
-        self.assertTrue(torch.allclose(ref_output, output))
+    #     output = optimize_mod(*inputs)
+    #     self.assertTrue(torch.allclose(ref_output, output))
 
-    @parameterized.expand(
-        [
-            ("c1", (4, 2), (4, 5), 0, 2),
-            ("c2", (4, 2), (4, 5), 1, 3),
-        ]
-    )
-    def test_setitem2d_1v_trt(self, name, x_shape, y_shape, y_start, y_end):
-        class TestModule(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
+    # @parameterized.expand(
+    #     [
+    #         ("c1", (4, 2), (4, 5), 0, 2),
+    #         ("c2", (4, 2), (4, 5), 1, 3),
+    #     ]
+    # )
+    # def test_setitem2d_1v_trt(self, name, x_shape, y_shape, y_start, y_end):
+    #     class TestModule(torch.nn.Module):
+    #         def __init__(self):
+    #             super().__init__()
 
-            def forward(self, x, y):
-                y[:, y_start:y_end] = x
-                return y
+    #         def forward(self, x, y):
+    #             y[:, y_start:y_end] = x
+    #             return y
 
-        inputs = [torch.randn(x_shape), torch.randn(y_shape)]
-        m = TestModule()
+    #     inputs = [torch.randn(x_shape), torch.randn(y_shape)]
+    #     m = TestModule()
 
-        inputs = [i.cuda() for i in inputs]
-        m.cuda()
+    #     inputs = [i.cuda() for i in inputs]
+    #     m.cuda()
 
-        ref_output = m(*inputs)
-        optimize_mod = torchdynamo.optimize(backends.fx2trt_compiler, nopython=True)(m)
-        output = optimize_mod(*inputs)
-        self.assertTrue(torch.allclose(ref_output, output))
+    #     ref_output = m(*inputs)
+    #     optimize_mod = torchdynamo.optimize(backends.fx2trt_compiler, nopython=True)(m)
+    #     output = optimize_mod(*inputs)
+    #     self.assertTrue(torch.allclose(ref_output, output))
 
-    @parameterized.expand(
-        [
-            ("c1", (2, 3, 4, 5), (4, 5, 6, 7), 0, 2, 0, 3, 0, 4, 0, 5),
-            ("c2", (2, 3, 4, 5), (4, 5, 6, 7), 1, 3, 1, 4, 1, 5, 1, 6),
-        ]
-    )
-    def test_setitem4d_4v_trt(
-        self,
-        name,
-        x_shape,
-        y_shape,
-        start_0,
-        end_0,
-        start_1,
-        end_1,
-        start_2,
-        end_2,
-        start_3,
-        end_3,
-    ):
-        class TestModule(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
+    # @parameterized.expand(
+    #     [
+    #         ("c1", (2, 3, 4, 5), (4, 5, 6, 7), 0, 2, 0, 3, 0, 4, 0, 5),
+    #         ("c2", (2, 3, 4, 5), (4, 5, 6, 7), 1, 3, 1, 4, 1, 5, 1, 6),
+    #     ]
+    # )
+    # def test_setitem4d_4v_trt(
+    #     self,
+    #     name,
+    #     x_shape,
+    #     y_shape,
+    #     start_0,
+    #     end_0,
+    #     start_1,
+    #     end_1,
+    #     start_2,
+    #     end_2,
+    #     start_3,
+    #     end_3,
+    # ):
+    #     class TestModule(torch.nn.Module):
+    #         def __init__(self):
+    #             super().__init__()
 
-            def forward(self, x, y):
-                y[start_0:end_0, start_1:end_1, start_2:end_2, start_3:end_3] = x
-                y = y + 3
-                x = y[start_0:end_0, start_1:end_1, start_2:end_2, start_3:end_3]
-                return x
+    #         def forward(self, x, y):
+    #             y[start_0:end_0, start_1:end_1, start_2:end_2, start_3:end_3] = x
+    #             y = y + 3
+    #             x = y[start_0:end_0, start_1:end_1, start_2:end_2, start_3:end_3]
+    #             return x
 
-        inputs = [torch.randn(x_shape), torch.randn(y_shape)]
-        m = TestModule()
+    #     inputs = [torch.randn(x_shape), torch.randn(y_shape)]
+    #     m = TestModule()
 
-        inputs = [i.cuda() for i in inputs]
-        m.cuda()
+    #     inputs = [i.cuda() for i in inputs]
+    #     m.cuda()
 
-        ref_output = m(*inputs)
-        optimize_mod = torchdynamo.optimize(backends.fx2trt_compiler, nopython=True)(m)
-        output = optimize_mod(*inputs)
-        self.assertTrue(torch.allclose(ref_output, output))
+    #     ref_output = m(*inputs)
+    #     optimize_mod = torchdynamo.optimize(backends.fx2trt_compiler, nopython=True)(m)
+    #     output = optimize_mod(*inputs)
+    #     self.assertTrue(torch.allclose(ref_output, output))
 
 
 if __name__ == "__main__":

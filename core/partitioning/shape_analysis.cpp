@@ -13,7 +13,8 @@ namespace partitioning {
 at::Tensor generateSingleInput(
     ir::Input& input,
     c10::optional<at::ScalarType>& type_opt,
-    const ir::ShapeMode& shape_mode) {
+    const ir::ShapeMode& shape_mode,
+    int64_t gpu_id) {
   nvinfer1::Dims input_shape = input.input_shape;
   if (input.input_is_dynamic) {
     if (shape_mode == ir::ShapeMode::kMIN) {
@@ -26,8 +27,8 @@ at::Tensor generateSingleInput(
   }
 
   // Initialize min and max ranges for random number selection
-  int LoValIncl = 0;
-  int HiValExcl = 2;
+  double LoValIncl = input.tensor_domain[0];
+  double HiValExcl = input.tensor_domain[1];
 
   auto type = at::kFloat;
   if (type_opt) {
@@ -36,9 +37,14 @@ at::Tensor generateSingleInput(
     LOG_WARNING("Input type for doing shape analysis could not be determined, defaulting to F32");
   }
 
+  LOG_DEBUG(
+      "Using the Range: [" << LoValIncl << ", " << HiValExcl
+                           << ") as a random range for shape analysis on input with data type " << type);
+
   // Make the value range for input tensor a uniform (float) distribution
   // over [LoValIncl, HiValExcl), then cast to the desired dtype
-  auto in = ((HiValExcl - LoValIncl) * at::rand(util::toVec(input_shape), {at::kCUDA}) + LoValIncl).to(type);
+  auto in = ((HiValExcl - LoValIncl) * at::rand(util::toVec(input_shape)) + LoValIncl)
+                .to(at::Device(at::kCUDA, gpu_id), type);
 
   return in;
 }
@@ -46,7 +52,8 @@ at::Tensor generateSingleInput(
 std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomInputs(
     std::unordered_map<const torch::jit::Value*, std::vector<ir::Input>>& inputs,
     std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>>& types,
-    const ir::ShapeMode& shape_mode) {
+    const ir::ShapeMode& shape_mode,
+    int64_t gpu_id) {
   // generate random inputs for running pytorch segments
   std::unordered_map<const torch::jit::Value*, torch::jit::IValue> ivalue_map;
 
@@ -55,7 +62,7 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
       c10::TypePtr elementType = c10::TensorType::get();
       auto generic_list = c10::impl::GenericList(elementType);
       for (size_t i = 0; i < input.second.size(); i++) {
-        auto in = generateSingleInput(input.second[i], types[input.first][i], shape_mode);
+        auto in = generateSingleInput(input.second[i], types[input.first][i], shape_mode, gpu_id);
         generic_list.push_back(in.clone());
       }
       ivalue_map[input.first] = c10::IValue(generic_list);
@@ -63,13 +70,13 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
       // create tuple
       std::vector<torch::jit::IValue> list;
       for (size_t i = 0; i < input.second.size(); i++) {
-        auto in = generateSingleInput(input.second[i], types[input.first][i], shape_mode);
+        auto in = generateSingleInput(input.second[i], types[input.first][i], shape_mode, gpu_id);
         list.push_back(in.clone());
       }
       auto tuple = c10::ivalue::Tuple::create(list); // create tuple ptr
       ivalue_map[input.first] = c10::IValue(tuple);
     } else {
-      auto in = generateSingleInput(input.second[0], types[input.first][0], shape_mode);
+      auto in = generateSingleInput(input.second[0], types[input.first][0], shape_mode, gpu_id);
       ivalue_map[input.first] = in.clone();
     }
   }
@@ -188,6 +195,8 @@ void getSegmentsOutputByRunning(
       jit_inputs_ivalues.push_back(ivalues_maps[input].toBool());
     } else if (input->type()->isSubtypeOf(torch::jit::FloatType::get())) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toDouble());
+    } else if (input->type()->isSubtypeOf(torch::jit::StringType::get())) {
+      jit_inputs_ivalues.push_back(ivalues_maps[input].toString());
     } else if (input->type()->kind() == torch::jit::TypeKind::ListType) {
       // create list
       jit_inputs_ivalues.push_back(ivalues_maps[input].toList());
@@ -303,10 +312,10 @@ void getSegmentsOutputByRunning(
             "Unable to process subgraph input type of at::kLong/at::kDouble, try to compile model with truncate_long_and_double enabled");
       } else if (partitioning_info.truncate_long_and_double && t == at::kLong) {
         cur_ivalue = cur_ivalue.toTensor().to(at::kInt);
-        LOG_WARNING("Truncating graph input type from at::kLong to at::kInt");
+        LOG_WARNING("Truncating intermediate graph input type from at::kLong to at::kInt");
       } else if (partitioning_info.truncate_long_and_double && t == at::kDouble) {
         cur_ivalue = cur_ivalue.toTensor().to(at::kFloat);
-        LOG_WARNING("Truncating graph input type from at::kDouble to at::kFloat");
+        LOG_WARNING("Truncating intermediate graph input type from at::kDouble to at::kFloat");
       }
 
       c10::optional<nvinfer1::DataType> dtype = util::optTypeMetaToTRTDataType(cur_ivalue.toTensor().dtype());

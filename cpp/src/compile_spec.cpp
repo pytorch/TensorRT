@@ -36,13 +36,15 @@ CompileSpec::CompileSpec(torch::jit::IValue input_signature) {
   graph_inputs.input_signature = input_signature;
 }
 
-void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IValue& converted_ivalue) {
+void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IValue& converted_ivalue, int depth = 0) {
+  TORCHTRT_CHECK(
+      depth <= 2, "Input nesting depth exceeds max supported depth, use 1 level: [A, B], or 2 level: [A, (B, C)]")
   if (input_ivalue.isTuple()) {
     auto input_tuple = input_ivalue.toTuple();
     std::vector<torch::jit::IValue> converted_elements;
     for (auto item : input_tuple->elements()) {
       torch::jit::IValue converted_item;
-      to_internal_input_signature(item, converted_item);
+      to_internal_input_signature(item, converted_item, depth++);
       converted_elements.push_back(converted_item);
       auto tuple_ptr = c10::ivalue::Tuple::create(converted_elements);
       converted_ivalue = torch::jit::IValue(tuple_ptr);
@@ -53,7 +55,7 @@ void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IV
     auto converted_elements = c10::impl::GenericList(type);
     for (auto item : input_list) {
       torch::jit::IValue converted_item;
-      to_internal_input_signature(item, converted_item);
+      to_internal_input_signature(item, converted_item, depth++);
       converted_elements.push_back(converted_item);
     }
     converted_ivalue = torch::jit::IValue(converted_elements);
@@ -72,33 +74,14 @@ torchtrt::core::CompileSpec init_compile_spec(CompileSpec& external) {
     LOG_WARNING("Input signature parsing is an experimental feature, behavior and APIs may change");
     to_internal_input_signature(external.graph_inputs.input_signature, converted_input_signature);
     torchtrt::core::CompileSpec internal(converted_input_signature);
-
-    TORCHTRT_CHECK(
-        !external.require_full_compilation,
-        "Grouped inputs currently requires partial compilation to be enabled, \
-      this restriction will be relaxed in a future release");
-
-    LOG_DEBUG("Grouped inputs currently requires additional settings to enable the feature");
-    LOG_DEBUG(
-        "Adding the following ops to torch_executed_ops:" << std::endl
-                                                          << "  - aten::__getitem__" << std::endl
-                                                          << "  - prim::ListConstruct" << std::endl
-                                                          << "  - prim::ListUnpack" << std::endl
-                                                          << "  - prim::TupleIndex" << std::endl
-                                                          << "  - prim::TupleConstruct" << std::endl
-                                                          << "  - prim::TupleUnpack");
-    external.torch_executed_ops.push_back("aten::__getitem__");
-    external.torch_executed_ops.push_back("prim::ListConstruct");
-    external.torch_executed_ops.push_back("prim::ListUnpack");
-    external.torch_executed_ops.push_back("prim::TupleIndex");
-    external.torch_executed_ops.push_back("prim::TupleConstruct");
-    external.torch_executed_ops.push_back("prim::TupleUnpack");
     return internal;
   }
 }
 
-torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
+torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external, bool converting_to_trt_engine) {
   torchtrt::core::CompileSpec internal = init_compile_spec(external);
+
+  internal.lower_info.converting_to_trt_engine = converting_to_trt_engine;
 
   for (auto p : external.enabled_precisions) {
     internal.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));
@@ -109,6 +92,7 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.convert_info.engine_settings.refit = external.refit;
   internal.convert_info.engine_settings.debug = external.debug;
   internal.convert_info.engine_settings.truncate_long_and_double = external.truncate_long_and_double;
+  internal.convert_info.engine_settings.allow_shape_tensors = external.allow_shape_tensors;
   internal.convert_info.engine_settings.device.allow_gpu_fallback = external.device.allow_gpu_fallback;
   internal.lower_info.target_device.allow_gpu_fallback = external.device.allow_gpu_fallback;
   internal.partitioning_info.target_device.allow_gpu_fallback = external.device.allow_gpu_fallback;

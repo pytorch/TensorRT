@@ -15,9 +15,11 @@ PartitioningCtx::PartitioningCtx(torch::jit::Block* b, PartitioningInfo info)
 }
 
 void PartitioningCtx::_load_nodes_into_decision_map(torch::jit::Block* b) {
-  if (!b->owningNode() || b->owningNode()->kind() != torch::jit::prim::Loop) {
-    original_blocks.push_back(b);
-  }
+  if (b->owningNode() && b->owningNode()->kind() == torch::jit::prim::Loop)
+    return;
+
+  original_blocks.push_back(b);
+
   for (const auto n : b->nodes()) {
     if (n->kind() == torch::jit::prim::Constant) {
       continue;

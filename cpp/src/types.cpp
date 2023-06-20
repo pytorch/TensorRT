@@ -87,6 +87,25 @@ nvinfer1::DataType toTRTDataType(DataType value) {
   }
 }
 
+at::ScalarType toAtenDataType(DataType value) {
+  switch (value) {
+    case DataType::kChar:
+      return at::kChar;
+    case DataType::kHalf:
+      return at::kHalf;
+    case DataType::kInt:
+      return at::kInt;
+    case DataType::kLong:
+      return at::kLong;
+    case DataType::kBool:
+      return at::kBool;
+    case DataType::kFloat:
+    case DataType::kUnknown:
+    default:
+      return at::kFloat;
+  }
+}
+
 nvinfer1::TensorFormat toTRTTensorFormat(TensorFormat value) {
   TORCHTRT_CHECK(!(value == TensorFormat::kUnknown), "Tensor format is unknown");
   switch (value) {
@@ -100,7 +119,7 @@ nvinfer1::TensorFormat toTRTTensorFormat(TensorFormat value) {
 
 DataType::DataType(c10::ScalarType t) {
   TORCHTRT_CHECK(
-      t == at::kHalf || t == at::kFloat || t == at::kChar || t == at::kInt || t == at::kBool,
+      t == at::kHalf || t == at::kFloat || t == at::kChar || t == at::kLong || t == at::kInt || t == at::kBool,
       "Data type is unsupported (" << t << ")");
   switch (t) {
     case at::kHalf:
@@ -111,6 +130,9 @@ DataType::DataType(c10::ScalarType t) {
       break;
     case at::kInt:
       value = DataType::kInt;
+      break;
+    case at::kLong:
+      value = DataType::kLong;
       break;
     case at::kBool:
       value = DataType::kBool;
@@ -151,6 +173,18 @@ Input::Input(std::vector<int64_t> shape, TensorFormat format) {
   this->dtype = DataType::kUnknown;
   this->format = format;
   this->input_is_dynamic = false;
+  this->tensor_domain = std::vector<double>{0, 2};
+}
+
+Input::Input(std::vector<int64_t> shape, std::vector<double> tensor_domain, TensorFormat format) {
+  this->opt_shape = shape;
+  this->min_shape = shape;
+  this->max_shape = shape;
+  this->shape = shape;
+  this->dtype = DataType::kUnknown;
+  this->format = format;
+  this->input_is_dynamic = false;
+  this->tensor_domain = tensor_domain;
 }
 
 Input::Input(std::vector<int64_t> shape, DataType dtype, TensorFormat format) {
@@ -161,6 +195,18 @@ Input::Input(std::vector<int64_t> shape, DataType dtype, TensorFormat format) {
   this->dtype = dtype;
   this->format = format;
   this->input_is_dynamic = false;
+  this->tensor_domain = std::vector<double>{0, 2};
+}
+
+Input::Input(std::vector<int64_t> shape, DataType dtype, std::vector<double> tensor_domain, TensorFormat format) {
+  this->opt_shape = shape;
+  this->min_shape = shape;
+  this->max_shape = shape;
+  this->shape = shape;
+  this->dtype = dtype;
+  this->format = format;
+  this->input_is_dynamic = false;
+  this->tensor_domain = tensor_domain;
 }
 
 Input::Input(c10::IntArrayRef shape, TensorFormat format) {
@@ -171,6 +217,18 @@ Input::Input(c10::IntArrayRef shape, TensorFormat format) {
   this->dtype = DataType::kUnknown;
   this->format = format;
   this->input_is_dynamic = false;
+  this->tensor_domain = std::vector<double>{0, 2};
+}
+
+Input::Input(c10::IntArrayRef shape, std::vector<double> tensor_domain, TensorFormat format) {
+  this->opt_shape = torch_tensorrt::core::util::toVec(shape);
+  this->min_shape = torch_tensorrt::core::util::toVec(shape);
+  this->max_shape = torch_tensorrt::core::util::toVec(shape);
+  this->shape = torch_tensorrt::core::util::toVec(shape);
+  this->dtype = DataType::kUnknown;
+  this->format = format;
+  this->input_is_dynamic = false;
+  this->tensor_domain = tensor_domain;
 }
 
 Input::Input(c10::IntArrayRef shape, DataType dtype, TensorFormat format) {
@@ -181,6 +239,18 @@ Input::Input(c10::IntArrayRef shape, DataType dtype, TensorFormat format) {
   this->dtype = dtype;
   this->format = format;
   this->input_is_dynamic = false;
+  this->tensor_domain = std::vector<double>{0, 2};
+}
+
+Input::Input(c10::IntArrayRef shape, DataType dtype, std::vector<double> tensor_domain, TensorFormat format) {
+  this->opt_shape = torch_tensorrt::core::util::toVec(shape);
+  this->min_shape = torch_tensorrt::core::util::toVec(shape);
+  this->max_shape = torch_tensorrt::core::util::toVec(shape);
+  this->shape = torch_tensorrt::core::util::toVec(shape);
+  this->dtype = dtype;
+  this->format = format;
+  this->input_is_dynamic = false;
+  this->tensor_domain = tensor_domain;
 }
 
 Input::Input(
@@ -196,6 +266,24 @@ Input::Input(
   this->dtype = DataType::kUnknown;
   this->format = format;
   this->input_is_dynamic = true;
+  this->tensor_domain = std::vector<double>{0, 2};
+}
+
+Input::Input(
+    std::vector<int64_t> min_shape,
+    std::vector<int64_t> opt_shape,
+    std::vector<int64_t> max_shape,
+    std::vector<double> tensor_domain,
+    TensorFormat format) {
+  this->opt_shape = opt_shape;
+  this->min_shape = min_shape;
+  this->max_shape = max_shape;
+  this->shape = torch_tensorrt::core::util::toVec(
+      torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
+  this->dtype = DataType::kUnknown;
+  this->format = format;
+  this->input_is_dynamic = true;
+  this->tensor_domain = tensor_domain;
 }
 
 Input::Input(
@@ -212,6 +300,25 @@ Input::Input(
   this->dtype = dtype;
   this->format = format;
   this->input_is_dynamic = true;
+  this->tensor_domain = std::vector<double>{0, 2};
+}
+
+Input::Input(
+    std::vector<int64_t> min_shape,
+    std::vector<int64_t> opt_shape,
+    std::vector<int64_t> max_shape,
+    DataType dtype,
+    std::vector<double> tensor_domain,
+    TensorFormat format) {
+  this->opt_shape = opt_shape;
+  this->min_shape = min_shape;
+  this->max_shape = max_shape;
+  this->shape = torch_tensorrt::core::util::toVec(
+      torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
+  this->dtype = dtype;
+  this->format = format;
+  this->input_is_dynamic = true;
+  this->tensor_domain = tensor_domain;
 }
 
 Input::Input(c10::IntArrayRef min_shape, c10::IntArrayRef opt_shape, c10::IntArrayRef max_shape, TensorFormat format) {
@@ -223,6 +330,24 @@ Input::Input(c10::IntArrayRef min_shape, c10::IntArrayRef opt_shape, c10::IntArr
   this->dtype = DataType::kUnknown;
   this->format = format;
   this->input_is_dynamic = true;
+  this->tensor_domain = std::vector<double>{0, 2};
+}
+
+Input::Input(
+    c10::IntArrayRef min_shape,
+    c10::IntArrayRef opt_shape,
+    c10::IntArrayRef max_shape,
+    std::vector<double> tensor_domain,
+    TensorFormat format) {
+  this->opt_shape = torch_tensorrt::core::util::toVec(opt_shape);
+  this->min_shape = torch_tensorrt::core::util::toVec(min_shape);
+  this->max_shape = torch_tensorrt::core::util::toVec(max_shape);
+  this->shape = torch_tensorrt::core::util::toVec(
+      torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
+  this->dtype = DataType::kUnknown;
+  this->format = format;
+  this->input_is_dynamic = true;
+  this->tensor_domain = tensor_domain;
 }
 
 Input::Input(
@@ -239,6 +364,25 @@ Input::Input(
   this->dtype = dtype;
   this->format = format;
   this->input_is_dynamic = true;
+  this->tensor_domain = std::vector<double>{0, 2};
+}
+
+Input::Input(
+    c10::IntArrayRef min_shape,
+    c10::IntArrayRef opt_shape,
+    c10::IntArrayRef max_shape,
+    DataType dtype,
+    std::vector<double> tensor_domain,
+    TensorFormat format) {
+  this->opt_shape = torch_tensorrt::core::util::toVec(opt_shape);
+  this->min_shape = torch_tensorrt::core::util::toVec(min_shape);
+  this->max_shape = torch_tensorrt::core::util::toVec(max_shape);
+  this->shape = torch_tensorrt::core::util::toVec(
+      torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
+  this->dtype = dtype;
+  this->format = format;
+  this->input_is_dynamic = true;
+  this->tensor_domain = tensor_domain;
 }
 
 Input::Input(at::Tensor tensor) {
@@ -258,6 +402,7 @@ Input::Input(at::Tensor tensor) {
   }
   this->format = frmt;
   this->input_is_dynamic = false;
+  this->tensor_domain = std::vector<double>{0, 2};
 }
 
 /* ==========================================*/
@@ -267,9 +412,10 @@ torch_tensorrt::core::ir::Input to_internal_input(Input& i) {
       i.min_shape,
       i.opt_shape,
       i.max_shape,
-      toTRTDataType(i.dtype),
+      toAtenDataType(i.dtype),
       toTRTTensorFormat(i.format),
-      !(i.dtype == DataType::kUnknown));
+      !(i.dtype == DataType::kUnknown),
+      i.tensor_domain);
 }
 
 std::vector<torch_tensorrt::core::ir::Input> to_vec_internal_inputs(std::vector<Input>& external) {

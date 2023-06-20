@@ -121,36 +121,30 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     }
   }
 
-  std::vector<void*> gpu_handles;
-  std::vector<at::Tensor> contig_inputs{};
   {
     std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
     if (compiled_engine->profile_execution) {
       input_profiler_guard =
           std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
     }
-
-    contig_inputs.reserve(inputs.size());
-
     for (size_t i = 0; i < inputs.size(); i++) {
-      uint64_t pyt_idx = compiled_engine->in_binding_map[i];
+      std::string name = compiled_engine->in_binding_names[i];
       TORCHTRT_CHECK(
-          inputs[pyt_idx].is_cuda(),
-          "Expected input tensors to have device cuda, found device " << inputs[pyt_idx].device());
-      auto expected_type = util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getBindingDataType(i));
+          inputs[i].is_cuda(), "Expected input tensors to have device cuda, found device " << inputs[i].device());
+      auto expected_type =
+          util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
       TORCHTRT_CHECK(
-          inputs[pyt_idx].dtype() == expected_type,
-          "Expected input tensors to have type " << expected_type << ", found type " << inputs[pyt_idx].dtype());
-      auto dims = core::util::toDimsPad(inputs[pyt_idx].sizes(), 1);
+          inputs[i].dtype() == expected_type,
+          "Expected input tensors to have type " << expected_type << ", found type " << inputs[i].dtype());
+      auto dims = core::util::toDimsPad(inputs[i].sizes(), 1);
       auto shape = core::util::toVec(dims);
-      contig_inputs.push_back(inputs[pyt_idx].view(shape).contiguous());
-      LOG_DEBUG("Input shape: " << dims);
-      compiled_engine->exec_ctx->setBindingDimensions(i, dims);
-      gpu_handles.push_back(contig_inputs.back().data_ptr());
+      LOG_DEBUG("Input Name: " << name << " Shape: " << dims);
+      compiled_engine->exec_ctx->setInputShape(name.c_str(), dims);
+      compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputs[i].view(shape).contiguous().data_ptr());
     }
+
     TORCHTRT_CHECK(
-        compiled_engine->exec_ctx->allInputDimensionsSpecified(),
-        "Not enough inputs provided (torch.ops.tensorrt.execute_engine)");
+        compiled_engine->exec_ctx->allInputShapesSpecified(), "Not enough inputs provided (runtime.RunCudaEngine)");
   }
 
   std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
@@ -163,26 +157,27 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
     for (size_t o = inputs.size(); o < (compiled_engine->num_io.first + compiled_engine->num_io.second); o++) {
       uint64_t pyt_idx = compiled_engine->out_binding_map[o];
-      auto out_shape = compiled_engine->exec_ctx->getBindingDimensions(o);
-      LOG_DEBUG("Output shape: " << out_shape);
+      std::string name = compiled_engine->out_binding_names[pyt_idx];
+      auto out_shape = compiled_engine->exec_ctx->getTensorShape(name.c_str());
+      LOG_DEBUG("Output Name: " << name << " Shape: " << out_shape);
       auto dims = core::util::toVec(out_shape);
-      auto type = util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getBindingDataType(o));
+      auto type = util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
       outputs[pyt_idx] = std::move(at::empty(dims, {at::kCUDA}).to(type).contiguous());
-      gpu_handles.push_back(outputs[pyt_idx].data_ptr());
+      compiled_engine->exec_ctx->setTensorAddress(name.c_str(), outputs[pyt_idx].data_ptr());
     }
   }
+
   {
     std::unique_ptr<torch::autograd::profiler::RecordProfile> enqueue_profiler_guard;
     if (compiled_engine->profile_execution) {
       enqueue_profiler_guard =
           std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->enqueue_profile_path);
     }
-
     c10::cuda::CUDAStream stream = c10::cuda::getCurrentCUDAStream(inputs[0].device().index());
 
     // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
     std::unique_lock<std::mutex> lock(compiled_engine->mu);
-    compiled_engine->exec_ctx->enqueueV2(gpu_handles.data(), stream, nullptr);
+    compiled_engine->exec_ctx->enqueueV3(stream);
     if (compiled_engine->profile_execution) {
       LOG_INFO(std::endl << *compiled_engine->trt_engine_profiler);
       dump_trace(compiled_engine->trt_engine_profile_path, *compiled_engine->trt_engine_profiler);

@@ -6,28 +6,6 @@
 #include "torch/csrc/jit/ir/irparser.h"
 #include "torch/csrc/jit/ir/subgraph_matcher.h"
 
-TEST(LoweringPasses, ReduceToDtypeLayoutCorrectly) {
-  std::string source_graph = R"IR(
-    graph(%x, %dtype, %layout, %device, %pm, %nb, %copy, %format):
-        %out : Tensor = aten::to(%x, %dtype, %layout, %device, %pm, %nb, %copy, %format)
-        return (%out))IR";
-  std::string target_graph = R"IR(
-    graph(%x, %dtype, %layout, %device, %pm, %nb, %copy, %format):
-        %out : Tensor = aten::to(%x, %device, %dtype, %nb, %copy, %format)
-        return (%out))IR";
-
-  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(
-      torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
-  auto sg = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(source_graph, &*sg);
-  torch_tensorrt::core::lowering::passes::ReduceToOperation(sg);
-
-  auto tg = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(target_graph, &*tg);
-
-  ASSERT_TRUE(!torch::jit::findPatternMatches(*tg, *sg).empty());
-}
-
 TEST(LoweringPasses, ReduceAtenTypeAsCorrectly) {
   std::string source_graph = R"IR(
     graph(%input, %other):

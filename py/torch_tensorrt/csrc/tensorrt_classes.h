@@ -27,9 +27,10 @@ namespace pyapi {
     return static_cast<int64_t>(field_name);                                    \
   }
 
-enum class DataType : int8_t { kFloat, kHalf, kChar, kInt32, kBool, kUnknown };
+enum class DataType : int8_t { kLong, kFloat, kHalf, kChar, kInt32, kBool, kUnknown };
 std::string to_str(DataType value);
 nvinfer1::DataType toTRTDataType(DataType value);
+at::ScalarType toAtenDataType(DataType value);
 
 enum class TensorFormat : int8_t { kContiguous, kChannelsLast };
 std::string to_str(TensorFormat value);
@@ -39,6 +40,7 @@ struct Input : torch::CustomClassHolder {
   std::vector<int64_t> min;
   std::vector<int64_t> opt;
   std::vector<int64_t> max;
+  std::vector<double> tensor_domain;
 
   bool input_is_dynamic;
   bool explicit_set_dtype;
@@ -48,6 +50,7 @@ struct Input : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(min, std::vector<int64_t>);
   ADD_FIELD_GET_SET(opt, std::vector<int64_t>);
   ADD_FIELD_GET_SET(max, std::vector<int64_t>);
+  ADD_FIELD_GET_SET(tensor_domain, std::vector<double>);
   ADD_FIELD_GET_SET(input_is_dynamic, bool);
   ADD_FIELD_GET_SET(explicit_set_dtype, bool);
   ADD_ENUM_GET_SET(dtype, DataType, static_cast<int64_t>(DataType::kUnknown));
@@ -120,7 +123,7 @@ std::string to_str(EngineCapability value);
 nvinfer1::EngineCapability toTRTEngineCapability(EngineCapability value);
 
 struct CompileSpec : torch::CustomClassHolder {
-  core::CompileSpec toInternalCompileSpec();
+  core::CompileSpec toInternalCompileSpec(bool converting_to_trt_engine = false);
   std::string stringify();
   void appendInput(const c10::intrusive_ptr<Input>& ir) {
     inputs.push_back(*ir);
@@ -164,6 +167,7 @@ struct CompileSpec : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(dla_local_dram_size, int64_t);
   ADD_FIELD_GET_SET(dla_global_dram_size, int64_t);
   ADD_FIELD_GET_SET(truncate_long_and_double, bool);
+  ADD_FIELD_GET_SET(allow_shape_tensors, bool);
   ADD_FIELD_GET_SET(device, Device);
   ADD_FIELD_GET_SET(torch_fallback, TorchFallback);
   ADD_FIELD_GET_SET(ptq_calibrator, nvinfer1::IInt8Calibrator*);
@@ -177,6 +181,7 @@ struct CompileSpec : torch::CustomClassHolder {
   bool refit = false;
   bool debug = false;
   bool truncate_long_and_double = false;
+  bool allow_shape_tensors = false;
   Device device;
   TorchFallback torch_fallback;
   EngineCapability capability = EngineCapability::kDEFAULT;

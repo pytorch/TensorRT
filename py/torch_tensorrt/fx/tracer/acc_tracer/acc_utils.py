@@ -110,7 +110,8 @@ def get_model_info_str(gm: torch.fx.GraphModule, header: Optional[str] = None):
     If `header` is provided then it's included in the printed string.
     """
     ops_and_counts: Dict[Callable, int] = {}
-    placeholder_count = get_attr_count = call_method_count = call_module_count = 0
+    placeholder_count = get_attr_count = 0
+    call_method_count = call_module_count = output_count = 0
     for node in gm.graph.nodes:
         if node.op == "call_function":
             ops_and_counts[node.target] = ops_and_counts.get(node.target, 0) + 1
@@ -141,12 +142,21 @@ def get_model_info_str(gm: torch.fx.GraphModule, header: Optional[str] = None):
     # easier to parse.
     pretty_ops_and_counts: List[Tuple[str, int]] = []
     for op, count in ops_and_counts.items():
-        pretty_ops_and_counts.append((_get_qualified_name(op), count))
+        name = strip_module_prefixes(_get_qualified_name(op))
+        pretty_ops_and_counts.append((name, count))
     pretty_ops_and_counts.sort()
     for op_str, count in pretty_ops_and_counts:
         model_info_str += f"> {op_str}: {count}\n"
 
     return model_info_str
+
+
+def strip_module_prefixes(op_name):
+    return (
+        op_name.replace("torch_tensorrt.fx.tracer.acc_tracer.", "")
+        .replace("glow.fb.fx.acc_tracer.", "")
+        .replace("glow.fb.fx.", "")
+    )
 
 
 def get_unique_attr_name_in_module(mod_traced: torch.fx.GraphModule, name: str) -> str:

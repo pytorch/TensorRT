@@ -43,6 +43,7 @@ class Var : torch::CustomClassHolder {
   c10::Scalar unwrapToScalar();
   c10::List<int64_t> unwrapToIntList(c10::List<int64_t> default_val);
   c10::List<int64_t> unwrapToIntList();
+  std::vector<nvinfer1::ITensor*> unwrapToITensorList();
   c10::List<double> unwrapToDoubleList(c10::List<double> default_val);
   c10::List<double> unwrapToDoubleList();
   c10::List<bool> unwrapToBoolList(c10::List<bool> default_val);
@@ -59,6 +60,20 @@ class Var : torch::CustomClassHolder {
   bool isIValue() const;
   bool isITensor() const;
   bool isNone() const;
+
+  bool isInt();
+  bool isDouble();
+  bool isBool();
+  bool isString();
+  bool isScalar();
+  bool isTensor();
+  bool isIntList();
+  bool isDoubleList();
+  bool isBoolList();
+  bool isTensorList();
+  bool isITensorList();
+  bool isList();
+
   Var::Type type() const;
   std::string type_name() const;
 

@@ -1,10 +1,16 @@
 import torch
 
-from torch_tensorrt import _enums
+# from torch_tensorrt import _enums
+import tensorrt as trt
 from torch_tensorrt import logging
-from torch_tensorrt import _C
-
 import warnings
+
+try:
+    from torch_tensorrt import _C
+except:
+    warnings.warn(
+        "Unable to import torchscript frontend core and torch-tensorrt runtime. Some dependent features may be unavailable."
+    )
 
 
 class Device(object):
@@ -51,7 +57,7 @@ class Device(object):
                 )
             else:
                 (self.device_type, id) = Device._parse_device_str(args[0])
-                if self.device_type == _enums.DeviceType.GPU:
+                if self.device_type == trt.DeviceType.GPU:
                     self.gpu_id = id
                 else:
                     self.dla_core = id
@@ -64,7 +70,7 @@ class Device(object):
         elif len(args) == 0:
             if "gpu_id" in kwargs or "dla_core" in kwargs:
                 if "dla_core" in kwargs:
-                    self.device_type = _enums.DeviceType.DLA
+                    self.device_type = trt.DeviceType.DLA
                     self.dla_core = kwargs["dla_core"]
                     if "gpu_id" in kwargs:
                         self.gpu_id = kwargs["gpu_id"]
@@ -76,7 +82,7 @@ class Device(object):
                         )
                 else:
                     self.gpu_id = kwargs["gpu_id"]
-                    self.device_type = _enums.DeviceType.GPU
+                    self.device_type = trt.DeviceType.GPU
             else:
                 raise ValueError(
                     "Either gpu_id or dla_core or both must be defined if no string with device specs is provided as an arg"
@@ -97,7 +103,7 @@ class Device(object):
     def __str__(self) -> str:
         return (
             "Device(type={}, gpu_id={}".format(self.device_type, self.gpu_id) + ")"
-            if self.device_type == _enums.DeviceType.GPU
+            if self.device_type == trt.DeviceType.GPU
             else ", dla_core={}, allow_gpu_fallback={}".format(
                 self.dla_core, self.allow_gpu_fallback
             )
@@ -105,7 +111,15 @@ class Device(object):
 
     def _to_internal(self) -> _C.Device:
         internal_dev = _C.Device()
-        internal_dev.device_type = self.device_type
+        if self.device_type == trt.DeviceType.GPU:
+            internal_dev.device_type = _C.DeviceType.GPU
+        elif self.device_type == trt.DeviceType.DLA:
+            internal_dev.device_type = _C.DeviceType.DLA
+        else:
+            raise ValueError(
+                "Invalid DeviceType detected while parsing the Device class"
+            )
+
         internal_dev.gpu_id = self.gpu_id
         internal_dev.dla_core = self.dla_core
         internal_dev.allow_gpu_fallback = self.allow_gpu_fallback
@@ -136,6 +150,6 @@ class Device(object):
         s = s.lower()
         spec = s.split(":")
         if spec[0] == "gpu" or spec[0] == "cuda":
-            return (_enums.DeviceType.GPU, int(spec[1]))
+            return (trt.DeviceType.GPU, int(spec[1]))
         elif spec[0] == "dla":
-            return (_enums.DeviceType.DLA, int(spec[1]))
+            return (trt.DeviceType.DLA, int(spec[1]))

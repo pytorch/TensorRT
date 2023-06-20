@@ -135,3 +135,13 @@ TEST(Converters, ATenMinConvertsCorrectly) {
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
 }
+
+TEST(Converters, ATenLogicalAndConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor, %1 : Tensor):
+      %2 : Tensor = aten::logical_and(%0, %1)
+      return (%2))IR";
+  pointwise_test_helper(graph, false, false, {5, 5}, {5, 5}, false, at::kBool, at::kBool);
+  pointwise_test_helper(graph, false, false, {5, 5}, {5, 5}, false, at::kInt, at::kBool);
+  pointwise_test_helper(graph, false, false, {5, 5}, {5, 5}, false, at::kInt, at::kInt);
+}

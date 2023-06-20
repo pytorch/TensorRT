@@ -1,4 +1,4 @@
-FROM pytorch/manylinux-builder:cuda11.6
+FROM pytorch/manylinux-builder:cuda11.7
 ARG trt_version
 
 RUN echo -e "Installing with TensorRT ${trt_version}"

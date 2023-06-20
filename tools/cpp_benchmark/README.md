@@ -6,7 +6,7 @@ This is a quick benchmarking application for Torch-TensorRT. It lets you run sup
 
 Run with bazel:
 
-> Note: Make sure libtorch and TensorRT are in your LD_LIBRARY_PATH before running, if you need a location you can `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:[WORKSPACE ROOT]/bazel-Torch-TensorRT/external/libtorch/lib:[WORKSPACE ROOT]/bazel-Torch-TensorRT/external/tensorrt/lib`
+> Note: Make sure libtorch and TensorRT are in your LD_LIBRARY_PATH before running, if you need a location you can `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:[WORKSPACE ROOT]/bazel-TensorRT/external/libtorch/lib:[WORKSPACE ROOT]/bazel-TensorRT/external/tensorrt/lib`
 
 ``` sh
 bazel run //tools/cpp_benchmark --cxxopt="-DNDEBUG" --cxxopt="-DJIT" --cxxopt="-DTRT" -- [PATH TO JIT MODULE FILE] [INPUT SIZE (explicit batch)]

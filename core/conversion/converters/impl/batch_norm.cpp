@@ -20,15 +20,28 @@ void _batch_norm(
     const torch::Tensor& mean,
     const torch::Tensor& var,
     const float eps) {
-  auto scale = gamma / torch::sqrt(var + eps);
-  auto bias = beta - mean * scale;
+  auto orig_dtype = var.dtype();
+  // perform compile-time weight calculations in float to improve accuracy
+  // resulting weights will be embedded as the original dtype
+  auto calculation_gamma = gamma;
+  auto calculation_beta = beta;
+  auto calculation_mean = mean;
+  auto calculation_var = var;
+  if (orig_dtype == torch::kHalf) {
+    calculation_gamma = calculation_gamma.to(torch::kFloat);
+    calculation_beta = calculation_beta.to(torch::kFloat);
+    calculation_mean = calculation_mean.to(torch::kFloat);
+    calculation_var = calculation_var.to(torch::kFloat);
+  }
+  auto scale = calculation_gamma / torch::sqrt(calculation_var + eps);
+  auto bias = calculation_beta - calculation_mean * scale;
   LOG_DEBUG("_batch_norm Tensor Scale : " << scale.sizes());
   LOG_DEBUG("_batch_norm Tensor bias : " << bias.sizes());
 
-  auto scale_weights = Weights(ctx, scale);
-  auto bias_weights = Weights(ctx, bias);
+  auto scale_weights = Weights(ctx, scale.to(orig_dtype));
+  auto bias_weights = Weights(ctx, bias.to(orig_dtype));
 
-  auto power = Weights(ctx, at::ones_like(scale));
+  auto power = Weights(ctx, at::ones_like(scale).to(orig_dtype));
   auto bn =
       ctx->net->addScaleNd(*input, nvinfer1::ScaleMode::kCHANNEL, bias_weights.data, scale_weights.data, power.data, 1);
   bn->setName(util::node_info(n).c_str());

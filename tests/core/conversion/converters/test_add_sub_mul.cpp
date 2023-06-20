@@ -178,3 +178,14 @@ TEST(Converters, ATenPowScalarConvertsCorrectly) {
           return (%3))IR";
   pointwise_test_helper(graph, true);
 }
+
+TEST(Converters, ElementWiseTypePromotionDisambiguatesCastNames) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : int = prim::Constant[value=1]()
+        %3 : Tensor = aten::add(%0, %1, %2)
+        %4 : Tensor = aten::add(%0, %1, %2)
+        %5 : Tensor = aten::add(%3, %4, %2)
+        return (%5))IR";
+  pointwise_test_helper(graph, false, false, {4, 3, 3, 3}, {4, 3, 3, 3}, false, at::kInt, at::kFloat);
+}

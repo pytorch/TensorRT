@@ -103,7 +103,8 @@ class TestInput(unittest.TestCase):
 
         example_tensor = torch.randn(shape).half()
         i = torchtrt.Input.from_tensor(example_tensor)
-        self.assertTrue(self._verify_correctness(i, target))
+        ts_i = torchtrt.ts.TSInput(shape=i.shape, dtype=i.dtype, format=i.format)
+        self.assertTrue(self._verify_correctness(ts_i, target))
 
     def test_static_shape(self):
         shape = [1, 3, 255, 255]
@@ -118,22 +119,28 @@ class TestInput(unittest.TestCase):
         }
 
         i = torchtrt.Input(shape)
-        self.assertTrue(self._verify_correctness(i, target))
+        ts_i = torchtrt.ts.TSInput(shape=i.shape, dtype=i.dtype, format=i.format)
+        self.assertTrue(self._verify_correctness(ts_i, target))
 
         i = torchtrt.Input(tuple(shape))
-        self.assertTrue(self._verify_correctness(i, target))
+        ts_i = torchtrt.ts.TSInput(shape=i.shape, dtype=i.dtype, format=i.format)
+        self.assertTrue(self._verify_correctness(ts_i, target))
 
         i = torchtrt.Input(torch.randn(shape).shape)
-        self.assertTrue(self._verify_correctness(i, target))
+        ts_i = torchtrt.ts.TSInput(shape=i.shape, dtype=i.dtype, format=i.format)
+        self.assertTrue(self._verify_correctness(ts_i, target))
 
         i = torchtrt.Input(shape=shape)
-        self.assertTrue(self._verify_correctness(i, target))
+        ts_i = torchtrt.ts.TSInput(shape=i.shape, dtype=i.dtype, format=i.format)
+        self.assertTrue(self._verify_correctness(ts_i, target))
 
         i = torchtrt.Input(shape=tuple(shape))
-        self.assertTrue(self._verify_correctness(i, target))
+        ts_i = torchtrt.ts.TSInput(shape=i.shape, dtype=i.dtype, format=i.format)
+        self.assertTrue(self._verify_correctness(ts_i, target))
 
         i = torchtrt.Input(shape=torch.randn(shape).shape)
-        self.assertTrue(self._verify_correctness(i, target))
+        ts_i = torchtrt.ts.TSInput(shape=i.shape, dtype=i.dtype, format=i.format)
+        self.assertTrue(self._verify_correctness(ts_i, target))
 
     def test_data_type(self):
         shape = [1, 3, 255, 255]
@@ -148,10 +155,12 @@ class TestInput(unittest.TestCase):
         }
 
         i = torchtrt.Input(shape, dtype=torchtrt.dtype.half)
-        self.assertTrue(self._verify_correctness(i, target))
+        ts_i = torchtrt.ts.TSInput(shape=i.shape, dtype=i.dtype, format=i.format)
+        self.assertTrue(self._verify_correctness(ts_i, target))
 
         i = torchtrt.Input(shape, dtype=torch.half)
-        self.assertTrue(self._verify_correctness(i, target))
+        ts_i = torchtrt.ts.TSInput(shape=i.shape, dtype=i.dtype, format=i.format)
+        self.assertTrue(self._verify_correctness(ts_i, target))
 
     def test_tensor_format(self):
         shape = [1, 3, 255, 255]
@@ -166,10 +175,12 @@ class TestInput(unittest.TestCase):
         }
 
         i = torchtrt.Input(shape, format=torchtrt.TensorFormat.channels_last)
-        self.assertTrue(self._verify_correctness(i, target))
+        ts_i = torchtrt.ts.TSInput(shape=i.shape, dtype=i.dtype, format=i.format)
+        self.assertTrue(self._verify_correctness(ts_i, target))
 
         i = torchtrt.Input(shape, format=torch.channels_last)
-        self.assertTrue(self._verify_correctness(i, target))
+        ts_i = torchtrt.ts.TSInput(shape=i.shape, dtype=i.dtype, format=i.format)
+        self.assertTrue(self._verify_correctness(ts_i, target))
 
     def test_dynamic_shape(self):
         min_shape = [1, 3, 128, 128]
@@ -188,14 +199,28 @@ class TestInput(unittest.TestCase):
         i = torchtrt.Input(
             min_shape=min_shape, opt_shape=opt_shape, max_shape=max_shape
         )
-        self.assertTrue(self._verify_correctness(i, target))
+        ts_i = torchtrt.ts.TSInput(
+            min_shape=i.shape["min_shape"],
+            opt_shape=i.shape["opt_shape"],
+            max_shape=i.shape["max_shape"],
+            dtype=i.dtype,
+            format=i.format,
+        )
+        self.assertTrue(self._verify_correctness(ts_i, target))
 
         i = torchtrt.Input(
             min_shape=tuple(min_shape),
             opt_shape=tuple(opt_shape),
             max_shape=tuple(max_shape),
         )
-        self.assertTrue(self._verify_correctness(i, target))
+        ts_i = torchtrt.ts.TSInput(
+            min_shape=i.shape["min_shape"],
+            opt_shape=i.shape["opt_shape"],
+            max_shape=i.shape["max_shape"],
+            dtype=i.dtype,
+            format=i.format,
+        )
+        self.assertTrue(self._verify_correctness(ts_i, target))
 
         tensor_shape = lambda shape: torch.randn(shape).shape
         i = torchtrt.Input(
@@ -203,7 +228,14 @@ class TestInput(unittest.TestCase):
             opt_shape=tensor_shape(opt_shape),
             max_shape=tensor_shape(max_shape),
         )
-        self.assertTrue(self._verify_correctness(i, target))
+        ts_i = torchtrt.ts.TSInput(
+            min_shape=i.shape["min_shape"],
+            opt_shape=i.shape["opt_shape"],
+            max_shape=i.shape["max_shape"],
+            dtype=i.dtype,
+            format=i.format,
+        )
+        self.assertTrue(self._verify_correctness(ts_i, target))
 
 
 class TestTRTModuleNext(unittest.TestCase):

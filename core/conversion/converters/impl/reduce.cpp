@@ -9,6 +9,36 @@ namespace converters {
 namespace impl {
 namespace {
 
+nvinfer1::ITensor* anyDimImplementation(
+    ConversionCtx* ctx,
+    const torch::jit::Node* n,
+    nvinfer1::ITensor* in_tensor,
+    int dim,
+    bool keepdim) {
+  auto in_dims = in_tensor->getDimensions();
+  LOG_DEBUG("Dim to reduce (original): " << dim);
+  dim = dim < 0 ? (in_dims.nbDims + dim) : dim;
+  LOG_DEBUG("Dim to reduce (converted): " << dim);
+
+  uint32_t axis_mask = 1 << dim;
+  LOG_DEBUG("Axis Mask: " << std::bitset<32>(axis_mask));
+  LOG_DEBUG("Keep dims: " << keepdim);
+
+  // Reduce does not work on bool inputs
+  if (in_tensor->getType() == nvinfer1::DataType::kBOOL) {
+    in_tensor = castITensor(ctx, in_tensor, nvinfer1::DataType::kINT32, (util::node_info(n) + "_in").c_str());
+  }
+  auto sum_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kSUM, axis_mask, keepdim);
+
+  TORCHTRT_CHECK(sum_layer, "Unable to create sum layer from node: " << *n);
+
+  sum_layer->setName(util::node_info(n).c_str());
+  auto out_tensor =
+      castITensor(ctx, sum_layer->getOutput(0), nvinfer1::DataType::kBOOL, (util::node_info(n) + "_out").c_str());
+  out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
+  return out_tensor;
+}
+
 auto reduce_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern(
@@ -203,7 +233,8 @@ auto reduce_registrations TORCHTRT_UNUSED =
                return true;
              }})
         .pattern(
-            {"aten::min(Tensor self) -> Tensor", [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+            {"aten::min(Tensor self) -> Tensor",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto in_tensor = args[0].ITensorOrFreeze(ctx);
                auto in_dims = util::toVec(in_tensor->getDimensions());
 
@@ -216,6 +247,40 @@ auto reduce_registrations TORCHTRT_UNUSED =
                min_layer->setName(util::node_info(n).c_str());
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], min_layer->getOutput(0));
 
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }})
+        .pattern(
+            {"aten::any.dim(Tensor self, int dim, bool keepdim=False) -> Tensor",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto in_tensor = args[0].ITensorOrFreeze(ctx);
+               auto dim = args[1].unwrapToInt();
+               auto keepdim = args[2].unwrapToBool();
+               auto out_tensor = anyDimImplementation(ctx, n, in_tensor, dim, keepdim);
+               out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }})
+        .pattern(
+            {"aten::all.dim(Tensor self, int dim, bool keepdim=False) -> Tensor",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               // use Not(Any(Not(input))) to calculate all without a direct all reduction
+               auto in_tensor = args[0].ITensorOrFreeze(ctx);
+               auto dim = args[1].unwrapToInt();
+               auto keepdim = args[2].unwrapToBool();
+               if (in_tensor->getType() != nvinfer1::DataType::kBOOL) {
+                 // unary not layer only supports bool inputs
+                 in_tensor = castITensor(
+                     ctx, in_tensor, nvinfer1::DataType::kBOOL, (util::node_info(n) + "_in_to_bool").c_str());
+               }
+               auto not_input_layer = ctx->net->addUnary(*in_tensor, nvinfer1::UnaryOperation::kNOT);
+               TORCHTRT_CHECK(not_input_layer, "Unable to create logical_not layer from node: " << *n);
+               not_input_layer->setName((util::node_info(n) + "_not_in").c_str());
+               auto not_in = not_input_layer->getOutput(0);
+               auto any_out = anyDimImplementation(ctx, n, not_in, dim, keepdim);
+               auto not_output_layer = ctx->net->addUnary(*any_out, nvinfer1::UnaryOperation::kNOT);
+               TORCHTRT_CHECK(not_output_layer, "Unable to create logical_not layer from node: " << *n);
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], not_output_layer->getOutput(0));
                LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
                return true;
              }});

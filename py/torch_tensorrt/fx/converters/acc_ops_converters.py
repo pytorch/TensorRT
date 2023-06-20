@@ -26,6 +26,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
     trt_transposed_matmul,
 )
 from torch_tensorrt.fx.tracer.acc_tracer.acc_ops import contiguous
+from torch_tensorrt.fx.converters.impl import activation
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -116,7 +117,7 @@ def acc_ops_conv1d(
     # right now
     if kwargs["bias"] is not None and not isinstance(kwargs["bias"], torch.Tensor):
         raise RuntimeError(
-            f"linear {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tenosr]"
+            f"linear {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tensor]"
         )
     bias = to_numpy(kwargs["bias"])  # type: ignore[arg-type]
     if bias is not None:
@@ -146,7 +147,7 @@ def acc_ops_conv1d(
     else:
         if not isinstance(kwargs["weight"], torch.Tensor):
             raise RuntimeError(
-                f"linear {name} has weight of type {type(kwargs['weight'])}, Expect Optional[Tenosr]"
+                f"linear {name} has weight of type {type(kwargs['weight'])}, Expect Optional[Tensor]"
             )
         weight = to_numpy(weight)
         weight = np.expand_dims(weight, -1)
@@ -202,11 +203,11 @@ def acc_ops_convnd(
     # right now
     if kwargs["bias"] is not None and not isinstance(kwargs["bias"], torch.Tensor):
         raise RuntimeError(
-            f"linear {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tenosr]"
+            f"linear {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tensor]"
         )
     bias = to_numpy(kwargs["bias"])  # type: ignore[arg-type]
 
-    if network.has_explicit_precision:
+    if network.has_explicit_precision or isinstance(kwargs["weight"], TRTTensor):
         weight = get_trt_tensor(network, kwargs["weight"], f"{name}_weight")
         weight_shape = tuple(kwargs["weight"].shape)  # type: ignore[union-attr]
         # will need to use uninitialized weight and set it later to support
@@ -224,7 +225,7 @@ def acc_ops_convnd(
     else:
         if not isinstance(kwargs["weight"], torch.Tensor):
             raise RuntimeError(
-                f"linear {name} has weight of type {type(kwargs['weight'])}, Expect Optional[Tenosr]"
+                f"linear {name} has weight of type {type(kwargs['weight'])}, Expect Optional[Tensor]"
             )
         weight = to_numpy(kwargs["weight"])
         layer = network.add_convolution_nd(
@@ -276,7 +277,7 @@ def acc_ops_conv_transposend(
         )
     bias = to_numpy(kwargs["bias"])  # type: ignore[arg-type]
 
-    if network.has_explicit_precision:
+    if network.has_explicit_precision or isinstance(kwargs["weight"], TRTTensor):
         weight = get_trt_tensor(network, kwargs["weight"], f"{name}_weight")
         weight_shape = tuple(kwargs["weight"].shape)  # type: ignore[union-attr]
         # will need to use uninitialized weight and set it later to support
@@ -691,10 +692,13 @@ def acc_ops_layer_norm(network, target, args, kwargs, name):
     eps_field = trt.PluginField(
         "eps", np.array([kwargs["eps"]], dtype=np.float32), trt.PluginFieldType.FLOAT32
     )
+    normalized_shape = kwargs["normalized_shape"]
     try:
-        normalized_shape = np.array(kwargs["normalized_shape"], dtype=np.int32)
+        normalized_shape = np.array(normalized_shape, dtype=np.int32)
     except TypeError:
-        _LOGGER.error("Unable to convert normalized_shape to a field, fall back to []")
+        _LOGGER.error(
+            f"Unable to convert normalized_shape with value {normalized_shape} to a field, fall back to []"
+        )
         normalized_shape = np.array([], dtype=np.int32)
 
     normalized_shape_filed = trt.PluginField(
@@ -1004,9 +1008,14 @@ def acc_ops_relu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-    operation_type = trt.ActivationType.RELU
-    return add_activation_layer(network, input_val, operation_type, target, name)
+
+    return activation.relu(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        kwargs["input"],
+    )
 
 
 @tensorrt_converter(acc_ops.leaky_relu)
@@ -1017,11 +1026,9 @@ def acc_ops_leaky_relu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-    negative_slope = kwargs["negative_slope"]
-    operation_type = trt.ActivationType.LEAKY_RELU
-    return add_activation_layer(
-        network, input_val, operation_type, target, name, negative_slope
+
+    return activation.leaky_relu(
+        network, target, SourceIR.ACC, name, kwargs["input"], kwargs["negative_slope"]
     )
 
 
@@ -1033,10 +1040,15 @@ def acc_ops_elu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-    alpha = kwargs["alpha"]
-    operation_type = trt.ActivationType.ELU
-    return add_activation_layer(network, input_val, operation_type, target, name, alpha)
+
+    return activation.elu(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        kwargs["input"],
+        kwargs["alpha"],
+    )
 
 
 @tensorrt_converter(acc_ops.selu)
@@ -1047,9 +1059,14 @@ def acc_ops_selu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-    operation_type = trt.ActivationType.SELU
-    return add_activation_layer(network, input_val, operation_type, target, name)
+
+    return activation.selu(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        kwargs["input"],
+    )
 
 
 @tensorrt_converter(acc_ops.softsign)
@@ -1062,7 +1079,14 @@ def acc_ops_softsign(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     operation_type = trt.ActivationType.SOFTSIGN
-    return add_activation_layer(network, input_val, operation_type, target, name)
+    return activation.convert_activation(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        operation_type,
+        input_val,
+    )
 
 
 @tensorrt_converter(acc_ops.sin)
@@ -1138,9 +1162,13 @@ def acc_ops_tanh(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-    operation_type = trt.ActivationType.TANH
-    return add_activation_layer(network, input_val, operation_type, target, name)
+    return activation.tanh(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        kwargs["input"],
+    )
 
 
 @tensorrt_converter(acc_ops.asin)
@@ -2802,7 +2830,7 @@ def acc_ops_linear(
 
     if isinstance(kwargs["weight"], torch.Tensor):
         weight = get_trt_tensor(network, kwargs["weight"].t(), f"{name}_weight")
-        if target is not acc_ops.linear:
+        if target not in (acc_ops.linear, torch.ops.aten.linear):
             weight_op = trt.MatrixOperation.TRANSPOSE
         else:
             weight_op = trt.MatrixOperation.NONE
@@ -3137,12 +3165,13 @@ def acc_ops_hard_sigmoid(
             "of the TensorRT region!"
         )
 
-    return add_activation_layer(
+    return activation.convert_activation(
         network,
-        input_val,
-        trt.ActivationType.HARD_SIGMOID,
         target,
+        SourceIR.ACC,
         name,
+        trt.ActivationType.HARD_SIGMOID,
+        input_val,
         alpha=1 / 6,
         beta=0.5,
     )
@@ -3156,16 +3185,13 @@ def acc_ops_sigmoid(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
 
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"Sigmoid received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
-
-    return add_activation_layer(
-        network, input_val, trt.ActivationType.SIGMOID, target, name
+    return activation.sigmoid(
+        network,
+        target,
+        SourceIR.ACC,
+        name,
+        kwargs["input"],
     )
 
 
@@ -3549,22 +3575,15 @@ def acc_ops_hardtanh(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
 
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"hardtanh received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
-
-    return add_activation_layer(
+    return activation.hardtanh(
         network,
-        input_val,
-        trt.ActivationType.CLIP,
         target,
+        SourceIR.ACC,
         name,
-        alpha=kwargs["min_val"],
-        beta=kwargs["max_val"],
+        kwargs["input"],
+        kwargs["min_val"],
+        kwargs["max_val"],
     )
 
 

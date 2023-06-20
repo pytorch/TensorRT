@@ -32,7 +32,7 @@ auto unsqueeze_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().
 
        auto shuffle_layer = ctx->net->addShuffle(*self);
        TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
-       shuffle_layer->setReshapeDimensions(util::unsqueezeDims(self->getDimensions(), dim));
+       shuffle_layer->setReshapeDimensions(util::unsqueezeDims(self->getDimensions(), dim, 1, false));
 
        auto out = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle_layer->getOutput(0));
 

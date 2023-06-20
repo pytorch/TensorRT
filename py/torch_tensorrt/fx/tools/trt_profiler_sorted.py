@@ -3,8 +3,9 @@ import logging
 import operator
 from typing import List, Mapping, Optional
 
-import tensorrt as trt
 import torch
+
+from tensorrt import tensorrt as trt
 
 from .. import TRTModule
 

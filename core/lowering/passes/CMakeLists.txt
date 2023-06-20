@@ -15,6 +15,7 @@ target_sources(${lib_name}
             "${CMAKE_CURRENT_SOURCE_DIR}/remove_nops.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/remove_set_attrs.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/remove_unnecessary_casts.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/replace_aten_pad.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/silu_to_sigmoid_multiplication.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_addmm.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_batch_norm.cpp"

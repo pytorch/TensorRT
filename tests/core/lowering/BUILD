@@ -28,7 +28,11 @@ cc_test(
 )
 
 lowering_test(
-    name = "test_conv1d_pass",
+    name = "test_autocast_long_inputs",
+)
+
+lowering_test(
+    name = "test_conv_pass",
 )
 
 lowering_test(
@@ -95,10 +99,15 @@ lowering_test(
     name = "test_rewrite_inputs_with_params",
 )
 
+lowering_test(
+    name = "test_replace_aten_pad_pass",
+)
+
 test_suite(
     name = "lowering_tests",
     tests = [
-        ":test_conv1d_pass",
+        ":test_autocast_long_inputs",
+        ":test_conv_pass",
         ":test_device_casting",
         ":test_exception_elimination_pass",
         ":test_linear_to_addmm",
@@ -111,6 +120,7 @@ test_suite(
         ":test_remove_detach_pass",
         ":test_remove_dropout_pass",
         ":test_remove_unnecessary_casts",
+        ":test_replace_aten_pad_pass",
         ":test_rewrite_inputs_with_params",
         ":test_unpack_hardsigmoid",
         ":test_unpack_hardswish",

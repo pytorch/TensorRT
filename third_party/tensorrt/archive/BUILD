@@ -46,10 +46,7 @@ cc_library(
         "nvinfer_lib",
         "@cuda//:cudart",
         "@cudnn",
-    ] + select({
-        ":windows": ["@cuda//:cublas"],
-        "//conditions:default": ["@cuda//:cublas"],
-    }),
+    ],
 )
 
 ####################################################################################
@@ -186,8 +183,5 @@ cc_library(
         "nvinferplugin_lib",
         "@cuda//:cudart",
         "@cudnn",
-    ] + select({
-        ":windows": ["@cuda//:cublas"],
-        "//conditions:default": ["@cuda//:cublas"],
-    }),
+    ],
 )

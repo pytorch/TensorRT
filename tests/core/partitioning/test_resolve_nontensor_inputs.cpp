@@ -150,6 +150,97 @@ TEST(Partitioning, ResolveNonTensorInputsCorrectly) {
   ASSERT_TRUE(trt_block_cnt == 1 && torch_block_cnt == 1);
 }
 
+TEST(Partitioning, ResolveMultipleNonTensorInputsCorrectly) {
+  const auto graph = R"IR(
+          graph(%x.1 : Tensor):
+            # TensorRT-intended Block
+            %16 : int = prim::Constant[value=8]()
+            %15 : int = prim::Constant[value=64]()
+            %13 : int = prim::Constant[value=0]()
+            %10 : int = prim::Constant[value=1]()
+            %self.linear.bias : Float(4096, strides=[1], requires_grad=0, device=cuda:0) = prim::Constant[value=<Tensor>]()
+            %self.linear.weight : Float(4096, 64, strides=[64, 1], requires_grad=0, device=cuda:0) = prim::Constant[value=<Tensor>]()
+            %3 : int = prim::Constant[value=-1]()
+            %2 : int = prim::Constant[value=1]()
+            %x.5 : Tensor = aten::flatten(%x.1, %2, %3)
+            %4 : Tensor = aten::t(%self.linear.weight)
+            %6 : Tensor = aten::matmul(%x.5, %4)
+            %7 : Tensor = trt::const(%self.linear.bias)
+            %9 : Tensor = aten::add(%7, %6, %10)
+            %11 : int[] = aten::size(%9) # <string>:13:9
+            %12 : int = aten::__getitem__(%11, %13)
+            %shape.3 : int[] = prim::ListConstruct(%12, %15, %16, %16)
+            %x.13 : Tensor = aten::reshape(%9, %shape.3)
+
+            # Torch-intended Block
+            %num_spatial_dims.2 : int = prim::Constant[value=2]()
+            %11 : int[] = prim::Constant[value=[0, 0]]()
+            %10 : bool = prim::Constant[value=0]()
+            %conv1_bias : Float(32, strides=[1], requires_grad=0, device=cuda:0) = prim::Constant[value=<Tensor>]()
+            %conv1_weight : Float(32, 32, 3, 3, strides=[288, 9, 3, 1], requires_grad=0, device=cuda:0) = prim::Constant[value=<Tensor>]()
+            %6 : int = prim::Constant[value=1]()
+            %5 : int[] = prim::Constant[value=[1, 1]]()
+            %4 : int[] = prim::Constant[value=[2, 2]]()
+            %conv_bias : Float(32, strides=[1], requires_grad=0, device=cuda:0) = prim::Constant[value=<Tensor>]()
+            %conv_weight : Float(64, 32, 3, 3, strides=[288, 9, 3, 1], requires_grad=0, device=cuda:0) = prim::Constant[value=<Tensor>]()
+            %input.16 : Tensor = aten::conv_transpose2d(%x.13, %conv_weight, %conv_bias, %4, %5, %5, %6, %5)
+            %7 : Tensor = aten::_convolution(%input.16, %conv1_weight, %conv1_bias, %5, %5, %5, %10, %11, %6, %10, %10, %10, %10)
+            %12 : int[] = aten::size(%7)
+            %96 : int = aten::len(%12)
+            %14 : int = aten::__range_length(%num_spatial_dims.2, %96, %6)
+
+            # TensorRT-intended Block
+            %15 : float = prim::Constant[value=1e-05]()
+            %14 : float = prim::Constant[value=0.1]()
+            %13 : NoneType = prim::Constant()
+            %num_spatial_dims.2 : int = prim::Constant[value=2]()
+            %300 : int = prim::Constant[value=3]()
+            %345 : int = aten::sub(%300, %96)
+            %3 : int = aten::add(%345, %6)
+            %2 : bool = prim::Constant[value=1]()
+            %size_prods.2 : int = prim::Loop(%3, %2, %6)
+              block0(%loop : int, %size_prods.13 : int):
+                %i.3 : int = aten::__derive_index(%loop, %num_spatial_dims.2, %3)
+                %8 : int = aten::__getitem__(%12, %i.3)
+                %size_prods.15 : int = aten::mul(%size_prods.13, %8)
+                -> (%2, %size_prods.15)
+            %11 : Tensor = aten::instance_norm(%7, %13, %13, %13, %13, %2, %14, %15, %2)
+            return (%11))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get(), true);
+
+  torch_tensorrt::core::partitioning::PartitioningInfo partitioning_info;
+  partitioning_info.enabled = true;
+  std::vector<torch_tensorrt::core::ir::Input> inputs;
+  inputs.push_back(torch_tensorrt::core::ir::Input({1, 64}));
+
+  torch_tensorrt::core::ir::CollectionInputSpecMap inputs_map;
+  std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>> input_types;
+  for (size_t i = 0; i < g->inputs().size(); ++i) {
+    inputs_map.insert({g->inputs()[i], {inputs[i]}});
+    input_types.insert({g->inputs()[i], {{at::kFloat}}});
+  }
+
+  partitioning_info.collection_input_spec_map = inputs_map;
+  partitioning_info.forced_fallback_operators = {"aten::_convolution"};
+  torch_tensorrt::core::partitioning::PartitioningCtx ctx(g->block(), partitioning_info);
+  ctx.input_types_map = input_types;
+
+  torch_tensorrt::core::partitioning::populateInputIValues(&ctx);
+  torch_tensorrt::core::partitioning::partition(&ctx);
+  std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
+      ctx.partitioned_blocks.begin()->second;
+
+  // For each TensorRT segmented block, verify that all inputs are of Tensor type
+  for (auto block : segmented_blocks) {
+    if (block.target() == torch_tensorrt::core::partitioning::SegmentedBlock::SegmentedBlockTarget::kTensorRT) {
+      for (auto input : block.raw_inputs())
+        ASSERT_TRUE(input->type()->isSubtypeOf(c10::TensorType::get()));
+    }
+  }
+}
+
 TEST(Partitioning, ResolveTensorListInputsInTrtCorrectly) {
   const auto graph = R"IR(
           graph(%0 : Float(1, 3, 16, 16, strides=[768, 256, 16, 1]),

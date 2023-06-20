@@ -26,6 +26,8 @@ std::string ConvertBlockToEngine(
 
 bool OpSupported(const torch::jit::Node* n);
 
+bool InputIsCollection(const torch::jit::Block* b);
+
 bool OutputIsCollection(const torch::jit::Block* b);
 
 bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_errors = false);

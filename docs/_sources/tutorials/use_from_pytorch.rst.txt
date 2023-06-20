@@ -33,7 +33,7 @@ at the documentation for the Torch-TensorRT ``TensorRTCompileSpec`` API.
 
     spec = {
         "forward": torch_tensorrt.ts.TensorRTCompileSpec(
-            {
+            **{
                 "inputs": [torch_tensorrt.Input([1, 3, 300, 300])],
                 "enabled_precisions": {torch.float, torch.half},
                 "refit": False,

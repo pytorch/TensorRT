@@ -1,5 +1,6 @@
 from enum import Enum
-from typing import List
+from typing import List, Optional, Callable
+from packaging import version
 
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
@@ -18,6 +19,20 @@ class LowerPrecision(Enum):
     FP32 = "fp32"
     FP16 = "fp16"
     INT8 = "int8"
+    BF16 = "bf16"
+
+    @staticmethod
+    def from_str(label: str) -> Optional["LowerPrecision"]:
+        if label in ("fp32", "float32", "float", "torch.float32"):
+            return LowerPrecision.FP32
+        elif label in ("fp16", "float16", "half", "torch.half", "torch.float16"):
+            return LowerPrecision.FP16
+        elif label in ("int8"):
+            return LowerPrecision.INT8
+        elif label in ("bf16", "bfloat16", "torch.bfloat16"):
+            return LowerPrecision.BF16
+        else:
+            return None
 
 
 def torch_dtype_to_trt(dtype: torch.dtype) -> TRTDataType:
@@ -104,3 +119,36 @@ def proxytensor_trace(mod, inputs):
     mod = run_const_fold(mod)
     mod = replace_op_with_indices(mod)
     return mod
+
+
+def req_torch_version(min_torch_version: str = "2.dev"):
+    """
+    Create a decorator which verifies the Torch version installed
+    against a specified version range
+
+    Args:
+        min_torch_version (str): The minimum required Torch version
+        for the decorated function to work properly
+
+    Returns:
+        A decorator which raises a descriptive error message if
+        an unsupported Torch version is used
+    """
+
+    def nested_decorator(f: Callable):
+        def function_wrapper(*args, **kwargs):
+            # Parse minimum and current Torch versions
+            min_version = version.parse(min_torch_version)
+            current_version = version.parse(torch.__version__)
+
+            if current_version < min_version:
+                raise AssertionError(
+                    f"Expected Torch version {min_torch_version} or greater, "
+                    + f"when calling {f}. Detected version {torch.__version__}"
+                )
+            else:
+                return f(*args, **kwargs)
+
+        return function_wrapper
+
+    return nested_decorator

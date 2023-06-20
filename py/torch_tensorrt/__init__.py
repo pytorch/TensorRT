@@ -4,6 +4,7 @@ import os
 import sys
 import platform
 import warnings
+from packaging import version
 from torch_tensorrt._version import (
     __version__,
     __cuda_version__,
@@ -58,7 +59,7 @@ except:
 
     elif sys.platform.startswith("linux"):
         LINUX_PATHS = [
-            "/usr/local/cuda/lib64",
+            "/usr/local/cuda-11.8/lib64",
         ]
 
         if "LD_LIBRARY_PATH" in os.environ:
@@ -93,6 +94,10 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._TRTModuleNext import TRTModuleNext
 
 from torch_tensorrt import fx
+
+if version.parse(torch.__version__) >= version.parse("2.dev"):
+    from torch_tensorrt import dynamo
+    from torch_tensorrt.dynamo import backend
 
 
 def _register_with_torch():
