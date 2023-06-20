@@ -24,11 +24,21 @@ def convert_module(
     Returns:
         TRTModule or TRTModuleNext
     """
+    # Specify module output data types to ensure TRT output types agree with
+    # that of the equivalent Torch module
+    module_outputs = module(*inputs)
+
+    if not isinstance(module_outputs, (list, tuple)):
+        module_outputs = [module_outputs]
+
+    output_dtypes = list(output.dtype for output in module_outputs)
+
     interpreter = TRTInterpreter(
         module,
         InputTensorSpec.from_tensors(inputs),
         explicit_batch_dimension=True,
         logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
+        output_dtypes=output_dtypes,
     )
 
     interpreter_result = interpreter.run(
