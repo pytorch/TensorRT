@@ -121,6 +121,11 @@ class LowerTrtInterpreter:
                 logger.warning(f"Cannot load timing cache for {split_name}: {str(e)}")
                 cache_data = None
 
+        module_outputs = mod(*input)
+        if not isinstance(module_outputs, (list, tuple)):
+            module_outputs = [module_outputs]
+        output_dtypes = list(output.dtype for output in module_outputs)
+
         interpreter = TRTInterpreter(
             mod,
             input_specs=self.lower_setting.input_specs,
@@ -129,6 +134,7 @@ class LowerTrtInterpreter:
             logger_level=trt.Logger.VERBOSE
             if self.lower_setting.verbose_log
             else trt.Logger.WARNING,
+            output_dtypes=output_dtypes,
         )
 
         interp_result: TRTInterpreterResult = interpreter.run(
@@ -142,6 +148,11 @@ class LowerTrtInterpreter:
             if self.lower_setting.verbose_profile
             else trt.ProfilingVerbosity.LAYER_NAMES_ONLY,
             tactic_sources=self.lower_setting.tactic_sources,
+            max_aux_streams=self.lower_setting.max_aux_streams,
+            version_compatible=self.lower_setting.version_compatible,
+            tactic_heuristic=self.lower_setting.tactic_heuristic,
+            optimization_level=self.lower_setting.optimization_level,
+            faster_dynamic_shapes=self.lower_setting.faster_dynamic_shapes,
         )
 
         # Update timing cache file if needed
