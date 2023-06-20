@@ -148,11 +148,6 @@ class LowerTrtInterpreter:
             if self.lower_setting.verbose_profile
             else trt.ProfilingVerbosity.LAYER_NAMES_ONLY,
             tactic_sources=self.lower_setting.tactic_sources,
-            max_aux_streams=self.lower_setting.max_aux_streams,
-            version_compatible=self.lower_setting.version_compatible,
-            tactic_heuristic=self.lower_setting.tactic_heuristic,
-            optimization_level=self.lower_setting.optimization_level,
-            faster_dynamic_shapes=self.lower_setting.faster_dynamic_shapes,
         )
 
         # Update timing cache file if needed
