@@ -111,7 +111,7 @@ TRTEngine::TRTEngine(
     for (size_t pyt_idx = 0; pyt_idx < inputs_size; pyt_idx++) {
       auto binding_name = _in_binding_names[pyt_idx];
       auto trt_idx = cuda_engine->getBindingIndex(binding_name.c_str());
-      std::string engine_binded_name = cuda_engine->getIOTensorName(pyt_idx);
+      std::string engine_binded_name = cuda_engine->getIOTensorName(trt_idx);
       TORCHTRT_CHECK(
           (binding_name == engine_binded_name),
           "Could not find a TensorRT engine binding for input named " << binding_name);

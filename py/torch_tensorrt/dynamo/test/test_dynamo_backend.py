@@ -1,6 +1,7 @@
 import torch
 import timm
 import pytest
+import unittest
 
 import torch_tensorrt as torchtrt
 import torchvision.models as models
@@ -11,6 +12,8 @@ from torch_tensorrt.dynamo.common_utils.test_utils import (
     COSINE_THRESHOLD,
     cosine_similarity,
 )
+
+assertions = unittest.TestCase()
 
 
 @pytest.mark.unit
@@ -31,9 +34,9 @@ def test_resnet18(ir):
 
     trt_mod = torchtrt.compile(model, **compile_spec)
     cos_sim = cosine_similarity(model(input), trt_mod(input))
-    assert (
+    assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
-        f"Resnet18 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        msg=f"Resnet18 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
 
     # Clean up model env
@@ -61,9 +64,9 @@ def test_mobilenet_v2(ir):
 
     trt_mod = torchtrt.compile(model, **compile_spec)
     cos_sim = cosine_similarity(model(input), trt_mod(input))
-    assert (
+    assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
-        f"Mobilenet v2 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        msg=f"Mobilenet v2 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
 
     # Clean up model env
@@ -91,9 +94,9 @@ def test_efficientnet_b0(ir):
 
     trt_mod = torchtrt.compile(model, **compile_spec)
     cos_sim = cosine_similarity(model(input), trt_mod(input))
-    assert (
+    assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
-        f"EfficientNet-B0 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        msg=f"EfficientNet-B0 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
 
     # Clean up model env
@@ -134,9 +137,9 @@ def test_bert_base_uncased(ir):
     for key in model_outputs.keys():
         out, trt_out = model_outputs[key], trt_model_outputs[key]
         cos_sim = cosine_similarity(out, trt_out)
-        assert (
+        assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
-            f"HF BERT base-uncased TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+            msg=f"HF BERT base-uncased TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
     # Clean up model env
@@ -164,9 +167,9 @@ def test_resnet18_half(ir):
 
     trt_mod = torchtrt.compile(model, **compile_spec)
     cos_sim = cosine_similarity(model(input), trt_mod(input))
-    assert (
+    assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
-        f"Resnet18 Half TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        msg=f"Resnet18 Half TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
 
     # Clean up model env

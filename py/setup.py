@@ -427,6 +427,8 @@ setup(
     ext_modules=ext_modules,
     install_requires=[
         "torch >=2.1.dev,<2.2" if not LEGACY else "torch >=1.13.0,<2.0",
+        "pyyaml",
+        "packaging",
     ],
     setup_requires=[],
     cmdclass={
