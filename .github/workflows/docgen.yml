@@ -28,10 +28,10 @@ jobs:
           apt update
           DEBIAN_FRONTEND=noninteractive apt install -y software-properties-common gcc git curl wget make zlib1g-dev bzip2 libbz2-dev lzma lzma-dev libreadline-dev libsqlite3-dev libssl-dev libffi-dev doxygen pandoc
           git config --global --add safe.directory '*'
-      - name: Set up Python 3.9.4
+      - name: Set up Python 3.10.12
         uses: actions/setup-python@v4
         with:
-          python-version: 3.9.4
+          python-version: 3.10.12
       - uses: actions/checkout@v3
         with:
           ref: ${{github.head_ref}}
