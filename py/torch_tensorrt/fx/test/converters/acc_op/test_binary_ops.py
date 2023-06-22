@@ -58,6 +58,23 @@ class TestBinaryOpConverters(AccTestCase):
         self.run_test(m, inputs, expected_ops={expected_op})
 
     @parameterized.expand([(op[1].__name__, op[0], op[1]) for op in elementwise_ops])
+    def test_elementwise_ops_mismatched_dtypes(
+        self, name, orig_op: Callable, expected_op
+    ):
+        class TestModule(nn.Module):
+            def __init__(self, orig_op):
+                super().__init__()
+                self.orig_op = orig_op
+
+            def forward(self, x):
+                return self.orig_op(x.int(), x)
+
+        m = TestModule(orig_op)
+        # Avoid dividing by 0.
+        inputs = [2 * torch.rand(1, 1, dtype=torch.float) + 1]
+        self.run_test(m, inputs, expected_ops={expected_op})
+
+    @parameterized.expand([(op[1].__name__, op[0], op[1]) for op in elementwise_ops])
     def test_elementwise_ops_with_one_constant(
         self, name, orig_op: Callable, expected_op
     ):

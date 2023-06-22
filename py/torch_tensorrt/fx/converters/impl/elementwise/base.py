@@ -17,6 +17,7 @@ from torch_tensorrt.fx.converters.converter_utils import (
     broadcast,
     squeeze_left,
     get_trt_tensor,
+    cast_trt_tensor,
 )
 
 
@@ -52,6 +53,7 @@ def convert_binary_elementwise(
     introduce constant via .size() op. Other scenario should be const folded first.
     If any operand is not a trt tensor, we make it a trt constant layer while preserve
     its dtype. Then we broadcast these two inputs to have the same number of dimensions.
+    We also promote the types of the two tensors to avoid dtype errors in TRT.
 
     Limitation:
         If we are using implicit batch dim mode, the operand that is not a trt
@@ -125,6 +127,17 @@ def convert_binary_elementwise(
 
     lhs_val = get_trt_tensor(network, lhs_val, f"{name}_lhs", lhs_dtype)
     rhs_val = get_trt_tensor(network, rhs_val, f"{name}_rhs", rhs_dtype)
+
+    promoted_type = torch.promote_types(
+        unified_dtype_converter(lhs_val.dtype, Frameworks.TORCH),
+        unified_dtype_converter(rhs_val.dtype, Frameworks.TORCH),
+    )
+    trt_promoted_type = unified_dtype_converter(promoted_type, Frameworks.TRT)
+
+    if trt_promoted_type != lhs_val.dtype:
+        lhs_val = cast_trt_tensor(network, lhs_val, trt_promoted_type, name)
+    if trt_promoted_type != rhs_val.dtype:
+        rhs_val = cast_trt_tensor(network, rhs_val, trt_promoted_type, name)
 
     # Check the limitation in the doc string.
     if network.has_implicit_batch_dimension:
