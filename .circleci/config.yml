@@ -4,19 +4,19 @@ version: 2.1
 
 commands:
   install-bazel:
-    description: "Install bazel"
+    description: "Install bazelisk"
     parameters:
       platform:
         type: string
-        default: "x86_64"
+        default: "amd64"
       version:
         type: string
-        default: "6.2.1"
+        default: "v1.17.0"
     steps:
       - run:
-          name: Install bazel
+          name: Install bazelisk
           command: |
-            sudo wget -q https://github.com/bazelbuild/bazel/releases/download/<< parameters.version >>/bazel-<< parameters.version >>-linux-<< parameters.platform >> -O /usr/bin/bazel
+            sudo wget -q https://github.com/bazelbuild/bazelisk/releases/download/<< parameters.version >>/bazelisk-linux-<< parameters.platform >> -O /usr/bin/bazel
             sudo chmod a+x /usr/bin/bazel
 
   install-cmake:
@@ -190,12 +190,9 @@ commands:
       trt-version-long:
         type: string
         default: "8.6.1.6-1"
-      bazel-version:
-        type: string
-        default: "6.2.1"
       bazel-platform:
         type: string
-        default: "x86_64"
+        default: "amd64"
     steps:
       - install-cudnn:
           os: << parameters.os >>
@@ -212,7 +209,6 @@ commands:
             sudo apt-get install libnvinfer8=<< parameters.trt-version-long >>+<< parameters.cuda-string-version >> libnvinfer-plugin8=<< parameters.trt-version-long>>+<< parameters.cuda-string-version >> libnvinfer-dev=<< parameters.trt-version-long >>+<< parameters.cuda-string-version >> libnvinfer-plugin-dev=<< parameters.trt-version-long>>+<< parameters.cuda-string-version >> libnvinfer-headers-dev=<< parameters.trt-version-long>>+<< parameters.cuda-string-version >> libnvinfer-headers-plugin-dev=<< parameters.trt-version-long>>+<< parameters.cuda-string-version >>
       - install-bazel:
           platform: << parameters.bazel-platform >>
-          version: << parameters.bazel-version >>
 
   setup-py-version:
       description: "Set python version"
@@ -816,8 +812,7 @@ jobs:
           platform: "x86_64"
           cudnn-version: << pipeline.parameters.cudnn-version >>
           trt-version-short:  << pipeline.parameters.trt-version-short >>
-          bazel-version: << pipeline.parameters.bazel-version >>
-          bazel-platform: "x86_64"
+          bazel-platform: "amd64"
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torchvision-build: << parameters.torchvision-build >>
@@ -879,8 +874,7 @@ jobs:
           platform: "x86_64"
           cudnn-version: << parameters.cudnn-version >>
           trt-version-short:  << parameters.trt-version-short >>
-          bazel-version: << pipeline.parameters.bazel-version >>
-          bazel-platform: "x86_64"
+          bazel-platform: "amd64"
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
       - install-torch-from-index:
@@ -1114,8 +1108,7 @@ jobs:
                 platform: "x86_64"
                 cudnn-version: << pipeline.parameters.cudnn-version >>
                 trt-version-short:  << pipeline.parameters.trt-version-short >>
-                bazel-version: << pipeline.parameters.bazel-version >>
-                bazel-platform: "x86_64"
+                bazel-platform: "amd64"
             - install-torch-from-index:
                 torch-build:  << parameters.torch-build >>
                 torch-build-index: << parameters.torch-build-index >>
@@ -1186,7 +1179,6 @@ jobs:
           architecture: "arm64"
           cudnn-version: << pipeline.parameters.cudnn-jetson-version >>
           trt-version-short:  << pipeline.parameters.trt-jetson-version-short >>
-          bazel-version: << pipeline.parameters.bazel-version >>
           bazel-platform: "arm64"
       - run:
           name: Set python version
@@ -1328,9 +1320,6 @@ jobs:
                 command: echo -e "Packaging stage not enabled"
 
 parameters:
-  bazel-version:
-    type: string
-    default: "6.2.1"
   python-version:
     type: string
     default: "3.9.4"
