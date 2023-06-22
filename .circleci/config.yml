@@ -94,7 +94,7 @@ commands:
                         - << parameters.install-dir >>
 
   install-cudnn:
-    description: "Install CUDNN 8.9.0"
+    description: "Install CUDNN 8.9.1"
     parameters:
       os:
         type: string
@@ -104,7 +104,7 @@ commands:
         default: "x86_64"
       cudnn-version:
         type: string
-        default: "8.9.0.131"
+        default: "8.9.1.23"
       cuda-version:
         type: string
         default: "cuda12.1"
@@ -183,7 +183,7 @@ commands:
         default: "cuda12.0"
       cudnn-version:
         type: string
-        default: "8.9.0.131"
+        default: "8.9.1.23"
       trt-version-short:
         type: string
         default: "8.6.1"
@@ -235,7 +235,7 @@ commands:
           default: "8.6.1"
         cudnn-version-long:
           type: string
-          default: "8.9.0.131"
+          default: "8.9.1.23"
       steps:
         - run:
             name: Set up python environment
@@ -252,7 +252,7 @@ commands:
     parameters:
       torch-build:
         type: string
-        default: "2.1.0.dev20230613+cu121.with.pypi.cudnn.with.pypi.cudnn"
+        default: "2.1.0.dev20230613+cu121.with.pypi.cudnn"
       torchvision-build:
         type: string
         default: "0.16.0.dev20230613+cu121"
@@ -1359,7 +1359,7 @@ parameters:
     default: true
   cudnn-version:
     type: string
-    default: "8.9.0.131"
+    default: "8.9.1.23"
   trt-version-short:
     type: string
     default: "8.6.1"
