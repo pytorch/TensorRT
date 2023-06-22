@@ -82,6 +82,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         ] = dict()
         # Data types for TRT Module output Tensors
         self.output_dtypes = output_dtypes
+
     def validate_input_specs(self):
         for shape, _, _, shape_ranges, has_batch_dim in self.input_specs:
             if not self.network.has_implicit_batch_dimension:
