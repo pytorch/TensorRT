@@ -8,7 +8,6 @@ from typing import Any, Sequence
 from torch_tensorrt import EngineCapability, Device
 from torch_tensorrt.fx.utils import LowerPrecision
 
-from torch_tensorrt.dynamo.backend._settings import CompilationSettings
 from torch_tensorrt.dynamo.backend.utils import prepare_inputs, prepare_device
 from torch_tensorrt.dynamo.backend.backends import torch_tensorrt_backend
 from torch_tensorrt.dynamo.backend._defaults import (
@@ -62,6 +61,10 @@ def compile(
 
     inputs = prepare_inputs(inputs, prepare_device(device))
 
+    if not isinstance(enabled_precisions, collections.abc.Collection):
+        enabled_precisions = [enabled_precisions]
+
+    # Parse user-specified enabled precisions
     if (
         torch.float16 in enabled_precisions
         or torch_tensorrt.dtype.half in enabled_precisions
@@ -123,19 +126,12 @@ def create_backend(
     Returns:
         Backend for torch.compile
     """
-    if debug:
-        logger.setLevel(logging.DEBUG)
-
-    settings = CompilationSettings(
+    return partial(
+        torch_tensorrt_backend,
         debug=debug,
         precision=precision,
         workspace_size=workspace_size,
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
         pass_through_build_failures=pass_through_build_failures,
-    )
-
-    return partial(
-        torch_tensorrt_backend,
-        settings=settings,
     )
