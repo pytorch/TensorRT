@@ -45,10 +45,6 @@ c10::IValue dynamic_size_layer(ConversionCtx* ctx, const torch::jit::Node* n, kw
     // Handle negative axis by refering to nbDims of input Tensor
     dim = dim < 0 ? dim + maxDim : dim;
     LOG_DEBUG("Dimension to select: " << dim);
-    // Check if selected dimension size is -1 else return static size
-    if (input_dims.d[dim] != -1) {
-      return input_dims.d[dim];
-    }
     shape_1d_tensor = index_layer(ctx, n, shape_1d_tensor, dim);
     LOG_DEBUG("Output tensor shape: " << shape_1d_tensor->getDimensions());
 
