@@ -1,25 +1,79 @@
 [build-system]
 requires = [
-    "setuptools",
-    "wheel",
+    "setuptools>=68.0.0",
+    "packaging>=23.1",
+    "wheel>=0.40.0",
+    "ninja>=1.11.0",
+    "pyyaml>=6.0",
+    "cffi>=1.15.1",
+    "typing-extensions>=4.7.0",
+    "future>=0.18.3",
+    "tensorrt>=8.6,<8.7",
+    #"torch >=2.0.0,<2.1.0",
+    "torch==2.1.0.dev20230703+cu121",
+    "pybind11==2.6.2",
     "numpy",
-    "ninja",
-    "pyyaml",
-    "setuptools",
-    "cffi",
-    "typing_extensions",
-    "future",
-    "tensorrt >=8.6,<8.7"
 ]
+build-backend = "setuptools.build_meta"
 
-# Use legacy backend to import local packages in setup.py
-#build-backend = "setuptools.build_meta:__legacy__"
+[project]
+name = "torch_tensorrt"
+authors = [
+    {name="NVIDIA Corporation", email="narens@nvidia.com"}
+]
+description = "Torch-TensorRT is a package which allows users to automatically compile PyTorch and TorchScript modules to TensorRT while remaining in PyTorch"
+license = {file = "LICENSE"}
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: GPU :: NVIDIA CUDA",
+    "License :: OSI Approved :: BSD License",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: C++",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries",
+]
+readme = {file = "py/README.md", content-type = "text/markdown"}
+requires-python = ">=3.8"
+keywords = ["pytorch", "torch", "tensorrt", "trt", "ai", "artificial intelligence", "ml", "machine learning", "dl", "deep learning", "compiler", "dynamo", "torchscript", "inference"]
+dependencies = [
+    #"torch>=2.0.0,<2.1.0",
+    "torch==2.1.0.dev20230703+cu121",
+    "tensorrt>=8.6,<8.7",
+    "packaging>=23",
+    "numpy",
+    "typing-extensions>=4.7.0",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+torchvision = ["torchvision >=0.16.dev,<0.17.0"]
+
+[project.urls]
+Homepage = "https://pytorch.org/tensorrt"
+Documentation = "https://pytorch.org/tensorrt"
+Repository = "https://github.com/pytorch/tensorrt.git"
+Changelog = "https://github.com/pytorch/tensorrt/releases"
 
 
 [tool.black]
 # Uncomment if pyproject.toml worked fine to ensure consistency with flake8
 # line-length = 120
-target-versions = ["py38", "py39", "py310"]
+target-versions = ["py38", "py39", "py310", "py311", "py312"]
 force-exclude = """
 elu_converter/setup.py
 """
+
+[tool.mypy]
+show_error_codes = true
+disable_error_code = "attr-defined"
+no_implicit_optional = true
+
+[tool.setuptools]
+package-dir = {"" = "py"}
+include-package-data = false

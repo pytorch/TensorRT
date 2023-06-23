@@ -7,7 +7,8 @@ from .converter_registry import dynamo_tensorrt_converter
 from torch.fx.node import Argument, Target, Node
 
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
-from torch_tensorrt.dynamo.conversion import SourceIR, impl
+from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion.converter_utils import cast_trt_tensor
 from torch_tensorrt.dynamo.conversion.converter_utils import cast_int_int_div_trt_tensor
 

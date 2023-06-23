@@ -30,6 +30,10 @@ repos:
         args:
           - --warnings=all
     -   id: buildifier-lint
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.13
+    hooks:
+      - id: validate-pyproject
   - repo: local
     hooks:
     -   id: dont-commit-upstream

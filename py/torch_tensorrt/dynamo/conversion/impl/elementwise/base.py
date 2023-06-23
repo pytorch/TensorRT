@@ -11,7 +11,7 @@ from torch_tensorrt.fx.utils import (
     unified_dtype_converter,
     Frameworks,
 )
-from torch_tensorrt.dynamo.conversion import SourceIR
+from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
 )

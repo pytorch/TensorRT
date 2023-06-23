@@ -8,7 +8,7 @@ from torch_tensorrt.fx.types import (
     TRTTensor,
 )
 
-from torch_tensorrt.dynamo.conversion import SourceIR
+from torch_tensorrt.dynamo._SourceIR import SourceIR
 
 
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (

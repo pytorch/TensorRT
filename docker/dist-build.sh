@@ -3,22 +3,22 @@
 TOP_DIR=$(cd $(dirname $0); pwd)/..
 
 if [[ -z "${USE_CXX11}" ]]; then
-    BUILD_CMD="python setup.py bdist_wheel"
+    BUILD_CMD="python -m pip wheel .  --extra-index-url https://download.pytorch.org/whl/nightly/cu121 -w dist"
 else
-    BUILD_CMD="python setup.py bdist_wheel  --use-cxx11-abi"
+    BUILD_CMD="python -m pip wheel . --config-setting="--build-option=--use-cxx11-abi" --extra-index-url https://download.pytorch.org/whl/nightly/cu121 -w dist"
 fi
 
+# TensorRT restricts our pip version
 cd ${TOP_DIR} \
-    && mkdir -p dist && cd py \
-    && pip install -r requirements.txt \
-    && pip install wheel
+    && python -m pip install "pip<=23.1" wheel \
+    && python -m pip install -r py/requirements.txt
 
 # Build Torch-TRT
-MAX_JOBS=1 LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8 ${BUILD_CMD} $* || exit 1
+MAX_JOBS=4 LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8 ${BUILD_CMD} $* || exit 1
 
-pip3 install ipywidgets --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org
+python -m pip install ipywidgets --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org
 jupyter nbextension enable --py widgetsnbextension
-pip3 install timm
+python -m pip install timm
 
 # test install
-pip3 uninstall -y torch_tensorrt && pip3 install ${TOP_DIR}/py/dist/*.whl
+python -m pip uninstall -y torch_tensorrt && python -m pip install ${TOP_DIR}/dist/*.whl

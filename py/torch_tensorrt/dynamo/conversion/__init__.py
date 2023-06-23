@@ -1,4 +1,3 @@
-from .SourceIR import SourceIR
 from .aten_ops_converters import *
 from .trt_interpreter import *
 from .conversion import *

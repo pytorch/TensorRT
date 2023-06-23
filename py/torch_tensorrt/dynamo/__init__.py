@@ -10,3 +10,4 @@ if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
         dynamo_tensorrt_converter,
     )
     from .compile import compile
+    from ._SourceIR import SourceIR

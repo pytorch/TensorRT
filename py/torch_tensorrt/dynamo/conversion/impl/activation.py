@@ -6,13 +6,13 @@ import tensorrt as trt
 import torch
 from torch.fx.node import Target
 
+from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.fx.converters.impl.activation import *
 from torch_tensorrt.fx.converters.converter_utils import (
     mark_as_int8_layer,
     set_layer_name,
     get_trt_plugin,
 )
-from torch_tensorrt.dynamo.conversion import SourceIR
 
 from torch_tensorrt.fx.types import (
     TRTNetwork,

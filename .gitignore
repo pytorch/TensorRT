@@ -67,3 +67,4 @@ bazel-tensorrt
 *cifar-10-batches-py*
 bazel-project
 build/
+wheelhouse/
