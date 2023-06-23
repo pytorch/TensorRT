@@ -1241,7 +1241,7 @@ jobs:
           platform: "x86_64"
           cudnn-version: << parameters.cudnn-version >>
           trt-version-short:  << parameters.trt-version-short >>
-          bazel-platform: "x86_64"
+          bazel-platform: "amd64"
       - install-cmake:
           version: 3.24.1
       - install-torch-from-index:
