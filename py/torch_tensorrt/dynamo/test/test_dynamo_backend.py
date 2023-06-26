@@ -8,7 +8,7 @@ import torchvision.models as models
 
 from transformers import BertModel
 
-from torch_tensorrt.dynamo.common.test_utils import (
+from torch_tensorrt.dynamo.utils import (
     COSINE_THRESHOLD,
     cosine_similarity,
 )

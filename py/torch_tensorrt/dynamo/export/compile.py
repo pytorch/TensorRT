@@ -7,10 +7,16 @@ from functools import partial
 from typing import Any, Optional, Sequence
 from torch_tensorrt import EngineCapability, Device
 from torch_tensorrt.fx.utils import LowerPrecision
-
+from torch.fx.passes.pass_manager import PassManager
+from torch.fx.passes.shape_prop import ShapeProp
+import torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer as aten_tracer
+from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
+from torch_tensorrt.dynamo.backend.lowering import fuse_permute_linear, fuse_permute_matmul
 from torch_tensorrt.dynamo import CompilationSettings
-from torch_tensorrt.dynamo.utils import prepare_inputs, prepare_device
+from torch_tensorrt.dynamo.backend.utils import prepare_inputs, prepare_device
 from torch_tensorrt.dynamo.backend.backends import torch_tensorrt_backend
+from torch_tensorrt.dynamo.backend.conversion import convert_module
+
 from torch_tensorrt.dynamo._defaults import (
     PRECISION,
     DEBUG,
@@ -93,38 +99,53 @@ def compile(
             f"Precision {enabled_precisions} not supported in the Dynamo Path"
         )
 
-    custom_backend = create_backend(
-        precision=lower_precision,
+    settings = CompilationSettings(
         debug=debug,
+        precision=lower_precision,
         workspace_size=workspace_size,
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
+        pass_through_build_failures=False,
         max_aux_streams=max_aux_streams,
         version_compatible=version_compatible,
         optimization_level=optimization_level,
         use_experimental_rt=use_experimental_rt,
-        **kwargs,
     )
 
-    model = torch.compile(gm, backend=custom_backend)
+    model = trace(gm, inputs, **kwargs)
 
-    # Ensure compilation occurs by calling the function with provided inputs
-    model(*inputs)
+    if kwargs["use_capability_partitioner"]:
+        traced_model = trace(model)
+        model = lower_model(traced_model, inputs)
+        return _compile_module(model, inputs, settings)
+    else:
+        split_result = lower_model_using_trt_splitter(model, inputs)
+        trt_splitter = _compile_graph(split_result, inputs, settings)
+        return trt_splitter.split_module
 
-    return model
-    
+def _compile_graph(split_result: TRTSplitter,
+                   inputs: Any,
+                   settings: CompilationSettings = CompilationSettings(),
+                   **kwargs,):
 
-def create_backend(
-    precision: LowerPrecision = PRECISION,
-    debug: bool = DEBUG,
-    workspace_size: int = WORKSPACE_SIZE,
-    min_block_size: int = MIN_BLOCK_SIZE,
-    torch_executed_ops: Sequence[str] = set(),
-    pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES,
-    max_aux_streams: Optional[int] = MAX_AUX_STREAMS,
-    version_compatible: bool = VERSION_COMPATIBLE,
-    optimization_level: Optional[int] = OPTIMIZATION_LEVEL,
-    use_experimental_rt: bool = USE_EXPERIMENTAL_RT,
+    for submod_name, submod_inputs in split_result.submodule_inputs.items():
+        submod = getattr(split_result.split_module, submod_name)
+        # Only acc submodules will be lowered.
+        if not submod_name.startswith(split_result.non_acc_submodule_prefix):
+            # Create TRT Module from submodule
+            trt_mod = convert_module(
+                submod,
+                submod_inputs,
+                settings=settings,
+                name=submod_name,
+            )
+            setattr(split_result.split_module, submod_name, trt_mod)
+
+    return split_result
+
+def trace(
+    model: torch.nn.Module,
+    inputs: Any,
     **kwargs,
 ):
     """Create torch.compile backend given specified arguments
@@ -144,23 +165,30 @@ def create_backend(
     Returns:
         Backend for torch.compile
     """
-    if debug:
-        logger.setLevel(logging.DEBUG)
+    model = aten_tracer.opt_trace(model, inputs)
 
-    settings = CompilationSettings(
-        debug=debug,
-        precision=precision,
-        workspace_size=workspace_size,
-        min_block_size=min_block_size,
-        torch_executed_ops=torch_executed_ops,
-        pass_through_build_failures=pass_through_build_failures,
-        max_aux_streams=max_aux_streams,
-        version_compatible=version_compatible,
-        optimization_level=optimization_level,
-        use_experimental_rt=use_experimental_rt,
-    )
+    return model
 
-    return partial(
-        torch_tensorrt_backend,
-        settings=settings,
+def lower_model_using_trt_splitter(model: torch.nn.Module,
+                inputs: Any,
+                **kwargs):
+    splitter_setting = TRTSplitterSetting()
+    splitter_setting.use_implicit_batch_dim = False
+    splitter_setting.min_acc_module_size = 1
+    splitter_setting.use_experimental_rt = False
+    splitter = TRTSplitter(model, inputs, settings=splitter_setting)
+    splitter.node_support_preview()
+    return splitter.generate_split_results()
+
+def lower_model(model: torch.nn.Module,
+                inputs: Any,
+                **kwargs):
+
+    graph_optimization_pm = PassManager.build_from_passlist(
+        [fuse_permute_matmul, fuse_permute_linear]
     )
+    lowered_model = graph_optimization_pm(model)
+    if isinstance(lowered_model, torch.fx.GraphModule):
+        ShapeProp(lowered_model).propagate(*inputs)
+
+    return lowered_model

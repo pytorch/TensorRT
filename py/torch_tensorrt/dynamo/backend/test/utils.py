@@ -13,6 +13,7 @@ from torch._dynamo.backends.common import fake_tensor_unsupported
 
 from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
 
+DECIMALS_OF_AGREEMENT = 4
 
 @fake_tensor_unsupported
 def fx_dynamo_testing_backend(

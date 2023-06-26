@@ -5,3 +5,4 @@ from torch_tensorrt.dynamo.backend.lowering._partition import (
     partition,
     get_submod_inputs,
 )
+from ._fusers import *
