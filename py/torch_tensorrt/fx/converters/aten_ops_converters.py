@@ -25,7 +25,7 @@ import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch_tensorrt.fx.converters.impl import activation
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
 from torch_tensorrt.fx.converters.impl.elementwise import rsqrt
-from torch_tensorrt.fx.converters.impl.elementwise import matrix_multiply
+from torch_tensorrt.fx.converters.impl.matmul import matrix_multiply
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
