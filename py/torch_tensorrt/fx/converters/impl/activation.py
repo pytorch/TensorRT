@@ -256,6 +256,7 @@ def selu(
         dyn_range_fn=elu_dyn_range_fn,
     )
 
+
 def gelu(
     network: TRTNetwork,
     target: Target,
