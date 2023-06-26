@@ -253,7 +253,7 @@ def aten_ops_matmul(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return matrix_multiply(network, target, SourceIR.ATEN, name, args[0], args[1])
 
-    
+
 @tensorrt_converter(torch.ops.aten.fmod.Tensor)
 def aten_ops_fmod(
     network: TRTNetwork,
@@ -279,7 +279,7 @@ def aten_ops_leaky_relu(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
 
     return activation.leaky_relu(network, target, SourceIR.ATEN, name, args[0], args[1])
-    
+
 
 @tensorrt_converter(torch.ops.aten.linear)
 def aten_ops_linear(

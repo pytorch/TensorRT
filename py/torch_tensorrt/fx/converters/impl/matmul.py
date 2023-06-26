@@ -18,6 +18,7 @@ from torch_tensorrt.fx.converters.converter_utils import (
     set_layer_name,
 )
 
+
 def matrix_multiply(
     network: TRTNetwork,
     target: Target,
