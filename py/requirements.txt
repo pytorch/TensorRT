@@ -2,8 +2,8 @@ numpy
 packaging
 pybind11==2.6.2
 --extra-index-url https://download.pytorch.org/whl/nightly/cu121
---extra-index-url https://download.pytorch.org/whl/nightly/cu121_pypi_cudnn
-torch==2.1.0.dev20230613+cu121.with.pypi.cudnn
+#--extra-index-url https://download.pytorch.org/whl/nightly/cu121_pypi_cudnn
+torch==2.1.0.dev20230613+cu121#.with.pypi.cudnn
 torchvision==0.16.0.dev20230613+cu121
 --extra-index-url https://pypi.ngc.nvidia.com
 tensorrt==8.6.1
