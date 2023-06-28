@@ -61,20 +61,16 @@ new_local_repository(
 # x86_64 python distribution. If using NVIDIA's version just point to the root of the package
 # for both versions here and do not use --config=pre-cxx11-abi
 
-http_archive(
+new_local_repository(
     name = "libtorch",
-    build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "5ba55259b65e071346a2b547b8d1378595f1467a39aaa923fecb09f134f1bcba",
-    strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-cxx11-abi-shared-with-deps-2.1.0.dev20230619%2Bcu121.zip"],
+    path = "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch",
+    build_file = "third_party/libtorch/BUILD"
 )
 
-http_archive(
+new_local_repository(
     name = "libtorch_pre_cxx11_abi",
-    build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "8f6661bfc11597e77400e9e36cc8dd8e5e385ba82361d630d9ccede8518d7c7e",
-    strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-shared-with-deps-2.1.0.dev20230619%2Bcu121.zip"],
+    path = "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch",
+    build_file = "third_party/libtorch/BUILD"
 )
 
 new_local_repository(

@@ -94,7 +94,7 @@ commands:
                         - << parameters.install-dir >>
 
   install-cudnn:
-    description: "Install CUDNN 8.9.1"
+    description: "Install CUDNN 8.8.1"
     parameters:
       os:
         type: string
@@ -104,10 +104,10 @@ commands:
         default: "x86_64"
       cudnn-version:
         type: string
-        default: "8.9.1.23"
+        default: "8.8.1.3"
       cuda-version:
         type: string
-        default: "cuda12.1"
+        default: "cuda12.0"
     steps:
       - run:
           name: Install CUDNN
@@ -183,7 +183,7 @@ commands:
         default: "cuda12.0"
       cudnn-version:
         type: string
-        default: "8.9.1.23"
+        default: "8.8.1.3"
       trt-version-short:
         type: string
         default: "8.6.1"
@@ -235,7 +235,7 @@ commands:
           default: "8.6.1"
         cudnn-version-long:
           type: string
-          default: "8.9.1.23"
+          default: "8.8.1.3"
       steps:
         - run:
             name: Set up python environment
@@ -252,13 +252,13 @@ commands:
     parameters:
       torch-build:
         type: string
-        default: "2.1.0.dev20230619+cu121.with.pypi.cudnn"
+        default: "2.1.0.dev20230619+cu121"
       torchvision-build:
         type: string
         default: "0.16.0.dev20230619+cu121"
       torch-build-index:
         type: string
-        default: "https://download.pytorch.org/whl/nightly/cu121_pypi_cudnn"
+        default: "https://download.pytorch.org/whl/nightly/cu121"
       torchvision-build-index:
         type: string
         default: "https://download.pytorch.org/whl/nightly/cu121"
@@ -1338,13 +1338,13 @@ parameters:
   # Nightly platform config
   torch-build:
     type: string
-    default: "2.1.0.dev20230619+cu121.with.pypi.cudnn"
+    default: "2.1.0.dev20230619+cu121"
   torchvision-build:
     type: string
     default: "0.16.0.dev20230619+cu121"
   torch-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/nightly/cu121_pypi_cudnn"
+    default: "https://download.pytorch.org/whl/nightly/cu121"
   torch-build-legacy:
     type: string
     default: "1.13.1+cu117"
@@ -1359,7 +1359,7 @@ parameters:
     default: true
   cudnn-version:
     type: string
-    default: "8.9.1.23"
+    default: "8.8.1.3"
   trt-version-short:
     type: string
     default: "8.6.1"

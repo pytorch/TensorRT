@@ -71,10 +71,10 @@ http_archive(
 http_archive(
     name = "cudnn",
     build_file = "@//third_party/cudnn/archive:BUILD",
-    sha256 = "35163c5c542be0c511738b27e25235193cbeedc5e0e006e44b1cdeaf1922e83e",
-    strip_prefix = "cudnn-linux-x86_64-8.9.1.23_cuda12-archive",
+    sha256 = "79d77a769c7e7175abc7b5c2ed5c494148c0618a864138722c887f95c623777c",
+    strip_prefix = "cudnn-linux-x86_64-8.8.1.3_cuda12-archive",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/cudnn/secure/8.9.1/local_installers/12.x/cudnn-linux-x86_64-8.9.1.23_cuda12-archive.tar.xz",
+        "https://developer.nvidia.com/downloads/compute/cudnn/secure/8.8.1/local_installers/12.0/cudnn-linux-x86_64-8.8.1.3_cuda12-archive.tar.xz",
     ],
 )
 
