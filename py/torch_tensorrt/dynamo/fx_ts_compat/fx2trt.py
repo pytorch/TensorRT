@@ -410,7 +410,9 @@ class TRTInterpreter(torch.fx.Interpreter):
             if output_bool:
                 output.dtype = trt.bool
             elif self.output_dtypes is not None:
-                output.dtype = torch_dtype_to_trt(self.output_dtypes[i])
+                output.dtype = unified_dtype_converter(
+                    self.output_dtypes[i], Frameworks.TRT
+                )
             elif self.output_fp16 and output.dtype == trt.float32:
                 output.dtype = trt.float16
             self._output_names.append(name)
