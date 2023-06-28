@@ -13,7 +13,7 @@ import torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer as aten_tracer
 from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 from torch_tensorrt.dynamo.backend.lowering import fuse_permute_linear, fuse_permute_matmul
 from torch_tensorrt.dynamo import CompilationSettings
-from torch_tensorrt.dynamo.backend.utils import prepare_inputs, prepare_device
+from torch_tensorrt.dynamo.utils import prepare_inputs, prepare_device
 from torch_tensorrt.dynamo.backend.backends import torch_tensorrt_backend
 from torch_tensorrt.dynamo.backend.conversion import convert_module
 
@@ -114,7 +114,7 @@ def compile(
 
     model = trace(gm, inputs, **kwargs)
 
-    if kwargs["use_capability_partitioner"]:
+    if kwargs.get("use_capability_partitioner", None):
         traced_model = trace(model)
         model = lower_model(traced_model, inputs)
         return _compile_module(model, inputs, settings)
