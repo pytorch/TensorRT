@@ -77,13 +77,12 @@ def _pretraced_backend(
         )
         return trt_compiled
     except:
-        logger.error(
-            "FX2TRT conversion failed on the subgraph. See trace above. "
-            + "Returning GraphModule forward instead.",
-            exc_info=True,
-        )
-
         if not settings.pass_through_build_failures:
+            logger.warning(
+                "TRT conversion failed on the subgraph. See trace above. "
+                + "Returning GraphModule forward instead.",
+                exc_info=True,
+            )
             return gm.forward
         else:
             raise AssertionError(
