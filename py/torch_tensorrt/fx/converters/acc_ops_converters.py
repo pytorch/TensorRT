@@ -18,7 +18,7 @@ from ..types import *  # noqa: F403
 from torch.fx.immutable_collections import immutable_list
 from torch.fx.node import Argument, Target
 
-from ..utils import get_dynamic_dims, torch_dtype_from_trt, torch_dtype_to_trt
+from ..utils import get_dynamic_dims, unified_dtype_converter, Frameworks
 
 from .converter_utils import *  # noqa: F403
 from torch_tensorrt.fx.passes.lower_basic_pass import (
@@ -400,7 +400,7 @@ def acc_ops_pad_with_slice_layer(
         )
 
     # cast value to TRTensor
-    dt = torch_dtype_from_trt(input_val.dtype)
+    dt = unified_dtype_converter(input_val.dtype, Frameworks.TORCH)
     value = 0 if value == None else value
     value_const = get_trt_tensor(
         network, torch.tensor([value], dtype=dt), f"{name}_value"
@@ -1551,7 +1551,7 @@ def acc_ops_to_dtype(
     input_t = get_trt_tensor(network, input_val, f"{name}_input_t")
     if input_dtype:
         if isinstance(input_dtype, torch.dtype):
-            input_dtype = torch_dtype_to_trt(input_dtype)
+            input_dtype = unified_dtype_converter(input_dtype, Frameworks.TRT)
         input_t = type_cast(network, target, f"{name}_input", input_t, input_dtype)
     return input_t
 
@@ -1812,7 +1812,7 @@ def acc_ops_logical_xor(
 #             f"isinf received input {input_t} that is not part "
 #             "of the TensorRT region!"
 #         )
-#     tdtype = torch_dtype_from_trt(input_t.dtype)
+#     tdtype = unified_dtype_converter(input_t.dtype, Frameworks.TORCH)
 
 #     inf_t = torch.ones(tuple(input_t.shape))
 #     inf_t = inf_t * float("inf")
@@ -1850,7 +1850,7 @@ def acc_ops_any(
 
     if input_t.dtype in (trt.float32, trt.float16, trt.int32):
         comp_t = torch.zeros(tuple([*input_t.shape])).to(
-            torch_dtype_from_trt(input_t.dtype)
+            unified_dtype_converter(input_t.dtype, Frameworks.TORCH)
         )
         comp_t = get_trt_tensor(network, comp_t, f"{name}_comp_t")
         kwargs_new = {"input": input_t, "other": comp_t}
@@ -2739,7 +2739,7 @@ def acc_ops_masked_fill_tensor(
     if type(value_t) is torch.Tensor:
         value_t = value_t.cpu().numpy()
     # cast to input type
-    input_dtype = torch_dtype_from_trt(input_t.dtype)
+    input_dtype = unified_dtype_converter(input_t.dtype, Frameworks.TORCH)
     value_t = (torch.ones(shape) * value_t).to(input_dtype)
     input_val = get_trt_tensor(network, input_t, f"{name}_input")
     value_val = get_trt_tensor(network, value_t, f"{name}_input")
@@ -2873,7 +2873,11 @@ def add_clamp(network, input, val, op, name):
         # clamping scalar
         acc_ops_clamp_trt = get_trt_tensor(
             network,
-            squeeze_left(torch.tensor([val], dtype=torch_dtype_from_trt(input.dtype))),
+            squeeze_left(
+                torch.tensor(
+                    [val], dtype=unified_dtype_converter(input.dtype, Frameworks.TORCH)
+                )
+            ),
             f"{name}_clamp_{val}",
         )
     else:
@@ -2882,7 +2886,8 @@ def add_clamp(network, input, val, op, name):
             (
                 val
                 * torch.ones(
-                    acc_ops_clamp_shape, dtype=torch_dtype_from_trt(input.dtype)
+                    acc_ops_clamp_shape,
+                    dtype=unified_dtype_converter(input.dtype, Frameworks.TORCH),
                 )
             )
             .cpu()
@@ -3528,7 +3533,9 @@ def acc_ops_cumsum(
     iterator = loop.add_iterator(input_val, dim, False)
     data = iterator.get_output(0)
     new_dims = tuple(data.shape)
-    zero_tensor = torch.zeros(new_dims, dtype=trt_dtype_to_torch_dtype(input_val.dtype))
+    zero_tensor = torch.zeros(
+        new_dims, dtype=unified_dtype_converter(input_val.dtype, Frameworks.TORCH)
+    )
     zero_tensor = network.add_constant(
         zero_tensor.shape, to_numpy(zero_tensor)
     ).get_output(0)
@@ -3671,7 +3678,7 @@ def acc_ops_new_ones(
     dtype_val = kwargs.get("dtype")
     if dtype_val is None:
         dtype_val = input_val.dtype
-        dtype_val = torch_dtype_from_trt(dtype_val)
+        dtype_val = unified_dtype_converter(dtype_val, Frameworks.TORCH)
 
     device_val = kwargs.get("device")
     assert (
@@ -3695,7 +3702,7 @@ def acc_ops_new_empty(
     dtype_val = kwargs.get("dtype")
     if dtype_val is None:
         dtype_val = input_val.dtype
-        dtype_val = torch_dtype_from_trt(dtype_val)
+        dtype_val = unified_dtype_converter(dtype_val, Frameworks.TORCH)
 
     device_val = kwargs.get("device")
     assert (

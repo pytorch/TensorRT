@@ -17,7 +17,12 @@ from torch.fx.passes.shape_prop import TensorMetadata
 from torch_tensorrt.dynamo.fx_ts_compat import CONVERTERS
 from .input_tensor_spec import InputTensorSpec
 from torch_tensorrt.fx.observer import Observer
-from torch_tensorrt.fx.utils import get_dynamic_dims, LowerPrecision, torch_dtype_to_trt
+from torch_tensorrt.fx.utils import (
+    get_dynamic_dims,
+    LowerPrecision,
+    unified_dtype_converter,
+    Frameworks,
+)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -330,7 +335,9 @@ class TRTInterpreter(torch.fx.Interpreter):
                 self.optimization_profiles[i].set_shape(target, *shape_range)
 
         return self.network.add_input(
-            name=target, shape=tuple(shape), dtype=torch_dtype_to_trt(dtype)
+            name=target,
+            shape=tuple(shape),
+            dtype=unified_dtype_converter(dtype, Frameworks.TRT),
         )
 
     def call_module(self, target, args, kwargs):

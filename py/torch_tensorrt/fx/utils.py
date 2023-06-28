@@ -1,5 +1,6 @@
 from enum import Enum
-from typing import List, Optional, Callable
+from typing import Dict, List, Optional, Callable, Union
+import numpy as np
 from packaging import version
 
 # @manual=//deeplearning/trt/python:py_tensorrt
@@ -13,6 +14,45 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
 )
 
 from .types import Shape, TRTDataType
+
+
+class Frameworks(Enum):
+    NUMPY = "numpy"
+    TORCH = "torch"
+    TRT = "trt"
+
+
+DataTypeEquivalence: Dict[
+    TRTDataType, Dict[Frameworks, Union[TRTDataType, np.dtype, torch.dtype]]
+] = {
+    trt.int8: {
+        Frameworks.NUMPY: np.int8,
+        Frameworks.TORCH: torch.int8,
+        Frameworks.TRT: trt.int8,
+    },
+    trt.int32: {
+        Frameworks.NUMPY: np.int32,
+        Frameworks.TORCH: torch.int32,
+        Frameworks.TRT: trt.int32,
+    },
+    trt.float16: {
+        Frameworks.NUMPY: np.float16,
+        Frameworks.TORCH: torch.float16,
+        Frameworks.TRT: trt.float16,
+    },
+    trt.float32: {
+        Frameworks.NUMPY: np.float32,
+        Frameworks.TORCH: torch.float32,
+        Frameworks.TRT: trt.float32,
+    },
+}
+
+if trt.__version__ >= "7.0":
+    DataTypeEquivalence[trt.bool] = {
+        Frameworks.NUMPY: np.bool_,
+        Frameworks.TORCH: torch.bool,
+        Frameworks.TRT: trt.bool,
+    }
 
 
 class LowerPrecision(Enum):
@@ -35,52 +75,33 @@ class LowerPrecision(Enum):
             return None
 
 
-def torch_dtype_to_trt(dtype: torch.dtype) -> TRTDataType:
+def unified_dtype_converter(
+    dtype: Union[TRTDataType, torch.dtype, np.dtype], to: Frameworks
+) -> Union[np.dtype, torch.dtype, TRTDataType]:
     """
-    Convert PyTorch data types to TensorRT data types.
+    Convert TensorRT, Numpy, or Torch data types to any other of those data types.
 
     Args:
-        dtype (torch.dtype): A PyTorch data type.
+        dtype (TRTDataType, torch.dtype, np.dtype): A TensorRT, Numpy, or Torch data type.
+        to (Frameworks): The framework to convert the data type to.
 
     Returns:
-        The equivalent TensorRT data type.
+        The equivalent data type in the requested framework.
     """
-    if trt.__version__ >= "7.0" and dtype == torch.bool:
-        return trt.bool
-    elif dtype == torch.int8:
-        return trt.int8
-    elif dtype == torch.int32:
-        return trt.int32
-    elif dtype == torch.float16:
-        return trt.float16
-    elif dtype == torch.float32:
-        return trt.float32
+    assert to in Frameworks, f"Expected valid Framework for translation, got {to}"
+
+    if dtype in (np.int8, torch.int8, trt.int8):
+        return DataTypeEquivalence[trt.int8][to]
+    elif trt.__version__ >= "7.0" and dtype in (np.bool_, torch.bool, trt.bool):
+        return DataTypeEquivalence[trt.bool][to]
+    elif dtype in (np.int32, torch.int32, trt.int32):
+        return DataTypeEquivalence[trt.int32][to]
+    elif dtype in (np.float16, torch.float16, trt.float16):
+        return DataTypeEquivalence[trt.float16][to]
+    elif dtype in (np.float32, torch.float32, trt.float32):
+        return DataTypeEquivalence[trt.float32][to]
     else:
-        raise TypeError("%s is not supported by tensorrt" % dtype)
-
-
-def torch_dtype_from_trt(dtype: TRTDataType) -> torch.dtype:
-    """
-    Convert TensorRT data types to PyTorch data types.
-
-    Args:
-        dtype (TRTDataType): A TensorRT data type.
-
-    Returns:
-        The equivalent PyTorch data type.
-    """
-    if dtype == trt.int8:
-        return torch.int8
-    elif trt.__version__ >= "7.0" and dtype == trt.bool:
-        return torch.bool
-    elif dtype == trt.int32:
-        return torch.int32
-    elif dtype == trt.float16:
-        return torch.float16
-    elif dtype == trt.float32:
-        return torch.float32
-    else:
-        raise TypeError("%s is not supported by torch" % dtype)
+        raise TypeError("%s is not a supported dtype" % dtype)
 
 
 def get_dynamic_dims(shape: Shape) -> List[int]:
