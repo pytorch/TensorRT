@@ -43,8 +43,6 @@ class TRTInterpreter(torch.fx.Interpreter):
         self,
         module: torch.fx.GraphModule,
         input_specs: List[InputTensorSpec],
-        explicit_batch_dimension: bool = True,
-        explicit_precision: bool = False,
         logger_level=None,
         output_dtypes=None,
     ):
@@ -54,17 +52,11 @@ class TRTInterpreter(torch.fx.Interpreter):
         self.builder = trt.Builder(self.logger)
 
         flag = 0
-        if explicit_batch_dimension:
-            EXPLICIT_BATCH = 1 << (int)(
-                trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH
-            )
-            flag |= EXPLICIT_BATCH
 
-        if explicit_precision:
-            EXPLICIT_PRECISION = 1 << (int)(
-                trt.NetworkDefinitionCreationFlag.EXPLICIT_PRECISION
-            )
-            flag |= EXPLICIT_PRECISION
+        # It is deprecated to not use this flag
+        EXPLICIT_BATCH = 1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+        flag |= EXPLICIT_BATCH
+
         self.network = self.builder.create_network(flag)
 
         missing_ops = self.validate_conversion()

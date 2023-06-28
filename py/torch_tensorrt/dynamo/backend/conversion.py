@@ -36,7 +36,6 @@ def convert_module(
     interpreter = TRTInterpreter(
         module,
         InputTensorSpec.from_tensors(inputs),
-        explicit_batch_dimension=True,
         logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
         output_dtypes=output_dtypes,
     )

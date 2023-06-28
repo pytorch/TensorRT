@@ -44,7 +44,6 @@ class LowerSetting(LowerSettingBasic):
     Args:
     input_specs: Specs for inputs to engine, can either be a single size or a
     range defined by Min, Optimal, Max sizes.
-    explicit_precision: Use explicit precision during lowering.
     workspace_size: The maximum workspace size. The maximum GPU temporary
     memory which the TensorRT engine can use at execution time.
     strict_type_constraints: Require TensorRT engine to strictly follow data type
@@ -76,8 +75,6 @@ class LowerSetting(LowerSettingBasic):
     """
 
     input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
-    explicit_batch_dimension: bool = True
-    explicit_precision: bool = False
     workspace_size: int = 0
     strict_type_constraints: bool = False
     customized_fuse_pass: PassManager = dc.field(
