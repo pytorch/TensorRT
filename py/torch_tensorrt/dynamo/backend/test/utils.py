@@ -8,6 +8,9 @@ from torch_tensorrt.dynamo.backend.lowering._decompositions import (
 from torch_tensorrt.dynamo.backend.lowering._partition import (
     partition,
 )
+from torch_tensorrt.dynamo.backend.lowering._pre_aot_lowering import (
+    pre_aot_substitutions,
+)
 
 from torch._dynamo.backends.common import fake_tensor_unsupported
 
@@ -30,6 +33,8 @@ def fx_dynamo_testing_backend(
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
     )
+
+    gm = pre_aot_substitutions(gm)
 
     # Invoke AOTAutograd to translate operators to aten
     return aot_module_simplified(

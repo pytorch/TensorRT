@@ -1,7 +1,9 @@
-from torch_tensorrt.dynamo.backend.lowering._decompositions import (
+from ._decompositions import (
     get_decompositions,
 )
-from torch_tensorrt.dynamo.backend.lowering._partition import (
-    partition,
-    get_submod_inputs,
+from ._pre_aot_lowering import (
+    SUBSTITUTION_REGISTRY,
+    register_substitution,
 )
+from ._partition import partition, get_submod_inputs, DEFAULT_SINGLE_NODE_PARTITIONS
+from .substitutions import *

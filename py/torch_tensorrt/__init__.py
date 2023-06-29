@@ -95,7 +95,7 @@ from torch_tensorrt._TRTModuleNext import TRTModuleNext
 
 from torch_tensorrt import fx
 
-if version.parse(torch.__version__) >= version.parse("2.dev"):
+if version.parse(torch.__version__) >= version.parse("2.1.dev"):
     from torch_tensorrt import dynamo
     from torch_tensorrt.dynamo import backend
 
