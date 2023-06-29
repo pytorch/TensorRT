@@ -111,6 +111,27 @@ TEST(Converters, ATenLogicalNotBoolConvertsCorrectly) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
+TEST(Converters, ATenFiniteConvertsCorrectly) {
+  const auto graph = gen_test_graph("isfinite");
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+  auto in = at::tensor(
+      {float(0),
+       std::nanf(""),
+       float(2),
+       std::numeric_limits<float>::infinity(),
+       float(4),
+       -std::numeric_limits<float>::infinity()},
+      {at::kCUDA});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
 #define test_unary(unary, name)                                                                  \
   TEST(Converters, ATen##name##ConvertsCorrectly) {                                              \
     const auto graph = gen_test_graph(#unary);                                                   \

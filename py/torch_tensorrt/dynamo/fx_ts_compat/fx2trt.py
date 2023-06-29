@@ -1,6 +1,7 @@
 import logging
 import warnings
 from datetime import datetime
+from packaging import version
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence
 
 import numpy
@@ -40,6 +41,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         explicit_batch_dimension: bool = True,
         explicit_precision: bool = False,
         logger_level=None,
+        output_dtypes=None,
     ):
         super().__init__(module)
 
@@ -77,6 +79,9 @@ class TRTInterpreter(torch.fx.Interpreter):
         self._itensor_to_tensor_meta: Dict[
             trt.tensorrt.ITensor, TensorMetadata
         ] = dict()
+
+        # Data types for TRT Module output Tensors
+        self.output_dtypes = output_dtypes
 
     def validate_input_specs(self):
         for shape, _, _, shape_ranges, has_batch_dim in self.input_specs:
@@ -163,6 +168,9 @@ class TRTInterpreter(torch.fx.Interpreter):
         timing_cache=None,
         profiling_verbosity=None,
         tactic_sources=None,
+        max_aux_streams=None,
+        version_compatible=False,
+        optimization_level=None,
     ) -> TRTInterpreterResult:
         """
         Build TensorRT engine with some configs.
@@ -175,13 +183,17 @@ class TRTInterpreter(torch.fx.Interpreter):
             algorithm_selector: set up algorithm selection for certain layer
             timing_cache: enable timing cache for TensorRT
             profiling_verbosity: TensorRT logging level
+            max_aux_streams: Maximum number of allowed auxiliary TRT streams for each engine
+            version_compatible: Provide version forward-compatibility for engine plan files
+            optimization_level: Builder optimization 0-5, higher levels imply longer build time,
+                searching for more optimization options. TRT defaults to 3
         Return:
             TRTInterpreterResult
         """
         TRT_INTERPRETER_CALL_PRE_OBSERVER.observe(self.module)
 
         # For float outputs, we set their dtype to fp16 only if lower_precision == LowerPrecision.FP16 and
-        # force_fp32_output=False.
+        # force_fp32_output=False. Overriden by specifying output_dtypes
         self.output_fp16 = (
             not force_fp32_output and lower_precision == LowerPrecision.FP16
         )
@@ -221,12 +233,24 @@ class TRTInterpreter(torch.fx.Interpreter):
             cache = builder_config.create_timing_cache(b"")
         builder_config.set_timing_cache(cache, False)
 
-        if trt.__version__ >= "8.2":
+        if version.parse(trt.__version__) >= version.parse("8.2"):
             builder_config.profiling_verbosity = (
                 profiling_verbosity
                 if profiling_verbosity
                 else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
             )
+
+        if version.parse(trt.__version__) >= version.parse("8.6"):
+            if max_aux_streams is not None:
+                _LOGGER.info(f"Setting max aux streams to {max_aux_streams}")
+                builder_config.max_aux_streams = max_aux_streams
+            if version_compatible:
+                _LOGGER.info(f"Using version compatible")
+                builder_config.set_flag(trt.BuilderFlag.VERSION_COMPATIBLE)
+            if optimization_level is not None:
+                _LOGGER.info(f"Using optimization level {optimization_level}")
+                builder_config.builder_optimization_level = optimization_level
+
         if lower_precision == LowerPrecision.FP16:
             builder_config.set_flag(trt.BuilderFlag.FP16)
 
@@ -264,6 +288,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
+        _LOGGER.info(f"TRT Engine uses: {engine.device_memory_size} bytes of Memory")
 
         return TRTInterpreterResult(
             engine, self._input_names, self._output_names, serialized_cache
@@ -356,6 +381,11 @@ class TRTInterpreter(torch.fx.Interpreter):
         if not all(isinstance(output, trt.tensorrt.ITensor) for output in outputs):
             raise RuntimeError("TensorRT requires all outputs to be Tensor!")
 
+        if self.output_dtypes is not None and len(self.output_dtypes) != len(outputs):
+            raise RuntimeError(
+                f"Specified output dtypes ({len(self.output_dtypes)}) differ from number of outputs ({len(outputs)})"
+            )
+
         for i, output in enumerate(outputs):
             if any(
                 op_name in output.name.split("_")
@@ -380,6 +410,8 @@ class TRTInterpreter(torch.fx.Interpreter):
             self.network.mark_output(output)
             if output_bool:
                 output.dtype = trt.bool
+            elif self.output_dtypes is not None:
+                output.dtype = torch_dtype_to_trt(self.output_dtypes[i])
             elif self.output_fp16 and output.dtype == trt.float32:
                 output.dtype = trt.float16
             self._output_names.append(name)

@@ -171,6 +171,33 @@ def aten_ops_div(
         )
 
 
+@tensorrt_converter(torch.ops.aten.elu.default)
+def aten_ops_elu(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+
+    if len(args) > 2:
+        return activation.selu(
+            network,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+        )
+    return activation.elu(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
 @tensorrt_converter(torch.ops.aten.floor_divide.default)
 def aten_ops_floor_div(
     network: TRTNetwork,
@@ -200,6 +227,47 @@ def aten_ops_fmod(
         "other": args[1],
     }
     return acc_ops_converters.acc_ops_fmod(network, target, None, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten.hardtanh.default)
+def aten_ops_hardtanh(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+
+    return activation.hardtanh(
+        network, target, SourceIR.ATEN, name, args[0], args[1], args[2]
+    )
+
+
+@tensorrt_converter(torch.ops.aten.fmod.Tensor)
+def aten_ops_fmod(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    kwargs_new = {
+        "input": args[0],
+        "other": args[1],
+    }
+    return acc_ops_converters.acc_ops_fmod(network, target, None, kwargs_new, name)
+
+
+@tensorrt_converter(torch.ops.aten.leaky_relu.default)
+def aten_ops_leaky_relu(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+
+    return activation.leaky_relu(network, target, SourceIR.ATEN, name, args[0], args[1])
 
 
 @tensorrt_converter(torch.ops.aten.linear)
@@ -438,6 +506,24 @@ def aten_ops_reshape(
 
     set_layer_name(layer, target, name)
     return layer.get_output(0)
+
+
+@tensorrt_converter(torch.ops.aten.tanh.default)
+def aten_ops_tanh(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+
+    return activation.tanh(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
 
 
 @tensorrt_converter(torch.ops.aten.cat.default)

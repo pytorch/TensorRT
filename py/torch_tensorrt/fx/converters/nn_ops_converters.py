@@ -29,10 +29,87 @@ def sigmoid(network, submod, args, kwargs, layer_name):
     # args/kwargs should have already been normalized to kwargs
     assert len(args) == 0
 
-    activation.sigmoid(
+    return activation.sigmoid(
         network=network,
         target="torch.nn.modules.activation.Sigmoid",
         source_ir=SourceIR.NN,
         name=layer_name,
         input_val=kwargs["input"],
+    )
+
+
+@tensorrt_converter(torch.nn.functional.hardtanh)
+@tensorrt_converter(torch.nn.modules.activation.Hardtanh)
+def hardtanh(network, submod, args, kwargs, layer_name):
+    # args/kwargs should have already been normalized to kwargs
+    assert len(args) == 0
+
+    return activation.hardtanh(
+        network=network,
+        target="torch.nn.modules.activation.Hardtanh",
+        source_ir=SourceIR.NN,
+        name=layer_name,
+        input_val=kwargs["input"],
+    )
+
+
+@tensorrt_converter(torch.nn.functional.tanh)
+@tensorrt_converter(torch.nn.modules.activation.Tanh)
+def tanh(network, submod, args, kwargs, layer_name):
+    # args/kwargs should have already been normalized to kwargs
+    assert len(args) == 0
+
+    return activation.tanh(
+        network=network,
+        target="torch.nn.modules.activation.Tanh",
+        source_ir=SourceIR.NN,
+        name=layer_name,
+        input_val=kwargs["input"],
+    )
+
+
+@tensorrt_converter(torch.nn.functional.leaky_relu)
+@tensorrt_converter(torch.nn.modules.activation.LeakyReLU)
+def leaky_relu(network, submod, args, kwargs, layer_name):
+    # args/kwargs should have already been normalized to kwargs
+    assert len(args) == 0
+
+    return activation.leaky_relu(
+        network=network,
+        target="torch.nn.functional.leaky_relu",
+        source_ir=SourceIR.NN,
+        name=layer_name,
+        input_val=kwargs["input"],
+        alpha=kwargs["negative_slope"],
+    )
+
+
+@tensorrt_converter(torch.nn.functional.elu)
+@tensorrt_converter(torch.nn.modules.activation.ELU)
+def elu(network, submod, args, kwargs, layer_name):
+    # args/kwargs should have already been normalized to kwargs
+    assert len(args) == 0
+
+    return activation.elu(
+        network=network,
+        target="torch.nn.functional.elu",
+        source_ir=SourceIR.NN,
+        name=layer_name,
+        input_val=kwargs["input"],
+    )
+
+
+@tensorrt_converter(torch.nn.functional.selu)
+@tensorrt_converter(torch.nn.modules.activation.SELU)
+def selu(network, submod, args, kwargs, layer_name):
+    # args/kwargs should have already been normalized to kwargs
+    assert len(args) == 0
+
+    return activation.selu(
+        network=network,
+        target="torch.nn.functional.selu",
+        source_ir=SourceIR.NN,
+        name=layer_name,
+        input_val=kwargs["input"],
+        alpha=kwargs["alpha"],
     )

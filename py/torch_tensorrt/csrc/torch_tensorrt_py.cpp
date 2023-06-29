@@ -158,7 +158,8 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec& info
 
 py::bytes ConvertGraphToTRTEngine(const torch::jit::Module& mod, const std::string& method_name, CompileSpec& info) {
   py::gil_scoped_acquire gil;
-  auto trt_engine = core::ConvertGraphToTRTEngine(mod, method_name, info.toInternalCompileSpec());
+  auto trt_engine = core::ConvertGraphToTRTEngine(
+      mod, method_name, info.toInternalCompileSpec(/*bool converting_to_trt_engine=*/true));
   return py::bytes(trt_engine);
 }
 

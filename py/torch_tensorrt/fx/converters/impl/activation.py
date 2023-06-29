@@ -69,6 +69,37 @@ def convert_activation(
     return layer.get_output(0)
 
 
+def hardtanh(
+    network: TRTNetwork,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+    alpha: Optional[Any] = None,
+    beta: Optional[Any] = None,
+):
+    operation_type = trt.ActivationType.CLIP
+
+    def hardtanh_dyn_range_fn(dyn_range):
+        def hardtanh_fn(x):
+            # TODO: Called torch.nn.functional.hardtanh
+            return torch.nn.functional.hardtanh(x)
+
+        return hardtanh_dyn_range_fn(dyn_range[0]), hardtanh_dyn_range_fn(dyn_range[1])
+
+    return convert_activation(
+        network,
+        target,
+        source_ir,
+        name,
+        operation_type,
+        input_val,
+        alpha,
+        beta,
+        dyn_range_fn=hardtanh_dyn_range_fn,
+    )
+
+
 def relu(
     network: TRTNetwork,
     target: Target,
@@ -116,4 +147,106 @@ def sigmoid(
         operation_type,
         input_val,
         dyn_range_fn=sigmoid_dyn_range_fn,
+    )
+
+
+def tanh(
+    network: TRTNetwork,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+):
+    operation_type = trt.ActivationType.TANH
+
+    def tanh_dyn_range_fn(dyn_range):
+        def tanh_fn(x):
+            # TODO: Can this just call torch.nn.functional.tanh?
+            return (np.exp(x) - np.exp(-x)) / (np.exp(x) + np.exp(-x))
+
+        return tanh_fn(dyn_range[0]), tanh_fn(dyn_range[1])
+
+    return convert_activation(
+        network,
+        target,
+        source_ir,
+        name,
+        operation_type,
+        input_val,
+        dyn_range_fn=tanh_dyn_range_fn,
+    )
+
+
+def leaky_relu(
+    network: TRTNetwork,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+    alpha: Optional[Any],
+):
+    operation_type = trt.ActivationType.LEAKY_RELU
+
+    def leaky_relu_dyn_range_fn(dyn_range):
+        return (max(0, dyn_range[0]) + alpha * min(0, dyn_range[0])), (
+            max(0, dyn_range[1]) + alpha * min(0, dyn_range[1])
+        )
+
+    return convert_activation(
+        network,
+        target,
+        source_ir,
+        name,
+        operation_type,
+        input_val,
+        alpha,
+        dyn_range_fn=leaky_relu_dyn_range_fn,
+    )
+
+
+def elu(
+    network: TRTNetwork,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+    alpha: Optional[Any],
+):
+    operation_type = trt.ActivationType.ELU
+
+    def elu_dyn_range_fn(dyn_range):
+        return (torch.nn.ELU(dyn_range[0]), torch.nn.ELU(dyn_range[1]))
+
+    return convert_activation(
+        network,
+        target,
+        source_ir,
+        name,
+        operation_type,
+        input_val,
+        alpha,
+        dyn_range_fn=elu_dyn_range_fn,
+    )
+
+
+def selu(
+    network: TRTNetwork,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+):
+    operation_type = trt.ActivationType.SELU
+
+    def elu_dyn_range_fn(dyn_range):
+        return (torch.nn.SELU(dyn_range[0]), torch.nn.ELU(dyn_range[1]))
+
+    return convert_activation(
+        network,
+        target,
+        source_ir,
+        name,
+        operation_type,
+        input_val,
+        dyn_range_fn=elu_dyn_range_fn,
     )

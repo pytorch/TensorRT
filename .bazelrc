@@ -22,7 +22,7 @@
 # +------------------------------------------------------------+
 # Enable colorful output of GCC
 build --cxxopt="-fdiagnostics-color=always"
-build --cxxopt='-std=c++14'
+build --cxxopt='-std=c++17'
 #build --linkopt="-Wl,--no-as-needed"
 
 

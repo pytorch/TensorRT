@@ -123,7 +123,7 @@ std::string to_str(EngineCapability value);
 nvinfer1::EngineCapability toTRTEngineCapability(EngineCapability value);
 
 struct CompileSpec : torch::CustomClassHolder {
-  core::CompileSpec toInternalCompileSpec();
+  core::CompileSpec toInternalCompileSpec(bool converting_to_trt_engine = false);
   std::string stringify();
   void appendInput(const c10::intrusive_ptr<Input>& ir) {
     inputs.push_back(*ir);
