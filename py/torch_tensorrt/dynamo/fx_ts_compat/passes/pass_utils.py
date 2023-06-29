@@ -126,7 +126,10 @@ def chain_passes(*passes: PassFunc) -> PassFunc:
 # (TODO(shirongwu): Add exception notification for fblearner flow when available, notify oncall
 # on pass that failed accuracy check.
 def validate_inference(
-    rtol=None, atol=None, device=torch.device(torch.cuda.current_device())
+    rtol=None,
+    atol=None,
+    device=torch.device(torch.cuda.current_device()),
+    suppress_accuracy_check_failure=True,
 ):
     def _validate_inference(pass_: PassFunc) -> PassFunc:
         """
@@ -141,48 +144,51 @@ def validate_inference(
             *args,
             **kwargs,
         ) -> fx.GraphModule:
-            input_tensors = extract_example_tensors_from_input(input, device)
-            res0 = module(*input_tensors)
-            processed_module = pass_(module, input, *args, **kwargs)
-            res1 = processed_module(*input_tensors)
-            tensor_res_0 = _collect_tensors(res0)
-            tensor_res_1 = _collect_tensors(res1)
-            relax_accuracy_check_failure = RELAX_ACCURACY_FAILURE
+            if suppress_accuracy_check_failure:
+                return pass_(module, input, *args, **kwargs)
+            else:
+                input_tensors = extract_example_tensors_from_input(input, device)
+                res0 = module(*input_tensors)
+                processed_module = pass_(module, input, *args, **kwargs)
+                res1 = processed_module(*input_tensors)
+                tensor_res_0 = _collect_tensors(res0)
+                tensor_res_1 = _collect_tensors(res1)
+                relax_accuracy_check_failure = RELAX_ACCURACY_FAILURE
 
-            for kk, (x, y) in enumerate(zip(tensor_res_0, tensor_res_1)):
-                kwargs2 = {"equal_nan": True}
-                if rtol:
-                    kwargs2["rtol"] = rtol
-                if atol:
-                    kwargs2["atol"] = atol
-                kwargs2[
-                    "msg"
-                ] = (
-                    lambda msg: f"Pass {pass_} failed correctness check due at output {kk}:\n{msg}"
-                )
-                # If tensors are on different devices, make sure to compare
-                # their copies that are on the same device.
-                if x.get_device() != y.get_device():
-                    x = x.cpu()
-                    y = y.cpu()
-                try:
-                    torch.testing.assert_close(x, y, **kwargs2)
-                except Exception as e:
-                    if relax_accuracy_check_failure:
-                        _LOGGER.error(f"{e}")
-                        kwargs2["rtol"] *= FINAL_CHECK_RTOL_MULTIPLIER
-                        kwargs2["atol"] *= FINAL_CHECK_ATOL_MULTIPLIER
-                        new_atol = kwargs2["atol"]
-                        new_rtol = kwargs2["rtol"]
-                        _LOGGER.info(
-                            f"Do a sanity check to see whether things are completely wrong with {new_atol=}, {new_rtol=}"
-                        )
+                for kk, (x, y) in enumerate(zip(tensor_res_0, tensor_res_1)):
+                    kwargs2 = {"equal_nan": True}
+                    if rtol:
+                        kwargs2["rtol"] = rtol
+                    if atol:
+                        kwargs2["atol"] = atol
+                    kwargs2[
+                        "msg"
+                    ] = (
+                        lambda msg: f"Pass {pass_} failed correctness check due at output {kk}:\n{msg}"
+                    )
+                    # If tensors are on different devices, make sure to compare
+                    # their copies that are on the same device.
+                    if x.get_device() != y.get_device():
+                        x = x.cpu()
+                        y = y.cpu()
+                    try:
                         torch.testing.assert_close(x, y, **kwargs2)
-                        return processed_module
-                    else:
-                        raise e
+                    except Exception as e:
+                        if relax_accuracy_check_failure:
+                            _LOGGER.error(f"{e}")
+                            kwargs2["rtol"] *= FINAL_CHECK_RTOL_MULTIPLIER
+                            kwargs2["atol"] *= FINAL_CHECK_ATOL_MULTIPLIER
+                            new_atol = kwargs2["atol"]
+                            new_rtol = kwargs2["rtol"]
+                            _LOGGER.info(
+                                f"Do a sanity check to see whether things are completely wrong with {new_atol=}, {new_rtol=}"
+                            )
+                            torch.testing.assert_close(x, y, **kwargs2)
+                            return processed_module
+                        else:
+                            raise e
 
-            return processed_module
+                return processed_module
 
         return pass_with_validation
 

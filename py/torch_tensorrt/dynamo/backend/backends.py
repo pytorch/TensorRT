@@ -12,6 +12,7 @@ from torch_tensorrt.dynamo.backend.lowering._partition import (
     partition,
     get_submod_inputs,
 )
+from torch_tensorrt.dynamo.backend.utils import parse_dynamo_kwargs
 from torch_tensorrt.dynamo.backend.conversion import convert_module
 
 from torch._dynamo.backends.common import fake_tensor_unsupported
@@ -25,22 +26,20 @@ logger = logging.getLogger(__name__)
 @td.register_backend(name="torch_tensorrt")
 @fake_tensor_unsupported
 def torch_tensorrt_backend(
-    gm: torch.fx.GraphModule,
-    sample_inputs: Sequence[torch.Tensor],
-    settings: CompilationSettings = CompilationSettings(),
+    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor], **kwargs
 ):
     DEFAULT_BACKEND = aot_torch_tensorrt_aten_backend
 
-    return DEFAULT_BACKEND(gm, sample_inputs, settings=settings)
+    return DEFAULT_BACKEND(gm, sample_inputs, **kwargs)
 
 
 @td.register_backend(name="aot_torch_tensorrt_aten")
 @fake_tensor_unsupported
 def aot_torch_tensorrt_aten_backend(
-    gm: torch.fx.GraphModule,
-    sample_inputs: Sequence[torch.Tensor],
-    settings: CompilationSettings = CompilationSettings(),
+    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor], **kwargs
 ):
+    settings = parse_dynamo_kwargs(kwargs)
+
     custom_backend = partial(
         _pretraced_backend,
         settings=settings,

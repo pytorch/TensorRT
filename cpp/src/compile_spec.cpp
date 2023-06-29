@@ -78,8 +78,10 @@ torchtrt::core::CompileSpec init_compile_spec(CompileSpec& external) {
   }
 }
 
-torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
+torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external, bool converting_to_trt_engine) {
   torchtrt::core::CompileSpec internal = init_compile_spec(external);
+
+  internal.lower_info.converting_to_trt_engine = converting_to_trt_engine;
 
   for (auto p : external.enabled_precisions) {
     internal.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));

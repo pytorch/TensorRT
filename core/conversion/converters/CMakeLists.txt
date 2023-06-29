@@ -7,6 +7,7 @@ target_sources(${lib_name}
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/activation.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/batch_norm.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/cast.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/impl/chunk.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/concat.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/constant.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/constant_pad.cpp"

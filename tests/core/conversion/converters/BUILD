@@ -36,6 +36,10 @@ converter_test(
 )
 
 converter_test(
+    name = "test_chunk",
+)
+
+converter_test(
     name = "test_clone",
 )
 
@@ -208,6 +212,7 @@ test_suite(
         ":test_batch_norm",
         ":test_bitwise",
         ":test_cast",
+        ":test_chunk",
         ":test_clamp",
         ":test_clone",
         ":test_comparators",
