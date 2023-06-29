@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Sequence, Set
 import torch
 
 from torch_tensorrt.dynamo.backend._defaults import MIN_BLOCK_SIZE
-from torch_tensorrt.dynamo.backend.lowering import MODULE_SUBSTITUTION_REGISTRY
+from torch_tensorrt.dynamo.backend.lowering import SUBSTITUTION_REGISTRY
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
 from torch.fx.graph_module import GraphModule
 from torch.fx.node import _get_qualified_name
@@ -16,8 +16,8 @@ from torch_tensorrt.fx.converter_registry import CONVERTERS
 logger = logging.getLogger(__name__)
 
 DEFAULT_SINGLE_NODE_PARTITIONS: Set[str] = set(
-    _get_qualified_name(module.new_operator)
-    for module in MODULE_SUBSTITUTION_REGISTRY.values()
+    _get_qualified_name(to_replace.new_operator)
+    for to_replace in SUBSTITUTION_REGISTRY.values()
 )
 
 
