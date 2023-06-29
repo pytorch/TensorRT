@@ -155,8 +155,10 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
           std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->output_profile_path);
     }
 
-    for (size_t o = inputs.size(); o < (compiled_engine->num_io.first + compiled_engine->num_io.second); o++) {
-      uint64_t pyt_idx = compiled_engine->out_binding_map[o];
+    for (auto output_indices : compiled_engine->out_binding_map) {
+      // out_binding_map stores TRT_IDX: PYT_IDX
+      auto pyt_idx = output_indices.second;
+
       std::string name = compiled_engine->out_binding_names[pyt_idx];
       auto out_shape = compiled_engine->exec_ctx->getTensorShape(name.c_str());
       LOG_DEBUG("Output Name: " << name << " Shape: " << out_shape);

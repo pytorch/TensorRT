@@ -17,7 +17,18 @@ TEST(Converters, ATenTopKConvertsCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto in = at::rand({10, 10, 100}, {at::kCUDA});
+  auto dim0 = 10, dim1 = 10, dim2 = 100;
+
+  // Initialize zero tensor to be filled with random indices along the final dimension
+  auto in = at::zeros({dim0, dim1, dim2}, {at::kCUDA});
+
+  // For each final dimension, fill it with random scramble of unique integers in the range [0, dim0*dim1*dim2)
+  for (auto i = 0; i < dim0; i++) {
+    for (auto j = 0; j < dim1; j++) {
+      auto random_index_permutation = at::randperm(dim0 * dim1 * dim2, c10::kInt, {}, at::kCUDA, {}).slice(0, 0, dim2);
+      in.slice(0, i, i + 1).slice(1, j, j + 1) = random_index_permutation;
+    }
+  }
 
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});

@@ -44,12 +44,12 @@ def squeeze(
             for dim in dim:
                 dims.append(cast(Optional[int], dim))
 
-    # dim = cast(Optional[int], kwargs["dim"] if "dim" in kwargs else None)
     # Squeeze with dim=None would only work in explicit batch dim mode without any dynamic
     # dim, which is a very rare case. For now we just claim not supporting dim=None.
     assert not (len(dims) == 0), "We don't support dim=None right now for squeeze."
 
     for dim in dims:
+        dim = cast(Optional[int], dim)
         dim = get_positive_dim(
             dim,
             len(input.shape) + (1 if network.has_implicit_batch_dimension else 0),

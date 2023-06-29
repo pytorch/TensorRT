@@ -14,7 +14,7 @@ from torch_tensorrt.dynamo.backend.backends import torch_tensorrt_backend
 from torch_tensorrt.dynamo.backend._defaults import (
     PRECISION,
     DEBUG,
-    MAX_WORKSPACE_SIZE,
+    WORKSPACE_SIZE,
     MIN_BLOCK_SIZE,
     PASS_THROUGH_BUILD_FAILURES,
 )
@@ -35,7 +35,7 @@ def compile(
     debug=DEBUG,
     capability=EngineCapability.default,
     num_avg_timing_iters=1,
-    workspace_size=MAX_WORKSPACE_SIZE,
+    workspace_size=WORKSPACE_SIZE,
     dla_sram_size=1048576,
     dla_local_dram_size=1073741824,
     dla_global_dram_size=536870912,
@@ -105,7 +105,7 @@ logger = logging.getLogger(__name__)
 def create_backend(
     precision: LowerPrecision = PRECISION,
     debug: bool = DEBUG,
-    workspace_size: int = MAX_WORKSPACE_SIZE,
+    workspace_size: int = WORKSPACE_SIZE,
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Sequence[str] = set(),
     pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES,
@@ -114,10 +114,12 @@ def create_backend(
     """Create torch.compile backend given specified arguments
 
     Args:
-        precision:
-        debug: Whether to print out verbose debugging information
-        workspace_size: Maximum workspace TRT is allowed to use for the module
         precision: Model Layer precision
+        debug: Whether to print out verbose debugging information
+        workspace_size: Workspace TRT is allowed to use for the module (0 is default)
+        min_block_size: Minimum number of operators per TRT-Engine Block
+        torch_executed_ops: Sequence of operations to run in Torch, regardless of converter coverage
+        pass_through_build_failures: Whether to fail on TRT engine build errors (True) or not (False)
     Returns:
         Backend for torch.compile
     """

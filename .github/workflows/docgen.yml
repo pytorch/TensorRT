@@ -28,19 +28,19 @@ jobs:
           apt update
           DEBIAN_FRONTEND=noninteractive apt install -y software-properties-common gcc git curl wget make zlib1g-dev bzip2 libbz2-dev lzma lzma-dev libreadline-dev libsqlite3-dev libssl-dev libffi-dev doxygen pandoc
           git config --global --add safe.directory '*'
-      - name: Set up Python 3.9.4
-        uses: actions/setup-python@v2
+      - name: Set up Python 3.10.12
+        uses: actions/setup-python@v4
         with:
-          python-version: 3.9.4
-      - uses: actions/checkout@v2
+          python-version: 3.10.12
+      - uses: actions/checkout@v3
         with:
           ref: ${{github.head_ref}}
       - name: Get HEAD SHA
         id: vars
-        run: echo "::set-output name=sha::$(git rev-parse --short HEAD)"
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
       - name: Get Bazel version
         id: bazel_info
-        run: echo "::set-output name=version::$(cat .bazelversion)"
+        run: echo "version=$(cat .bazelversion)" >> $GITHUB_OUTPUT
       - name: Install Bazel
         run: |
           wget -q https://github.com/bazelbuild/bazel/releases/download/${{ steps.bazel_info.outputs.version }}/bazel-${{ steps.bazel_info.outputs.version }}-linux-x86_64 -O /usr/bin/bazel
@@ -64,7 +64,7 @@ jobs:
           apt-get install -y libnvinfer8 libnvinfer-plugin8 libnvinfer-dev libnvinfer-plugin-dev
       - name: Install Torch
         run: |
-          python3 -m pip install -r py/requirements.txt
+          python3 -m pip install -r py/requirements.txt --user
       - name: Build Python Package
         run: |
           cp toolchains/ci_workspaces/WORKSPACE.x86_64 WORKSPACE

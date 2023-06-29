@@ -32,6 +32,8 @@ void RemoveDropout(std::shared_ptr<torch::jit::Graph>& graph);
 void RemoveNOPs(std::shared_ptr<torch::jit::Graph> graph);
 void RemoveSingleUse0DTensors(std::shared_ptr<torch::jit::Graph>& g);
 void RemoveUnnecessaryCasts(std::shared_ptr<torch::jit::Graph>& graph);
+void ReplaceAtenInt(std::shared_ptr<torch::jit::Graph>& g);
+void RemoveCollectionCast(std::shared_ptr<torch::jit::Graph>& g);
 void UnpackAddMM(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackBatchNorm(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackLogSoftmax(std::shared_ptr<torch::jit::Graph>& graph);

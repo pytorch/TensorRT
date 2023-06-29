@@ -79,6 +79,26 @@ auto logical_not_registration TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
        return true;
      }});
 
+auto isfinite_registration TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
+    {"aten::isfinite(Tensor self) -> Tensor", [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+       auto in = args[0].ITensorOrFreeze(ctx);
+       // assuming x-x = 0 for all values other than nan/inf/-inf where x-x = nan
+       // x==x for all non-nan values
+       auto inf_test_layer = ctx->net->addElementWise(*in, *in, nvinfer1::ElementWiseOperation::kSUB);
+       TORCHTRT_CHECK(inf_test_layer, "Unable to create sub layer from node: " << *n);
+       inf_test_layer->setName((util::node_info(n) + "_inf_test").c_str());
+       auto inf_test_tensor = inf_test_layer->getOutput(0);
+
+       auto nan_test_layer =
+           ctx->net->addElementWise(*inf_test_tensor, *inf_test_tensor, nvinfer1::ElementWiseOperation::kEQUAL);
+       TORCHTRT_CHECK(nan_test_layer, "Unable to create eq layer from node: " << *n);
+       nan_test_layer->setName((util::node_info(n) + "_nan_test").c_str());
+
+       auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], nan_test_layer->getOutput(0));
+       LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+       return true;
+     }});
+
 #define convert(unary, trt_type)                                                               \
   auto unary##_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(       \
       {"aten::" #unary "(Tensor self) -> Tensor",                                              \

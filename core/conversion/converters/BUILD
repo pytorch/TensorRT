@@ -57,6 +57,7 @@ cc_library(
         "impl/batch_norm.cpp",
         "impl/bitwise.cpp",
         "impl/cast.cpp",
+        "impl/chunk.cpp",
         "impl/concat.cpp",
         "impl/constant.cpp",
         "impl/constant_pad.cpp",
