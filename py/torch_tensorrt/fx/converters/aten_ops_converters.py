@@ -20,7 +20,7 @@ from torch.fx.node import Argument, Target
 
 from .converter_utils import *  # noqa: F403
 import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
-from torch_tensorrt.fx.converters.impl import activation
+from torch_tensorrt.fx.converters.impl import activation, convolution
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -127,13 +127,36 @@ def aten_ops_convolution(
     # we do not handle output_padding.
     if args[7] not in ([0], [0, 0], [0, 0, 0]):
         raise RuntimeError(f"Target {target} has non-0 output_padding")
+
     if len(kwargs_new["stride"]) == 1:
-        return acc_ops_converters.acc_ops_conv1d(
-            network, target, None, kwargs_new, name
+        return convolution.convNd(
+            network,
+            target,
+            source_ir=SourceIR.ATEN,
+            name=name,
+            is_conv1d=True,
+            input_val=kwargs_new["input"],
+            weight=kwargs_new["weight"],
+            bias=kwargs_new["bias"],
+            stride=kwargs_new["stride"],
+            padding=kwargs_new["padding"],
+            dilation=kwargs_new["dilation"],
+            groups=kwargs_new["groups"],
         )
     else:
-        return acc_ops_converters.acc_ops_convnd(
-            network, target, None, kwargs_new, name
+        return convolution.convNd(
+            network,
+            target,
+            source_ir=SourceIR.ATEN,
+            name=name,
+            is_conv1d=False,
+            input_val=kwargs_new["input"],
+            weight=kwargs_new["weight"],
+            bias=kwargs_new["bias"],
+            stride=kwargs_new["stride"],
+            padding=kwargs_new["padding"],
+            dilation=kwargs_new["dilation"],
+            groups=kwargs_new["groups"],
         )
 
 
