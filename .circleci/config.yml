@@ -780,6 +780,21 @@ commands:
       - store_artifacts:
           path: /tmp/testlogs
 
+  test-dynamo-converters:
+    description: "Test the Dynamo aten converters"
+    steps:
+      - run:
+          name: Run Dynamo converter tests
+          command: |
+            cd tests/py/dynamo/converters
+            TESTS_TO_RUN=$(circleci tests glob "test_*.py" | circleci tests split --split-by=timings)
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/converters/test_results.xml $TESTS_TO_RUN
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
 # =================== Dynamo tests end ======================== #
 
 # Define a job to be invoked later in a workflow.
@@ -1036,6 +1051,7 @@ jobs:
           command: pip3 install --pre /tmp/dist/x86_64-linux/*cp39-cp39*.whl
       # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - dump-test-env
+      - test-dynamo-converters
       - test-dynamo-torch_compile
       - test-dynamo-models_torch_compile
       - test-dynamo-models_torch_export
