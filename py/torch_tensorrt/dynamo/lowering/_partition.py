@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Optional, Sequence, Set
+from typing import Callable, Dict, List, Optional, Sequence, Set
 
 import torch
 
@@ -55,6 +55,10 @@ class TRTPartitioner(CapabilityBasedPartitioner):
         )
 
         self.min_block_size = min_block_size
+        logger.debug(
+            "Initialized Capability-Based Partitioner with available Converters:\n"
+            + f"{CONVERTERS.display_all_available_converters()}"
+        )
 
     def propose_partitions(self) -> List[Partition]:
         # Propose partitions using the default, then refine the results
@@ -123,10 +127,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):
             else node.target
         )
 
-        if (
-            node.target in CONVERTERS.keys()
-            and node_name not in self.torch_executed_ops
-        ):
+        if node in CONVERTERS and node_name not in self.torch_executed_ops:
             # If node is a proper, supported computational node, store the operator
             if not node.is_impure():
                 self.supported_operators.add(node_name)
