@@ -46,6 +46,16 @@ def rsqrt_replacement(*args, **kwargs) -> torch.Tensor:
     return torch.reciprocal(torch.sqrt(*args, **kwargs))
 
 
+@register_decomposition(aten._unsafe_view, registry=DECOMPOSITIONS)
+def unsafe_view_replacement(x: torch.Tensor, *args, **kwargs) -> torch.Tensor:
+    return torch.reshape(x, *args, **kwargs)
+
+
+@register_decomposition(torch.ops.aten.lift_fresh_copy, registry=DECOMPOSITIONS)
+def lift_fresh_copy_replacement(x: torch.Tensor) -> torch.Tensor:
+    return x
+
+
 @register_decomposition(aten.alias, registry=DECOMPOSITIONS)
 def alias_replacement(x: torch.Tensor) -> torch.Tensor:
     return x
