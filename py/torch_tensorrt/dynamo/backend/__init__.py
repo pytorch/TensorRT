@@ -7,7 +7,6 @@ from functools import partial
 from typing import Any, Optional, Sequence
 from torch_tensorrt import EngineCapability, Device
 from torch_tensorrt.fx.utils import LowerPrecision
-
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.utils import prepare_inputs, prepare_device
 from torch_tensorrt.dynamo.backend.backends import torch_tensorrt_backend
@@ -49,6 +48,7 @@ def compile(
     min_block_size=MIN_BLOCK_SIZE,
     torch_executed_ops=[],
     torch_executed_modules=[],
+    pass_through_build_failures=PASS_THROUGH_BUILD_FAILURES,
     max_aux_streams=MAX_AUX_STREAMS,
     version_compatible=VERSION_COMPATIBLE,
     optimization_level=OPTIMIZATION_LEVEL,
@@ -75,6 +75,10 @@ def compile(
 
     inputs = prepare_inputs(inputs, prepare_device(device))
 
+    if not isinstance(enabled_precisions, collections.abc.Collection):
+        enabled_precisions = [enabled_precisions]
+
+    # Parse user-specified enabled precisions
     if (
         torch.float16 in enabled_precisions
         or torch_tensorrt.dtype.half in enabled_precisions
@@ -99,6 +103,7 @@ def compile(
         workspace_size=workspace_size,
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
+        pass_through_build_failures=pass_through_build_failures,
         max_aux_streams=max_aux_streams,
         version_compatible=version_compatible,
         optimization_level=optimization_level,
@@ -144,10 +149,8 @@ def create_backend(
     Returns:
         Backend for torch.compile
     """
-    if debug:
-        logger.setLevel(logging.DEBUG)
-
-    settings = CompilationSettings(
+    return partial(
+        torch_tensorrt_backend,
         debug=debug,
         precision=precision,
         workspace_size=workspace_size,
@@ -158,9 +161,4 @@ def create_backend(
         version_compatible=version_compatible,
         optimization_level=optimization_level,
         use_experimental_rt=use_experimental_rt,
-    )
-
-    return partial(
-        torch_tensorrt_backend,
-        settings=settings,
     )

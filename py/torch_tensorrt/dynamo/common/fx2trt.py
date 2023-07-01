@@ -17,7 +17,12 @@ from torch.fx.passes.shape_prop import TensorMetadata
 from torch_tensorrt.dynamo.fx_ts_compat import CONVERTERS
 from .input_tensor_spec import InputTensorSpec
 from torch_tensorrt.fx.observer import Observer
-from torch_tensorrt.fx.utils import get_dynamic_dims, LowerPrecision, torch_dtype_to_trt
+from torch_tensorrt.fx.utils import (
+    get_dynamic_dims,
+    LowerPrecision,
+    unified_dtype_converter,
+    Frameworks,
+)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -38,8 +43,6 @@ class TRTInterpreter(torch.fx.Interpreter):
         self,
         module: torch.fx.GraphModule,
         input_specs: List[InputTensorSpec],
-        explicit_batch_dimension: bool = True,
-        explicit_precision: bool = False,
         logger_level=None,
         output_dtypes=None,
     ):
@@ -49,17 +52,11 @@ class TRTInterpreter(torch.fx.Interpreter):
         self.builder = trt.Builder(self.logger)
 
         flag = 0
-        if explicit_batch_dimension:
-            EXPLICIT_BATCH = 1 << (int)(
-                trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH
-            )
-            flag |= EXPLICIT_BATCH
 
-        if explicit_precision:
-            EXPLICIT_PRECISION = 1 << (int)(
-                trt.NetworkDefinitionCreationFlag.EXPLICIT_PRECISION
-            )
-            flag |= EXPLICIT_PRECISION
+        # It is deprecated to not use this flag
+        EXPLICIT_BATCH = 1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+        flag |= EXPLICIT_BATCH
+
         self.network = self.builder.create_network(flag)
 
         missing_ops = self.validate_conversion()
@@ -330,7 +327,9 @@ class TRTInterpreter(torch.fx.Interpreter):
                 self.optimization_profiles[i].set_shape(target, *shape_range)
 
         return self.network.add_input(
-            name=target, shape=tuple(shape), dtype=torch_dtype_to_trt(dtype)
+            name=target,
+            shape=tuple(shape),
+            dtype=unified_dtype_converter(dtype, Frameworks.TRT),
         )
 
     def call_module(self, target, args, kwargs):
@@ -411,7 +410,9 @@ class TRTInterpreter(torch.fx.Interpreter):
             if output_bool:
                 output.dtype = trt.bool
             elif self.output_dtypes is not None:
-                output.dtype = torch_dtype_to_trt(self.output_dtypes[i])
+                output.dtype = unified_dtype_converter(
+                    self.output_dtypes[i], Frameworks.TRT
+                )
             elif self.output_fp16 and output.dtype == trt.float32:
                 output.dtype = trt.float16
             self._output_names.append(name)

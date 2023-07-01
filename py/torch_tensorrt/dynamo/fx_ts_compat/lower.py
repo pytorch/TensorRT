@@ -89,11 +89,6 @@ def compile(
     Returns:
         A torch.nn.Module lowered by TensorRT.
     """
-    if use_experimental_rt and not explicit_batch_dimension:
-        raise ValueError(
-            "The experimental unifed runtime only supports explicit batch. Please make sure to set explicit_batch_dimension=True when use_experimental_fx_rt=True"
-        )
-
     logger.warn(
         "For ir=fx_ts_compat backend only the "
         + "following arguments are supported: "
@@ -183,8 +178,6 @@ class LowerTrtInterpreter:
         interpreter = TRTInterpreter(
             mod,
             input_specs=self.lower_setting.input_specs,
-            explicit_batch_dimension=self.lower_setting.explicit_batch_dimension,
-            explicit_precision=self.lower_setting.explicit_precision,
             logger_level=trt.Logger.VERBOSE
             if self.lower_setting.debug
             else trt.Logger.WARNING,
@@ -219,7 +212,7 @@ def default_split_function(
     model: fx.GraphModule, inputs: Input, lower_setting: LowerSetting
 ) -> SplitResult:
     splitter_setting = TRTSplitterSetting()
-    splitter_setting.use_implicit_batch_dim = not lower_setting.explicit_batch_dimension
+    splitter_setting.use_implicit_batch_dim = False
     splitter_setting.min_block_size = lower_setting.min_block_size
     splitter_setting.use_experimental_rt = lower_setting.use_experimental_rt
     splitter = TRTSplitter(model, inputs, settings=splitter_setting)
@@ -247,7 +240,11 @@ def default_lower_pass(
             import io
 
             from torch_tensorrt._Device import Device
+<<<<<<< HEAD
             from torch_tensorrt.dynamo import TorchTensorRTModule
+=======
+            from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule
+>>>>>>> 369f44201a7cad91081f73fdc7ad98852b5ea67b
 
             with io.BytesIO() as engine_bytes:
                 engine_bytes.write(interp_res.engine.serialize())

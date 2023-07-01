@@ -16,7 +16,7 @@ def convert_module(
     inputs: Sequence[torch.Tensor],
     settings: CompilationSettings = CompilationSettings(),
     name: str = "",
-) -> Union[TorchTensorRTModule, TRTModule]:
+):
     """Convert an FX module to a TRT module
     Args:
         module: FX GraphModule to convert
@@ -38,7 +38,6 @@ def convert_module(
     interpreter = TRTInterpreter(
         module,
         InputTensorSpec.from_tensors(inputs),
-        explicit_batch_dimension=True,
         logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
         output_dtypes=output_dtypes,
     )
@@ -57,6 +56,11 @@ def convert_module(
     )
 
     if settings.use_experimental_rt:
+<<<<<<< HEAD
+=======
+        from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule
+
+>>>>>>> 369f44201a7cad91081f73fdc7ad98852b5ea67b
         with io.BytesIO() as engine_bytes:
             engine_bytes.write(interpreter_result.engine.serialize())
             engine_str = engine_bytes.getvalue()
