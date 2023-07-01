@@ -7,11 +7,17 @@ from functools import partial
 from typing import Any, Optional, Sequence
 from torch_tensorrt import EngineCapability, Device
 from torch_tensorrt.fx.utils import LowerPrecision
-from torch.fx.passes.pass_manager import PassManager
+from torch.fx.passes.pass_manager import inplace_wrapper, PassManager
 from torch.fx.passes.shape_prop import ShapeProp
 import torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer as aten_tracer
 from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
-from torch_tensorrt.dynamo.backend.lowering import fuse_permute_linear, fuse_permute_matmul
+from torch_tensorrt.fx.passes.remove_duplicate_output_args import (
+    remove_duplicate_output_args,
+)
+from torch_tensorrt.dynamo.backend.lowering import (
+    fuse_permute_linear,
+    fuse_permute_matmul,
+)
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.utils import prepare_inputs, prepare_device
 from torch_tensorrt.dynamo.backend.backends import torch_tensorrt_backend
@@ -120,13 +126,17 @@ def compile(
         return _compile_module(model, inputs, settings)
     else:
         split_result = lower_model_using_trt_splitter(model, inputs)
-        trt_splitter = _compile_graph(split_result, inputs, settings)
-        return trt_splitter.split_module
+        trt_module = _compile_graph(split_result, inputs, settings)
 
-def _compile_graph(split_result: TRTSplitter,
-                   inputs: Any,
-                   settings: CompilationSettings = CompilationSettings(),
-                   **kwargs,):
+        return trt_module
+
+
+def _compile_graph(
+    split_result: TRTSplitter,
+    inputs: Any,
+    settings: CompilationSettings = CompilationSettings(),
+    **kwargs,
+):
 
     for submod_name, submod_inputs in split_result.submodule_inputs.items():
         submod = getattr(split_result.split_module, submod_name)
@@ -141,7 +151,8 @@ def _compile_graph(split_result: TRTSplitter,
             )
             setattr(split_result.split_module, submod_name, trt_mod)
 
-    return split_result
+    return split_result.split_module
+
 
 def trace(
     model: torch.nn.Module,
@@ -169,20 +180,22 @@ def trace(
 
     return model
 
-def lower_model_using_trt_splitter(model: torch.nn.Module,
-                inputs: Any,
-                **kwargs):
+
+def lower_model_using_trt_splitter(model: torch.nn.Module, inputs: Any, **kwargs):
+    # Perform basic lowering
+    model = lower_model(model, inputs)
     splitter_setting = TRTSplitterSetting()
     splitter_setting.use_implicit_batch_dim = False
     splitter_setting.min_acc_module_size = 1
     splitter_setting.use_experimental_rt = False
     splitter = TRTSplitter(model, inputs, settings=splitter_setting)
     splitter.node_support_preview()
-    return splitter.generate_split_results()
+    split_result = splitter.generate_split_results()
 
-def lower_model(model: torch.nn.Module,
-                inputs: Any,
-                **kwargs):
+    return split_result
+
+
+def lower_model(model: torch.nn.Module, inputs: Any, **kwargs):
 
     graph_optimization_pm = PassManager.build_from_passlist(
         [fuse_permute_matmul, fuse_permute_linear]

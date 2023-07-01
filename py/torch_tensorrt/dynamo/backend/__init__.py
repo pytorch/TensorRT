@@ -112,7 +112,7 @@ def compile(
     model(*inputs)
 
     return model
-    
+
 
 def create_backend(
     precision: LowerPrecision = PRECISION,
