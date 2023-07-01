@@ -17,7 +17,11 @@ TEST_P(CppAPITests, ModuleAsEngineIsClose) {
   ASSERT_TRUE(torch_tensorrt::tests::util::cosineSimEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
-#ifndef DISABLE_TEST_IN_CI
+#ifdef DISABLE_TEST_IN_CI
+
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(CppAPITests);
+
+#else
 
 INSTANTIATE_TEST_SUITE_P(
     ModuleAsEngineForwardIsCloseSuite,
