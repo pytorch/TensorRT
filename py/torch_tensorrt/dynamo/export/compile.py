@@ -7,13 +7,10 @@ from functools import partial
 from typing import Any, Optional, Sequence
 from torch_tensorrt import EngineCapability, Device
 from torch_tensorrt.fx.utils import LowerPrecision
-from torch.fx.passes.pass_manager import inplace_wrapper, PassManager
+from torch.fx.passes.pass_manager import PassManager
 from torch.fx.passes.shape_prop import ShapeProp
 import torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer as aten_tracer
 from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
-from torch_tensorrt.fx.passes.remove_duplicate_output_args import (
-    remove_duplicate_output_args,
-)
 from torch_tensorrt.dynamo.backend.lowering import (
     fuse_permute_linear,
     fuse_permute_matmul,

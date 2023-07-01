@@ -240,11 +240,7 @@ def default_lower_pass(
             import io
 
             from torch_tensorrt._Device import Device
-<<<<<<< HEAD
             from torch_tensorrt.dynamo import TorchTensorRTModule
-=======
-            from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule
->>>>>>> 369f44201a7cad91081f73fdc7ad98852b5ea67b
 
             with io.BytesIO() as engine_bytes:
                 engine_bytes.write(interp_res.engine.serialize())

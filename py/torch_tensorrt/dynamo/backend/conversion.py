@@ -56,11 +56,6 @@ def convert_module(
     )
 
     if settings.use_experimental_rt:
-<<<<<<< HEAD
-=======
-        from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule
-
->>>>>>> 369f44201a7cad91081f73fdc7ad98852b5ea67b
         with io.BytesIO() as engine_bytes:
             engine_bytes.write(interpreter_result.engine.serialize())
             engine_str = engine_bytes.getvalue()
