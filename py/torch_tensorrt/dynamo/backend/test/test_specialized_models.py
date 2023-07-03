@@ -1,7 +1,7 @@
 from utils import lower_graph_testing
 from torch.testing._internal.common_utils import run_tests, TestCase
 import torch
-from torch_tensorrt.dynamo import compile
+from torch_tensorrt.dynamo.backend import compile
 
 
 class TestFakeTensors(TestCase):

@@ -26,7 +26,7 @@ def test_resnet18(ir):
         "device": torchtrt.Device("cuda:0"),
         "enabled_precisions": {torch.float},
         "ir": ir,
-        "debug": True
+        "debug": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -41,6 +41,7 @@ def test_resnet18(ir):
 
     with torch.no_grad():
         torch.cuda.empty_cache()
+
 
 @pytest.mark.unit
 def test_mobilenet_v2(ir):
@@ -52,7 +53,7 @@ def test_mobilenet_v2(ir):
         "device": torchtrt.Device("cuda:0"),
         "enabled_precisions": {torch.float},
         "ir": ir,
-        "debug": True
+        "debug": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -67,6 +68,7 @@ def test_mobilenet_v2(ir):
 
     with torch.no_grad():
         torch.cuda.empty_cache()
+
 
 @pytest.mark.unit
 def test_efficientnet_b0(ir):
@@ -78,7 +80,7 @@ def test_efficientnet_b0(ir):
         "device": torchtrt.Device("cuda:0"),
         "enabled_precisions": {torch.float},
         "ir": ir,
-        "debug": True
+        "debug": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -93,6 +95,7 @@ def test_efficientnet_b0(ir):
 
     with torch.no_grad():
         torch.cuda.empty_cache()
+
 
 @pytest.mark.unit
 def test_resnet18_half(ir):

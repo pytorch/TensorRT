@@ -2,7 +2,7 @@ from torch_tensorrt.dynamo.backend.lowering import partition
 from torch.testing._internal.common_utils import run_tests, TestCase
 import torch
 from copy import deepcopy
-from torch_tensorrt.dynamo import compile
+from torch_tensorrt.dynamo.backend import compile
 from utils import lower_graph_testing, DECIMALS_OF_AGREEMENT
 
 

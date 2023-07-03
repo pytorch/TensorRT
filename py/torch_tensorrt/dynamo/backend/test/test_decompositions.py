@@ -2,7 +2,7 @@ from functools import partial
 from utils import lower_graph_testing, DECIMALS_OF_AGREEMENT
 from torch.testing._internal.common_utils import run_tests, TestCase
 import torch
-from torch_tensorrt.dynamo import compile
+from torch_tensorrt.dynamo.backend import compile
 
 
 class TestLowering(TestCase):
