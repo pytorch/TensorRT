@@ -92,17 +92,9 @@ commands:
                     key: cmake-<< parameters.cache-key >>-<< parameters.version >>
                     paths:
                         - << parameters.install-dir >>
-  uninstall-cuda:
-    description: "Uninstall CUDA-11.4"
-    steps:
-      - run:
-          name: "Uninstall CUDA-11.4"
-          command: |
-            sudo apt-get --purge remove "cuda*" "nsight*"
-            sudo apt-get --purge remove "*nvidia*"
 
   install-cudnn:
-    description: "Install CUDNN 8.8.0"
+    description: "Install CUDNN 8.8.1"
     parameters:
       os:
         type: string
@@ -112,10 +104,10 @@ commands:
         default: "x86_64"
       cudnn-version:
         type: string
-        default: "8.8.0.121"
+        default: "8.8.1.3"
       cuda-version:
         type: string
-        default: "cuda11.8"
+        default: "cuda12.0"
     steps:
       - run:
           name: Install CUDNN
@@ -149,13 +141,13 @@ commands:
         default: "amd64"
       cuda-pkg-name:
         type: string
-        default: "cuda-toolkit-11-8"
+        default: "cuda-toolkit-12-1"
       cuda-pkg-version:
         type: string
-        default: "11-8"
+        default: "12-1"
       cuda-version:
         type: string
-        default: "11.8.0"
+        default: "12.1.1"
     steps:
       - run:
           name: Install CUDA
@@ -186,21 +178,12 @@ commands:
       architecture:
         type: string
         default: "amd64"
-      cuda-pkg-name:
-        type: string
-        default: "cuda-toolkit-11-8"
-      cuda-pkg-version:
-        type: string
-        default: "11-8"
-      cuda-version:
-        type: string
-        default: "11.8.0"
       cuda-string-version:
         type: string
-        default: "cuda11.8"
+        default: "cuda12.0"
       cudnn-version:
         type: string
-        default: "8.8.0.121"
+        default: "8.8.1.3"
       trt-version-short:
         type: string
         default: "8.6.1"
@@ -252,7 +235,7 @@ commands:
           default: "8.6.1"
         cudnn-version-long:
           type: string
-          default: "8.8.0.121"
+          default: "8.8.1.3"
       steps:
         - run:
             name: Set up python environment
@@ -261,7 +244,7 @@ commands:
               pip3 install wheel setuptools
               pip3 install nvidia-pyindex
               pip3 install tabulate
-              pip3 install tensorrt==<< parameters.trt-version-long >> nvidia-cudnn-cu11==<< parameters.cudnn-version-long >>
+              pip3 install tensorrt==<< parameters.trt-version-long >> nvidia-cudnn-cu12==<< parameters.cudnn-version-long >>
               pip3 install pytest parameterized expecttest nox
 
   install-torch-from-index:
@@ -269,19 +252,22 @@ commands:
     parameters:
       torch-build:
         type: string
-        default: "2.1.0.dev20230605+cu118"
+        default: "2.1.0.dev20230619+cu121"
       torchvision-build:
         type: string
-        default: "0.16.0.dev20230605+cu118"
+        default: "0.16.0.dev20230619+cu121"
       torch-build-index:
         type: string
-        default: "https://download.pytorch.org/whl/nightly/cu118"
+        default: "https://download.pytorch.org/whl/nightly/cu121"
+      torchvision-build-index:
+        type: string
+        default: "https://download.pytorch.org/whl/nightly/cu121"
     steps:
       - run:
           name: Install Torch
           command: |
             pip3 install --upgrade pip
-            pip3 install torch==<< parameters.torch-build >>  torchvision==<< parameters.torchvision-build >> --extra-index-url << parameters.torch-build-index >>
+            pip3 install torch==<< parameters.torch-build >>  torchvision==<< parameters.torchvision-build >> --extra-index-url << parameters.torch-build-index >> --extra-index-url << parameters.torchvision-build-index >>
 
   build-py:
     description: "Build the torch-tensorrt python release (pre-cxx11-abi)"
@@ -293,7 +279,7 @@ commands:
       - run:
           name: Build torch-tensorrt python release (pre-cxx11-abi)
           command: |
-            export CUDA_HOME=/usr/local/cuda-11.8/
+            export CUDA_HOME=/usr/local/cuda-12.1/
             mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
             cd py
             python3 -m pip install wheel setuptools
@@ -313,7 +299,7 @@ commands:
       - run:
           name: Build torch-tensorrt python legacy release (pre-cxx11-abi)
           command: |
-            export CUDA_HOME=/usr/local/cuda-11.8/
+            export CUDA_HOME=/usr/local/cuda-12.1/
             mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
             cd py
             python3 -m pip install wheel setuptools
@@ -345,7 +331,7 @@ commands:
             - run:
                 name: Build torch-tensorrt python release package
                 command: |
-                  export CUDA_HOME=/usr/local/cuda-11.8/
+                  export CUDA_HOME=/usr/local/cuda-12.1/
                   cd ~/project/py
                   python3 setup.py bdist_wheel --use-cxx11-abi --release
                   python3 setup.py install --use-cxx11-abi --release
@@ -357,7 +343,7 @@ commands:
             - run:
                 name: Build torch-tensorrt python package
                 command: |
-                  export CUDA_HOME=/usr/local/cuda-11.8/
+                  export CUDA_HOME=/usr/local/cuda-12.1/
                   cd ~/project/py
                   python3 setup.py bdist_wheel --use-cxx11-abi
                   python3 setup.py install --use-cxx11-abi
@@ -375,7 +361,7 @@ commands:
       - run:
           name: Build torch-tensorrt python release with only the fx backend
           command: |
-            export CUDA_HOME=/usr/local/cuda-11.8/
+            export CUDA_HOME=/usr/local/cuda-12.1/
             mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
             cd py
             python3 -m pip install wheel setuptools
@@ -447,7 +433,7 @@ commands:
           name: Build torch-tensorrt library with CMake
           command: |
             mkdir build
-            export PATH=$PATH:/usr/local/cuda-11.8/bin
+            export PATH=$PATH:/usr/local/cuda-12.1/bin
             ~/cmake/bin/cmake -S. -Bbuild \
               -DCMAKE_MODULE_PATH=cmake/Module \
               -DTorch_DIR=/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch/share/cmake/Torch \
@@ -499,7 +485,7 @@ commands:
           name: Run core / C++ tests
           no_output_timeout: 15m
           environment:
-            LD_LIBRARY_PATH: "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch_tensorrt.libs:/home/circleci/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:/home/circleci/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda-11.8/lib64/:$LD_LIBRARY_PATH"
+            LD_LIBRARY_PATH: "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch_tensorrt.libs:/home/circleci/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:/home/circleci/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda-12.1/lib64/:$LD_LIBRARY_PATH"
           command: |
             set -e
             mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
@@ -529,7 +515,7 @@ commands:
           environment:
             USE_HOST_DEPS: "1"
             PYT_PATH: "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/"
-            LD_LIBRARY_PATH: "/usr/lib/x86_64-linux-gnu/:/usr/local/cuda-11.8/lib64/:$LD_LIBRARY_PATH"
+            LD_LIBRARY_PATH: "/usr/lib/x86_64-linux-gnu/:/usr/local/cuda-12.1/lib64/:$LD_LIBRARY_PATH"
           command: |
             set -e
             mkdir -p /tmp/artifacts/test_results
@@ -819,7 +805,7 @@ jobs:
         type: boolean
         default: false
     machine:
-      image: linux-cuda-11:2023.02.1
+      image: linux-cuda-12:2023.05.1
     resource_class: gpu.nvidia.small
     steps:
       - checkout
@@ -881,7 +867,7 @@ jobs:
       cudnn-version:
         type: string
     machine:
-      image: linux-cuda-11:2023.02.1
+      image: linux-cuda-12:2023.05.1
     resource_class: gpu.nvidia.large
     parallelism: 4
     steps:
@@ -922,7 +908,7 @@ jobs:
       python-version:
         type: string
     machine:
-      image: linux-cuda-11:2023.02.1
+      image: linux-cuda-12:2023.05.1
     resource_class: gpu.nvidia.large
     steps:
       - checkout
@@ -956,7 +942,7 @@ jobs:
         type: string
     parallelism: 8
     machine:
-      image: linux-cuda-11:2023.02.1
+      image: linux-cuda-12:2023.05.1
     resource_class: gpu.nvidia.large
     steps:
       - checkout
@@ -992,7 +978,7 @@ jobs:
         type: string
     parallelism: 8
     machine:
-      image: linux-cuda-11:2023.02.1
+      image: linux-cuda-12:2023.05.1
     resource_class: gpu.nvidia.large
     steps:
       - checkout
@@ -1030,7 +1016,7 @@ jobs:
       python-version:
         type: string
     machine:
-      image: linux-cuda-11:2023.02.1
+      image: linux-cuda-12:2023.05.1
     resource_class: gpu.nvidia.large
     steps:
       - checkout
@@ -1068,7 +1054,7 @@ jobs:
         type: string
     parallelism: 4
     machine:
-      image: linux-cuda-11:2023.02.1
+      image: linux-cuda-12:2023.05.1
     resource_class: gpu.nvidia.small
     steps:
       - when:
@@ -1116,7 +1102,7 @@ jobs:
       torch-build-index:
         type: string
     machine:
-      image: linux-cuda-11:2023.02.1
+      image: linux-cuda-12:2023.05.1
     resource_class: gpu.nvidia.small
     steps:
       - when:
@@ -1252,7 +1238,7 @@ jobs:
       python-version:
         type: string
     machine:
-      image: linux-cuda-11:2023.02.1
+      image: linux-cuda-12:2023.05.1
     resource_class: gpu.nvidia.small
     steps:
       - checkout
@@ -1288,7 +1274,7 @@ jobs:
       torch-base-image:
         type: string
     machine:
-      image: linux-cuda-11:2023.02.1
+      image: linux-cuda-12:2023.05.1
     resource_class: gpu.nvidia.small
     steps:
       - checkout
@@ -1316,7 +1302,7 @@ jobs:
       torch-base-image:
         type: string
     machine:
-      image: linux-cuda-11:2023.02.1
+      image: linux-cuda-12:2023.05.1
     resource_class: gpu.nvidia.small
     steps:
       - when:
@@ -1352,13 +1338,13 @@ parameters:
   # Nightly platform config
   torch-build:
     type: string
-    default: "2.1.0.dev20230605+cu118"
+    default: "2.1.0.dev20230619+cu121"
   torchvision-build:
     type: string
-    default: "0.16.0.dev20230605+cu118"
+    default: "0.16.0.dev20230619+cu121"
   torch-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/nightly/cu118"
+    default: "https://download.pytorch.org/whl/nightly/cu121"
   torch-build-legacy:
     type: string
     default: "1.13.1+cu117"
@@ -1373,7 +1359,7 @@ parameters:
     default: true
   cudnn-version:
     type: string
-    default: "8.8.0.121"
+    default: "8.8.1.3"
   trt-version-short:
     type: string
     default: "8.6.1"

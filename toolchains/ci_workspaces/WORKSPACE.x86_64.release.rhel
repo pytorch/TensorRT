@@ -41,7 +41,7 @@ local_repository(
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",
-    path = "/usr/local/cuda-11.8",
+    path = "/usr/local/cuda-12.1",
 )
 
 new_local_repository(
@@ -56,17 +56,17 @@ new_local_repository(
 http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "999becce82b73e566d0ffe010cd21fea8cf3a33f90f09dcc6b01150b820ae063",
+    sha256 = "5ba55259b65e071346a2b547b8d1378595f1467a39aaa923fecb09f134f1bcba",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu118/libtorch-cxx11-abi-shared-with-deps-2.1.0.dev20230605%2Bcu118.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-cxx11-abi-shared-with-deps-2.1.0.dev20230619%2Bcu121.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "786cc728c63ea69c40bd8fb535cf8e5e1dfff1d43eaad3eb5256b9ed89c1b268",
+    sha256 = "8f6661bfc11597e77400e9e36cc8dd8e5e385ba82361d630d9ccede8518d7c7e",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu118/libtorch-shared-with-deps-2.1.0.dev20230605%2Bcu118.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-shared-with-deps-2.1.0.dev20230619%2Bcu121.zip"],
 )
 
 ####################################################################################
