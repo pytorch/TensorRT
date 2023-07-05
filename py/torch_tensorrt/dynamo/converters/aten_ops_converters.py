@@ -196,22 +196,6 @@ def aten_ops_unsqueeze(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.rsub.Tensor)
-def aten_ops_rsub(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    alpha = None
-    if "alpha" in kwargs:
-        alpha = kwargs["alpha"]
-    return impl.elementwise.rsub(
-        network, target, SourceIR.ATEN, name, args[0], args[1], alpha
-    )
-
-
 @dynamo_tensorrt_converter(torch.ops.aten._softmax.default)
 def aten_ops_softmax(
     network: TRTNetwork,

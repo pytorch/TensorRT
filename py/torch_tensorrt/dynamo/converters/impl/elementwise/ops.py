@@ -139,40 +139,6 @@ def rsqrt(
     return output
 
 
-def rsub(
-    network: TRTNetwork,
-    target: Target,
-    source_ir: Optional[SourceIR],
-    name: str,
-    input: TRTTensor,
-    other: TRTTensor,
-    alpha: Optional[Any] = None,
-) -> TRTTensor:
-    scaled_tensor_output = other
-    if alpha is not None:
-        scaled_tensor_output = convert_binary_elementwise(
-            network,
-            target,
-            source_ir,
-            f"{name}_scaled",
-            trt.ElementWiseOperation.PROD,
-            other,
-            alpha,
-        )
-
-    output = convert_binary_elementwise(
-        network,
-        target,
-        source_ir,
-        f"{name}_output",
-        trt.ElementWiseOperation.SUB,
-        input,
-        scaled_tensor_output,
-    )
-
-    return output
-
-
 def fmod(
     network: TRTNetwork,
     target: Target,
