@@ -31,6 +31,8 @@ def test_resnet18(ir):
         "enabled_precisions": {torch.float},
         "ir": ir,
         "pass_through_build_failures": True,
+        "optimization_level": 1,
+        "min_block_size": 8,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -62,6 +64,8 @@ def test_mobilenet_v2(ir):
         "enabled_precisions": {torch.float},
         "ir": ir,
         "pass_through_build_failures": True,
+        "optimization_level": 1,
+        "min_block_size": 8,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -93,6 +97,8 @@ def test_efficientnet_b0(ir):
         "enabled_precisions": {torch.float},
         "ir": ir,
         "pass_through_build_failures": True,
+        "optimization_level": 1,
+        "min_block_size": 8,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -133,6 +139,8 @@ def test_bert_base_uncased(ir):
         "truncate_long_and_double": True,
         "ir": ir,
         "pass_through_build_failures": True,
+        "optimization_level": 1,
+        "min_block_size": 8,
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
 
@@ -168,6 +176,8 @@ def test_resnet18_half(ir):
         "enabled_precisions": {torch.half},
         "ir": ir,
         "pass_through_build_failures": True,
+        "optimization_level": 1,
+        "min_block_size": 8,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)

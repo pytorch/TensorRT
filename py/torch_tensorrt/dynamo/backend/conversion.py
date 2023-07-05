@@ -55,7 +55,14 @@ def convert_module(
         optimization_level=settings.optimization_level,
     )
 
-    if settings.use_experimental_rt:
+    if settings.use_python_runtime:
+        return TRTModule(
+            engine=interpreter_result.engine,
+            input_names=interpreter_result.input_names,
+            output_names=interpreter_result.output_names,
+        )
+
+    else:
         from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule
 
         with io.BytesIO() as engine_bytes:
@@ -66,10 +73,4 @@ def convert_module(
             name=name,
             input_binding_names=interpreter_result.input_names,
             output_binding_names=interpreter_result.output_names,
-        )
-    else:
-        return TRTModule(
-            engine=interpreter_result.engine,
-            input_names=interpreter_result.input_names,
-            output_names=interpreter_result.output_names,
         )

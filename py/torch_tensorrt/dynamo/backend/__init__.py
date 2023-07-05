@@ -19,7 +19,7 @@ from torch_tensorrt.dynamo.backend._defaults import (
     MAX_AUX_STREAMS,
     VERSION_COMPATIBLE,
     OPTIMIZATION_LEVEL,
-    USE_EXPERIMENTAL_RT,
+    USE_PYTHON_RUNTIME,
 )
 
 
@@ -52,7 +52,7 @@ def compile(
     max_aux_streams=MAX_AUX_STREAMS,
     version_compatible=VERSION_COMPATIBLE,
     optimization_level=OPTIMIZATION_LEVEL,
-    use_experimental_rt=USE_EXPERIMENTAL_RT,
+    use_python_runtime=USE_PYTHON_RUNTIME,
     **kwargs,
 ):
     if debug:
@@ -64,11 +64,6 @@ def compile(
         + "{enabled_precisions, debug, workspace_size, min_block_size, "
         + "torch_executed_ops, pass_through_build_failures}"
     )
-
-    if "use_experimental_fx_rt" in kwargs:
-        use_experimental_rt = kwargs["use_experimental_fx_rt"]
-
-    logger.info(f"Using {'C++' if use_experimental_rt else 'Python'} TRT Runtime")
 
     if not isinstance(inputs, collections.abc.Sequence):
         inputs = [inputs]
@@ -107,7 +102,7 @@ def compile(
         max_aux_streams=max_aux_streams,
         version_compatible=version_compatible,
         optimization_level=optimization_level,
-        use_experimental_rt=use_experimental_rt,
+        use_python_runtime=use_python_runtime,
         **kwargs,
     )
 
@@ -134,7 +129,7 @@ def create_backend(
     max_aux_streams: Optional[int] = MAX_AUX_STREAMS,
     version_compatible: bool = VERSION_COMPATIBLE,
     optimization_level: Optional[int] = OPTIMIZATION_LEVEL,
-    use_experimental_rt: bool = USE_EXPERIMENTAL_RT,
+    use_python_runtime: Optional[bool] = USE_PYTHON_RUNTIME,
     **kwargs,
 ):
     """Create torch.compile backend given specified arguments
@@ -150,7 +145,9 @@ def create_backend(
         version_compatible: Provide version forward-compatibility for engine plan files
         optimization_level: Builder optimization 0-5, higher levels imply longer build time,
             searching for more optimization options. TRT defaults to 3
-        use_experimental_rt: Whether to use the new experimental TRTModuleNext for TRT engines
+        use_python_runtime: Whether to strictly use Python runtime or C++ runtime. To auto-select a runtime
+            based on C++ dependency presence (preferentially choosing C++ runtime if available), leave the
+            argument as None
     Returns:
         Backend for torch.compile
     """
@@ -165,5 +162,6 @@ def create_backend(
         max_aux_streams=max_aux_streams,
         version_compatible=version_compatible,
         optimization_level=optimization_level,
-        use_experimental_rt=use_experimental_rt,
+        use_python_runtime=use_python_runtime,
+        **kwargs,
     )

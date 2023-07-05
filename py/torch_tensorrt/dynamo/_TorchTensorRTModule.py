@@ -69,9 +69,6 @@ class TorchTensorRTModule(torch.nn.Module):
                 )
 
         """
-        logger.warning(
-            "TorchTensorRTModule should be considered experimental stability, APIs are subject to change. Note: TorchTensorRTModule only supports engines built with explict batch"
-        )
         super(TorchTensorRTModule, self).__init__()
 
         if not isinstance(serialized_engine, bytearray):

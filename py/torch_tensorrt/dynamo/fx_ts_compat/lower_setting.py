@@ -68,7 +68,8 @@ class LowerSetting(LowerSettingBasic):
     meaning all possible tactic sources.
     correctness_atol: absolute tolerance for correctness check
     correctness_rtol: relative tolerance for correctness check
-    use_experimental_rt: Uses the next generation TRTModule which supports both Python and TorchScript based execution (including in C++).
+    use_python_runtime: Whether to use Python runtime or C++ runtime. None implies the user has not
+        selected a runtime, and the frontend will automatically do so on their behalf
     max_aux_streams: max number of aux stream to use
     version_compatible: enable version compatible feature
     optimization_level: builder optimization level
@@ -95,7 +96,7 @@ class LowerSetting(LowerSettingBasic):
     tactic_sources: Optional[int] = None
     correctness_atol: float = 0.1
     correctness_rtol: float = 0.1
-    use_experimental_rt: bool = False
+    use_python_runtime: Optional[bool] = None
     max_aux_streams: Optional[int] = None
     version_compatible: bool = False
     optimization_level: Optional[int] = None

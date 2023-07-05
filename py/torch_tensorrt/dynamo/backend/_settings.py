@@ -11,11 +11,11 @@ from torch_tensorrt.dynamo.backend._defaults import (
     MAX_AUX_STREAMS,
     VERSION_COMPATIBLE,
     OPTIMIZATION_LEVEL,
-    USE_EXPERIMENTAL_RT,
+    USE_PYTHON_RUNTIME,
 )
 
 
-@dataclass(frozen=True)
+@dataclass
 class CompilationSettings:
     precision: LowerPrecision = PRECISION
     debug: bool = DEBUG
@@ -26,4 +26,4 @@ class CompilationSettings:
     max_aux_streams: Optional[int] = MAX_AUX_STREAMS
     version_compatible: bool = VERSION_COMPATIBLE
     optimization_level: Optional[int] = OPTIMIZATION_LEVEL
-    use_experimental_rt: bool = USE_EXPERIMENTAL_RT
+    use_python_runtime: Optional[bool] = USE_PYTHON_RUNTIME
