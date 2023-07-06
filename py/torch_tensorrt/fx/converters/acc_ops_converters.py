@@ -26,7 +26,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
     trt_transposed_matmul,
 )
 from torch_tensorrt.fx.tracer.acc_tracer.acc_ops import contiguous
-from torch_tensorrt.fx.converters.impl import activation
+from torch_tensorrt.fx.converters.impl import activation, convolution
 from torch_tensorrt.fx.converters.impl.elementwise import trunc_div
 from torch_tensorrt.fx.converters.impl.unary import sign
 from torch_tensorrt.fx.converters.impl.elementwise.base import (

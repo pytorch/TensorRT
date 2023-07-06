@@ -10,7 +10,7 @@ import torch
 from torch.fx.node import Target
 
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor, TRTElementWiseOp
-from torch_tensorrt.fx.utils import torch_dtype_from_trt
+from torch_tensorrt.fx.utils import unified_dtype_converter, Frameworks
 from torch_tensorrt.fx.converters.converter_utils import (
     SourceIR,
     set_layer_name,

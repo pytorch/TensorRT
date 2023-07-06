@@ -10,7 +10,7 @@ import torch
 from torch.fx.node import Target
 
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor, TRTElementWiseOp
-from torch_tensorrt.fx.utils import torch_dtype_from_trt
+from torch_tensorrt.fx.utils import unified_dtype_converter, Frameworks
 from torch_tensorrt.fx.converters.converter_utils import (
     SourceIR,
     set_layer_name,
@@ -77,10 +77,10 @@ def convert_binary_elementwise(
     is_rhs_trt_tensor = False
 
     if isinstance(lhs_val, TRTTensor):
-        lhs_dtype = torch_dtype_from_trt(lhs_val.dtype)
+        lhs_dtype = unified_dtype_converter(lhs_val.dtype, Frameworks.TORCH)
         is_lhs_trt_tensor = True
     if isinstance(rhs_val, TRTTensor):
-        rhs_dtype = torch_dtype_from_trt(rhs_val.dtype)
+        rhs_dtype = unified_dtype_converter(rhs_val.dtype, Frameworks.TORCH)
         is_rhs_trt_tensor = True
 
     if not is_lhs_trt_tensor and not is_rhs_trt_tensor:

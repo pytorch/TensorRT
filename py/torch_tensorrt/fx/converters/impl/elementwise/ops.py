@@ -10,7 +10,7 @@ import torch
 from torch.fx.node import Target
 
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor, TRTElementWiseOp
-from torch_tensorrt.fx.utils import torch_dtype_from_trt
+from torch_tensorrt.fx.utils import unified_dtype_converter, Frameworks
 from torch_tensorrt.fx.converters.converter_utils import (
     SourceIR,
     get_trt_tensor,
@@ -70,7 +70,10 @@ def trunc_div(
         input = get_trt_tensor(network, input, f"{name}_input")
     if not isinstance(other, trt.tensorrt.ITensor):
         other = get_trt_tensor(
-            network, other, f"{name}_other", dtype=torch_dtype_from_trt(input.dtype)
+            network,
+            other,
+            f"{name}_other",
+            dtype=unified_dtype_converter(input.dtype, Frameworks.TORCH),
         )
 
     abs_input_output = convert_unary(
