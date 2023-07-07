@@ -4,7 +4,7 @@ import collections.abc
 import torch_tensorrt
 from functools import partial
 
-from typing import Any, Sequence
+from typing import Any, Optional, Sequence
 from torch_tensorrt import EngineCapability, Device
 from torch_tensorrt.fx.utils import LowerPrecision
 
@@ -16,6 +16,10 @@ from torch_tensorrt.dynamo.backend._defaults import (
     WORKSPACE_SIZE,
     MIN_BLOCK_SIZE,
     PASS_THROUGH_BUILD_FAILURES,
+    MAX_AUX_STREAMS,
+    VERSION_COMPATIBLE,
+    OPTIMIZATION_LEVEL,
+    USE_PYTHON_RUNTIME,
 )
 
 
@@ -45,6 +49,10 @@ def compile(
     torch_executed_ops=[],
     torch_executed_modules=[],
     pass_through_build_failures=PASS_THROUGH_BUILD_FAILURES,
+    max_aux_streams=MAX_AUX_STREAMS,
+    version_compatible=VERSION_COMPATIBLE,
+    optimization_level=OPTIMIZATION_LEVEL,
+    use_python_runtime=USE_PYTHON_RUNTIME,
     **kwargs,
 ):
     if debug:
@@ -91,6 +99,10 @@ def compile(
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
         pass_through_build_failures=pass_through_build_failures,
+        max_aux_streams=max_aux_streams,
+        version_compatible=version_compatible,
+        optimization_level=optimization_level,
+        use_python_runtime=use_python_runtime,
         **kwargs,
     )
 
@@ -114,6 +126,10 @@ def create_backend(
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Sequence[str] = set(),
     pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES,
+    max_aux_streams: Optional[int] = MAX_AUX_STREAMS,
+    version_compatible: bool = VERSION_COMPATIBLE,
+    optimization_level: Optional[int] = OPTIMIZATION_LEVEL,
+    use_python_runtime: Optional[bool] = USE_PYTHON_RUNTIME,
     **kwargs,
 ):
     """Create torch.compile backend given specified arguments
@@ -125,6 +141,13 @@ def create_backend(
         min_block_size: Minimum number of operators per TRT-Engine Block
         torch_executed_ops: Sequence of operations to run in Torch, regardless of converter coverage
         pass_through_build_failures: Whether to fail on TRT engine build errors (True) or not (False)
+        max_aux_streams: Maximum number of allowed auxiliary TRT streams for each engine
+        version_compatible: Provide version forward-compatibility for engine plan files
+        optimization_level: Builder optimization 0-5, higher levels imply longer build time,
+            searching for more optimization options. TRT defaults to 3
+        use_python_runtime: Whether to strictly use Python runtime or C++ runtime. To auto-select a runtime
+            based on C++ dependency presence (preferentially choosing C++ runtime if available), leave the
+            argument as None
     Returns:
         Backend for torch.compile
     """
@@ -136,4 +159,9 @@ def create_backend(
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
         pass_through_build_failures=pass_through_build_failures,
+        max_aux_streams=max_aux_streams,
+        version_compatible=version_compatible,
+        optimization_level=optimization_level,
+        use_python_runtime=use_python_runtime,
+        **kwargs,
     )

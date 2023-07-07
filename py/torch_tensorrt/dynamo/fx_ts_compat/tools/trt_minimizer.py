@@ -15,23 +15,30 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 def lower_mod_default(
     mod: torch.fx.GraphModule,
     inputs: Tensors,
-    use_experimental_rt: bool = False,
+    use_python_runtime: bool = False,
 ) -> TRTModule:
     interp = TRTInterpreter(
         mod, InputTensorSpec.from_tensors(inputs), explicit_batch_dimension=True
     )
     interpreter_result = interp.run()
-    if use_experimental_rt:
+    if use_python_runtime:
+        res_mod = TRTModule(
+            interpreter_result.engine,
+            interpreter_result.input_names,
+            interpreter_result.output_names,
+        )
+
+    else:
         import io
 
         from torch_tensorrt._Device import Device
-        from torch_tensorrt._TRTModuleNext import TRTModuleNext
+        from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule
 
         with io.BytesIO() as engine_bytes:
             engine_bytes.write(interpreter_result.engine.serialize())
             engine_str = engine_bytes.getvalue()
 
-        res_mod = TRTModuleNext(
+        res_mod = TorchTensorRTModule(
             engine_str,
             name=str(type(mod)),
             input_binding_names=interpreter_result.input_names,
@@ -39,12 +46,7 @@ def lower_mod_default(
             target_device=Device(f"cuda:{torch.cuda.current_device()}"),
             # cuda_graph_batch_size=lower_setting.cuda_graph_batch_size, # NOTE: Not sure what this is supposed to do
         )
-    else:
-        res_mod = TRTModule(
-            interpreter_result.engine,
-            interpreter_result.input_names,
-            interpreter_result.output_names,
-        )
+
     return res_mod
 
 

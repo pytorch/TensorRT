@@ -5,6 +5,7 @@ from dataclasses import replace, fields
 from torch_tensorrt.dynamo.backend._settings import CompilationSettings
 from typing import Any, Union, Sequence, Dict
 from torch_tensorrt import _Input, Device
+from ..common_utils import use_python_runtime_parser
 
 
 logger = logging.getLogger(__name__)
@@ -101,6 +102,9 @@ def parse_dynamo_kwargs(kwargs: Dict) -> CompilationSettings:
     # Enable debug/verbose mode if requested
     if settings.debug:
         logger.setLevel(logging.DEBUG)
+
+    # Parse input runtime specification
+    settings.use_python_runtime = use_python_runtime_parser(settings.use_python_runtime)
 
     logger.debug(f"Compiling with Settings:\n{settings}")
 

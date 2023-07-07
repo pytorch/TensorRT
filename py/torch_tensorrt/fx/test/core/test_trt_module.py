@@ -10,7 +10,7 @@ import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 from torch.testing._internal.common_utils import run_tests, TestCase
 from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter, TRTModule
 
-# from torch_tensorrt import TRTModuleNext
+# from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule
 # from torch_tensorrt import Device
 from torch_tensorrt.fx.utils import LowerPrecision
 
@@ -59,7 +59,7 @@ class TestTRTModule(TestCase):
 
 
 # TODO add unittest.skip later
-# class TestTRTModuleNext(TestCase):
+# class TestTorchTensorRTModule(TestCase):
 #     def test_save_and_load_trt_module(self):
 #         class TestModule(torch.nn.Module):
 #             def forward(self, x):
@@ -82,7 +82,7 @@ class TestTRTModule(TestCase):
 #             engine_bytes.write(interp_res.engine.serialize())
 #             engine_str = engine_bytes.getvalue()
 
-#         trt_mod = TRTModuleNext(
+#         trt_mod = TorchTensorRTModule(
 #             name="TestModule",
 #             serialized_engine=engine_str,
 #             input_binding_names=interp_res.input_names,
@@ -122,7 +122,7 @@ class TestTRTModule(TestCase):
 #             engine_bytes.write(interp_res.engine.serialize())
 #             engine_str = engine_bytes.getvalue()
 
-#         trt_mod = TRTModuleNext(
+#         trt_mod = TorchTensorRTModule(
 #             name="TestModule",
 #             serialized_engine=engine_str,
 #             input_binding_names=interp_res.input_names,
@@ -132,7 +132,7 @@ class TestTRTModule(TestCase):
 
 #         st = trt_mod.state_dict()
 
-#         new_trt_mod = TRTModuleNext()
+#         new_trt_mod = TorchTensorRTModule()
 #         new_trt_mod.load_state_dict(st)
 
 #         torch.testing.assert_allclose(

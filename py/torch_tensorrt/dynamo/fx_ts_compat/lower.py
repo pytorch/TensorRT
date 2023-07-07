@@ -14,6 +14,7 @@ from .fx2trt import TRTInterpreter, TRTInterpreterResult
 from .lower_setting import LowerSetting
 from .passes.lower_pass_manager_builder import LowerPassManagerBuilder
 from .passes.pass_utils import PassFunc, validate_inference
+from ..common_utils import use_python_runtime_parser
 from torch_tensorrt.fx.tools.timing_cache_utils import TimingCacheManager
 from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 
@@ -48,7 +49,7 @@ def compile(
     save_timing_cache=False,
     cuda_graph_batch_size=-1,
     is_aten=False,
-    use_experimental_fx_rt=False,
+    use_python_runtime=None,
     max_aux_streams=None,
     version_compatible=False,
     optimization_level=None,
@@ -70,7 +71,9 @@ def compile(
         timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.
         save_timing_cache: Update timing cache with current timing cache data if set to True.
         cuda_graph_batch_size: Cuda graph batch size, default to be -1.
-        use_experimental_fx_rt: Uses the next generation TRTModule which supports both Python and TorchScript based execution (including in C++).
+        use_python_runtime: Whether to strictly use Python runtime or C++ runtime. To auto-select a runtime
+            based on C++ dependency presence (preferentially choosing C++ runtime if available), leave the
+            argument as None
         max_aux_streams: max number of aux stream to use
         version_compatible: enable version compatible feature
         optimization_level: builder optimization level
@@ -111,6 +114,9 @@ def compile(
             "Invalid device provided. Supported options: torch.device | torch_tensorrt.Device"
         )
 
+    # Parse user-specification of which runtime to use
+    use_python_runtime = use_python_runtime_parser(use_python_runtime)
+
     lower_setting = LowerSetting(
         device=device,
         min_block_size=min_block_size,
@@ -123,7 +129,7 @@ def compile(
         save_timing_cache=save_timing_cache,
         cuda_graph_batch_size=cuda_graph_batch_size,
         is_aten=is_aten,
-        use_experimental_rt=use_experimental_fx_rt,
+        use_python_runtime=use_python_runtime,
         max_aux_streams=max_aux_streams,
         version_compatible=version_compatible,
         optimization_level=optimization_level,
@@ -202,7 +208,7 @@ def default_split_function(
     splitter_setting = TRTSplitterSetting()
     splitter_setting.use_implicit_batch_dim = False
     splitter_setting.min_block_size = lower_setting.min_block_size
-    splitter_setting.use_experimental_rt = lower_setting.use_experimental_rt
+    splitter_setting.use_experimental_rt = not lower_setting.use_python_runtime
     splitter = TRTSplitter(model, inputs, settings=splitter_setting)
     splitter.node_support_preview()
     return splitter.generate_split_results()
@@ -224,32 +230,30 @@ def default_lower_pass(
         """
         interpreter = create_trt_interpreter(lower_setting)
         interp_res: TRTInterpreterResult = interpreter(mod, input, module_name)
-        if lower_setting.use_experimental_rt:
-            import io
-
-            from torch_tensorrt._Device import Device
-            from torch_tensorrt._TRTModuleNext import TRTModuleNext
-
-            with io.BytesIO() as engine_bytes:
-                engine_bytes.write(interp_res.engine.serialize())
-                engine_str = engine_bytes.getvalue()
-
-            trt_module = TRTModuleNext(
-                engine_str,
-                name=module_name,
-                input_binding_names=interp_res.input_names,
-                output_binding_names=interp_res.output_names,
-                target_device=Device(f"cuda:{torch.cuda.current_device()}"),
-                # cuda_graph_batch_size=lower_setting.cuda_graph_batch_size, # NOTE: Not sure what this is supposed to do
-            )
-            return trt_module
-
-        else:
+        if lower_setting.use_python_runtime:
             trt_module = TRTModule(
                 engine=interp_res.engine,
                 input_names=interp_res.input_names,
                 output_names=interp_res.output_names,
                 cuda_graph_batch_size=lower_setting.cuda_graph_batch_size,
+            )
+            return trt_module
+
+        else:
+            import io
+            from torch_tensorrt._Device import Device
+            from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule
+
+            with io.BytesIO() as engine_bytes:
+                engine_bytes.write(interp_res.engine.serialize())
+                engine_str = engine_bytes.getvalue()
+
+            trt_module = TorchTensorRTModule(
+                engine_str,
+                name=module_name,
+                input_binding_names=interp_res.input_names,
+                output_binding_names=interp_res.output_names,
+                target_device=Device(f"cuda:{torch.cuda.current_device()}"),
             )
             return trt_module
 
