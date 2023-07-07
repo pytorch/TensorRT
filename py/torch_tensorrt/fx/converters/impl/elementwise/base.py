@@ -129,7 +129,8 @@ def convert_binary_elementwise(
     rhs_val = get_trt_tensor(network, rhs_val, f"{name}_rhs", rhs_dtype)
 
     promoted_type = torch.promote_types(
-        unified_dtype_converter(lhs_val.dtype, Frameworks.TORCH), unified_dtype_converter(rhs_val.dtype, Frameworks.TORCH)
+        unified_dtype_converter(lhs_val.dtype, Frameworks.TORCH),
+        unified_dtype_converter(rhs_val.dtype, Frameworks.TORCH),
     )
     trt_promoted_type = unified_dtype_converter(promoted_type, Frameworks.TRT)
 

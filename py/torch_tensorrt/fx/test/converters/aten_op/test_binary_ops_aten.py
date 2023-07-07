@@ -113,6 +113,41 @@ class TestBinaryOpConverters(DispatchTestCase):
         inputs = [torch.randn(2, 2)]
         self.run_test(m, inputs, expected_ops={expected_op})
 
+    @parameterized.expand([((lambda x, y: x / y), torch.ops.aten.div.Tensor)])
+    def test_elementwise_op_div_with_two_ints(self, orig_op: Callable, expected_op):
+        class TestModule(nn.Module):
+            def __init__(self, orig_op):
+                super().__init__()
+                self.orig_op = orig_op
+
+            def forward(self, x):
+                return self.orig_op(x, x + 1)
+
+        m = TestModule(orig_op)
+        inputs = [torch.randint(1, 10, (5,), dtype=torch.int32)]
+        self.run_test(m, inputs, expected_ops={expected_op})
+
+    @parameterized.expand([((lambda x, y: x / y), torch.ops.aten.div.Tensor)])
+    def test_elementwise_op_div_with_one_int_one_constant(
+        self, orig_op: Callable, expected_op
+    ):
+        class TestModule(nn.Module):
+            def __init__(self, orig_op):
+                super().__init__()
+                self.constant1 = torch.nn.Parameter(
+                    torch.randn(
+                        5,
+                    )
+                )
+                self.orig_op = orig_op
+
+            def forward(self, x):
+                return self.orig_op(x, self.constant1)
+
+        m = TestModule(orig_op)
+        inputs = [torch.randint(1, 10, (5,), dtype=torch.int32)]
+        self.run_test(m, inputs, expected_ops={expected_op})
+
     # Dynamic shape test
     @parameterized.expand(
         [
