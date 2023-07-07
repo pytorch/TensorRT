@@ -94,6 +94,11 @@ RUN bash ./docker/dist-build.sh
 FROM base as torch-tensorrt
 
 COPY . /opt/torch_tensorrt
+
+# Symlink the path pyenv is using for python with the /opt directory for package sourcing
+RUN mkdir -p "/opt/python3/" &&\
+    ln -s "`pyenv which python | xargs dirname | xargs dirname`/lib/python$PYTHON_VERSION/site-packages" "/opt/python3/"
+
 COPY --from=torch-tensorrt-builder  /workspace/torch_tensorrt/src/py/dist/ .
 
 RUN cp /opt/torch_tensorrt/docker/WORKSPACE.docker /opt/torch_tensorrt/WORKSPACE
