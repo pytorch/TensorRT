@@ -1,6 +1,6 @@
+import numpy as np
 from typing import Optional
 import tensorrt as trt
-import torch
 from torch.fx.node import Target
 
 from torch_tensorrt.dynamo.converters import SourceIR
@@ -27,24 +27,18 @@ def add_clamp(network, input, val, op, name):
         acc_ops_clamp_trt = get_trt_tensor(
             network,
             squeeze_left(
-                torch.tensor(
-                    [val], dtype=unified_dtype_converter(input.dtype, Frameworks.TORCH)
+                np.array(
+                    [val], dtype=unified_dtype_converter(input.dtype, Frameworks.NUMPY)
                 )
             ),
             f"{name}_clamp_{val}",
         )
     else:
         acc_ops_clamp_shape = (1,) * len(input.shape)  # broadcast all dimensions
-        acc_ops_clamp_tensor = (
-            (
-                val
-                * torch.ones(
-                    acc_ops_clamp_shape,
-                    dtype=unified_dtype_converter(input.dtype, Frameworks.TORCH),
-                )
-            )
-            .cpu()
-            .numpy()
+        acc_ops_clamp_tensor = np.full(
+            acc_ops_clamp_shape,
+            val,
+            dtype=unified_dtype_converter(input.dtype, Frameworks.NUMPY),
         )
         acc_ops_clamp_trt = network.add_constant(
             acc_ops_clamp_shape, acc_ops_clamp_tensor
