@@ -1,9 +1,13 @@
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 from enum import Enum, auto
 
 from torch.fx.node import Target, Node, _get_qualified_name
 from torch_tensorrt.fx.converter_registry import CONVERTERS
+
+
+logger = logging.getLogger(__name__)
 
 
 class ConverterPriority(Enum):
@@ -84,6 +88,10 @@ def dynamo_tensorrt_converter(
                 DYNAMO_ATEN_CONVERTERS[key].append(converter_support)
         else:
             DYNAMO_ATEN_CONVERTERS[key] = [converter_support]
+
+        logger.debug(
+            f"Converter for {key} added to Dynamo ATen Converter Registry with priority: {priority}"
+        )
 
         return converter
 

@@ -8,12 +8,12 @@ def dynamic_unsupported(node: torch.fx.Node) -> bool:
     ), "Inputs to validator functions must be FX Nodes"
 
     # Check node value itself
-    if node.meta["val"]._has_symbolic_sizes_strides:
+    if getattr(node.meta["val"], "_has_symbolic_sizes_strides", False):
         return False
 
     # Check node arguments individually
     if any(
-        arg.meta["val"]._has_symbolic_sizes_strides
+        getattr(arg.meta["val"], "_has_symbolic_sizes_strides", False)
         for arg in node.args
         if isinstance(arg, torch.fx.Node)
     ):
@@ -21,7 +21,7 @@ def dynamic_unsupported(node: torch.fx.Node) -> bool:
 
     # Check node keyword arguments individually
     if any(
-        kwarg.meta["val"]._has_symbolic_sizes_strides
+        getattr(kwarg.meta["val"], "_has_symbolic_sizes_strides", False)
         for kwarg in node.kwargs.values()
         if isinstance(kwarg, torch.fx.Node)
     ):
