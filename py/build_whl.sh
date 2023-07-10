@@ -5,7 +5,7 @@
 cd /workspace/Torch-TensorRT/py
 
 export CXX=g++
-export CUDA_HOME=/usr/local/cuda-11.3
+export CUDA_HOME=/usr/local/cuda-11.8
 
 build_py37() {
     /opt/python/cp37-cp37m/bin/python -m pip install -r requirements.txt

@@ -59,7 +59,7 @@ except:
 
     elif sys.platform.startswith("linux"):
         LINUX_PATHS = [
-            "/usr/local/cuda-12.1/lib64",
+            "/usr/local/cuda-11.8/lib64",
         ]
 
         if "LD_LIBRARY_PATH" in os.environ:
