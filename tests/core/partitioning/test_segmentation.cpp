@@ -338,13 +338,12 @@ TEST(Partitioning, ContainUninitializedValueCorrectly) {
   auto ivalue_1 = g->insertConstant(torch::jit::IValue(1));
   auto ivalue_2 = g->insertConstant(torch::jit::IValue(2));
 
-    auto uninitialized_node = g->createUninitialized(torch::jit::BoolType::get());
+  auto uninitialized_node = g->createUninitialized(torch::jit::BoolType::get());
   g->appendNode(uninitialized_node);
 
   auto x_dim = g->create(torch::jit::aten::dim, {x}, 1);
   g->appendNode(x_dim);
   x_dim->output()->setType(torch::jit::IntType::get());
-
 
   auto eq1 = g->create(torch::jit::aten::eq, {ivalue_1, x_dim->output()}, 1);
   g->appendNode(eq1);
@@ -354,10 +353,10 @@ TEST(Partitioning, ContainUninitializedValueCorrectly) {
   auto exception_val = g->insertConstant(except);
   auto if_node = g->create(torch::jit::prim::If, {eq1->output()}, 1);
   auto if_block_0 = if_node->addBlock();
-    auto exception_node = g->create(torch::jit::prim::RaiseException, {exception_val, none_const_val}, 0);
+  auto exception_node = g->create(torch::jit::prim::RaiseException, {exception_val, none_const_val}, 0);
   if_block_0->appendNode(exception_node);
   if_block_0->registerOutput(uninitialized_node->output());
-  
+
   auto if_block_1 = if_node->addBlock();
   if_block_1->registerOutput(eq1->output());
 
