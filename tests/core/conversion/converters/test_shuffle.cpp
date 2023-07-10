@@ -364,3 +364,55 @@ TEST(Converters, ATenPixelShuffle5DConvertsCorrectly) {
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
+
+TEST(Converters, ATenUnflattenConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+      %2 : int = prim::Constant[value=1]()
+      %3 : int = prim::Constant[value=512]()
+      %4 : int = prim::Constant[value=1]()
+      %5 : int = prim::Constant[value=1]()
+      %6 : int[] = prim::ListConstruct(%3, %4, %5)
+      %7 : Tensor = aten::unflatten(%x.1, %2, %6)
+      return (%7))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(0, 5, {1, 512}, {at::kCUDA});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
+
+  in = at::clone(in);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
+TEST(Converters, ATenUnflattenNegativeDimConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+      %2 : int = prim::Constant[value=-1]()
+      %3 : int = prim::Constant[value=512]()
+      %4 : int = prim::Constant[value=1]()
+      %5 : int = prim::Constant[value=1]()
+      %6 : int[] = prim::ListConstruct(%3, %4, %5)
+      %7 : Tensor = aten::unflatten(%x.1, %2, %6)
+      return (%7))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(0, 5, {1, 512}, {at::kCUDA});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
+
+  in = at::clone(in);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
