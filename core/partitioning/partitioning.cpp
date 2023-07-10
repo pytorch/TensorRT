@@ -70,7 +70,7 @@ void setExplicitFallbackNodes(PartitioningCtx* ctx, torch::jit::Block* block) {
   const auto to_compile_sym = c10::Symbol::attr("to_compile");
 
   for (const auto n : nodes) {
-    if (n->kind() == torch::jit::prim::Constant) {
+    if (isConstantOrUninitialized(n)) {
       continue;
     }
 
@@ -107,7 +107,7 @@ void setNonTensorConnectedNodes(PartitioningCtx* ctx, std::vector<torch::jit::No
     q.pop();
     // for every node that produces this fallback node's NonTensor input, they should fallback too
     for (auto input : cur_node->inputs()) {
-      if (!isTensor(input) && input->node()->kind() != torch::jit::prim::Constant &&
+      if (!isTensor(input) && !isConstantOrUninitialized(input->node()) &&
           ctx->shouldNodeRunInTensorRT(input->node())) {
         ctx->setNodeExecutorDecision(input->node(), NodeExecutorDecision::kNON_TENSOR);
         q.push(input->node());
@@ -118,7 +118,7 @@ void setNonTensorConnectedNodes(PartitioningCtx* ctx, std::vector<torch::jit::No
       if (!isTensor(output)) {
         for (auto use : output->uses()) {
           auto node = use.user;
-          if (node->kind() != torch::jit::prim::Constant && ctx->shouldNodeRunInTensorRT(node)) {
+          if (isConstantOrUninitialized(node) && ctx->shouldNodeRunInTensorRT(node)) {
             ctx->setNodeExecutorDecision(node, NodeExecutorDecision::kNON_TENSOR);
             q.push(node);
           }
@@ -128,11 +128,13 @@ void setNonTensorConnectedNodes(PartitioningCtx* ctx, std::vector<torch::jit::No
   }
 }
 
-std::set<torch::jit::Node*> getDependentNodes(torch::jit::Node* n) {
-  std::set<torch::jit::Node*> dependent_nodes;
+std::set<torch::jit::Node*> getUserNodes(torch::jit::Node* n) {
+  std::set<torch::jit::Node*> user_nodes;
   for (auto val : n->outputs()) {
     for (auto use : val->uses()) {
-      dependent_nodes.insert(use.user);
+      if (use.user->owningBlock()->owningNode())
+        user_nodes.insert(use.user->owningBlock()->owningNode());
+      user_nodes.insert(use.user);
     }
   }
   if (const auto* schema = n->maybeSchema()) {
@@ -142,13 +144,13 @@ std::set<torch::jit::Node*> getDependentNodes(torch::jit::Node* n) {
         for (auto use : n->inputs()[i]->uses()) {
           torch::jit::Node* use_node = use.user;
           if (use_node->isAfter(n)) {
-            dependent_nodes.insert(use_node);
+            user_nodes.insert(use_node);
           }
         }
       }
     }
   }
-  return dependent_nodes;
+  return user_nodes;
 }
 
 // Sub-function that traverses the entire block and check if TensorRT node sequence satisfy min_block_size
@@ -158,14 +160,14 @@ std::vector<torch::jit::Node*> traverseNodesForMinBlockSize(PartitioningCtx* ctx
   std::unordered_set<torch::jit::Node*> cur_trt_nodes_uses;
   std::vector<torch::jit::Node*> min_block_fallback_nodes;
   for (const auto n : nodes) {
-    if (n->kind() == torch::jit::prim::Constant) {
+    if (isConstantOrUninitialized(n)) {
       continue;
     }
 
     // check if current node fallback or not
     if (!ctx->shouldNodeRunInTorch(n)) {
       cur_trt_nodes.push_back(n);
-      auto dependent_nodes = getDependentNodes(n);
+      auto dependent_nodes = getUserNodes(n);
       cur_trt_nodes_uses.insert(dependent_nodes.begin(), dependent_nodes.end());
     } else {
       if (cur_trt_nodes_uses.count(n)) {
@@ -250,7 +252,7 @@ std::vector<torch::jit::Node*> getDependencyNodes(
     auto cur_val = q.front();
     q.pop();
     auto node = cur_val->node();
-    if (node->kind() != torch::jit::prim::Constant && !visited.count(node)) {
+    if (!isConstantOrUninitialized(node) && !visited.count(node)) {
       visited.insert(node);
       auto modifying_nodes = findModifyingNodes(cur_val, seg_block_nodes);
       stk.insert(stk.end(), modifying_nodes.rbegin(), modifying_nodes.rend());
@@ -454,10 +456,10 @@ void segmentGraph(PartitioningCtx* ctx, torch::jit::Block* block) {
   std::unordered_set<torch::jit::Node*> cur_pyt_nodes_uses;
   for (const auto n : nodes) {
     // Skip constant nodes as they are resources for both kinds of modules
-    if (n->kind() == torch::jit::prim::Constant) {
+    if (isConstantOrUninitialized(n)) {
       continue;
     }
-    auto dependent_nodes = getDependentNodes(n);
+    auto dependent_nodes = getUserNodes(n);
     // the outputs of trt subgraph shouldn't be collections
     if (ctx->shouldNodeRunInTensorRT(n)) {
       in_prog_trt_blk_nodes.push_back(n);

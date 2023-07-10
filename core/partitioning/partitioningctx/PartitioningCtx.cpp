@@ -22,7 +22,7 @@ void PartitioningCtx::_load_nodes_into_decision_map(torch::jit::Block* b) {
   original_blocks.push_back(b);
 
   for (const auto n : b->nodes()) {
-    if (n->kind() == torch::jit::prim::Constant) {
+    if (isConstantOrUninitialized(n)) {
       continue;
     }
     node_executor_decision_map[n] = NodeExecutorDecision::kUNKNOWN;
