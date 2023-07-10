@@ -2,10 +2,11 @@ import copy
 import sys
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Union
+from packaging import version
 
 import torch
 
-if not torch.__version__.startswith("1"):
+if version.parse(torch.__version__) >= version.parse("2.dev"):
     import torch._dynamo as torchdynamo
 
 from torch.fx.passes.infra.pass_base import PassResult
