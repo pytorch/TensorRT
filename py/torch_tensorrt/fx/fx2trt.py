@@ -276,7 +276,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         # The call stack contains a detailed name of the module
         # which shows exactly where the module is located in the
         # network architecture.
-        stack_item =  node.meta.get("nn_module_stack", None)
+        stack_item = node.meta.get("nn_module_stack", None)
         # The current node is the last item in the stack
         mod_stack = stack_item.popitem() if stack_item else ""
         node_name = str(node)
@@ -285,7 +285,7 @@ class TRTInterpreter(torch.fx.Interpreter):
             # Clean up the module name
             mod_name = re.sub("^.*__self", "", mod_name)
             mod_name = re.sub("_(\d+)$", "/\g<1>", mod_name)
-            node_name = mod_name + '/' + node_name
+            node_name = mod_name + "/" + node_name
 
         _LOGGER.debug(f"Node meta name {node_name}")
         return node_name
