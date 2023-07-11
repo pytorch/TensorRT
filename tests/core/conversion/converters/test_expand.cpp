@@ -670,6 +670,126 @@ TEST(Converters, ATenRepeatInterleave3dScalarNoDimConvertsCorrectlyWithDynamicIn
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
+TEST(Converters, ATenTileConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+            %2 : int[] = prim::Constant[value=[4, 1]]()
+            %3 : Tensor = aten::tile(%x.1, %2)
+            return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {1, 3}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(jit_in);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
+TEST(Converters, ATenTileRepeatRankConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+            %2 : int[] = prim::Constant[value=[4, 1, 2]]()
+            %3 : Tensor = aten::tile(%x.1, %2)
+            return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {1, 3}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(jit_in);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
+TEST(Converters, ATenTileConvertsCorrectlyWithDynamicInput) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+            %2 : int[] = prim::Constant[value=[4, 1]]()
+            %3 : Tensor = aten::tile(%x.1, %2)
+            return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {1, 3}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(jit_in);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {trt_in});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
+TEST(Converters, ATenTile3dConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+            %2 : int[] = prim::Constant[value=[2, 2, 2]]()
+            %3 : Tensor = aten::tile(%x.1, %2)
+            return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {2, 3, 2}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(jit_in);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
+TEST(Converters, ATenTile3dConvertsCorrectlyWithDynamicInput) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+            %2 : int[] = prim::Constant[value=[2, 2, 2]]()
+            %3 : Tensor = aten::tile(%x.1, %2)
+            return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {2, 3, 2}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(jit_in);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {trt_in});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
 TEST(Converters, ATenMeshGridConvertsCorrectly) {
   const auto graph = R"IR(
     graph(%x : Tensor, %y : Tensor, %z : Tensor):
