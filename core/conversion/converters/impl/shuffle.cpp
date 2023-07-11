@@ -140,7 +140,7 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                    shape_tensor = tensor_to_const(ctx, torch::tensor(new_shape).to(torch::kI32));
                  } else {
                    LOG_ERROR(
-                       "Invalid IValue type of " << args[2].ivalue_type()
+                       "Invalid IValue type of " << args[2].IValue()->type()
                                                  << " detected for shape tensor from node: " << *n);
                  }
                } else {
