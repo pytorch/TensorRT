@@ -252,10 +252,10 @@ commands:
     parameters:
       torch-build:
         type: string
-        default: "2.1.0.dev20230709+cu121"
+        default: "2.1.0.dev20230703+cu121"
       torchvision-build:
         type: string
-        default: "0.16.0.dev20230709+cu121"
+        default: "0.16.0.dev20230703+cu121"
       torch-build-index:
         type: string
         default: "https://download.pytorch.org/whl/nightly/cu121"
@@ -1338,10 +1338,10 @@ parameters:
   # Nightly platform config
   torch-build:
     type: string
-    default: "2.1.0.dev20230709+cu121"
+    default: "2.1.0.dev20230703+cu121"
   torchvision-build:
     type: string
-    default: "0.16.0.dev20230709+cu121"
+    default: "0.16.0.dev20230703+cu121"
   torch-build-index:
     type: string
     default: "https://download.pytorch.org/whl/nightly/cu121"

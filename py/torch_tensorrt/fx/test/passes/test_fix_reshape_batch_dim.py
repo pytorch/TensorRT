@@ -35,11 +35,11 @@ class TestFixReshapeBatchDim(TestCase):
 
         expected_graph = r"""
 graph():
-    %x : [#users=0] = placeholder[target=x]
-    %y : [#users=2] = placeholder[target=y]
-    %size : [#users=1] = call_function[target=torch_tensorrt.fx.tracer.acc_tracer.acc_ops.size](args = (), kwargs = {input: %y})
-    %getitem_1 : [#users=1] = call_function[target=torch_tensorrt.fx.tracer.acc_tracer.acc_ops.getitem](args = (), kwargs = {idx: 0, input: %size})
-    %reshape : [#users=1] = call_function[target=torch_tensorrt.fx.tracer.acc_tracer.acc_ops.reshape](args = (), kwargs = {input: %y, acc_out_ty: ((%getitem_1, -1, 3), None, None, None, None, None, None)})
+    %x : [num_users=0] = placeholder[target=x]
+    %y : [num_users=2] = placeholder[target=y]
+    %size : [num_users=1] = call_function[target=torch_tensorrt.fx.tracer.acc_tracer.acc_ops.size](args = (), kwargs = {input: %y})
+    %getitem_1 : [num_users=1] = call_function[target=torch_tensorrt.fx.tracer.acc_tracer.acc_ops.getitem](args = (), kwargs = {idx: 0, input: %size})
+    %reshape : [num_users=1] = call_function[target=torch_tensorrt.fx.tracer.acc_tracer.acc_ops.reshape](args = (), kwargs = {input: %y, acc_out_ty: ((%getitem_1, -1, 3), None, None, None, None, None, None)})
     return reshape
 """
         assert (

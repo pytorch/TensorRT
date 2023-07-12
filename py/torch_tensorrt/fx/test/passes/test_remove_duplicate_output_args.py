@@ -47,11 +47,11 @@ class TestFx2TrtPasses(TestCase):
         ttop_graph_actual = str(ttop.graph).strip()
         ttop_graph_expected = """
 graph():
-    %x : [#users=1] = placeholder[target=x]
-    %a : [#users=2] = call_module[target=a](args = (%x,), kwargs = {})
-    %getitem : [#users=1] = call_function[target=operator.getitem](args = (%a, 0), kwargs = {})
-    %getitem_1 : [#users=1] = call_function[target=operator.getitem](args = (%a, 0), kwargs = {})
-    %add : [#users=1] = call_function[target=operator.add](args = (%getitem, %getitem_1), kwargs = {})
+    %x : [num_users=1] = placeholder[target=x]
+    %a : [num_users=2] = call_module[target=a](args = (%x,), kwargs = {})
+    %getitem : [num_users=1] = call_function[target=operator.getitem](args = (%a, 0), kwargs = {})
+    %getitem_1 : [num_users=1] = call_function[target=operator.getitem](args = (%a, 0), kwargs = {})
+    %add : [num_users=1] = call_function[target=operator.add](args = (%getitem, %getitem_1), kwargs = {})
     return add
 """.strip()
         assert (
@@ -61,7 +61,7 @@ graph():
         ttop_a_graph_actual = str(ttop.a.graph).strip()
         ttop_a_graph_expected = """
 graph():
-    %x : [#users=1] = placeholder[target=x]
+    %x : [num_users=1] = placeholder[target=x]
     return (x,)
 """.strip()
         assert (
