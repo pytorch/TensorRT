@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 COSINE_THRESHOLD = 0.99
 
+
 def use_python_runtime_parser(use_python_runtime: Optional[bool] = None) -> bool:
     """Parses a user-provided input argument regarding Python runtime
 
@@ -40,6 +41,7 @@ def use_python_runtime_parser(use_python_runtime: Optional[bool] = None) -> bool
 
     return using_python_runtime
 
+
 def cosine_similarity(gt_tensor, pred_tensor):
     gt_tensor = gt_tensor.flatten().to(torch.float32)
     pred_tensor = pred_tensor.flatten().to(torch.float32)
@@ -50,6 +52,7 @@ def cosine_similarity(gt_tensor, pred_tensor):
     res = res.cpu().detach().item()
 
     return res
+
 
 def prepare_inputs(
     inputs: Union[_Input.Input, torch.Tensor, Sequence, Dict],

@@ -74,11 +74,6 @@ def compile(
         + "torch_executed_ops, pass_through_build_failures}"
     )
 
-    if "use_experimental_fx_rt" in kwargs:
-        use_experimental_rt = kwargs["use_experimental_fx_rt"]
-
-    logger.info(f"Using {'C++' if use_experimental_rt else 'Python'} TRT Runtime")
-
     if not isinstance(inputs, collections.abc.Sequence):
         inputs = [inputs]
 

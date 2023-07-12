@@ -1,8 +1,8 @@
+import torch
+import torch_tensorrt
 from torch_tensorrt.dynamo.backend.lowering import partition
 from torch.testing._internal.common_utils import run_tests, TestCase
-import torch
 from copy import deepcopy
-from torch_tensorrt.dynamo.backend import compile
 from utils import lower_graph_testing, DECIMALS_OF_AGREEMENT
 
 
@@ -33,8 +33,9 @@ class TestTRTModuleNextCompilation(TestCase):
         torch._dynamo.reset()
 
         # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = compile(
+        optimized_model = torch_tensorrt.compile(
             fx_graph,
+            "torch_compile",
             inputs,
             min_block_size=1,
             pass_through_build_failures=True,
@@ -101,8 +102,9 @@ class TestTRTModuleNextCompilation(TestCase):
         torch._dynamo.reset()
 
         # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = compile(
+        optimized_model = torch_tensorrt.compile(
             fx_graph,
+            "torch_compile",
             inputs,
             min_block_size=1,
             pass_through_build_failures=True,
@@ -143,8 +145,9 @@ class TestCompilationOptions(TestCase):
         ]
 
         # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = compile(
+        optimized_model = torch_tensorrt.compile(
             fx_graph,
+            "torch_compile",
             inputs,
             min_block_size=1,
             pass_through_build_failures=True,

@@ -519,7 +519,7 @@ commands:
           command: |
             set -e
             mkdir -p /tmp/artifacts/test_results
-            cd tests/py
+            cd tests/py/ts/
             pytest --junitxml=/tmp/artifacts/test_results/api/api_test_results.xml api/
             pytest --junitxml=/tmp/artifacts/test_results/models/models_test_results.xml models/
             pytest --junitxml=/tmp/artifacts/test_results/integrations/integrations_test_results.xml integrations/
@@ -733,15 +733,15 @@ commands:
 # =================== FX tests end ======================== #
 
 # =================== Dynamo tests start ======================== #
-  test-dynamo-fx_ts:
-    description: "Test the Dynamo fx_ts_compat path"
+
+  test-dynamo-torch_compile:
+    description: "Test Dynamo torch_compile tests"
     steps:
       - run:
-          name: Run Dynamo fx_ts_compat core tests
+          name: Run Dynamo torch_compile tests
           command: |
-            cd py/torch_tensorrt/dynamo/fx_ts_compat/test
-            pushd core/
-            pytest --junitxml=/tmp/artifacts/test_results/dynamo/fx_ts_compat/test_results.xml
+            cd tests/py/dynamo/backend/
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/torch_compile/test_results.xml
             popd
 
       - store_test_results:
@@ -749,33 +749,33 @@ commands:
       - store_artifacts:
           path: /tmp/testlogs
 
-  test-dynamo-compile-core:
-    description: "Test the Dynamo compile path"
+  test-dynamo-models_torch_compile:
+    description: "Test the Dynamo models via torch_compile path"
     steps:
       - run:
-          name: Run Dynamo compile core tests
+          name: Run Dynamo models via torch_compile path
           command: |
-            cd py/torch_tensorrt/dynamo/backend
-            pushd test/
-            pytest --junitxml=/tmp/artifacts/test_results/dynamo/backend/test_results.xml
-            popd
-
-      - store_test_results:
-          path: /tmp/artifacts
-      - store_artifacts:
-          path: /tmp/testlogs
-
-  test-dynamo-compile:
-    description: "Test the Dynamo compile path"
-    steps:
-      - run:
-          name: Run Dynamo compile E2E tests
-          command: |
-            cd py/torch_tensorrt/dynamo/
-            pushd test/
+            cd tests/py/dynamo/models
             pip3 install timm
             pip3 install transformers
-            pytest --junitxml=/tmp/artifacts/test_results/dynamo/backend/test_results.xml --ir dynamo_compile
+            pytest test_models.py --junitxml=/tmp/artifacts/test_results/dynamo/backend/test_results.xml --ir torch_compile
+            popd
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-dynamo-models_torch_export:
+    description: "Test the Dynamo models via torch_export path"
+    steps:
+      - run:
+          name: Run Dynamo models via torch_export path
+          command: |
+            cd tests/py/dynamo/models
+            pip3 install timm
+            pip3 install transformers
+            pytest test_models_export.py --junitxml=/tmp/artifacts/test_results/dynamo/backend/test_results.xml --ir dynamo
             popd
 
       - store_test_results:
@@ -1039,9 +1039,9 @@ jobs:
           command: pip3 install --pre /tmp/dist/x86_64-linux/*cp39-cp39*.whl
       # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - dump-test-env
-      - test-dynamo-compile
-      - test-dynamo-compile-core
-      - test-dynamo-fx_ts
+      - test-dynamo-torch_compile
+      - test-dynamo-models_torch_compile
+      - test-dynamo-models_torch_export
 
   package-x86_64-linux:
     parameters:

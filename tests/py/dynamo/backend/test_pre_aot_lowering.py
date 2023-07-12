@@ -1,7 +1,7 @@
 import torch
+import torch_tensorrt
 from utils import lower_graph_testing
 from torch.testing._internal.common_utils import run_tests, TestCase
-from torch_tensorrt.dynamo.backend import compile
 
 
 class TestMaxPool1D(TestCase):
@@ -39,8 +39,12 @@ class TestMaxPool1D(TestCase):
         torch._dynamo.reset()
 
         # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = compile(
-            fx_graph, inputs, min_block_size=1, pass_through_build_failures=True
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()
@@ -85,8 +89,12 @@ class TestEinsum(TestCase):
         torch._dynamo.reset()
 
         # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = compile(
-            fx_graph, inputs, min_block_size=1, pass_through_build_failures=True
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()
