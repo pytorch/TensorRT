@@ -1,14 +1,17 @@
 import logging
 import re
-from typing import List
+from typing import List, Optional
 
 import tensorrt as trt
 import torch
+from torch.fx.node import Target, _get_qualified_name
 from torch_tensorrt.fx.converters.converter_utils import (
     Frameworks,
     unified_dtype_converter,
 )
 from torch_tensorrt.fx.types import TRTDataType, TRTNetwork, TRTTensor
+
+from .._SourceIR import SourceIR
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -71,6 +74,8 @@ def cast_trt_tensor(
     input_val: TRTTensor,
     dtype: TRTDataType,
     name: str,
+    target: Target = "",
+    source_ir: Optional[SourceIR] = None,
 ) -> TRTTensor:
     """
     Given a TRT Tensor, convert that Tensor to the specified dtype
@@ -78,17 +83,26 @@ def cast_trt_tensor(
     Args:
         network (TRTNetwork): A TensorRT network
         input_val (TRTTensor): A TRT Tensor to cast to a new data type
-        dtype (TRTDataType): The TRTDataType to cast the input Tensor to
+        dtype (TRTDataType, torch.dtype, np.dtype): The data type to cast the input Tensor to
         name (str): Name of the calling layer
+        target (Target): Target of calling node
+        source_ir (SourceIR): SourceIR of calling converter
     Returns:
         A TensorRT ITensor which has been casted to the specified dtype
     """
     trt_dtype = unified_dtype_converter(dtype, Frameworks.TRT)
 
     if input_val.dtype != trt_dtype:
+        source_ir = source_ir if source_ir is not None else SourceIR.UNKNOWN
+        target_name = (
+            f"{source_ir}_ops{'.' + target if target else ''}"
+            if (isinstance(target, str))
+            else f"{source_ir}_ops.{_get_qualified_name(target)}"
+        )
+
         identity_layer = network.add_identity(input_val)
         identity_layer.set_output_type(0, trt_dtype)
-        identity_layer.name = f"Cast ITensor {input_val.name} from {input_val.dtype} to {trt_dtype} - {name}"
+        identity_layer.name = f"Cast ITensor {input_val.name} from {input_val.dtype} to {trt_dtype} -{name}-[{target_name}]-[{name}]"
         return identity_layer.get_output(0)
     else:
         return input_val

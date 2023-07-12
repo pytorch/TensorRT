@@ -1,11 +1,17 @@
+import logging
 import time
 import unittest
-import torch
-import logging
 from typing import Callable, List, Optional, Set, Tuple
-from torch.testing._internal.common_utils import TestCase
 
+import torch
 import torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer as aten_tracer
+from torch.fx.passes.infra.pass_base import PassResult
+from torch.testing._internal.common_utils import TestCase
+from torch_tensorrt import Input
+
+# Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
+from torch_tensorrt.dynamo.conversion import TRTInterpreter
+from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
     compose_bmm,
     compose_chunk,
@@ -18,14 +24,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
     replace_transpose_mm_op_with_linear,
     run_const_fold,
 )
-from torch.fx.passes.infra.pass_base import PassResult
 from torch_tensorrt.fx.passes.pass_utils import chain_passes
-
-# Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
-from torch_tensorrt.dynamo.conversion import TRTInterpreter
-from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
-from torch_tensorrt import Input
-
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -217,6 +216,7 @@ class DispatchTestCase(TRTTestCase):
         expected_ops: Set[Callable],
         unexpected_ops: Optional[Set[Callable]] = None,
         customized_passes: List[Callable] = None,
+        disable_passes: bool = False,
     ):
         # Torchdynamo+aot proxytensor tracer
         # Below are common passes
@@ -234,6 +234,10 @@ class DispatchTestCase(TRTTestCase):
         # Combine with customized passes specific to any model
         if customized_passes:
             passes_list.extend(customized_passes)
+
+        if disable_passes:
+            passes_list = []
+
         fx_module, _ = aten_tracer.trace(mod, original_inputs)
         for passes in passes_list:
             pr: PassResult = passes(fx_module)
@@ -261,9 +265,17 @@ class DispatchTestCase(TRTTestCase):
         atol=1e-03,
         precision=torch.float,
         check_dtype=True,
+        disable_passes=False,
     ):
         mod.eval()
-        mod = self.generate_graph(mod, inputs, expected_ops, unexpected_ops, None)
+        mod = self.generate_graph(
+            mod,
+            inputs,
+            expected_ops,
+            unexpected_ops,
+            None,
+            disable_passes=disable_passes,
+        )
 
         if apply_passes is not None:
             pass_tracer = chain_passes(*apply_passes)
@@ -293,10 +305,18 @@ class DispatchTestCase(TRTTestCase):
         unexpected_ops=None,
         rtol=1e-03,
         atol=1e-03,
+        disable_passes=False,
     ):
         mod.eval()
         inputs = [spec.example_tensor("opt_shape") for spec in input_specs]
-        mod = self.generate_graph(mod, inputs, expected_ops, unexpected_ops, None)
+        mod = self.generate_graph(
+            mod,
+            inputs,
+            expected_ops,
+            unexpected_ops,
+            None,
+            disable_passes=disable_passes,
+        )
 
         interp = TRTInterpreter(
             mod,
