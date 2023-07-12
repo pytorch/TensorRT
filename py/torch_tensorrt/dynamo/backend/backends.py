@@ -88,13 +88,14 @@ def _pretraced_backend(
             )
             return gm.forward
         else:
-            raise AssertionError(
+            logger.critical(
                 "Halting compilation on build failure since "
                 + "pass_through_build_failures was specified as True. "
                 + "To return the default Torch implementation and avoid "
                 + "halting compilation on engine build failures, "
                 + "specify pass_through_build_failures=False."
             )
+            raise
 
 
 def _compile_module(
