@@ -1,14 +1,55 @@
 import torch
 import logging
 from dataclasses import replace, fields
-
-from torch_tensorrt.dynamo.common import CompilationSettings, use_python_runtime_parser
+from torch_tensorrt.dynamo import CompilationSettings
 from typing import Any, Union, Sequence, Dict
 from torch_tensorrt import _Input, Device
-
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+COSINE_THRESHOLD = 0.99
+
+def use_python_runtime_parser(use_python_runtime: Optional[bool] = None) -> bool:
+    """Parses a user-provided input argument regarding Python runtime
+
+    Automatically handles cases where the user has not specified a runtime (None)
+
+    Returns True if the Python runtime should be used, False if the C++ runtime should be used
+    """
+    using_python_runtime = use_python_runtime
+    reason = ""
+
+    # Runtime was manually specified by the user
+    if using_python_runtime is not None:
+        reason = "as requested by user"
+    # Runtime was not manually specified by the user, automatically detect runtime
+    else:
+        try:
+            from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule
+
+            using_python_runtime = False
+            reason = "since C++ dependency was detected as present"
+        except ImportError:
+            using_python_runtime = True
+            reason = "since import failed, C++ dependency not installed"
+
+    logger.info(
+        f"Using {'Python' if using_python_runtime else 'C++'} {reason} TRT Runtime"
+    )
+
+    return using_python_runtime
+
+def cosine_similarity(gt_tensor, pred_tensor):
+    gt_tensor = gt_tensor.flatten().to(torch.float32)
+    pred_tensor = pred_tensor.flatten().to(torch.float32)
+    if torch.sum(gt_tensor) == 0.0 or torch.sum(pred_tensor) == 0.0:
+        if torch.allclose(gt_tensor, pred_tensor, atol=1e-4, rtol=1e-4, equal_nan=True):
+            return 1.0
+    res = torch.nn.functional.cosine_similarity(gt_tensor, pred_tensor, dim=0, eps=1e-6)
+    res = res.cpu().detach().item()
+
+    return res
 
 def prepare_inputs(
     inputs: Union[_Input.Input, torch.Tensor, Sequence, Dict],

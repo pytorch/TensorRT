@@ -7,3 +7,4 @@ from ._pre_aot_lowering import (
 )
 from ._partition import partition, get_submod_inputs, DEFAULT_SINGLE_NODE_PARTITIONS
 from .substitutions import *
+from ._fusers import *

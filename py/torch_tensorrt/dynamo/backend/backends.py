@@ -4,7 +4,7 @@ import torch
 from functools import partial
 import torch._dynamo as td
 
-from torch_tensorrt.dynamo.common import CompilationSettings
+from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.backend.lowering._decompositions import (
     get_decompositions,
 )
@@ -15,8 +15,8 @@ from torch_tensorrt.dynamo.backend.lowering._partition import (
     partition,
     get_submod_inputs,
 )
-from torch_tensorrt.dynamo.backend.utils import parse_dynamo_kwargs
-from torch_tensorrt.dynamo.backend.conversion import convert_module
+from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs
+from torch_tensorrt.dynamo.conversion import convert_module
 
 from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
 

@@ -15,8 +15,8 @@ class _IRType(Enum):
 
     ts = 0
     fx = 1
-    fx_ts_compat = 2
-    dynamo_compile = 3
+    dynamo = 2
+    torch_compile = 3
 
 
 class _ModuleType(Enum):
@@ -47,31 +47,29 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
 
     ir_targets_torchscript = any([ir == opt for opt in ["torchscript", "ts"]])
     ir_targets_fx = ir == "fx"
-    ir_targets_dynamo_compile = ir == "dynamo_compile"
-    ir_targets_fx_ts_compat = ir == "fx_ts_compat"
+    ir_targets_dynamo = ir == "dynamo"
+    ir_targets_torch_compile = ir == "torch_compile"
 
     if module_is_tsable and ir_targets_torchscript:
         return _IRType.ts
     elif module_is_fxable and ir_targets_fx:
         return _IRType.fx
-    elif module_is_fxable and ir_targets_fx_ts_compat:
-        return _IRType.fx_ts_compat
-    elif module_is_fxable and ir_targets_dynamo_compile:
-        return _IRType.dynamo_compile
+    elif module_is_fxable and ir_targets_dynamo:
+        return _IRType.dynamo
+    elif module_is_fxable and ir_targets_torch_compile:
+        return _IRType.torch_compile
     else:
         if ir == "default":
             # Options are listed in order of preference
-            if module_is_tsable:
+            if module_is_fxable:
                 logging.log(
-                    logging.Level.Info, "ir was set to default, using TorchScript as ir"
+                    logging.Level.Info, "ir was set to default, using dynamo as ir"
                 )
-                return _IRType.ts
-            elif module_is_fxable:
+                return _IRType.dynamo
+            elif module_is_tsable:
                 raise ValueError(
-                    "Was given a torch.fx.GraphModule, fx is not currently supported by Torch-TensorRT"
+                    "Input graph is a Torchscript module but the ir provided is default (dynamo). Please set ir=torchscript to compile."
                 )
-                # logging.log(logging.Level.Info, "ir was set to default, using TorchScript as fx")
-                # return _IRType.fx
             else:
                 raise ValueError("Module was provided with in an unsupported format")
         else:
@@ -156,12 +154,12 @@ def compile(
             dynamic_batch=False,
             **kwargs,
         )
-    elif target_ir == _IRType.dynamo_compile:
+    elif target_ir == _IRType.dynamo:
         return torch_tensorrt.dynamo.compile(
             module, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs
         )
-    elif target_ir == _IRType.fx_ts_compat:
-        return torch_tensorrt.dynamo.fx_ts_compat.compile(
+    elif target_ir == _IRType.torch_compile:
+        return torch_tensorrt.dynamo.backend.compile(
             module, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs
         )
     else:
