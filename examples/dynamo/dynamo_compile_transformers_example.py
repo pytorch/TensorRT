@@ -37,7 +37,7 @@ workspace_size = 20 << 30
 
 # Maximum number of TRT Engines
 # (Lower value allows more graph segmentation)
-min_block_size = 3
+min_block_size = 7
 
 # Operations to Run in Torch, regardless of converter support
 torch_executed_ops = {}
@@ -88,5 +88,13 @@ new_outputs = optimized_model(*new_inputs)
 # Finally, we use Torch utilities to clean up the workspace
 torch._dynamo.reset()
 
-with torch.no_grad():
-    torch.cuda.empty_cache()
+# %%
+# Cuda Driver Error Note
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#
+# Occasionally, upon exiting the Python runtime after Dynamo compilation with `torch_tensorrt`,
+# one may encounter a Cuda Driver Error. This issue is related to https://github.com/NVIDIA/TensorRT/issues/2052
+# and can be resolved by wrapping the compilation/inference in a function and using a scoped call, as in::
+#
+#       if __name__ == '__main__':
+#           compile_engine_and_infer()

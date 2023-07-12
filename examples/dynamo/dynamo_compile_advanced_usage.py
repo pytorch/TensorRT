@@ -9,7 +9,6 @@ This interactive script is intended as an overview of the process by which `torc
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 import torch
-from torch_tensorrt.fx.lower_setting import LowerPrecision
 
 # %%
 
@@ -68,12 +67,12 @@ model_half = Model().eval().cuda()
 # For accepted backend options, see the CompilationSettings dataclass:
 # py/torch_tensorrt/dynamo/backend/_settings.py
 backend_kwargs = {
-    "precision": LowerPrecision.FP16,
+    "enabled_precisions": {torch.half},
     "debug": True,
     "min_block_size": 2,
     "torch_executed_ops": {"torch.ops.aten.sub.Tensor"},
     "optimization_level": 4,
-    "use_experimental_rt": True,
+    "use_python_runtime": False,
 }
 
 # Run the model on an input to cause compilation, as so:
@@ -89,5 +88,13 @@ optimized_model_custom(*sample_inputs_half)
 # Finally, we use Torch utilities to clean up the workspace
 torch._dynamo.reset()
 
-with torch.no_grad():
-    torch.cuda.empty_cache()
+# %%
+# Cuda Driver Error Note
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#
+# Occasionally, upon exiting the Python runtime after Dynamo compilation with `torch_tensorrt`,
+# one may encounter a Cuda Driver Error. This issue is related to https://github.com/NVIDIA/TensorRT/issues/2052
+# and can be resolved by wrapping the compilation/inference in a function and using a scoped call, as in::
+#
+#       if __name__ == '__main__':
+#           compile_engine_and_infer()
