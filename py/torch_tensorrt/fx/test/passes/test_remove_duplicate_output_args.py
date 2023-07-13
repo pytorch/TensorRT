@@ -1,6 +1,8 @@
 # Owner(s): ["oncall: gpu_enablement"]
 
 import logging
+import torch
+from packaging import version
 
 import torch.fx as fx
 import torch.nn as nn
@@ -54,6 +56,10 @@ graph():
     %add : [num_users=1] = call_function[target=operator.add](args = (%getitem, %getitem_1), kwargs = {})
     return add
 """.strip()
+
+        if version.parse(torch.__version__) < version.parse("2.1.0.dev20230620"):
+            ttop_graph_expected = ttop_graph_expected.replace("num_users", "#users")
+
         assert (
             ttop_graph_expected == ttop_graph_actual
         ), f"Unexpected ttop graph: {ttop_graph_actual}"
@@ -64,6 +70,10 @@ graph():
     %x : [num_users=1] = placeholder[target=x]
     return (x,)
 """.strip()
+
+        if version.parse(torch.__version__) < version.parse("2.1.0.dev20230620"):
+            ttop_a_graph_expected = ttop_a_graph_expected.replace("num_users", "#users")
+
         assert (
             ttop_a_graph_expected == ttop_a_graph_actual
         ), f"Unexpected ttop.a graph: {ttop_a_graph_actual}"
