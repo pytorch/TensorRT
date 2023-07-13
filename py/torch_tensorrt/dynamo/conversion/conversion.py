@@ -1,7 +1,7 @@
 from typing import Sequence, Union
 import torch
 import io
-from torch_tensorrt.fx.trt_module import TRTModule
+from torch_tensorrt.dynamo.runtime import TRTModule
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt import Input
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
@@ -60,7 +60,7 @@ def convert_module(
         )
 
     else:
-        from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule
+        from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
         with io.BytesIO() as engine_bytes:
             engine_bytes.write(interpreter_result.engine.serialize())

@@ -154,13 +154,13 @@ def compile(
             dynamic_batch=False,
             **kwargs,
         )
-    elif target_ir == _IRType.dynamo:
+    elif target_ir == _IRType.dynamo or target_ir == _IRType.torch_compile:
         return torch_tensorrt.dynamo.compile(
-            module, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs
-        )
-    elif target_ir == _IRType.torch_compile:
-        return torch_tensorrt.dynamo.backend.compile(
-            module, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs
+            module,
+            inputs=inputs,
+            enabled_precisions=enabled_precisions,
+            ir=target_ir.name,
+            **kwargs,
         )
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")

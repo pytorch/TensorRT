@@ -27,7 +27,7 @@ def use_python_runtime_parser(use_python_runtime: Optional[bool] = None) -> bool
     # Runtime was not manually specified by the user, automatically detect runtime
     else:
         try:
-            from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule
+            from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
             using_python_runtime = False
             reason = "since C++ dependency was detected as present"
