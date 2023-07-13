@@ -2,6 +2,7 @@
 
 import logging
 from copy import deepcopy
+from packaging import version
 
 import torch
 import torch.fx as fx
@@ -42,6 +43,9 @@ graph():
     %reshape : [num_users=1] = call_function[target=torch_tensorrt.fx.tracer.acc_tracer.acc_ops.reshape](args = (), kwargs = {input: %y, acc_out_ty: ((%getitem_1, -1, 3), None, None, None, None, None, None)})
     return reshape
 """
+        if version.parse(torch.__version__) < version.parse("2.1.0.dev20230620"):
+            expected_graph = expected_graph.replace("num_users", "#users")
+
         assert (
             str(mod_fixed.graph).strip() == expected_graph.strip()
         ), f"Unexpected fixed graph. \nActual: {str(mod_fixed.graph)} \nExpected: {expected_graph}"
