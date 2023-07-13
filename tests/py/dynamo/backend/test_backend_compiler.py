@@ -1,6 +1,6 @@
 import torch
 import torch_tensorrt
-from torch_tensorrt.dynamo.backend.lowering import partition
+from torch_tensorrt.dynamo.lowering import partition
 from torch.testing._internal.common_utils import run_tests, TestCase
 from copy import deepcopy
 from utils import lower_graph_testing, DECIMALS_OF_AGREEMENT

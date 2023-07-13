@@ -1,4 +1,4 @@
-from torch_tensorrt.dynamo.backend.lowering import partition
+from torch_tensorrt.dynamo.lowering import partition
 from torch.testing._internal.common_utils import run_tests, TestCase
 from utils import lower_graph_testing
 import torch

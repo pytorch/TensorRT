@@ -7,7 +7,7 @@ from torch_tensorrt.fx.converter_registry import tensorrt_converter
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 
-from torch_tensorrt.dynamo.backend.lowering import register_substitution
+from torch_tensorrt.dynamo.lowering import register_substitution
 
 
 @custom_op(

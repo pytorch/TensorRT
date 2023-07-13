@@ -5,13 +5,13 @@ from functools import partial
 import torch._dynamo as td
 
 from torch_tensorrt.dynamo import CompilationSettings
-from torch_tensorrt.dynamo.backend.lowering._decompositions import (
+from torch_tensorrt.dynamo.lowering._decompositions import (
     get_decompositions,
 )
-from torch_tensorrt.dynamo.backend.lowering._pre_aot_lowering import (
+from torch_tensorrt.dynamo.lowering._pre_aot_lowering import (
     pre_aot_substitutions,
 )
-from torch_tensorrt.dynamo.backend.lowering._partition import (
+from torch_tensorrt.dynamo.lowering._partition import (
     partition,
     get_submod_inputs,
 )

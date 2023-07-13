@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Sequence, Set
 
 import torch
 
-from torch_tensorrt.dynamo.backend.lowering import SUBSTITUTION_REGISTRY
+from torch_tensorrt.dynamo.lowering import SUBSTITUTION_REGISTRY
 from torch_tensorrt.dynamo._defaults import MIN_BLOCK_SIZE
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
 from torch.fx.graph_module import GraphModule

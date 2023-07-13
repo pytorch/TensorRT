@@ -9,9 +9,9 @@ from torch_tensorrt import EngineCapability, Device
 from torch_tensorrt.fx.utils import LowerPrecision
 from torch.fx.passes.pass_manager import PassManager
 from torch.fx.passes.shape_prop import ShapeProp
-import torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer as aten_tracer
+from torch_tensorrt.dynamo.aten_tracer import trace
 from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
-from torch_tensorrt.dynamo.backend.lowering import (
+from torch_tensorrt.dynamo.lowering import (
     fuse_permute_linear,
     fuse_permute_matmul,
 )
@@ -113,8 +113,7 @@ def compile(
     model = trace(gm, inputs, **kwargs)
 
     if kwargs.get("use_capability_partitioner", None):
-        traced_model = trace(model)
-        model = lower_model(traced_model, inputs)
+        model = lower_model(model, inputs)
         return _compile_module(model, inputs, settings)
     else:
         split_result = lower_model_using_trt_splitter(model, inputs)
@@ -144,33 +143,6 @@ def _compile_graph(
             setattr(split_result.split_module, submod_name, trt_mod)
 
     return split_result.split_module
-
-
-def trace(
-    model: torch.nn.Module,
-    inputs: Any,
-    **kwargs,
-):
-    """Create torch.compile backend given specified arguments
-
-    Args:
-        precision: Model Layer precision
-        debug: Whether to print out verbose debugging information
-        workspace_size: Workspace TRT is allowed to use for the module (0 is default)
-        min_block_size: Minimum number of operators per TRT-Engine Block
-        torch_executed_ops: Sequence of operations to run in Torch, regardless of converter coverage
-        pass_through_build_failures: Whether to fail on TRT engine build errors (True) or not (False)
-        max_aux_streams: Maximum number of allowed auxiliary TRT streams for each engine
-        version_compatible: Provide version forward-compatibility for engine plan files
-        optimization_level: Builder optimization 0-5, higher levels imply longer build time,
-            searching for more optimization options. TRT defaults to 3
-        use_experimental_rt: Whether to use the new experimental TRTModuleNext for TRT engines
-    Returns:
-        Backend for torch.compile
-    """
-    model = aten_tracer.opt_trace(model, inputs)
-
-    return model
 
 
 def lower_model_using_trt_splitter(model: torch.nn.Module, inputs: Any, **kwargs):

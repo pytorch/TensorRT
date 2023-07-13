@@ -1,3 +1,2 @@
-from .input_tensor_spec import *
-from .fx2trt import *
+from .trt_interpreter import *
 from .conversion import *

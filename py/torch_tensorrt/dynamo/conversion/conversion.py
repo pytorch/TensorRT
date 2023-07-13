@@ -3,10 +3,9 @@ import torch
 import io
 from torch_tensorrt.fx.trt_module import TRTModule
 from torch_tensorrt.dynamo import CompilationSettings
-from torch_tensorrt.dynamo.conversion import (
-    InputTensorSpec,
-    TRTInterpreter,
-)
+from torch_tensorrt import Input
+from torch_tensorrt.dynamo.conversion import TRTInterpreter
+
 
 import tensorrt as trt
 
@@ -34,14 +33,12 @@ def convert_module(
         module_outputs = [module_outputs]
 
     output_dtypes = list(output.dtype for output in module_outputs)
-
     interpreter = TRTInterpreter(
         module,
-        InputTensorSpec.from_tensors(inputs),
+        Input.from_tensors(inputs),
         logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
         output_dtypes=output_dtypes,
     )
-
     interpreter_result = interpreter.run(
         workspace_size=settings.workspace_size,
         lower_precision=settings.precision,

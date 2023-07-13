@@ -15,7 +15,7 @@ from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 
 from torch_tensorrt.fx import CONVERTERS
-from .input_tensor_spec import InputTensorSpec
+from torch_tensorrt import Input
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.fx.utils import (
     get_dynamic_dims,
@@ -42,7 +42,7 @@ class TRTInterpreter(torch.fx.Interpreter):
     def __init__(
         self,
         module: torch.fx.GraphModule,
-        input_specs: List[InputTensorSpec],
+        input_specs: List[Input],
         logger_level=None,
         output_dtypes=None,
     ):
@@ -69,7 +69,6 @@ class TRTInterpreter(torch.fx.Interpreter):
         self.optimization_profiles: Optional[List] = None
         self.input_specs = input_specs
         self.input_specs_iter = 0
-        self.validate_input_specs()
         self._cur_node_name: Optional[str] = None
         self._input_names: List[str] = []
         self._output_names: List[str] = []
@@ -79,63 +78,6 @@ class TRTInterpreter(torch.fx.Interpreter):
 
         # Data types for TRT Module output Tensors
         self.output_dtypes = output_dtypes
-
-    def validate_input_specs(self):
-        for shape, _, _, shape_ranges, has_batch_dim in self.input_specs:
-            if not self.network.has_implicit_batch_dimension:
-                assert (
-                    has_batch_dim
-                ), "It's required to specify batch dimension when it's explicit in TensorRT network."
-
-            dynamic_dims = get_dynamic_dims(shape)
-            if len(dynamic_dims):
-                assert not self.network.has_implicit_batch_dimension, (
-                    "Can't have dynamic dim when "
-                    f"batch dim is implicit, got {shape}."
-                )
-                assert len(
-                    shape_ranges
-                ), "shape_ranges must be provided when shape has dynamic dim."
-
-                if self.optimization_profiles:
-                    assert len(shape_ranges) == len(self.optimization_profiles), (
-                        "Number of optimization "
-                        f"profiles {len(self.optimization_profiles)} doesn't match with the number of shape_range"
-                        f" {len(shape_ranges)} provided."
-                    )
-                else:
-                    self.optimization_profiles = [
-                        self.builder.create_optimization_profile()
-                        for _ in range(len(shape_ranges))
-                    ]
-
-                for shape_range in shape_ranges:
-                    assert (
-                        len(shape_range) == 3
-                    ), f"Expect three elements in shape_range, got {len(shape_range)}"
-                    assert all(len(s) == len(shape) for s in shape_range), (
-                        "Expect elements in shape_range"
-                        f" {shape_range} have the same number of dimension as the provided shape {len(shape)}"
-                    )
-
-                    for i in range(len(shape)):
-                        if i in dynamic_dims:
-                            assert all(
-                                shape_range[j][i] <= shape_range[j + 1][i]
-                                for j in range(2)
-                            ), (
-                                "Expect dynamic dim"
-                                f" {i} to have incremental value for shapes in shape_range {shape_range}."
-                            )
-                        else:
-                            assert all(s[i] == shape[i] for s in shape_range), (
-                                f"Expect non dynamic dim {i} to be the same"
-                                f" for all shapes in shape_range {shape_range}."
-                            )
-            else:
-                assert (
-                    len(shape_ranges) == 0
-                ), "shape_ranges are provided for input that doesn't have dynamic dim."
 
     def validate_conversion(self):
         missing_converter = set()
@@ -313,23 +255,30 @@ class TRTInterpreter(torch.fx.Interpreter):
 
     def placeholder(self, target, args, kwargs):
         self._input_names.append(target)
-        shape, dtype, _, shape_ranges, has_batch_dim = self.input_specs[
-            self.input_specs_iter
-        ]
+        current_input = self.input_specs[self.input_specs_iter]
         self.input_specs_iter += 1
-
-        if self.network.has_implicit_batch_dimension:
-            if has_batch_dim:
-                shape = shape[1:]
-        else:
-            for i, shape_range in enumerate(shape_ranges):
-                assert self.optimization_profiles
-                self.optimization_profiles[i].set_shape(target, *shape_range)
+        # Set optimization profile for dynamic input shape
+        shape = current_input.shape
+        if current_input.shape_mode == Input._ShapeMode.DYNAMIC:
+            shape = []
+            min_shape = current_input.shape["min_shape"]
+            opt_shape = current_input.shape["opt_shape"]
+            max_shape = current_input.shape["max_shape"]
+            self.optimization_profiles[0].set_shape(
+                target, [min_shape, opt_shape, max_shape]
+            )
+            assert len(min_shape) == len(opt_shape) == len(max_shape)
+            for i in range(len(min_shape)):
+                if min_shape[i] == opt_shape[i] == max_shape[i]:
+                    shape.append(min_shape[i])
+                else:
+                    # -1 to represent the dynamic dimension
+                    shape.append(-1)
 
         return self.network.add_input(
             name=target,
             shape=tuple(shape),
-            dtype=unified_dtype_converter(dtype, Frameworks.TRT),
+            dtype=unified_dtype_converter(current_input.torch_dtype, Frameworks.TRT),
         )
 
     def call_module(self, target, args, kwargs):
