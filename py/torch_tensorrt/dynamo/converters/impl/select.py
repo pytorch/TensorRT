@@ -1,6 +1,6 @@
 from typing import Optional, cast
 
-import torch
+import numpy as np
 from torch.fx.node import Target
 
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor, Shape
@@ -53,7 +53,7 @@ def select(
         output_shape = get_shape_with_dynamic_shape(
             network, target, source_ir, name, output_shape, input
         )
-    index_value = torch.tensor(index, dtype=torch.int32)
+    index_value = np.array(index, dtype=np.int32)
     indices_tensor = network.add_constant(
         index_value.shape, to_numpy(index_value)
     ).get_output(0)
