@@ -7,6 +7,12 @@ from torch_tensorrt.fx.utils import unified_dtype_converter, Frameworks
 
 
 class TRTModule(torch.nn.Module):
+    """TRTModule is a PyTorch module which encompasses an arbitrary TensorRT Engine.
+
+    This module is backed by the Torch-TensorRT runtime and is only compatibile with
+    FX / Dynamo / Python deployments. This module cannot be serialized to torchscript via torch.jit.trace for C++ deployment.
+    """
+
     def __init__(
         self, engine=None, input_names=None, output_names=None, cuda_graph_batch_size=-1
     ):

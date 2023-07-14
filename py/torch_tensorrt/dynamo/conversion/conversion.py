@@ -41,7 +41,7 @@ def convert_module(
     )
     interpreter_result = interpreter.run(
         workspace_size=settings.workspace_size,
-        lower_precision=settings.precision,
+        precision=settings.precision,
         profiling_verbosity=(
             trt.ProfilingVerbosity.VERBOSE
             if settings.debug

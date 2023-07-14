@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional, Sequence
-
-from torch_tensorrt.fx.utils import LowerPrecision
+import torch
 from torch_tensorrt.dynamo._defaults import (
     PRECISION,
     DEBUG,
@@ -17,7 +16,7 @@ from torch_tensorrt.dynamo._defaults import (
 
 @dataclass
 class CompilationSettings:
-    precision: LowerPrecision = PRECISION
+    precision: torch.dtype = PRECISION
     debug: bool = DEBUG
     workspace_size: int = WORKSPACE_SIZE
     min_block_size: int = MIN_BLOCK_SIZE

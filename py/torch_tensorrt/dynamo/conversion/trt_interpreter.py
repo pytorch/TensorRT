@@ -19,7 +19,6 @@ from torch_tensorrt import Input
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.fx.utils import (
     get_dynamic_dims,
-    LowerPrecision,
     unified_dtype_converter,
     Frameworks,
 )
@@ -98,7 +97,7 @@ class TRTInterpreter(torch.fx.Interpreter):
     def run(
         self,
         workspace_size=0,
-        lower_precision=LowerPrecision.FP16,
+        precision=torch.float32,
         sparse_weights=False,
         disable_tf32=False,
         force_fp32_output=False,
@@ -115,7 +114,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         Build TensorRT engine with some configs.
         Args:
             workspace_size: Amount of memory used by TensorRT to store intermediate buffers within an operation.
-            lower_precision: the precision model layers are running on (TensorRT will choose the best perforamnce precision).
+            precision: the precision model layers are running on (TensorRT will choose the best perforamnce precision).
             sparse_weights: allow the builder to examine weights and use optimized functions when weights have suitable sparsity
             force_fp32_output: force output to be fp32
             strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric reasons.
@@ -131,22 +130,14 @@ class TRTInterpreter(torch.fx.Interpreter):
         """
         TRT_INTERPRETER_CALL_PRE_OBSERVER.observe(self.module)
 
-        # For float outputs, we set their dtype to fp16 only if lower_precision == LowerPrecision.FP16 and
+        # For float outputs, we set their dtype to fp16 only if precision == torch.float16 and
         # force_fp32_output=False. Overriden by specifying output_dtypes
-        self.output_fp16 = (
-            not force_fp32_output and lower_precision == LowerPrecision.FP16
-        )
+        self.output_fp16 = not force_fp32_output and precision == torch.float16
 
-        if (
-            lower_precision == LowerPrecision.INT8
-            and not self.builder.platform_has_fast_int8
-        ):
+        if precision == torch.int8 and not self.builder.platform_has_fast_int8:
             raise RuntimeError("Current platform doesn't support fast native int8!")
 
-        if (
-            lower_precision == LowerPrecision.FP16
-            and not self.builder.platform_has_fast_fp16
-        ):
+        if precision == torch.float16 and not self.builder.platform_has_fast_fp16:
             warnings.warn("Current platform doesn't support fast native fp16!")
 
         self.input_specs_iter = 0
@@ -190,10 +181,10 @@ class TRTInterpreter(torch.fx.Interpreter):
                 _LOGGER.info(f"Using optimization level {optimization_level}")
                 builder_config.builder_optimization_level = optimization_level
 
-        if lower_precision == LowerPrecision.FP16:
+        if precision == torch.float16:
             builder_config.set_flag(trt.BuilderFlag.FP16)
 
-        if lower_precision == LowerPrecision.INT8:
+        if precision == torch.int8:
             builder_config.set_flag(trt.BuilderFlag.INT8)
 
         if sparse_weights:

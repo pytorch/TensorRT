@@ -13,7 +13,7 @@ class TorchTensorRTModule(torch.nn.Module):
 
     This module is backed by the Torch-TensorRT runtime and is fully compatibile with both
     FX / Python deployments (just ``import torch_tensorrt`` as part of the application) as
-    well as TorchScript / C++ deployments since TRTModule can be passed to ``torch.jit.trace``
+    well as TorchScript / C++ deployments since TorchTensorRTModule can be passed to ``torch.jit.trace``
     and then saved.
 
     The forward function is simpily forward(*args: torch.Tensor) -> Tuple[torch.Tensor] where

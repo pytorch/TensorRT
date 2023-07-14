@@ -3,7 +3,7 @@ import logging
 from dataclasses import replace, fields
 from torch_tensorrt.dynamo import CompilationSettings
 from typing import Any, Union, Sequence, Dict
-from torch_tensorrt import _Input, Device
+from torch_tensorrt import Input, Device
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -55,43 +55,51 @@ def cosine_similarity(gt_tensor, pred_tensor):
 
 
 def prepare_inputs(
-    inputs: Union[_Input.Input, torch.Tensor, Sequence, Dict],
+    inputs: Union[Input, torch.Tensor, Sequence, Dict],
     device: torch.device = torch.device("cuda"),
 ) -> Any:
-    if isinstance(inputs, _Input.Input):
+    if isinstance(inputs, Input):
         if isinstance(inputs.shape, dict):
-            return inputs.example_tensor(optimization_profile_field="opt_shape").to(
-                device
-            )
+            return inputs, inputs.example_tensor(
+                optimization_profile_field="opt_shape"
+            ).to(device)
         else:
-            return inputs.example_tensor().to(device)
+            return inputs, inputs.example_tensor().to(device)
 
     elif isinstance(inputs, torch.Tensor):
-        return inputs
+        return Input.from_tensor(inputs), inputs
 
     elif isinstance(inputs, list):
         prepared_input = list()
-
+        torchtrt_inputs = []
+        torch_inputs = []
         for input_obj in inputs:
-            prepared_input.append(prepare_inputs(input_obj))
+            torchtrt_input, torch_input = prepare_inputs(input_obj)
+            torchtrt_inputs.append(torchtrt_input)
+            torch_inputs.append(torch_input)
 
-        return prepared_input
+        return torchtrt_inputs, torch_inputs
 
     elif isinstance(inputs, tuple):
-        prepared_input = list()
-
+        torchtrt_inputs = []
+        torch_inputs = []
         for input_obj in inputs:
-            prepared_input.append(prepare_inputs(input_obj))
+            torchtrt_input, torch_input = prepare_inputs(input_obj)
+            torchtrt_inputs.append(torchtrt_input)
+            torch_inputs.append(torch_input)
 
-        return tuple(prepared_input)
+        return tuple(torchtrt_inputs), tuple(torch_inputs)
 
     elif isinstance(inputs, dict):
-        prepared_input = dict()
+        torchtrt_inputs = dict()
+        torch_inputs = dict()
 
         for key, input_obj in inputs.items():
-            prepared_input[key] = prepare_inputs(input_obj)
+            torchtrt_input, torch_input = prepare_inputs(input_obj)
+            torchtrt_inputs[key] = torchtrt_input
+            torch_inputs[key] = torch_input
 
-        return prepared_input
+        return torchtrt_inputs, torch_inputs
 
     else:
         raise ValueError(

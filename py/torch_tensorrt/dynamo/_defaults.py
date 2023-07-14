@@ -1,7 +1,6 @@
-from torch_tensorrt.fx.utils import LowerPrecision
+import torch
 
-
-PRECISION = LowerPrecision.FP32
+PRECISION = torch.float32
 DEBUG = False
 WORKSPACE_SIZE = 0
 MIN_BLOCK_SIZE = 5

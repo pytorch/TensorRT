@@ -742,7 +742,6 @@ commands:
           command: |
             cd tests/py/dynamo/backend/
             pytest --junitxml=/tmp/artifacts/test_results/dynamo/torch_compile/test_results.xml
-            popd
 
       - store_test_results:
           path: /tmp/artifacts
@@ -759,7 +758,6 @@ commands:
             pip3 install timm
             pip3 install transformers
             pytest test_models.py --junitxml=/tmp/artifacts/test_results/dynamo/backend/test_results.xml --ir torch_compile
-            popd
 
       - store_test_results:
           path: /tmp/artifacts
@@ -776,7 +774,6 @@ commands:
             pip3 install timm
             pip3 install transformers
             pytest test_models_export.py --junitxml=/tmp/artifacts/test_results/dynamo/backend/test_results.xml --ir dynamo
-            popd
 
       - store_test_results:
           path: /tmp/artifacts
