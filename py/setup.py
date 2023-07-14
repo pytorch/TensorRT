@@ -2,7 +2,7 @@ import os
 import sys
 import glob
 import setuptools
-from setuptools import setup, Extension, find_packages
+from setuptools import setup, Extension, find_namespace_packages
 from setuptools.command.build_ext import build_ext
 from setuptools.command.develop import develop
 from setuptools.command.install import install
@@ -440,7 +440,7 @@ setup(
     },
     zip_safe=False,
     license="BSD",
-    packages=packages if FX_ONLY else find_packages(),
+    packages=packages if FX_ONLY else find_namespace_packages(),
     package_dir=package_dir if FX_ONLY else {},
     classifiers=[
         "Development Status :: 5 - Production/Stable",
