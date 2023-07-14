@@ -868,7 +868,7 @@ jobs:
         type: string
     machine:
       image: linux-cuda-12:2023.05.1
-    resource_class: gpu.nvidia.large
+    resource_class: gpu.nvidia.medium
     parallelism: 4
     steps:
       - checkout
@@ -909,7 +909,7 @@ jobs:
         type: string
     machine:
       image: linux-cuda-12:2023.05.1
-    resource_class: gpu.nvidia.large
+    resource_class: gpu.nvidia.medium
     steps:
       - checkout
       - setup-py-version:
@@ -943,7 +943,7 @@ jobs:
     parallelism: 8
     machine:
       image: linux-cuda-12:2023.05.1
-    resource_class: gpu.nvidia.large
+    resource_class: gpu.nvidia.medium
     steps:
       - checkout
       - setup-py-version:
@@ -979,7 +979,7 @@ jobs:
     parallelism: 8
     machine:
       image: linux-cuda-12:2023.05.1
-    resource_class: gpu.nvidia.large
+    resource_class: gpu.nvidia.medium
     steps:
       - checkout
       - setup-py-version:
@@ -1017,7 +1017,7 @@ jobs:
         type: string
     machine:
       image: linux-cuda-12:2023.05.1
-    resource_class: gpu.nvidia.large
+    resource_class: gpu.nvidia.medium
     steps:
       - checkout
       - setup-py-version:
