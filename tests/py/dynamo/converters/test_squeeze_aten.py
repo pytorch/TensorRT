@@ -2,10 +2,8 @@ import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.test_utils import (
-    DispatchTestCase,
-    InputTensorSpec,
-)
+from torch_tensorrt.dynamo.test_utils import DispatchTestCase
+from torch_tensorrt import Input
 
 
 class TestSqueezeConverter(DispatchTestCase):
@@ -53,7 +51,7 @@ class TestSqueezeConverter(DispatchTestCase):
         else:
             expected_op = {torch.ops.aten.squeeze.dims}
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=init_size,
                 dtype=torch.float32,
                 shape_ranges=shape_range,

@@ -1,10 +1,8 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.test_utils import (
-    DispatchTestCase,
-    InputTensorSpec,
-)
+from torch_tensorrt.dynamo.test_utils import DispatchTestCase
+from torch_tensorrt import Input
 
 
 class TestHardTanHConverter(DispatchTestCase):
@@ -24,7 +22,7 @@ class TestHardTanHConverter(DispatchTestCase):
                 return nn.functional.hardtanh(x)
 
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=(-1, -1, -1),
                 dtype=torch.float32,
                 shape_ranges=[((1, 1, 1), (1, 2, 3), (3, 3, 3))],
@@ -40,7 +38,7 @@ class TestHardTanHConverter(DispatchTestCase):
                 return nn.functional.hardtanh(x)
 
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=(-1, -1, -1, -1),
                 dtype=torch.float32,
                 shape_ranges=[((1, 1, 1, 5), (1, 2, 3, 5), (3, 3, 3, 5))],

@@ -4,14 +4,14 @@ import math
 from torch.fx.node import Target
 
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor, Shape
-from torch_tensorrt.dynamo.converters import SourceIR
+from torch_tensorrt.dynamo.conversion import SourceIR
 from torch_tensorrt.fx.converters.converter_utils import (
     get_positive_dim,
     has_dynamic_shape,
     broadcast,
     get_trt_tensor,
 )
-from torch_tensorrt.dynamo.converters.impl.slice.base import slice
+from torch_tensorrt.dynamo.conversion.impl.slice.base import slice
 
 
 def slice_op(

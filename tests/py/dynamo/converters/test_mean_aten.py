@@ -1,10 +1,8 @@
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.test_utils import (
-    DispatchTestCase,
-    InputTensorSpec,
-)
+from torch_tensorrt.dynamo.test_utils import DispatchTestCase
+from torch_tensorrt import Input
 
 
 class TestMeanDimConverter(DispatchTestCase):
@@ -22,7 +20,7 @@ class TestMeanDimConverter(DispatchTestCase):
                 return torch.mean(x, dim=[0, 1, 2], keepdim=True)
 
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=(-1, -1, -1),
                 dtype=torch.float32,
                 shape_ranges=[((1, 1, 1), (1, 2, 3), (3, 3, 3))],
@@ -46,7 +44,7 @@ class TestMeanDimConverter(DispatchTestCase):
                 return torch.mean(x, dim=-1, keepdim=False)
 
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=(-1, -1, -1),
                 dtype=torch.float32,
                 shape_ranges=[((1, 1, 1), (1, 2, 3), (3, 3, 3))],
@@ -72,7 +70,7 @@ class TestMeanConverter(DispatchTestCase):
                 return torch.mean(x)
 
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=(-1, -1, -1),
                 dtype=torch.float32,
                 shape_ranges=[((1, 1, 1), (1, 5, 8), (3, 10, 10))],

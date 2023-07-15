@@ -6,14 +6,14 @@ import torch
 from torch.fx.node import Target
 
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
-from torch_tensorrt.dynamo.converters import SourceIR
-from torch_tensorrt.dynamo.converters.converter_utils import broadcastable
+from torch_tensorrt.dynamo.conversion import SourceIR
+from torch_tensorrt.dynamo.conversion.converter_utils import broadcastable
 from torch_tensorrt.fx.converters.converter_utils import (
     broadcast,
     get_trt_tensor,
     set_layer_name,
 )
-from torch_tensorrt.dynamo.converters.impl.slice import expand
+from torch_tensorrt.dynamo.conversion.impl.slice import expand
 
 
 def where(

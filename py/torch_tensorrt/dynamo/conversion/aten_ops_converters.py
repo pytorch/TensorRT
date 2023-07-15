@@ -1,13 +1,13 @@
 import logging
 from typing import Dict, Sequence, Tuple, Union
 import torch
+import tensorrt as trt
 from torch_tensorrt.fx.converters import acc_ops_converters
 from ..converter_registry import dynamo_tensorrt_converter
 from torch.fx.node import Argument, Target
 
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
-from torch_tensorrt.dynamo.converters import SourceIR
-from torch_tensorrt.dynamo.converters import impl
+from torch_tensorrt.dynamo.conversion import SourceIR, impl
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

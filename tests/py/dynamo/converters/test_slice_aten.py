@@ -1,10 +1,8 @@
 import torch
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.test_utils import (
-    DispatchTestCase,
-    InputTensorSpec,
-)
+from torch_tensorrt.dynamo.test_utils import DispatchTestCase
+from torch_tensorrt import Input
 
 
 class TestSelectConverterImplicitBatch(DispatchTestCase):
@@ -71,7 +69,7 @@ class TestSelectConverterDynamicShape(DispatchTestCase):
                 return out
 
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=(1, 10, -1),
                 dtype=torch.float32,
                 shape_ranges=[((1, 10, 1), (1, 10, 10), (1, 10, 10))],

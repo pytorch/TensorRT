@@ -20,11 +20,10 @@ from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
 )
 from torch.fx.passes.infra.pass_base import PassResult
 from torch_tensorrt.fx.passes.pass_utils import chain_passes
-from torch_tensorrt.fx.utils import LowerPrecision
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion.trt_interpreter import TRTInterpreter
-from torch_tensorrt.dynamo.runtime._PythonTorchTRTModule import TRTModule
+from torch_tensorrt.dynamo.runtime._PythonTorchTRTModule import PythonTorchTRTModule
 from torch_tensorrt import Input
 
 
@@ -67,7 +66,7 @@ class TRTTestCase(TestCase):
         interpreter,
         rtol,
         atol,
-        precision=LowerPrecision.FP32,
+        precision=torch.float,
     ):
         with torch.no_grad():
             cuda_inputs = []
@@ -80,10 +79,10 @@ class TRTTestCase(TestCase):
             if unexpected_ops:
                 self.assert_unexpected_op(mod, unexpected_ops)
             start = time.perf_counter()
-            interpreter_result = interpreter.run(lower_precision=precision)
+            interpreter_result = interpreter.run(precision=precision)
             sec = time.perf_counter() - start
             _LOGGER.info(f"Interpreter run time(s): {sec}")
-            trt_mod = TRTModule(
+            trt_mod = PythonTorchTRTModule(
                 interpreter_result.engine,
                 interpreter_result.input_names,
                 interpreter_result.output_names,
@@ -152,11 +151,9 @@ class TRTTestCase(TestCase):
                 self.assert_has_op(mod, expected_ops)
 
             interpreter_result = interpreter.run(
-                lower_precision=LowerPrecision.FP16
-                if fp16_mode
-                else LowerPrecision.FP32
+                precision=torch.half if fp16_mode else torch.float
             )
-            trt_mod = TRTModule(
+            trt_mod = PythonTorchTRTModule(
                 interpreter_result.engine,
                 interpreter_result.input_names,
                 interpreter_result.output_names,
@@ -180,7 +177,7 @@ class TRTTestCase(TestCase):
                     cuda_inputs.append(i.cuda())
 
                 mod.eval()
-                interpreter.run(lower_precision=LowerPrecision.FP32)
+                interpreter.run(precision=torch.float)
 
     def assert_has_op(self, mod, ops):
         ops_in_mod = set()
@@ -256,7 +253,7 @@ class DispatchTestCase(TRTTestCase):
         apply_passes=None,
         rtol=1e-03,
         atol=1e-03,
-        precision=LowerPrecision.FP32,
+        precision=torch.float,
     ):
         mod.eval()
         mod = self.generate_graph(mod, inputs, expected_ops, unexpected_ops, None)
@@ -283,7 +280,7 @@ class DispatchTestCase(TRTTestCase):
         atol=1e-03,
     ):
         mod.eval()
-        inputs = Input.create_inputs_from_specs(input_specs)
+        inputs = [spec.example_tensor("opt_shape") for spec in input_specs]
         mod = self.generate_graph(mod, inputs, expected_ops, unexpected_ops, None)
 
         interp = TRTInterpreter(
@@ -292,7 +289,7 @@ class DispatchTestCase(TRTTestCase):
         )
         # Since the lowering is based on optimal shape. We need to test with
         # different shape(for ex. max shape) for testing dynamic shape
-        inputs_max = Input.create_inputs_from_max_specs(input_specs)
+        inputs_max = [spec.example_tensor("max_shape") for spec in input_specs]
         super().run_test(
             mod, inputs_max, expected_ops, unexpected_ops, interp, rtol, atol
         )

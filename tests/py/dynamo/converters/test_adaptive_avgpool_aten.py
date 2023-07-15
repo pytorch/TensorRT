@@ -1,10 +1,8 @@
 import torch
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.test_utils import (
-    DispatchTestCase,
-    InputTensorSpec,
-)
+from torch_tensorrt.dynamo.test_utils import DispatchTestCase
+from torch_tensorrt import Input
 
 
 class TestAdaptiveAvgPoolConverter(DispatchTestCase):
@@ -60,7 +58,7 @@ class TestAdaptiveAvgPoolConverter(DispatchTestCase):
                 return self.pool(x)
 
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=(-1, -1, 256, 256),
                 dtype=torch.float32,
                 shape_ranges=[((1, 1, 256, 256), (3, 3, 256, 256), (5, 5, 256, 256))],
@@ -108,7 +106,7 @@ class TestAdaptiveAvgPoolConverter(DispatchTestCase):
                 return self.pool(x)
 
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=(-1, -1, 32, 64, 64),
                 dtype=torch.float32,
                 shape_ranges=[

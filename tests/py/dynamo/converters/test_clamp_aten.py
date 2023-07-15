@@ -1,10 +1,8 @@
 import torch
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.test_utils import (
-    DispatchTestCase,
-    InputTensorSpec,
-)
+from torch_tensorrt.dynamo.test_utils import DispatchTestCase
+from torch_tensorrt import Input
 
 
 class TestClampConverter(DispatchTestCase):
@@ -54,7 +52,7 @@ class TestClampConverter(DispatchTestCase):
                 return torch.clamp(y, min, max)
 
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=(-1, -1, 3, 3),
                 dtype=torch.float32,
                 shape_ranges=[((1, 1, 3, 3), (3, 3, 3, 3), (5, 5, 3, 3))],

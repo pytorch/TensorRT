@@ -1,9 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.test_utils import (
-    DispatchTestCase,
-    InputTensorSpec,
-)
+from torch_tensorrt.dynamo.test_utils import DispatchTestCase
+from torch_tensorrt import Input
 
 
 class TestBatchNormConverter(DispatchTestCase):
@@ -29,7 +27,7 @@ class TestBatchNormConverter(DispatchTestCase):
                 return self.bn(x)
 
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=(-1, 3, 5),
                 dtype=torch.float32,
                 shape_ranges=[((2, 3, 5), (6, 3, 5), (10, 3, 5))],
@@ -50,7 +48,7 @@ class TestBatchNormConverter(DispatchTestCase):
                 return self.bn(x)
 
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=(-1, 3, -1, -1),
                 dtype=torch.float32,
                 shape_ranges=[((1, 3, 1, 1), (1, 3, 5, 5), (2, 3, 10, 10))],
