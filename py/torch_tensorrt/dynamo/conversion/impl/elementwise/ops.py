@@ -8,14 +8,14 @@ from torch_tensorrt.fx.utils import (
     unified_dtype_converter,
     Frameworks,
 )
-from torch_tensorrt.dynamo.converters import SourceIR
+from torch_tensorrt.dynamo.conversion import SourceIR
 from torch_tensorrt.fx.converters.converter_utils import get_trt_tensor
 
-from torch_tensorrt.dynamo.converters.impl.elementwise.base import (
+from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
 )
-from torch_tensorrt.dynamo.converters.impl.unary.base import convert_unary
-from torch_tensorrt.dynamo.converters.impl.unary import sign
+from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
+from torch_tensorrt.dynamo.conversion.impl.unary import sign
 
 
 def trunc_div(

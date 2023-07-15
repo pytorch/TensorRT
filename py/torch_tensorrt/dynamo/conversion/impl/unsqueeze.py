@@ -3,7 +3,7 @@ from typing import Optional, cast
 from torch.fx.node import Target
 
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
-from torch_tensorrt.dynamo.converters import SourceIR
+from torch_tensorrt.dynamo.conversion import SourceIR
 from torch_tensorrt.fx.converters.converter_utils import (
     get_positive_dim,
     get_trt_tensor,

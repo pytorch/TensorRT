@@ -51,7 +51,7 @@ class TestLinearConverter(DispatchTestCase):
     #             return self.linear(x)
 
     #     input_specs = [
-    #         InputTensorSpec(
+    #         Input(
     #             shape=(-1, 3, 512),
     #             dtype=torch.float32,
     #             shape_ranges=[((1, 3, 512), (3, 3, 512), (4, 3, 512))],

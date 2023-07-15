@@ -8,13 +8,13 @@ from torch_tensorrt.fx.types import (
     TRTTensor,
 )
 
-from torch_tensorrt.dynamo.converters import SourceIR
+from torch_tensorrt.dynamo.conversion import SourceIR
 
 
-from torch_tensorrt.dynamo.converters.impl.elementwise.base import (
+from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
 )
-from torch_tensorrt.dynamo.converters.impl.unary.base import convert_unary
+from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
 
 
 def sign(

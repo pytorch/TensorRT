@@ -10,7 +10,7 @@ import logging
 
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 from torch_tensorrt.fx.utils import get_dynamic_dims
-from torch_tensorrt.dynamo.converters import SourceIR
+from torch_tensorrt.dynamo.conversion import SourceIR
 
 from torch_tensorrt.fx.converters.converter_utils import (
     get_trt_plugin,
@@ -20,11 +20,11 @@ from torch_tensorrt.fx.converters.converter_utils import (
     get_positive_dim,
 )
 
-from torch_tensorrt.dynamo.converters.impl.unary.base import (
+from torch_tensorrt.dynamo.conversion.impl.unary.base import (
     convert_unary,
 )
 
-from torch_tensorrt.dynamo.converters.impl.elementwise.base import (
+from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
 )
 

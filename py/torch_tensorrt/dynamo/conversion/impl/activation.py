@@ -12,7 +12,7 @@ from torch_tensorrt.fx.converters.converter_utils import (
     set_layer_name,
     get_trt_plugin,
 )
-from torch_tensorrt.dynamo.converters import SourceIR
+from torch_tensorrt.dynamo.conversion import SourceIR
 
 from torch_tensorrt.fx.types import (
     TRTNetwork,

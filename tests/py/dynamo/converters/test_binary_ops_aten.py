@@ -5,10 +5,8 @@ import torch.nn as nn
 
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.test_utils import (
-    DispatchTestCase,
-    InputTensorSpec,
-)
+from torch_tensorrt.dynamo.test_utils import DispatchTestCase
+from torch_tensorrt import Input
 
 NEED_TEST_BOTH_CONSTANTS_CASE = True
 
@@ -151,12 +149,12 @@ class TestBinaryOpConverters(DispatchTestCase):
                 return orig_op(x, y)
 
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=x_shape,
                 dtype=torch.float32,
                 shape_ranges=[x_shape_ranges],
             ),
-            InputTensorSpec(
+            Input(
                 shape=y_shape,
                 dtype=torch.float32,
                 shape_ranges=[y_shape_ranges],
@@ -190,12 +188,12 @@ class TestBinaryOpConverters(DispatchTestCase):
                 return orig_op(x, y)
 
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=(-1, -1, -1, -1),
                 dtype=torch.float32,
                 shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (5, 5, 5, 5))],
             ),
-            InputTensorSpec(
+            Input(
                 shape=(-1, -1, -1, -1),
                 dtype=torch.float32,
                 shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (5, 5, 5, 5))],

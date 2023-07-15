@@ -3,10 +3,8 @@ import torch.fx
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.test_utils import (
-    DispatchTestCase,
-    InputTensorSpec,
-)
+from torch_tensorrt.dynamo.test_utils import DispatchTestCase
+from torch_tensorrt import Input
 
 
 class TestUnsqueeze(DispatchTestCase):
@@ -49,7 +47,7 @@ class TestUnsqueeze(DispatchTestCase):
                 return torch.unsqueeze(x, self.dim)
 
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=(-1, 2, 3),
                 dtype=torch.float32,
                 shape_ranges=[((1, 2, 3), (2, 2, 3), (3, 2, 3))],

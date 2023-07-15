@@ -4,10 +4,8 @@ import tensorrt as trt
 import torch
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.test_utils import (
-    DispatchTestCase,
-    InputTensorSpec,
-)
+from torch_tensorrt.dynamo.test_utils import DispatchTestCase
+from torch_tensorrt import Input
 
 
 class TestReshapeConverter(DispatchTestCase):
@@ -58,7 +56,7 @@ class TestReshapeConverter(DispatchTestCase):
                 return torch.reshape(x, self.target_shape)
 
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=(-1, 2, 5),
                 dtype=torch.float32,
                 shape_ranges=[((1, 2, 5), (10, 2, 5), (10, 2, 5))],
@@ -82,12 +80,12 @@ class TestReshapeConverter(DispatchTestCase):
                 return torch.reshape(x, [-1, t, 3])
 
         input_specs = [
-            InputTensorSpec(
+            Input(
                 shape=(-1, 5, 6),
                 dtype=torch.float32,
                 shape_ranges=[((1, 5, 6), (3, 5, 6), (3, 5, 6))],
             ),
-            InputTensorSpec(
+            Input(
                 shape=(-1, 5),
                 dtype=torch.float32,
                 shape_ranges=[((1, 5), (3, 5), (3, 5))],
