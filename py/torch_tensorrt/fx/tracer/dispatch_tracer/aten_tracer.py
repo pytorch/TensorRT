@@ -3,10 +3,11 @@ import sys
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Union
 from packaging import version
+from torch_tensorrt._utils import sanitized_torch_version
 
 import torch
 
-if version.parse(torch.__version__) >= version.parse("2.dev"):
+if version.parse(sanitized_torch_version()) >= version.parse("2.dev"):
     import torch._dynamo as torchdynamo
 
 from torch.fx.passes.infra.pass_base import PassResult

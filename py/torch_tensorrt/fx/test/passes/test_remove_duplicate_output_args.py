@@ -8,6 +8,8 @@ import torch.fx as fx
 import torch.nn as nn
 
 import torch_tensorrt.fx.passes.remove_duplicate_output_args as dedup
+from torch_tensorrt._utils import sanitized_torch_version
+
 from torch.testing._internal.common_utils import run_tests, TestCase
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,7 +59,9 @@ graph():
     return add
 """.strip()
 
-        if version.parse(torch.__version__) < version.parse("2.1.0.dev20230620"):
+        if version.parse(sanitized_torch_version()) < version.parse(
+            "2.1.0.dev20230620"
+        ):
             ttop_graph_expected = ttop_graph_expected.replace("num_users", "#users")
 
         assert (
@@ -71,7 +75,9 @@ graph():
     return (x,)
 """.strip()
 
-        if version.parse(torch.__version__) < version.parse("2.1.0.dev20230620"):
+        if version.parse(sanitized_torch_version()) < version.parse(
+            "2.1.0.dev20230620"
+        ):
             ttop_a_graph_expected = ttop_a_graph_expected.replace("num_users", "#users")
 
         assert (

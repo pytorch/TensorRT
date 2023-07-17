@@ -12,7 +12,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
     replace_op_with_indices,
     run_const_fold,
 )
-
+from torch_tensorrt._utils import sanitized_torch_version
 from .types import Shape, TRTDataType
 
 
@@ -160,7 +160,7 @@ def req_torch_version(min_torch_version: str = "2.dev"):
         def function_wrapper(*args, **kwargs):
             # Parse minimum and current Torch versions
             min_version = version.parse(min_torch_version)
-            current_version = version.parse(torch.__version__)
+            current_version = version.parse(sanitized_torch_version())
 
             if current_version < min_version:
                 raise AssertionError(
