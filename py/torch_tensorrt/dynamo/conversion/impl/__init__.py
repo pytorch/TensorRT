@@ -1,6 +1,7 @@
 from torch_tensorrt.fx.converters.impl import convolution
 from . import condition
 from . import elementwise
+from . import embedding
 from . import normalization
 from . import slice
 from . import unary
