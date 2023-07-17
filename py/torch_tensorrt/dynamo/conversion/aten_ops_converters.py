@@ -4,7 +4,7 @@ import torch
 import tensorrt as trt
 from torch_tensorrt.fx.converters import acc_ops_converters
 from ..converter_registry import dynamo_tensorrt_converter
-from torch.fx.node import Argument, Target
+from torch.fx.node import Argument, Target, Node
 
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 from torch_tensorrt.dynamo.conversion import SourceIR, impl
@@ -69,6 +69,62 @@ def aten_ops_div(
         raise RuntimeError(
             f"Target {target} does not support rounding mode {rounding_mode}"
         )
+
+
+def embedding_param_validator(embedding_node: Node):
+
+    max_norm = args_bounds_check(embedding_node.args, 2)
+    norm_type = args_bounds_check(embedding_node.args, 3)
+    scale_grad_by_freq = args_bounds_check(embedding_node.args, 4)
+    sparse = args_bounds_check(embedding_node.args, 5)
+
+    if max_norm is not None:
+        _LOGGER.debug(
+            f"Currently we don't support specifying max_norm, got {max_norm}."
+        )
+        return False
+
+    if norm_type is not None and norm_type != 2.0:
+        _LOGGER.debug(
+            f"Currently we don't support specifying norm_type, got {norm_type}."
+        )
+        return False
+
+    if scale_grad_by_freq is not None:
+        _LOGGER.debug(
+            f"Currently we don't support specifying scale gradient by word frequency, got {scale_grad_by_freq}."
+        )
+        return False
+
+    if sparse is not None:
+        _LOGGER.debug(f"Currently we don't support sparse gradient, got {sparse}.")
+        return False
+
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.embedding.default, capability_validator=embedding_param_validator
+)
+def aten_ops_embedding(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.embedding.embedding(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[1],
+        weight=args[0],
+        max_norm=or_none(args, 2),
+        norm_type=or_none(args, 3),
+        scale_grad_by_freq=or_none(args, 4),
+        sparse=or_none(args, 5),
+    )
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar)
