@@ -11,6 +11,7 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import run_tests, TestCase
 from torch_tensorrt.fx.passes.lower_basic_pass import fix_reshape_batch_dim
 from torch_tensorrt.fx.tracer.acc_tracer import acc_tracer
+from torch_tensorrt._util import sanitized_torch_version
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,7 +44,9 @@ graph():
     %reshape : [num_users=1] = call_function[target=torch_tensorrt.fx.tracer.acc_tracer.acc_ops.reshape](args = (), kwargs = {input: %y, acc_out_ty: ((%getitem_1, -1, 3), None, None, None, None, None, None)})
     return reshape
 """
-        if version.parse(torch.__version__) < version.parse("2.1.0.dev20230620"):
+        if version.parse(sanitized_torch_version()) < version.parse(
+            "2.1.0.dev20230620"
+        ):
             expected_graph = expected_graph.replace("num_users", "#users")
 
         assert (

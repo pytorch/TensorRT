@@ -94,7 +94,7 @@ from torch_tensorrt._Device import Device
 
 from torch_tensorrt import fx
 
-if version.parse(torch.__version__) >= version.parse("2.1.dev"):
+if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
     from torch_tensorrt import dynamo
     from torch_tensorrt.dynamo import backend
 
