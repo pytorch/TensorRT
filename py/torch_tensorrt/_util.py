@@ -30,3 +30,11 @@ def get_build_info() -> str:
 
 def set_device(gpu_id):
     _C.set_device(gpu_id)
+
+
+def sanitized_torch_version() -> str:
+    return (
+        torch.__version__
+        if ".nv" not in torch.__version__
+        else torch.__version__.split(".nv")[0]
+    )
