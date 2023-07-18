@@ -6,8 +6,8 @@ import torch
 from torch_tensorrt.fx.utils import unified_dtype_converter, Frameworks
 
 
-class TRTModule(torch.nn.Module):
-    """TRTModule is a PyTorch module which encompasses an arbitrary TensorRT Engine.
+class PythonTorchTRTModule(torch.nn.Module):
+    """PythonTorchTRTModule is a PyTorch module which encompasses an arbitrary TensorRT Engine.
 
     This module is backed by the Torch-TensorRT runtime and is only compatibile with
     FX / Dynamo / Python deployments. This module cannot be serialized to torchscript via torch.jit.trace for C++ deployment.
@@ -16,8 +16,8 @@ class TRTModule(torch.nn.Module):
     def __init__(
         self, engine=None, input_names=None, output_names=None, cuda_graph_batch_size=-1
     ):
-        super(TRTModule, self).__init__()
-        self._register_state_dict_hook(TRTModule._on_state_dict)
+        super(PythonTorchTRTModule, self).__init__()
+        self._register_state_dict_hook(PythonTorchTRTModule._on_state_dict)
         self.engine = engine
         self.input_names = input_names
         self.output_names = output_names
@@ -94,7 +94,7 @@ class TRTModule(torch.nn.Module):
 
     def _check_initialized(self):
         if not self.initialized:
-            raise RuntimeError("TRTModule is not initialized.")
+            raise RuntimeError("PythonTorchTRTModule is not initialized.")
 
     def _on_state_dict(self, state_dict, prefix, local_metadata):
         self._check_initialized()
@@ -138,10 +138,12 @@ class TRTModule(torch.nn.Module):
             self.context = self.engine.create_execution_context()
 
     def forward(self, *inputs):
-        with torch.autograd.profiler.record_function("TRTModule:Forward"):
+        with torch.autograd.profiler.record_function("PythonTorchTRTModule:Forward"):
             self._check_initialized()
 
-            with torch.autograd.profiler.record_function("TRTModule:ProcessInputs"):
+            with torch.autograd.profiler.record_function(
+                "PythonTorchTRTModule:ProcessInputs"
+            ):
                 assert len(inputs) == len(
                     self.input_names
                 ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(inputs)}."
@@ -176,7 +178,9 @@ class TRTModule(torch.nn.Module):
                             f"Expect {self.input_shapes[i]}, got {inputs[i].size()[1:]}."
                         )
 
-            with torch.autograd.profiler.record_function("TRTModule:ProcessOutputs"):
+            with torch.autograd.profiler.record_function(
+                "PythonTorchTRTModule:ProcessOutputs"
+            ):
                 # create output tensors
                 outputs: List[torch.Tensor] = []
 
@@ -207,7 +211,9 @@ class TRTModule(torch.nn.Module):
                     )
                     bindings[idx] = output.data_ptr()
 
-            with torch.autograd.profiler.record_function("TRTModule:TensorRTRuntime"):
+            with torch.autograd.profiler.record_function(
+                "PythonTorchTRTModule:TensorRTRuntime"
+            ):
                 if self.engine.has_implicit_batch_dimension:
                     self.context.execute_async(
                         batch_size, bindings, torch.cuda.current_stream().cuda_stream

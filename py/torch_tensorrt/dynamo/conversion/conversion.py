@@ -1,7 +1,7 @@
 from typing import Sequence, Union
 import torch
 import io
-from torch_tensorrt.dynamo.runtime import TRTModule
+from torch_tensorrt.dynamo.runtime import _PythonTorchTRTModule
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt import Input
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
@@ -23,7 +23,7 @@ def convert_module(
         settings: Compilation settings
         name: TRT engine name
     Returns:
-        TRTModule or TRTModuleNext
+        _PythonTorchTRTModule or TorchTensorRTModule
     """
     # Specify module output data types to ensure TRT output types agree with
     # that of the equivalent Torch module
@@ -35,7 +35,7 @@ def convert_module(
     output_dtypes = list(output.dtype for output in module_outputs)
     interpreter = TRTInterpreter(
         module,
-        Input.from_tensors(inputs),
+        Input.from_tensors(inputs, disable_memory_format_check=True),
         logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
         output_dtypes=output_dtypes,
     )
@@ -53,7 +53,7 @@ def convert_module(
     )
 
     if settings.use_python_runtime:
-        return TRTModule(
+        return _PythonTorchTRTModule(
             engine=interpreter_result.engine,
             input_names=interpreter_result.input_names,
             output_names=interpreter_result.output_names,

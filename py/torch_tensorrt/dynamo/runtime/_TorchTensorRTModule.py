@@ -36,7 +36,7 @@ class TorchTensorRTModule(torch.nn.Module):
         output_binding_names: List[str] = [],
         target_device: Device = Device._current_device(),
     ):
-        """__init__ method for torch_tensorrt.TorchTensorRTModule
+        """__init__ method for torch_tensorrt.dynamo.runtime._TorchTensorRTModule.TorchTensorRTModule
 
         Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it.
@@ -61,11 +61,11 @@ class TorchTensorRTModule(torch.nn.Module):
                     engine_bytes.write(trt_engine.serialize())
                     engine_str = engine_bytes.getvalue()
 
-                trt_module = TRTModule(
+                trt_module = TorchTensorRTModule(
                     engine_str,
-                    engine_name="my_module",
-                    input_names=["x"],
-                    output_names=["output"],
+                    name="my_module",
+                    input_binding_names=["x"],
+                    output_binding_names=["output"],
                 )
 
         """

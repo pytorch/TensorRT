@@ -1,2 +1,2 @@
-from ._PythonTorchTRTModule import TRTModule
+from ._PythonTorchTRTModule import PythonTorchTRTModule
 from ._TorchTensorRTModule import TorchTensorRTModule

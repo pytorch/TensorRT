@@ -302,47 +302,58 @@ class Input(object):
         return result_domain
 
     @classmethod
-    def from_tensor(cls, t: torch.Tensor) -> "Input":
+    def from_tensor(
+        cls, t: torch.Tensor, disable_memory_format_check: bool = False
+    ) -> "Input":
         """
         Produce a Input which contains the information of the given PyTorch tensor.
 
         Args:
             tensor (torch.Tensor): A PyTorch tensor.
+            disable_memory_format_check (bool): Whether to validate the memory formats of input tensors
 
         Returns:
             A Input object.
         """
-        if not any(
-            [
-                t.is_contiguous(memory_format=torch.contiguous_format),
-                t.is_contiguous(memory_format=torch.channels_last),
-            ]
+        if not (
+            t.is_contiguous(memory_format=torch.contiguous_format)
+            or t.is_contiguous(memory_format=torch.channels_last)
+            or disable_memory_format_check
         ):
             raise ValueError(
                 "Tensor does not have a supported memory format, supported formats are contiguous or channel_last"
             )
         frmt = (
             torch.contiguous_format
-            if t.is_contiguous(memory_format=torch.contiguous_format)
+            if (
+                t.is_contiguous(memory_format=torch.contiguous_format)
+                or disable_memory_format_check
+            )
             else torch.channels_last
         )
         return cls(shape=t.shape, dtype=t.dtype, format=frmt)
 
     @classmethod
-    def from_tensors(cls, ts: torch.Tensor) -> List["Input"]:
+    def from_tensors(
+        cls, ts: torch.Tensor, disable_memory_format_check: bool = False
+    ) -> List["Input"]:
         """
         Produce a list of Inputs which contain
         the information of all the given PyTorch tensors.
 
         Args:
             tensors (Iterable[torch.Tensor]): A list of PyTorch tensors.
+            disable_memory_format_check (bool): Whether to validate the memory formats of input tensors
 
         Returns:
             A list of Inputs.
         """
 
         assert isinstance(ts, (list, tuple))
-        return [cls.from_tensor(t) for t in ts]
+        return [
+            cls.from_tensor(t, disable_memory_format_check=disable_memory_format_check)
+            for t in ts
+        ]
 
     def example_tensor(self, optimization_profile_field: str = None) -> torch.Tensor:
         """

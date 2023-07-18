@@ -24,16 +24,22 @@ class TestPrepareDevice(unittest.TestCase):
 class TestPrepareInputs(unittest.TestCase):
     def test_prepare_single_tensor_input(self):
         inputs = [torch.ones((4, 4))]
-        prepared_inputs = prepare_inputs(inputs)
+        prepared_inputs_trt, prepared_inputs_torch = prepare_inputs(inputs)
         self.assertTrue(
-            same_output_format(inputs, prepared_inputs, enforce_tensor_type=False)
+            same_output_format(inputs, prepared_inputs_trt, enforce_tensor_type=False)
+        )
+        self.assertTrue(
+            same_output_format(inputs, prepared_inputs_torch, enforce_tensor_type=False)
         )
 
     def test_prepare_trt_input(self):
         inputs = [torch_tensorrt.Input(shape=(4, 3), dtype=torch.float)]
-        prepared_inputs = prepare_inputs(inputs)
+        prepared_inputs_trt, prepared_inputs_torch = prepare_inputs(inputs)
         self.assertTrue(
-            same_output_format(inputs, prepared_inputs, enforce_tensor_type=False)
+            same_output_format(inputs, prepared_inputs_trt, enforce_tensor_type=False)
+        )
+        self.assertTrue(
+            same_output_format(inputs, prepared_inputs_torch, enforce_tensor_type=False)
         )
 
     def test_prepare_mixed_type_compound_tensor_input(self):
@@ -47,9 +53,12 @@ class TestPrepareInputs(unittest.TestCase):
                 (torch.rand((5, 1)), torch_tensorrt.Input(shape=(2, 3))),
             ),
         }
-        prepared_inputs = prepare_inputs(inputs)
+        prepared_inputs_trt, prepared_inputs_torch = prepare_inputs(inputs)
         self.assertTrue(
-            same_output_format(inputs, prepared_inputs, enforce_tensor_type=False)
+            same_output_format(inputs, prepared_inputs_trt, enforce_tensor_type=False)
+        )
+        self.assertTrue(
+            same_output_format(inputs, prepared_inputs_torch, enforce_tensor_type=False)
         )
 
 

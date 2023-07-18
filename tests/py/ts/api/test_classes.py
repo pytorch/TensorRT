@@ -1,6 +1,6 @@
 import unittest
 import torch_tensorrt as torchtrt
-from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule
+from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 import torch
 import torchvision.models as models
 import copy

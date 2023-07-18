@@ -36,7 +36,7 @@ def use_python_runtime_parser(use_python_runtime: Optional[bool] = None) -> bool
             reason = "since import failed, C++ dependency not installed"
 
     logger.info(
-        f"Using {'Python' if using_python_runtime else 'C++'} {reason} TRT Runtime"
+        f"Using {'Python-only' if using_python_runtime else 'Default'} Torch-TRT Runtime ({reason})"
     )
 
     return using_python_runtime
