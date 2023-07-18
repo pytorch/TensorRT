@@ -11,7 +11,7 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import run_tests, TestCase
 from torch_tensorrt.fx.passes.lower_basic_pass import fix_reshape_batch_dim
 from torch_tensorrt.fx.tracer.acc_tracer import acc_tracer
-from torch_tensorrt._utils import sanitized_torch_version
+from torch_tensorrt._util import sanitized_torch_version
 
 _LOGGER = logging.getLogger(__name__)
 

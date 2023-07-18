@@ -84,7 +84,7 @@ except:
 import torch
 
 from torch_tensorrt._compile import *
-from torch_tensorrt.ts._util import *
+from torch_tensorrt._util import *
 from torch_tensorrt import ts
 from torch_tensorrt import ptq
 from torch_tensorrt._enums import *
@@ -93,7 +93,6 @@ from torch_tensorrt._Input import Input
 from torch_tensorrt._Device import Device
 
 from torch_tensorrt import fx
-from torch_tensorrt._utils import sanitized_torch_version
 
 if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
     from torch_tensorrt import dynamo

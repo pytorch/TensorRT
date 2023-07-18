@@ -12,7 +12,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
     replace_op_with_indices,
     run_const_fold,
 )
-from torch_tensorrt._utils import sanitized_torch_version
+from torch_tensorrt._util import sanitized_torch_version
 from .types import Shape, TRTDataType
 
 
