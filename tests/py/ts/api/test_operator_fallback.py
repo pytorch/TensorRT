@@ -23,6 +23,7 @@ class TestFallbackModels(unittest.TestCase):
             },
             "enabled_precisions": {torch.float},
             "torch_executed_ops": ["aten::add"],
+            "ir": "ts",
         }
         trt_mod = torchtrt.compile(self.model, **compile_spec)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
@@ -49,6 +50,7 @@ class TestFallbackModels(unittest.TestCase):
             },
             "enabled_precisions": {torch.float},
             "torch_executed_ops": ["aten::add"],
+            "ir": "ts",
         }
         trt_mod = torchtrt.compile(self.model, **compile_spec)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
@@ -72,6 +74,7 @@ class TestFallbackModels(unittest.TestCase):
             },
             "enabled_precisions": {torch.float},
             "torch_executed_ops": ["aten::hardtanh"],
+            "ir": "ts",
         }
         trt_mod = torchtrt.compile(self.model, **compile_spec)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))

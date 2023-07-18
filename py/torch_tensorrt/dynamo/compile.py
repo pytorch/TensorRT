@@ -8,6 +8,7 @@ from typing import Any, Optional, Sequence
 from torch_tensorrt import EngineCapability, Device
 from torch.fx.passes.pass_manager import PassManager
 from torch.fx.passes.shape_prop import ShapeProp
+from torch.fx.passes.splitter_base import SplitResult
 from torch_tensorrt.dynamo.aten_tracer import trace
 from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 from torch_tensorrt.dynamo.lowering import (
@@ -17,6 +18,7 @@ from torch_tensorrt.dynamo.lowering import (
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.utils import prepare_inputs, prepare_device
 from torch_tensorrt.dynamo.backend import torch_tensorrt_backend
+from torch_tensorrt.dynamo.backend.backends import _compile_module
 from torch_tensorrt.dynamo.conversion import convert_module
 
 from torch_tensorrt.dynamo._defaults import (
@@ -124,7 +126,7 @@ def compile(
 
 
 def _compile_graph(
-    split_result: TRTSplitter,
+    split_result: SplitResult,
     inputs: Any,
     settings: CompilationSettings = CompilationSettings(),
     **kwargs,

@@ -23,6 +23,7 @@ class TestModuleFallback(unittest.TestCase):
             },
             "enabled_precisions": {torch.float},
             "torch_executed_modules": ["torchvision.models.resnet.BasicBlock"],
+            "ir": "ts",
         }
         trt_mod = torchtrt.compile(self.model, **compile_spec)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
@@ -49,6 +50,7 @@ class TestModuleFallback(unittest.TestCase):
                 "torchvision.models.mobilenetv2.ConvBNActivation"
             ],
             "min_block_size": 5,
+            "ir": "ts",
         }
         trt_mod = torchtrt.compile(self.model, **compile_spec)
         cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
