@@ -27,6 +27,7 @@ class TestModelToEngineToModel(unittest.TestCase):
                 "gpu_id": 0,
             },
             "enabled_precisions": {torch.float},
+            "ir": "ts",
         }
         rn18_trt_mod = torchtrt.compile(self.resnet18, **compile_spec)
         rn50_trt_mod = torchtrt.compile(self.resnet50, **compile_spec)

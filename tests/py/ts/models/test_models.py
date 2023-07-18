@@ -25,6 +25,7 @@ class TestModels(unittest.TestCase):
                 "gpu_id": 0,
             },
             "enabled_precisions": {torch.float},
+            "ir": "ts",
         }
 
         trt_mod = torchtrt.compile(self.model, **compile_spec)
@@ -49,6 +50,7 @@ class TestModels(unittest.TestCase):
                 "gpu_id": 0,
             },
             "enabled_precisions": {torch.float},
+            "ir": "ts",
         }
 
         trt_mod = torchtrt.compile(self.model, **compile_spec)
@@ -75,6 +77,7 @@ class TestModels(unittest.TestCase):
                 "gpu_id": 0,
             },
             "enabled_precisions": {torch.float},
+            "ir": "ts",
         }
 
         trt_mod = torchtrt.compile(self.model, **compile_spec)
@@ -107,6 +110,7 @@ class TestModels(unittest.TestCase):
             },
             "enabled_precisions": {torch.float},
             "truncate_long_and_double": True,
+            "ir": "ts",
         }
         with torchtrt.logging.errors():
             trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
@@ -137,6 +141,7 @@ class TestModels(unittest.TestCase):
                 "gpu_id": 0,
             },
             "enabled_precisions": {torch.half},
+            "ir": "ts",
         }
 
         trt_mod = torchtrt.compile(self.scripted_model, **compile_spec)
