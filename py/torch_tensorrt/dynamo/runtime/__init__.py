@@ -1,2 +1,2 @@
-from ._PythonTorchTRTModule import PythonTorchTRTModule
-from ._TorchTensorRTModule import TorchTensorRTModule
+from ._PythonTorchTensorRTModule import PythonTorchTensorRTModule  # noqa: F401
+from ._TorchTensorRTModule import TorchTensorRTModule  # noqa: F401

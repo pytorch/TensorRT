@@ -899,7 +899,6 @@ def acc_ops_relu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return activation.relu(
         network,
         target,
@@ -917,7 +916,6 @@ def acc_ops_leaky_relu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return activation.leaky_relu(
         network, target, SourceIR.ACC, name, kwargs["input"], kwargs["negative_slope"]
     )
@@ -931,7 +929,6 @@ def acc_ops_elu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return activation.elu(
         network,
         target,
@@ -950,7 +947,6 @@ def acc_ops_selu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return activation.selu(
         network,
         target,
@@ -2494,7 +2490,6 @@ def acc_ops_where(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     condition_t = kwargs["condition"]
     x_t = kwargs["x"]
     y_t = kwargs["y"]
@@ -3081,7 +3076,6 @@ def acc_ops_sigmoid(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return activation.sigmoid(
         network,
         target,
@@ -3473,7 +3467,6 @@ def acc_ops_hardtanh(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return activation.hardtanh(
         network,
         target,

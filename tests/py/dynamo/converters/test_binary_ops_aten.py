@@ -6,7 +6,7 @@ import torch.nn as nn
 
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.test_utils import DispatchTestCase
+from harness import DispatchTestCase
 from torch_tensorrt import Input
 
 NEED_TEST_BOTH_CONSTANTS_CASE = True

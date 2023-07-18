@@ -2138,7 +2138,6 @@ def linalg_norm(*, input, ord, dim, keepdim):
     ],
 )
 def norm_mapper(node: torch.fx.Node, _: torch.nn.Module) -> torch.fx.Node:
-
     input_node = node.kwargs["input"]
     p = node.kwargs["p"]
     dim = node.kwargs["dim"]

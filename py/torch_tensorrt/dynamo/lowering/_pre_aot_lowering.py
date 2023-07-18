@@ -1,10 +1,16 @@
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Type, Union
-import torch
 import logging
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Optional, Type, TypeAlias
 
+import torch
+from torch._ops import OpOverload
+from torch.fx import GraphModule, Node
 
 logger = logging.getLogger(__name__)
+
+SubgraphInsertionFnType: TypeAlias = Callable[
+    [GraphModule, Node, Optional[torch.nn.Module]], Node
+]
 
 
 @dataclass(frozen=True)
@@ -18,22 +24,20 @@ class Substitution:
     # and returning a replacement node, with type 'call_function', or raising an Error if
     # incompatibility is detected
     # Note: subgraph_insertion_fn should NOT delete nodes or recompile the graph
-    subgraph_insertion_fn: Callable[
-        [torch.fx.GraphModule, torch.fx.Node, Optional[torch.nn.Module]], torch.fx.Node
-    ]
+    subgraph_insertion_fn: SubgraphInsertionFnType
 
 
 # Dictionary mapping module to Substitution instance
 SUBSTITUTION_REGISTRY: Dict[
-    Union[Type[torch.nn.Module], Callable], Substitution
+    (Type[torch.nn.Module] | Callable[..., Any]), Substitution
 ] = dict()
 
 
 def register_substitution(
-    module_or_function_to_replace: Union[Type[torch.nn.Module], Callable],
-    new_operator: torch._ops.OpOverload,
+    module_or_function_to_replace: (Type[torch.nn.Module] | Callable[..., Any]),
+    new_operator: OpOverload,
     enabled: bool = True,
-) -> Callable[[Any], Any]:
+) -> Callable[[SubgraphInsertionFnType], SubgraphInsertionFnType]:
     """Decorator to register subgraph insertion functions
 
     Args:
@@ -44,7 +48,9 @@ def register_substitution(
         torch.fx.GraphModule
     """
 
-    def enable_substitution(subgraph_insertion_fn):
+    def enable_substitution(
+        subgraph_insertion_fn: SubgraphInsertionFnType,
+    ) -> SubgraphInsertionFnType:
         """Function for use if substitution is enabled"""
         replacement = Substitution(
             new_operator=new_operator, subgraph_insertion_fn=subgraph_insertion_fn
@@ -52,14 +58,16 @@ def register_substitution(
         SUBSTITUTION_REGISTRY[module_or_function_to_replace] = replacement
         return subgraph_insertion_fn
 
-    def disable_substitution(subgraph_insertion_fn):
+    def disable_substitution(
+        subgraph_insertion_fn: SubgraphInsertionFnType,
+    ) -> SubgraphInsertionFnType:
         """Function for use if substitution is disabled"""
         return subgraph_insertion_fn
 
     return enable_substitution if enabled else disable_substitution
 
 
-def pre_aot_substitutions(gm: torch.fx.GraphModule):
+def pre_aot_substitutions(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """Perform graph substitutions prior to AOT tracing
 
     Args:
@@ -92,6 +100,7 @@ def pre_aot_substitutions(gm: torch.fx.GraphModule):
         # If submodule/function is a member of the substitution registry, replace it
         if exists_in_registry:
             try:
+                assert to_replace is not None
                 replacement = SUBSTITUTION_REGISTRY[to_replace]
                 op, insertion_fn = (
                     replacement.new_operator,

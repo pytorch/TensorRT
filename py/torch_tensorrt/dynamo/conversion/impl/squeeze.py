@@ -1,14 +1,12 @@
-from typing import Optional, cast, Any
+from typing import Any, Optional, cast
 
 from torch.fx.node import Target
-
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.fx.converters.converter_utils import (
     get_positive_dim,
     set_layer_name,
 )
-
+from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 from torch_tensorrt.fx.utils import get_dynamic_dims
 
 
@@ -38,7 +36,6 @@ def squeeze(
     assert not (len(dims) == 0), "We don't support dim=None right now for squeeze."
 
     for dim in dims:
-        dim = cast(Optional[int], dim)
         dim = get_positive_dim(
             dim,
             len(input.shape) + (1 if network.has_implicit_batch_dimension else 0),

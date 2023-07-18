@@ -1,14 +1,17 @@
 from torch_tensorrt.fx.converters.impl import convolution
-from . import condition
-from . import elementwise
-from . import embedding
-from . import normalization
-from . import slice
-from . import unary
-from . import activation
-from . import matmul
-from . import select
-from . import shape
-from . import squeeze
-from . import unsqueeze
-from . import permutation
+
+from . import (
+    activation,
+    condition,
+    elementwise,
+    embedding,
+    matmul,
+    normalization,
+    permutation,
+    select,
+    shape,
+    slice,
+    squeeze,
+    unary,
+    unsqueeze,
+)

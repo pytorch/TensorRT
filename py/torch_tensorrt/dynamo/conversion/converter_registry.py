@@ -1,13 +1,35 @@
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Optional, Sequence, Union, List
 from enum import Enum, auto
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+    cast,
+)
 
-from torch.fx.node import Target, Node, _get_qualified_name
+from torch.fx.node import Argument, Node, Target, _get_qualified_name
 from torch_tensorrt.fx.converter_registry import CONVERTERS
-
+from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 
 logger = logging.getLogger(__name__)
+
+ConverterImplSignature = Callable[
+    [
+        TRTNetwork,
+        Target,
+        Tuple[Argument, ...],
+        Dict[str, Argument],
+        str,
+    ],
+    TRTTensor | Sequence[TRTTensor],
+]
 
 
 class ConverterPriority(Enum):
@@ -28,7 +50,7 @@ class ConverterSupport:
             this function must not modify the node or its graph
     """
 
-    converter_implementation: Callable
+    converter_implementation: ConverterImplSignature
     capability_validator: Callable[[Node], bool] = field(default=lambda node: True)
 
 
@@ -61,7 +83,7 @@ def dynamo_tensorrt_converter(
         The converter being decorated
     """
 
-    def register_converter(converter):
+    def register_converter(converter: ConverterImplSignature) -> ConverterImplSignature:
         """Helper function to register the converter, then return it"""
         assert callable(converter), "Converter function must be callable"
 
@@ -95,7 +117,7 @@ def dynamo_tensorrt_converter(
 
         return converter
 
-    def disable_converter(converter):
+    def disable_converter(converter: ConverterImplSignature) -> ConverterImplSignature:
         return converter
 
     # Select whether to cache/enable the converter
@@ -123,15 +145,17 @@ class ConverterRegistry:
 
     def __init__(
         self,
-        registries: Sequence[Dict[Target, Union[Callable, Sequence[ConverterSupport]]]],
+        registries: Sequence[
+            Dict[Target, Union[Callable[..., Any], Sequence[ConverterSupport]]]
+        ],
         registry_names: Optional[Sequence[str]] = None,
     ):
         # Copy reference to each dictionary object into attribute list
-        self.registries = [registry for registry in registries]
+        self.registries = list(registries)
 
         if registry_names is not None:
             assert len(self.registries) == len(registry_names)
-            self.registry_names = [name for name in registry_names]
+            self.registry_names = list(registry_names)
         else:
             self.registry_names = [
                 f"Registry {i + 1}" for i in range(len(self.registries))
@@ -139,7 +163,7 @@ class ConverterRegistry:
 
         self.validate_invariants()
 
-    def validate_invariants(self):
+    def validate_invariants(self) -> None:
         """Validates the invariants required of the dictionaries in the registries
 
         Raises AssertionError if any invariants have been violated
@@ -160,7 +184,11 @@ class ConverterRegistry:
                 else:
                     assert callable(converters), "Converter function must be callable"
 
-    def __getitem_without_validation__(self, key: Target):
+    def __getitem_without_validation__(
+        self, key: Target
+    ) -> (
+        Any
+    ):  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
         """Get the first-found converter in any registry
 
         Searches all registries in order and returns the first converter encountered
@@ -185,7 +213,11 @@ class ConverterRegistry:
 
         raise KeyError(f"None of the converter registries have an entry for {key}")
 
-    def __getitem__(self, node: Node):
+    def __getitem__(
+        self, node: Node
+    ) -> (
+        Any
+    ):  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
         """Get the first-found validated converter in any registry
 
         Searches all registries in order and returns the first converter
@@ -218,25 +250,33 @@ class ConverterRegistry:
             f"None of the converter registries have a validated entry for {key}, with node {node}"
         )
 
-    def keys(self):
+    def keys(self) -> Set[Target]:
         """Get all unique targets across all dictionaries"""
         return self.unique_targets()
 
-    def get_unvalidated(self, key: Target, value=None):
+    def get_unvalidated(
+        self, key: Target, value: Optional[ConverterImplSignature] = None
+    ) -> (
+        Any
+    ):  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
         """Get unvalidated converter for input target with a default return"""
         try:
             return self.__getitem_without_validation__(key)
         except KeyError:
             return value
 
-    def get(self, node: Node, value=None):
+    def get(
+        self, node: Node, value: Optional[ConverterImplSignature] = None
+    ) -> (
+        Any
+    ):  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
         """Get validated converter for input node with a default return"""
         try:
             return self.__getitem__(node)
         except KeyError:
             return value
 
-    def __contains__(self, key: Union[Target, Node]):
+    def __contains__(self, key: Target | Node) -> bool:
         """Check whether a converter for an input node or target exists"""
         try:
             # Attempt to access the item in the registry
@@ -251,7 +291,9 @@ class ConverterRegistry:
 
     def get_all_converters_with_target(
         self, key: Target, return_registry_info: bool = False
-    ):
+    ) -> Tuple[
+        List[Any], Dict[str, int] | None
+    ]:  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
         """Get all converters across all registries for the target
 
         Returns a list of all converterts having the specified target
@@ -283,25 +325,25 @@ class ConverterRegistry:
         if return_registry_info:
             return converters_with_target, registry_data
         else:
-            return converters_with_target
+            return converters_with_target, None
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: Any, value: Any) -> None:
         raise AssertionError(
-            f"Do not set registry members directly through the ConverterRegistry object. "
+            "Do not set registry members directly through the ConverterRegistry object. "
             + f"Attempted to set {key}: {value} via direct assignment to ConverterRegistry."
         )
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: Any) -> None:
         raise AssertionError(
-            f"Do not delete registry members directly through the ConverterRegistry object. "
+            "Do not delete registry members directly through the ConverterRegistry object. "
             + f"Attempted to delete {key} via direct del on ConverterRegistry."
         )
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Returns the sum of lengths of all registries stored"""
         return sum(len(registry) for registry in self.registries)
 
-    def unique_targets(self):
+    def unique_targets(self) -> Set[Target]:
         """Returns the set of unique converter targets stored across all registries"""
         return set.union(*[set(registry.keys()) for registry in self.registries])
 
@@ -311,9 +353,9 @@ class ConverterRegistry:
         if isinstance(target, str):
             return target
         else:
-            return _get_qualified_name(target)
+            return cast(str, _get_qualified_name(target))
 
-    def get_converter_support_info(self) -> Dict[str, Dict[str, int]]:
+    def get_converter_support_info(self) -> Dict[str, Optional[Dict[str, int]]]:
         """Returns a dictionary of targets backed by at least one converter"""
         available_converters = {}
         for target in sorted(
@@ -330,7 +372,7 @@ class ConverterRegistry:
         available_converters = "Available converters in ATen registries with counts:\n"
 
         support_info = self.get_converter_support_info()
-        for target, registry_data in support_info.keys():
+        for target, registry_data in support_info.items():
             available_converters += f"Node: {self.qualified_name_or_str(target)} - Registry Presence Counts: {registry_data}\n"
 
         return available_converters
@@ -339,6 +381,6 @@ class ConverterRegistry:
 # Initialize dynamo converter registry with the FX and Dynamo aten registries
 # Note the Dynamo registry is listed first, for precedence
 DYNAMO_CONVERTERS: ConverterRegistry = ConverterRegistry(
-    [DYNAMO_ATEN_CONVERTERS, CONVERTERS],
+    [DYNAMO_ATEN_CONVERTERS, CONVERTERS],  # type: ignore[list-item]
     ["Dynamo ATen Converters Registry", "FX ATen Converters Registry"],
 )

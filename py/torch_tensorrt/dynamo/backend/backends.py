@@ -1,45 +1,37 @@
 import logging
-from typing import Sequence
-import torch
 from functools import partial
-import torch._dynamo as td
+from typing import Any, Callable, Sequence
 
+import torch
+import torch._dynamo as td
+from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
 from torch_tensorrt.dynamo import CompilationSettings
-from torch_tensorrt.dynamo.lowering._decompositions import (
-    get_decompositions,
-)
-from torch_tensorrt.dynamo.lowering._pre_aot_lowering import (
-    pre_aot_substitutions,
-)
-from torch_tensorrt.dynamo.lowering._partition import (
-    partition,
-    get_submod_inputs,
-)
-from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs
 from torch_tensorrt.dynamo.conversion import (
     convert_module,
     repair_long_or_double_inputs,
 )
-
-from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
-
+from torch_tensorrt.dynamo.lowering._decompositions import get_decompositions
+from torch_tensorrt.dynamo.lowering._partition import get_submod_inputs, partition
+from torch_tensorrt.dynamo.lowering._pre_aot_lowering import pre_aot_substitutions
+from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs
 
 logger = logging.getLogger(__name__)
 
 
-@td.register_backend(name="torch_tensorrt")
+@td.register_backend(name="torch_tensorrt")  # type: ignore[misc]
 def torch_tensorrt_backend(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor], **kwargs
-):
+    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor], **kwargs: Any
+) -> torch.nn.Module:
     DEFAULT_BACKEND = aot_torch_tensorrt_aten_backend
 
-    return DEFAULT_BACKEND(gm, sample_inputs, **kwargs)
+    compiled_mod: torch.nn.Module = DEFAULT_BACKEND(gm, sample_inputs, **kwargs)
+    return compiled_mod
 
 
-@td.register_backend(name="aot_torch_tensorrt_aten")
+@td.register_backend(name="aot_torch_tensorrt_aten")  # type: ignore[misc]
 def aot_torch_tensorrt_aten_backend(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor], **kwargs
-):
+    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor], **kwargs: Any
+) -> torch.nn.Module:
     settings = parse_dynamo_kwargs(kwargs)
 
     custom_backend = partial(
@@ -63,7 +55,7 @@ def _pretraced_backend(
     gm: torch.fx.GraphModule,
     sample_inputs: Sequence[torch.Tensor],
     settings: CompilationSettings = CompilationSettings(),
-):
+) -> torch.fx.GraphModule | Callable[..., Any]:
     """Helper function to manage translation of traced FX module to TRT engines
 
     Args:
@@ -82,7 +74,7 @@ def _pretraced_backend(
             settings=settings,
         )
         return trt_compiled
-    except:
+    except AssertionError:
         if not settings.pass_through_build_failures:
             logger.warning(
                 "TRT conversion failed on the subgraph. See trace above. "
@@ -138,6 +130,7 @@ def _compile_module(
             partitioned_module, submodule, sample_inputs
         )
 
+        assert submodule_inputs is not None
         # Handle long/double inputs if requested by the user
         if settings.truncate_long_and_double:
             submodule_inputs = repair_long_or_double_inputs(

@@ -1,26 +1,22 @@
 import logging
 import warnings
 from datetime import datetime
-from packaging import version
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set
 
 import numpy
-
-# @manual=//deeplearning/trt/python:py_tensorrt
-import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
+from torch_tensorrt._Input import Input
+from torch_tensorrt.fx.observer import Observer
+from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
+
+# @manual=//deeplearning/trt/python:py_tensorrt
+import tensorrt as trt
+from packaging import version
 
 from .converter_registry import DYNAMO_CONVERTERS as CONVERTERS
-from torch_tensorrt import Input
-from torch_tensorrt.fx.observer import Observer
-from torch_tensorrt.fx.utils import (
-    get_dynamic_dims,
-    unified_dtype_converter,
-    Frameworks,
-)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -36,17 +32,18 @@ class TRTInterpreterResult(NamedTuple):
     serialized_cache: bytearray
 
 
-class TRTInterpreter(torch.fx.Interpreter):
+class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     def __init__(
         self,
         module: torch.fx.GraphModule,
         input_specs: List[Input],
-        logger_level=None,
-        output_dtypes=None,
+        logger_level: trt.ILogger.Severity = trt.ILogger.Severity.WARNING,
+        output_dtypes: Optional[List[torch.dtype]] = None,
     ):
         super().__init__(module)
 
-        self.logger = trt.Logger(logger_level or trt.Logger.WARNING)
+        # TODO: @narendasan replace with Torch-TensorRT Logger
+        self.logger = trt.Logger(logger_level)
         self.builder = trt.Builder(self.logger)
 
         flag = 0
@@ -59,12 +56,13 @@ class TRTInterpreter(torch.fx.Interpreter):
 
         missing_ops = self.validate_conversion()
         if missing_ops:
+            # TODO: @narendasan make sure to set logging.captureWarnings(True)
             warnings.warn(
                 "Interpretation will fail due to missing operations \n"
                 + "\n".join(f"{i}" for i in missing_ops)
             )
 
-        self.optimization_profiles = (
+        self.optimization_profiles: Optional[List[trt.IOptimizationProfile]] = (
             [self.builder.create_optimization_profile()]
             if any(
                 input_spec.shape_mode == Input._ShapeMode.DYNAMIC
@@ -86,37 +84,37 @@ class TRTInterpreter(torch.fx.Interpreter):
         # Data types for TRT Module output Tensors
         self.output_dtypes = output_dtypes
 
-    def validate_conversion(self):
-        missing_converter = set()
+    def validate_conversion(self) -> Set[str]:
+        missing_converters: Set[str] = set()
 
         for node in self.module.graph.nodes:
             if node.op == "call_function" and not CONVERTERS.get(node):
-                missing_converter.add(f"{node.op} {_get_qualified_name(node.target)}")
+                missing_converters.add(f"{node.op} {_get_qualified_name(node.target)}")
             elif node.op == "call_method" and not CONVERTERS.get(node):
-                missing_converter.add(f"{node.op} torch.Tensor.{node.target}")
+                missing_converters.add(f"{node.op} torch.Tensor.{node.target}")
             elif node.op == "call_module":
                 submod = self.fetch_attr(node.target)
                 submod_type = getattr(submod, "_base_class_origin", type(submod))
                 if not CONVERTERS.get(node):
-                    missing_converter.add(f"{node.op} {torch.typename(submod_type)}")
+                    missing_converters.add(f"{node.op} {torch.typename(submod_type)}")
 
-        return missing_converter
+        return missing_converters
 
     def run(
         self,
-        workspace_size=0,
-        precision=torch.float32,
-        sparse_weights=False,
-        disable_tf32=False,
-        force_fp32_output=False,
-        strict_type_constraints=False,
-        algorithm_selector=None,
-        timing_cache=None,
-        profiling_verbosity=None,
-        tactic_sources=None,
-        max_aux_streams=None,
-        version_compatible=False,
-        optimization_level=None,
+        workspace_size: int = 0,
+        precision: torch.dtype = torch.float32,  # TODO: @peri044 Needs to be expanded to set
+        sparse_weights: bool = False,
+        disable_tf32: bool = False,
+        force_fp32_output: bool = False,
+        strict_type_constraints: bool = False,
+        algorithm_selector: Optional[trt.IAlgorithmSelector] = None,
+        timing_cache: Optional[trt.ITimingCache] = None,
+        profiling_verbosity: Optional[trt.ProfilingVerbosity] = None,
+        tactic_sources: Optional[int] = None,
+        max_aux_streams: Optional[int] = None,
+        version_compatible: bool = False,
+        optimization_level: Optional[int] = None,
     ) -> TRTInterpreterResult:
         """
         Build TensorRT engine with some configs.
@@ -183,7 +181,7 @@ class TRTInterpreter(torch.fx.Interpreter):
                 _LOGGER.info(f"Setting max aux streams to {max_aux_streams}")
                 builder_config.max_aux_streams = max_aux_streams
             if version_compatible:
-                _LOGGER.info(f"Using version compatible")
+                _LOGGER.info("Using version compatible")
                 builder_config.set_flag(trt.BuilderFlag.VERSION_COMPATIBLE)
             if optimization_level is not None:
                 _LOGGER.info(f"Using optimization level {optimization_level}")
@@ -204,9 +202,10 @@ class TRTInterpreter(torch.fx.Interpreter):
         if strict_type_constraints:
             builder_config.set_flag(trt.BuilderFlag.STRICT_TYPES)
 
-        if self.optimization_profiles:
-            for optimization_profile in self.optimization_profiles:
-                builder_config.add_optimization_profile(optimization_profile)
+        if self.optimization_profiles is not None:
+            if len(self.optimization_profiles) > 0:
+                for optimization_profile in self.optimization_profiles:
+                    builder_config.add_optimization_profile(optimization_profile)
 
         if algorithm_selector:
             builder_config.set_flag(trt.BuilderFlag.DISABLE_TIMING_CACHE)
@@ -232,7 +231,7 @@ class TRTInterpreter(torch.fx.Interpreter):
             engine, self._input_names, self._output_names, serialized_cache
         )
 
-    def run_node(self, n):
+    def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
         self._cur_node_name = str(n)
         self._cur_node = n
         # add "_itensor_to_tensor_meta"
@@ -241,7 +240,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         n.kwargs = kwargs
 
         # run the node
-        trt_node = super().run_node(n)
+        trt_node: torch.fx.Node = super().run_node(n)
 
         # remove "_itensor_to_tensor_meta"
         kwargs = dict(n.kwargs)
@@ -253,17 +252,20 @@ class TRTInterpreter(torch.fx.Interpreter):
 
         return trt_node
 
-    def placeholder(self, target, args, kwargs):
+    def placeholder(self, target: str, args: Any, kwargs: Any) -> trt.ITensor:
         self._input_names.append(target)
         current_input = self.input_specs[self.input_specs_iter]
         self.input_specs_iter += 1
         # Set optimization profile for dynamic input shape
-        shape = current_input.shape
+        shape = None
         if current_input.shape_mode == Input._ShapeMode.DYNAMIC:
+            assert isinstance(current_input.shape, dict)
             shape = []
             min_shape = current_input.shape["min_shape"]
             opt_shape = current_input.shape["opt_shape"]
             max_shape = current_input.shape["max_shape"]
+            # TODO: Does not support disjoint optimization profiles?
+            assert self.optimization_profiles is not None
             self.optimization_profiles[0].set_shape(
                 target, min_shape, opt_shape, max_shape
             )
@@ -274,6 +276,13 @@ class TRTInterpreter(torch.fx.Interpreter):
                 else:
                     # -1 to represent the dynamic dimension
                     shape.append(-1)
+        elif current_input.shape_mode == Input._ShapeMode.STATIC:
+            assert isinstance(current_input.shape, tuple)
+            shape = list(current_input.shape)
+        else:
+            raise RuntimeError(
+                f"Unable to access shape spec for input: {target} (got: {current_input})"
+            )
 
         return self.network.add_input(
             name=target,
@@ -281,7 +290,9 @@ class TRTInterpreter(torch.fx.Interpreter):
             dtype=unified_dtype_converter(current_input.torch_dtype, Frameworks.TRT),
         )
 
-    def call_module(self, target, args, kwargs):
+    def call_module(
+        self, target: str, args: Any, kwargs: Any
+    ) -> Any:  # Probably should be Tuple[trt.ITensor]? Case for Any?
         assert isinstance(target, str)
         submod = self.fetch_attr(target)
         submod_type = getattr(submod, "_base_class_origin", type(submod))
@@ -295,7 +306,8 @@ class TRTInterpreter(torch.fx.Interpreter):
         assert self._cur_node_name is not None
         return converter(self.network, submod, args, kwargs, self._cur_node_name)
 
-    def call_function(self, target, args, kwargs):
+    def call_function(self, target: str, args: Any, kwargs: Any) -> Any:
+        # TODO: Why is this stateful? We should be able to take in the inputs
         converter = CONVERTERS.get(self._cur_node)
         if not converter:
             raise RuntimeError(
@@ -305,7 +317,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         assert self._cur_node_name is not None
         return converter(self.network, target, args, kwargs, self._cur_node_name)
 
-    def call_method(self, target, args, kwargs):
+    def call_method(self, target: str, args: Any, kwargs: Any) -> Any:
         assert isinstance(target, str)
         converter = CONVERTERS.get(self._cur_node)
 
@@ -317,7 +329,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         assert self._cur_node_name is not None
         return converter(self.network, target, args, kwargs, self._cur_node_name)
 
-    def output(self, target, args, kwargs):
+    def output(self, target: str, args: Any, kwargs: Any) -> List[Any]:
         assert len(args) == 1
         if isinstance(args[0], tuple):
             outputs = args[0]

@@ -40,7 +40,6 @@ def convNd(
     scale: Optional[Union[torch.Tensor, float]] = None,
     zero_point: Optional[Union[torch.Tensor, float]] = None,
 ) -> TRTTensor:
-
     if has_dynamic_shape(input_val.shape):
         assert input_val.shape[1] != -1, "Channel dim can't be dynamic for convolution."
 

@@ -1,20 +1,10 @@
-import operator
-import warnings
-from typing import Optional, cast, Any
+from typing import Optional
 
-import numpy as np
-
-import tensorrt as trt
 import torch
 from torch.fx.node import Target
-
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.fx.converters.converter_utils import get_trt_tensor, set_layer_name
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
-from torch_tensorrt.fx.converters.converter_utils import (
-    set_layer_name,
-)
-
-from torch_tensorrt.fx.converters.converter_utils import get_trt_tensor
 
 
 def embedding(
@@ -29,7 +19,6 @@ def embedding(
     scale_grad_by_freq: bool,
     sparse: bool,
 ) -> TRTTensor:
-
     if network.has_implicit_batch_dimension:
         raise RuntimeError(
             "The `embedding` function should be called with explicit batch dimension."

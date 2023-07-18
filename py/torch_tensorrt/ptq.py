@@ -1,12 +1,17 @@
-from typing import List, Dict, Any
-import torch
-import os
+import sys
+from typing import Any, List, Optional
 
-from torch_tensorrt import _C
-from torch_tensorrt._version import __version__
-from torch_tensorrt.logging import *
-from types import FunctionType
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
+import os
 from enum import Enum
+
+import torch
+from torch_tensorrt import _C
+from torch_tensorrt.logging import Level, log
 
 
 class CalibrationAlgo(Enum):
@@ -16,15 +21,15 @@ class CalibrationAlgo(Enum):
     MINMAX_CALIBRATION = _C.CalibrationAlgo.MINMAX_CALIBRATION
 
 
-def get_cache_mode_batch(self):
+def get_cache_mode_batch(self: object) -> None:
     return None
 
 
-def get_batch_size(self):
+def get_batch_size(self: object) -> int:
     return 1
 
 
-def get_batch(self, names):
+def get_batch(self: object, _: Any) -> Optional[List[int]]:
     if self.current_batch_idx + self.batch_size > len(self.data_loader.dataset):
         return None
 
@@ -39,27 +44,30 @@ def get_batch(self, names):
     return inputs_gpu
 
 
-def read_calibration_cache(self):
+def read_calibration_cache(self: object) -> bytes:
     if self.cache_file and self.use_cache:
         if os.path.exists(self.cache_file):
             with open(self.cache_file, "rb") as f:
-                return f.read()
+                b: bytes = f.read()
+                return b
+        else:
+            raise FileNotFoundError(self.cache_file)
     else:
         return b""
 
 
-def write_calibration_cache(self, cache):
+def write_calibration_cache(self: object, cache: bytes) -> None:
     if self.cache_file:
         with open(self.cache_file, "wb") as f:
             f.write(cache)
     else:
-        return b""
+        return
 
 
 # deepcopy (which involves pickling) is performed on the compile_spec internally during compilation.
 # We register this __reduce__ function for pickler to identity the calibrator object returned by DataLoaderCalibrator during deepcopy.
 # This should be the object's local name relative to the module https://docs.python.org/3/library/pickle.html#object.__reduce__
-def __reduce__(self):
+def __reduce__(self: object) -> str:
     return self.__class__.__name__
 
 
@@ -75,10 +83,10 @@ class DataLoaderCalibrator(object):
         device: device on which calibration data is copied to.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         pass
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
         dataloader = args[0]
         algo_type = kwargs.get("algo_type", CalibrationAlgo.ENTROPY_CALIBRATION_2)
         cache_file = kwargs.get("cache_file", None)
@@ -126,27 +134,30 @@ class DataLoaderCalibrator(object):
 
         # Using type metaclass to construct calibrator class based on algorithm type
         if algo_type == CalibrationAlgo.ENTROPY_CALIBRATION:
-            return type(
+            calib_ec: Self = type(
                 "Int8EntropyCalibrator", (_C.IInt8EntropyCalibrator,), attribute_mapping
             )()
+            return calib_ec
         elif algo_type == CalibrationAlgo.ENTROPY_CALIBRATION_2:
-            return type(
+            calib_ec2: Self = type(
                 "Int8EntropyCalibrator2",
                 (_C.IInt8EntropyCalibrator2,),
                 attribute_mapping,
             )()
+            return calib_ec2
         elif algo_type == CalibrationAlgo.LEGACY_CALIBRATION:
-            return type(
+            calib_lc: Self = type(
                 "Int8LegacyCalibrator", (_C.IInt8LegacyCalibrator,), attribute_mapping
             )()
+            return calib_lc
         elif algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
-            return type(
+            calib_mmc: Self = type(
                 "Int8MinMaxCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping
             )()
+            return calib_mmc
         else:
-            log(
-                Level.Error,
-                "Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION",
+            raise ValueError(
+                "Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION"
             )
 
 
@@ -158,10 +169,10 @@ class CacheCalibrator(object):
         algo_type: choice of calibration algorithm.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         pass
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
         cache_file = args[0]
         algo_type = kwargs.get("algo_type", CalibrationAlgo.ENTROPY_CALIBRATION_2)
 
@@ -184,23 +195,26 @@ class CacheCalibrator(object):
         }
         # Using type metaclass to construct calibrator class based on algorithm type
         if algo_type == CalibrationAlgo.ENTROPY_CALIBRATION:
-            return type(
+            calib_ec: Self = type(
                 "DataLoaderCalibrator", (_C.IInt8EntropyCalibrator,), attribute_mapping
             )()
+            return calib_ec
         elif algo_type == CalibrationAlgo.ENTROPY_CALIBRATION_2:
-            return type(
+            calib_ec2: Self = type(
                 "DataLoaderCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping
             )()
+            return calib_ec2
         elif algo_type == CalibrationAlgo.LEGACY_CALIBRATION:
-            return type(
+            calib_lc: Self = type(
                 "DataLoaderCalibrator", (_C.IInt8LegacyCalibrator,), attribute_mapping
             )()
+            return calib_lc
         elif algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
-            return type(
+            calib_mmc: Self = type(
                 "DataLoaderCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping
             )()
+            return calib_mmc
         else:
-            log(
-                Level.Error,
-                "Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION",
+            raise ValueError(
+                "Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION"
             )

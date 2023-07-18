@@ -1,18 +1,13 @@
+from typing import List
+
 import torch
-
-from torch_tensorrt.fx.types import (
-    TRTDataType,
-    TRTNetwork,
-    TRTTensor,
-)
-
 from torch_tensorrt.fx.converters.converter_utils import (
-    unified_dtype_converter,
     Frameworks,
+    unified_dtype_converter,
 )
+from torch_tensorrt.fx.types import TRTDataType, TRTNetwork, TRTTensor
 
 import tensorrt as trt
-from typing import List
 
 
 def dynamic_unsupported(node: torch.fx.Node) -> bool:
@@ -93,7 +88,7 @@ def cast_int_int_div_trt_tensor(
     ):
         lhs_val = cast_trt_tensor(network, lhs_val, trt.float32, name)
         rhs_val = cast_trt_tensor(network, rhs_val, trt.float32, name)
-    return list((lhs_val, rhs_val))
+    return [lhs_val, rhs_val]
 
 
 def broadcastable(

@@ -34,7 +34,7 @@ cc_library(
         ":macros",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
 )
 
@@ -68,7 +68,7 @@ cc_library(
         "@tensorrt//:nvinfer",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
 )
 
@@ -81,12 +81,12 @@ cc_library(
         "trt_util.h",
     ],
     deps = [
-        "@tensorrt//:nvinfer",
-        "//core/util/logging",
         ":macros",
+        "//core/util/logging",
+        "@tensorrt//:nvinfer",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
 )
 

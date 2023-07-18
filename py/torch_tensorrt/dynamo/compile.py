@@ -1,38 +1,36 @@
-import torch
-import logging
 import collections.abc
-import torch_tensorrt
-from functools import partial
+import logging
+from typing import Any, List, Optional, Set, Tuple
 
-from typing import Any, Optional, Sequence
-from torch_tensorrt import EngineCapability, Device
+import torch
+import torch_tensorrt
 from torch.fx.passes.pass_manager import PassManager
-from torch.fx.passes.shape_prop import ShapeProp
 from torch.fx.passes.splitter_base import SplitResult
-from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
-from torch_tensorrt.dynamo.lowering import (
+from torch_tensorrt._Device import Device
+from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
+    EngineCapability,
+)
+from torch_tensorrt.dynamo import CompilationSettings
+from torch_tensorrt.dynamo._defaults import (
+    DEBUG,
+    MAX_AUX_STREAMS,
+    MIN_BLOCK_SIZE,
+    OPTIMIZATION_LEVEL,
+    PASS_THROUGH_BUILD_FAILURES,
+    PRECISION,
+    TRUNCATE_LONG_AND_DOUBLE,
+    USE_PYTHON_RUNTIME,
+    VERSION_COMPATIBLE,
+    WORKSPACE_SIZE,
+)
+from torch_tensorrt.dynamo.backend.backends import _compile_module
+from torch_tensorrt.dynamo.conversion import convert_module
+from torch_tensorrt.dynamo.lowering._fusers import (
     fuse_permute_linear,
     fuse_permute_matmul,
 )
-from torch_tensorrt.dynamo import CompilationSettings
-from torch_tensorrt.dynamo.utils import prepare_inputs, prepare_device
-from torch_tensorrt.dynamo.backend import torch_tensorrt_backend
-from torch_tensorrt.dynamo.backend.backends import _compile_module
-from torch_tensorrt.dynamo.conversion import convert_module
-
-from torch_tensorrt.dynamo._defaults import (
-    PRECISION,
-    DEBUG,
-    WORKSPACE_SIZE,
-    MIN_BLOCK_SIZE,
-    PASS_THROUGH_BUILD_FAILURES,
-    MAX_AUX_STREAMS,
-    VERSION_COMPATIBLE,
-    OPTIMIZATION_LEVEL,
-    USE_PYTHON_RUNTIME,
-    TRUNCATE_LONG_AND_DOUBLE,
-)
-
+from torch_tensorrt.dynamo.utils import prepare_device, prepare_inputs
+from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 
 logger = logging.getLogger(__name__)
 
@@ -41,35 +39,37 @@ def compile(
     gm: Any,
     inputs: Any,
     *,
-    device=Device._current_device(),
-    disable_tf32=False,
-    sparse_weights=False,
-    enabled_precisions=set(),
-    refit=False,
-    debug=DEBUG,
-    capability=EngineCapability.default,
-    num_avg_timing_iters=1,
-    workspace_size=WORKSPACE_SIZE,
-    dla_sram_size=1048576,
-    dla_local_dram_size=1073741824,
-    dla_global_dram_size=536870912,
-    calibrator=None,
-    truncate_long_and_double=TRUNCATE_LONG_AND_DOUBLE,
-    require_full_compilation=False,
-    min_block_size=MIN_BLOCK_SIZE,
-    torch_executed_ops=[],
-    torch_executed_modules=[],
-    pass_through_build_failures=PASS_THROUGH_BUILD_FAILURES,
-    max_aux_streams=MAX_AUX_STREAMS,
-    version_compatible=VERSION_COMPATIBLE,
-    optimization_level=OPTIMIZATION_LEVEL,
-    use_python_runtime=USE_PYTHON_RUNTIME,
-    **kwargs,
-):
+    device: Device = Device._current_device(),
+    disable_tf32: bool = False,
+    sparse_weights: bool = False,
+    enabled_precisions: Set[torch.dtype] | Tuple[torch.dtype] = (torch.float32,),
+    refit: bool = False,
+    debug: bool = DEBUG,
+    capability: EngineCapability = EngineCapability.default,
+    num_avg_timing_iters: int = 1,
+    workspace_size: int = WORKSPACE_SIZE,
+    dla_sram_size: int = 1048576,
+    dla_local_dram_size: int = 1073741824,
+    dla_global_dram_size: int = 536870912,
+    calibrator: object = None,
+    truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE,
+    require_full_compilation: bool = False,
+    min_block_size: int = MIN_BLOCK_SIZE,
+    torch_executed_ops: Optional[List[str]] = None,
+    torch_executed_modules: Optional[List[str]] = None,
+    pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES,
+    max_aux_streams: Optional[int] = MAX_AUX_STREAMS,
+    version_compatible: bool = VERSION_COMPATIBLE,
+    optimization_level: Optional[int] = OPTIMIZATION_LEVEL,
+    use_python_runtime: bool = USE_PYTHON_RUNTIME,
+    **kwargs: Any,
+) -> torch.fx.GraphModule:
     if debug:
         logger.setLevel(logging.DEBUG)
 
-    logger.warn(
+    enabled_precisions = set(enabled_precisions)
+
+    logger.warning(
         "The Dynamo backend is an experimental feature, for which only the "
         + "following arguments are supported: "
         + "{enabled_precisions, debug, workspace_size, min_block_size, "
@@ -79,7 +79,7 @@ def compile(
     if not isinstance(inputs, collections.abc.Sequence):
         inputs = [inputs]
 
-    torchtrt_inputs, torch_inputs = prepare_inputs(inputs, prepare_device(device))
+    _, torch_inputs = prepare_inputs(inputs, prepare_device(device))
 
     if (
         torch.float16 in enabled_precisions
@@ -104,7 +104,9 @@ def compile(
         "debug": debug,
         "workspace_size": workspace_size,
         "min_block_size": min_block_size,
-        "torch_executed_ops": torch_executed_ops,
+        "torch_executed_ops": torch_executed_ops
+        if torch_executed_ops is not None
+        else [],
         "pass_through_build_failures": pass_through_build_failures,
         "max_aux_streams": max_aux_streams,
         "version_compatible": version_compatible,
@@ -128,9 +130,8 @@ def _compile_graph(
     split_result: SplitResult,
     inputs: Any,
     settings: CompilationSettings = CompilationSettings(),
-    **kwargs,
-):
-
+    **kwargs: Any,
+) -> torch.fx.GraphModule:
     for submod_name, submod_inputs in split_result.submodule_inputs.items():
         submod = getattr(split_result.split_module, submod_name)
         # Only acc submodules will be lowered.
@@ -147,7 +148,9 @@ def _compile_graph(
     return split_result.split_module
 
 
-def lower_model_using_trt_splitter(model: torch.nn.Module, inputs: Any, **kwargs):
+def lower_model_using_trt_splitter(
+    model: torch.nn.Module, inputs: Any, **kwargs: Any
+) -> SplitResult:
     # Perform basic lowering
     model = lower_model(model, inputs)
     splitter_setting = TRTSplitterSetting()
@@ -161,12 +164,13 @@ def lower_model_using_trt_splitter(model: torch.nn.Module, inputs: Any, **kwargs
     return split_result
 
 
-def lower_model(model: torch.nn.Module, inputs: Any, **kwargs):
-
+def lower_model(
+    model: torch.nn.Module, inputs: Any, **kwargs: Any
+) -> torch.fx.GraphModule:
     graph_optimization_pm = PassManager.build_from_passlist(
         [fuse_permute_matmul, fuse_permute_linear]
     )
-    lowered_model = graph_optimization_pm(model)
+    lowered_model: torch.fx.GraphModule = graph_optimization_pm(model)
     # if isinstance(lowered_model, torch.fx.GraphModule):
     #     ShapeProp(lowered_model).propagate(*inputs)
 
