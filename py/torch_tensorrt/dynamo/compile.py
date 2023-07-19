@@ -9,7 +9,6 @@ from torch_tensorrt import EngineCapability, Device
 from torch.fx.passes.pass_manager import PassManager
 from torch.fx.passes.shape_prop import ShapeProp
 from torch.fx.passes.splitter_base import SplitResult
-from torch_tensorrt.dynamo.aten_tracer import trace
 from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 from torch_tensorrt.dynamo.lowering import (
     fuse_permute_linear,
@@ -38,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 def compile(
-    gm: torch.nn.Module,
+    gm: Any,
     inputs: Any,
     *,
     device=Device._current_device(),
@@ -113,13 +112,11 @@ def compile(
     }
 
     settings = CompilationSettings(**compilation_options)
-    model = trace(gm, torch_inputs, **kwargs)
-
     if kwargs.get("use_capability_partitioner", None):
-        model = lower_model(model, torch_inputs)
+        model = lower_model(gm, torch_inputs)
         return _compile_module(model, torch_inputs, settings)
     else:
-        split_result = lower_model_using_trt_splitter(model, torch_inputs)
+        split_result = lower_model_using_trt_splitter(gm, torch_inputs)
         trt_module = _compile_graph(split_result, torch_inputs, settings)
 
         return trt_module

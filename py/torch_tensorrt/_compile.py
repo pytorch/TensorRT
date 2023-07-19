@@ -73,7 +73,7 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
                 )
                 return _IRType.ts
             else:
-                raise ValueError("Module was provided with in an unsupported format")
+                raise ValueError("Module was provided in an unsupported format")
         else:
             raise ValueError("Unknown ir was requested")
 
@@ -157,6 +157,15 @@ def compile(
             **kwargs,
         )
     elif target_ir == _IRType.dynamo:
+        from torch_tensorrt import Device
+        from torch_tensorrt.dynamo.utils import prepare_inputs, prepare_device
+        import collections.abc
+
+        if not isinstance(inputs, collections.abc.Sequence):
+            inputs = [inputs]
+        device = kwargs.get("device", Device._current_device())
+        torchtrt_inputs, torch_inputs = prepare_inputs(inputs, prepare_device(device))
+        module = torch_tensorrt.dynamo.trace(module, torch_inputs, **kwargs)
         return torch_tensorrt.dynamo.compile(
             module,
             inputs=inputs,
@@ -164,30 +173,22 @@ def compile(
             **kwargs,
         )
     elif target_ir == _IRType.torch_compile:
-        return torch_compile(
-            module, inputs, enabled_precisions=enabled_precisions, **kwargs
-        )
+        return torch_compile(module, enabled_precisions=enabled_precisions, **kwargs)
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
 
 
-def torch_compile(module, inputs, **kwargs):
-
-    from torch_tensorrt.dynamo.utils import prepare_inputs, prepare_device
+def torch_compile(module, **kwargs):
+    """
+    Returns a boxed model which is the output of torch.compile.
+    This does not compile the model to TRT. Execute this model on
+    sample inputs to compile the model to TRT.
+    """
     from torch_tensorrt.dynamo.backend import torch_tensorrt_backend
-    from torch_tensorrt import Device
-    import collections.abc
 
-    if not isinstance(inputs, collections.abc.Sequence):
-        inputs = [inputs]
+    boxed_fn = torch.compile(module, backend=torch_tensorrt_backend, options={**kwargs})
 
-    device = kwargs.get("device", Device._current_device())
-    torchtrt_inputs, torch_inputs = prepare_inputs(inputs, prepare_device(device))
-    model = torch.compile(module, backend=torch_tensorrt_backend, options={**kwargs})
-    # Ensure compilation occurs by calling the function with provided inputs
-    model(*torch_inputs)
-
-    return model
+    return boxed_fn
 
 
 def convert_method_to_trt_engine(
@@ -246,6 +247,16 @@ def convert_method_to_trt_engine(
             **kwargs,
         )
     elif target_ir == _IRType.fx:
-        raise RuntimeError("fx is currently not supported")
+        raise RuntimeError(
+            "convert_method_to_trt_engine call is not supported for ir=fx"
+        )
+    elif target_ir == _IRType.dynamo:
+        raise RuntimeError(
+            "convert_method_to_trt_engine call is not supported for ir=dynamo."
+        )
+    elif target_ir == _IRType.torch_compile:
+        raise RuntimeError(
+            "convert_method_to_trt_engine call is not supported for ir=torch_compile"
+        )
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
