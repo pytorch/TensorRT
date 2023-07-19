@@ -63,13 +63,13 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
             # Options are listed in order of preference
             if module_is_tsable:
                 logging.log(
-                    logging.Level.Warning,
-                    "Input graph is a Torchscript module but the ir provided is default (dynamo). Please set ir=torchscript to suppress the warning. Compiling the module with ir=ts",
+                    logging.Level.Info, "ir was set to default, using TorchScript as ir"
                 )
                 return _IRType.ts
             elif module_is_fxable:
                 logging.log(
-                    logging.Level.Info, "ir was set to default, using dynamo as ir"
+                    logging.Level.Warning,
+                    "Input graph is a torch.fx.GraphModule but the ir provided is default (ts). Please set ir=dynamo to suppress the warning.",
                 )
                 return _IRType.dynamo
             else:
