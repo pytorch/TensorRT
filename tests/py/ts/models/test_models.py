@@ -110,7 +110,6 @@ class TestModels(unittest.TestCase):
             },
             "enabled_precisions": {torch.float},
             "truncate_long_and_double": True,
-            "ir": "ts",
         }
         with torchtrt.logging.errors():
             trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
