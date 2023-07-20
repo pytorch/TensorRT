@@ -226,7 +226,7 @@ class TestLowering(TestCase):
         # Validate that the results between Torch and Torch-TRT are similar
         optimized_model = torch_tensorrt.compile(
             fx_graph,
-            "torch_tensorrt",
+            "torch_compile",
             inputs,
             min_block_size=1,
             pass_through_build_failures=True,

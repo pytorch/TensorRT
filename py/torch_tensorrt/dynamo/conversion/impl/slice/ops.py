@@ -46,6 +46,8 @@ def slice_op(
             assert input.shape[dim] != -1, "Can't chunk on dynamic shape dimension!"
     start_int = cast(int, start)
     stop_int = cast(int, stop)
+    if stop_int == 2**63 - 1:
+        stop_int = input.shape[dim]
     step_int = cast(int, step)
     start = [0] * len(input.shape)
     start[dim] = start_int

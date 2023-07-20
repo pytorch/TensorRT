@@ -78,13 +78,13 @@ class TestEmbeddingConverter(DispatchTestCase):
         input_specs = [
             Input(
                 shape=(-1, -1, -1, -1),
-                dtype=torch.float32,
+                dtype=torch.int,
                 shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
             ),
             Input(
-                shape=(-1, -1, -1, -1),
+                shape=(-1, -1),
                 dtype=torch.float32,
-                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+                shape_ranges=[((1, 1), (2, 3), (2, 3))],
             ),
         ]
 

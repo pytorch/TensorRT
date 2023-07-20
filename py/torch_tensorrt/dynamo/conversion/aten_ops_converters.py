@@ -14,8 +14,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import cast_int_int_div_tr
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-def or_none(args, i):
-    return args[i] if len(args) > i else None
+def args_bounds_check(args, i, replacement=None):
+    return args[i] if len(args) > i else replacement
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.batch_norm)
@@ -59,17 +59,24 @@ def aten_ops_div(
     # If both are TRTTensor, both are cast to float32
     if isinstance(args[0], TRTTensor) and isinstance(args[1], TRTTensor):
         kwargs_new["input"], kwargs_new["other"] = cast_int_int_div_trt_tensor(
-            network, kwargs_new["input"], kwargs_new["other"]
+            network,
+            kwargs_new["input"],
+            kwargs_new["other"],
+            name,
         )
     # If one is TRTTensor, it is cast to float32
     elif isinstance(args[0], TRTTensor) and (
         kwargs_new["input"].dtype == trt.int8 or kwargs_new["input"].dtype == trt.int32
     ):
-        kwargs_new["input"] = cast_trt_tensor(network, kwargs_new["input"], trt.float32)
+        kwargs_new["input"] = cast_trt_tensor(
+            network, kwargs_new["input"], trt.float32, name
+        )
     elif isinstance(args[1], TRTTensor) and (
         kwargs_new["other"].dtype == trt.int8 or kwargs_new["other"].dtype == trt.int32
     ):
-        kwargs_new["other"] = cast_trt_tensor(network, kwargs_new["other"], trt.float32)
+        kwargs_new["other"] = cast_trt_tensor(
+            network, kwargs_new["other"], trt.float32, name
+        )
     rounding_mode = kwargs.get("rounding_mode")
     if rounding_mode is None:
         return acc_ops_converters.acc_ops_div(network, target, None, kwargs_new, name)
@@ -136,10 +143,10 @@ def aten_ops_embedding(
         name,
         input=args[1],
         weight=args[0],
-        max_norm=or_none(args, 2),
-        norm_type=or_none(args, 3),
-        scale_grad_by_freq=or_none(args, 4),
-        sparse=or_none(args, 5),
+        max_norm=args_bounds_check(args, 2),
+        norm_type=args_bounds_check(args, 3),
+        scale_grad_by_freq=args_bounds_check(args, 4),
+        sparse=args_bounds_check(args, 5),
     )
 
 
@@ -311,11 +318,11 @@ def aten_ops_clamp(
     return impl.elementwise.clamp(
         network,
         target,
-        SourceIR.ACC,
+        SourceIR.ATEN,
         name,
         input_val=args[0],
-        min_val=or_none(args, 1),
-        max_val=or_none(args, 2),
+        min_val=args_bounds_check(args, 1),
+        max_val=args_bounds_check(args, 2),
     )
 
 
@@ -349,5 +356,5 @@ def aten_ops_slice(
         args[1],
         args[2],
         args[3],
-        args[4],
+        args_bounds_check(args, 4, replacement=1),
     )

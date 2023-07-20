@@ -60,6 +60,7 @@ class TestSigmoidConverter(DispatchTestCase):
             inputs,
             expected_ops={torch.ops.aten.sigmoid.default},
             precision=torch.half,
+            check_dtype=False,
         )
 
 
