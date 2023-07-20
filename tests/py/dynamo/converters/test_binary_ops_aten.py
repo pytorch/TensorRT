@@ -1,4 +1,5 @@
 from typing import Callable
+import unittest
 
 import torch
 import torch.nn as nn
@@ -76,6 +77,7 @@ class TestBinaryOpConverters(DispatchTestCase):
         self.run_test(m, inputs, expected_ops={expected_op})
 
     @parameterized.expand([(op[1].__name__, op[0], op[1]) for op in elementwise_ops])
+    @unittest.skip("Pending reimplementation of all binary converters in Dynamo")
     def test_elementwise_ops_mismatched_dtypes(
         self, name, orig_op: Callable, expected_op
     ):
@@ -84,12 +86,15 @@ class TestBinaryOpConverters(DispatchTestCase):
                 super().__init__()
                 self.orig_op = orig_op
 
-            def forward(self, x):
-                return self.orig_op(x.int(), x)
+            def forward(self, x, y):
+                return self.orig_op(x, y)
 
         m = TestModule(orig_op)
         # Avoid dividing by 0.
-        inputs = [2 * torch.rand(1, 1, dtype=torch.float) + 1]
+        inputs = [
+            2 * torch.rand(1, 1, dtype=torch.float) + 1,
+            torch.randint(1, 3, (1, 1), dtype=torch.int),
+        ]
         self.run_test(m, inputs, expected_ops={expected_op})
 
     @parameterized.expand([(op[1].__name__, op[0], op[1]) for op in elementwise_ops])

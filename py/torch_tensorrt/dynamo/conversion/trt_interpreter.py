@@ -64,7 +64,15 @@ class TRTInterpreter(torch.fx.Interpreter):
                 + "\n".join(f"{i}" for i in missing_ops)
             )
 
-        self.optimization_profiles: Optional[List] = None
+        self.optimization_profiles = (
+            [self.builder.create_optimization_profile()]
+            if any(
+                input_spec.shape_mode == Input._ShapeMode.DYNAMIC
+                for input_spec in input_specs
+            )
+            else None
+        )
+
         self.input_specs = input_specs
         self.input_specs_iter = 0
         self._cur_node_name: Optional[str] = None
@@ -257,7 +265,7 @@ class TRTInterpreter(torch.fx.Interpreter):
             opt_shape = current_input.shape["opt_shape"]
             max_shape = current_input.shape["max_shape"]
             self.optimization_profiles[0].set_shape(
-                target, [min_shape, opt_shape, max_shape]
+                target, min_shape, opt_shape, max_shape
             )
             assert len(min_shape) == len(opt_shape) == len(max_shape)
             for i in range(len(min_shape)):

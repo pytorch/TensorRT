@@ -67,6 +67,7 @@ class TRTTestCase(TestCase):
         rtol,
         atol,
         precision=torch.float,
+        check_dtype=True,
     ):
         with torch.no_grad():
             cuda_inputs = []
@@ -117,7 +118,12 @@ class TRTTestCase(TestCase):
                 if ref.dtype == torch.int64:
                     ref = ref.int()  # convert torch.max's index output tensor to int32
                 torch.testing.assert_close(
-                    out.cpu(), ref, rtol=rtol, atol=atol, equal_nan=True
+                    out.cpu(),
+                    ref,
+                    rtol=rtol,
+                    atol=atol,
+                    equal_nan=True,
+                    check_dtype=check_dtype,
                 )
 
     def run_test_custom_compare_results(
@@ -254,6 +260,7 @@ class DispatchTestCase(TRTTestCase):
         rtol=1e-03,
         atol=1e-03,
         precision=torch.float,
+        check_dtype=True,
     ):
         mod.eval()
         mod = self.generate_graph(mod, inputs, expected_ops, unexpected_ops, None)
@@ -267,7 +274,15 @@ class DispatchTestCase(TRTTestCase):
             Input.from_tensors(inputs),
         )
         super().run_test(
-            mod, inputs, expected_ops, unexpected_ops, interp, rtol, atol, precision
+            mod,
+            inputs,
+            expected_ops,
+            unexpected_ops,
+            interp,
+            rtol,
+            atol,
+            precision,
+            check_dtype,
         )
 
     def run_test_with_dynamic_shape(
