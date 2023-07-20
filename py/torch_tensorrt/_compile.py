@@ -15,8 +15,8 @@ class _IRType(Enum):
 
     ts = 0
     fx = 1
-    fx_ts_compat = 2
-    dynamo_compile = 3
+    dynamo = 2
+    torch_compile = 3
 
 
 class _ModuleType(Enum):
@@ -47,17 +47,17 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
 
     ir_targets_torchscript = any([ir == opt for opt in ["torchscript", "ts"]])
     ir_targets_fx = ir == "fx"
-    ir_targets_dynamo_compile = ir == "dynamo_compile"
-    ir_targets_fx_ts_compat = ir == "fx_ts_compat"
+    ir_targets_dynamo = ir == "dynamo"
+    ir_targets_torch_compile = ir == "torch_compile"
 
     if module_is_tsable and ir_targets_torchscript:
         return _IRType.ts
     elif module_is_fxable and ir_targets_fx:
         return _IRType.fx
-    elif module_is_fxable and ir_targets_fx_ts_compat:
-        return _IRType.fx_ts_compat
-    elif module_is_fxable and ir_targets_dynamo_compile:
-        return _IRType.dynamo_compile
+    elif module_is_fxable and ir_targets_dynamo:
+        return _IRType.dynamo
+    elif module_is_fxable and ir_targets_torch_compile:
+        return _IRType.torch_compile
     else:
         if ir == "default":
             # Options are listed in order of preference
@@ -67,13 +67,13 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
                 )
                 return _IRType.ts
             elif module_is_fxable:
-                raise ValueError(
-                    "Was given a torch.fx.GraphModule, fx is not currently supported by Torch-TensorRT"
+                logging.log(
+                    logging.Level.Warning,
+                    "Input graph is a torch.fx.GraphModule but the ir provided is default (ts). Please set ir=dynamo to suppress the warning.",
                 )
-                # logging.log(logging.Level.Info, "ir was set to default, using TorchScript as fx")
-                # return _IRType.fx
+                return _IRType.dynamo
             else:
-                raise ValueError("Module was provided with in an unsupported format")
+                raise ValueError("Module was provided in an unsupported format")
         else:
             raise ValueError("Unknown ir was requested")
 
@@ -156,16 +156,39 @@ def compile(
             dynamic_batch=False,
             **kwargs,
         )
-    elif target_ir == _IRType.dynamo_compile:
+    elif target_ir == _IRType.dynamo:
+        from torch_tensorrt import Device
+        from torch_tensorrt.dynamo.utils import prepare_inputs, prepare_device
+        import collections.abc
+
+        if not isinstance(inputs, collections.abc.Sequence):
+            inputs = [inputs]
+        device = kwargs.get("device", Device._current_device())
+        torchtrt_inputs, torch_inputs = prepare_inputs(inputs, prepare_device(device))
+        module = torch_tensorrt.dynamo.trace(module, torch_inputs, **kwargs)
         return torch_tensorrt.dynamo.compile(
-            module, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs
+            module,
+            inputs=inputs,
+            enabled_precisions=enabled_precisions,
+            **kwargs,
         )
-    elif target_ir == _IRType.fx_ts_compat:
-        return torch_tensorrt.dynamo.fx_ts_compat.compile(
-            module, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs
-        )
+    elif target_ir == _IRType.torch_compile:
+        return torch_compile(module, enabled_precisions=enabled_precisions, **kwargs)
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
+
+
+def torch_compile(module, **kwargs):
+    """
+    Returns a boxed model which is the output of torch.compile.
+    This does not compile the model to TRT. Execute this model on
+    sample inputs to compile the model to TRT.
+    """
+    from torch_tensorrt.dynamo.backend import torch_tensorrt_backend
+
+    boxed_fn = torch.compile(module, backend=torch_tensorrt_backend, options={**kwargs})
+
+    return boxed_fn
 
 
 def convert_method_to_trt_engine(
@@ -224,6 +247,16 @@ def convert_method_to_trt_engine(
             **kwargs,
         )
     elif target_ir == _IRType.fx:
-        raise RuntimeError("fx is currently not supported")
+        raise RuntimeError(
+            "convert_method_to_trt_engine call is not supported for ir=fx"
+        )
+    elif target_ir == _IRType.dynamo:
+        raise RuntimeError(
+            "convert_method_to_trt_engine call is not supported for ir=dynamo."
+        )
+    elif target_ir == _IRType.torch_compile:
+        raise RuntimeError(
+            "convert_method_to_trt_engine call is not supported for ir=torch_compile"
+        )
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
