@@ -10,7 +10,7 @@ from torch.fx.graph_module import GraphModule
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.operator_support import OperatorSupport
 
-from torch_tensorrt.fx.converter_registry import CONVERTERS
+from torch_tensorrt.dynamo import DYNAMO_CONVERTERS as CONVERTERS
 
 
 logger = logging.getLogger(__name__)
@@ -110,8 +110,8 @@ class TorchTensorRTOperatorSupport(OperatorSupport):
         super().__init__(support_dict)
 
         # Initialize sets of supported/unsupported operators
-        self.supported_operators = set()
-        self.unsupported_operators = set()
+        self.supported_operators = {}
+        self.unsupported_operators = {}
         self.torch_executed_ops = torch_executed_ops
 
     def is_node_supported(
@@ -123,18 +123,21 @@ class TorchTensorRTOperatorSupport(OperatorSupport):
             else node.target
         )
 
-        if (
-            node.target in CONVERTERS.keys()
-            and node_name not in self.torch_executed_ops
-        ):
+        if node in CONVERTERS and node_name not in self.torch_executed_ops:
             # If node is a proper, supported computational node, store the operator
             if not node.is_impure():
-                self.supported_operators.add(node_name)
+                if node_name not in self.supported_operators:
+                    self.supported_operators[node_name] = 1
+                else:
+                    self.supported_operators[node_name] += 1
 
             return True
         else:
             if not node.is_impure():
-                self.unsupported_operators.add(node_name)
+                if node_name not in self.unsupported_operators:
+                    self.unsupported_operators[node_name] = 1
+                else:
+                    self.unsupported_operators[node_name] += 1
 
             return False
 
@@ -146,15 +149,16 @@ class TorchTensorRTOperatorSupport(OperatorSupport):
 
         # Reformat support messages for debugger to print node overview as a single string
         supported_nodes_str = "\nSupported Nodes:\n"
-        for node_name in self.supported_operators:
-            supported_nodes_str += f"- {node_name}\n"
+        for node_name, count in self.supported_operators.items():
+            supported_nodes_str += f"- {node_name} + Operator Count: {count}\n"
 
         logger.debug(supported_nodes_str)
 
-        if len(self.unsupported_operators) != 0:
+        if self.unsupported_operators:
             unsupported_nodes_str = "\nUnsupported or Excluded Nodes:\n"
-            for node_name in self.unsupported_operators:
-                unsupported_nodes_str += f"- {node_name}\n"
+            for node_name, count in self.unsupported_operators.items():
+                unsupported_nodes_str += f"- {node_name} + Operator Count: {count}\n"
+
             logger.debug(unsupported_nodes_str)
         else:
             logger.debug("\nAll Nodes Supported\n")

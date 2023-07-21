@@ -10,11 +10,10 @@ import numpy
 import tensorrt as trt
 import torch
 import torch.fx
-from torch._ops import OpOverload
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 
-from torch_tensorrt.fx import CONVERTERS
+from torch_tensorrt.dynamo import DYNAMO_CONVERTERS as CONVERTERS
 from torch_tensorrt import Input
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.fx.utils import (
@@ -69,6 +68,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         self.input_specs = input_specs
         self.input_specs_iter = 0
         self._cur_node_name: Optional[str] = None
+        self._cur_node: Optional[torch.fx.Node] = None
         self._input_names: List[str] = []
         self._output_names: List[str] = []
         self._itensor_to_tensor_meta: Dict[
@@ -82,14 +82,14 @@ class TRTInterpreter(torch.fx.Interpreter):
         missing_converter = set()
 
         for node in self.module.graph.nodes:
-            if node.op == "call_function" and not CONVERTERS.get(node.target):
+            if node.op == "call_function" and not CONVERTERS.get(node):
                 missing_converter.add(f"{node.op} {_get_qualified_name(node.target)}")
-            elif node.op == "call_method" and not CONVERTERS.get(node.target):
+            elif node.op == "call_method" and not CONVERTERS.get(node):
                 missing_converter.add(f"{node.op} torch.Tensor.{node.target}")
             elif node.op == "call_module":
                 submod = self.fetch_attr(node.target)
                 submod_type = getattr(submod, "_base_class_origin", type(submod))
-                if not CONVERTERS.get(submod_type):
+                if not CONVERTERS.get(node):
                     missing_converter.add(f"{node.op} {torch.typename(submod_type)}")
 
         return missing_converter
@@ -226,6 +226,7 @@ class TRTInterpreter(torch.fx.Interpreter):
 
     def run_node(self, n):
         self._cur_node_name = str(n)
+        self._cur_node = n
         # add "_itensor_to_tensor_meta"
         kwargs = dict(n.kwargs)
         kwargs["_itensor_to_tensor_meta"] = self._itensor_to_tensor_meta
@@ -276,7 +277,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         assert isinstance(target, str)
         submod = self.fetch_attr(target)
         submod_type = getattr(submod, "_base_class_origin", type(submod))
-        converter = CONVERTERS.get(submod_type)
+        converter = CONVERTERS.get(self._cur_node)
 
         if not converter:
             raise RuntimeError(
@@ -287,7 +288,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         return converter(self.network, submod, args, kwargs, self._cur_node_name)
 
     def call_function(self, target, args, kwargs):
-        converter = CONVERTERS.get(target)
+        converter = CONVERTERS.get(self._cur_node)
         if not converter:
             raise RuntimeError(
                 f"Conversion of function {torch.typename(target)} not currently supported!"
@@ -298,7 +299,7 @@ class TRTInterpreter(torch.fx.Interpreter):
 
     def call_method(self, target, args, kwargs):
         assert isinstance(target, str)
-        converter = CONVERTERS.get(target)
+        converter = CONVERTERS.get(self._cur_node)
 
         if not converter:
             raise RuntimeError(
