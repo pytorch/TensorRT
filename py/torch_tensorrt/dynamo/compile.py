@@ -19,6 +19,7 @@ from torch_tensorrt.dynamo.utils import prepare_inputs, prepare_device
 from torch_tensorrt.dynamo.backend import torch_tensorrt_backend
 from torch_tensorrt.dynamo.backend.backends import _compile_module
 from torch_tensorrt.dynamo.conversion import convert_module
+from torch_tensorrt import Input
 
 from torch_tensorrt.dynamo._defaults import (
     PRECISION,
@@ -77,8 +78,10 @@ def compile(
 
     if not isinstance(inputs, collections.abc.Sequence):
         inputs = [inputs]
-
-    torchtrt_inputs, torch_inputs = prepare_inputs(inputs, prepare_device(device))
+    
+    input_tuples = inputs
+    if isinstance(inputs[0], Input) or isinstance(inputs[0], torch.Tensor):
+        input_tuples = prepare_inputs(inputs, prepare_device(device))
 
     if (
         torch.float16 in enabled_precisions
@@ -113,8 +116,8 @@ def compile(
 
     settings = CompilationSettings(**compilation_options)
     if kwargs.get("use_capability_partitioner", None):
-        model = lower_model(gm, torch_inputs)
-        return _compile_module(model, torch_inputs, settings)
+        # model = lower_model(gm, torch_inputs)
+        return _compile_module(gm, input_tuples, settings)
     else:
         split_result = lower_model_using_trt_splitter(gm, torch_inputs)
         trt_module = _compile_graph(split_result, torch_inputs, settings)

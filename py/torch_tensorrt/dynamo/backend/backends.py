@@ -1,5 +1,5 @@
 import logging
-from typing import Sequence
+from typing import Sequence, Any
 import torch
 from functools import partial
 import torch._dynamo as td
@@ -100,7 +100,7 @@ def _pretraced_backend(
 
 def _compile_module(
     gm: torch.fx.GraphModule,
-    sample_inputs: Sequence[torch.Tensor],
+    sample_inputs: Sequence[Any],
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
@@ -114,6 +114,7 @@ def _compile_module(
     Returns:
         Compiled FX GraphModule
     """
+    import pdb; pdb.set_trace()
     # Partition module into components that can be TRT-accelerated
     partitioned_module = partition(
         gm,
@@ -130,15 +131,17 @@ def _compile_module(
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
 
+        torch_inputs = [input.torch_input for input in sample_inputs]
+        torchtrt_inputs = [input.torchtrt_input for input in sample_inputs]
         # Get submodule inputs
         submodule_inputs = get_submod_inputs(
-            partitioned_module, submodule, sample_inputs
+            partitioned_module, submodule, torch_inputs
         )
-
+        
         # Create TRT Module from submodule
         trt_mod = convert_module(
             submodule,
-            submodule_inputs,
+            sample_inputs,
             settings=settings,
             name=name,
         )

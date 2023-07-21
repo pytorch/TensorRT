@@ -3,16 +3,15 @@ import torch
 import io
 from torch_tensorrt.dynamo.runtime import _PythonTorchTRTModule
 from torch_tensorrt.dynamo import CompilationSettings
-from torch_tensorrt import Input
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
-
+from torch_tensorrt.dynamo.utils import InputTuple
 
 import tensorrt as trt
 
 
 def convert_module(
     module: torch.fx.GraphModule,
-    inputs: Sequence[torch.Tensor],
+    inputs: Sequence[InputTuple],
     settings: CompilationSettings = CompilationSettings(),
     name: str = "",
 ):
@@ -25,9 +24,11 @@ def convert_module(
     Returns:
         _PythonTorchTRTModule or TorchTensorRTModule
     """
+    torch_inputs = [input.torch_input for input in inputs]
+    torchtrt_inputs = [input.torchtrt_input for input in inputs]
     # Specify module output data types to ensure TRT output types agree with
     # that of the equivalent Torch module
-    module_outputs = module(*inputs)
+    module_outputs = module(*torch_inputs)
 
     if not isinstance(module_outputs, (list, tuple)):
         module_outputs = [module_outputs]
@@ -35,7 +36,7 @@ def convert_module(
     output_dtypes = list(output.dtype for output in module_outputs)
     interpreter = TRTInterpreter(
         module,
-        Input.from_tensors(inputs, disable_memory_format_check=True),
+        torchtrt_inputs,
         logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
         output_dtypes=output_dtypes,
     )

@@ -159,16 +159,22 @@ def compile(
     elif target_ir == _IRType.dynamo:
         from torch_tensorrt import Device
         from torch_tensorrt.dynamo.utils import prepare_inputs, prepare_device
+        from torch_tensorrt.dynamo.utils import InputTuple
         import collections.abc
 
         if not isinstance(inputs, collections.abc.Sequence):
             inputs = [inputs]
         device = kwargs.get("device", Device._current_device())
-        torchtrt_inputs, torch_inputs = prepare_inputs(inputs, prepare_device(device))
+        prepared_inputs = prepare_inputs(inputs, prepare_device(device))
+        torch_inputs = []
+        for input in prepared_inputs:
+            if isinstance(input, InputTuple):
+                torch_inputs.append(input.torch_input)
+ 
         module = torch_tensorrt.dynamo.trace(module, torch_inputs, **kwargs)
         return torch_tensorrt.dynamo.compile(
             module,
-            inputs=inputs,
+            inputs=prepared_inputs,
             enabled_precisions=enabled_precisions,
             **kwargs,
         )
