@@ -6,12 +6,16 @@ from typing import Any, Callable, Sequence
 
 import torch
 import torch._dynamo as td
-from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
+from torch._functorch.aot_autograd import make_boxed_compiler
+from torch._guards import TracingContext
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.compile import compile_module
 from torch_tensorrt.dynamo.lowering._decompositions import get_decompositions
+from torch_tensorrt.dynamo.lowering._freeze_aot_graph import freeze_autograd_gm
 from torch_tensorrt.dynamo.lowering._pre_aot_lowering import pre_aot_substitutions
 from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs
+
+from .aot_module import aot_module
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +37,9 @@ def torch_tensorrt_backend(
 
     DEFAULT_BACKEND = aot_torch_tensorrt_aten_backend
 
-    compiled_mod: torch.nn.Module = DEFAULT_BACKEND(gm, sample_inputs, **kwargs)
-    return compiled_mod
+    TracingContext.get().fake_mode.allow_non_fake_inputs = True
+
+    return DEFAULT_BACKEND(gm, sample_inputs, **kwargs)
 
 
 @td.register_backend(name="aot_torch_tensorrt_aten")  # type: ignore[misc]
@@ -52,7 +57,7 @@ def aot_torch_tensorrt_aten_backend(
     gm = pre_aot_substitutions(gm)
 
     # Invoke AOTAutograd to translate operators to aten
-    return aot_module_simplified(
+    return aot_module(
         gm,
         sample_inputs,
         fw_compiler=make_boxed_compiler(custom_backend),
@@ -77,9 +82,16 @@ def _pretraced_backend(
     try:
         logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
 
+        frozen_gm, unfrozen_indices = freeze_autograd_gm(gm, sample_inputs)
+        nonfrozen_inputs = [sample_inputs[idx] for idx in unfrozen_indices]
+
+        frozen_gm.graph.eliminate_dead_code()
+        frozen_gm.graph.lint()
+        frozen_gm.recompile()
+
         trt_compiled = compile_module(
-            gm,
-            sample_inputs,
+            frozen_gm,
+            nonfrozen_inputs,
             settings=settings,
         )
         return trt_compiled
