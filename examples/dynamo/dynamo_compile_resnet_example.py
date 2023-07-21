@@ -2,7 +2,7 @@
 Dynamo Compile ResNet Example
 =========================
 
-This interactive script is intended as a sample of the `torch_tensorrt.dynamo.compile` workflow on a ResNet model."""
+This interactive script is intended as a sample of the `torch_tensorrt.compile` workflow with `torch.compile` on a ResNet model."""
 
 # %%
 # Imports and Model Definition
@@ -19,7 +19,7 @@ model = models.resnet18(pretrained=True).half().eval().to("cuda")
 inputs = [torch.randn((1, 3, 224, 224)).to("cuda").half()]
 
 # %%
-# Optional Input Arguments to `torch_tensorrt.dynamo.compile`
+# Optional Input Arguments to `torch_tensorrt.compile`
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 # Enabled precision for TensorRT optimization
@@ -39,13 +39,14 @@ min_block_size = 7
 torch_executed_ops = {}
 
 # %%
-# Compilation with `torch_tensorrt.dynamo.compile`
+# Compilation with `torch_tensorrt.compile`
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 # Build and compile the model with torch.compile, using Torch-TensorRT backend
-optimized_model = torch_tensorrt.dynamo.compile(
+optimized_model = torch_tensorrt.compile(
     model,
-    inputs,
+    ir="torch_compile",
+    inputs=inputs,
     enabled_precisions=enabled_precisions,
     debug=debug,
     workspace_size=workspace_size,
