@@ -356,3 +356,5 @@ class TRTInterpreter(torch.fx.Interpreter):
             elif self.output_fp16 and output.dtype == trt.float32:
                 output.dtype = trt.float16
             self._output_names.append(name)
+
+        return list(outputs)
