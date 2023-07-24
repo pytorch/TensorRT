@@ -11,6 +11,7 @@ from torch_tensorrt.dynamo._defaults import (
     VERSION_COMPATIBLE,
     OPTIMIZATION_LEVEL,
     USE_PYTHON_RUNTIME,
+    TRUNCATE_LONG_AND_DOUBLE,
 )
 
 
@@ -26,3 +27,4 @@ class CompilationSettings:
     version_compatible: bool = VERSION_COMPATIBLE
     optimization_level: Optional[int] = OPTIMIZATION_LEVEL
     use_python_runtime: Optional[bool] = USE_PYTHON_RUNTIME
+    truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE
