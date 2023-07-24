@@ -262,6 +262,22 @@ def aten_ops_squeeze(
     return impl.squeeze.squeeze(network, target, SourceIR.ATEN, name, args[0], args[1])
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.sqrt.default)
+def aten_ops_sqrt(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = args[0]
+    return impl.unary.sqrt(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        input_val,
+    )
 @dynamo_tensorrt_converter(torch.ops.aten.unsqueeze.default)
 def aten_ops_unsqueeze(
     network: TRTNetwork,
