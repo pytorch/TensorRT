@@ -126,7 +126,7 @@ These are the following dependencies used to verify the testcases. Torch-TensorR
 Releases: https://github.com/pytorch/TensorRT/releases
 
 ```
-pip install torch-tensorrt
+pip install tensorrt torch-tensorrt
 ```
 
 ## Compiling Torch-TensorRT
