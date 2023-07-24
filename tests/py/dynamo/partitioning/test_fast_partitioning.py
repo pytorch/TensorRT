@@ -31,6 +31,30 @@ class TestFastPartitioning(TestCase):
             "Single operators should not be segmented",
         )
 
+    def test_partition_fully_supported_one_op_require_full_compilation(self):
+        class FullySupportedOneOp(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+
+            def forward(self, x, y):
+                return torch.ops.aten.add.Tensor(x, y)
+
+        fx_graph = torch.fx.symbolic_trace(FullySupportedOneOp())
+        partitioned_graph = partitioning.fast_partition(
+            deepcopy(fx_graph), require_full_compilation=True
+        )
+        self.assertEquals(
+            len(
+                [
+                    1
+                    for submod in list(partitioned_graph.named_children())
+                    if "_run_on_acc" in submod[0]
+                ]
+            ),
+            1,
+            "Single operators can be segmented if full compilation is required",
+        )
+
     def test_partition_fully_supported_multi_op(self):
         class FullySupportedMultiOp(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:
