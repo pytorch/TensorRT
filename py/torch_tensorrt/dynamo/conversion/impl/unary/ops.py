@@ -1,5 +1,6 @@
 from typing import Optional
 
+import torch
 import tensorrt as trt
 from torch.fx.node import Target
 
@@ -95,4 +96,22 @@ def sign(
         trt.ElementWiseOperation.SUB,
         double_floor_div_output,
         1,
+    )
+
+
+def sqrt(
+    network: TRTNetwork,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+) -> TRTTensor:
+    operation_type = trt.UnaryOperation.SQRT
+    return convert_unary(
+        network,
+        target,
+        source_ir,
+        name,
+        operation_type,
+        input_val,
     )

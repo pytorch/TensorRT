@@ -11,6 +11,7 @@ if hasattr(trt, "__version__"):
     TRTPlugin = trt.IPluginV2
     TRTDataType = trt.DataType
     TRTElementWiseOp = trt.ElementWiseOperation
+    TRTUnaryOp = trt.UnaryOperation
 else:
     TRTNetwork = "trt.INetworkDefinition"
     TRTTensor = "trt.tensorrt.ITensor"
@@ -19,6 +20,7 @@ else:
     TRTPlugin = "trt.IPluginV2"
     TRTDataType = "trt.DataType"
     TRTElementWiseOp = "trt.ElementWiseOperation"
+    TRTUnaryOp = "trt.UnaryOperation"
 
 Shape = Sequence[int]
 ShapeRange = Tuple[Shape, Shape, Shape]
