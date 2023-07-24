@@ -13,11 +13,12 @@ assignees: ''
 ## Goal(s)
 <!-- What are we trying to achieve here, what features + objectives does this story include? -->
 
-## Implementation Phases
-<!-- Key issues/features/PRs proposed for this story, in descending-priority/implementation order -->
-1.
-2.
-3.
+
+## Tasks
+```[tasklist]
+### Tasks
+- [ ] https://github.com/pytorch/TensorRT/issues/2123
+```
 
 ## Additional context
 <!-- Add any other context about the story -->
