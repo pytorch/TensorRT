@@ -1,5 +1,6 @@
 import torch
 from torch._decomp import register_decomposition, core_aten_decompositions
+from typing import Sequence, List
 
 
 DECOMPOSITIONS = {**core_aten_decompositions()}
@@ -75,6 +76,44 @@ def reciprocal_replacement(
     input_: torch.Tensor,
 ) -> torch.Tensor:
     return torch.div(1, input_)
+
+
+@register_decomposition(torch.ops.aten.var_mean, registry=DECOMPOSITIONS)
+def var_mean_replacement(
+    input_: torch.Tensor,
+    dim: int = None,
+    correction: int = 1,
+    keepdim: bool = False,
+    unbiased: bool = True,
+) -> List[torch.Tensor] :
+    if (dim is not None):
+        mean = torch.mean(input_)
+        variance = torch.mean(torch.pow(torch.sub(input_, mean), 2))
+    else:
+        mean = torch.mean(input_, dim)
+        variance = torch.mean(torch.pow(torch.sub(input_, mean), 2), dim)
+
+    if (unbiased):
+        N = torch.numel(input_)
+        correction_term = N / (N - correction)
+        variance = torch.mul(variance, correction_term)
+    
+    return [variance, mean]
+
+
+@register_decomposition(torch.ops.aten.var_mean.dim, registry=DECOMPOSITIONS)
+def var_mean_dim_replacement(
+    input_: torch.Tensor,
+) -> torch.Tensor:
+    return torch.div(1, input_)
+
+
+@register_decomposition(torch.ops.aten.var_mean, registry=DECOMPOSITIONS)
+def var_mean_correction_replacement(
+    input_: torch.Tensor,
+) -> torch.Tensor:
+    return torch.div(1, input_)
+
 
 
 def get_decompositions():
