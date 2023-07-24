@@ -17,7 +17,6 @@ assignees: ''
 ## Tasks
 ```[tasklist]
 ### Tasks
-- [ ] https://github.com/pytorch/TensorRT/issues/2123
 ```
 
 ## Additional context
