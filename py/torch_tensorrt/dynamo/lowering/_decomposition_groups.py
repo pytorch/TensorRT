@@ -176,7 +176,7 @@ torch_enabled_decompositions: Set[OpOverload] = {
     aten.full,
     aten.repeat,
 }
-torch_disabled_decompositions: Set[OpOverload] = set()
+torch_disabled_decompositions: Set[OpOverload] = {aten.rsub}
 
 
 ENABLED_TORCH_DECOMPOSITIONS: Dict[
