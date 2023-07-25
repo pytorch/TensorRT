@@ -77,5 +77,14 @@ def reciprocal_replacement(
     return torch.div(1, input_)
 
 
+@register_decomposition(torch.ops.aten.rsub.default, registry=DECOMPOSITIONS)
+def rsub_replacement(
+    input_: torch.Tensor,
+    other: torch.Tensor,
+    alpha = 1
+) -> torch.Tensor:
+    return torch.sub(other, torch.mul(alpha, input_))
+
+
 def get_decompositions():
     return DECOMPOSITIONS
