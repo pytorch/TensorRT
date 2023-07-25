@@ -222,7 +222,7 @@ class Test64BitInput(TestCase):
         class PartiallySupportedMultiOp(torch.nn.Module):
             def forward(self, x, y):
                 return torch.ops.aten.div.Tensor_mode(
-                    x, torch.ops.aten.add.Tensor(y, y), rounding_mode="floor"
+                    x, torch.ops.aten.add.Tensor(y, y), rounding_mode=None
                 )
 
         fx_graph = torch.fx.symbolic_trace(PartiallySupportedMultiOp())

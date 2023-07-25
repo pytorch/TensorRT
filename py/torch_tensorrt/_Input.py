@@ -68,6 +68,17 @@ class Input(object):
             - Input(shape=(1,3,32,32), dtype=torch_tensorrt.dtype.int32, format=torch_tensorrt.TensorFormat.NCHW)
             - Input(min_shape=(1,3,32,32), opt_shape=[2,3,32,32], max_shape=(3,3,32,32)) #Implicitly dtype=torch_tensorrt.dtype.float32, format=torch_tensorrt.TensorFormat.NCHW
         """
+        # Compatibility code for switching over from InputTensorSpec
+        if "shape" in kwargs and "shape_ranges" in kwargs:
+            assert (
+                len(kwargs["shape_ranges"]) == 1 and len(kwargs["shape_ranges"][0]) == 3
+            )
+            del kwargs["shape"]
+
+            kwargs["min_shape"] = kwargs["shape_ranges"][0][0]
+            kwargs["opt_shape"] = kwargs["shape_ranges"][0][1]
+            kwargs["max_shape"] = kwargs["shape_ranges"][0][2]
+
         if len(args) == 1:
             if not Input._supported_input_size_type(args[0]):
                 raise TypeError(
