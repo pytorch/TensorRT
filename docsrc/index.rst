@@ -59,9 +59,9 @@ User Guide
 
 Tutorials
 ------------
+* :ref:`torch_tensorrt_tutorials`
 * :ref:`serving_torch_tensorrt_with_triton`
 * :ref:`notebooks`
-* :ref:`dynamo_compile`
 
 .. toctree::
    :caption: Tutorials
