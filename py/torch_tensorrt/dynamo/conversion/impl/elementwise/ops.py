@@ -8,7 +8,7 @@ from torch_tensorrt.fx.utils import (
     unified_dtype_converter,
     Frameworks,
 )
-from torch_tensorrt.dynamo.conversion import SourceIR
+from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.fx.converters.converter_utils import get_trt_tensor
 
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (

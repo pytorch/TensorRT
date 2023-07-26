@@ -45,7 +45,11 @@ TEST_P(CppAPITests, CompiledModuleIsClose) {
   }
 }
 
-#ifndef DISABLE_TEST_IN_CI
+#ifdef DISABLE_TEST_IN_CI
+
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(CppAPITests);
+
+#else
 
 INSTANTIATE_TEST_SUITE_P(
     CompiledModuleForwardIsCloseSuite,

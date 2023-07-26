@@ -4,19 +4,19 @@ version: 2.1
 
 commands:
   install-bazel:
-    description: "Install bazel"
+    description: "Install bazelisk"
     parameters:
       platform:
         type: string
-        default: "x86_64"
+        default: "amd64"
       version:
         type: string
-        default: "5.2.0"
+        default: "v1.17.0"
     steps:
       - run:
-          name: Install bazel
+          name: Install bazelisk
           command: |
-            sudo wget -q https://github.com/bazelbuild/bazel/releases/download/<< parameters.version >>/bazel-<< parameters.version >>-linux-<< parameters.platform >> -O /usr/bin/bazel
+            sudo wget -q https://github.com/bazelbuild/bazelisk/releases/download/<< parameters.version >>/bazelisk-linux-<< parameters.platform >> -O /usr/bin/bazel
             sudo chmod a+x /usr/bin/bazel
 
   install-cmake:
@@ -92,6 +92,21 @@ commands:
                     key: cmake-<< parameters.cache-key >>-<< parameters.version >>
                     paths:
                         - << parameters.install-dir >>
+
+  install-nvctk:
+    description: "Install NVIDIA Container Toolkit"
+    steps:
+      - run:
+          name: "Install NVIDIA Container Toolkit"
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y nvidia-container-toolkit
+            sudo nvidia-ctk runtime configure --runtime=docker
+            sudo systemctl restart docker
+      - run:
+          name: "Test NVCTK"
+          command: |
+            sudo docker run --rm --runtime=nvidia --gpus all nvidia/cuda:11.6.2-base-ubuntu20.04 nvidia-smi
 
   install-cudnn:
     description: "Install CUDNN 8.8.1"
@@ -190,12 +205,9 @@ commands:
       trt-version-long:
         type: string
         default: "8.6.1.6-1"
-      bazel-version:
-        type: string
-        default: "5.2.0"
       bazel-platform:
         type: string
-        default: "x86_64"
+        default: "amd64"
     steps:
       - install-cudnn:
           os: << parameters.os >>
@@ -212,14 +224,13 @@ commands:
             sudo apt-get install libnvinfer8=<< parameters.trt-version-long >>+<< parameters.cuda-string-version >> libnvinfer-plugin8=<< parameters.trt-version-long>>+<< parameters.cuda-string-version >> libnvinfer-dev=<< parameters.trt-version-long >>+<< parameters.cuda-string-version >> libnvinfer-plugin-dev=<< parameters.trt-version-long>>+<< parameters.cuda-string-version >> libnvinfer-headers-dev=<< parameters.trt-version-long>>+<< parameters.cuda-string-version >> libnvinfer-headers-plugin-dev=<< parameters.trt-version-long>>+<< parameters.cuda-string-version >>
       - install-bazel:
           platform: << parameters.bazel-platform >>
-          version: << parameters.bazel-version >>
 
   setup-py-version:
       description: "Set python version"
       parameters:
         python-version:
           type: string
-          default: "3.9.4"
+          default: "3.10.9"
       steps:
         - run:
             name: Set python version
@@ -267,11 +278,15 @@ commands:
           name: Install Torch
           command: |
             pip3 install --upgrade pip
-            pip3 install torch==<< parameters.torch-build >>  torchvision==<< parameters.torchvision-build >> --extra-index-url << parameters.torch-build-index >> --extra-index-url << parameters.torchvision-build-index >>
+            pip3 install torch==<< parameters.torch-build >>  torchvision==<< parameters.torchvision-build >> --extra-index-url https://pypi.nvidia.com --extra-index-url << parameters.torch-build-index >> --extra-index-url << parameters.torchvision-build-index >>
 
   build-py:
     description: "Build the torch-tensorrt python release (pre-cxx11-abi)"
     parameters:
+      cuda-version:
+        type: string
+      torch-build-index:
+        type: string
       platform:
         type: string
         default: "x86_64"
@@ -279,19 +294,21 @@ commands:
       - run:
           name: Build torch-tensorrt python release (pre-cxx11-abi)
           command: |
-            export CUDA_HOME=/usr/local/cuda-12.1/
+            export CUDA_HOME=/usr/local/cuda-<< parameters.cuda-version >>/
             mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
-            cd py
-            python3 -m pip install wheel setuptools
-            python3 -m pip install pybind11==2.6.2
-            python3 setup.py bdist_wheel
-            python3 setup.py install
+            python3 -m pip install pip==22.0.2
+            python3 -m pip wheel --no-deps --verbose --pre . --extra-index-url https://pypi.nvidia.com --extra-index-url << parameters.torch-build-index >> -w dist
+            python3 -m pip install dist/torch_tensorrt*
             mkdir -p /tmp/dist/builds
-            cp dist/* /tmp/dist/builds
+            cp dist/torch_tensorrt* /tmp/dist/builds
 
   build-py-legacy:
     description: "Build the torch-tensorrt python legacy release (pre-cxx11-abi)"
     parameters:
+      cuda-version:
+        type: string
+      torch-build-index:
+        type: string
       platform:
         type: string
         default: "x86_64"
@@ -299,19 +316,21 @@ commands:
       - run:
           name: Build torch-tensorrt python legacy release (pre-cxx11-abi)
           command: |
-            export CUDA_HOME=/usr/local/cuda-12.1/
+            export CUDA_HOME=/usr/local/cuda-<< parameters.cuda-version >>/
             mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
-            cd py
-            python3 -m pip install wheel setuptools
-            python3 -m pip install pybind11==2.6.2
-            python3 setup.py bdist_wheel --legacy
-            python3 setup.py install --legacy
+            python3 -m pip install pip==22.0.2
+            python3 -m pip wheel --no-deps --verbose --pre . --extra-index-url https://pypi.nvidia.com --extra-index-url << parameters.torch-build-index >> --config-setting="--build-option=--legacy" -w dist
+            python3 -m pip install dist/torch_tensorrt*
             mkdir -p /tmp/dist/builds
-            cp dist/* /tmp/dist/builds
+            cp dist/torch_tensorrt* /tmp/dist/builds
 
   build-py-cxx11-abi:
     description: "Build the torch-tensorrt python release (cxx11-abi)"
     parameters:
+      cuda-version:
+        type: string
+      torch-build-index:
+        type: string
       platform:
         type: string
         default: "x86_64"
@@ -323,36 +342,38 @@ commands:
           name: Build setup
           command: |
             mv ~/project/toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> ~/project/WORKSPACE
-            python3 -m pip install wheel setuptools
-            python3 -m pip install pybind11==2.6.2
       - when:
           condition: << parameters.release >>
           steps:
             - run:
                 name: Build torch-tensorrt python release package
                 command: |
-                  export CUDA_HOME=/usr/local/cuda-12.1/
-                  cd ~/project/py
-                  python3 setup.py bdist_wheel --use-cxx11-abi --release
-                  python3 setup.py install --use-cxx11-abi --release
+                  export CUDA_HOME=/usr/local/cuda-<< parameters.cuda-version >>/
+                  python3 -m pip install pip==22.0.2
+                  python3 -m pip wheel --no-deps --verbose --pre . --extra-index-url https://pypi.nvidia.com --extra-index-url << parameters.torch-build-index >> --config-setting="--build-option=--release" --config-setting="--build-option=--use-cxx11-abi" -w dist
+                  python3 -m pip install dist/torch_tensorrt*
                   mkdir -p /tmp/dist/builds
-                  cp dist/* /tmp/dist/builds
+                  cp dist/torch_tensorrt* /tmp/dist/builds
       - unless:
           condition: << parameters.release >>
           steps:
             - run:
                 name: Build torch-tensorrt python package
                 command: |
-                  export CUDA_HOME=/usr/local/cuda-12.1/
-                  cd ~/project/py
-                  python3 setup.py bdist_wheel --use-cxx11-abi
-                  python3 setup.py install --use-cxx11-abi
+                  export CUDA_HOME=/usr/local/cuda-<< parameters.cuda-version >>/
+                  python3 -m pip install pip==22.0.2
+                  python3 -m pip wheel --no-deps --verbose --pre . --extra-index-url https://pypi.nvidia.com --extra-index-url << parameters.torch-build-index >> --config-setting="--build-option=--use-cxx11-abi" -w dist
+                  python3 -m pip install dist/torch_tensorrt*
                   mkdir -p /tmp/dist/builds
-                  cp dist/* /tmp/dist/builds
+                  cp dist/torch_tensorrt* /tmp/dist/builds
 
   build-py-fx-only:
     description: "Build the torch-tensorrt python release with only the fx backend"
     parameters:
+      cuda-version:
+        type: string
+      torch-build-index:
+        type: string
       platform:
         type: string
         default: "x86_64"
@@ -361,15 +382,13 @@ commands:
       - run:
           name: Build torch-tensorrt python release with only the fx backend
           command: |
-            export CUDA_HOME=/usr/local/cuda-12.1/
+            export CUDA_HOME=/usr/local/cuda-<< parameters.cuda-version >>/
             mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
-            cd py
-            python3 -m pip install wheel setuptools
-            python3 -m pip install pybind11==2.6.2
-            python3 setup.py bdist_wheel --fx-only
-            python3 setup.py install --fx-only
+            python3 -m pip install pip==22.0.2
+            python3 -m pip wheel --no-deps --verbose --pre . --extra-index-url https://pypi.nvidia.com --extra-index-url << parameters.torch-build-index >> --config-setting="--build-option=--fx-only" -w dist
+            python3 -m pip install dist/torch_tensorrt*
             mkdir -p /tmp/dist/builds
-            cp dist/* /tmp/dist/builds
+            cp dist/torch_tensorrt* /tmp/dist/builds
 
   build-py-ngc:
     description: "Build the torch-tensorrt python release for NGC PyTorch (cxx11-abi)"
@@ -400,7 +419,6 @@ commands:
             export BAZEL_VERSION="$(cat /home/circleci/project/.bazelversion)"
             docker exec ngc_build_container bash -c "wget https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-linux-x86_64 -O /usr/bin/bazel && chmod a+x /usr/bin/bazel"
             docker exec ngc_build_container bash -c "mv /workspace/docker/WORKSPACE.ngc /workspace/WORKSPACE"
-            docker exec ngc_build_container bash -c "cd /workspace/py && pip install wheel setuptools pybind11==2.6.2"
             docker exec ngc_build_container bash -c "git config --global --add safe.directory /workspace"
       - when:
           condition: << parameters.release >>
@@ -408,14 +426,14 @@ commands:
             - run:
                 name: Build torch-tensorrt release build for NGC
                 command: |
-                  docker exec ngc_build_container bash -c "cd /workspace/py && python3 setup.py bdist_wheel --use-cxx11-abi --release"
+                  docker exec ngc_build_container bash -c "cd /workspace/ && python3 -m pip wheel --no-deps --verbose --pre . --config-setting="--build-option=--release" --config-setting="--build-option=--use-cxx11-abi" -w dist"
       - unless:
           condition: << parameters.release >>
           steps:
             - run:
                 name: Build torch-tensorrt debug build for NGC
                 command: |
-                  docker exec ngc_build_container bash -c "cd /workspace/py && python3 setup.py bdist_wheel --use-cxx11-abi"
+                  docker exec ngc_build_container bash -c "cd /workspace/py && python3 -m pip wheel --no-deps --verbose --pre . --config-setting="--build-option=--use-cxx11-abi" -w dist"
       - run:
           name: Collect builds
           command: |
@@ -428,15 +446,17 @@ commands:
       platform:
         type: string
         default: "x86_64"
+      cuda-version:
+        type: string
     steps:
       - run:
           name: Build torch-tensorrt library with CMake
           command: |
             mkdir build
-            export PATH=$PATH:/usr/local/cuda-12.1/bin
+            export PATH=$PATH:/usr/local/<< parameters.cuda-version >>/bin
             ~/cmake/bin/cmake -S. -Bbuild \
               -DCMAKE_MODULE_PATH=cmake/Module \
-              -DTorch_DIR=/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch/share/cmake/Torch \
+              -DTorch_DIR=/opt/circleci/.pyenv/versions/3.10.9/lib/python3.10/site-packages/torch/share/cmake/Torch \
               -DTensorRT_ROOT=/usr \
               -DCMAKE_BUILD_TYPE=Debug
             cmake --build build -- -j12
@@ -485,7 +505,7 @@ commands:
           name: Run core / C++ tests
           no_output_timeout: 15m
           environment:
-            LD_LIBRARY_PATH: "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch_tensorrt.libs:/home/circleci/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:/home/circleci/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda-12.1/lib64/:$LD_LIBRARY_PATH"
+            LD_LIBRARY_PATH: "/opt/circleci/.pyenv/versions/3.10.9/lib/python3.10/site-packages/torch_tensorrt.libs:/home/circleci/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:/home/circleci/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda-12.1/lib64/:$LD_LIBRARY_PATH"
           command: |
             set -e
             mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
@@ -810,6 +830,8 @@ jobs:
         type: string
       python-version:
         type: string
+      cuda-version:
+        type: string
       cxx11-abi:
         type: boolean
         default: false
@@ -828,8 +850,7 @@ jobs:
           platform: "x86_64"
           cudnn-version: << pipeline.parameters.cudnn-version >>
           trt-version-short:  << pipeline.parameters.trt-version-short >>
-          bazel-version: << pipeline.parameters.bazel-version >>
-          bazel-platform: "x86_64"
+          bazel-platform: "amd64"
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torchvision-build: << parameters.torchvision-build >>
@@ -837,18 +858,24 @@ jobs:
       - when:
           condition: << parameters.cxx11-abi >>
           steps:
-            - build-py-cxx11-abi
+            - build-py-cxx11-abi:
+                cuda-version: << parameters.cuda-version >>
+                torch-build-index: << parameters.torch-build-index >>
       - unless:
           condition: << parameters.cxx11-abi >>
           steps:
             - when:
                 condition: << parameters.legacy >>
                 steps:
-                  - build-py-legacy
+                  - build-py-legacy:
+                      cuda-version: << parameters.cuda-version >>
+                      torch-build-index: << parameters.torch-build-index >>
             - unless:
                 condition: << parameters.legacy >>
                 steps:
-                  - build-py
+                  - build-py:
+                      cuda-version: << parameters.cuda-version >>
+                      torch-build-index: << parameters.torch-build-index >>
       - run:
           name: Move to build dir
           command: |
@@ -891,8 +918,7 @@ jobs:
           platform: "x86_64"
           cudnn-version: << parameters.cudnn-version >>
           trt-version-short:  << parameters.trt-version-short >>
-          bazel-version: << pipeline.parameters.bazel-version >>
-          bazel-platform: "x86_64"
+          bazel-platform: "amd64"
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
       - install-torch-from-index:
@@ -903,7 +929,7 @@ jobs:
           at: /tmp/dist
       - run:
           name: "Install torch-tensorrt"
-          command: pip3 install /tmp/dist/x86_64-linux/*cp39-cp39*.whl
+          command: pip3 install /tmp/dist/x86_64-linux/*cp310-cp310*.whl
       - dump-test-env
       - test-ts-core
 
@@ -936,7 +962,7 @@ jobs:
           torch-build-index: << parameters.torch-build-index >>
       - run:
           name: "Install torch-tensorrt"
-          command: pip3 install --pre /tmp/dist/x86_64-linux/*cp39-cp39*.whl
+          command: pip3 install --pre /tmp/dist/x86_64-linux/*cp310-cp310*.whl
       - dump-test-env
       - test-ts-py-api
 
@@ -971,7 +997,7 @@ jobs:
       - install-cudnn
       - run:
           name: "Install torch-tensorrt"
-          command: pip3 install --pre /tmp/dist/x86_64-linux/*cp39-cp39*.whl
+          command: pip3 install --pre /tmp/dist/x86_64-linux/*cp310-cp310*.whl
       # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - dump-test-env
       - test-fx
@@ -1010,7 +1036,7 @@ jobs:
       #     command: export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH
       - run:
           name: "Install torch-tensorrt"
-          command: pip3 install --pre /tmp/dist/x86_64-linux/*cp39-cp39*.whl
+          command: pip3 install --pre /tmp/dist/x86_64-linux/*cp310-cp310*.whl
       # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - dump-test-env
       - test-fx-no-aten
@@ -1048,7 +1074,7 @@ jobs:
       #     command: export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH
       - run:
           name: "Install torch-tensorrt"
-          command: pip3 install --pre /tmp/dist/x86_64-linux/*cp39-cp39*.whl
+          command: pip3 install --pre /tmp/dist/x86_64-linux/*cp310-cp310*.whl
       # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - dump-test-env
       - test-dynamo-converters
@@ -1074,6 +1100,7 @@ jobs:
           condition: << parameters.enabled >>
           steps:
             - checkout
+            - install-nvctk
             - run:
                 name: "Build packaging container"
                 command: |
@@ -1127,8 +1154,7 @@ jobs:
                 platform: "x86_64"
                 cudnn-version: << pipeline.parameters.cudnn-version >>
                 trt-version-short:  << pipeline.parameters.trt-version-short >>
-                bazel-version: << pipeline.parameters.bazel-version >>
-                bazel-platform: "x86_64"
+                bazel-platform: "amd64"
             - install-torch-from-index:
                 torch-build:  << parameters.torch-build >>
                 torch-build-index: << parameters.torch-build-index >>
@@ -1146,8 +1172,8 @@ jobs:
                   TRT_VERSION=$(python3 -c "from versions import __tensorrt_version__;print(__tensorrt_version__)")
                   CUDNN_VERSION=$(python3 -c "from versions import __cudnn_version__;print(__cudnn_version__)")
                   TORCH_VERSION=$(python3 -c "from torch import __version__;print(__version__.split('+')[0])")
-                  pip3 install --upgrade pip
-                  pip3 install -r ~/project/py/requirements.txt
+                  python3 -m pip install pip==22.0.2
+                  python3 -m pip install -r ~/project/py/requirements.txt
                   TORCH_VERSION=$(python3 -c "from torch import __version__;print(__version__.split('+')[0])")
                   mkdir -p ~/project/py/dist/
                   cp ~/project/bazel-bin/libtorchtrt.tar.gz ~/project/py/dist/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
@@ -1199,7 +1225,6 @@ jobs:
           architecture: "arm64"
           cudnn-version: << pipeline.parameters.cudnn-jetson-version >>
           trt-version-short:  << pipeline.parameters.trt-jetson-version-short >>
-          bazel-version: << pipeline.parameters.bazel-version >>
           bazel-platform: "arm64"
       - run:
           name: Set python version
@@ -1240,6 +1265,8 @@ jobs:
 
   build-x86_64-linux-cmake:
     parameters:
+      cuda-version:
+        type: string
       cudnn-version:
         type: string
       trt-version-short:
@@ -1262,13 +1289,14 @@ jobs:
           platform: "x86_64"
           cudnn-version: << parameters.cudnn-version >>
           trt-version-short:  << parameters.trt-version-short >>
-          bazel-platform: "x86_64"
+          bazel-platform: "amd64"
       - install-cmake:
           version: 3.24.1
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
-      - build-cmake
+      - build-cmake:
+          cuda-version: << parameters.cuda-version >>
       - run:
           name: Move to cmake build dir
           command: |
@@ -1341,14 +1369,14 @@ jobs:
                 command: echo -e "Packaging stage not enabled"
 
 parameters:
-  bazel-version:
-    type: string
-    default: "5.2.0"
   python-version:
     type: string
-    default: "3.9.4"
+    default: "3.10.9"
 
   # Nightly platform config
+  cuda-version:
+    type: string
+    default: "12.1"
   torch-build:
     type: string
     default: "2.1.0.dev20230703+cu121"
@@ -1358,18 +1386,6 @@ parameters:
   torch-build-index:
     type: string
     default: "https://download.pytorch.org/whl/nightly/cu121"
-  torch-build-legacy:
-    type: string
-    default: "1.13.1+cu117"
-  torchvision-build-legacy:
-    type: string
-    default: "0.14.1+cu117"
-  torch-build-index-legacy:
-    type: string
-    default: "https://download.pytorch.org/whl/cu117"
-  enable-legacy:
-    type: boolean
-    default: true
   cudnn-version:
     type: string
     default: "8.8.1.3"
@@ -1380,7 +1396,33 @@ parameters:
     type: string
     default: "8.6.1"
 
+  # Legacy platform config
+  cuda-version-legacy:
+    type: string
+    default: "11.7"
+  torch-build-legacy:
+    type: string
+    default: "1.13.1+cu117"
+  torchvision-build-legacy:
+    type: string
+    default: "0.14.1+cu117"
+  torch-build-index-legacy:
+    type: string
+    default: "https://download.pytorch.org/whl/cu117"
+  cudnn-version-legacy:
+    type: string
+    default: "8.8.1.3"
+  trt-version-short-legacy:
+    type: string
+    default: "8.6.1"
+  trt-version-long-legacy:
+    type: string
+    default: "8.6.1"
+
   # Jetson platform config
+  cuda-jetson-version:
+    type: string
+    default: "11.8"
   torch-jetson-build:
     type: string
     default: "torch-1.13.0a0+d0d6b1f2.nv22.09-cp38-cp38-linux_aarch64.whl"
@@ -1409,6 +1451,10 @@ parameters:
     type: boolean
     default: false
 
+  enable-legacy:
+    type: boolean
+    default: true
+
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
@@ -1428,6 +1474,7 @@ workflows:
           torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           python-version: << pipeline.parameters.python-version >>
+          cuda-version: << pipeline.parameters.cuda-version >>
 
       - test-core-cpp-x86_64-linux:
           torch-build: << pipeline.parameters.torch-build >>
@@ -1469,6 +1516,7 @@ workflows:
 
       - build-x86_64-linux:
           name: build-x86_64-linux-legacy
+          cuda-version: << pipeline.parameters.cuda-version-legacy >>
           torch-build: << pipeline.parameters.torch-build-legacy >>
           torchvision-build: << pipeline.parameters.torchvision-build-legacy >>
           torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
@@ -1480,9 +1528,9 @@ workflows:
           torch-build: << pipeline.parameters.torch-build-legacy >>
           torchvision-build: << pipeline.parameters.torchvision-build-legacy >>
           torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
-          trt-version-short: << pipeline.parameters.trt-version-short >>
-          trt-version-long: << pipeline.parameters.trt-version-long >>
-          cudnn-version: << pipeline.parameters.cudnn-version >>
+          trt-version-short: << pipeline.parameters.trt-version-short-legacy >>
+          trt-version-long: << pipeline.parameters.trt-version-long-legacy >>
+          cudnn-version: << pipeline.parameters.cudnn-version-legacy >>
           python-version: << pipeline.parameters.python-version >>
           requires:
             - build-x86_64-linux-legacy
@@ -1492,7 +1540,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build-legacy >>
           torchvision-build: << pipeline.parameters.torchvision-build-legacy >>
           torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
-          trt-version-long: << pipeline.parameters.trt-version-long >>
+          trt-version-long: << pipeline.parameters.trt-version-long-legacy >>
           python-version: << pipeline.parameters.python-version >>
           requires:
             - build-x86_64-linux-legacy
@@ -1501,7 +1549,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-build-legacy >>
           torchvision-build: << pipeline.parameters.torchvision-build-legacy >>
           torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
-          trt-version-long: << pipeline.parameters.trt-version-long >>
+          trt-version-long: << pipeline.parameters.trt-version-long-legacy >>
           python-version: << pipeline.parameters.python-version >>
           requires:
             - build-x86_64-linux-legacy
@@ -1561,6 +1609,7 @@ workflows:
   on-push:
     jobs:
       - build-x86_64-linux:
+          cuda-version: << pipeline.parameters.cuda-version >>
           torch-build: << pipeline.parameters.torch-build >>
           torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
@@ -1605,6 +1654,7 @@ workflows:
             - build-x86_64-linux
 
       - build-x86_64-linux-cmake:
+          cuda-version: << pipeline.parameters.cuda-version >>
           torch-build: << pipeline.parameters.torch-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-short: << pipeline.parameters.trt-version-short >>

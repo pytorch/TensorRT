@@ -8,70 +8,73 @@ export PROJECT_DIR=/workspace/project
 
 cp -r $CUDA_HOME /usr/local/cuda
 
-py37() {
-    cd /workspace/project/py
-    PY_BUILD_CODE=cp37-cp37m
-    PY_VERSION=3.7
-    PY_NAME=python${PY_VERSION}
-    PY_DIR=/opt/python/${PY_BUILD_CODE}
-    PY_PKG_DIR=${PY_DIR}/lib/${PY_NAME}/site-packages/
-    ${PY_DIR}/bin/python -m pip install --upgrade pip
-    ${PY_DIR}/bin/python -m pip install -r requirements.txt
-    ${PY_DIR}/bin/python -m pip install setuptools wheel auditwheel
-    ${PY_DIR}/bin/python setup.py bdist_wheel --release --ci
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${PY_PKG_DIR}/torch/lib:${PY_PKG_DIR}/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs ${PY_DIR}/bin/python -m auditwheel repair $(cat ${PROJECT_DIR}/py/ci/soname_excludes.params) --plat manylinux_2_17_x86_64 dist/torch_tensorrt-*-${PY_BUILD_CODE}-linux_x86_64.whl
+build_wheel() {
+    $1/bin/python -m pip install --upgrade pip
+    $1/bin/python -m pip wheel . --config-setting="--build-option=--release" --config-setting="--build-option=--ci" -w dist
+}
+
+patch_wheel() {
+    $2/bin/python -m pip install auditwheel
+    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$1/torch/lib:$1/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs $2/bin/python -m auditwheel repair  $(cat ${PROJECT_DIR}/py/ci/soname_excludes.params) --plat manylinux_2_34_x86_64 dist/torch_tensorrt-*-$3-linux_x86_64.whl
 }
 
 py38() {
-    cd /workspace/project/py
+    cd /workspace/project
     PY_BUILD_CODE=cp38-cp38
     PY_VERSION=3.8
     PY_NAME=python${PY_VERSION}
     PY_DIR=/opt/python/${PY_BUILD_CODE}
     PY_PKG_DIR=${PY_DIR}/lib/${PY_NAME}/site-packages/
-    ${PY_DIR}/bin/python -m pip install --upgrade pip
-    ${PY_DIR}/bin/python -m pip install -r requirements.txt
-    ${PY_DIR}/bin/python -m pip install setuptools wheel auditwheel
-    ${PY_DIR}/bin/python setup.py bdist_wheel --release --ci
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${PY_PKG_DIR}/torch/lib:${PY_PKG_DIR}/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs ${PY_DIR}/bin/python -m auditwheel repair  $(cat ${PROJECT_DIR}/py/ci/soname_excludes.params) --plat manylinux_2_17_x86_64 dist/torch_tensorrt-*-${PY_BUILD_CODE}-linux_x86_64.whl
+    build_wheel ${PY_DIR}
+    patch_wheel ${PY_PKG_DIR} ${PY_DIR} ${PY_BUILD_CODE}
 }
 
 py39() {
-    cd /workspace/project/py
+    cd /workspace/project
     PY_BUILD_CODE=cp39-cp39
     PY_VERSION=3.9
     PY_NAME=python${PY_VERSION}
     PY_DIR=/opt/python/${PY_BUILD_CODE}
     PY_PKG_DIR=${PY_DIR}/lib/${PY_NAME}/site-packages/
-    ${PY_DIR}/bin/python -m pip install --upgrade pip
-    ${PY_DIR}/bin/python -m pip install -r requirements.txt
-    ${PY_DIR}/bin/python -m pip install setuptools wheel auditwheel
-    ${PY_DIR}/bin/python setup.py bdist_wheel --release --ci
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${PY_PKG_DIR}/torch/lib:${PY_PKG_DIR}/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs ${PY_DIR}/bin/python -m auditwheel repair  $(cat ${PROJECT_DIR}/py/ci/soname_excludes.params) --plat manylinux_2_17_x86_64 dist/torch_tensorrt-*-${PY_BUILD_CODE}-linux_x86_64.whl
+    build_wheel ${PY_DIR}
+    patch_wheel ${PY_PKG_DIR} ${PY_DIR} ${PY_BUILD_CODE}
 }
 
 py310() {
-    cd /workspace/project/py
+    cd /workspace/project
     PY_BUILD_CODE=cp310-cp310
     PY_VERSION=3.10
     PY_NAME=python${PY_VERSION}
     PY_DIR=/opt/python/${PY_BUILD_CODE}
     PY_PKG_DIR=${PY_DIR}/lib/${PY_NAME}/site-packages/
-    ${PY_DIR}/bin/python -m pip install --upgrade pip
-    ${PY_DIR}/bin/python -m pip install -r requirements.txt
-    ${PY_DIR}/bin/python -m pip install setuptools wheel auditwheel
-    ${PY_DIR}/bin/python setup.py bdist_wheel --release --ci
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${PY_PKG_DIR}/torch/lib:${PY_PKG_DIR}/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs ${PY_DIR}/bin/python -m auditwheel repair  $(cat ${PROJECT_DIR}/py/ci/soname_excludes.params) --plat manylinux_2_17_x86_64 dist/torch_tensorrt-*-${PY_BUILD_CODE}-linux_x86_64.whl
+    build_wheel ${PY_DIR}
+    patch_wheel ${PY_PKG_DIR} ${PY_DIR} ${PY_BUILD_CODE}
 }
 
-#build_py311() {
-#    /opt/python/cp311-cp311/bin/python -m pip install -r requirements.txt
-#    /opt/python/cp311-cp311/bin/python setup.py bdist_wheel --release --ci
-#    #auditwheel repair --plat manylinux2014_x86_64
-#}
+py311() {
+    cd /workspace/project
+    PY_BUILD_CODE=cp311-cp311
+    PY_VERSION=3.11
+    PY_NAME=python${PY_VERSION}
+    PY_DIR=/opt/python/${PY_BUILD_CODE}
+    PY_PKG_DIR=${PY_DIR}/lib/${PY_NAME}/site-packages/
+    build_wheel ${PY_DIR}
+    patch_wheel ${PY_PKG_DIR} ${PY_DIR} ${PY_BUILD_CODE}
+}
+
+py312() {
+    cd /workspace/project
+    PY_BUILD_CODE=cp312-cp312
+    PY_VERSION=3.12
+    PY_NAME=python${PY_VERSION}
+    PY_DIR=/opt/python/${PY_BUILD_CODE}
+    PY_PKG_DIR=${PY_DIR}/lib/${PY_NAME}/site-packages/
+    build_wheel ${PY_DIR}
+    patch_wheel ${PY_PKG_DIR} ${PY_DIR} ${PY_BUILD_CODE}
+}
 
 libtorchtrt() {
-    cd /workspace/project/py
+    cd /workspace/project
     mkdir -p /workspace/project/py/wheelhouse
     PY_BUILD_CODE=cp310-cp310
     PY_VERSION=3.10
@@ -79,13 +82,13 @@ libtorchtrt() {
     PY_DIR=/opt/python/${PY_BUILD_CODE}
     PY_PKG_DIR=${PY_DIR}/lib/${PY_NAME}/site-packages/
     ${PY_DIR}/bin/python -m pip install --upgrade pip
-    ${PY_DIR}/bin/python -m pip install -r requirements.txt
+    ${PY_DIR}/bin/python -m pip install -r py/requirements.txt
     ${PY_DIR}/bin/python -m pip install setuptools wheel auditwheel
     bazel build //:libtorchtrt --platforms //toolchains:ci_rhel_x86_64_linux -c opt --noshow_progress
-    CUDA_VERSION=$(cd ${PROJECT_DIR}/py && ${PY_DIR}/bin/python3 -c "from versions import __cuda_version__;print(__cuda_version__)")
-    TORCHTRT_VERSION=$(cd ${PROJECT_DIR}/py && ${PY_DIR}/bin/python3 -c "from versions import __version__;print(__version__)")
-    TRT_VERSION=$(cd ${PROJECT_DIR}/py && ${PY_DIR}/bin/python3 -c "from versions import __tensorrt_version__;print(__tensorrt_version__)")
-    CUDNN_VERSION=$(cd ${PROJECT_DIR}/py && ${PY_DIR}/bin/python3 -c "from versions import __cudnn_version__;print(__cudnn_version__)")
+    CUDA_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.cuda_version()")
+    TORCHTRT_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.torch_tensorrt_version()")
+    TRT_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.tensorrt_version()")
+    CUDNN_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.cudnn_version()")
     TORCH_VERSION=$(${PY_DIR}/bin/python -c "from torch import __version__;print(__version__.split('+')[0])")
     cp ${PROJECT_DIR}/bazel-bin/libtorchtrt.tar.gz ${PROJECT_DIR}/py/wheelhouse/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
 }
@@ -99,13 +102,13 @@ libtorchtrt_pre_cxx11_abi() {
     PY_DIR=/opt/python/${PY_BUILD_CODE}
     PY_PKG_DIR=${PY_DIR}/lib/${PY_NAME}/site-packages/
     ${PY_DIR}/bin/python -m pip install --upgrade pip
-    ${PY_DIR}/bin/python -m pip install -r requirements.txt
+    ${PY_DIR}/bin/python -m pip install -r ${PROJECT_DIR}/py/requirements.txt
     ${PY_DIR}/bin/python -m pip install setuptools wheel auditwheel
     bazel build //:libtorchtrt --config pre_cxx11_abi --platforms //toolchains:ci_rhel_x86_64_linux -c opt --noshow_progress
-    CUDA_VERSION=$(cd ${PROJECT_DIR}/py && ${PY_DIR}/bin/python3 -c "from versions import __cuda_version__;print(__cuda_version__)")
-    TORCHTRT_VERSION=$(cd ${PROJECT_DIR}/py && ${PY_DIR}/bin/python3 -c "from versions import __version__;print(__version__)")
-    TRT_VERSION=$(cd ${PROJECT_DIR}/py && ${PY_DIR}/bin/python3 -c "from versions import __tensorrt_version__;print(__tensorrt_version__)")
-    CUDNN_VERSION=$(cd ${PROJECT_DIR}/py && ${PY_DIR}/bin/python3 -c "from versions import __cudnn_version__;print(__cudnn_version__)")
+    CUDA_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.cuda_version()")
+    TORCHTRT_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.torch_tensorrt_version()")
+    TRT_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.tensorrt_version()")
+    CUDNN_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.cudnn_version()")
     TORCH_VERSION=$(${PY_DIR}/bin/python -c "from torch import __version__;print(__version__.split('+')[0])")
     cp ${PROJECT_DIR}/bazel-bin/libtorchtrt.tar.gz ${PROJECT_DIR}/py/wheelhouse/libtorchtrt-${TORCHTRT_VERSION}-pre-cxx11-abi-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
 }

@@ -3,7 +3,7 @@ from typing import Optional
 import tensorrt as trt
 from torch.fx.node import Target
 
-from torch_tensorrt.dynamo.conversion import SourceIR
+from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.fx.utils import (
     unified_dtype_converter,
     Frameworks,

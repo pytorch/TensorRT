@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # Base image starts with CUDA
 ARG BASE_IMG=nvidia/cuda:12.1.1-devel-ubuntu22.04
 FROM ${BASE_IMG} as base
@@ -50,7 +52,7 @@ RUN apt-get update
 RUN apt-get install -y libnvinfer8=${TENSORRT_VERSION}.* libnvinfer-plugin8=${TENSORRT_VERSION}.* libnvinfer-dev=${TENSORRT_VERSION}.* libnvinfer-plugin-dev=${TENSORRT_VERSION}.* libnvonnxparsers8=${TENSORRT_VERSION}.* libnvonnxparsers-dev=${TENSORRT_VERSION}.* libnvparsers8=${TENSORRT_VERSION}.*  libnvparsers-dev=${TENSORRT_VERSION}.*
 
 # Setup Bazel via Bazelisk
-RUN wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.16.0/bazelisk-linux-amd64 -O /usr/bin/bazel &&\
+RUN wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -O /usr/bin/bazel &&\
     chmod a+x /usr/bin/bazel
 
 # Build Torch-TensorRT in an auxillary container
@@ -99,12 +101,12 @@ COPY . /opt/torch_tensorrt
 RUN mkdir -p "/opt/python3/" &&\
     ln -s "`pyenv which python | xargs dirname | xargs dirname`/lib/python$PYTHON_VERSION/site-packages" "/opt/python3/"
 
-COPY --from=torch-tensorrt-builder  /workspace/torch_tensorrt/src/py/dist/ .
+COPY --from=torch-tensorrt-builder  /workspace/torch_tensorrt/src/dist/ .
 
 RUN cp /opt/torch_tensorrt/docker/WORKSPACE.docker /opt/torch_tensorrt/WORKSPACE
 RUN pip install -r /opt/torch_tensorrt/py/requirements.txt
 RUN pip install tensorrt==${TENSORRT_VERSION}.*
-RUN pip install *.whl && rm -fr /workspace/torch_tensorrt/py/dist/* *.whl
+RUN pip install *.whl && rm -fr /workspace/torch_tensorrt/dist/* *.whl
 
 WORKDIR /opt/torch_tensorrt
 

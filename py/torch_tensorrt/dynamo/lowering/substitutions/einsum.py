@@ -33,6 +33,7 @@ def einsum_generic(
     )
 
 
+# TODO: @gs-olive Port to dynamo converter
 @tensorrt_converter(torch.ops.tensorrt.einsum.default)
 def aten_ops_einsum(
     network: TRTNetwork,

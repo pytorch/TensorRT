@@ -6,3 +6,4 @@ torch==2.1.0.dev20230703+cu121
 torchvision==0.16.0.dev20230703+cu121
 --extra-index-url https://pypi.ngc.nvidia.com
 tensorrt==8.6.1
+pyyaml
