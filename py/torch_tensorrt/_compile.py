@@ -35,13 +35,13 @@ __all__ = [
 def _non_fx_input_interface(
     inputs: Sequence[Input | torch.Tensor | InputTensorSpec],
 ) -> TypeGuard[List[Input | torch.Tensor]]:
-    return all(isinstance(i, torch.Tensor | Input) for i in inputs)
+    return all(isinstance(i, (torch.Tensor, Input)) for i in inputs)
 
 
 def _fx_input_interface(
     inputs: Sequence[Input | torch.Tensor | InputTensorSpec],
 ) -> TypeGuard[List[InputTensorSpec | torch.Tensor]]:
-    return all(isinstance(i, torch.Tensor | InputTensorSpec) for i in inputs)
+    return all(isinstance(i, (torch.Tensor, InputTensorSpec)) for i in inputs)
 
 
 class _IRType(Enum):

@@ -1,0 +1,27 @@
+name: Cut Nightly
+
+on:
+  schedule:
+    - cron: '30 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  cut_nightly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: main
+      - name: Create nightly commit
+        shell: bash
+        run: |
+          git config --global user.email "torch-tensorrt.github.bot@nvidia.com"
+          git config --global user.name "Torch-TensorRT Github Bot"
+          git fetch origin nightly
+          HEAD_COMMIT_HASH=$(git rev-parse HEAD)
+          NIGHTLY_DATE=$(date +"%Y-%m-%d")
+          # shellcheck disable=SC1083
+          NIGHTLY_RELEASE_COMMIT=$(git commit-tree -p FETCH_HEAD HEAD^{tree} -m "${NIGHTLY_DATE} nightly release (${HEAD_COMMIT_HASH})")
+          # shellcheck disable=SC1083
+          git push -f origin "${NIGHTLY_RELEASE_COMMIT}:nightly"
