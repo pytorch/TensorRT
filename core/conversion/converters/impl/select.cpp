@@ -165,10 +165,7 @@ auto select_registrations TORCHTRT_UNUSED =
                  }
 
                  shuffle_layer->setReshapeDimensions(util::squeezeDims(
-                     out->getDimensions(),
-                     dim,
-                     ctx->input_is_dynamic,
-                     ctx->input_is_dynamic && (num_zero_dimensions > 0)));
+                     out->getDimensions(), dim, false, ctx->input_is_dynamic && (num_zero_dimensions > 0)));
                  shuffle_layer->setName(util::node_info(n).c_str());
                  out = shuffle_layer->getOutput(0);
                }
@@ -710,9 +707,8 @@ auto select_registrations TORCHTRT_UNUSED =
                auto val_t_dtype = util::TRTDataTypeToScalarType(self->getType());
 
                // Initialize contant tensor for fill with the inherited data type
-               auto val_t = tensor_to_const(
-                   ctx, torch::full(util::toVec(self->getDimensions()), val, {torch::dtype(val_t_dtype)}));
-
+               std::vector<int64_t> singleton_dims(self->getDimensions().nbDims, 1);
+               auto val_t = tensor_to_const(ctx, torch::full(singleton_dims, val, {torch::dtype(val_t_dtype)}));
                TORCHTRT_CHECK(
                    util::broadcastable(self->getDimensions(), mask->getDimensions(), /*multidirectional=*/false),
                    "Self and mask tensors are not broadcastable");
