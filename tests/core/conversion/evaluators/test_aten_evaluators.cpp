@@ -336,7 +336,7 @@ TEST(Evaluators, ZerosLikeDynamic) {
 
   auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in}, true, true);
 
   ASSERT_TRUE(at::equal(jit_results[0].toTensor().to(at::kCUDA), trt_results[0]));
 }
@@ -392,7 +392,7 @@ TEST(Evaluators, OnesLikeDynamic) {
 
   auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in}, true, true);
 
   ASSERT_TRUE(at::equal(jit_results[0].toTensor().to(at::kCUDA), trt_results[0]));
 }
