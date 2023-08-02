@@ -16,6 +16,7 @@ from torch.fx.passes.shape_prop import TensorMetadata
 from .converter_registry import DYNAMO_CONVERTERS as CONVERTERS
 from torch_tensorrt import Input
 from torch_tensorrt.fx.observer import Observer
+from torch_tensorrt.dynamo.conversion.converter_utils import get_node_name
 from torch_tensorrt.fx.utils import (
     get_dynamic_dims,
     unified_dtype_converter,
@@ -233,7 +234,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         )
 
     def run_node(self, n):
-        self._cur_node_name = str(n)
+        self._cur_node_name = get_node_name(n)
         self._cur_node = n
         # add "_itensor_to_tensor_meta"
         kwargs = dict(n.kwargs)
