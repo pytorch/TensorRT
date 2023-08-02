@@ -166,6 +166,10 @@ def compile(
         device = kwargs.get("device", Device._current_device())
         torchtrt_inputs, torch_inputs = prepare_inputs(inputs, prepare_device(device))
         module = torch_tensorrt.dynamo.trace(module, torch_inputs, **kwargs)
+        # import pdb; pdb.set_trace()
+        from torch._export import export
+        # exp_program = export(module, torch_inputs)
+        # module = exp_program.graph_module
         return torch_tensorrt.dynamo.compile(
             module,
             inputs=inputs,

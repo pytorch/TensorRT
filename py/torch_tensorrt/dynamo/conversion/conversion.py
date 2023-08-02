@@ -1,7 +1,7 @@
 from typing import Sequence, Union
 import torch
 import io
-from torch_tensorrt.dynamo.runtime import _PythonTorchTRTModule
+from torch_tensorrt.dynamo.runtime import PythonTorchTRTModule
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt import Input
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
@@ -51,9 +51,10 @@ def convert_module(
         version_compatible=settings.version_compatible,
         optimization_level=settings.optimization_level,
     )
-
+    return interpreter_result
+    
     if settings.use_python_runtime:
-        return _PythonTorchTRTModule(
+        return PythonTorchTRTModule(
             engine=interpreter_result.engine,
             input_names=interpreter_result.input_names,
             output_names=interpreter_result.output_names,

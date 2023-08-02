@@ -143,6 +143,14 @@ def _compile_module(
             submodule_inputs = repair_long_or_double_inputs(
                 partitioned_module, submodule, submodule_inputs, name
             )
+        
+        # Store the input nodes for this TRT subgraph
+        submodule_input_nodes = []
+        submodule_node = None
+        for node in partitioned_module.graph.nodes:
+            if node.name == name:
+                submodule_node = node
+                submodule_input_nodes.extend(node.args)
 
         # Create TRT Module from submodule
         trt_mod = convert_module(
@@ -151,11 +159,21 @@ def _compile_module(
             settings=settings,
             name=name,
         )
-
-        trt_modules[name] = trt_mod
-
+        # Add the engine as input to the execute engine op node.
+        # submodule_input_nodes.append(trt_mod.engine)
+        
+        new_node = partitioned_module.graph.create_node("call_function", torch.ops.tensorrt.execute_engine, (submodule_input_nodes, trt_mod.engine))
+        submodule_node.replace_all_uses_with(new_node)
+        # import pdb; pdb.set_trace()
+        partitioned_module.graph.erase_node(submodule_node)
+        # trt_modules[name] = trt_mod
+        # partitioned_module.recompile()
+        # import pdb; pdb.set_trace()
+        # print("done")
+ 
+    
     # Replace all FX Modules with TRT Modules
-    for name, trt_mod in trt_modules.items():
-        setattr(partitioned_module, name, trt_mod)
+    # for name, trt_mod in trt_modules.items():
+    #     setattr(partitioned_module, name, trt_mod)
 
     return partitioned_module
