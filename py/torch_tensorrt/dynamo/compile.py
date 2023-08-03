@@ -24,6 +24,7 @@ from torch_tensorrt.dynamo._defaults import (
     USE_PYTHON_RUNTIME,
     VERSION_COMPATIBLE,
     WORKSPACE_SIZE,
+    ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
 )
 from torch_tensorrt.dynamo.backend.backends import _compile_module
 from torch_tensorrt.dynamo.lowering._fusers import (
@@ -63,6 +64,7 @@ def compile(
     optimization_level: Optional[int] = OPTIMIZATION_LEVEL,
     use_python_runtime: bool = USE_PYTHON_RUNTIME,
     use_fast_partitioner: bool = USE_FAST_PARTITIONER,
+    enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     if debug:
@@ -72,9 +74,10 @@ def compile(
 
     logger.warning(
         "The Dynamo backend is an experimental feature, for which only the "
-        + "following arguments are supported: "
-        + "{enabled_precisions, debug, workspace_size, min_block_size, "
-        + "torch_executed_ops, pass_through_build_failures, use_fast_partitioner}"
+        "following arguments are supported: "
+        "{enabled_precisions, debug, workspace_size, min_block_size, "
+        "torch_executed_ops, pass_through_build_failures, use_fast_partitioner, "
+        "enable_experimental_decompositions}"
     )
 
     if not isinstance(inputs, collections.abc.Sequence):
@@ -115,6 +118,7 @@ def compile(
         "use_python_runtime": use_python_runtime,
         "truncate_long_and_double": truncate_long_and_double,
         "use_fast_partitioner": use_fast_partitioner,
+        "enable_experimental_decompositions": enable_experimental_decompositions,
     }
 
     settings = CompilationSettings(**compilation_options)

@@ -48,7 +48,7 @@ def aot_torch_tensorrt_aten_backend(
         gm,
         sample_inputs,
         fw_compiler=make_boxed_compiler(custom_backend),
-        decompositions=get_decompositions(),
+        decompositions=get_decompositions(settings.enable_experimental_decompositions),
     )
 
 
