@@ -39,6 +39,7 @@ jobs:
       env:
         DOCKER_TAG: ${{ env.DOCKER_REGISTRY }}/${{ env.CONTAINER_NAME }}
       run: |
+        python3 -m pip install pyyaml
         TRT_VERSION=$(python3 -c "import versions; versions.tensorrt_version()")
         echo "TRT VERSION = ${TRT_VERSION}"
         CUDNN_VERSION=$(python3 -c "import versions; versions.cudnn_version()")
