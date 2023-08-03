@@ -9,6 +9,7 @@
 #include "torch/csrc/jit/ir/ir.h"
 #include "torch/torch.h"
 
+#include "core/conversion/converters/converter_util.h"
 #include "core/conversion/evaluators/eval_macros.h"
 #include "core/conversion/evaluators/eval_util.h"
 #include "core/conversion/evaluators/evaluators.h"
@@ -298,7 +299,14 @@ auto aten_registrations TORCHTRT_UNUSED =
                } else {
                  auto dim = args.at(n->input(1)).unwrapToInt();
                  if (tensor_var.isITensor()) {
-                   if (ctx->input_is_dynamic) {
+                   auto tensor = tensor_var.ITensor();
+                   auto dims = util::toVec(tensor->getDimensions());
+                   auto nbDims = tensor->getDimensions().nbDims;
+                   if (dim < 0) {
+                     dim += nbDims;
+                   }
+                   // Check if selected dimension size is -1 else return static size
+                   if (ctx->input_is_dynamic && dims[dim] == -1) {
                      if (ctx->settings.allow_shape_tensors) {
                        return dynamic_size_layer(ctx, n, args);
                      } else {
@@ -306,12 +314,7 @@ auto aten_registrations TORCHTRT_UNUSED =
                            "There may be undefined behavior using dynamic shape and aten::size without setting allow_shape_tensors");
                      }
                    }
-                   auto tensor = tensor_var.ITensor();
-                   auto dims = util::toVec(tensor->getDimensions());
-                   auto nbDims = tensor->getDimensions().nbDims;
-                   if (dim < 0) {
-                     dim += nbDims;
-                   }
+
                    return dims[dim];
                  } else if (tensor_var.IValue()->isTensor()) {
                    auto tensor = tensor_var.unwrapToTensor();
@@ -677,6 +680,25 @@ auto aten_registrations TORCHTRT_UNUSED =
         .evaluator(
             {c10::Symbol::fromQualString("aten::floordiv"),
              [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               // Dynamic version of aten::floordiv
+               if (args.at(n->input(0)).isITensor()) {
+                 if (args.at(n->input(1)).IValue()->isInt()) {
+                   auto int_tensor = scalar_to_tensor(args.at(n->input(1)).IValue()->toInt());
+                   auto int_itensor = converters::tensor_to_const(ctx, int_tensor, util::node_info(n) + "_constant");
+                   auto elementwise_layer = converters::add_elementwise(
+                       ctx,
+                       nvinfer1::ElementWiseOperation::kFLOOR_DIV,
+                       args.at(n->input(0)).ITensor(),
+                       int_itensor,
+                       util::node_info(n));
+                   auto output_tensor = elementwise_layer->getOutput(0);
+                   auto tensor_holder = TensorContainer();
+                   tensor_holder.hold_tensor(output_tensor);
+                   auto output_ivalue = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                   return output_ivalue;
+                 }
+               }
+               // Static version
                if (args.at(n->input(0)).IValue()->isInt()) {
                  auto a = args.at(n->input(0)).unwrapToInt();
                  auto b = args.at(n->input(1)).unwrapToInt();
