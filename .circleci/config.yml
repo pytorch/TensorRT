@@ -317,10 +317,14 @@ commands:
           name: Build torch-tensorrt python legacy release (pre-cxx11-abi)
           command: |
             export CUDA_HOME=/usr/local/cuda-<< parameters.cuda-version >>/
-            mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
             python3 -m pip install pip==22.0.2
-            python3 -m pip wheel --no-deps --verbose --pre . --extra-index-url https://pypi.nvidia.com --extra-index-url << parameters.torch-build-index >> --config-setting="--build-option=--legacy" -w dist
-            python3 -m pip install dist/torch_tensorrt*
+
+            mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
+            python3 -m pip install wheel setuptools pyyaml
+            python3 -m pip install pybind11==2.6.2
+            python3 setup.py bdist_wheel --legacy
+            python3 setup.py install --legacy
+
             mkdir -p /tmp/dist/builds
             cp dist/torch_tensorrt* /tmp/dist/builds
 
@@ -840,6 +844,75 @@ jobs:
         default: false
     machine:
       image: linux-cuda-12:2023.05.1
+    resource_class: gpu.nvidia.small
+    steps:
+      - checkout
+      - setup-py-version:
+          python-version: << parameters.python-version >>
+      - create-env:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+          trt-version-short:  << pipeline.parameters.trt-version-short >>
+          bazel-platform: "amd64"
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torchvision-build: << parameters.torchvision-build >>
+          torch-build-index: << parameters.torch-build-index >>
+      - when:
+          condition: << parameters.cxx11-abi >>
+          steps:
+            - build-py-cxx11-abi:
+                cuda-version: << parameters.cuda-version >>
+                torch-build-index: << parameters.torch-build-index >>
+      - unless:
+          condition: << parameters.cxx11-abi >>
+          steps:
+            - when:
+                condition: << parameters.legacy >>
+                steps:
+                  - build-py-legacy:
+                      cuda-version: << parameters.cuda-version >>
+                      torch-build-index: << parameters.torch-build-index >>
+            - unless:
+                condition: << parameters.legacy >>
+                steps:
+                  - build-py:
+                      cuda-version: << parameters.cuda-version >>
+                      torch-build-index: << parameters.torch-build-index >>
+      - run:
+          name: Move to build dir
+          command: |
+            mkdir -p /tmp/dist/x86_64-linux
+            cp -r /tmp/dist/builds/* /tmp/dist/x86_64-linux
+      - persist_to_workspace:
+          root: /tmp/dist
+          paths:
+            - x86_64-linux
+      - store_artifacts:
+          path: /tmp/dist/x86_64-linux
+          destination: x86_64-linux
+
+  build-x86_64-linux-legacy:
+    parameters:
+      torch-build:
+        type: string
+      torchvision-build:
+        type: string
+      torch-build-index:
+        type: string
+      python-version:
+        type: string
+      cuda-version:
+        type: string
+      cxx11-abi:
+        type: boolean
+        default: false
+      legacy:
+        type: boolean
+        default: false
+    machine:
+      image: linux-cuda-11:2023.02.1
     resource_class: gpu.nvidia.small
     steps:
       - checkout
@@ -1514,7 +1587,7 @@ workflows:
           requires:
             - build-x86_64-linux
 
-      - build-x86_64-linux:
+      - build-x86_64-linux-legacy:
           name: build-x86_64-linux-legacy
           cuda-version: << pipeline.parameters.cuda-version-legacy >>
           torch-build: << pipeline.parameters.torch-build-legacy >>
@@ -1660,3 +1733,12 @@ workflows:
           trt-version-short: << pipeline.parameters.trt-version-short >>
           cudnn-version: << pipeline.parameters.cudnn-version >>
           python-version: << pipeline.parameters.python-version >>
+
+      - build-x86_64-linux:
+          name: build-x86_64-linux-legacy
+          cuda-version: << pipeline.parameters.cuda-version-legacy >>
+          torch-build: << pipeline.parameters.torch-build-legacy >>
+          torchvision-build: << pipeline.parameters.torchvision-build-legacy >>
+          torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
+          python-version: << pipeline.parameters.python-version >>
+          legacy: << pipeline.parameters.enable-legacy >>
