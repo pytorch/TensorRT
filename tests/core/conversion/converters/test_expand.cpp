@@ -1,6 +1,7 @@
 #include <torch/torch.h>
 #include <string>
 #include "core/compiler.h"
+#include "core/lowering/passes/passes.h"
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
@@ -680,6 +681,7 @@ TEST(Converters, ATenTileConvertsCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
 
   torch::jit::parseIR(graph, g.get());
+  torch_tensorrt::core::lowering::passes::ReplaceTileWithRepeat(g);
 
   auto in = at::randint(1, 10, {1, 3}, {at::kCUDA});
 
@@ -704,6 +706,7 @@ TEST(Converters, ATenTileRepeatRankConvertsCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
 
   torch::jit::parseIR(graph, g.get());
+  torch_tensorrt::core::lowering::passes::ReplaceTileWithRepeat(g);
 
   auto in = at::randint(1, 10, {1, 3}, {at::kCUDA});
 
@@ -728,6 +731,7 @@ TEST(Converters, ATenTileConvertsCorrectlyWithDynamicInput) {
   auto g = std::make_shared<torch::jit::Graph>();
 
   torch::jit::parseIR(graph, g.get());
+  torch_tensorrt::core::lowering::passes::ReplaceTileWithRepeat(g);
 
   auto in = at::randint(1, 10, {1, 3}, {at::kCUDA});
 
@@ -752,6 +756,7 @@ TEST(Converters, ATenTile3dConvertsCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
 
   torch::jit::parseIR(graph, g.get());
+  torch_tensorrt::core::lowering::passes::ReplaceTileWithRepeat(g);
 
   auto in = at::randint(1, 10, {2, 3, 2}, {at::kCUDA});
 
@@ -776,6 +781,7 @@ TEST(Converters, ATenTile3dConvertsCorrectlyWithDynamicInput) {
   auto g = std::make_shared<torch::jit::Graph>();
 
   torch::jit::parseIR(graph, g.get());
+  torch_tensorrt::core::lowering::passes::ReplaceTileWithRepeat(g);
 
   auto in = at::randint(1, 10, {2, 3, 2}, {at::kCUDA});
 

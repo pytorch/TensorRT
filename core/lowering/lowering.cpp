@@ -153,6 +153,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, std::vector<torch::jit::I
   passes::ReplaceScalarImplicit(g);
   passes::RewriteInputsWithParams(g, params);
   passes::ReplaceAtenPad(g);
+  passes::ReplaceTileWithRepeat(g);
   LOG_GRAPH(*g);
 }
 
