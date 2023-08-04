@@ -15,11 +15,13 @@ from torch_tensorrt.dynamo.lowering._partition import (
     partition,
     get_submod_inputs,
 )
+from torch_tensorrt._Device import Device
 from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs
 from torch_tensorrt.dynamo.conversion import (
     convert_module,
     repair_long_or_double_inputs,
 )
+from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
 from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
 
@@ -162,22 +164,23 @@ def _compile_module(
             settings=settings,
             name=name,
         )
+        import pdb; pdb.set_trace()
         # Add the engine as input to the execute engine op node.
         engine_with_metadata = torch.classes.tensorrt.Engine(
                 [
                     torch.ops.tensorrt.ABI_VERSION(),
                     name + "_engine" if name != "" else "tensorrt_engine",
-                    target_device._to_serialized_rt_device(),
-                    serialized_engine,
-                    TorchTensorRTModule._pack_binding_names(self.input_binding_names),
-                    TorchTensorRTModule._pack_binding_names(self.output_binding_names),
+                    Device._current_device()._to_serialized_rt_device(),
+                    trt_mod.engine,
+                    TorchTensorRTModule._pack_binding_names(trt_mod.input_names),
+                    TorchTensorRTModule._pack_binding_names(trt_mod.output_names),
                 ]
             )
-        submodule_input_nodes.append(trt_mod.engine)
-        
+        submodule_input_nodes.append(engine_with_metadata)
+        import pdb; pdb.set_trace()
         new_node = partitioned_module.graph.create_node("call_function", torch.ops.tensorrt.execute_engine, tuple(submodule_input_nodes))
         submodule_node.replace_all_uses_with(new_node)
-        # import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         partitioned_module.graph.erase_node(submodule_node)
         # trt_modules[name] = trt_mod
         # partitioned_module.recompile()

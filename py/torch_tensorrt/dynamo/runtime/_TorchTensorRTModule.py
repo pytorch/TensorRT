@@ -77,7 +77,7 @@ class TorchTensorRTModule(torch.nn.Module):
         self.input_binding_names = input_binding_names
         self.output_binding_names = output_binding_names
         self.name = name
-
+        import pdb; pdb.set_trace()
         if serialized_engine != bytearray():
             self.engine = torch.classes.tensorrt.Engine(
                 [
