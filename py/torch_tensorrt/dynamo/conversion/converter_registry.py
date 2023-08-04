@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Optional, Sequence, Union
+from typing import Any, Callable, Dict, Optional, Sequence, Union, List
 from enum import Enum, auto
 
 from torch.fx.node import Target, Node, _get_qualified_name
@@ -305,6 +305,7 @@ class ConverterRegistry:
         """Returns the set of unique converter targets stored across all registries"""
         return set.union(*[set(registry.keys()) for registry in self.registries])
 
+    # TODO: Make this a static method since it does not need state
     def qualified_name_or_str(self, target: Target) -> str:
         """Returns string representation of an FX Node target"""
         if isinstance(target, str):
@@ -312,16 +313,24 @@ class ConverterRegistry:
         else:
             return _get_qualified_name(target)
 
-    def display_all_available_converters(self) -> str:
-        """Returns a string with all converters and their source, separated by newlines"""
-        available_converters = "Available converters in ATen registries with counts:\n"
-
+    def get_converter_support_info(self) -> Dict[str, Dict[str, int]]:
+        """Returns a dictionary of targets backed by at least one converter"""
+        available_converters = {}
         for target in sorted(
             self.unique_targets(), key=lambda target: self.qualified_name_or_str(target)
         ):
             _, registry_data = self.get_all_converters_with_target(
                 target, return_registry_info=True
             )
+            available_converters[self.qualified_name_or_str(target)] = registry_data
+        return available_converters
+
+    def display_all_available_converters(self) -> str:
+        """Returns a string with all converters and their source, separated by newlines"""
+        available_converters = "Available converters in ATen registries with counts:\n"
+
+        support_info = self.get_converter_support_info()
+        for target, registry_data in support_info.keys():
             available_converters += f"Node: {self.qualified_name_or_str(target)} - Registry Presence Counts: {registry_data}\n"
 
         return available_converters
