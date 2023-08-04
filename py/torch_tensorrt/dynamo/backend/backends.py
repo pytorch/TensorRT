@@ -150,7 +150,10 @@ def _compile_module(
         for node in partitioned_module.graph.nodes:
             if node.name == name:
                 submodule_node = node
-                submodule_input_nodes.extend(node.args)
+                if len(node.args) > 0:
+                    for i in range(len(node.args)):
+                        if node.args[i].op == "placeholder":
+                            submodule_input_nodes.append(node.args[i])
 
         # Create TRT Module from submodule
         trt_mod = convert_module(
@@ -160,9 +163,19 @@ def _compile_module(
             name=name,
         )
         # Add the engine as input to the execute engine op node.
-        # submodule_input_nodes.append(trt_mod.engine)
+        engine_with_metadata = torch.classes.tensorrt.Engine(
+                [
+                    torch.ops.tensorrt.ABI_VERSION(),
+                    name + "_engine" if name != "" else "tensorrt_engine",
+                    target_device._to_serialized_rt_device(),
+                    serialized_engine,
+                    TorchTensorRTModule._pack_binding_names(self.input_binding_names),
+                    TorchTensorRTModule._pack_binding_names(self.output_binding_names),
+                ]
+            )
+        submodule_input_nodes.append(trt_mod.engine)
         
-        new_node = partitioned_module.graph.create_node("call_function", torch.ops.tensorrt.execute_engine, (submodule_input_nodes, trt_mod.engine))
+        new_node = partitioned_module.graph.create_node("call_function", torch.ops.tensorrt.execute_engine, tuple(submodule_input_nodes))
         submodule_node.replace_all_uses_with(new_node)
         # import pdb; pdb.set_trace()
         partitioned_module.graph.erase_node(submodule_node)
