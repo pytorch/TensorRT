@@ -5,7 +5,7 @@ import torch
 from torch_tensorrt.dynamo.lowering._decompositions import (
     get_decompositions,
 )
-from torch_tensorrt.dynamo.lowering._partition import (
+from torch_tensorrt.dynamo.partitioning import (
     partition,
 )
 from torch_tensorrt.dynamo.lowering._pre_aot_lowering import (
@@ -176,7 +176,9 @@ def lower_graph_testing(
         for top_level_node in fx_module.graph.nodes:
             if top_level_node.op == "call_function" and not testing_partitioning:
                 classify_node(top_level_node)
-            elif top_level_node.op == "call_module":
+            elif top_level_node.op == "call_module" and (
+                not testing_partitioning or "_run_on_acc_" in top_level_node.target
+            ):
                 for node in fx_module.get_submodule(top_level_node.target).graph.nodes:
                     classify_node(node)
 

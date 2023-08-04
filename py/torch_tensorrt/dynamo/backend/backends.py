@@ -6,12 +6,22 @@ import torch
 import torch._dynamo as td
 from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
 from torch_tensorrt.dynamo import CompilationSettings
+from torch_tensorrt.dynamo.lowering._decompositions import (
+    get_decompositions,
+)
+from torch_tensorrt.dynamo.lowering._pre_aot_lowering import (
+    pre_aot_substitutions,
+)
+from torch_tensorrt.dynamo.partitioning import (
+    partition,
+    get_submod_inputs,
+)
+from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs
 from torch_tensorrt.dynamo.conversion import (
     convert_module,
     repair_long_or_double_inputs,
 )
 from torch_tensorrt.dynamo.lowering._decompositions import get_decompositions
-from torch_tensorrt.dynamo.lowering._partition import get_submod_inputs, partition
 from torch_tensorrt.dynamo.lowering._pre_aot_lowering import pre_aot_substitutions
 from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs
 
@@ -123,6 +133,11 @@ def _compile_module(
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
     for name, _ in partitioned_module.named_children():
+
+        # Criteria for a module to be convertible to TRT
+        if "_run_on_acc" not in name:
+            continue
+
         submodule = getattr(partitioned_module, name)
 
         # Get submodule inputs

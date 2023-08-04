@@ -1,8 +1,12 @@
 import logging
-from typing import Dict, List, Mapping, Optional, Sequence, Set
+from typing import Dict, List, Optional, Sequence
 
 import torch
+
+from torch_tensorrt.dynamo._defaults import MIN_BLOCK_SIZE
+from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
 from torch.fx.graph_module import GraphModule
+from .common import DEFAULT_SINGLE_NODE_PARTITIONS
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
 from torch.fx.passes.operator_support import OperatorSupport, SupportDict
@@ -13,11 +17,6 @@ from torch_tensorrt.dynamo.conversion.converter_registry import (
 from torch_tensorrt.dynamo.lowering._pre_aot_lowering import SUBSTITUTION_REGISTRY
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_SINGLE_NODE_PARTITIONS: List[str] = [
-    _get_qualified_name(to_replace.new_operator)
-    for to_replace in SUBSTITUTION_REGISTRY.values()
-]
 
 
 class TRTPartitioner(CapabilityBasedPartitioner):  # type: ignore[misc]
@@ -202,29 +201,3 @@ def partition(
         supported_ops.print_support_overview(len(partitions))
 
     return fused_graph
-
-
-def get_submod_inputs(
-    mod: torch.fx.GraphModule,
-    submod: torch.fx.GraphModule,
-    inputs: Sequence[torch.Tensor],
-) -> Optional[Sequence[torch.Tensor]]:
-    """Helper function to get inputs to a Torch submodule
-
-    Args:
-        mod: Parent FX GraphModule
-        submod: Child FX GraphModule
-        inputs: Sample inputs to parent module
-    Returns:
-        Sequence of Tensors representing inputs to child module
-    """
-    acc_inputs: Optional[Sequence[torch.Tensor]] = None
-
-    def get_input(_: torch.fx.GraphModule, inputs: Sequence[torch.Tensor]) -> None:
-        nonlocal acc_inputs
-        acc_inputs = inputs
-
-    handle = submod.register_forward_pre_hook(get_input)
-    mod(*inputs)
-    handle.remove()
-    return acc_inputs
