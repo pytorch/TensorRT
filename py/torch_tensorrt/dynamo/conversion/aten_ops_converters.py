@@ -377,3 +377,23 @@ def aten_ops_permute(
         args[0],
         args[1],
     )
+
+@dynamo_tensorrt_converter(torch.ops.aten.amax.default)
+@dynamo_tensorrt_converter(torch.ops.aten.amax.out)
+def aten_ops_amax(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.amax.amax(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args[2] if len(args) >= 3 else False,
+        kwargs.get("out"),
+    )

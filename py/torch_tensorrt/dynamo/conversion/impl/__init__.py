@@ -12,3 +12,4 @@ from . import shape
 from . import squeeze
 from . import unsqueeze
 from . import permutation
+from . import amax
