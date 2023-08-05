@@ -103,6 +103,10 @@ lowering_test(
     name = "test_replace_aten_pad_pass",
 )
 
+lowering_test(
+    name = "test_tile_to_repeat_pass",
+)
+
 test_suite(
     name = "lowering_tests",
     tests = [
@@ -122,6 +126,7 @@ test_suite(
         ":test_remove_unnecessary_casts",
         ":test_replace_aten_pad_pass",
         ":test_rewrite_inputs_with_params",
+        ":test_tile_to_repeat_pass",
         ":test_unpack_hardsigmoid",
         ":test_unpack_hardswish",
         ":test_unpack_reduce_ops",
