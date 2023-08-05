@@ -1,6 +1,6 @@
 import torch
 import torch_tensorrt
-from torch_tensorrt.dynamo.partitioning import partition
+from torch_tensorrt.dynamo.partitioning import fast_partition
 from torch.testing._internal.common_utils import run_tests, TestCase
 from copy import deepcopy
 from utils import lower_graph_testing, DECIMALS_OF_AGREEMENT
@@ -17,7 +17,7 @@ class TestTRTModuleNextCompilation(TestCase):
                 return torch.mean(out, dim=1)
 
         fx_graph = torch.fx.symbolic_trace(FullySupportedMultiOp())
-        partitioned_graph = partition(deepcopy(fx_graph), min_block_size=3)
+        partitioned_graph = fast_partition(deepcopy(fx_graph), min_block_size=3)
 
         self.assertEquals(
             len(
@@ -196,7 +196,7 @@ class Test64BitInput(TestCase):
                 )
 
         fx_graph = torch.fx.symbolic_trace(FullySupportedMultiOp())
-        partitioned_graph = partition(deepcopy(fx_graph), min_block_size=3)
+        partitioned_graph = fast_partition(deepcopy(fx_graph), min_block_size=3)
 
         self.assertEquals(
             len(list(partitioned_graph.named_children())),

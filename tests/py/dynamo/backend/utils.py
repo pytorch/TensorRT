@@ -5,9 +5,7 @@ import torch
 from torch_tensorrt.dynamo.lowering._decompositions import (
     get_decompositions,
 )
-from torch_tensorrt.dynamo.partitioning import (
-    partition,
-)
+from torch_tensorrt.dynamo import partitioning
 from torch_tensorrt.dynamo.lowering._pre_aot_lowering import (
     pre_aot_substitutions,
 )
@@ -27,6 +25,7 @@ def fx_dynamo_testing_backend(
     store_intermediate_graphs: List,
     min_block_size: int = 3,
     torch_executed_ops: Sequence[str] = set(),
+    use_fast_partitioner: bool = True,
 ):
     """Helper Dynamo backend exclusively for testing"""
     custom_backend = partial(
@@ -34,6 +33,7 @@ def fx_dynamo_testing_backend(
         store_intermediate_graphs=store_intermediate_graphs,
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
+        use_fast_partitioner=use_fast_partitioner,
     )
 
     gm = pre_aot_substitutions(gm)
@@ -54,11 +54,21 @@ def compile_module_testing(
     store_intermediate_graphs: List,
     min_block_size: int = 3,
     torch_executed_ops: Sequence[str] = str(),
+    use_fast_partitioner: bool = True,
 ) -> torch.fx.GraphModule:
     """Helper compiler exclusively for testing"""
-    partitioned_module = partition(
-        gm, min_block_size=min_block_size, torch_executed_ops=torch_executed_ops
-    )
+    if use_fast_partitioner:
+        partitioned_module = partitioning.fast_partition(
+            gm,
+            min_block_size=min_block_size,
+            torch_executed_ops=torch_executed_ops,
+        )
+    else:
+        partitioned_module = partitioning.global_partition(
+            gm,
+            min_block_size=min_block_size,
+            torch_executed_ops=torch_executed_ops,
+        )
 
     # Store intermediate graph from partitioned module
     store_intermediate_graphs.append(deepcopy(partitioned_module))
@@ -130,6 +140,7 @@ def lower_graph_testing(
     min_block_size: int = 3,
     torch_executed_ops: Sequence[str] = set(),
     testing_partitioning: bool = False,
+    use_fast_partitioner: bool = True,
 ):
     """Helper function to assist with graph lowering for testing of Dynamo compile
 
@@ -141,6 +152,7 @@ def lower_graph_testing(
         min_block_size: Minimum number of operators per TRT-Engine Block
         torch_executed_ops: Sequence of operations to run in Torch, regardless of converter coverage
         testing_partitioning: Whether partitioning is being tested (to analyze only TRT-supported ops)
+        use_fast_partitioner: Whether to use the fast or global partitioner
     Returns:
         If testing_partitioning:
             List[torch.fx.GraphModule], Set, Set: List of partitioned graph outputs, unexpected ops seen, expected ops unseen
@@ -154,6 +166,7 @@ def lower_graph_testing(
         store_intermediate_graphs=partitioned_graphs,
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
+        use_fast_partitioner=use_fast_partitioner,
     )
 
     # Invoke compilation
@@ -177,7 +190,9 @@ def lower_graph_testing(
             if top_level_node.op == "call_function" and not testing_partitioning:
                 classify_node(top_level_node)
             elif top_level_node.op == "call_module" and (
-                not testing_partitioning or "_run_on_acc_" in top_level_node.target
+                not testing_partitioning
+                or not use_fast_partitioner
+                or ("_run_on_acc_" in top_level_node.target)
             ):
                 for node in fx_module.get_submodule(top_level_node.target).graph.nodes:
                     classify_node(node)

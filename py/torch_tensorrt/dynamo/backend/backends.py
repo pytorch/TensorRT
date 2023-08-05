@@ -12,10 +12,7 @@ from torch_tensorrt.dynamo.lowering._decompositions import (
 from torch_tensorrt.dynamo.lowering._pre_aot_lowering import (
     pre_aot_substitutions,
 )
-from torch_tensorrt.dynamo.partitioning import (
-    partition,
-    get_submod_inputs,
-)
+from torch_tensorrt.dynamo import partitioning
 from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs
 from torch_tensorrt.dynamo.conversion import (
     convert_module,
@@ -120,12 +117,20 @@ def _compile_module(
         Compiled FX GraphModule
     """
     # Partition module into components that can be TRT-accelerated
-    partitioned_module = partition(
-        gm,
-        verbose=settings.debug,
-        min_block_size=settings.min_block_size,
-        torch_executed_ops=settings.torch_executed_ops,
-    )
+    if settings.use_fast_partitioner:
+        partitioned_module = partitioning.fast_partition(
+            gm,
+            verbose=settings.debug,
+            min_block_size=settings.min_block_size,
+            torch_executed_ops=settings.torch_executed_ops,
+        )
+    else:
+        partitioned_module = partitioning.global_partition(
+            gm,
+            verbose=settings.debug,
+            min_block_size=settings.min_block_size,
+            torch_executed_ops=settings.torch_executed_ops,
+        )
 
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
@@ -135,13 +140,13 @@ def _compile_module(
     for name, _ in partitioned_module.named_children():
 
         # Criteria for a module to be convertible to TRT
-        if "_run_on_acc" not in name:
+        if settings.use_fast_partitioner and "_run_on_acc" not in name:
             continue
 
         submodule = getattr(partitioned_module, name)
 
         # Get submodule inputs
-        submodule_inputs = get_submod_inputs(
+        submodule_inputs = partitioning.get_submod_inputs(
             partitioned_module, submodule, sample_inputs
         )
 

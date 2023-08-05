@@ -13,6 +13,7 @@ from torch_tensorrt.dynamo._defaults import (
     USE_PYTHON_RUNTIME,
     VERSION_COMPATIBLE,
     WORKSPACE_SIZE,
+    USE_FAST_PARTITIONER,
 )
 
 
@@ -29,3 +30,4 @@ class CompilationSettings:
     optimization_level: Optional[int] = OPTIMIZATION_LEVEL
     use_python_runtime: Optional[bool] = USE_PYTHON_RUNTIME
     truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE
+    use_fast_partitioner: bool = USE_FAST_PARTITIONER
