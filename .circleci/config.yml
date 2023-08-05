@@ -1053,6 +1053,7 @@ jobs:
         type: string
       python-version:
         type: string
+    parallelism: 4
     machine:
       image: linux-cuda-12:2023.05.1
     resource_class: gpu.nvidia.medium
