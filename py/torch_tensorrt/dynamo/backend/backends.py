@@ -166,12 +166,17 @@ def _compile_module(
         )
         import pdb; pdb.set_trace()
         # Add the engine as input to the execute engine op node.
+        import io
+        engine_str = None
+        with io.BytesIO() as engine_bytes:
+            engine_bytes.write(trt_mod.engine.serialize())
+            engine_str = engine_bytes.getvalue()
         engine_with_metadata = torch.classes.tensorrt.Engine(
                 [
                     torch.ops.tensorrt.ABI_VERSION(),
                     name + "_engine" if name != "" else "tensorrt_engine",
                     Device._current_device()._to_serialized_rt_device(),
-                    trt_mod.engine,
+                    engine_str,
                     TorchTensorRTModule._pack_binding_names(trt_mod.input_names),
                     TorchTensorRTModule._pack_binding_names(trt_mod.output_names),
                 ]
