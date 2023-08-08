@@ -172,6 +172,12 @@ torch_enabled_decompositions: Set[OpOverload] = {
     aten.zero_,
     aten.zeros,
     aten.zeros_like,
+    # Non-default convenience decompositions
+    aten.clamp_min,
+    aten.clamp_max,
+    aten.linalg_vector_norm,
+    aten.full,
+    aten.repeat,
 }
 torch_disabled_decompositions: Set[OpOverload] = {}
 
