@@ -22,11 +22,11 @@ cc_library(
         "ir.h",
     ],
     deps = [
-        "@tensorrt//:nvinfer",
         "//core/util:prelude",
+        "@tensorrt//:nvinfer",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
 )
 

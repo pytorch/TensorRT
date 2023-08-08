@@ -20,13 +20,13 @@ cc_library(
         "Var_inl.h",
     ],
     deps = [
-        "@tensorrt//:nvinfer",
-        "//core/util:prelude",
         "//core/conversion/converters:converter_util",
-        "//core/conversion/tensorcontainer:tensorcontainer",
+        "//core/conversion/tensorcontainer",
+        "//core/util:prelude",
+        "@tensorrt//:nvinfer",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
     alwayslink = True,
 )

@@ -70,7 +70,6 @@ class PassUtilsTest(unittest.TestCase):
         input = gen_input(bs=10)
 
         with diagnostics.collect_when(diagnostics.CollectionConditions.always()):
-
             with override_alternative_batch_size_exception_should_throw(True):
                 # This should succeed: the validate_inference decorator will
                 # run both bs=10 and bs=1 successfully

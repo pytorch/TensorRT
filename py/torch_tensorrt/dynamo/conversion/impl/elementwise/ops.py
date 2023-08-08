@@ -1,21 +1,22 @@
-from typing import Any, Optional
+from typing import Optional
 
-import tensorrt as trt
+import numpy as np
 from torch.fx.node import Target
-
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
-from torch_tensorrt.fx.utils import (
-    unified_dtype_converter,
-    Frameworks,
-)
 from torch_tensorrt.dynamo._SourceIR import SourceIR
-from torch_tensorrt.fx.converters.converter_utils import get_trt_tensor
-
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
 )
-from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
 from torch_tensorrt.dynamo.conversion.impl.unary import sign
+from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
+from torch_tensorrt.fx.converters.converter_utils import (
+    get_trt_tensor,
+    set_layer_name,
+    squeeze_left,
+)
+from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
+
+import tensorrt as trt
 
 
 def trunc_div(
@@ -116,7 +117,6 @@ def rsqrt(
     name: str,
     input: TRTTensor,
 ) -> TRTTensor:
-
     sqrt_trt_output = convert_unary(
         network,
         target,
@@ -175,3 +175,68 @@ def fmod(
         prod_value,
     )
     return sub_value
+
+
+def clamp(
+    network: TRTNetwork,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+    min_val: Optional[float] = None,
+    max_val: Optional[float] = None,
+) -> TRTTensor:
+    if not isinstance(input_val, TRTTensor):
+        raise RuntimeError(
+            f"Clamp received input {input_val} that is not part "
+            "of the TensorRT region!"
+        )
+
+    def _add_layer(
+        network: TRTNetwork,
+        input: TRTTensor,
+        val: float,
+        op: trt.ElementWiseOperation,
+        name: str,
+    ) -> (
+        trt.ILayer
+    ):  # TODO: Simplify and merge implementations, should just be max and min stacked
+        if not len(input.shape):
+            # clamping scalar
+            acc_ops_clamp_trt = get_trt_tensor(
+                network,
+                squeeze_left(
+                    np.array(
+                        [val],
+                        dtype=unified_dtype_converter(input.dtype, Frameworks.NUMPY),
+                    )
+                ),
+                f"{name}_clamp_{val}",
+            )
+        else:
+            acc_ops_clamp_shape = (1,) * len(input.shape)  # broadcast all dimensions
+            acc_ops_clamp_tensor = np.full(
+                acc_ops_clamp_shape,
+                val,
+                dtype=unified_dtype_converter(input.dtype, Frameworks.NUMPY),
+            )
+            acc_ops_clamp_trt = network.add_constant(
+                acc_ops_clamp_shape, acc_ops_clamp_tensor
+            ).get_output(0)
+        layer = network.add_elementwise(input, acc_ops_clamp_trt, op)
+        return layer
+
+    if min_val is not None:
+        clamp_min_layer = _add_layer(
+            network, input_val, min_val, trt.ElementWiseOperation.MAX, name
+        )
+        set_layer_name(clamp_min_layer, target, f"{name}_clamp_min")
+        input_val = clamp_min_layer.get_output(0)
+    if max_val is not None:
+        clamp_max_layer = _add_layer(
+            network, input_val, max_val, trt.ElementWiseOperation.MIN, name
+        )
+        set_layer_name(clamp_max_layer, target, f"{name}_clamp_max")
+        input_val = clamp_max_layer.get_output(0)
+
+    return input_val

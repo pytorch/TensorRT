@@ -1,21 +1,27 @@
 import logging
-from typing import Dict, Sequence, Tuple, Union
-import torch
-import tensorrt as trt
-from torch_tensorrt.fx.converters import acc_ops_converters
-from .converter_registry import dynamo_tensorrt_converter
-from torch.fx.node import Argument, Target, Node
+from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+import torch
+from torch.fx.node import Argument, Node, Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
-from torch_tensorrt.dynamo.conversion.converter_utils import cast_trt_tensor
-from torch_tensorrt.dynamo.conversion.converter_utils import cast_int_int_div_trt_tensor
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_int_int_div_trt_tensor,
+    cast_trt_tensor,
+)
+from torch_tensorrt.fx.converters import acc_ops_converters
+from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+
+import tensorrt as trt
+
+from .converter_registry import dynamo_tensorrt_converter
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-def args_bounds_check(args, i, replacement=None):
+def args_bounds_check(
+    args: Tuple[Argument, ...], i: int, replacement: Optional[Any] = None
+) -> Any:
     return args[i] if len(args) > i else replacement
 
 
@@ -95,8 +101,7 @@ def aten_ops_div(
         )
 
 
-def embedding_param_validator(embedding_node: Node):
-
+def embedding_param_validator(embedding_node: Node) -> bool:
     max_norm = args_bounds_check(embedding_node.args, 2)
     norm_type = args_bounds_check(embedding_node.args, 3)
     scale_grad_by_freq = args_bounds_check(embedding_node.args, 4)
@@ -223,7 +228,6 @@ def aten_ops_relu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return impl.activation.relu(
         network,
         target,
@@ -241,7 +245,6 @@ def aten_ops_rsqrt(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return impl.elementwise.rsqrt(
         network,
         target,

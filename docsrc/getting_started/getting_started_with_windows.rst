@@ -117,7 +117,7 @@ Building With Visual Studio Code
 e.g. /.vscode/settings.json
 
 .. code-block:: json
-    
+
     {
         "cmake.generator": "Ninja",
         "cmake.configureSettings": {

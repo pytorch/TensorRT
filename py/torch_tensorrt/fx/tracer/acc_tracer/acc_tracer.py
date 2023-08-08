@@ -59,7 +59,6 @@ class Acc_Rewriter(ast.NodeTransformer):
     def rewrite(
         self, fn: FunctionType
     ) -> Tuple[FunctionType, Set[Type[Exception]], Set[Type[Exception]]]:
-
         # Normalize the source lines
         sourcelines, _ = inspect.getsourcelines(fn)
         sourcelines = normalize_source_lines(sourcelines)

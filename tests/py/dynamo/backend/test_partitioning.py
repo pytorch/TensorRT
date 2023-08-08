@@ -93,7 +93,11 @@ class TestPartitioning(TestCase):
         ]
 
         fx_graph = torch.fx.symbolic_trace(PartiallySupportedMultiOp())
-        (unexpected_ops_seen, _, partitioned_graphs,) = lower_graph_testing(
+        (
+            unexpected_ops_seen,
+            _,
+            partitioned_graphs,
+        ) = lower_graph_testing(
             fx_graph,
             inputs,
             unexpected_ops=unexpected_ops,

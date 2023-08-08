@@ -2,16 +2,26 @@ import torch
 from torch_tensorrt.fx.tracer.acc_tracer import acc_ops
 
 
-def check_permute(node: torch.fx.Node):
+def check_permute(node: torch.fx.Node) -> bool:
     ranks = len(node.meta["tensor_meta"].shape)
-    permutation = list(i % ranks for i in node.kwargs["permutation"])  # type: ignore[union-attr]
-    allowed_permutation = list(i for i in range(ranks))
+    permutation = [i % ranks for i in node.kwargs["permutation"]]
+    allowed_permutation = list(range(ranks))
     allowed_permutation[-1] = ranks - 2
     allowed_permutation[-2] = ranks - 1
     return permutation == allowed_permutation
 
 
-def fuse_permute_matmul(gm: torch.fx.GraphModule):
+def trt_transposed_matmul(
+    lhs: torch.Tensor, rhs: torch.Tensor, lhs_transposed: bool, rhs_transposed: bool
+) -> torch.Tensor:
+    if lhs_transposed:
+        lhs = lhs.transpose(-1, -2)
+    if rhs_transposed:
+        rhs = rhs.transpose(-1, -2)
+    return torch.matmul(lhs, rhs)
+
+
+def fuse_permute_matmul(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """
     Fuse pattern like permute + matmul if permute is transposing the last two dimension.
     """
@@ -45,11 +55,11 @@ def fuse_permute_matmul(gm: torch.fx.GraphModule):
 
 def trt_transposed_linear(
     input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor
-):
+) -> torch.Tensor:
     return torch.matmul(input.transpose(-1, -2), weight.t()) + bias
 
 
-def fuse_permute_linear(gm: torch.fx.GraphModule):
+def fuse_permute_linear(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """
     Fuse pattern like permute + linear if permute is transposing the last two dimension.
     """

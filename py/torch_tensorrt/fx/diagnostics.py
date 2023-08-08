@@ -81,7 +81,6 @@ def set_current_collector(collector: "DiagnosticsCollector"):
 
 
 class DiagnosticsWriter:
-
     # the root dir in which the diagnostics will be written
     _root_dir: str
 

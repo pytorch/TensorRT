@@ -145,7 +145,6 @@ def main():
         # Creating an empty manifest file for overwriting post setup
         os.system("touch {}".format(MANIFEST_FILE))
     else:
-
         # Load manifest if already exists
         with open(MANIFEST_FILE, "r") as f:
             manifest = json.load(f)
