@@ -1,17 +1,19 @@
-from typing import Callable, Dict, Set
+from typing import Any, Callable, Dict, Set
 import torch
+import logging
 from torch._decomp import (
     register_decomposition,
     core_aten_decompositions,
     get_decompositions as get_torch_decompositions,
 )
+from torch._ops import OpOverload
 
 aten = torch.ops.aten
 
 _core_aten_decompositions: Dict[
-    torch._ops.OpOverload, Callable
+    OpOverload, Callable
 ] = core_aten_decompositions()
-enabled_decompositions: Set[torch._ops.OpOverload] = {
+torch_enabled_decompositions: Set[OpOverload] = {
     aten._adaptive_avg_pool2d_backward,
     aten.addcdiv,
     aten.addcdiv_,
@@ -171,12 +173,66 @@ enabled_decompositions: Set[torch._ops.OpOverload] = {
     aten.zeros,
     aten.zeros_like,
 }
-disabled_decompositions: Set[torch._ops.OpOverload] = {}
+torch_disabled_decompositions: Set[OpOverload] = {}
+
 
 ENABLED_TORCH_DECOMPOSITIONS: Dict[
-    torch._ops.OpOverload, Callable
-] = get_torch_decompositions(enabled_decompositions)
-TORCH_TRT_DECOMPOSITIONS: Dict[torch._ops.OpOverload, Callable] = {}
+    OpOverload, Callable
+] = get_torch_decompositions(torch_enabled_decompositions)
+TORCH_TRT_DECOMPOSITIONS: Dict[OpOverload, Callable] = {}
+
+
+logger = logging.getLogger(__name__)
+
+
+def check_decomp_set_invariants():
+    """Validates no overlap between enabled and disabled decomposition sets"""
+    overlap = torch_enabled_decompositions.intersection(torch_disabled_decompositions)
+
+    if overlap:
+        raise AssertionError(
+            f"Detected {overlap} registered in both torch_enabled_decompositions "
+            "and torch_disabled_decompositions. Ensure all operator(s) are in "
+            "at most one of the two sets."
+        )
+
+
+check_decomp_set_invariants()
+
+
+def register_torch_trt_decomposition(aten_op, registry=None):
+    """Checks if the decomposition already exists in one of the sets
+    Registers the decomposition via the Torch utility
+
+    Alerts the user if the decomposition already exists, before registering
+    Throws an AssertionError if the user attempts to register a decomposition
+    which is present in the set of explicitly disabled decompositions
+    """
+    if aten_op in torch_enabled_decompositions:
+        logger.warning(
+            f"Detected custom decomposition for {aten_op}, which conflicts "
+            "with an existing Torch decomposition in torch_enabled_decompositions. "
+            "The custom implementation will take precedence."
+        )
+    elif aten_op in torch_disabled_decompositions:
+        logger.info(
+            f"Detected custom decomposition for {aten_op}, which is present "
+            "in torch_disabled_decompositions."
+        )
+
+    # Conflicts with _core_aten_decompositions will only occur if
+    # enable_experimental_decompositions is True in get_decompositions
+    if aten_op in _core_aten_decompositions:
+        logger.debug(
+            f"Detected custom decomposition for {aten_op}, which conflicts "
+            "with an existing Torch decomposition in core_aten_decompositions. "
+            "The custom implementation will take precedence."
+        )
+
+    def register(fn: Callable) -> Callable:
+        return register_decomposition(aten_op=aten_op, registry=registry)(fn)
+
+    return register
 
 
 def replace_inplace_op(aten_op: OpOverload, outplace_op: OpOverload) -> Any:
@@ -185,7 +241,7 @@ def replace_inplace_op(aten_op: OpOverload, outplace_op: OpOverload) -> Any:
     https://github.com/pytorch/pytorch/blob/3344d79e3f732dadd5c85b99a7aa1a022f187929/torch/_decomp/decompositions.py#L3355-L3361
     """
 
-    @register_decomposition(aten_op, registry=TORCH_TRT_DECOMPOSITIONS)
+    @register_torch_trt_decomposition(aten_op, registry=TORCH_TRT_DECOMPOSITIONS)
     def inplace_op(*args, **kwargs):
         out = outplace_op(*args, **kwargs)
         return args[0].copy_(out)
@@ -208,34 +264,36 @@ replace_inplace_op(aten.scatter_add_, aten.scatter_add)
 replace_inplace_op(aten.scatter_reduce_, aten.scatter_reduce)
 
 
-@register_decomposition(aten.std, registry=TORCH_TRT_DECOMPOSITIONS)
+@register_torch_trt_decomposition(aten.std, registry=TORCH_TRT_DECOMPOSITIONS)
 def std_replacement(*args, **kwargs) -> torch.Tensor:
     return torch.sqrt(torch.var(*args, **kwargs))
 
 
-@register_decomposition(aten.rsqrt, registry=TORCH_TRT_DECOMPOSITIONS)
+@register_torch_trt_decomposition(aten.rsqrt, registry=TORCH_TRT_DECOMPOSITIONS)
 def rsqrt_replacement(*args, **kwargs) -> torch.Tensor:
     return torch.reciprocal(torch.sqrt(*args, **kwargs))
 
 
-@register_decomposition(aten._unsafe_view, registry=TORCH_TRT_DECOMPOSITIONS)
+@register_torch_trt_decomposition(aten._unsafe_view, registry=TORCH_TRT_DECOMPOSITIONS)
 def unsafe_view_replacement(x: torch.Tensor, *args, **kwargs) -> torch.Tensor:
     return torch.reshape(x, *args, **kwargs)
 
 
-@register_decomposition(
+@register_torch_trt_decomposition(
     torch.ops.aten.lift_fresh_copy, registry=TORCH_TRT_DECOMPOSITIONS
 )
 def lift_fresh_copy_replacement(x: torch.Tensor) -> torch.Tensor:
     return x
 
 
-@register_decomposition(aten.alias, registry=TORCH_TRT_DECOMPOSITIONS)
+@register_torch_trt_decomposition(aten.alias, registry=TORCH_TRT_DECOMPOSITIONS)
 def alias_replacement(x: torch.Tensor) -> torch.Tensor:
     return x
 
 
-@register_decomposition(torch.ops.aten.addmm, registry=TORCH_TRT_DECOMPOSITIONS)
+@register_torch_trt_decomposition(
+    torch.ops.aten.addmm, registry=TORCH_TRT_DECOMPOSITIONS
+)
 def addmm_replacement(
     input_: torch.Tensor,
     mat1: torch.Tensor,
@@ -249,7 +307,7 @@ def addmm_replacement(
     )
 
 
-@register_decomposition(
+@register_torch_trt_decomposition(
     torch.ops.aten.reciprocal.default, registry=TORCH_TRT_DECOMPOSITIONS
 )
 def reciprocal_replacement(
@@ -260,22 +318,13 @@ def reciprocal_replacement(
 
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
-) -> Dict[torch._ops.OpOverload, Callable]:
+) -> Dict[OpOverload, Callable]:
     if enable_experimental_decompositions:
-        CORE_ATEN_DECOMPOSITIONS_FILTERED: Dict[torch._ops.OpOverload, Callable] = {
+        CORE_ATEN_DECOMPOSITIONS_FILTERED: Dict[OpOverload, Callable] = {
             decomp: _core_aten_decompositions[decomp]
             for decomp in _core_aten_decompositions
-            if (
-                decomp not in TORCH_TRT_DECOMPOSITIONS
-                and decomp not in disabled_decompositions
-            )
+            if decomp not in torch_disabled_decompositions
         }
         return {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **TORCH_TRT_DECOMPOSITIONS}
     else:
-        duplicate_registrations = set(ENABLED_TORCH_DECOMPOSITIONS.keys()).intersection(
-            set(TORCH_TRT_DECOMPOSITIONS.keys())
-        )
-        assert (
-            not duplicate_registrations
-        ), f"Detected duplicate decompositions on: {duplicate_registrations}"
         return {**ENABLED_TORCH_DECOMPOSITIONS, **TORCH_TRT_DECOMPOSITIONS}
