@@ -5,15 +5,7 @@ from typing import Any, Callable, Sequence
 import torch
 import torch._dynamo as td
 from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
-from torch_tensorrt.dynamo import CompilationSettings
-from torch_tensorrt.dynamo.lowering._decompositions import (
-    get_decompositions,
-)
-from torch_tensorrt.dynamo.lowering._pre_aot_lowering import (
-    pre_aot_substitutions,
-)
-from torch_tensorrt.dynamo import partitioning
-from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs
+from torch_tensorrt.dynamo import CompilationSettings, partitioning
 from torch_tensorrt.dynamo.conversion import (
     convert_module,
     repair_long_or_double_inputs,
@@ -138,7 +130,6 @@ def _compile_module(
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
     for name, _ in partitioned_module.named_children():
-
         # Criteria for a module to be convertible to TRT
         if settings.use_fast_partitioner and "_run_on_acc" not in name:
             continue

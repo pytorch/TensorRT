@@ -1,9 +1,10 @@
-from torch_tensorrt.dynamo import partitioning
-from torch.testing._internal.common_utils import run_tests, TestCase
-from utils import lower_graph_testing
-import torch
 from copy import deepcopy
+
 import numpy as np
+import torch
+from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo import partitioning
+from utils import lower_graph_testing
 
 
 class TestFastPartitioning(TestCase):
@@ -244,7 +245,11 @@ class TestGlobalPartitioning(TestCase):
         ]
 
         fx_graph = torch.fx.symbolic_trace(PartiallySupportedMultiOp())
-        (unexpected_ops_seen, _, partitioned_graphs,) = lower_graph_testing(
+        (
+            unexpected_ops_seen,
+            _,
+            partitioned_graphs,
+        ) = lower_graph_testing(
             fx_graph,
             inputs,
             unexpected_ops=unexpected_ops,

@@ -1,38 +1,35 @@
 import logging
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Collection, Dict, List, Optional, Tuple
 
 import torch
-
+import torch.fx.passes.operator_support as ops
+from torch.fx.node import Target
 from torch.fx.passes.splitter_base import (
+    FxNetAccFusionsFinder,
+    FxNetAccNodesFinder,
     Subgraph,
     _SplitterBase,
     _SplitterSettingBase,
-    FxNetAccNodesFinder,
-    FxNetAccFusionsFinder,
 )
-import torch.fx.passes.operator_support as ops
-from torch.fx.passes.tools_common import NodeSet, CALLABLE_NODE_OPS
-from torch.fx.node import Target
-
-from torch_tensorrt.dynamo.conversion.converter_registry import ConverterRegistry
-from .common import DEFAULT_SINGLE_NODE_PARTITIONS
-from torch_tensorrt.dynamo._defaults import MIN_BLOCK_SIZE
-
+from torch.fx.passes.tools_common import CALLABLE_NODE_OPS, NodeSet
 from torch_tensorrt.dynamo import DYNAMO_CONVERTERS as CONVERTERS
+from torch_tensorrt.dynamo._defaults import MIN_BLOCK_SIZE
+from torch_tensorrt.dynamo.conversion.converter_registry import ConverterRegistry
 
+from .common import DEFAULT_SINGLE_NODE_PARTITIONS
 
 logger = logging.getLogger(__name__)
 
 
-class OpSupportTester(ops.OperatorSupportBase):
+class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
     """Class to determine whether operators within a module are supported"""
 
-    def __init__(self, torch_executed_ops: Sequence[Target] = set()) -> None:
+    def __init__(self, torch_executed_ops: Collection[Target] = set()) -> None:
         super().__init__()
 
         # Initialize sets of supported/unsupported operators
-        self.supported_operators = {}
-        self.unsupported_operators = {}
+        self.supported_operators: Dict[str, int] = {}
+        self.unsupported_operators: Dict[str, int] = {}
         self.torch_executed_ops = torch_executed_ops
 
     def is_node_supported(
@@ -58,7 +55,7 @@ class OpSupportTester(ops.OperatorSupportBase):
 
             return False
 
-    def print_support_overview(self, num_trt_blocks: Optional[int] = None):
+    def print_support_overview(self, num_trt_blocks: Optional[int] = None) -> None:
         if num_trt_blocks is not None:
             logger.debug(
                 f"\nNumber of TensorRT-Accelerated Engines Generated: {num_trt_blocks}"
@@ -81,7 +78,7 @@ class OpSupportTester(ops.OperatorSupportBase):
             logger.debug("\nAll Nodes Supported\n")
 
 
-class TRTPartitioner(_SplitterBase):
+class TRTPartitioner(_SplitterBase):  # type: ignore
     """Partitioner to split an FX graph into subgraphs based on operator support
 
     Adapted from, and modified for the Torch-TensorRT Dynamo case:
@@ -102,7 +99,7 @@ class TRTPartitioner(_SplitterBase):
         module: torch.fx.GraphModule,
         operator_support: ops.OperatorSupportBase,
         allowed_single_node_partition_ops: Optional[
-            Sequence[str]
+            Collection[str]
         ] = DEFAULT_SINGLE_NODE_PARTITIONS,
         min_block_size: int = MIN_BLOCK_SIZE,
     ):
@@ -141,7 +138,7 @@ class TRTPartitioner(_SplitterBase):
         self.non_acc_submodule_name = "_run_on_gpu_"
         self._node_submodule_map: Dict[str, str] = {}
 
-        self.num_trt_accelerated_subgraphs = None
+        self.num_trt_accelerated_subgraphs: Optional[int] = None
         self.allowed_single_node_partition_ops = allowed_single_node_partition_ops
 
     def remove_small_acc_subgraphs(self, subgraphs: List[Subgraph]) -> List[Subgraph]:
@@ -152,10 +149,13 @@ class TRTPartitioner(_SplitterBase):
         result: List[Subgraph] = []
         for subgraph in subgraphs:
             if subgraph.is_acc:
-                if len(subgraph.nodes) >= self.settings.min_acc_module_size or any(
-                    ConverterRegistry.qualified_name_or_str(node.target)
-                    in self.allowed_single_node_partition_ops
-                    for node in subgraph.nodes
+                if len(subgraph.nodes) >= self.settings.min_acc_module_size or (
+                    self.allowed_single_node_partition_ops is not None
+                    and any(
+                        ConverterRegistry.qualified_name_or_str(node.target)
+                        in self.allowed_single_node_partition_ops
+                        for node in subgraph.nodes
+                    )
                 ):
                     result.append(subgraph)
                 else:
@@ -214,7 +214,7 @@ def partition(
     gm: torch.fx.GraphModule,
     verbose: bool = True,
     min_block_size: int = MIN_BLOCK_SIZE,
-    torch_executed_ops: Sequence[Target] = set(),
+    torch_executed_ops: Collection[Target] = set(),
 ) -> torch.fx.GraphModule:
     """Partition an FX GraphModule with aten ops into TRT engines
     Partitioning is based on converter operator support
@@ -223,7 +223,7 @@ def partition(
         gm: FX GraphModule to partition
         verbose: Bool representing whether to print operator support
         min_block_size: Minimum number of operators per TRT-Engine Block
-        torch_executed_ops: Sequence of operations to run in Torch, regardless of converter coverage
+        torch_executed_ops: Collection of operations to run in Torch, regardless of converter coverage
     Returns:
         torch.fx.GraphModule
     """

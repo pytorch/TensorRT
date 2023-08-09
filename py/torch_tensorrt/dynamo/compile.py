@@ -19,10 +19,10 @@ from torch_tensorrt.dynamo._defaults import (
     PASS_THROUGH_BUILD_FAILURES,
     PRECISION,
     TRUNCATE_LONG_AND_DOUBLE,
+    USE_FAST_PARTITIONER,
     USE_PYTHON_RUNTIME,
     VERSION_COMPATIBLE,
     WORKSPACE_SIZE,
-    USE_FAST_PARTITIONER,
 )
 from torch_tensorrt.dynamo.backend.backends import _compile_module
 from torch_tensorrt.dynamo.conversion import convert_module

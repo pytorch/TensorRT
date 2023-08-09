@@ -1,12 +1,8 @@
 import logging
-from typing import Dict, List, Optional, Sequence
+from typing import Collection, Dict, List, Mapping, Optional, Sequence, Set
 
 import torch
-
-from torch_tensorrt.dynamo._defaults import MIN_BLOCK_SIZE
-from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
 from torch.fx.graph_module import GraphModule
-from .common import DEFAULT_SINGLE_NODE_PARTITIONS
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
 from torch.fx.passes.operator_support import OperatorSupport, SupportDict
@@ -14,7 +10,8 @@ from torch_tensorrt.dynamo._defaults import MIN_BLOCK_SIZE
 from torch_tensorrt.dynamo.conversion.converter_registry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
-from torch_tensorrt.dynamo.lowering._pre_aot_lowering import SUBSTITUTION_REGISTRY
+
+from .common import DEFAULT_SINGLE_NODE_PARTITIONS
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +37,7 @@ class TRTPartitioner(CapabilityBasedPartitioner):  # type: ignore[misc]
         *,
         non_compute_ops: Optional[Sequence[str]] = None,
         allowed_single_node_partition_ops: Optional[
-            Sequence[str]
+            Collection[str]
         ] = DEFAULT_SINGLE_NODE_PARTITIONS,
         min_block_size: int = MIN_BLOCK_SIZE,
     ) -> None:
