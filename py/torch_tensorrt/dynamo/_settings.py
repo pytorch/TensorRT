@@ -4,6 +4,7 @@ from typing import Optional, Set
 import torch
 from torch_tensorrt.dynamo._defaults import (
     DEBUG,
+    ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     OPTIMIZATION_LEVEL,
@@ -14,7 +15,6 @@ from torch_tensorrt.dynamo._defaults import (
     USE_PYTHON_RUNTIME,
     VERSION_COMPATIBLE,
     WORKSPACE_SIZE,
-    ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
 )
 
 
@@ -51,6 +51,7 @@ class CompilationSettings:
     version_compatible: bool = VERSION_COMPATIBLE
     optimization_level: Optional[int] = OPTIMIZATION_LEVEL
     use_python_runtime: Optional[bool] = USE_PYTHON_RUNTIME
+
     truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE
     use_fast_partitioner: bool = USE_FAST_PARTITIONER
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS

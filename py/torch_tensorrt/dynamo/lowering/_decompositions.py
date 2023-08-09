@@ -1,17 +1,16 @@
-from typing import Any, Callable, Dict, Set
-import torch
 import logging
-from torch._decomp import (
-    register_decomposition,
-    core_aten_decompositions,
-    get_decompositions as get_torch_decompositions,
-)
+from typing import Any, Callable, Dict, Optional, Set
+
+import torch
+from torch._decomp import core_aten_decompositions
+from torch._decomp import get_decompositions as get_torch_decompositions
+from torch._decomp import register_decomposition
 from torch._ops import OpOverload
 
 aten = torch.ops.aten
 
 _core_aten_decompositions: Dict[
-    OpOverload, Callable
+    OpOverload, Callable[[Any], Any]
 ] = core_aten_decompositions()
 torch_enabled_decompositions: Set[OpOverload] = {
     aten._adaptive_avg_pool2d_backward,
@@ -179,19 +178,19 @@ torch_enabled_decompositions: Set[OpOverload] = {
     aten.full,
     aten.repeat,
 }
-torch_disabled_decompositions: Set[OpOverload] = {}
+torch_disabled_decompositions: Set[OpOverload] = set()
 
 
 ENABLED_TORCH_DECOMPOSITIONS: Dict[
-    OpOverload, Callable
+    OpOverload, Callable[[Any], Any]
 ] = get_torch_decompositions(torch_enabled_decompositions)
-TORCH_TRT_DECOMPOSITIONS: Dict[OpOverload, Callable] = {}
+TORCH_TRT_DECOMPOSITIONS: Dict[OpOverload, Callable[[Any], Any]] = {}
 
 
 logger = logging.getLogger(__name__)
 
 
-def check_decomp_set_invariants():
+def check_decomp_set_invariants() -> None:
     """Validates no overlap between enabled and disabled decomposition sets"""
     overlap = torch_enabled_decompositions.intersection(torch_disabled_decompositions)
 
@@ -206,7 +205,9 @@ def check_decomp_set_invariants():
 check_decomp_set_invariants()
 
 
-def register_torch_trt_decomposition(aten_op, registry=None):
+def register_torch_trt_decomposition(
+    aten_op: OpOverload, registry: Optional[Any] = None
+) -> Callable[[Any], Any]:
     """Checks if the decomposition already exists in one of the sets
     Registers the decomposition via the Torch utility
 
@@ -235,7 +236,7 @@ def register_torch_trt_decomposition(aten_op, registry=None):
             "The custom implementation will take precedence."
         )
 
-    def register(fn: Callable) -> Callable:
+    def register(fn: Callable[[Any], Any]) -> Any:
         return register_decomposition(aten_op=aten_op, registry=registry)(fn)
 
     return register
@@ -248,7 +249,7 @@ def replace_inplace_op(aten_op: OpOverload, outplace_op: OpOverload) -> Any:
     """
 
     @register_torch_trt_decomposition(aten_op, registry=TORCH_TRT_DECOMPOSITIONS)
-    def inplace_op(*args, **kwargs):
+    def inplace_op(*args, **kwargs):  # type: ignore
         out = outplace_op(*args, **kwargs)
         return args[0].copy_(out)
 
@@ -271,17 +272,17 @@ replace_inplace_op(aten.scatter_reduce_, aten.scatter_reduce)
 
 
 @register_torch_trt_decomposition(aten.std, registry=TORCH_TRT_DECOMPOSITIONS)
-def std_replacement(*args, **kwargs) -> torch.Tensor:
+def std_replacement(*args, **kwargs) -> torch.Tensor:  # type: ignore
     return torch.sqrt(torch.var(*args, **kwargs))
 
 
 @register_torch_trt_decomposition(aten.rsqrt, registry=TORCH_TRT_DECOMPOSITIONS)
-def rsqrt_replacement(*args, **kwargs) -> torch.Tensor:
+def rsqrt_replacement(*args, **kwargs) -> torch.Tensor:  # type: ignore
     return torch.reciprocal(torch.sqrt(*args, **kwargs))
 
 
 @register_torch_trt_decomposition(aten._unsafe_view, registry=TORCH_TRT_DECOMPOSITIONS)
-def unsafe_view_replacement(x: torch.Tensor, *args, **kwargs) -> torch.Tensor:
+def unsafe_view_replacement(x: torch.Tensor, *args, **kwargs) -> torch.Tensor:  # type: ignore
     return torch.reshape(x, *args, **kwargs)
 
 
@@ -324,9 +325,9 @@ def reciprocal_replacement(
 
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
-) -> Dict[OpOverload, Callable]:
+) -> Dict[OpOverload, Callable[[Any], Any]]:
     if enable_experimental_decompositions:
-        CORE_ATEN_DECOMPOSITIONS_FILTERED: Dict[OpOverload, Callable] = {
+        CORE_ATEN_DECOMPOSITIONS_FILTERED: Dict[OpOverload, Callable[[Any], Any]] = {
             decomp: _core_aten_decompositions[decomp]
             for decomp in _core_aten_decompositions
             if decomp not in torch_disabled_decompositions
