@@ -114,15 +114,7 @@ def compile(
     }
 
     settings = CompilationSettings(**compilation_options)
-    if kwargs.get("use_capability_partitioner", None):
-        model = lower_model(gm, torch_inputs)
-        return _compile_module(model, torch_inputs, settings)
-    else:
-        split_result = lower_model_using_trt_splitter(gm, torch_inputs)
-        trt_module = _compile_graph(split_result, torch_inputs, settings)
-
-        return trt_module
-
+    return _compile_module(gm, torch_inputs, settings)
 
 def _compile_graph(
     split_result: SplitResult,
