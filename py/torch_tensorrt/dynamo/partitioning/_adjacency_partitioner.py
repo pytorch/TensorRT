@@ -12,8 +12,10 @@ from torch.fx.passes.splitter_base import (
     _SplitterSettingBase,
 )
 from torch.fx.passes.tools_common import CALLABLE_NODE_OPS, NodeSet
-from torch_tensorrt.dynamo import DYNAMO_CONVERTERS as CONVERTERS
-from torch_tensorrt.dynamo._defaults import MIN_BLOCK_SIZE
+from torch_tensorrt.dynamo._defaults import DEBUG, MIN_BLOCK_SIZE
+from torch_tensorrt.dynamo.conversion.converter_registry import (
+    DYNAMO_CONVERTERS as CONVERTERS,
+)
 from torch_tensorrt.dynamo.conversion.converter_registry import ConverterRegistry
 
 from .common import DEFAULT_SINGLE_NODE_PARTITIONS
@@ -212,7 +214,7 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
 
 def partition(
     gm: torch.fx.GraphModule,
-    verbose: bool = True,
+    verbose: bool = DEBUG,
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Collection[Target] = set(),
 ) -> torch.fx.GraphModule:

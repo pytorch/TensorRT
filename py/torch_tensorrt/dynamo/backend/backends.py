@@ -108,15 +108,47 @@ def _compile_module(
     Returns:
         Compiled FX GraphModule
     """
-    # Partition module into components that can be TRT-accelerated
-    if settings.use_fast_partitioner:
-        partitioned_module = partitioning.fast_partition(
-            gm,
-            verbose=settings.debug,
-            min_block_size=settings.min_block_size,
-            torch_executed_ops=settings.torch_executed_ops,
+    # Check the number of supported operations in the graph
+    num_supported_ops, total_ops = partitioning.get_graph_converter_support(
+        gm, settings.debug, settings.torch_executed_ops
+    )
+
+    # If the number of supported operations is 0 or less than the block size, skip the subgraph
+    # TODO: Add condition to second expression below when require_full_compilation is added
+    if num_supported_ops == 0 or (num_supported_ops < settings.min_block_size):
+        logger.warning(
+            f"{num_supported_ops} supported operations detected in subgraph containing {total_ops} computational nodes. "
+            f"Skipping this subgraph, since min_block_size was detected to be {settings.min_block_size}"
         )
+        return gm
     else:
+        logger.debug(
+            f"Detected support for {num_supported_ops} operators out of {total_ops} in subgraph."
+        )
+
+    # Partition module into components that can be TRT-accelerated
+    fast_partitioner_failed = False
+
+    # If specified, try using the fast partitioner and fall back to the global one on failure
+    if settings.use_fast_partitioner:
+        try:
+            partitioned_module = partitioning.fast_partition(
+                gm,
+                verbose=settings.debug,
+                min_block_size=settings.min_block_size,
+                torch_executed_ops=settings.torch_executed_ops,
+            )
+        except torch.fx.passes.splitter_base.FxNetSplitterInternalError:
+            logger.error(
+                "Partitioning failed on the subgraph with fast partition. See trace above. "
+                + "Retrying with global partition.",
+                exc_info=True,
+            )
+
+            fast_partitioner_failed = True
+            settings.use_fast_partitioner = False
+
+    if not settings.use_fast_partitioner:
         partitioned_module = partitioning.global_partition(
             gm,
             verbose=settings.debug,
@@ -161,5 +193,9 @@ def _compile_module(
     # Replace all FX Modules with TRT Modules
     for name, trt_mod in trt_modules.items():
         setattr(partitioned_module, name, trt_mod)
+
+    # Reset settings object to user specification after fallback to global partitioning mode
+    if fast_partitioner_failed:
+        settings.use_fast_partitioner = True
 
     return partitioned_module
