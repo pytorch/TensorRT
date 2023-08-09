@@ -2,9 +2,7 @@ import torch
 import torch.nn as nn
 from harness import DispatchTestCase
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.conversion.trt_interpreter import (
-    UnsupportedOperatorException,
-)
+from torch_tensorrt.dynamo.conversion import UnsupportedOperatorException
 
 
 class TestToCopyConverter(DispatchTestCase):
