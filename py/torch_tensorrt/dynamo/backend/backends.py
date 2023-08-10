@@ -164,7 +164,6 @@ def _compile_module(
             settings=settings,
             name=name,
         )
-        import pdb; pdb.set_trace()
         # Add the engine as input to the execute engine op node.
         import io
         engine_str = None
@@ -181,11 +180,15 @@ def _compile_module(
                     TorchTensorRTModule._pack_binding_names(trt_mod.output_names),
                 ]
             )
-        submodule_input_nodes.append(engine_with_metadata)
-        import pdb; pdb.set_trace()
+        
+        
+        engine_torch = torch.frombuffer(engine_str, dtype=torch.uint8)
+        partitioned_module.register_buffer("engine", engine_torch)
+        engine_node = partitioned_module.graph.get_attr("engine")
+        submodule_input_nodes.append(engine_node)
         new_node = partitioned_module.graph.create_node("call_function", torch.ops.tensorrt.execute_engine, tuple(submodule_input_nodes))
         submodule_node.replace_all_uses_with(new_node)
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         partitioned_module.graph.erase_node(submodule_node)
         # trt_modules[name] = trt_mod
         # partitioned_module.recompile()
