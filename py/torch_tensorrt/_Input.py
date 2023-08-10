@@ -32,11 +32,11 @@ class Input(object):
     shape: Optional[
         Tuple[int, ...] | Dict[str, Tuple[int, ...]]
     ] = None  #: Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ "min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple }``
-    dtype: _enums.dtype = (  # type: ignore[name-defined]
+    dtype: _enums.dtype = (
         _enums.dtype.unknown
     )  #: The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)
     _explicit_set_dtype: bool = False
-    format: _enums.TensorFormat = (  # type: ignore[name-defined]
+    format: _enums.TensorFormat = (
         _enums.TensorFormat.contiguous
     )  #: The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)
 
@@ -208,7 +208,7 @@ class Input(object):
             return False
 
     @staticmethod
-    def _parse_dtype(dtype: Any) -> _enums.dtype:  # type: ignore[name-defined]
+    def _parse_dtype(dtype: Any) -> _enums.dtype:
         if isinstance(dtype, torch.dtype):
             if dtype == torch.long:
                 return _enums.dtype.long
@@ -236,7 +236,7 @@ class Input(object):
             )
 
     @staticmethod
-    def _to_torch_dtype(dtype: _enums.dtype) -> torch.dtype:  # type: ignore[name-defined]
+    def _to_torch_dtype(dtype: _enums.dtype) -> torch.dtype:
         if dtype == _enums.dtype.long:
             return torch.long
         elif dtype == _enums.dtype.int32:
@@ -255,7 +255,7 @@ class Input(object):
         return bool(self.dtype != _enums.dtype.long)
 
     @staticmethod
-    def _parse_format(format: Any) -> _enums.TensorFormat:  # type: ignore[name-defined]
+    def _parse_format(format: Any) -> _enums.TensorFormat:
         if isinstance(format, torch.memory_format):
             if format == torch.contiguous_format:
                 return _enums.TensorFormat.contiguous
@@ -337,9 +337,9 @@ class Input(object):
             A Input object.
         """
         if not (
-            t.is_contiguous(memory_format=torch.contiguous_format)
+            disable_memory_format_check
+            or t.is_contiguous(memory_format=torch.contiguous_format)
             or t.is_contiguous(memory_format=torch.channels_last)
-            or disable_memory_format_check
         ):
             raise ValueError(
                 "Tensor does not have a supported memory format, supported formats are contiguous or channel_last"
@@ -347,8 +347,8 @@ class Input(object):
         frmt = (
             torch.contiguous_format
             if (
-                t.is_contiguous(memory_format=torch.contiguous_format)
-                or disable_memory_format_check
+                disable_memory_format_check
+                or t.is_contiguous(memory_format=torch.contiguous_format)
             )
             else torch.channels_last
         )
