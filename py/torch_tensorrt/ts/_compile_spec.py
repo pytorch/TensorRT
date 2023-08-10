@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Set
 
@@ -39,7 +41,7 @@ def _supported_input_size_type(input_size: Any) -> bool:
         )
 
 
-def _parse_op_precision(precision: Any) -> _enums.dtype:  # type: ignore[name-defined]
+def _parse_op_precision(precision: Any) -> _enums.dtype:
     if isinstance(precision, torch.dtype):
         if precision == torch.int8:
             return _enums.dtype.int8
@@ -63,7 +65,7 @@ def _parse_op_precision(precision: Any) -> _enums.dtype:  # type: ignore[name-de
         )
 
 
-def _parse_enabled_precisions(precisions: Any) -> Set[_enums.dtype]:  # type: ignore[name-defined]
+def _parse_enabled_precisions(precisions: Any) -> Set[_enums.dtype]:
     parsed_precisions = set()
     if any(isinstance(precisions, type) for type in [list, tuple, set]):
         for p in precisions:
@@ -73,7 +75,7 @@ def _parse_enabled_precisions(precisions: Any) -> Set[_enums.dtype]:  # type: ig
     return parsed_precisions
 
 
-def _parse_device_type(device: Any) -> _enums.DeviceType:  # type: ignore[name-defined]
+def _parse_device_type(device: Any) -> _enums.DeviceType:
     if isinstance(device, torch.device):
         if device.type == "cuda":
             return _C.DeviceType.gpu
@@ -346,10 +348,10 @@ def TensorRTCompileSpec(
     device: torch.device | Device = Device._current_device(),
     disable_tf32: bool = False,
     sparse_weights: bool = False,
-    enabled_precisions: Optional[Set[torch.dtype | _enums.dtype]] = None,  # type: ignore[name-defined]
+    enabled_precisions: Optional[Set[torch.dtype | _enums.dtype]] = None,
     refit: bool = False,
     debug: bool = False,
-    capability: _enums.EngineCapability = _enums.EngineCapability.default,  # type: ignore[name-defined]
+    capability: _enums.EngineCapability = _enums.EngineCapability.default,
     num_avg_timing_iters: int = 1,
     workspace_size: int = 0,
     dla_sram_size: int = 1048576,

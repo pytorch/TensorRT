@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Type, TypeAlias
+from typing import Any, Callable, Dict, Optional, Type
 
 import torch
 from torch._ops import OpOverload
 from torch.fx import GraphModule, Node
+from typing_extensions import TypeAlias
 
 logger = logging.getLogger(__name__)
 
