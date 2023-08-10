@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from enum import Enum
-from typing import Any, Callable, List, Optional, Sequence, Set, TypeGuard
+from typing import Any, Callable, List, Optional, Sequence, Set
 
 import torch
 import torch.fx
@@ -12,6 +14,7 @@ from torch_tensorrt.fx import InputTensorSpec
 from torch_tensorrt.fx.lower import compile as fx_compile
 from torch_tensorrt.fx.utils import LowerPrecision
 from torch_tensorrt.ts._compiler import compile as torchscript_compile
+from typing_extensions import TypeGuard
 
 
 def _non_fx_input_interface(

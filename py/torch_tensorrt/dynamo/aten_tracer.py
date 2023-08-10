@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import copy
 import sys
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 import torch
 import torch._dynamo as torchdynamo
@@ -22,7 +24,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
 )
 from typing_extensions import TypeAlias
 
-Value: TypeAlias = Tuple["Value", ...] | List["Value"] | Dict[str, "Value"]
+Value: TypeAlias = Union[Tuple["Value", ...], List["Value"], Dict[str, "Value"]]
 
 
 class DynamoConfig:

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import collections.abc
 import logging
 from typing import Any, List, Optional, Set, Tuple

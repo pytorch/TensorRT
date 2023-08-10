@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -32,11 +34,11 @@ class Input(object):
     shape: Optional[
         Tuple[int, ...] | Dict[str, Tuple[int, ...]]
     ] = None  #: Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ "min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple }``
-    dtype: _enums.dtype = (  # type: ignore[name-defined]
+    dtype: _enums.dtype = (
         _enums.dtype.unknown
     )  #: The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)
     _explicit_set_dtype: bool = False
-    format: _enums.TensorFormat = (  # type: ignore[name-defined]
+    format: _enums.TensorFormat = (
         _enums.TensorFormat.contiguous
     )  #: The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)
 
@@ -208,7 +210,7 @@ class Input(object):
             return False
 
     @staticmethod
-    def _parse_dtype(dtype: Any) -> _enums.dtype:  # type: ignore[name-defined]
+    def _parse_dtype(dtype: Any) -> _enums.dtype:
         if isinstance(dtype, torch.dtype):
             if dtype == torch.long:
                 return _enums.dtype.long
@@ -236,7 +238,7 @@ class Input(object):
             )
 
     @staticmethod
-    def _to_torch_dtype(dtype: _enums.dtype) -> torch.dtype:  # type: ignore[name-defined]
+    def _to_torch_dtype(dtype: _enums.dtype) -> torch.dtype:
         if dtype == _enums.dtype.long:
             return torch.long
         elif dtype == _enums.dtype.int32:
@@ -255,7 +257,7 @@ class Input(object):
         return bool(self.dtype != _enums.dtype.long)
 
     @staticmethod
-    def _parse_format(format: Any) -> _enums.TensorFormat:  # type: ignore[name-defined]
+    def _parse_format(format: Any) -> _enums.TensorFormat:
         if isinstance(format, torch.memory_format):
             if format == torch.contiguous_format:
                 return _enums.TensorFormat.contiguous
