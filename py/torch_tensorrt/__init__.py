@@ -4,10 +4,11 @@ import platform
 import sys
 from typing import Dict, List
 
-from torch_tensorrt._version import (
+from torch_tensorrt._version import (  # noqa: F401
     __cuda_version__,
     __cudnn_version__,
     __tensorrt_version__,
+    __version__,
 )
 
 from packaging import version
@@ -87,6 +88,7 @@ from torch_tensorrt._Device import Device  # noqa: F401
 from torch_tensorrt._enums import *  # noqa: F403
 from torch_tensorrt._Input import Input  # noqa: F401
 from torch_tensorrt._utils import *  # noqa: F403
+from torch_tensorrt._utils import sanitized_torch_version
 
 if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
     from torch_tensorrt import dynamo  # noqa: F401
