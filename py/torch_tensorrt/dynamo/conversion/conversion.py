@@ -3,13 +3,12 @@ from __future__ import annotations
 import io
 from typing import Sequence
 
+import tensorrt as trt
 import torch
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
-
-import tensorrt as trt
 
 
 def convert_module(
@@ -72,4 +71,5 @@ def convert_module(
             name=name,
             input_binding_names=list(interpreter_result.input_names),
             output_binding_names=list(interpreter_result.output_names),
+            target_device=settings.device,
         )

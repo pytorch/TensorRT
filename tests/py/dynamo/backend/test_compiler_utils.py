@@ -1,24 +1,59 @@
-from torch_tensorrt.dynamo.utils import prepare_device, prepare_inputs
-from utils import same_output_format
-import torch_tensorrt
 import unittest
+
 import torch
+import torch_tensorrt
+from torch_tensorrt.dynamo.utils import (
+    prepare_inputs,
+    to_torch_device,
+    to_torch_tensorrt_device,
+)
+from utils import same_output_format
 
 
-class TestPrepareDevice(unittest.TestCase):
-    def test_prepare_cuda_device(self):
+class TestToTorchDevice(unittest.TestCase):
+    def test_cast_cuda_device(self):
         gpu_id = 0
         device = torch.device(f"cuda:{gpu_id}")
-        prepared_device = prepare_device(device)
+        prepared_device = to_torch_device(device)
         self.assertTrue(isinstance(prepared_device, torch.device))
         self.assertTrue(prepared_device.index == gpu_id)
 
-    def test_prepare_trt_device(self):
+    def test_cast_trt_device(self):
         gpu_id = 4
         device = torch_tensorrt.Device(gpu_id=gpu_id)
-        prepared_device = prepare_device(device)
+        prepared_device = to_torch_device(device)
         self.assertTrue(isinstance(prepared_device, torch.device))
         self.assertTrue(prepared_device.index == gpu_id)
+
+    def test_cast_str_device(self):
+        gpu_id = 2
+        device = f"cuda:{2}"
+        prepared_device = to_torch_device(device)
+        self.assertTrue(isinstance(prepared_device, torch.device))
+        self.assertTrue(prepared_device.index == gpu_id)
+
+
+class TestToTorchTRTDevice(unittest.TestCase):
+    def test_cast_cuda_device(self):
+        gpu_id = 0
+        device = torch.device(f"cuda:{gpu_id}")
+        prepared_device = to_torch_tensorrt_device(device)
+        self.assertTrue(isinstance(prepared_device, torch_tensorrt.Device))
+        self.assertTrue(prepared_device.gpu_id == gpu_id)
+
+    def test_cast_trt_device(self):
+        gpu_id = 4
+        device = torch_tensorrt.Device(gpu_id=gpu_id)
+        prepared_device = to_torch_tensorrt_device(device)
+        self.assertTrue(isinstance(prepared_device, torch_tensorrt.Device))
+        self.assertTrue(prepared_device.gpu_id == gpu_id)
+
+    def test_cast_str_device(self):
+        gpu_id = 2
+        device = f"cuda:{2}"
+        prepared_device = to_torch_tensorrt_device(device)
+        self.assertTrue(isinstance(prepared_device, torch_tensorrt.Device))
+        self.assertTrue(prepared_device.gpu_id == gpu_id)
 
 
 class TestPrepareInputs(unittest.TestCase):
