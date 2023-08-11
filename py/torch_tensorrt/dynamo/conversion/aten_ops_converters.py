@@ -1,5 +1,4 @@
 import logging
-import operator
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 import tensorrt as trt
@@ -406,24 +405,6 @@ def aten_ops_to_copy_dtype(
     )
 
 
-@dynamo_tensorrt_converter(operator.getitem)
-def operator_getitem(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.evaluators.getitem(
-        network,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-        args[1],
-    )
-
-
 @dynamo_tensorrt_converter(torch.ops.aten.clone.default)
 def aten_ops_clone(
     network: TRTNetwork,
@@ -432,7 +413,7 @@ def aten_ops_clone(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.evaluators.clone(
+    return impl.cast.clone(
         network,
         target,
         SourceIR.ATEN,

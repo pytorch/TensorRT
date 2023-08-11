@@ -4,7 +4,7 @@ from typing import List, Optional
 
 import tensorrt as trt
 import torch
-from torch.fx.node import Target, _get_qualified_name
+from torch.fx.node import Target
 from torch_tensorrt.fx.converters.converter_utils import (
     Frameworks,
     unified_dtype_converter,
@@ -12,6 +12,7 @@ from torch_tensorrt.fx.converters.converter_utils import (
 from torch_tensorrt.fx.types import TRTDataType, TRTNetwork, TRTTensor
 
 from .._SourceIR import SourceIR
+from .converter_registry import ConverterRegistry
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -94,15 +95,12 @@ def cast_trt_tensor(
 
     if input_val.dtype != trt_dtype:
         source_ir = source_ir if source_ir is not None else SourceIR.UNKNOWN
-        target_name = (
-            f"{source_ir}_ops{'.' + target if target else ''}"
-            if (isinstance(target, str))
-            else f"{source_ir}_ops.{_get_qualified_name(target)}"
-        )
+        target_str = ConverterRegistry.qualified_name_or_str(target)
+        target_name = f"{source_ir}_ops{('.' + target_str) if target_str else ''}"
 
         identity_layer = network.add_identity(input_val)
         identity_layer.set_output_type(0, trt_dtype)
-        identity_layer.name = f"Cast ITensor {input_val.name} from {input_val.dtype} to {trt_dtype} -{name}-[{target_name}]-[{name}]"
+        identity_layer.name = f"Cast ITensor {input_val.name} from {input_val.dtype} to {trt_dtype} - [{target_name}]-[{name}]"
         return identity_layer.get_output(0)
     else:
         return input_val

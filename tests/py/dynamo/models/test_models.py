@@ -27,7 +27,6 @@ def test_resnet18(ir):
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
-        "min_block_size": 10,
         "ir": "torch_compile",
     }
 
@@ -176,7 +175,6 @@ def test_resnet18_half(ir):
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
-        "min_block_size": 10,
         "ir": "torch_compile",
     }
 

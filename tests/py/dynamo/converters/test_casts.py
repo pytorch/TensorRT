@@ -5,6 +5,36 @@ from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.dynamo.conversion import UnsupportedOperatorException
 
 
+class TestCloneConverter(DispatchTestCase):
+    def test_clone_contiguous(self):
+        class Clone(nn.Module):
+            def forward(self, x):
+                y = torch.clone(x, memory_format=torch.contiguous_format)
+                return y + 1
+
+        inputs = [torch.randn((1, 3, 10))]
+        self.run_test(
+            Clone(),
+            inputs,
+            expected_ops={torch.ops.aten.clone.default},
+            disable_passes=True,
+        )
+
+    def test_clone_regular(self):
+        class Clone(nn.Module):
+            def forward(self, x):
+                y = torch.clone(x)
+                return y + 1
+
+        inputs = [torch.randn((8, 2, 10))]
+        self.run_test(
+            Clone(),
+            inputs,
+            expected_ops={torch.ops.aten.clone.default},
+            disable_passes=True,
+        )
+
+
 class TestToCopyConverter(DispatchTestCase):
     def test_to_copy_half(self):
         class ToCopyHalf(nn.Module):

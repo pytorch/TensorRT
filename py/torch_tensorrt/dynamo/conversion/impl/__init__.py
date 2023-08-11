@@ -6,7 +6,6 @@ from . import (
     condition,
     elementwise,
     embedding,
-    evaluators,
     matmul,
     normalization,
     permutation,
