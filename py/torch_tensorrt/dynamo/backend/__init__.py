@@ -1,1 +1,1 @@
-from .backends import torch_tensorrt_backend
+from .backends import torch_tensorrt_backend  # noqa: F401

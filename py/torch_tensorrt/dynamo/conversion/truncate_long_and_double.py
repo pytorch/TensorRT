@@ -1,10 +1,13 @@
+from __future__ import annotations
+
+from typing import Optional, Sequence, Set
+
 import torch
 from torch.fx.node import _get_qualified_name
-from typing import Optional, Sequence, Union
 
 
 def _extract_downstream_get_nodes(
-    module_node: torch.fx.Node, output_indices: Sequence[int]
+    module_node: torch.fx.Node, output_indices: Set[int]
 ) -> Sequence[torch.fx.Node]:
     """Extracts downstream users of a node which get the item at a particular index
 
@@ -35,9 +38,9 @@ def _repair_64bit_input(
     gm: torch.fx.GraphModule,
     position: int,
     submodule_name: str,
-    submodule_outputs: Optional[Union[torch.Tensor, Sequence[torch.Tensor]]],
+    submodule_outputs: Optional[torch.Tensor | Sequence[torch.Tensor]],
     dtype: torch.dtype,
-):
+) -> None:
     """Fixes a single Long/Double input to a TRT-accelerated subgraph
 
     In-Place modifies the provided graph
@@ -90,14 +93,15 @@ def _repair_64bit_input(
     module_node.replace_input_with(node_64bit, node_32bit)
 
     output_positions_64bit = set()
-    outputs_list = (
-        [submodule_outputs]
-        if isinstance(submodule_outputs, torch.Tensor)
-        else submodule_outputs
-    )
 
     # Determine if any outputs of the model are 64-bit type and store their indices
     if submodule_outputs is not None:
+        outputs_list = (
+            [submodule_outputs]
+            if isinstance(submodule_outputs, torch.Tensor)
+            else submodule_outputs
+        )
+
         for output_position, output in enumerate(outputs_list):
             if output.dtype == dtype_64bit:
                 output_positions_64bit.add(output_position)
@@ -199,9 +203,11 @@ def repair_long_or_double_inputs(
             # Repair submodule inputs in accordance with inserted casts
             dtype_32bit = torch.int32 if (param.dtype == torch.int64) else torch.float32
             submodule_inputs = (
-                submodule_inputs[:position]
-                + (param.to(dtype_32bit),)
-                + submodule_inputs[position + 1 :]
+                list(submodule_inputs[:position])
+                + [
+                    param.to(dtype_32bit),
+                ]
+                + list(submodule_inputs[position + 1 :])
             )
 
     return submodule_inputs

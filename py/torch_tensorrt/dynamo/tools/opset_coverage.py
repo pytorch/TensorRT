@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import os
+import warnings
 from collections import OrderedDict
 from dataclasses import dataclass
 from enum import Enum, auto
@@ -10,8 +11,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import torch
 import torch._prims as prims
 import torchgen
-from torch._ops import OpOverload
 from torch._dynamo.variables import BuiltinVariable
+from torch._ops import OpOverload
 from torch_tensorrt.dynamo.conversion.converter_registry import (
     DYNAMO_CONVERTERS,
     ConverterRegistry,
@@ -110,7 +111,6 @@ def opset_coverage(
     converter_registry: Optional[ConverterRegistry] = None,
     decomposition_registry: Optional[Dict[OpOverload, Callable[..., Any]]] = None,
 ) -> OpsetCoverage:
-
     opset_schemas = dict(opset)
     opset_targets = set(opset_schemas.keys())
 
@@ -134,17 +134,20 @@ def opset_coverage(
             _, registry_data = c_registry.get_all_converters_with_target(
                 target, return_registry_info=True
             )
-            if registry_data["Dynamo ATen Converters Registry"] >= 1:
-                status = SupportStatus.CONVERTED
-                support_count += 1
-            elif registry_data["FX ATen Converters Registry"] >= 1:
-                status = SupportStatus.LEGACY_CONVERTED
-                legacy_count += 1
+            if registry_data is not None:
+                if registry_data["Dynamo ATen Converters Registry"] >= 1:
+                    status = SupportStatus.CONVERTED
+                    support_count += 1
+                elif registry_data["FX ATen Converters Registry"] >= 1:
+                    status = SupportStatus.LEGACY_CONVERTED
+                    legacy_count += 1
 
-            support_status[target_str] = {
-                "schema": f"{target_str.split('.')[0]}.{opset_schemas[target_str]}",
-                "status": str(status),
-            }
+                support_status[target_str] = {
+                    "schema": f"{target_str.split('.')[0]}.{opset_schemas[target_str]}",
+                    "status": str(status),
+                }
+            else:
+                warnings.warn(f"No registry data for op: {target_str}")
 
     l_registry = (
         decomposition_registry

@@ -218,6 +218,7 @@ def check_correctness(args, mod, inputs, optimize_ctx, optimize_name):
 
 synchronize = torch.cuda.synchronize
 
+
 # timing function to record the repeated run time
 def timed(model, model_iter_fn, train_inputs, timings=1, return_result=False):
     synchronize()

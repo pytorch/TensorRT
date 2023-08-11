@@ -1,17 +1,19 @@
-import copy
-import sys
-import torch
-from contextlib import contextmanager
-from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Union
-from packaging import version
-from torch._functorch.aot_autograd import _aot_export_function
-from torch._guards import detect_fake_mode
-from torch._subclasses import FakeTensor, FakeTensorMode
+from __future__ import annotations
+
 import unittest.mock
+from typing import Any, Tuple
+
+import torch
+from torch._functorch.aot_autograd import _aot_export_function
+from torch._subclasses import FakeTensorMode
 from torch_tensorrt.dynamo.lowering import get_decompositions
 
 
-def trace(model, inputs, **kwargs):
+def trace(
+    model: torch.nn.Module | torch.fx.GraphModule,
+    inputs: Tuple[Any, ...],
+    **kwargs: Any,
+) -> torch.fx.GraphModule:
     fake_mode = FakeTensorMode(allow_non_fake_inputs=True)
     with unittest.mock.patch.object(
         fake_mode, "allow_non_fake_inputs", True

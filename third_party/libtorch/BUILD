@@ -21,14 +21,14 @@ cc_library(
     srcs = select({
         ":windows": [
             "lib/torch.lib",
-            "lib/torch_cuda.lib",
             "lib/torch_cpu.lib",
+            "lib/torch_cuda.lib",
             "lib/torch_global_deps.dll",
         ],
         "//conditions:default": [
             "lib/libtorch.so",
-            "lib/libtorch_cuda.so",
             "lib/libtorch_cpu.so",
+            "lib/libtorch_cuda.so",
             "lib/libtorch_global_deps.so",
         ],
     }),

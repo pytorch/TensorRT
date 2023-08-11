@@ -1,3 +1,11 @@
-pre-commit==2.20.0
-black==22.6.0
+pre-commit>=2.20.0
+black>=22.6.0
 clang-format==14.0.6
+mypy
+isort
+ruff
+pytest
+transformers
+timm
+parameterized
+expecttest

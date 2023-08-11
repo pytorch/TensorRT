@@ -20,16 +20,16 @@ cc_library(
         "conversion.h",
     ],
     deps = [
-        "@tensorrt//:nvinfer",
-        "//core/conversion/var",
         "//core/conversion/conversionctx",
         "//core/conversion/converters",
         "//core/conversion/evaluators",
+        "//core/conversion/var",
         "//core/ir",
         "//core/util:prelude",
+        "@tensorrt//:nvinfer",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
 )
 

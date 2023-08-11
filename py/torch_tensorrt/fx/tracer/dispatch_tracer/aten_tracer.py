@@ -3,7 +3,7 @@ import sys
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Union
 from packaging import version
-from torch_tensorrt._util import sanitized_torch_version
+from torch_tensorrt._utils import sanitized_torch_version
 
 import torch
 
@@ -47,7 +47,6 @@ class DynamoConfig:
         specialize_int: bool = True,
         verbose: bool = True,
     ) -> None:
-
         self.capture_scalar_outputs = capture_scalar_outputs
         self.guard_nn_modules = guard_nn_modules
         self.dynamic_shapes = dynamic_shapes

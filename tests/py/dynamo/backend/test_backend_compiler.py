@@ -74,7 +74,11 @@ class TestTRTModuleNextCompilation(TestCase):
             torch.randint(1, 40, (16, 7, 5), dtype=torch.int).cuda(),
         ]
 
-        (unexpected_ops_seen, _, partitioned_graphs,) = lower_graph_testing(
+        (
+            unexpected_ops_seen,
+            _,
+            partitioned_graphs,
+        ) = lower_graph_testing(
             fx_graph,
             inputs,
             unexpected_ops=unexpected_ops,
@@ -233,7 +237,11 @@ class Test64BitInput(TestCase):
             torch.randint(1, 40, (16, 7, 5), dtype=torch.long).cuda(),
         ]
 
-        (unexpected_ops_seen, _, partitioned_graphs,) = lower_graph_testing(
+        (
+            unexpected_ops_seen,
+            _,
+            partitioned_graphs,
+        ) = lower_graph_testing(
             fx_graph,
             inputs,
             unexpected_ops=unexpected_ops,

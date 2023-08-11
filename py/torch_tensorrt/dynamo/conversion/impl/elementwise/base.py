@@ -1,26 +1,21 @@
 import operator
 import warnings
-from typing import Union, Callable, Any, Optional
+from typing import Any, Callable, Optional, Union
 
-import tensorrt as trt
 import torch
 from torch.fx.node import Target
-
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor, TRTElementWiseOp
-from torch_tensorrt.fx.utils import (
-    unified_dtype_converter,
-    Frameworks,
-)
 from torch_tensorrt.dynamo._SourceIR import SourceIR
-from torch_tensorrt.dynamo.conversion.converter_utils import (
-    cast_trt_tensor,
-)
+from torch_tensorrt.dynamo.conversion.converter_utils import cast_trt_tensor
 from torch_tensorrt.fx.converters.converter_utils import (
-    set_layer_name,
     broadcast,
-    squeeze_left,
     get_trt_tensor,
+    set_layer_name,
+    squeeze_left,
 )
+from torch_tensorrt.fx.types import TRTElementWiseOp, TRTNetwork, TRTTensor
+from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
+
+import tensorrt as trt
 
 
 def get_python_op_from_trt_elementwise_op(
@@ -158,5 +153,6 @@ def convert_binary_elementwise(
     layer = network.add_elementwise(lhs_val, rhs_val, op_type)
     set_layer_name(layer, target, name, source_ir)
     output = layer.get_output(0)
-    output.name = output.name + "_" + target.__name__
+    kind: str = str(target.__name__) if callable(target) else target
+    output.name = output.name + "_" + kind
     return output

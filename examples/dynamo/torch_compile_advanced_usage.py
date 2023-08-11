@@ -15,6 +15,7 @@ import torch_tensorrt
 
 # %%
 
+
 # We begin by defining a model
 class Model(torch.nn.Module):
     def __init__(self) -> None:

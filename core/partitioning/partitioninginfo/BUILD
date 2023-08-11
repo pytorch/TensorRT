@@ -19,13 +19,13 @@ cc_library(
         "PartitioningInfo.h",
     ],
     deps = [
-        "//core/util:prelude",
-        "//core/ir",
         "//core/conversion",
+        "//core/ir",
         "//core/lowering",
+        "//core/util:prelude",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
     alwayslink = True,
 )
