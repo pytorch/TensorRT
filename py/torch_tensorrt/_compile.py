@@ -101,7 +101,9 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
                 )
                 return _IRType.ts
             elif module_is_exportable:
-                raise ValueError("Input graph is an ExportedProgram which is not currently supported. Please provide torch.nn.Module or torch.fx.GraphModule as input.")
+                raise ValueError(
+                    "Input graph is an ExportedProgram which is not currently supported. Please provide torch.nn.Module or torch.fx.GraphModule as input."
+                    )
             else:
                 raise ValueError("Module was provided in an unsupported format")
         else:
