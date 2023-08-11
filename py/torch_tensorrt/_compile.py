@@ -6,6 +6,7 @@ from typing import Any, Callable, List, Optional, Sequence, Set
 import torch
 import torch.fx
 import torch_tensorrt.ts
+from torch._export import ExportedProgram
 from torch_tensorrt import logging
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
@@ -15,7 +16,6 @@ from torch_tensorrt.fx.lower import compile as fx_compile
 from torch_tensorrt.fx.utils import LowerPrecision
 from torch_tensorrt.ts._compiler import compile as torchscript_compile
 from typing_extensions import TypeGuard
-from torch._export import ExportedProgram
 
 
 def _non_fx_input_interface(
@@ -74,15 +74,12 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
     ir_targets_fx = ir == "fx"
     ir_targets_dynamo = ir == "dynamo"
     ir_targets_torch_compile = ir == "torch_compile"
-    ir_targets_ep = ir == "exported_program"
 
     if module_is_tsable and ir_targets_torchscript:
         return _IRType.ts
     elif module_is_fxable and ir_targets_fx:
         return _IRType.fx
     elif module_is_fxable and ir_targets_dynamo:
-        return _IRType.dynamo
-    elif module_is_fxable and ir_targets_ep:
         return _IRType.dynamo
     elif module_is_fxable and ir_targets_torch_compile:
         return _IRType.torch_compile
@@ -103,9 +100,13 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
             elif module_is_exportable:
                 raise ValueError(
                     "Input graph is an ExportedProgram which is not currently supported. Please provide torch.nn.Module or torch.fx.GraphModule as input."
-                    )
+                )
             else:
                 raise ValueError("Module was provided in an unsupported format")
+        elif ir == "exported_program":
+            raise ValueError(
+                "ir=exported_program is not currently supported. Supported ir options : ts|fx|dynamo"
+            )
         else:
             raise ValueError("Unknown ir was requested")
 
