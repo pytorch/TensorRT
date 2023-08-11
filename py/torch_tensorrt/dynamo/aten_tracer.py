@@ -122,7 +122,7 @@ def dynamo_trace(
             ) from exc
 
 
-def trace_model(
+def trace(
     model: torch.nn.Module | torch.fx.GraphModule,
     inputs: Tuple[Any, ...],
     **kwargs: Any,

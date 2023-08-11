@@ -6,6 +6,7 @@ from typing import Any, List, Optional, Sequence, Set, Tuple
 
 import torch
 import torch_tensorrt
+from torch.fx.passes.splitter_base import SplitResult
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
     EngineCapability,
@@ -29,6 +30,7 @@ from torch_tensorrt.dynamo.conversion import (
 )
 from torch_tensorrt.dynamo.lowering._partition import get_submod_inputs, partition
 from torch_tensorrt.dynamo.utils import prepare_device, prepare_inputs
+from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +112,49 @@ def compile(
     settings = CompilationSettings(**compilation_options)
     logger.debug("Compilation Settings: %s\n", settings)
 
-    return compile_module(gm, torch_inputs, settings)
+    if kwargs.get("use_capability_partitioner", None):
+        return compile_module(gm, torch_inputs, settings)
+    else:
+        split_result = lower_model_using_trt_splitter(gm, torch_inputs)
+        trt_module = _compile_graph(split_result, torch_inputs, settings)
+
+        return trt_module
+
+
+def _compile_graph(
+    split_result: SplitResult,
+    inputs: Any,
+    settings: CompilationSettings = CompilationSettings(),
+    **kwargs: Any,
+) -> torch.fx.GraphModule:
+    for submod_name, submod_inputs in split_result.submodule_inputs.items():
+        submod = getattr(split_result.split_module, submod_name)
+        # Only acc submodules will be lowered.
+        if not submod_name.startswith(split_result.non_acc_submodule_prefix):
+            # Create TRT Module from submodule
+            trt_mod = convert_module(
+                submod,
+                submod_inputs,
+                settings=settings,
+                name=submod_name,
+            )
+            setattr(split_result.split_module, submod_name, trt_mod)
+
+    return split_result.split_module
+
+
+def lower_model_using_trt_splitter(
+    model: torch.nn.Module, inputs: Any, **kwargs: Any
+) -> SplitResult:
+    splitter_setting = TRTSplitterSetting()
+    splitter_setting.use_implicit_batch_dim = False
+    splitter_setting.min_acc_module_size = 1
+    splitter_setting.use_experimental_rt = False
+    splitter = TRTSplitter(model, inputs, settings=splitter_setting)
+    splitter.node_support_preview()
+    split_result = splitter.generate_split_results()
+
+    return split_result
 
 
 def compile_module(
