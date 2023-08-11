@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import logging
 from enum import Enum
 from typing import Any, Callable, List, Optional, Sequence, Set
 
 import torch
 import torch.fx
 import torch_tensorrt.ts
-from torch_tensorrt import logging
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo.compile import compile as dynamo_compile
@@ -15,6 +15,8 @@ from torch_tensorrt.fx.lower import compile as fx_compile
 from torch_tensorrt.fx.utils import LowerPrecision
 from torch_tensorrt.ts._compiler import compile as torchscript_compile
 from typing_extensions import TypeGuard
+
+logger = logging.getLogger(__name__)
 
 
 def _non_fx_input_interface(
@@ -30,7 +32,7 @@ def _fx_input_interface(
 
 
 class _IRType(Enum):
-    """Enum to set the minimum required logging level to print a message to stdout"""
+    """Enum to determine the type of IR selected for model compilation"""
 
     ts = 0
     fx = 1
@@ -39,7 +41,7 @@ class _IRType(Enum):
 
 
 class _ModuleType(Enum):
-    """Enum to set the minimum required logging level to print a message to stdout"""
+    """Enum to determine the type of model provided as input"""
 
     nn = 0
     ts = 1
@@ -81,14 +83,11 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
         if ir == "default":
             # Options are listed in order of preference
             if module_is_fxable:
-                logging.log(
-                    logging.Level.Info, "ir was set to default, using dynamo as ir"
-                )
+                logger.info("ir was set to default, using dynamo as ir")
                 return _IRType.dynamo
             elif module_is_tsable:
-                logging.log(
-                    logging.Level.Warning,
-                    "Input graph is a Torchscript module but the ir provided is default (dynamo). Please set ir=torchscript to suppress the warning. Compiling the module with ir=torchscript",
+                logger.warning(
+                    "Input graph is a Torchscript module but the ir provided is default (dynamo). Please set ir=torchscript to suppress the warning. Compiling the module with ir=torchscript"
                 )
                 return _IRType.ts
             else:
@@ -151,9 +150,8 @@ def compile(
     if target_ir == _IRType.ts:
         ts_mod = module
         if module_type == _ModuleType.nn:
-            logging.log(
-                logging.Level.Info,
-                "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript",
+            logger.info(
+                "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript"
             )
             ts_mod = torch.jit.script(module)
         assert _non_fx_input_interface(input_list)
@@ -274,9 +272,8 @@ def convert_method_to_trt_engine(
     if target_ir == _IRType.ts:
         ts_mod = module
         if module_type == _ModuleType.nn:
-            logging.log(
-                logging.Level.Info,
-                "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript",
+            logger.info(
+                "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript"
             )
             ts_mod = torch.jit.script(module)
         return torch_tensorrt.ts.convert_method_to_trt_engine(  # type: ignore[no-any-return]

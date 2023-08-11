@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import collections.abc
 import logging
-from typing import Any, List, Optional, Set, Tuple
+from typing import Any, List, Optional, Sequence, Set, Tuple
 
 import torch
 import torch_tensorrt
-from torch.fx.passes.pass_manager import PassManager
-from torch.fx.passes.splitter_base import SplitResult
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
     EngineCapability,
@@ -25,14 +23,12 @@ from torch_tensorrt.dynamo._defaults import (
     VERSION_COMPATIBLE,
     WORKSPACE_SIZE,
 )
-from torch_tensorrt.dynamo.backend.backends import _compile_module
-from torch_tensorrt.dynamo.conversion import convert_module
-from torch_tensorrt.dynamo.lowering._fusers import (
-    fuse_permute_linear,
-    fuse_permute_matmul,
+from torch_tensorrt.dynamo.conversion import (
+    convert_module,
+    repair_long_or_double_inputs,
 )
+from torch_tensorrt.dynamo.lowering._partition import get_submod_inputs, partition
 from torch_tensorrt.dynamo.utils import prepare_device, prepare_inputs
-from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 
 logger = logging.getLogger(__name__)
 
@@ -67,16 +63,10 @@ def compile(
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     if debug:
-        logger.setLevel(logging.DEBUG)
+        if logger.parent:
+            logger.parent.setLevel(logging.DEBUG)
 
     enabled_precisions = set(enabled_precisions)
-
-    logger.warning(
-        "The Dynamo backend is an experimental feature, for which only the "
-        + "following arguments are supported: "
-        + "{enabled_precisions, debug, workspace_size, min_block_size, "
-        + "torch_executed_ops, pass_through_build_failures}"
-    )
 
     if not isinstance(inputs, collections.abc.Sequence):
         inputs = [inputs]
@@ -118,62 +108,67 @@ def compile(
     }
 
     settings = CompilationSettings(**compilation_options)
-    if kwargs.get("use_capability_partitioner", None):
-        model = lower_model(gm, torch_inputs)
-        return _compile_module(model, torch_inputs, settings)
-    else:
-        split_result = lower_model_using_trt_splitter(gm, torch_inputs)
-        trt_module = _compile_graph(split_result, torch_inputs, settings)
+    logger.debug("Compilation Settings: %s\n", settings)
 
-        return trt_module
+    return compile_module(gm, torch_inputs, settings)
 
 
-def _compile_graph(
-    split_result: SplitResult,
-    inputs: Any,
+def compile_module(
+    gm: torch.fx.GraphModule,
+    sample_inputs: Sequence[torch.Tensor],
     settings: CompilationSettings = CompilationSettings(),
-    **kwargs: Any,
 ) -> torch.fx.GraphModule:
-    for submod_name, submod_inputs in split_result.submodule_inputs.items():
-        submod = getattr(split_result.split_module, submod_name)
-        # Only acc submodules will be lowered.
-        if not submod_name.startswith(split_result.non_acc_submodule_prefix):
-            # Create TRT Module from submodule
-            trt_mod = convert_module(
-                submod,
-                submod_inputs,
-                settings=settings,
-                name=submod_name,
-            )
-            setattr(split_result.split_module, submod_name, trt_mod)
+    """Compile a traced FX module
 
-    return split_result.split_module
+    Includes: Partitioning + Conversion Phases
 
-
-def lower_model_using_trt_splitter(
-    model: torch.nn.Module, inputs: Any, **kwargs: Any
-) -> SplitResult:
-    # Perform basic lowering
-    model = lower_model(model, inputs)
-    splitter_setting = TRTSplitterSetting()
-    splitter_setting.use_implicit_batch_dim = False
-    splitter_setting.min_acc_module_size = 1
-    splitter_setting.use_experimental_rt = False
-    splitter = TRTSplitter(model, inputs, settings=splitter_setting)
-    splitter.node_support_preview()
-    split_result = splitter.generate_split_results()
-
-    return split_result
-
-
-def lower_model(
-    model: torch.nn.Module, inputs: Any, **kwargs: Any
-) -> torch.fx.GraphModule:
-    graph_optimization_pm = PassManager.build_from_passlist(
-        [fuse_permute_matmul, fuse_permute_linear]
+    Args:
+        module: FX GraphModule to convert
+        inputs: Inputs to the module
+        settings: Compilation settings
+    Returns:
+        Compiled FX GraphModule
+    """
+    # Partition module into components that can be TRT-accelerated
+    partitioned_module = partition(
+        gm,
+        verbose=settings.debug,
+        min_block_size=settings.min_block_size,
+        torch_executed_ops=settings.torch_executed_ops,
     )
-    lowered_model: torch.fx.GraphModule = graph_optimization_pm(model)
-    # if isinstance(lowered_model, torch.fx.GraphModule):
-    #     ShapeProp(lowered_model).propagate(*inputs)
 
-    return lowered_model
+    # Store TRT replicas of Torch subgraphs
+    trt_modules = {}
+
+    # Iterate over all components that can be accelerated
+    # Generate the corresponding TRT Module for those
+    for name, _ in partitioned_module.named_children():
+        submodule = getattr(partitioned_module, name)
+
+        # Get submodule inputs
+        submodule_inputs = get_submod_inputs(
+            partitioned_module, submodule, sample_inputs
+        )
+
+        assert submodule_inputs is not None
+        # Handle long/double inputs if requested by the user
+        if settings.truncate_long_and_double:
+            submodule_inputs = repair_long_or_double_inputs(
+                partitioned_module, submodule, submodule_inputs, name
+            )
+
+        # Create TRT Module from submodule
+        trt_mod = convert_module(
+            submodule,
+            submodule_inputs,
+            settings=settings,
+            name=name,
+        )
+
+        trt_modules[name] = trt_mod
+
+    # Replace all FX Modules with TRT Modules
+    for name, trt_mod in trt_modules.items():
+        setattr(partitioned_module, name, trt_mod)
+
+    return partitioned_module

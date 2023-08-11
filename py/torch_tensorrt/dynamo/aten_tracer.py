@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 import sys
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
@@ -8,7 +9,6 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 import torch
 import torch._dynamo as torchdynamo
 from torch.fx.passes.infra.pass_base import PassResult
-from torch_tensorrt.dynamo.utils import req_torch_version
 from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
     compose_bmm,
     compose_chunk,
@@ -25,6 +25,8 @@ from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
 from typing_extensions import TypeAlias
 
 Value: TypeAlias = Union[Tuple["Value", ...], List["Value"], Dict[str, "Value"]]
+
+logger = logging.getLogger(__name__)
 
 
 class DynamoConfig:
@@ -85,7 +87,6 @@ def setting_python_recursive_limit(limit: int = 10000) -> Generator[None, None, 
         sys.setrecursionlimit(default)
 
 
-@req_torch_version("2.dev")
 def dynamo_trace(
     f: Callable[..., Value],
     # pyre-ignore
@@ -121,8 +122,7 @@ def dynamo_trace(
             ) from exc
 
 
-@req_torch_version("2.dev")
-def trace(
+def trace_model(
     model: torch.nn.Module | torch.fx.GraphModule,
     inputs: Tuple[Any, ...],
     **kwargs: Any,
@@ -145,7 +145,7 @@ def trace(
     ]
 
     fx_module, __package__ = dynamo_trace(model, inputs, True, "symbolic")
-    print(fx_module.graph)
+
     for passes in passes_list:
         pr: PassResult = passes(fx_module)
         fx_module = pr.graph_module
@@ -153,5 +153,5 @@ def trace(
     fx_module(*inputs)
 
     fx_module = run_const_fold(fx_module)
-    print(fx_module.graph)
+    logger.info("Post export graph : %s\n", fx_module.graph)
     return fx_module
