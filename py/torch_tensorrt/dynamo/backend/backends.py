@@ -8,6 +8,7 @@ import torch
 import torch._dynamo as td
 from torch._dynamo.utils import detect_fake_mode
 from torch._functorch.aot_autograd import aot_export_joint_simple
+from torch._inductor.freezing import ConstantFolder, replace_node_with_constant
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.compile import compile_module
 from torch_tensorrt.dynamo.lowering._decompositions import get_decompositions
@@ -62,6 +63,8 @@ def aot_torch_tensorrt_aten_backend(
             ),
         )
 
+        constant_fold(graph_module)
+
         return _pretraced_backend(graph_module, sample_inputs, settings)
 
 
@@ -105,3 +108,25 @@ def _pretraced_backend(
                 + "specify pass_through_build_failures=False."
             )
             raise
+
+
+@torch.utils._python_dispatch._disable_current_modes()  # type: ignore
+def constant_fold(gm: torch.fx.GraphModule) -> Any:
+    cf = ConstantFolder(gm, skip_constructors=False)
+    cf.run()
+
+    for node, constant in cf.node_replacements.items():
+        replace_node_with_constant(gm, node, constant)
+
+    erased_params = []
+    for node in gm.graph.nodes:
+        if node.op == "get_attr" and len(node.users) == 0:
+            delattr(gm, node.target)
+            erased_params.append(node)
+
+    for node in erased_params:
+        gm.graph.erase_node(node)
+
+    gm.graph.eliminate_dead_code()
+    gm.graph.lint()
+    gm.recompile()
