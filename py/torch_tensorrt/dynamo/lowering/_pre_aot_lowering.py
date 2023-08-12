@@ -81,10 +81,6 @@ def pre_aot_substitutions(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """
     logger.debug("Pre-module replacement graph:\n" + str(gm.graph))
 
-    # Ensure all parameters are in inference mode
-    for param in gm.parameters():
-        param.requires_grad = False
-
     # Iterate over graph nodes, extracting module calls, to check for interceptions
     for n in gm.graph.nodes:
         exists_in_registry = False
