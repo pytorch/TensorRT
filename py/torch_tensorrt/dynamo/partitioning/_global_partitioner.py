@@ -122,8 +122,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
 
         if (
-            node.target in CONVERTERS.keys()
-            or (node.op == "get_attr" and "constant" in node_name)
+            node in CONVERTERS or (node.op == "get_attr" and "constant" in node_name)
         ) and node_name not in self.torch_executed_ops:
             # If node is a proper, supported computational node, store the operator
             if not node.is_impure():
