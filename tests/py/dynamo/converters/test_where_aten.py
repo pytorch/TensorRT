@@ -12,6 +12,7 @@ class TestWhereConverter(DispatchTestCase):
             ("2d_broadcast_condition_xshape_yshape", (2, 2), (2, 1)),
             ("3d_condition_xshape_yshape", (2, 2, 1), (2, 2, 1)),
             ("2d_3d_condition_xshape_yshape", (2, 2), (1, 2, 2)),
+            ("3d_2d_condition_xshape_yshape", (1, 2, 2), (2, 2)),
         ]
     )
     def test_(self, _, x_size, y_size):
