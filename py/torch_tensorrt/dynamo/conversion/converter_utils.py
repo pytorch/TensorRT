@@ -137,25 +137,23 @@ def broadcastable(
     "Check if two tensors are broadcastable according to torch rules"
     a_shape = tuple(a.shape)
     b_shape = tuple(b.shape)
+
     # check from the trailing
     diff = len(a_shape) - len(b_shape)
-    if diff == 0:
+
+    # Validate tensors have same rank and shape
+    if diff == 0 and all(a_shape[i] == b_shape[i] for i in range(len(a_shape))):
         return True
+
+    # Left-pad the shorter dimension with ones
     if diff > 0:
-        max = len(a_shape)
-        min = len(b_shape)
-        greater_tensor = a_shape
-        lesser_tensor = b_shape
-    elif diff < 0:
-        max = len(b_shape)
-        min = len(a_shape)
-        greater_tensor = b_shape
-        lesser_tensor = a_shape
-    j = min - 1
-    for i in range(max - 1, diff - 1, -1):
-        if not (
-            greater_tensor[i] != lesser_tensor[j]
-            and (greater_tensor[i] == 1 or lesser_tensor[i] == 1)
-        ):
+        b_shape = (1,) * abs(diff) + b_shape
+    else:
+        a_shape = (1,) * abs(diff) + a_shape
+
+    # Validate one of the following conditions for broadcastability per-dimension
+    # 1. Equal number of dimensions or 2. Dimension has shape 1
+    for i in range(len(a_shape)):
+        if not (a_shape[i] == b_shape[i] or a_shape[i] == 1 or b_shape[i] == 1):
             return False
     return True
