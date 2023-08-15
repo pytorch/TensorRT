@@ -354,6 +354,22 @@ def aten_ops_softmax(
     )
 
 
+@dynamo_tensorrt_converter(
+    torch.ops.aten.split.default, capability_validator=dynamic_unsupported
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.split.sizes, capability_validator=dynamic_unsupported
+)
+def aten_ops_split(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.split(network, target, SourceIR.ATEN, name, args[0], args[1], args[2])
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.where.self)  # type: ignore[misc]
 def aten_ops_where(
     network: TRTNetwork,
