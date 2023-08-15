@@ -9,6 +9,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 import torch
 import torch._dynamo as torchdynamo
 from torch.fx.passes.infra.pass_base import PassResult
+from torch_tensorrt.dynamo.utils import req_torch_version
 from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
     compose_bmm,
     compose_chunk,
@@ -87,6 +88,7 @@ def setting_python_recursive_limit(limit: int = 10000) -> Generator[None, None, 
         sys.setrecursionlimit(default)
 
 
+@req_torch_version
 def dynamo_trace(
     f: Callable[..., Value],
     # pyre-ignore
@@ -122,6 +124,7 @@ def dynamo_trace(
             ) from exc
 
 
+@req_torch_version
 def trace(
     model: torch.nn.Module | torch.fx.GraphModule,
     inputs: Tuple[Any, ...],

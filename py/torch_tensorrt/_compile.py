@@ -18,6 +18,11 @@ from typing_extensions import TypeGuard
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "compile",
+    "convert_method_to_trt_engine",
+]
+
 
 def _non_fx_input_interface(
     inputs: Sequence[Input | torch.Tensor | InputTensorSpec],
