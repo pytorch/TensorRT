@@ -19,14 +19,14 @@ cc_library(
         "PartitioningCtx.h",
     ],
     deps = [
-        "//core/util:prelude",
-        "//core/ir",
         "//core/conversion",
-        "//core/partitioning/segmentedblock",
+        "//core/ir",
         "//core/partitioning/partitioninginfo",
+        "//core/partitioning/segmentedblock",
+        "//core/util:prelude",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
     alwayslink = True,
 )

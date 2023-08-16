@@ -22,8 +22,8 @@ from torch.fx.passes.infra.pass_base import PassResult
 from torch_tensorrt.fx.passes.pass_utils import chain_passes
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
-from torch_tensorrt.dynamo.conversion.trt_interpreter import TRTInterpreter
-from torch_tensorrt.dynamo.runtime._PythonTorchTRTModule import PythonTorchTRTModule
+from torch_tensorrt.dynamo.conversion import TRTInterpreter
+from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 from torch_tensorrt import Input
 
 
@@ -83,7 +83,7 @@ class TRTTestCase(TestCase):
             interpreter_result = interpreter.run(precision=precision)
             sec = time.perf_counter() - start
             _LOGGER.info(f"Interpreter run time(s): {sec}")
-            trt_mod = PythonTorchTRTModule(
+            trt_mod = PythonTorchTensorRTModule(
                 interpreter_result.engine,
                 interpreter_result.input_names,
                 interpreter_result.output_names,
@@ -159,7 +159,7 @@ class TRTTestCase(TestCase):
             interpreter_result = interpreter.run(
                 precision=torch.half if fp16_mode else torch.float
             )
-            trt_mod = PythonTorchTRTModule(
+            trt_mod = PythonTorchTensorRTModule(
                 interpreter_result.engine,
                 interpreter_result.input_names,
                 interpreter_result.output_names,

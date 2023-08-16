@@ -1,24 +1,19 @@
-import torch
-
-from torch_tensorrt.fx.types import (
-    TRTDataType,
-    TRTNetwork,
-    TRTTensor,
-)
-
-from torch_tensorrt.fx.converters.converter_utils import (
-    unified_dtype_converter,
-    Frameworks,
-)
 import logging
 import re
-import tensorrt as trt
 from typing import List
+
+import tensorrt as trt
+import torch
+from torch_tensorrt.fx.converters.converter_utils import (
+    Frameworks,
+    unified_dtype_converter,
+)
+from torch_tensorrt.fx.types import TRTDataType, TRTNetwork, TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-def get_node_name(node):
+def get_node_name(node: torch.fx.Node) -> str:
     # nn_module_stack preserves the call stack of pytorch nn.modules
     # The call stack contains a detailed name of the module
     # which shows exactly where the module is located in the
@@ -31,7 +26,7 @@ def get_node_name(node):
         mod_name = str(mod_stack[0]).replace("___", "/")
         # Clean up the module name
         mod_name = re.sub("^.*__self", "", mod_name)
-        mod_name = re.sub("_(\d+)$", "/\g<1>", mod_name)
+        mod_name = re.sub(r"_(\d+)$", r"/\g<1>", mod_name)
         node_name = mod_name + "/" + node_name
     else:
         # Try an alternative way to get the module info
@@ -120,7 +115,7 @@ def cast_int_int_div_trt_tensor(
     ):
         lhs_val = cast_trt_tensor(network, lhs_val, trt.float32, name)
         rhs_val = cast_trt_tensor(network, rhs_val, trt.float32, name)
-    return list((lhs_val, rhs_val))
+    return [lhs_val, rhs_val]
 
 
 def broadcastable(

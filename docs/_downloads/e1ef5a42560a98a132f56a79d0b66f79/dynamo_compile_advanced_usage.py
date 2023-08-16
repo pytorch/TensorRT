@@ -16,6 +16,7 @@ from torch_tensorrt.fx.lower_setting import LowerPrecision
 
 # %%
 
+
 # We begin by defining a model
 class Model(torch.nn.Module):
     def __init__(self) -> None:

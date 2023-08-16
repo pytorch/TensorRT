@@ -19,12 +19,12 @@ cc_library(
         "Weights.h",
     ],
     deps = [
-        "@tensorrt//:nvinfer",
-        "//core/util:prelude",
         "//core/conversion/conversionctx",
+        "//core/util:prelude",
+        "@tensorrt//:nvinfer",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
     alwayslink = True,
 )
@@ -39,12 +39,12 @@ cc_library(
     ],
     deps = [
         ":weights",
-        "@tensorrt//:nvinfer",
-        "//core/util:prelude",
         "//core/conversion/conversionctx",
+        "//core/util:prelude",
+        "@tensorrt//:nvinfer",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
     alwayslink = True,
 )
@@ -91,16 +91,16 @@ cc_library(
         "converters.h",
     ],
     deps = [
-        "@tensorrt//:nvinfer",
-        "//core/util:prelude",
-        "//core/conversion/var",
-        "//core/conversion/tensorcontainer",
-        "//core/conversion/conversionctx",
-        "//core/plugins:torch_tensorrt_plugins",
         ":converter_util",
+        "//core/conversion/conversionctx",
+        "//core/conversion/tensorcontainer",
+        "//core/conversion/var",
+        "//core/plugins:torch_tensorrt_plugins",
+        "//core/util:prelude",
+        "@tensorrt//:nvinfer",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
     alwayslink = True,
 )

@@ -96,7 +96,6 @@ class Fx2trtDiagnosticsTest(TestCase):
         assert not res  # root dir should be empty
 
     def test_conditions(self):
-
         _test_cond(
             diag.CollectionConditions.when_called_by_function(
                 self.test_conditions.__name__

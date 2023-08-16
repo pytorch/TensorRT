@@ -23,7 +23,6 @@ MODULE_DIR = find_repo_root() + "/tests/modules"
 
 class TestStandardTensorInput(unittest.TestCase):
     def test_compile(self):
-
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
             torch.jit.load(MODULE_DIR + "/standard_tensor_input_scripted.jit.pt")
@@ -52,7 +51,6 @@ class TestStandardTensorInput(unittest.TestCase):
 
 class TestStandardTensorInputLong(unittest.TestCase):
     def test_compile(self):
-
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
             torch.jit.load(MODULE_DIR + "/standard_tensor_input_scripted.jit.pt")
@@ -82,7 +80,6 @@ class TestStandardTensorInputLong(unittest.TestCase):
 
 class TestStandardTensorInputDomain(unittest.TestCase):
     def test_compile(self):
-
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
             torch.jit.load(MODULE_DIR + "/standard_tensor_input_scripted.jit.pt")
@@ -111,7 +108,6 @@ class TestStandardTensorInputDomain(unittest.TestCase):
 
 class TestTupleInput(unittest.TestCase):
     def test_compile(self):
-
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
             torch.jit.load(MODULE_DIR + "/tuple_input_scripted.jit.pt")
@@ -140,7 +136,6 @@ class TestTupleInput(unittest.TestCase):
 
 class TestListInput(unittest.TestCase):
     def test_compile(self):
-
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
             torch.jit.load(MODULE_DIR + "/list_input_scripted.jit.pt").eval().to("cuda")
@@ -167,7 +162,6 @@ class TestListInput(unittest.TestCase):
 
 class TestTupleInputOutput(unittest.TestCase):
     def test_compile(self):
-
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
             torch.jit.load(MODULE_DIR + "/tuple_input_output_scripted.jit.pt")
@@ -187,7 +181,7 @@ class TestTupleInputOutput(unittest.TestCase):
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
         trt_out = trt_mod((self.input, self.input))
         pyt_out = self.model((self.input, self.input))
-        for (t, p) in zip(trt_out, pyt_out):
+        for t, p in zip(trt_out, pyt_out):
             cos_sim = cosine_similarity(t, p)
             self.assertTrue(
                 cos_sim > COSINE_THRESHOLD,
@@ -215,7 +209,7 @@ class TestTupleInputOutput(unittest.TestCase):
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
         trt_out = trt_mod((self.input, self.input))
         pyt_out = self.model((self.input, self.input))
-        for (t, p) in zip(trt_out, pyt_out):
+        for t, p in zip(trt_out, pyt_out):
             cos_sim = cosine_similarity(t, p)
             self.assertTrue(
                 cos_sim > COSINE_THRESHOLD,
@@ -225,7 +219,6 @@ class TestTupleInputOutput(unittest.TestCase):
 
 class TestListInputOutput(unittest.TestCase):
     def test_compile(self):
-
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
             torch.jit.load(MODULE_DIR + "/list_input_output_scripted.jit.pt")
@@ -246,7 +239,7 @@ class TestListInputOutput(unittest.TestCase):
         trt_out = trt_mod((self.input, self.input))
         pyt_out = self.model((self.input, self.input))
 
-        for (t, p) in zip(trt_out, pyt_out):
+        for t, p in zip(trt_out, pyt_out):
             cos_sim = cosine_similarity(t, p)
             self.assertTrue(
                 cos_sim > COSINE_THRESHOLD,
@@ -254,7 +247,6 @@ class TestListInputOutput(unittest.TestCase):
             )
 
     def test_compile_full_compilation(self):
-
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
             torch.jit.load(MODULE_DIR + "/list_input_output_scripted.jit.pt")
@@ -276,7 +268,7 @@ class TestListInputOutput(unittest.TestCase):
         trt_out = trt_mod((self.input, self.input))
         pyt_out = self.model((self.input, self.input))
 
-        for (t, p) in zip(trt_out, pyt_out):
+        for t, p in zip(trt_out, pyt_out):
             cos_sim = cosine_similarity(t, p)
             self.assertTrue(
                 cos_sim > COSINE_THRESHOLD,
@@ -286,7 +278,6 @@ class TestListInputOutput(unittest.TestCase):
 
 class TestListInputTupleOutput(unittest.TestCase):
     def test_compile(self):
-
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
             torch.jit.load(MODULE_DIR + "/list_input_tuple_output_scripted.jit.pt")
@@ -306,7 +297,7 @@ class TestListInputTupleOutput(unittest.TestCase):
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
         trt_out = trt_mod((self.input, self.input))
         pyt_out = self.model((self.input, self.input))
-        for (t, p) in zip(trt_out, pyt_out):
+        for t, p in zip(trt_out, pyt_out):
             cos_sim = cosine_similarity(t, p)
             self.assertTrue(
                 cos_sim > COSINE_THRESHOLD,
@@ -314,7 +305,6 @@ class TestListInputTupleOutput(unittest.TestCase):
             )
 
     def test_compile_full_compilation(self):
-
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
             torch.jit.load(MODULE_DIR + "/list_input_tuple_output_scripted.jit.pt")
@@ -335,7 +325,7 @@ class TestListInputTupleOutput(unittest.TestCase):
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
         trt_out = trt_mod((self.input, self.input))
         pyt_out = self.model((self.input, self.input))
-        for (t, p) in zip(trt_out, pyt_out):
+        for t, p in zip(trt_out, pyt_out):
             cos_sim = cosine_similarity(t, p)
             self.assertTrue(
                 cos_sim > COSINE_THRESHOLD,

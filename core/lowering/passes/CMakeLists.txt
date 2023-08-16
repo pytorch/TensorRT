@@ -6,6 +6,7 @@ target_sources(${lib_name}
             "${CMAKE_CURRENT_SOURCE_DIR}/linear_to_addmm.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/module_fallback.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/op_aliasing.cpp"
+	    "${CMAKE_CURRENT_SOURCE_DIR}/tile_to_repeat.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/reduce_gelu.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/reduce_remainder.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/reduce_to.cpp"

@@ -1,14 +1,22 @@
+from __future__ import annotations
+
 import logging
-from typing import Any, List, Tuple
+from typing import Any, List, Optional, Tuple
 
 import torch
-from torch_tensorrt import _C
 from torch_tensorrt._Device import Device
 
 logger = logging.getLogger(__name__)
 
+SerializedTensorRTEngineFmt = Tuple[
+    str, str, bytes, str, str
+]  # Defined in //core/runtime/register_jit_hooks.cpp
+SerializedTorchTensorRTModuleFmt = Tuple[
+    str, SerializedTensorRTEngineFmt, List[str], List[str]
+]
 
-class TorchTensorRTModule(torch.nn.Module):
+
+class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     """TorchTensorRTModule is a PyTorch module which encompasses an arbitrary TensorRT Engine.
 
     This module is backed by the Torch-TensorRT runtime and is fully compatibile with both
@@ -30,10 +38,10 @@ class TorchTensorRTModule(torch.nn.Module):
 
     def __init__(
         self,
-        serialized_engine: bytearray = bytearray(),
+        serialized_engine: Optional[bytes] = None,
         name: str = "",
-        input_binding_names: List[str] = [],
-        output_binding_names: List[str] = [],
+        input_binding_names: Optional[List[str]] = None,
+        output_binding_names: Optional[List[str]] = None,
         target_device: Device = Device._current_device(),
     ):
         """__init__ method for torch_tensorrt.dynamo.runtime._TorchTensorRTModule.TorchTensorRTModule
@@ -74,11 +82,15 @@ class TorchTensorRTModule(torch.nn.Module):
         if not isinstance(serialized_engine, bytearray):
             ValueError("Expected serialized engine as bytearray")
 
-        self.input_binding_names = input_binding_names
-        self.output_binding_names = output_binding_names
+        self.input_binding_names = (
+            input_binding_names if input_binding_names is not None else []
+        )
+        self.output_binding_names = (
+            output_binding_names if output_binding_names is not None else []
+        )
         self.name = name
 
-        if serialized_engine != bytearray():
+        if serialized_engine is not None:
             self.engine = torch.classes.tensorrt.Engine(
                 [
                     torch.ops.tensorrt.ABI_VERSION(),
@@ -92,7 +104,7 @@ class TorchTensorRTModule(torch.nn.Module):
         else:
             self.engine = None
 
-    def get_extra_state(self):
+    def get_extra_state(self) -> SerializedTorchTensorRTModuleFmt:
         return (
             self.name,
             self.engine.__getstate__() if self.engine is not None else None,
@@ -100,7 +112,7 @@ class TorchTensorRTModule(torch.nn.Module):
             self.output_binding_names,
         )
 
-    def set_extra_state(self, state):
+    def set_extra_state(self, state: SerializedTorchTensorRTModuleFmt) -> None:
         self.name = state[0]
         if state[1] is not None:
             serialized_engine_info = state[1][0]
@@ -123,7 +135,7 @@ class TorchTensorRTModule(torch.nn.Module):
         self.input_binding_names = state[2]
         self.output_binding_names = state[3]
 
-    def forward(self, *inputs):
+    def forward(self, *inputs: Any) -> torch.Tensor | Tuple[torch.Tensor, ...]:
         """Implementation of the forward pass for a TensorRT engine
 
         Args:
@@ -139,28 +151,30 @@ class TorchTensorRTModule(torch.nn.Module):
             self.input_binding_names
         ), f"Wrong number of inputs, expected {len(self.input_binding_names)} got {len(inputs)}."
 
-        types = [issubclass(type(i), torch.Tensor) for i in inputs]
+        types: List[bool] = [issubclass(type(i), torch.Tensor) for i in inputs]
 
         try:
             assert all(types)
-        except:
+        except AssertionError:
 
             def is_non_tensor(i: Tuple[Any, bool]) -> bool:
                 return not i[1]
 
-            non_tensors = [i[0] for i in filter(zip(inputs, types), is_non_tensor)]
+            non_tensors = [i[0] for i in filter(is_non_tensor, zip(inputs, types))]
             raise RuntimeError(
                 f"TorchTensorRTModule expects a flattened list of tensors as input, found non tensors: {non_tensors}"
             )
 
-        outputs = torch.ops.tensorrt.execute_engine(list(inputs), self.engine)
+        outputs: List[torch.Tensor] = torch.ops.tensorrt.execute_engine(
+            list(inputs), self.engine
+        )
 
         if len(outputs) == 1:
             return outputs[0]
 
         return tuple(outputs)
 
-    def enable_profiling(self, profiling_results_dir: str = None):
+    def enable_profiling(self, profiling_results_dir: Optional[str] = None) -> None:
         """Enable the profiler to collect latency information about the execution of the engine
 
         Traces can be visualized using https://ui.perfetto.dev/ or compatible alternatives
@@ -175,7 +189,7 @@ class TorchTensorRTModule(torch.nn.Module):
             self.engine.profile_path_prefix = profiling_results_dir
         self.engine.enable_profiling()
 
-    def disable_profiling(self):
+    def disable_profiling(self) -> None:
         """Disable the profiler"""
         if self.engine is None:
             raise RuntimeError("Engine has not been initalized yet.")
@@ -192,16 +206,18 @@ class TorchTensorRTModule(torch.nn.Module):
         if self.engine is None:
             raise RuntimeError("Engine has not been initalized yet.")
 
-        return self.engine.get_engine_layer_info()
+        layer_info: str = self.engine.get_engine_layer_info()
+        return layer_info
 
-    def dump_layer_info(self):
+    def dump_layer_info(self) -> None:
         """Dump layer information encoded by the TensorRT engine in this module to STDOUT"""
         if self.engine is None:
             raise RuntimeError("Engine has not been initalized yet.")
 
-        return self.engine.dump_engine_layer_info()
+        self.engine.dump_engine_layer_info()
 
     @staticmethod
     def _pack_binding_names(binding_names: List[str]) -> str:
         delim = torch.ops.tensorrt.SERIALIZED_ENGINE_BINDING_DELIM()[0]
-        return delim.join(binding_names)
+        packed_bindings: str = delim.join(binding_names)
+        return packed_bindings

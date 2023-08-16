@@ -1,16 +1,17 @@
 import ctypes
-import glob
 import os
-import sys
 import platform
-import warnings
-from packaging import version
-from torch_tensorrt._version import (
-    __version__,
+import sys
+from typing import Dict, List
+
+from torch_tensorrt._version import (  # noqa: F401
     __cuda_version__,
     __cudnn_version__,
     __tensorrt_version__,
+    __version__,
 )
+
+from packaging import version
 
 if sys.version_info < (3,):
     raise Exception(
@@ -18,7 +19,7 @@ if sys.version_info < (3,):
     )
 
 
-def _parse_semver(version):
+def _parse_semver(version: str) -> Dict[str, str]:
     split = version.split(".")
     if len(split) < 3:
         split.append("")
@@ -26,7 +27,7 @@ def _parse_semver(version):
     return {"major": split[0], "minor": split[1], "patch": split[2]}
 
 
-def _find_lib(name, paths):
+def _find_lib(name: str, paths: List[str]) -> str:
     for path in paths:
         libpath = os.path.join(path, name)
         if os.path.isfile(libpath):
@@ -36,8 +37,8 @@ def _find_lib(name, paths):
 
 
 try:
-    import tensorrt
-except:
+    import tensorrt  # noqa: F401
+except ImportError:
     cuda_version = _parse_semver(__cuda_version__)
     cudnn_version = _parse_semver(__cudnn_version__)
     tensorrt_version = _parse_semver(__tensorrt_version__)
@@ -82,24 +83,19 @@ except:
             ctypes.CDLL(_find_lib(lib, LINUX_PATHS))
 
 import torch
-
-from torch_tensorrt._compile import *
-from torch_tensorrt._util import *
-from torch_tensorrt import ts
-from torch_tensorrt import ptq
-from torch_tensorrt._enums import *
-from torch_tensorrt import logging
-from torch_tensorrt._Input import Input
-from torch_tensorrt._Device import Device
-
-from torch_tensorrt import fx
+from torch_tensorrt._compile import *  # noqa: F403
+from torch_tensorrt._Device import Device  # noqa: F401
+from torch_tensorrt._enums import *  # noqa: F403
+from torch_tensorrt._Input import Input  # noqa: F401
+from torch_tensorrt._utils import *  # noqa: F403
+from torch_tensorrt._utils import sanitized_torch_version
 
 if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
-    from torch_tensorrt import dynamo
-    from torch_tensorrt.dynamo import backend
+    from torch_tensorrt import dynamo  # noqa: F401
+    from torch_tensorrt.dynamo import backend  # noqa: F401
 
 
-def _register_with_torch():
+def _register_with_torch() -> None:
     trtorch_dir = os.path.dirname(__file__)
     torch.ops.load_library(trtorch_dir + "/lib/libtorchtrt.so")
 

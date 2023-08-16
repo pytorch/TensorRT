@@ -1,15 +1,10 @@
-from enum import Enum
-from typing import List, Dict, Any, Tuple, Optional
+from typing import Any
 
-import torch
-
-from torch_tensorrt import _C
-from torch_tensorrt import _enums
-from torch_tensorrt import _Input
+from torch_tensorrt import _C, _enums
 from torch_tensorrt._Input import Input
 
 
-class TSInput(Input):
+class TorchScriptInput(Input):
     """
     Defines an input to a module in terms of expected shape, data type and tensor format.
 
@@ -26,7 +21,7 @@ class TSInput(Input):
         format (torch_tensorrt.TensorFormat): The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """__init__ Method for torch_tensorrt.Input
 
         Input accepts one of a few construction patterns
@@ -52,38 +47,39 @@ class TSInput(Input):
             - Input(shape=(1,3,32,32), dtype=torch_tensorrt.dtype.int32, format=torch_tensorrt.TensorFormat.NCHW)
             - Input(min_shape=(1,3,32,32), opt_shape=[2,3,32,32], max_shape=(3,3,32,32)) #Implicitly dtype=torch_tensorrt.dtype.float32, format=torch_tensorrt.TensorFormat.NCHW
         """
-        super(TSInput, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def _to_internal(self) -> _C.Input:
         internal_in = _C.Input()
         if self.shape_mode == Input._ShapeMode.DYNAMIC:
-            if not Input._supported_input_size_type(self.shape["min_shape"]):
-                raise TypeError(
-                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
-                    + str(type(self.shape["min_shape"]))
-                    + " for min_shape"
-                )
-            else:
-                internal_in.min = self.shape["min_shape"]
+            if isinstance(self.shape, dict):
+                if not Input._supported_input_size_type(self.shape["min_shape"]):
+                    raise TypeError(
+                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                        + str(type(self.shape["min_shape"]))
+                        + " for min_shape"
+                    )
+                else:
+                    internal_in.min = self.shape["min_shape"]
 
-            if not Input._supported_input_size_type(self.shape["opt_shape"]):
-                raise TypeError(
-                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
-                    + str(type(self.shape["opt_shape"]))
-                    + " for opt_shape"
-                )
-            else:
-                internal_in.opt = self.shape["opt_shape"]
+                if not Input._supported_input_size_type(self.shape["opt_shape"]):
+                    raise TypeError(
+                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                        + str(type(self.shape["opt_shape"]))
+                        + " for opt_shape"
+                    )
+                else:
+                    internal_in.opt = self.shape["opt_shape"]
 
-            if not Input._supported_input_size_type(self.shape["max_shape"]):
-                raise TypeError(
-                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
-                    + str(type(self.shape["max_shape"]))
-                    + " for max_shape"
-                )
-            else:
-                internal_in.max = self.shape["max_shape"]
-            internal_in.input_is_dynamic = True
+                if not Input._supported_input_size_type(self.shape["max_shape"]):
+                    raise TypeError(
+                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                        + str(type(self.shape["max_shape"]))
+                        + " for max_shape"
+                    )
+                else:
+                    internal_in.max = self.shape["max_shape"]
+                internal_in.input_is_dynamic = True
         else:
             if not Input._supported_input_size_type(self.shape):
                 raise TypeError(

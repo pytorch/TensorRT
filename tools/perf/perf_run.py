@@ -33,6 +33,7 @@ from utils import (
 WARMUP_ITER = 10
 results = []
 
+
 # YAML Parser class for parsing the run configurations
 class ConfigParser:
     def __init__(self, config_file):

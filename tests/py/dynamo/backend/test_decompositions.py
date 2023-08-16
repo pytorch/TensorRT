@@ -45,7 +45,7 @@ class TestLowering(TestCase):
                 super().__init__(*args, **kwargs)
 
             def forward(self, x):
-                y = torch.ops.aten.alias.default(x)
+                y = torch.ops.aten.alias.default(x) + 1
                 return y
 
         # Operations expected to be removed in the traced graph after decompositions

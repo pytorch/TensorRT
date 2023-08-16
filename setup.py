@@ -1,23 +1,22 @@
-import os
-import sys
 import glob
-import yaml
+import os
+import platform
+import subprocess
+import sys
+import warnings
 from dataclasses import dataclass
-import setuptools
-from setuptools import setup, Extension, find_namespace_packages
-from setuptools.command.build_ext import build_ext
-from setuptools.command.develop import develop
-from setuptools.command.install import install
-from setuptools.command.editable_wheel import editable_wheel
 from distutils.cmd import Command
-from wheel.bdist_wheel import bdist_wheel
-
-from torch.utils import cpp_extension
 from shutil import copyfile, rmtree
 
-import subprocess
-import platform
-import warnings
+import setuptools
+import yaml
+from setuptools import Extension, find_namespace_packages, setup
+from setuptools.command.build_ext import build_ext
+from setuptools.command.develop import develop
+from setuptools.command.editable_wheel import editable_wheel
+from setuptools.command.install import install
+from torch.utils import cpp_extension
+from wheel.bdist_wheel import bdist_wheel
 
 dir_path = os.path.dirname(os.path.realpath(__file__)) + "/py"
 
@@ -349,7 +348,9 @@ packages = [
     "torch_tensorrt.dynamo.conversion.impl.unary",
     "torch_tensorrt.dynamo.lowering",
     "torch_tensorrt.dynamo.lowering.substitutions",
+    "torch_tensorrt.dynamo.partitioning",
     "torch_tensorrt.dynamo.runtime",
+    "torch_tensorrt.dynamo.tools",
     "torch_tensorrt.fx",
     "torch_tensorrt.fx.converters",
     "torch_tensorrt.fx.converters.impl",
@@ -373,7 +374,9 @@ package_dir = {
     "torch_tensorrt.dynamo.conversion.impl.unary": "py/torch_tensorrt/dynamo/conversion/impl/unary",
     "torch_tensorrt.dynamo.lowering": "py/torch_tensorrt/dynamo/lowering",
     "torch_tensorrt.dynamo.lowering.substitutions": "py/torch_tensorrt/dynamo/lowering/substitutions",
+    "torch_tensorrt.dynamo.partitioning": "py/torch_tensorrt/dynamo/partitioning",
     "torch_tensorrt.dynamo.runtime": "py/torch_tensorrt/dynamo/runtime",
+    "torch_tensorrt.dynamo.tools": "py/torch_tensorrt/dynamo/tools",
     "torch_tensorrt.fx": "py/torch_tensorrt/fx",
     "torch_tensorrt.fx.converters": "py/torch_tensorrt/fx/converters",
     "torch_tensorrt.fx.converters.impl": "py/torch_tensorrt/fx/converters/impl",

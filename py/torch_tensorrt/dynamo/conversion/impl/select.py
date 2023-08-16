@@ -2,15 +2,14 @@ from typing import Optional, cast
 
 import numpy as np
 from torch.fx.node import Target
-
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor, Shape
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
 from torch_tensorrt.fx.converters.converter_utils import (
     get_positive_dim,
     has_dynamic_shape,
     to_numpy,
 )
-from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
+from torch_tensorrt.fx.types import Shape, TRTNetwork, TRTTensor
 
 
 def select(

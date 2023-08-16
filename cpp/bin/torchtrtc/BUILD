@@ -25,15 +25,15 @@ cc_binary(
         "-ldl",
     ],
     deps = [
-        "//third_party/args",
         "//cpp:torch_tensorrt",
+        "//third_party/args",
     ] + select({
         ":use_pre_cxx11_abi": [
-            "@libtorch_pre_cxx11_abi//:libtorch",
             "@libtorch_pre_cxx11_abi//:caffe2",
+            "@libtorch_pre_cxx11_abi//:libtorch",
         ],
         "//conditions:default": [
-            "@libtorch//:libtorch",
+            "@libtorch",
             "@libtorch//:caffe2",
         ],
     }),
