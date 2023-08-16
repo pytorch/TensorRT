@@ -10,7 +10,7 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
     EngineCapability,
 )
-from torch_tensorrt.dynamo import CompilationSettings
+from torch_tensorrt.dynamo import CompilationSettings, partitioning
 from torch_tensorrt.dynamo._defaults import (
     DEBUG,
     MAX_AUX_STREAMS,
@@ -28,7 +28,6 @@ from torch_tensorrt.dynamo.conversion import (
     convert_module,
     repair_long_or_double_inputs,
 )
-from torch_tensorrt.dynamo.lowering._partition import get_submod_inputs, partition
 from torch_tensorrt.dynamo.utils import prepare_device, prepare_inputs
 
 logger = logging.getLogger(__name__)
@@ -138,13 +137,53 @@ def compile_module(
     Returns:
         Compiled FX GraphModule
     """
-    # Partition module into components that can be TRT-accelerated
-    partitioned_module = partition(
-        gm,
-        verbose=settings.debug,
-        min_block_size=settings.min_block_size,
-        torch_executed_ops=settings.torch_executed_ops,
+    # Check the number of supported operations in the graph
+    num_supported_ops, total_ops = partitioning.get_graph_converter_support(
+        gm, settings.debug, settings.torch_executed_ops
     )
+
+    # If the number of supported operations is 0 or less than the block size, skip the subgraph
+    # TODO: Add condition to second expression below when require_full_compilation is added
+    if num_supported_ops == 0 or (num_supported_ops < settings.min_block_size):
+        logger.warning(
+            f"{num_supported_ops} supported operations detected in subgraph containing {total_ops} computational nodes. "
+            f"Skipping this subgraph, since min_block_size was detected to be {settings.min_block_size}"
+        )
+        return gm
+    else:
+        logger.debug(
+            f"Detected support for {num_supported_ops} operators out of {total_ops} in subgraph."
+        )
+
+    # Partition module into components that can be TRT-accelerated
+    fast_partitioner_failed = False
+
+    # If specified, try using the fast partitioner and fall back to the global one on failure
+    if settings.use_fast_partitioner:
+        try:
+            partitioned_module = partitioning.fast_partition(
+                gm,
+                verbose=settings.debug,
+                min_block_size=settings.min_block_size,
+                torch_executed_ops=settings.torch_executed_ops,
+            )
+        except torch.fx.passes.splitter_base.FxNetSplitterInternalError:
+            logger.error(
+                "Partitioning failed on the subgraph with fast partition. See trace above. "
+                + "Retrying with global partition.",
+                exc_info=True,
+            )
+
+            fast_partitioner_failed = True
+            settings.use_fast_partitioner = False
+
+    if not settings.use_fast_partitioner:
+        partitioned_module = partitioning.global_partition(
+            gm,
+            verbose=settings.debug,
+            min_block_size=settings.min_block_size,
+            torch_executed_ops=settings.torch_executed_ops,
+        )
 
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
@@ -152,10 +191,14 @@ def compile_module(
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
     for name, _ in partitioned_module.named_children():
+        # Criteria for a module to be convertible to TRT
+        if settings.use_fast_partitioner and "_run_on_acc" not in name:
+            continue
+
         submodule = getattr(partitioned_module, name)
 
         # Get submodule inputs
-        submodule_inputs = get_submod_inputs(
+        submodule_inputs = partitioning.get_submod_inputs(
             partitioned_module, submodule, sample_inputs
         )
 
@@ -179,5 +222,9 @@ def compile_module(
     # Replace all FX Modules with TRT Modules
     for name, trt_mod in trt_modules.items():
         setattr(partitioned_module, name, trt_mod)
+
+    # Reset settings object to user specification after fallback to global partitioning mode
+    if fast_partitioner_failed:
+        settings.use_fast_partitioner = True
 
     return partitioned_module
