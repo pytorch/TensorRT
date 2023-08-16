@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 import sys
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
@@ -25,6 +26,8 @@ from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
 from typing_extensions import TypeAlias
 
 Value: TypeAlias = Union[Tuple["Value", ...], List["Value"], Dict[str, "Value"]]
+
+logger = logging.getLogger(__name__)
 
 
 class DynamoConfig:
@@ -145,7 +148,7 @@ def trace(
     ]
 
     fx_module, __package__ = dynamo_trace(model, inputs, True, "symbolic")
-    print(fx_module.graph)
+
     for passes in passes_list:
         pr: PassResult = passes(fx_module)
         fx_module = pr.graph_module
@@ -153,5 +156,5 @@ def trace(
     fx_module(*inputs)
 
     fx_module = run_const_fold(fx_module)
-    print(fx_module.graph)
+    logger.info("Post export graph : %s\n", fx_module.graph)
     return fx_module
