@@ -1,23 +1,19 @@
 import logging
-from typing import Dict, List, Mapping, Optional, Sequence, Set
+from typing import Collection, Dict, List, Mapping, Optional, Sequence, Set
 
 import torch
 from torch.fx.graph_module import GraphModule
-from torch.fx.node import _get_qualified_name
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
 from torch.fx.passes.operator_support import OperatorSupport, SupportDict
-from torch_tensorrt.dynamo._defaults import MIN_BLOCK_SIZE
+from torch_tensorrt.dynamo._defaults import DEBUG, MIN_BLOCK_SIZE
 from torch_tensorrt.dynamo.conversion.converter_registry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
-from torch_tensorrt.dynamo.lowering._pre_aot_lowering import SUBSTITUTION_REGISTRY
+from torch_tensorrt.dynamo.conversion.converter_registry import ConverterRegistry
+
+from .common import DEFAULT_SINGLE_NODE_PARTITIONS
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_SINGLE_NODE_PARTITIONS: List[str] = [
-    _get_qualified_name(to_replace.new_operator)
-    for to_replace in SUBSTITUTION_REGISTRY.values()
-]
 
 
 class TRTPartitioner(CapabilityBasedPartitioner):  # type: ignore[misc]
@@ -41,7 +37,7 @@ class TRTPartitioner(CapabilityBasedPartitioner):  # type: ignore[misc]
         *,
         non_compute_ops: Optional[Sequence[str]] = None,
         allowed_single_node_partition_ops: Optional[
-            Sequence[str]
+            Collection[str]
         ] = DEFAULT_SINGLE_NODE_PARTITIONS,
         min_block_size: int = MIN_BLOCK_SIZE,
     ) -> None:
@@ -73,14 +69,15 @@ class TRTPartitioner(CapabilityBasedPartitioner):  # type: ignore[misc]
                 # Partitions are exempted from min_block_size if they contain an allowed single-node op
                 if (
                     node.op == "call_function"
-                    and _get_qualified_name(node.target)
+                    and ConverterRegistry.qualified_name_or_str(node.target)
                     in self.allowed_single_node_partition_ops
                 ):
                     exempted_partition = True
                     break
                 elif (
                     node.op == "call_function"
-                    and _get_qualified_name(node.target) not in non_compute_ops
+                    and ConverterRegistry.qualified_name_or_str(node.target)
+                    not in non_compute_ops
                 ):
                     compute_node_count += 1
 
@@ -122,11 +119,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
     def is_node_supported(
         self, submodules: Mapping[str, torch.nn.Module], node: torch.fx.Node
     ) -> bool:
-        node_name = (
-            _get_qualified_name(node.target)
-            if not isinstance(node.target, str)
-            else node.target
-        )
+        node_name = ConverterRegistry.qualified_name_or_str(node.target)
 
         if node in CONVERTERS and node_name not in self.torch_executed_ops:
             # If node is a proper, supported computational node, store the operator
@@ -146,32 +139,37 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
 
             return False
 
-    def print_support_overview(self, num_trt_blocks: Optional[int] = None) -> None:
+    def print_support_overview(
+        self, num_trt_blocks: Optional[int] = None, print_node_support: bool = False
+    ) -> None:
         if num_trt_blocks is not None:
             logger.debug(
                 f"\nNumber of TensorRT-Accelerated Engines Generated: {num_trt_blocks}"
             )
 
-        # Reformat support messages for debugger to print node overview as a single string
-        supported_nodes_str = "\nSupported Nodes:\n"
-        for node_name, count in self.supported_operators.items():
-            supported_nodes_str += f"- {node_name} + Operator Count: {count}\n"
+        if print_node_support:
+            # Reformat support messages for debugger to print node overview as a single string
+            supported_nodes_str = "\nSupported Nodes:\n"
+            for node_name, count in self.supported_operators.items():
+                supported_nodes_str += f"- {node_name} + Operator Count: {count}\n"
 
-        logger.debug(supported_nodes_str)
+            logger.debug(supported_nodes_str)
 
-        if self.unsupported_operators:
-            unsupported_nodes_str = "\nUnsupported or Excluded Nodes:\n"
-            for node_name, count in self.unsupported_operators.items():
-                unsupported_nodes_str += f"- {node_name} + Operator Count: {count}\n"
+            if self.unsupported_operators:
+                unsupported_nodes_str = "\nUnsupported or Excluded Nodes:\n"
+                for node_name, count in self.unsupported_operators.items():
+                    unsupported_nodes_str += (
+                        f"- {node_name} + Operator Count: {count}\n"
+                    )
 
-            logger.debug(unsupported_nodes_str)
-        else:
-            logger.debug("\nAll Nodes Supported\n")
+                logger.debug(unsupported_nodes_str)
+            else:
+                logger.debug("\nAll Nodes Supported\n")
 
 
 def partition(
     gm: torch.fx.GraphModule,
-    verbose: bool = True,
+    verbose: bool = DEBUG,
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Optional[Set[str]] = None,
 ) -> torch.fx.GraphModule:
@@ -202,29 +200,3 @@ def partition(
         supported_ops.print_support_overview(len(partitions))
 
     return fused_graph
-
-
-def get_submod_inputs(
-    mod: torch.fx.GraphModule,
-    submod: torch.fx.GraphModule,
-    inputs: Sequence[torch.Tensor],
-) -> Optional[Sequence[torch.Tensor]]:
-    """Helper function to get inputs to a Torch submodule
-
-    Args:
-        mod: Parent FX GraphModule
-        submod: Child FX GraphModule
-        inputs: Sample inputs to parent module
-    Returns:
-        Sequence of Tensors representing inputs to child module
-    """
-    acc_inputs: Optional[Sequence[torch.Tensor]] = None
-
-    def get_input(_: torch.fx.GraphModule, inputs: Sequence[torch.Tensor]) -> None:
-        nonlocal acc_inputs
-        acc_inputs = inputs
-
-    handle = submod.register_forward_pre_hook(get_input)
-    mod(*inputs)
-    handle.remove()
-    return acc_inputs

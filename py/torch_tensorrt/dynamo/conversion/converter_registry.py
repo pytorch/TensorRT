@@ -349,8 +349,8 @@ class ConverterRegistry:
         """Returns the set of unique converter targets stored across all registries"""
         return set.union(*[set(registry.keys()) for registry in self.registries])
 
-    # TODO: Make this a static method since it does not need state
-    def qualified_name_or_str(self, target: Target) -> str:
+    @staticmethod
+    def qualified_name_or_str(target: Target) -> str:
         """Returns string representation of an FX Node target"""
         if isinstance(target, str):
             return target
