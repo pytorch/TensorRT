@@ -336,28 +336,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  float scale = args[3].IValue()->toDouble();
                  std::vector<float> padded_scales(in_shape.size(), 1);
                  padded_scales[padded_scales.size() - 1] = scale;
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1) // IF TRT VERSION <= 7.0
-                 if (!align_corners) {
-                   TORCHTRT_THROW_ERROR(
-                       "Unable to convert node: "
-                       << util::node_info(n) << "\nupsample_linear1d only supports align_corner with TensorRT <= 7.0.");
-                 } else {
-                   resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, true);
-                 }
-#else
-                 TORCHTRT_CHECK(
-                     !(align_corners && ctx->input_is_dynamic),
-                     "Torch-TensorRT currently does not support the compilation of dynamic engines from code using using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
-                 if (align_corners) {
-                   // Align corners and scale factor behave slightly different together in TRT and PyTorch so run the
-                   // layer in ATen to maintain consistancy between Torch-TensorRT and PyTorch
-                   // https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.interpolate
-                   create_plugin(
-                       ctx, n, in, "linear1d", in_shape, {}, {}, {scale}, std::string("linear"), align_corners, true);
-                 } else {
-                   resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
-                 }
-#endif
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -366,18 +345,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1) // IF TRT VERSION <= 7.0
-                 if (!align_corners) {
-                   // align_corners not supported in TensorRT, create plugin and
-                   // run layer through PyTorch
-                   create_plugin(
-                       ctx, n, in, "linear1d", in_shape, out_shape, out_size, {}, std::string("linear"), align_corners);
-                 } else {
-                   resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, true);
-                 }
-#else
                  resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, align_corners);
-#endif
                }
 
                return true;
@@ -400,28 +368,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  float scale = scale_factors[0];
                  std::vector<float> padded_scales(in_shape.size(), 1);
                  padded_scales[padded_scales.size() - 1] = scale;
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1) // IF TRT VERSION <= 7.0
-                 if (!align_corners) {
-                   TORCHTRT_THROW_ERROR(
-                       "Unable to convert node: "
-                       << util::node_info(n) << "\nupsample_linear1d only supports align_corner with TensorRT <= 7.0.");
-                 } else {
-                   resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, true);
-                 }
-#else
-                 TORCHTRT_CHECK(
-                     !(align_corners && ctx->input_is_dynamic),
-                     "Torch-TensorRT currently does not support the compilation of dynamc engines from code using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
-                 if (align_corners) {
-                   // Align corners and scale factor behave slightly different together in TRT and PyTorch so run the
-                   // layer in ATen to maintain consistancy between Torch-TensorRT and PyTorch
-                   // https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.interpolate
-                   create_plugin(
-                       ctx, n, in, "linear1d", in_shape, {}, {}, {scale}, std::string("linear"), align_corners, true);
-                 } else {
-                   resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
-                 }
-#endif
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -430,18 +377,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1) // IF TRT VERSION <= 7.0
-                 if (!align_corners) {
-                   // align_corners not supported in TensorRT, create plugin and
-                   // run layer through PyTorch
-                   create_plugin(
-                       ctx, n, in, "linear1d", in_shape, out_shape, out_size, {}, std::string("linear"), align_corners);
-                 } else {
-                   resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, true);
-                 }
-#else
                  resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, align_corners);
-#endif
                }
 
                return true;
@@ -464,38 +400,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  std::vector<float> padded_scales(in_shape.size(), 1);
                  padded_scales[padded_scales.size() - 2] = scale_h;
                  padded_scales[padded_scales.size() - 1] = scale_w;
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1) // IF TRT VERSION <= 7.0
-                 if (!align_corners) {
-                   TORCHTRT_THROW_ERROR(
-                       "Unable to convert node: "
-                       << util::node_info(n) << "\nupsample_linear2d only supports align_corner with TensorRT <= 7.0.");
-                 } else {
-                   resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, true);
-                 }
-#else
-                 TORCHTRT_CHECK(
-                     !(align_corners && ctx->input_is_dynamic),
-                     "Torch-TensorRT currently does not support the compilation of dynamc engines from code using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
-                 if (align_corners) {
-                   // Align corners and scale factor behave slightly different together in TRT and PyTorch so run the
-                   // layer in ATen to maintain consistancy between Torch-TensorRT and PyTorch
-                   // https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.interpolate
-                   create_plugin(
-                       ctx,
-                       n,
-                       in,
-                       "bilinear2d",
-                       in_shape,
-                       {},
-                       {},
-                       {scale_h, scale_w},
-                       std::string("bilinear"),
-                       align_corners,
-                       true);
-                 } else {
-                   resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
-                 }
-#endif
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -505,28 +410,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1) // IF TRT VERSION <= 7.0
-                 if (!align_corners) {
-                   // align_corners not supported in TensorRT, create plugin and
-                   // run layer through PyTorch
-                   create_plugin(
-                       ctx,
-                       n,
-                       in,
-                       "bilinear2d",
-                       in_shape,
-                       out_shape,
-                       out_size,
-                       {},
-                       std::string("bilinear"),
-                       align_corners);
-                 } else {
-                   resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, true);
-                 }
-#else
                  resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, align_corners);
-#endif
                }
 
                return true;
@@ -551,38 +435,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  std::vector<float> padded_scales(in_shape.size(), 1);
                  padded_scales[padded_scales.size() - 2] = scale_h;
                  padded_scales[padded_scales.size() - 1] = scale_w;
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1) // IF TRT VERSION <= 7.0
-                 if (!align_corners) {
-                   TORCHTRT_THROW_ERROR(
-                       "Unable to convert node: "
-                       << util::node_info(n) << "\nupsample_linear2d only supports align_corner with TensorRT <= 7.0.");
-                 } else {
-                   resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, true);
-                 }
-#else
-                 TORCHTRT_CHECK(
-                     !(align_corners && ctx->input_is_dynamic),
-                     "Torch-TensorRT currently does not support the compilation of dynamc engines from code using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
-                 if (align_corners) {
-                   // Align corners and scale factor behave slightly different together in TRT and PyTorch so run the
-                   // layer in ATen to maintain consistancy between Torch-TensorRT and PyTorch
-                   // https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.interpolate
-                   create_plugin(
-                       ctx,
-                       n,
-                       in,
-                       "bilinear2d",
-                       in_shape,
-                       {},
-                       {},
-                       scale_factors.vec(),
-                       std::string("bilinear"),
-                       align_corners,
-                       true);
-                 } else {
-                   resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
-                 }
-#endif
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -592,28 +445,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1) // IF TRT VERSION <= 7.0
-                 if (!align_corners) {
-                   // align_corners not supported in TensorRT, create plugin and
-                   // run layer through PyTorch
-                   create_plugin(
-                       ctx,
-                       n,
-                       in,
-                       "bilinear2d",
-                       in_shape,
-                       out_shape,
-                       out_size,
-                       {},
-                       std::string("bilinear"),
-                       align_corners);
-                 } else {
-                   resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, true);
-                 }
-#else
                  resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, align_corners);
-#endif
                }
 
                return true;
@@ -638,38 +470,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  padded_scales[padded_scales.size() - 3] = scale_d;
                  padded_scales[padded_scales.size() - 2] = scale_h;
                  padded_scales[padded_scales.size() - 1] = scale_w;
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1) // IF TRT VERSION <= 7.0
-                 if (!align_corners) {
-                   TORCHTRT_THROW_ERROR(
-                       "Unable to convert node: "
-                       << util::node_info(n) << "\nupsample_linear3d only supports align_corner with TensorRT <= 7.0.");
-                 } else {
-                   resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, true);
-                 }
-#else
-                 TORCHTRT_CHECK(
-                     !(align_corners && ctx->input_is_dynamic),
-                     "Torch-TensorRT currently does not support the compilation of dynamc engines from code using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
-                 if (align_corners) {
-                   // Align corners and scale factor behave slightly different together in TRT and PyTorch so run the
-                   // layer in ATen to maintain consistancy between Torch-TensorRT and PyTorch
-                   // https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.interpolate
-                   create_plugin(
-                       ctx,
-                       n,
-                       in,
-                       "trilinear3d",
-                       in_shape,
-                       {},
-                       {},
-                       {scale_d, scale_h, scale_w},
-                       std::string("trilinear"),
-                       align_corners,
-                       true);
-                 } else {
-                   resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
-                 }
-#endif
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -679,27 +480,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1) // IF TRT VERSION <= 7.0
-                 if (!align_corners) {
-                   // align_corners not supported in TensorRT, create plugin and
-                   // run layer through PyTorch
-                   create_plugin(
-                       ctx,
-                       n,
-                       in,
-                       "trilinear3d",
-                       in_shape,
-                       out_shape,
-                       out_size,
-                       {},
-                       std::string("trilinear"),
-                       align_corners);
-                 } else {
-                   resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, true);
-                 }
-#else
                  resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, align_corners);
-#endif
                }
 
                return true;
@@ -726,38 +507,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  padded_scales[padded_scales.size() - 3] = scale_d;
                  padded_scales[padded_scales.size() - 2] = scale_h;
                  padded_scales[padded_scales.size() - 1] = scale_w;
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1) // IF TRT VERSION <= 7.0
-                 if (!align_corners) {
-                   TORCHTRT_THROW_ERROR(
-                       "Unable to convert node: "
-                       << util::node_info(n) << "\nupsample_linear3d only supports align_corner with TensorRT <= 7.0.");
-                 } else {
-                   resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, true);
-                 }
-#else
-                 TORCHTRT_CHECK(
-                     !(align_corners && ctx->input_is_dynamic),
-                     "Torch-TensorRT currently does not support the compilation of dynamc engines from code using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
-                 if (align_corners) {
-                   // Align corners and scale factor behave slightly different together in TRT and PyTorch so run the
-                   // layer in ATen to maintain consistancy between Torch-TensorRT and PyTorch
-                   // https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.interpolate
-                   create_plugin(
-                       ctx,
-                       n,
-                       in,
-                       "trilinear3d",
-                       in_shape,
-                       {},
-                       {},
-                       scale_factors.vec(),
-                       std::string("trilinear"),
-                       align_corners,
-                       true);
-                 } else {
-                   resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
-                 }
-#endif
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -767,27 +517,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1) // IF TRT VERSION <= 7.0
-                 if (!align_corners) {
-                   // align_corners not supported in TensorRT, create plugin and
-                   // run layer through PyTorch
-                   create_plugin(
-                       ctx,
-                       n,
-                       in,
-                       "trilinear3d",
-                       in_shape,
-                       out_shape,
-                       out_size,
-                       {},
-                       std::string("trilinear"),
-                       align_corners);
-                 } else {
-                   resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, true);
-                 }
-#else
                  resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, align_corners);
-#endif
                }
 
                return true;
