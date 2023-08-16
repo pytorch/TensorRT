@@ -2,23 +2,18 @@ from __future__ import annotations
 
 import logging
 from dataclasses import fields, replace
-from typing import Any, Callable, Dict, Optional, Sequence, TypeVar
+from typing import Any, Callable, Dict, Optional, Sequence
 
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import CompilationSettings
-from typing_extensions import ParamSpec
 
 from packaging import version
 
 logger = logging.getLogger(__name__)
 
 COSINE_THRESHOLD = 0.99
-
-MIN_TORCH_VERSION = "2.dev"
-P = ParamSpec("P")
-T = TypeVar("T")
 
 
 def use_python_runtime_parser(use_python_runtime: Optional[bool] = None) -> bool:
@@ -174,7 +169,7 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
     return settings
 
 
-def req_torch_version(func: Callable[P, T]) -> Callable[P, T]:
+def req_torch_version(min_torch_version: str = "2.dev") -> Callable[..., Any]:
     """
     Create a decorator which verifies the Torch version installed
     against a specified version range
@@ -188,17 +183,20 @@ def req_torch_version(func: Callable[P, T]) -> Callable[P, T]:
         an unsupported Torch version is used
     """
 
-    def function_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-        # Parse minimum and current Torch versions
-        min_version = version.parse(MIN_TORCH_VERSION)
-        current_version = version.parse(torch.__version__)
+    def nested_decorator(f: Callable[..., Any]) -> Callable[..., Any]:
+        def function_wrapper(*args: Any, **kwargs: Any) -> Any:
+            # Parse minimum and current Torch versions
+            min_version = version.parse(min_torch_version)
+            current_version = version.parse(torch.__version__)
 
-        if current_version < min_version:
-            raise AssertionError(
-                f"Expected Torch version {MIN_TORCH_VERSION} or greater, "
-                + f"when calling {func}. Detected version {torch.__version__}"
-            )
-        else:
-            return func(*args, **kwargs)
+            if current_version < min_version:
+                raise AssertionError(
+                    f"Expected Torch version {min_torch_version} or greater, "
+                    + f"when calling {f}. Detected version {torch.__version__}"
+                )
+            else:
+                return f(*args, **kwargs)
 
-    return function_wrapper
+        return function_wrapper
+
+    return nested_decorator

@@ -88,7 +88,7 @@ def setting_python_recursive_limit(limit: int = 10000) -> Generator[None, None, 
         sys.setrecursionlimit(default)
 
 
-@req_torch_version
+@req_torch_version("2.dev")
 def dynamo_trace(
     f: Callable[..., Value],
     # pyre-ignore
@@ -124,7 +124,7 @@ def dynamo_trace(
             ) from exc
 
 
-@req_torch_version
+@req_torch_version("2.dev")
 def trace(
     model: torch.nn.Module | torch.fx.GraphModule,
     inputs: Tuple[Any, ...],
