@@ -756,14 +756,30 @@ commands:
 
 # =================== Dynamo tests start ======================== #
 
-  test-dynamo-torch_compile:
-    description: "Test Dynamo torch_compile tests"
+  test-dynamo-backend:
+    description: "Test Dynamo backend tests"
     steps:
       - run:
-          name: Run Dynamo torch_compile tests
+          name: Run Dynamo backend tests
           command: |
             cd tests/py/dynamo/backend/
-            pytest --junitxml=/tmp/artifacts/test_results/dynamo/torch_compile/test_results.xml
+            TESTS_TO_RUN=$(circleci tests glob "test_*.py" | circleci tests split --split-by=timings)
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/backend/test_results.xml $TESTS_TO_RUN
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-dynamo-shared_utilities:
+    description: "Test Dynamo shared utilities tests"
+    steps:
+      - run:
+          name: Run Dynamo lowering, partitioning, runtime tests
+          command: |
+            cd tests/py/dynamo/
+            TESTS_TO_RUN=$(circleci tests glob "runtime/test_*.py" "partitioning/test_*.py" "lowering/test_*.py" | circleci tests split --split-by=timings)
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/shared_utilities/test_results.xml $TESTS_TO_RUN
 
       - store_test_results:
           path: /tmp/artifacts
@@ -808,9 +824,9 @@ commands:
       - run:
           name: Run Dynamo converter tests
           command: |
-            cd tests/py/dynamo/converters
+            cd tests/py/dynamo/conversion
             TESTS_TO_RUN=$(circleci tests glob "test_*.py" | circleci tests split --split-by=timings)
-            pytest --junitxml=/tmp/artifacts/test_results/dynamo/converters/test_results.xml $TESTS_TO_RUN
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/conversion/test_results.xml $TESTS_TO_RUN
 
       - store_test_results:
           path: /tmp/artifacts
@@ -1103,7 +1119,8 @@ jobs:
       # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - dump-test-env
       - test-dynamo-converters
-      - test-dynamo-torch_compile
+      - test-dynamo-backend
+      - test-dynamo-shared_utilities
       - test-dynamo-models_torch_compile
       - test-dynamo-models_torch_export
 

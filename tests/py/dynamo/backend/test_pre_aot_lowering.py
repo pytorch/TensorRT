@@ -1,7 +1,8 @@
 import torch
 import torch_tensorrt
-from utils import lower_graph_testing
-from torch.testing._internal.common_utils import run_tests, TestCase
+from torch.testing._internal.common_utils import TestCase, run_tests
+
+from ..testing_utilities import lower_graph_testing
 
 
 class TestMaxPool1D(TestCase):
