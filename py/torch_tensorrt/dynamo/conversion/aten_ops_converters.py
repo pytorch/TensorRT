@@ -101,23 +101,9 @@ def aten_ops_div(
         )
 
 
-def embedding_param_validator(embedding_node: Node) -> bool:
-    max_norm = args_bounds_check(embedding_node.args, 2)
-    norm_type = args_bounds_check(embedding_node.args, 3)
-    scale_grad_by_freq = args_bounds_check(embedding_node.args, 4)
-    sparse = args_bounds_check(embedding_node.args, 5)
-
-    if max_norm is not None:
-        _LOGGER.debug(
-            f"Currently we don't support specifying max_norm, got {max_norm}."
-        )
-        return False
-
-    if norm_type is not None and norm_type != 2.0:
-        _LOGGER.debug(
-            f"Currently we don't support specifying norm_type, got {norm_type}."
-        )
-        return False
+def embedding_param_validator(embedding_node: Node):
+    scale_grad_by_freq = args_bounds_check(embedding_node.args, 3)
+    sparse = args_bounds_check(embedding_node.args, 4)
 
     if scale_grad_by_freq is not None:
         _LOGGER.debug(
@@ -149,10 +135,9 @@ def aten_ops_embedding(
         name,
         input=args[1],
         weight=args[0],
-        max_norm=args_bounds_check(args, 2),
-        norm_type=args_bounds_check(args, 3),
-        scale_grad_by_freq=args_bounds_check(args, 4),
-        sparse=args_bounds_check(args, 5),
+        # args[2] is the padding index, which is useful for training only
+        scale_grad_by_freq=args_bounds_check(args, 3),
+        sparse=args_bounds_check(args, 4),
     )
 
 
