@@ -1647,6 +1647,59 @@ workflows:
   on-push:
     jobs:
       - build-x86_64-linux:
+          cuda-version: << pipeline.parameters.cuda-version >>
+          torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          python-version: << pipeline.parameters.python-version >>
+
+      - test-core-cpp-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-short: << pipeline.parameters.trt-version-short >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+          requires:
+            - build-x86_64-linux
+
+      - test-py-ts-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
+          requires:
+            - build-x86_64-linux
+
+      - test-py-fx-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
+          requires:
+            - build-x86_64-linux
+
+      - test-py-dynamo-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
+          python-version: << pipeline.parameters.python-version >>
+          requires:
+            - build-x86_64-linux
+
+      - build-x86_64-linux-cmake:
+          cuda-version: << pipeline.parameters.cuda-version >>
+          torch-build: << pipeline.parameters.torch-build >>
+          torch-build-index: << pipeline.parameters.torch-build-index >>
+          trt-version-short: << pipeline.parameters.trt-version-short >>
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+          python-version: << pipeline.parameters.python-version >>
+
+      - build-x86_64-linux:
           name: build-x86_64-linux-legacy
           cuda-version: << pipeline.parameters.cuda-version-legacy >>
           torch-build: << pipeline.parameters.torch-build-legacy >>
@@ -1655,3 +1708,38 @@ workflows:
           python-version: << pipeline.parameters.python-version >>
           legacy: << pipeline.parameters.enable-legacy >>
           ci-image: << pipeline.parameters.ci-image-legacy >>
+
+
+      - test-core-cpp-x86_64-linux:
+          name: test-core-cpp-x86_64-linux-legacy
+          torch-build: << pipeline.parameters.torch-build-legacy >>
+          torchvision-build: << pipeline.parameters.torchvision-build-legacy >>
+          torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
+          trt-version-short: << pipeline.parameters.trt-version-short-legacy >>
+          trt-version-long: << pipeline.parameters.trt-version-long-legacy >>
+          cudnn-version: << pipeline.parameters.cudnn-version-legacy >>
+          python-version: << pipeline.parameters.python-version >>
+          ci-image: << pipeline.parameters.ci-image-legacy >>
+          requires:
+            - build-x86_64-linux-legacy
+
+      - test-py-ts-x86_64-linux:
+          name: test-py-ts-x86_64-linux-legacy
+          torch-build: << pipeline.parameters.torch-build-legacy >>
+          torchvision-build: << pipeline.parameters.torchvision-build-legacy >>
+          torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
+          trt-version-long: << pipeline.parameters.trt-version-long-legacy >>
+          python-version: << pipeline.parameters.python-version >>
+          ci-image: << pipeline.parameters.ci-image-legacy >>
+          requires:
+            - build-x86_64-linux-legacy
+
+      - test-py-fx-x86_64-linux-no-aten:
+          torch-build: << pipeline.parameters.torch-build-legacy >>
+          torchvision-build: << pipeline.parameters.torchvision-build-legacy >>
+          torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
+          trt-version-long: << pipeline.parameters.trt-version-long-legacy >>
+          python-version: << pipeline.parameters.python-version >>
+          ci-image: << pipeline.parameters.ci-image-legacy >>
+          requires:
+            - build-x86_64-linux-legacy
