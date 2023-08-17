@@ -239,7 +239,10 @@ def torch_compile(module: torch.nn.Module, **kwargs: Any) -> Any:
     """
     from torch_tensorrt.dynamo.backend import torch_tensorrt_backend
 
-    boxed_fn = torch.compile(module, backend=torch_tensorrt_backend, options={**kwargs})
+    # TODO: Remove dynamic=False when SymInt Dynamic shape support is ready
+    boxed_fn = torch.compile(
+        module, backend=torch_tensorrt_backend, dynamic=False, options={**kwargs}
+    )
 
     return boxed_fn
 
