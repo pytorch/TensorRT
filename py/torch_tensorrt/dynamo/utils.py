@@ -159,10 +159,6 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
         valid_kwargs = {k: v for k, v in kwargs.items() if k in valid_attrs}
         settings = replace(settings, **valid_kwargs)
 
-    # Enable debug/verbose mode if requested
-    if settings.debug:
-        logger.setLevel(logging.DEBUG)
-
     # TODO: Remove once Dynamo precisions refactoring is complete
     if "enabled_precisions" in kwargs:
         enabled_precisions = kwargs["enabled_precisions"]
@@ -188,7 +184,7 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
     # Parse input runtime specification
     settings.use_python_runtime = use_python_runtime_parser(settings.use_python_runtime)
 
-    logger.debug(f"Compiling with Settings:\n{settings}")
+    logger.info("Compilation Settings: %s\n", settings)
 
     return settings
 

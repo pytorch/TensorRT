@@ -197,6 +197,9 @@ def compile_module(
 
         submodule = getattr(partitioned_module, name)
 
+        logger.debug(
+            "Submodule name: " + str(name) + " Graph: \n" + str(submodule.graph)
+        )
         # Get submodule inputs
         submodule_inputs = partitioning.get_submod_inputs(
             partitioned_module, submodule, sample_inputs
