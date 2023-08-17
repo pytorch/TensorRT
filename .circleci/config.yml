@@ -839,8 +839,11 @@ jobs:
       legacy:
         type: boolean
         default: false
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.small
     steps:
       - checkout
@@ -906,8 +909,11 @@ jobs:
         type: string
       cudnn-version:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.medium
     parallelism: 4
     steps:
@@ -946,8 +952,11 @@ jobs:
         type: string
       python-version:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.medium
     steps:
       - checkout
@@ -979,9 +988,12 @@ jobs:
         type: string
       python-version:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     parallelism: 8
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.medium
     steps:
       - checkout
@@ -1015,9 +1027,12 @@ jobs:
         type: string
       python-version:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     parallelism: 8
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.medium
     steps:
       - checkout
@@ -1054,9 +1069,12 @@ jobs:
         type: string
       python-version:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     parallelism: 4
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.medium
     steps:
       - checkout
@@ -1093,9 +1111,12 @@ jobs:
         type: string
       torch-build-index:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     parallelism: 4
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.small
     steps:
       - when:
@@ -1143,8 +1164,11 @@ jobs:
         type: string
       torch-build-index:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.small
     steps:
       - when:
@@ -1279,8 +1303,11 @@ jobs:
         type: string
       python-version:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.small
     steps:
       - checkout
@@ -1316,8 +1343,11 @@ jobs:
     parameters:
       torch-base-image:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.small
     steps:
       - checkout
@@ -1344,8 +1374,11 @@ jobs:
         default: false
       torch-base-image:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.small
     steps:
       - when:
@@ -1420,6 +1453,9 @@ parameters:
   trt-version-long-legacy:
     type: string
     default: "8.6.1"
+  ci-image-legacy:
+    type: string
+    default: "linux-cuda-11:2023.02.1"
 
   # Jetson platform config
   cuda-jetson-version:
@@ -1618,3 +1654,4 @@ workflows:
           torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
           python-version: << pipeline.parameters.python-version >>
           legacy: << pipeline.parameters.enable-legacy >>
+          ci-image: << pipeline.parameters.ci-image-legacy >>
