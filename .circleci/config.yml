@@ -319,8 +319,9 @@ commands:
             export CUDA_HOME=/usr/local/cuda-<< parameters.cuda-version >>/
             mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
             python3 -m pip install pip==22.0.2
-            python3 -m pip wheel --no-deps --verbose --pre . --extra-index-url https://pypi.nvidia.com --extra-index-url << parameters.torch-build-index >> --global-option="--legacy" -w dist
-            python3 -m pip install dist/torch_tensorrt*
+            python3 -m pip install -r py/requirements.txt
+            python3 setup.py bdist_wheel --legacy
+            python3 setup.py install --legacy
             mkdir -p /tmp/dist/builds
             cp dist/torch_tensorrt* /tmp/dist/builds
 
