@@ -420,3 +420,28 @@ def aten_ops_clone(
         name,
         args[0],
     )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.amax.default)
+def aten_ops_amax(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = args[0]
+    if (isinstance(input_val, TRTTensor)) and (
+        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+    ):
+        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+
+    return impl.reduce.amax(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        input_val,
+        args[1],
+        args_bounds_check(args, 2, replacement=False),
+    )
