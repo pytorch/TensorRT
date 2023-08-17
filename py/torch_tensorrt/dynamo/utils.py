@@ -160,7 +160,7 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
     # Parse input runtime specification
     settings.use_python_runtime = use_python_runtime_parser(settings.use_python_runtime)
 
-    logger.debug(f"Compiling with Settings:\n{settings}")
+    logger.info("Compilation Settings: %s\n", settings)
 
     return settings
 
