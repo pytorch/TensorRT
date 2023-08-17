@@ -1,17 +1,12 @@
-import torch
-import timm
-import pytest
 import unittest
 
+import pytest
+import timm
+import torch
 import torch_tensorrt as torchtrt
 import torchvision.models as models
-
+from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 from transformers import BertModel
-
-from torch_tensorrt.dynamo.utils import (
-    COSINE_THRESHOLD,
-    cosine_similarity,
-)
 
 assertions = unittest.TestCase()
 
@@ -32,7 +27,6 @@ def test_resnet18(ir):
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
-        "min_block_size": 10,
         "ir": "torch_compile",
     }
 
@@ -143,7 +137,7 @@ def test_bert_base_uncased(ir):
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
-        "min_block_size": 10,
+        "min_block_size": 15,
         "ir": "torch_compile",
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -181,7 +175,6 @@ def test_resnet18_half(ir):
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
-        "min_block_size": 10,
         "ir": "torch_compile",
     }
 
