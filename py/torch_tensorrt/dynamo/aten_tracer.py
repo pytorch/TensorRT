@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import logging
 import unittest.mock
 from typing import Any, Tuple
 
 import torch
-from torch._functorch.aot_autograd import _aot_export_function
-from torch._subclasses import FakeTensorMode
+from torch._export import export
+from torch._inductor.freezing import constant_fold
 from torch_tensorrt.dynamo.lowering import get_decompositions
+
+logger = logging.getLogger(__name__)
 
 
 def trace(
@@ -14,14 +17,8 @@ def trace(
     inputs: Tuple[Any, ...],
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
-    fake_mode = FakeTensorMode(allow_non_fake_inputs=True)
-    with unittest.mock.patch.object(
-        fake_mode, "allow_non_fake_inputs", True
-    ), fake_mode:
-        graph_module, _, _, _ = _aot_export_function(
-            model,
-            inputs,
-            decompositions=get_decompositions(),
-        )
-
+    with unittest.mock.patch("torch._export.DECOMP_TABLE", get_decompositions()):
+        graph_module = export(model, tuple(inputs)).module()
+        constant_fold(graph_module)
+    logging.debug("Post export graph: " + str(graph_module.graph))
     return graph_module
