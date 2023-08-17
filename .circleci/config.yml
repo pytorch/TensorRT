@@ -319,7 +319,7 @@ commands:
             export CUDA_HOME=/usr/local/cuda-<< parameters.cuda-version >>/
             mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
             python3 -m pip install pip==22.0.2
-            python3 -m pip wheel --no-deps --verbose --pre . --extra-index-url https://pypi.nvidia.com --extra-index-url << parameters.torch-build-index >> --config-setting="--build-option=--legacy" -w dist
+            python3 -m pip wheel --no-deps --verbose --pre . --extra-index-url https://pypi.nvidia.com --extra-index-url << parameters.torch-build-index >> --global-option="--legacy" -w dist
             python3 -m pip install dist/torch_tensorrt*
             mkdir -p /tmp/dist/builds
             cp dist/torch_tensorrt* /tmp/dist/builds
@@ -1610,54 +1610,10 @@ workflows:
   on-push:
     jobs:
       - build-x86_64-linux:
-          cuda-version: << pipeline.parameters.cuda-version >>
-          torch-build: << pipeline.parameters.torch-build >>
-          torchvision-build: << pipeline.parameters.torchvision-build >>
-          torch-build-index: << pipeline.parameters.torch-build-index >>
+          name: build-x86_64-linux-legacy
+          cuda-version: << pipeline.parameters.cuda-version-legacy >>
+          torch-build: << pipeline.parameters.torch-build-legacy >>
+          torchvision-build: << pipeline.parameters.torchvision-build-legacy >>
+          torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
           python-version: << pipeline.parameters.python-version >>
-
-      - test-core-cpp-x86_64-linux:
-          torch-build: << pipeline.parameters.torch-build >>
-          torchvision-build: << pipeline.parameters.torchvision-build >>
-          torch-build-index: << pipeline.parameters.torch-build-index >>
-          trt-version-short: << pipeline.parameters.trt-version-short >>
-          trt-version-long: << pipeline.parameters.trt-version-long >>
-          python-version: << pipeline.parameters.python-version >>
-          cudnn-version: << pipeline.parameters.cudnn-version >>
-          requires:
-            - build-x86_64-linux
-
-      - test-py-ts-x86_64-linux:
-          torch-build: << pipeline.parameters.torch-build >>
-          torchvision-build: << pipeline.parameters.torchvision-build >>
-          torch-build-index: << pipeline.parameters.torch-build-index >>
-          trt-version-long: << pipeline.parameters.trt-version-long >>
-          python-version: << pipeline.parameters.python-version >>
-          requires:
-            - build-x86_64-linux
-
-      - test-py-fx-x86_64-linux:
-          torch-build: << pipeline.parameters.torch-build >>
-          torchvision-build: << pipeline.parameters.torchvision-build >>
-          torch-build-index: << pipeline.parameters.torch-build-index >>
-          trt-version-long: << pipeline.parameters.trt-version-long >>
-          python-version: << pipeline.parameters.python-version >>
-          requires:
-            - build-x86_64-linux
-
-      - test-py-dynamo-x86_64-linux:
-          torch-build: << pipeline.parameters.torch-build >>
-          torchvision-build: << pipeline.parameters.torchvision-build >>
-          torch-build-index: << pipeline.parameters.torch-build-index >>
-          trt-version-long: << pipeline.parameters.trt-version-long >>
-          python-version: << pipeline.parameters.python-version >>
-          requires:
-            - build-x86_64-linux
-
-      - build-x86_64-linux-cmake:
-          cuda-version: << pipeline.parameters.cuda-version >>
-          torch-build: << pipeline.parameters.torch-build >>
-          torch-build-index: << pipeline.parameters.torch-build-index >>
-          trt-version-short: << pipeline.parameters.trt-version-short >>
-          cudnn-version: << pipeline.parameters.cudnn-version >>
-          python-version: << pipeline.parameters.python-version >>
+          legacy: << pipeline.parameters.enable-legacy >>
