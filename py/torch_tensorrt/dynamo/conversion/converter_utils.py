@@ -1,5 +1,8 @@
+import logging
+import re
 from typing import List
 
+import tensorrt as trt
 import torch
 from torch_tensorrt.fx.converters.converter_utils import (
     Frameworks,
@@ -7,7 +10,31 @@ from torch_tensorrt.fx.converters.converter_utils import (
 )
 from torch_tensorrt.fx.types import TRTDataType, TRTNetwork, TRTTensor
 
-import tensorrt as trt
+_LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+def get_node_name(node: torch.fx.Node) -> str:
+    # nn_module_stack preserves the call stack of pytorch nn.modules
+    # The call stack contains a detailed name of the module
+    # which shows exactly where the module is located in the
+    # network architecture.
+    stack_item = node.meta.get("nn_module_stack", None)
+    # The current node is the last item in the stack
+    mod_stack = stack_item.popitem() if stack_item else ""
+    node_name = str(node)
+    if mod_stack:
+        mod_name = str(mod_stack[0]).replace("___", "/")
+        # Clean up the module name
+        mod_name = re.sub("^.*__self", "", mod_name)
+        mod_name = re.sub(r"_(\d+)$", r"/\g<1>", mod_name)
+        node_name = mod_name + "/" + node_name
+    else:
+        # Try an alternative way to get the module info
+        # like the node.meta['source_fn'] attr
+        pass
+
+    _LOGGER.debug(f"Node meta name {node_name}")
+    return node_name
 
 
 def dynamic_unsupported(node: torch.fx.Node) -> bool:
