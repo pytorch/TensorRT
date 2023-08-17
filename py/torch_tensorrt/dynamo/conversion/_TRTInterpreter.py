@@ -4,16 +4,18 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set
 
 import numpy
+
+# @manual=//deeplearning/trt/python:py_tensorrt
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo.conversion.converter_utils import get_node_name
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
-# @manual=//deeplearning/trt/python:py_tensorrt
-import tensorrt as trt
 from packaging import version
 
 from .converter_registry import DYNAMO_CONVERTERS as CONVERTERS
@@ -232,7 +234,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
-        self._cur_node_name = str(n)
+        self._cur_node_name = get_node_name(n)
         self._cur_node = n
         # add "_itensor_to_tensor_meta"
         kwargs = dict(n.kwargs)
