@@ -157,10 +157,6 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
         valid_kwargs = {k: v for k, v in kwargs.items() if k in valid_attrs}
         settings = replace(settings, **valid_kwargs)
 
-    # Enable debug/verbose mode if requested
-    if settings.debug:
-        logger.setLevel(logging.DEBUG)
-
     # Parse input runtime specification
     settings.use_python_runtime = use_python_runtime_parser(settings.use_python_runtime)
 
