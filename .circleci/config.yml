@@ -317,7 +317,7 @@ commands:
           name: Build torch-tensorrt python legacy release (pre-cxx11-abi)
           command: |
             export CUDA_HOME=/usr/local/cuda-<< parameters.cuda-version >>/
-            mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
+            mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >>.legacy WORKSPACE
             python3 -m pip install wheel setuptools pyyaml
             python3 -m pip install pybind11==2.6.2
             python3 setup.py bdist_wheel --legacy
@@ -1434,7 +1434,7 @@ parameters:
   # Legacy platform config
   cuda-version-legacy:
     type: string
-    default: "11.7"
+    default: "11.8"
   torch-build-legacy:
     type: string
     default: "1.13.1+cu117"
