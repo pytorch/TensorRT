@@ -1,13 +1,44 @@
-from typing import List
+import logging
+import re
+from typing import List, Optional
 
+import tensorrt as trt
 import torch
+from torch.fx.node import Target
 from torch_tensorrt.fx.converters.converter_utils import (
     Frameworks,
     unified_dtype_converter,
 )
 from torch_tensorrt.fx.types import TRTDataType, TRTNetwork, TRTTensor
 
-import tensorrt as trt
+from .._SourceIR import SourceIR
+from .converter_registry import ConverterRegistry
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+def get_node_name(node: torch.fx.Node) -> str:
+    # nn_module_stack preserves the call stack of pytorch nn.modules
+    # The call stack contains a detailed name of the module
+    # which shows exactly where the module is located in the
+    # network architecture.
+    stack_item = node.meta.get("nn_module_stack", None)
+    # The current node is the last item in the stack
+    mod_stack = stack_item.popitem() if stack_item else ""
+    node_name = str(node)
+    if mod_stack:
+        mod_name = str(mod_stack[0]).replace("___", "/")
+        # Clean up the module name
+        mod_name = re.sub("^.*__self", "", mod_name)
+        mod_name = re.sub(r"_(\d+)$", r"/\g<1>", mod_name)
+        node_name = mod_name + "/" + node_name
+    else:
+        # Try an alternative way to get the module info
+        # like the node.meta['source_fn'] attr
+        pass
+
+    _LOGGER.debug(f"Node meta name {node_name}")
+    return node_name
 
 
 def dynamic_unsupported(node: torch.fx.Node) -> bool:
@@ -44,6 +75,8 @@ def cast_trt_tensor(
     input_val: TRTTensor,
     dtype: TRTDataType,
     name: str,
+    target: Target = "",
+    source_ir: Optional[SourceIR] = None,
 ) -> TRTTensor:
     """
     Given a TRT Tensor, convert that Tensor to the specified dtype
@@ -51,17 +84,23 @@ def cast_trt_tensor(
     Args:
         network (TRTNetwork): A TensorRT network
         input_val (TRTTensor): A TRT Tensor to cast to a new data type
-        dtype (TRTDataType): The TRTDataType to cast the input Tensor to
+        dtype (TRTDataType, torch.dtype, np.dtype): The data type to cast the input Tensor to
         name (str): Name of the calling layer
+        target (Target): Target of calling node
+        source_ir (SourceIR): SourceIR of calling converter
     Returns:
         A TensorRT ITensor which has been casted to the specified dtype
     """
     trt_dtype = unified_dtype_converter(dtype, Frameworks.TRT)
 
     if input_val.dtype != trt_dtype:
+        source_ir = source_ir if source_ir is not None else SourceIR.UNKNOWN
+        target_str = ConverterRegistry.qualified_name_or_str(target)
+        target_name = f"{source_ir}_ops{('.' + target_str) if target_str else ''}"
+
         identity_layer = network.add_identity(input_val)
         identity_layer.set_output_type(0, trt_dtype)
-        identity_layer.name = f"Cast ITensor {input_val.name} from {input_val.dtype} to {trt_dtype} - {name}"
+        identity_layer.name = f"Cast ITensor {input_val.name} from {input_val.dtype} to {trt_dtype} - [{target_name}]-[{name}]"
         return identity_layer.get_output(0)
     else:
         return input_val

@@ -1,6 +1,7 @@
 import logging
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
+import tensorrt as trt
 import torch
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -11,8 +12,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 from torch_tensorrt.fx.converters import acc_ops_converters
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
-
-import tensorrt as trt
 
 from .converter_registry import dynamo_tensorrt_converter
 
@@ -76,13 +75,13 @@ def aten_ops_div(
         kwargs_new["input"].dtype == trt.int8 or kwargs_new["input"].dtype == trt.int32
     ):
         kwargs_new["input"] = cast_trt_tensor(
-            network, kwargs_new["input"], trt.float32, name
+            network, kwargs_new["input"], trt.float32, name, target
         )
     elif isinstance(args[1], TRTTensor) and (
         kwargs_new["other"].dtype == trt.int8 or kwargs_new["other"].dtype == trt.int32
     ):
         kwargs_new["other"] = cast_trt_tensor(
-            network, kwargs_new["other"], trt.float32, name
+            network, kwargs_new["other"], trt.float32, name, target
         )
     rounding_mode = kwargs.get("rounding_mode")
     if rounding_mode is None:
@@ -102,22 +101,8 @@ def aten_ops_div(
 
 
 def embedding_param_validator(embedding_node: Node) -> bool:
-    max_norm = args_bounds_check(embedding_node.args, 2)
-    norm_type = args_bounds_check(embedding_node.args, 3)
-    scale_grad_by_freq = args_bounds_check(embedding_node.args, 4)
-    sparse = args_bounds_check(embedding_node.args, 5)
-
-    if max_norm is not None:
-        _LOGGER.debug(
-            f"Currently we don't support specifying max_norm, got {max_norm}."
-        )
-        return False
-
-    if norm_type is not None and norm_type != 2.0:
-        _LOGGER.debug(
-            f"Currently we don't support specifying norm_type, got {norm_type}."
-        )
-        return False
+    scale_grad_by_freq = args_bounds_check(embedding_node.args, 3)
+    sparse = args_bounds_check(embedding_node.args, 4)
 
     if scale_grad_by_freq is not None:
         _LOGGER.debug(
@@ -149,10 +134,9 @@ def aten_ops_embedding(
         name,
         input=args[1],
         weight=args[0],
-        max_norm=args_bounds_check(args, 2),
-        norm_type=args_bounds_check(args, 3),
-        scale_grad_by_freq=args_bounds_check(args, 4),
-        sparse=args_bounds_check(args, 5),
+        # args[2] is the padding index, which is useful for training only
+        scale_grad_by_freq=args_bounds_check(args, 3),
+        sparse=args_bounds_check(args, 4),
     )
 
 
@@ -379,4 +363,60 @@ def aten_ops_permute(
         name,
         args[0],
         args[1],
+    )
+
+
+def to_copy_dtype_validator(to_copy_node: Node) -> bool:
+    allowed_casts = {torch.float, torch.int32, torch.bool, torch.int8, torch.float16}
+
+    # Validate input node has convertible kwargs
+    if "dtype" in to_copy_node.kwargs:
+        if to_copy_node.kwargs["dtype"] in allowed_casts:
+            return True
+        else:
+            _LOGGER.debug(
+                f"_to_copy converter rejected node {to_copy_node} with dtype {to_copy_node.kwargs['dtype']}"
+            )
+            return False
+    else:
+        _LOGGER.debug(
+            f"_to_copy converter rejected node {to_copy_node} with kwargs {to_copy_node.kwargs}"
+        )
+        return False
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._to_copy.default, capability_validator=to_copy_dtype_validator
+)
+def aten_ops_to_copy_dtype(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.cast.to_copy(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        kwargs["dtype"],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.clone.default)
+def aten_ops_clone(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.cast.clone(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
     )

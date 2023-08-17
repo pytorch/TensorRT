@@ -3,17 +3,20 @@ import warnings
 from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set
 
-import numpy
+import numpy as np
+
+# @manual=//deeplearning/trt/python:py_tensorrt
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
+from torch.utils._python_dispatch import _disable_current_modes
 from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo.conversion.converter_utils import get_node_name
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
-# @manual=//deeplearning/trt/python:py_tensorrt
-import tensorrt as trt
 from packaging import version
 
 from .converter_registry import DYNAMO_CONVERTERS as CONVERTERS
@@ -23,6 +26,10 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[
     Callable[[torch.fx.GraphModule], None]
 ] = Observer("TRT_INTERPRETER_CALL_PRE_OBSERVER")
+
+
+class UnsupportedOperatorException(RuntimeError):
+    pass
 
 
 class TRTInterpreterResult(NamedTuple):
@@ -163,7 +170,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         cache = None
         if timing_cache:
-            cache_file = numpy.array(timing_cache)
+            cache_file = np.array(timing_cache)
             cache = builder_config.create_timing_cache(cache_file.tobytes())
         else:
             cache = builder_config.create_timing_cache(b"")
@@ -232,7 +239,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
-        self._cur_node_name = str(n)
+        self._cur_node_name = get_node_name(n)
         self._cur_node = n
         # add "_itensor_to_tensor_meta"
         kwargs = dict(n.kwargs)
@@ -299,7 +306,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         converter = CONVERTERS.get(self._cur_node)
 
         if not converter:
-            raise RuntimeError(
+            raise UnsupportedOperatorException(
                 f"Conversion of module of type {submod_type} not currently supported!"
             )
 
@@ -310,19 +317,34 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         # TODO: Why is this stateful? We should be able to take in the inputs
         converter = CONVERTERS.get(self._cur_node)
         if not converter:
-            raise RuntimeError(
+            raise UnsupportedOperatorException(
                 f"Conversion of function {torch.typename(target)} not currently supported!"
             )
 
         assert self._cur_node_name is not None
         return converter(self.network, target, args, kwargs, self._cur_node_name)
 
+    def get_attr(self, target: str, args: Any, kwargs: Any) -> np.ndarray:
+        with _disable_current_modes():
+            from torch_tensorrt.fx.converters import to_numpy
+
+            frozen_attr = self.fetch_attr(target)
+
+            if isinstance(frozen_attr, torch.nn.Parameter):
+                constant_tensor = frozen_attr.data
+            else:
+                constant_tensor = frozen_attr
+
+            network_constant = to_numpy(constant_tensor)
+
+        return network_constant
+
     def call_method(self, target: str, args: Any, kwargs: Any) -> Any:
         assert isinstance(target, str)
         converter = CONVERTERS.get(self._cur_node)
 
         if not converter:
-            raise RuntimeError(
+            raise UnsupportedOperatorException(
                 f"Conversion of method {target} not currently supported!"
             )
 
@@ -337,6 +359,17 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             outputs = tuple(args[0])
         else:
             outputs = (args[0],)
+
+        for output_idx in range(len(outputs)):
+            from torch_tensorrt.fx.converters import get_trt_tensor
+
+            output = outputs[output_idx]
+
+            if not isinstance(output, trt.tensorrt.ITensor):
+                new_output = get_trt_tensor(self.network, output, target)
+                outputs = (
+                    outputs[:output_idx] + (new_output,) + outputs[output_idx + 1 :]
+                )
 
         if not all(isinstance(output, trt.tensorrt.ITensor) for output in outputs):
             raise RuntimeError("TensorRT requires all outputs to be Tensor!")

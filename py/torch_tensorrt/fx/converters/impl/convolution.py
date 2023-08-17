@@ -1,27 +1,23 @@
-import numpy as np
 from typing import Any, Optional, Sequence, Union
+
+import numpy as np
 
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
 from torch.fx.node import Target
-
+from torch_tensorrt.fx.converters import acc_ops_converters
 from torch_tensorrt.fx.converters.converter_utils import (
     SourceIR,
     extend_attr_to_tuple,
     get_dyn_range,
+    get_trt_tensor,
+    has_dynamic_shape,
     mark_as_int8_layer,
     set_layer_name,
-    has_dynamic_shape,
     to_numpy,
-    get_trt_tensor,
 )
-from torch_tensorrt.fx.converters import acc_ops_converters
-
-from torch_tensorrt.fx.types import (
-    TRTNetwork,
-    TRTTensor,
-)
+from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 
 
 def convNd(
@@ -54,7 +50,7 @@ def convNd(
         )
 
     # Process bias terms
-    if isinstance(bias, torch.Tensor):
+    if isinstance(bias, (torch.Tensor, np.ndarray)):
         # Transform the bias constant into a Numpy array
         bias = to_numpy(bias)
 
@@ -79,7 +75,7 @@ def convNd(
                 network, target, tuple(), kwargs, name + "_unsqueeze_weight"
             )
 
-    elif isinstance(weight, torch.Tensor):
+    elif isinstance(weight, (torch.Tensor, np.ndarray)):
         # Transform the weight constant into a Numpy array
         weight = to_numpy(weight)
 

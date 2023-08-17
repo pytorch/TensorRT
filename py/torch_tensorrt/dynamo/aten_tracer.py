@@ -6,7 +6,7 @@ from typing import Any, Tuple
 
 import torch
 from torch._export import export
-from torch._inductor.freezing import constant_fold
+from torch_tensorrt.dynamo.backend.backends import constant_fold
 from torch_tensorrt.dynamo.lowering import get_decompositions
 
 logger = logging.getLogger(__name__)

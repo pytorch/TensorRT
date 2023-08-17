@@ -5,9 +5,11 @@ from dataclasses import fields, replace
 from typing import Any, Callable, Dict, Optional, Sequence
 
 import torch
+import torch_tensorrt
 from torch_tensorrt._Device import Device
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import CompilationSettings
+from torch_tensorrt.dynamo._defaults import PRECISION
 
 from packaging import version
 
@@ -156,6 +158,32 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
         valid_attrs = {attr.name for attr in fields(settings)}
         valid_kwargs = {k: v for k, v in kwargs.items() if k in valid_attrs}
         settings = replace(settings, **valid_kwargs)
+
+    # Enable debug/verbose mode if requested
+    if settings.debug:
+        logger.setLevel(logging.DEBUG)
+
+    # TODO: Remove once Dynamo precisions refactoring is complete
+    if "enabled_precisions" in kwargs:
+        enabled_precisions = kwargs["enabled_precisions"]
+
+        if (
+            torch.float16 in enabled_precisions
+            or torch_tensorrt.dtype.half in enabled_precisions
+        ):
+            settings.precision = torch.float16
+        elif (
+            torch.float32 in enabled_precisions
+            or torch_tensorrt.dtype.float in enabled_precisions
+        ):
+            settings.precision = torch.float32
+        elif len(enabled_precisions) == 0:
+            logger.info(f"No precision specified, defaulting to {PRECISION}")
+            settings.precision = PRECISION
+        else:
+            raise ValueError(
+                f"Precision {enabled_precisions} not supported in the Dynamo Path"
+            )
 
     # Parse input runtime specification
     settings.use_python_runtime = use_python_runtime_parser(settings.use_python_runtime)
