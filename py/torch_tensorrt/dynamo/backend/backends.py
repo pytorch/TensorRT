@@ -20,6 +20,12 @@ logger = logging.getLogger(__name__)
 def torch_tensorrt_backend(
     gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor], **kwargs: Any
 ) -> torch.nn.Module:
+    # Set log level at the top of compilation (torch_tensorrt.dynamo)
+    if "options" in kwargs:
+        if "debug" in kwargs["options"]:
+            if logger.parent:
+                logger.parent.setLevel(logging.DEBUG)
+
     DEFAULT_BACKEND = aot_torch_tensorrt_aten_backend
 
     compiled_mod: torch.nn.Module = DEFAULT_BACKEND(gm, sample_inputs, **kwargs)
