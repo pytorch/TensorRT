@@ -20,8 +20,8 @@ def split(
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    split_size_or_sections: Union[int, List(int)],
-    dim: Optional[Any] = 0,
+    split_size_or_sections: Union[int, List[int]],
+    dim: int = 0,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if not isinstance(input, TRTTensor):
         raise RuntimeError(
@@ -30,16 +30,12 @@ def split(
 
     dim = cast(int, dim)
     dynamic_shape = has_dynamic_shape(input.shape)
-    if network.has_implicit_batch_dimension:
-        assert dim != 0, "Can't split on batch dim when it's implicit!"
-        dim -= 1
-    else:
-        if dynamic_shape > 0:
-            # Check whether slice target dim is dynamic shape dim
-            assert input.shape[dim] != -1, "Can't chunk on dynamic shape dimension!"
+    if dynamic_shape > 0:
+        # Check whether slice target dim is dynamic shape dim
+        assert input.shape[dim] != -1, "Can't chunk on dynamic shape dimension!"
 
     split_sizes = []
-    if type(split_size_or_sections) == int:
+    if isinstance(split_size_or_sections, int):
         split_sizes.append(cast(int, split_size_or_sections))
     else:
         for split_size_or_section in split_size_or_sections:
@@ -48,12 +44,16 @@ def split(
     start = [0] * len(input.shape)
     stride = [1] * len(start)
     offset = 0
-
     if len(split_sizes) == 1:
-        num_splits = input.shape[dim] + split_sizes[0] - 1 // split_sizes[0]
+        num_splits = (input.shape[dim] + split_sizes[0] - 1) // split_sizes[0]
         split_sizes = [split_sizes[0]] * num_splits
     else:
         num_splits = len(split_sizes)
+        sum_split_sizes = sum(split_sizes)
+        if sum_split_sizes != input.shape[dim]:
+            raise RuntimeError(
+                f"split sizes don't add up to the tensor's size in the given dimension"
+            )
 
     if num_splits < 1:
         raise RuntimeError(
@@ -69,7 +69,7 @@ def split(
         start[dim] = offset
         if dynamic_shape:
             shape = get_shape_with_dynamic_shape(
-                network, shape, input, target, f"{name}_shape_{i}"
+                network, target, source_ir, f"{name}_shape_{i}", shape, input
             )
         layer = network.add_slice(
             input, start=start, shape=[] if dynamic_shape else shape, stride=stride
