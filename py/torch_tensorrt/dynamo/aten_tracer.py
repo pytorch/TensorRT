@@ -17,8 +17,12 @@ def trace(
     inputs: Tuple[Any, ...],
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
+    # Set log level at the top of compilation (torch_tensorrt.dynamo)
+    if ("debug" in kwargs and kwargs["debug"]) and logger.parent:
+        logger.parent.setLevel(logging.DEBUG)
+
     with unittest.mock.patch("torch._export.DECOMP_TABLE", get_decompositions()):
         graph_module = export(model, tuple(inputs)).module()
         constant_fold(graph_module)
-    logging.debug("Post export graph: " + str(graph_module.graph))
+    logger.debug("Post export graph: " + str(graph_module.graph))
     return graph_module
