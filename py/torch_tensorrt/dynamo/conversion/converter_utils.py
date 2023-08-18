@@ -1,3 +1,4 @@
+import functools
 import logging
 import re
 from typing import List, Optional
@@ -7,14 +8,13 @@ import torch
 from torch.fx.node import Target
 from torch_tensorrt.fx.converters.converter_utils import (
     Frameworks,
-    unified_dtype_converter,
     get_axes_for_reduce_op,
+    unified_dtype_converter,
 )
 from torch_tensorrt.fx.types import TRTDataType, TRTNetwork, TRTTensor
 
 from .._SourceIR import SourceIR
 from .converter_registry import ConverterRegistry
-import functools
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -161,4 +161,6 @@ def broadcastable(
     return True
 
 
-get_axes_for_reduce_op = functools.partial(get_axes_for_reduce_op, has_implicit_batch_dimension=False)
+get_axes_for_reduce_op = functools.partial(
+    get_axes_for_reduce_op, has_implicit_batch_dimension=False
+)

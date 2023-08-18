@@ -45,7 +45,7 @@ class TestAmaxConverter(DispatchTestCase):
             inputs,
             expected_ops={torch.ops.aten.amax.default},
         )
-        
+
     @parameterized.expand(
         [
             ((3, 2, 4), 1, True, torch.int, 0, 5),
@@ -66,7 +66,7 @@ class TestAmaxConverter(DispatchTestCase):
             expected_ops={torch.ops.aten.amax.default},
             check_dtype=False,
         )
-        
+
     @parameterized.expand(
         [
             ((3, 2, 4), [1], True, torch.int, 0, 5),
