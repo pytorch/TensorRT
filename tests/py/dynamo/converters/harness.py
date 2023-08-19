@@ -266,6 +266,7 @@ class DispatchTestCase(TRTTestCase):
         precision=torch.float,
         check_dtype=True,
         disable_passes=False,
+        output_dtypes=None,
     ):
         mod.eval()
         mod = self.generate_graph(
@@ -284,6 +285,7 @@ class DispatchTestCase(TRTTestCase):
         interp = TRTInterpreter(
             mod,
             Input.from_tensors(inputs),
+            output_dtypes=output_dtypes,
         )
         super().run_test(
             mod,
@@ -306,6 +308,7 @@ class DispatchTestCase(TRTTestCase):
         rtol=1e-03,
         atol=1e-03,
         disable_passes=False,
+        output_dtypes=None,
     ):
         mod.eval()
         inputs = [spec.example_tensor("opt_shape") for spec in input_specs]
@@ -321,6 +324,7 @@ class DispatchTestCase(TRTTestCase):
         interp = TRTInterpreter(
             mod,
             input_specs,
+            output_dtypes=output_dtypes,
         )
         # Since the lowering is based on optimal shape. We need to test with
         # different shape(for ex. max shape) for testing dynamic shape
