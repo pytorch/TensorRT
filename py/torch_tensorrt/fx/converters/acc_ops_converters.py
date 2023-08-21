@@ -3,30 +3,27 @@ import logging
 import math
 import operator
 import warnings
-from typing import cast, Dict, Optional, Sequence, Tuple, Union
+from typing import Dict, Optional, Sequence, Tuple, Union, cast
 
 import numpy as np
 
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
-
-from ..converter_registry import tensorrt_converter
-
-from ..tracer.acc_tracer import acc_ops
-from ..types import *  # noqa: F403
 from torch.fx.immutable_collections import immutable_list
 from torch.fx.node import Argument, Target
-
-from ..utils import get_dynamic_dims, unified_dtype_converter, Frameworks
-
-from .converter_utils import *  # noqa: F403
+from torch_tensorrt.fx.converters.impl import activation, convolution
 from torch_tensorrt.fx.passes.lower_basic_pass import (
     trt_transposed_linear,
     trt_transposed_matmul,
 )
 from torch_tensorrt.fx.tracer.acc_tracer.acc_ops import contiguous
-from torch_tensorrt.fx.converters.impl import activation, convolution
+
+from ..converter_registry import tensorrt_converter
+from ..tracer.acc_tracer import acc_ops
+from ..types import *  # noqa: F403
+from ..utils import Frameworks, get_dynamic_dims, unified_dtype_converter
+from .converter_utils import *  # noqa: F403
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -2714,8 +2711,14 @@ def acc_ops_linear(
         "dim for linear and it can't be the last dim."
     )
 
-    if isinstance(kwargs["weight"], torch.Tensor):
-        weight = get_trt_tensor(network, kwargs["weight"].t(), f"{name}_weight")
+    if isinstance(kwargs["weight"], (torch.Tensor, np.ndarray)):
+        weight = get_trt_tensor(
+            network,
+            kwargs["weight"].t()
+            if isinstance(kwargs["weight"], torch.Tensor)
+            else kwargs["weight"].T,
+            f"{name}_weight",
+        )
         if target not in (acc_ops.linear, torch.ops.aten.linear):
             weight_op = trt.MatrixOperation.TRANSPOSE
         else:

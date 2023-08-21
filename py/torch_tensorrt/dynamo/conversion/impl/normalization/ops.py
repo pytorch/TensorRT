@@ -2,6 +2,7 @@ import logging
 from typing import Any, List, Optional, Sequence, Union, cast
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -18,8 +19,6 @@ from torch_tensorrt.fx.converters.converter_utils import (
 )
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 from torch_tensorrt.fx.utils import get_dynamic_dims
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -101,9 +100,15 @@ def layer_norm(
             "of the TensorRT region!"
         )
 
-    gamma = weight.detach().cpu().float().numpy()
+    gamma = (
+        weight.detach().cpu().float().numpy()
+        if isinstance(weight, torch.Tensor)
+        else weight
+    )
     gamma_field = trt.PluginField("gamma", gamma, trt.PluginFieldType.FLOAT32)
-    beta = bias.detach().cpu().float().numpy()
+    beta = (
+        bias.detach().cpu().float().numpy() if isinstance(bias, torch.Tensor) else bias
+    )
     beta_field = trt.PluginField("beta", beta, trt.PluginFieldType.FLOAT32)
     eps_field = trt.PluginField(
         "eps", np.array(eps, dtype=np.float32), trt.PluginFieldType.FLOAT32
