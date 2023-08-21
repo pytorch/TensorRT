@@ -54,9 +54,6 @@ def aot_torch_tensorrt_aten_backend(
         fake_mode, "allow_non_fake_inputs", True
     ), fake_mode:
         # Invoke AOTAutograd to translate operators to aten
-        import pdb
-
-        pdb.set_trace()
         graph_module = aot_export_joint_simple(
             gm,
             sample_inputs,
