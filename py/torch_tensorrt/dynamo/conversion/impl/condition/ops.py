@@ -1,19 +1,18 @@
 from typing import Optional
 
-
-import tensorrt as trt
 import torch
 from torch.fx.node import Target
-
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion.converter_utils import broadcastable
+from torch_tensorrt.dynamo.conversion.impl.slice import expand
 from torch_tensorrt.fx.converters.converter_utils import (
     broadcast,
     get_trt_tensor,
     set_layer_name,
 )
-from torch_tensorrt.dynamo.conversion.impl.slice import expand
+from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+
+import tensorrt as trt
 
 
 def where(
@@ -36,7 +35,7 @@ def where(
         assert type(other) is torch.Tensor, f"value {other} is not torch.Tensor!"
 
     if not (broadcastable(input, other)):
-        assert f"The two torch tensors should be broadcastable"
+        assert "The two torch tensors should be broadcastable"
 
     # get output shape
     # purpose of this is to bring input and other rank same as
@@ -66,7 +65,7 @@ def where(
         condition_val = condition_layer.get_output(0)
     else:
         assert condition.dtype == trt.bool, "mask dtype is not bool!"
-        if condition_shape != condition_dim:
+        if condition_shape != condition_dim:  # TODO: What is this checking?
             condition_val = expand(
                 network, target, source_ir, f"{name}_expand", condition, output_shape
             )
@@ -74,7 +73,7 @@ def where(
             condition_val = condition
 
     if type(input) != TRTTensor:
-        if x_shape != input_dim:
+        if x_shape != input_dim:  # TODO: What is this checking?
             # special case where 1 element in input
             if len(input.shape) == 0:
                 input = input.unsqueeze(0)
@@ -96,7 +95,7 @@ def where(
         y_val = get_trt_tensor(network, other, f"{name}_y")
     else:
         y_val = other
-        if y_shape != other_dim:
+        if y_shape != other_dim:  # TODO: What is this checking?
             y_val = expand(
                 network, target, source_ir, f"{name}_y_expand", y_val, output_shape
             )

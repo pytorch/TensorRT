@@ -1,20 +1,19 @@
-from typing import Optional, cast
 import math
+from typing import Optional
 
 from torch.fx.node import Target
-
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor, Shape
 from torch_tensorrt.dynamo._SourceIR import SourceIR
-from torch_tensorrt.fx.converters.converter_utils import (
-    get_positive_dim,
-    has_dynamic_shape,
-    broadcast,
-    get_trt_tensor,
-)
 from torch_tensorrt.dynamo.conversion.impl.slice.base import slice
+from torch_tensorrt.fx.converters.converter_utils import (
+    broadcast,
+    get_positive_dim,
+    get_trt_tensor,
+    has_dynamic_shape,
+)
+from torch_tensorrt.fx.types import Shape, TRTNetwork, TRTTensor
 
 
-def slice_op(
+def slice_op(  # TODO: This should be slice not whatever is in base
     network: TRTNetwork,
     target: Target,
     source_ir: Optional[SourceIR],
@@ -32,7 +31,7 @@ def slice_op(
         )
 
     ranks = len(input.shape) + (1 if network.has_implicit_batch_dimension else 0)
-    dim = get_positive_dim(cast(int, dim), ranks)
+    dim = get_positive_dim(dim, ranks)
     dynamic_shape = has_dynamic_shape(input.shape)
     if network.has_implicit_batch_dimension:
         if dim == 0:
@@ -44,19 +43,21 @@ def slice_op(
         if dynamic_shape:
             # Check whether slice target dim is dynamic shape dim
             assert input.shape[dim] != -1, "Can't chunk on dynamic shape dimension!"
-    start_int = cast(int, start)
-    stop_int = cast(int, stop)
+    start_int = start
+    stop_int = stop
     if stop_int == 2**63 - 1:
         stop_int = input.shape[dim]
-    step_int = cast(int, step)
-    start = [0] * len(input.shape)
-    start[dim] = start_int
-    stride = [1] * len(start)
-    stride[dim] = step_int
+    step_int = step
+    start_slice = [0] * len(input.shape)
+    start_slice[dim] = start_int
+    stride_slice = [1] * len(start_slice)
+    stride_slice[dim] = step_int
     output_shape = list(input.shape)
     output_shape[dim] = math.ceil((stop_int - start_int) / step_int)
 
-    return slice(network, target, source_ir, name, input, start, output_shape, stride)
+    return slice(
+        network, target, source_ir, name, input, start_slice, output_shape, stride_slice
+    )
 
 
 def expand(
@@ -88,9 +89,9 @@ def expand(
         ranks = len(shape)
 
     inshape = tuple(input_val.shape)
-    shape = tuple(shape)
+    shape_t = tuple(shape)
     start = tuple([0] * ranks)
     stride = tuple(
         [int(i == o) for i, o in zip(inshape, shape)]
     )  # stride == 1 if dimensions match, 0 otherwise
-    return slice(network, target, source_ir, name, input_val, start, shape, stride)
+    return slice(network, target, source_ir, name, input_val, start, shape_t, stride)

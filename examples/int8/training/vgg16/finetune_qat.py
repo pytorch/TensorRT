@@ -184,7 +184,6 @@ def calibrate_model(
 
 
 def main():
-
     global state
     global classes
     global writer

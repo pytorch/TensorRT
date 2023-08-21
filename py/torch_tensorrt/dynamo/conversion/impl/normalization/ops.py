@@ -1,32 +1,25 @@
-from typing import cast, Union, Any, Optional, Sequence
+import logging
+from typing import Any, List, Optional, Sequence, Union, cast
 
 import numpy as np
-
-import tensorrt as trt
 import torch
 from torch.fx.node import Target
-
-import logging
-
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
-from torch_tensorrt.fx.utils import get_dynamic_dims
 from torch_tensorrt.dynamo._SourceIR import SourceIR
-
-from torch_tensorrt.fx.converters.converter_utils import (
-    get_trt_plugin,
-    set_layer_name,
-    to_numpy,
-    has_dynamic_shape,
-    get_positive_dim,
-)
-
-from torch_tensorrt.dynamo.conversion.impl.unary.base import (
-    convert_unary,
-)
-
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
 )
+from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
+from torch_tensorrt.fx.converters.converter_utils import (
+    get_positive_dim,
+    get_trt_plugin,
+    has_dynamic_shape,
+    set_layer_name,
+    to_numpy,
+)
+from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+from torch_tensorrt.fx.utils import get_dynamic_dims
+
+import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -43,9 +36,8 @@ def batch_norm(
     running_var: torch.Tensor,
     training: torch.Tensor,
     momentum: torch.Tensor,
-    eps: list,
+    eps: List[float],
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     if not isinstance(input, TRTTensor):
         raise RuntimeError(
             f"BatchNorm2d received input {input} that is not part "
@@ -55,14 +47,11 @@ def batch_norm(
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for batch norm."
 
-    scale = cast(torch.Tensor, to_numpy(cast(torch.Tensor, weight))) / np.sqrt(
-        cast(torch.Tensor, to_numpy(cast(torch.Tensor, running_var))) + cast(float, eps)
+    scale = cast(torch.Tensor, to_numpy(weight)) / np.sqrt(
+        cast(torch.Tensor, to_numpy(running_var)) + cast(float, eps)
     )
 
-    bias = (
-        to_numpy(cast(torch.Tensor, bias))
-        - to_numpy(cast(torch.Tensor, running_mean)) * scale
-    )
+    bias = to_numpy(bias) - to_numpy(running_mean) * scale
     power = np.ones_like(scale)
 
     # For BatchNorm1d, reshape 1d to 2d
@@ -101,10 +90,10 @@ def layer_norm(
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    normalized_shape: list,
+    normalized_shape: List[int],
     weight: torch.Tensor,
     bias: torch.Tensor,
-    eps: list,
+    eps: List[float],
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if not isinstance(input, trt.tensorrt.ITensor):
         raise RuntimeError(
@@ -120,13 +109,13 @@ def layer_norm(
         "eps", np.array(eps, dtype=np.float32), trt.PluginFieldType.FLOAT32
     )
     try:
-        normalized_shape = np.array(normalized_shape, dtype=np.int32)
+        normalized_shape_arr = np.array(normalized_shape, dtype=np.int32)
     except TypeError:
         _LOGGER.error("Unable to convert normalized_shape to a field, fall back to []")
-        normalized_shape = np.array([], dtype=np.int32)
+        normalized_shape_arr = np.array([], dtype=np.int32)
 
     normalized_shape_filed = trt.PluginField(
-        "normalized_shape", normalized_shape, trt.PluginFieldType.INT32
+        "normalized_shape", normalized_shape_arr, trt.PluginFieldType.INT32
     )
     field_collection = trt.PluginFieldCollection(
         [gamma_field, beta_field, eps_field, normalized_shape_filed]
@@ -155,22 +144,21 @@ def layer_norm_no_plugin(
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    normalized_shape: list,
+    normalized_shape: List[int],
     weight: torch.Tensor,
     bias: torch.Tensor,
-    eps: list,
+    eps: List[float],
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     if not isinstance(input, TRTTensor):
         raise RuntimeError(
             f"LayerNorm received input {input} that is not part "
             "of the TensorRT region!"
         )
 
-    shape = weight.shape  # type: ignore[union-attr]
+    shape = weight.shape
     broadcasted_shape = (1,) * (len(input.shape) - len(shape)) + shape
-    gamma = to_numpy(weight.reshape(*shape))  # type: ignore[union-attr]
-    beta = to_numpy(bias.reshape(*shape))  # type: ignore[union-attr]
+    gamma = to_numpy(weight.reshape(*shape))
+    beta = to_numpy(bias.reshape(*shape))
 
     axes = 0
     for d in range(len(shape)):
@@ -247,10 +235,14 @@ def layer_norm_no_plugin(
     )
 
     assert gamma is not None
-    gamma_tensor = network.add_constant(gamma.shape, trt.Weights(np.ascontiguousarray(gamma)))  # type: ignore[attr-defined]
+    gamma_tensor = network.add_constant(
+        gamma.shape, trt.Weights(np.ascontiguousarray(gamma))
+    )
     gamma_tensor.name = f"{name}_gamma"
     assert beta is not None
-    beta_tensor = network.add_constant(gamma.shape, trt.Weights(np.ascontiguousarray(beta)))  # type: ignore[attr-defined]
+    beta_tensor = network.add_constant(
+        gamma.shape, trt.Weights(np.ascontiguousarray(beta))
+    )
     beta_tensor.name = f"{name}_beta"
     # y * gamma + beta
     scale_layer = convert_binary_elementwise(
@@ -281,7 +273,7 @@ def softmax(
     input: TRTTensor,
     dim: Optional[Any] = None,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_ranks = len(input.shape) + (1 if network.has_implicit_batch_dimension else 0)  # type: ignore[union-attr]
+    input_ranks = len(input.shape) + (1 if network.has_implicit_batch_dimension else 0)
 
     if not isinstance(input, TRTTensor):
         raise RuntimeError(

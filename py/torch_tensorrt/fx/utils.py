@@ -12,7 +12,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass import (
     replace_op_with_indices,
     run_const_fold,
 )
-from torch_tensorrt._util import sanitized_torch_version
+from torch_tensorrt._utils import sanitized_torch_version
 from .types import Shape, TRTDataType
 
 
@@ -127,7 +127,6 @@ def get_dynamic_dims(shape: Shape) -> List[int]:
 
 
 def proxytensor_trace(mod, inputs):
-
     mod.eval()
 
     def f(*inp):

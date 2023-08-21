@@ -1,38 +1,35 @@
-import torch
-import logging
+from __future__ import annotations
+
 import collections.abc
+import logging
+from typing import Any, List, Optional, Sequence, Set, Tuple
+
+import torch
 import torch_tensorrt
-from functools import partial
-
-from typing import Any, Optional, Sequence
-from torch_tensorrt import EngineCapability, Device
-from torch.fx.passes.pass_manager import PassManager
-from torch.fx.passes.shape_prop import ShapeProp
-from torch.fx.passes.splitter_base import SplitResult
-from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
-from torch_tensorrt.dynamo.lowering import (
-    fuse_permute_linear,
-    fuse_permute_matmul,
+from torch_tensorrt._Device import Device
+from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
+    EngineCapability,
 )
-from torch_tensorrt.dynamo import CompilationSettings
-from torch_tensorrt.dynamo.utils import prepare_inputs, prepare_device
-from torch_tensorrt.dynamo.backend import torch_tensorrt_backend
-from torch_tensorrt.dynamo.backend.backends import _compile_module
-from torch_tensorrt.dynamo.conversion import convert_module
-
+from torch_tensorrt.dynamo import CompilationSettings, partitioning
 from torch_tensorrt.dynamo._defaults import (
-    PRECISION,
     DEBUG,
-    WORKSPACE_SIZE,
-    MIN_BLOCK_SIZE,
-    PASS_THROUGH_BUILD_FAILURES,
+    ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     MAX_AUX_STREAMS,
-    VERSION_COMPATIBLE,
+    MIN_BLOCK_SIZE,
     OPTIMIZATION_LEVEL,
-    USE_PYTHON_RUNTIME,
+    PASS_THROUGH_BUILD_FAILURES,
+    PRECISION,
     TRUNCATE_LONG_AND_DOUBLE,
+    USE_FAST_PARTITIONER,
+    USE_PYTHON_RUNTIME,
+    VERSION_COMPATIBLE,
+    WORKSPACE_SIZE,
 )
-
+from torch_tensorrt.dynamo.conversion import (
+    convert_module,
+    repair_long_or_double_inputs,
+)
+from torch_tensorrt.dynamo.utils import prepare_device, prepare_inputs
 
 logger = logging.getLogger(__name__)
 
@@ -41,45 +38,51 @@ def compile(
     gm: Any,
     inputs: Any,
     *,
-    device=Device._current_device(),
-    disable_tf32=False,
-    sparse_weights=False,
-    enabled_precisions=set(),
-    refit=False,
-    debug=DEBUG,
-    capability=EngineCapability.default,
-    num_avg_timing_iters=1,
-    workspace_size=WORKSPACE_SIZE,
-    dla_sram_size=1048576,
-    dla_local_dram_size=1073741824,
-    dla_global_dram_size=536870912,
-    calibrator=None,
-    truncate_long_and_double=TRUNCATE_LONG_AND_DOUBLE,
-    require_full_compilation=False,
-    min_block_size=MIN_BLOCK_SIZE,
-    torch_executed_ops=[],
-    torch_executed_modules=[],
-    pass_through_build_failures=PASS_THROUGH_BUILD_FAILURES,
-    max_aux_streams=MAX_AUX_STREAMS,
-    version_compatible=VERSION_COMPATIBLE,
-    optimization_level=OPTIMIZATION_LEVEL,
-    use_python_runtime=USE_PYTHON_RUNTIME,
-    **kwargs,
-):
+    device: Device = Device._current_device(),
+    disable_tf32: bool = False,
+    sparse_weights: bool = False,
+    enabled_precisions: Set[torch.dtype] | Tuple[torch.dtype] = (torch.float32,),
+    refit: bool = False,
+    debug: bool = DEBUG,
+    capability: EngineCapability = EngineCapability.default,
+    num_avg_timing_iters: int = 1,
+    workspace_size: int = WORKSPACE_SIZE,
+    dla_sram_size: int = 1048576,
+    dla_local_dram_size: int = 1073741824,
+    dla_global_dram_size: int = 536870912,
+    calibrator: object = None,
+    truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE,
+    require_full_compilation: bool = False,
+    min_block_size: int = MIN_BLOCK_SIZE,
+    torch_executed_ops: Optional[List[str]] = None,
+    torch_executed_modules: Optional[List[str]] = None,
+    pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES,
+    max_aux_streams: Optional[int] = MAX_AUX_STREAMS,
+    version_compatible: bool = VERSION_COMPATIBLE,
+    optimization_level: Optional[int] = OPTIMIZATION_LEVEL,
+    use_python_runtime: bool = USE_PYTHON_RUNTIME,
+    use_fast_partitioner: bool = USE_FAST_PARTITIONER,
+    enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    **kwargs: Any,
+) -> torch.fx.GraphModule:
     if debug:
-        logger.setLevel(logging.DEBUG)
+        if logger.parent:
+            logger.parent.setLevel(logging.DEBUG)
 
-    logger.warn(
+    enabled_precisions = set(enabled_precisions)
+
+    logger.warning(
         "The Dynamo backend is an experimental feature, for which only the "
-        + "following arguments are supported: "
-        + "{enabled_precisions, debug, workspace_size, min_block_size, "
-        + "torch_executed_ops, pass_through_build_failures}"
+        "following arguments are supported: "
+        "{enabled_precisions, debug, workspace_size, min_block_size, "
+        "torch_executed_ops, pass_through_build_failures, use_fast_partitioner, "
+        "enable_experimental_decompositions}"
     )
 
     if not isinstance(inputs, collections.abc.Sequence):
         inputs = [inputs]
 
-    torchtrt_inputs, torch_inputs = prepare_inputs(inputs, prepare_device(device))
+    _, torch_inputs = prepare_inputs(inputs, prepare_device(device))
 
     if (
         torch.float16 in enabled_precisions
@@ -104,70 +107,131 @@ def compile(
         "debug": debug,
         "workspace_size": workspace_size,
         "min_block_size": min_block_size,
-        "torch_executed_ops": torch_executed_ops,
+        "torch_executed_ops": torch_executed_ops
+        if torch_executed_ops is not None
+        else [],
         "pass_through_build_failures": pass_through_build_failures,
         "max_aux_streams": max_aux_streams,
         "version_compatible": version_compatible,
         "optimization_level": optimization_level,
         "use_python_runtime": use_python_runtime,
         "truncate_long_and_double": truncate_long_and_double,
+        "use_fast_partitioner": use_fast_partitioner,
+        "enable_experimental_decompositions": enable_experimental_decompositions,
     }
 
     settings = CompilationSettings(**compilation_options)
-    if kwargs.get("use_capability_partitioner", None):
-        model = lower_model(gm, torch_inputs)
-        return _compile_module(model, torch_inputs, settings)
-    else:
-        split_result = lower_model_using_trt_splitter(gm, torch_inputs)
-        trt_module = _compile_graph(split_result, torch_inputs, settings)
-
-        return trt_module
+    logger.info("Compilation Settings: %s\n", settings)
+    return compile_module(gm, torch_inputs, settings)
 
 
-def _compile_graph(
-    split_result: SplitResult,
-    inputs: Any,
+def compile_module(
+    gm: torch.fx.GraphModule,
+    sample_inputs: Sequence[torch.Tensor],
     settings: CompilationSettings = CompilationSettings(),
-    **kwargs,
-):
+) -> torch.fx.GraphModule:
+    """Compile a traced FX module
 
-    for submod_name, submod_inputs in split_result.submodule_inputs.items():
-        submod = getattr(split_result.split_module, submod_name)
-        # Only acc submodules will be lowered.
-        if not submod_name.startswith(split_result.non_acc_submodule_prefix):
-            # Create TRT Module from submodule
-            trt_mod = convert_module(
-                submod,
-                submod_inputs,
-                settings=settings,
-                name=submod_name,
-            )
-            setattr(split_result.split_module, submod_name, trt_mod)
+    Includes: Partitioning + Conversion Phases
 
-    return split_result.split_module
-
-
-def lower_model_using_trt_splitter(model: torch.nn.Module, inputs: Any, **kwargs):
-    # Perform basic lowering
-    model = lower_model(model, inputs)
-    splitter_setting = TRTSplitterSetting()
-    splitter_setting.use_implicit_batch_dim = False
-    splitter_setting.min_acc_module_size = 1
-    splitter_setting.use_experimental_rt = False
-    splitter = TRTSplitter(model, inputs, settings=splitter_setting)
-    splitter.node_support_preview()
-    split_result = splitter.generate_split_results()
-
-    return split_result
-
-
-def lower_model(model: torch.nn.Module, inputs: Any, **kwargs):
-
-    graph_optimization_pm = PassManager.build_from_passlist(
-        [fuse_permute_matmul, fuse_permute_linear]
+    Args:
+        module: FX GraphModule to convert
+        inputs: Inputs to the module
+        settings: Compilation settings
+    Returns:
+        Compiled FX GraphModule
+    """
+    # Check the number of supported operations in the graph
+    num_supported_ops, total_ops = partitioning.get_graph_converter_support(
+        gm, settings.debug, settings.torch_executed_ops
     )
-    lowered_model = graph_optimization_pm(model)
-    # if isinstance(lowered_model, torch.fx.GraphModule):
-    #     ShapeProp(lowered_model).propagate(*inputs)
 
-    return lowered_model
+    # If the number of supported operations is 0 or less than the block size, skip the subgraph
+    # TODO: Add condition to second expression below when require_full_compilation is added
+    if num_supported_ops == 0 or (num_supported_ops < settings.min_block_size):
+        logger.warning(
+            f"{num_supported_ops} supported operations detected in subgraph containing {total_ops} computational nodes. "
+            f"Skipping this subgraph, since min_block_size was detected to be {settings.min_block_size}"
+        )
+        return gm
+    else:
+        logger.debug(
+            f"Detected support for {num_supported_ops} operators out of {total_ops} in subgraph."
+        )
+
+    # Partition module into components that can be TRT-accelerated
+    fast_partitioner_failed = False
+
+    # If specified, try using the fast partitioner and fall back to the global one on failure
+    if settings.use_fast_partitioner:
+        try:
+            partitioned_module = partitioning.fast_partition(
+                gm,
+                verbose=settings.debug,
+                min_block_size=settings.min_block_size,
+                torch_executed_ops=settings.torch_executed_ops,
+            )
+        except torch.fx.passes.splitter_base.FxNetSplitterInternalError:
+            logger.error(
+                "Partitioning failed on the subgraph with fast partition. See trace above. "
+                + "Retrying with global partition.",
+                exc_info=True,
+            )
+
+            fast_partitioner_failed = True
+            settings.use_fast_partitioner = False
+
+    if not settings.use_fast_partitioner:
+        partitioned_module = partitioning.global_partition(
+            gm,
+            verbose=settings.debug,
+            min_block_size=settings.min_block_size,
+            torch_executed_ops=settings.torch_executed_ops,
+        )
+
+    # Store TRT replicas of Torch subgraphs
+    trt_modules = {}
+
+    # Iterate over all components that can be accelerated
+    # Generate the corresponding TRT Module for those
+    for name, _ in partitioned_module.named_children():
+        # Criteria for a module to be convertible to TRT
+        if settings.use_fast_partitioner and "_run_on_acc" not in name:
+            continue
+
+        submodule = getattr(partitioned_module, name)
+
+        logger.debug(
+            "Submodule name: " + str(name) + " Graph: \n" + str(submodule.graph)
+        )
+        # Get submodule inputs
+        submodule_inputs = partitioning.get_submod_inputs(
+            partitioned_module, submodule, sample_inputs
+        )
+
+        assert submodule_inputs is not None
+        # Handle long/double inputs if requested by the user
+        if settings.truncate_long_and_double:
+            submodule_inputs = repair_long_or_double_inputs(
+                partitioned_module, submodule, submodule_inputs, name
+            )
+
+        # Create TRT Module from submodule
+        trt_mod = convert_module(
+            submodule,
+            submodule_inputs,
+            settings=settings,
+            name=name,
+        )
+
+        trt_modules[name] = trt_mod
+
+    # Replace all FX Modules with TRT Modules
+    for name, trt_mod in trt_modules.items():
+        setattr(partitioned_module, name, trt_mod)
+
+    # Reset settings object to user specification after fallback to global partitioning mode
+    if fast_partitioner_failed:
+        settings.use_fast_partitioner = True
+
+    return partitioned_module

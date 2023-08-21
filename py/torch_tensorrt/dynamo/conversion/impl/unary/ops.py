@@ -1,20 +1,14 @@
 from typing import Optional
 
-import tensorrt as trt
 from torch.fx.node import Target
-
-from torch_tensorrt.fx.types import (
-    TRTNetwork,
-    TRTTensor,
-)
-
 from torch_tensorrt.dynamo._SourceIR import SourceIR
-
-
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
 )
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
+from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+
+import tensorrt as trt
 
 
 def sign(

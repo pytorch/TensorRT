@@ -1,20 +1,10 @@
-import operator
-import warnings
-from typing import Optional, cast, Any
+from typing import Optional
 
-import numpy as np
-
-import tensorrt as trt
 import torch
 from torch.fx.node import Target
-
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.fx.converters.converter_utils import get_trt_tensor, set_layer_name
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
-from torch_tensorrt.fx.converters.converter_utils import (
-    set_layer_name,
-)
-
-from torch_tensorrt.fx.converters.converter_utils import get_trt_tensor
 
 
 def embedding(
@@ -24,17 +14,9 @@ def embedding(
     name: str,
     input: TRTTensor,
     weight: TRTTensor,
-    max_norm: None,
-    norm_type: None,
     scale_grad_by_freq: bool,
     sparse: bool,
 ) -> TRTTensor:
-
-    if network.has_implicit_batch_dimension:
-        raise RuntimeError(
-            "The `embedding` function should be called with explicit batch dimension."
-        )
-
     indices_tensor = input
     embedding_tensor = weight
     if isinstance(indices_tensor, torch.Tensor) and indices_tensor.dtype == torch.int64:
@@ -48,16 +30,6 @@ def embedding(
     # unsupported parameters
     # ignore padding_idx since it is meaningful for training only
 
-    if max_norm is not None:
-        raise RuntimeError(
-            f"Currently we don't support specifying max_norm, got {max_norm}."
-        )
-
-    if norm_type is not None and norm_type != 2.0:
-        raise RuntimeError(
-            f"Currently we don't support specifying max_norm, got {norm_type} for norm_type."
-        )
-
     if scale_grad_by_freq:
         raise RuntimeError(
             "Currently we don't support scale gradient by word frequency."
@@ -68,5 +40,5 @@ def embedding(
 
     # Implement embedding lookup with gather layer
     gather_layer = network.add_gather(embedding_tensor, indices_tensor, axis=0)
-    set_layer_name(gather_layer, target, name + "_gather")
+    set_layer_name(gather_layer, target, name + "_gather", source_ir)
     return gather_layer.get_output(0)

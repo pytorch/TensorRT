@@ -53,6 +53,7 @@ TEST(Partitioning, CheckLoopFallbackNoEvalCompilesCorrectly) {
 
   std::vector<torch_tensorrt::core::ir::Input> input_ranges{torch_tensorrt::core::ir::Input({1, 10})};
   torch_tensorrt::core::CompileSpec cfg(input_ranges);
+  cfg.partitioning_info.forced_fallback_operators.push_back("aten::ones_like");
   cfg.partitioning_info.enabled = true;
 
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();

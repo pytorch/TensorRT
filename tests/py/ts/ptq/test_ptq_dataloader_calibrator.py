@@ -51,7 +51,6 @@ def compute_accuracy(testing_dataloader, model):
 
 class TestAccuracy(unittest.TestCase):
     def test_compile_script(self):
-
         self.model = (
             torch.jit.load(MODULE_DIR + "/trained_vgg16.jit.pt").eval().to("cuda")
         )

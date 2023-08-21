@@ -9,7 +9,7 @@ class SourceIR(Enum):
     TORCHTRT_LOWERED = auto()
     UNKNOWN = auto()
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self == SourceIR.NN:
             return "nn"
         elif self == SourceIR.ACC:

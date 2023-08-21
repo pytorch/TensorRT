@@ -39,7 +39,6 @@ def replace_mutable_op(module: torch.fx.GraphModule) -> torch.fx.GraphModule:
             # only through this op
             if set(n.args[0].users.keys()) == {n}:
                 with module.graph.inserting_after(n):
-
                     # TODO: move this outside?
                     def fill_with_mul_zero_and_add(*args):
                         return args[0].mul(0.0).add(args[1])

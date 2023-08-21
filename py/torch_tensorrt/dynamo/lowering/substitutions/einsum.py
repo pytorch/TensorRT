@@ -1,31 +1,30 @@
-from typing import Dict, Tuple
+from typing import Any, Dict, Optional, Sequence, Tuple
+
 import torch
 from torch._custom_op.impl import custom_op
 from torch.fx.node import Argument, Target
-
+from torch_tensorrt.dynamo.lowering._pre_aot_lowering import register_substitution
 from torch_tensorrt.fx.converter_registry import tensorrt_converter
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
-
-from torch_tensorrt.dynamo.lowering import register_substitution
 
 
 @custom_op(
     qualname="tensorrt::einsum",
     manual_schema="(str equation, Tensor[] tensors) -> Tensor",
 )
-def einsum(equation, tensors):
+def einsum(equation, tensors):  # type: ignore[no-untyped-def]
     # Defines operator schema, name, namespace, and function header
     ...
 
 
-@einsum.impl("cpu")
-@einsum.impl("cuda")
-@einsum.impl_abstract()
+@einsum.impl("cpu")  # type: ignore[misc]
+@einsum.impl("cuda")  # type: ignore[misc]
+@einsum.impl_abstract()  # type: ignore[misc]
 def einsum_generic(
-    *args,
-    **kwargs,
-):
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
     # Defines a converter implementation for AOT Autograd to use for shape analysis/propagation
     return torch.einsum(
         *args,
@@ -34,7 +33,7 @@ def einsum_generic(
 
 
 # TODO: @gs-olive Port to dynamo converter
-@tensorrt_converter(torch.ops.tensorrt.einsum.default)
+@tensorrt_converter(torch.ops.tensorrt.einsum.default)  # type: ignore[misc]
 def aten_ops_einsum(
     network: TRTNetwork,
     target: Target,
@@ -43,6 +42,7 @@ def aten_ops_einsum(
     name: str,
 ) -> TRTTensor:
     # Defines converter replacing the default operator for this function
+    assert isinstance(args[1], Sequence)
     for input_trt in args[1]:
         if not isinstance(input_trt, TRTTensor):
             raise RuntimeError(f"Einsum received non-TRTTensor input: {input_trt}")
@@ -53,11 +53,11 @@ def aten_ops_einsum(
     return einsum_layer.get_output(0)
 
 
-@register_substitution(torch.einsum, torch.ops.tensorrt.einsum)
+@register_substitution(torch.einsum, torch.ops.tensorrt.einsum)  # type: ignore[misc]
 def einsum_insertion_fn(
     gm: torch.fx.GraphModule,
     node: torch.fx.Node,
-    _unused: None = None,
+    submodule: Optional[torch.nn.Module] = None,
 ) -> torch.fx.Node:
     equation = node.args[0]
 
@@ -72,7 +72,7 @@ def einsum_insertion_fn(
     ), f"TRT Einsum currently only supports 1 or 2 Tensors, got {len(inputs)} Tensors"
 
     # Ensure the input is formatted as an equation and
-    new_node = gm.graph.call_function(
+    new_node: torch.fx.Node = gm.graph.call_function(
         torch.ops.tensorrt.einsum,
         args=(equation, inputs),
         kwargs=node.kwargs,

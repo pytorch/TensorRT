@@ -18,6 +18,9 @@ sys.path.append(os.path.join(os.path.dirname(__name__), "../py"))
 import torch
 import pytorch_sphinx_theme
 import torch_tensorrt
+from docutils.parsers.rst import Directive, directives
+from docutils.statemachine import StringList
+from docutils import nodes
 
 # -- Project information -----------------------------------------------------
 
@@ -47,6 +50,7 @@ extensions = [
     "sphinx.ext.coverage",
     "sphinx.ext.mathjax",
     "sphinx.ext.viewcode",
+    "sphinx_gallery.gen_gallery",
 ]
 
 napoleon_use_ivar = True
@@ -78,6 +82,18 @@ html_theme = "pytorch_sphinx_theme"
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+# Custom CSS paths should either relative to html_static_path
+# or fully qualified paths (eg. https://...)
+html_css_files = [
+    "https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css",
+    "css/custom.css",
+]
+
+# sphinx-gallery configuration
+sphinx_gallery_conf = {
+    "examples_dirs": "../examples",
+    "gallery_dirs": "tutorials/_rendered_examples/",
+}
 
 # Setup the breathe extension
 breathe_projects = {"Torch-TensorRT": "./_tmp/xml"}

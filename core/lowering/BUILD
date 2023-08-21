@@ -22,12 +22,12 @@ cc_library(
         "lowering.h",
     ],
     deps = [
+        "//core/ir",
         "//core/lowering/passes",
         "//core/util:prelude",
-        "//core/ir",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
     alwayslink = True,
 )

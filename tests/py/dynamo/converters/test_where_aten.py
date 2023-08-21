@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
+from harness import DispatchTestCase
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.test_utils import DispatchTestCase
 
 
 class TestWhereConverter(DispatchTestCase):
@@ -21,6 +21,20 @@ class TestWhereConverter(DispatchTestCase):
 
         inputX = torch.randn(*x_size)
         inputOther = torch.randn(*y_size)
+        condition = inputX < 0
+        self.run_test(
+            Where(),
+            (condition, inputX, inputOther),
+            expected_ops={torch.ops.aten.where.self},
+        )
+
+    def test_0D_input(self):
+        class Where(nn.Module):
+            def forward(self, condition, x, y):
+                return torch.where(condition, x, y)
+
+        inputX = torch.randn((5, 6, 7, 1, 3))
+        inputOther = torch.tensor(8.0, dtype=torch.float)
         condition = inputX < 0
         self.run_test(
             Where(),

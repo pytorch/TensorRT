@@ -32,6 +32,10 @@ auto prim_registrations =
         .evaluator(
             {torch::jit::prim::NumToTensor,
              [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               // Dynamic version receives an ITensor here so pass that as output directly.
+               if (args.at(n->input(0)).isITensor()) {
+                 return args.at(n->input(0)).ITensor();
+               }
                return evaluators::scalar_to_tensor(args.at(n->input(0)).IValue()->toScalar());
              }})
         .evaluator(

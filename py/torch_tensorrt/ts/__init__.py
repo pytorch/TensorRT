@@ -1,3 +1,3 @@
-from torch_tensorrt.ts._compiler import *
-from torch_tensorrt.ts._compile_spec import TensorRTCompileSpec
-from torch_tensorrt.ts.ts_input import TSInput
+from torch_tensorrt.ts._compile_spec import TensorRTCompileSpec  # noqa: F401
+from torch_tensorrt.ts._compiler import *  # noqa: F403
+from torch_tensorrt.ts._Input import TorchScriptInput  # noqa: F401

@@ -29,26 +29,26 @@ cc_library(
         "util.h",
     ],
     deps = [
-        "@tensorrt//:nvinfer",
         "@googletest//:gtest_main",
+        "@tensorrt//:nvinfer",
     ] + select({
         ":use_pre_cxx11_abi": [
-            "@libtorch_pre_cxx11_abi//:libtorch",
             "@libtorch_pre_cxx11_abi//:caffe2",
+            "@libtorch_pre_cxx11_abi//:libtorch",
         ],
         "//conditions:default": [
-            "@libtorch//:libtorch",
+            "@libtorch",
             "@libtorch//:caffe2",
         ],
     }) + select({
         ":ci_build_testing": [
-            "@torch_tensorrt//:torch_tensorrt",
+            "@torch_tensorrt",
             "@torch_tensorrt//:torch_tensorrt_core_hdrs",
         ],
         "//conditions:default": [
-            "//cpp:torch_tensorrt",
             "//core/conversion",
             "//core/util:prelude",
+            "//cpp:torch_tensorrt",
         ],
     }),
 )

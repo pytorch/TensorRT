@@ -32,6 +32,32 @@ TEST(Converters, ATenSelectIntConvertsCorrectly) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
+TEST(Converters, ATenSelectIntDynamicConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %2 : int = prim::Constant[value=0]()
+        %3 : Tensor = aten::select(%0, %2, %2)
+        return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {5, 7, 9}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {trt_in});
+
+  auto trt = trt_results[0].reshape(jit_results[0].sizes());
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+}
+
 TEST(Converters, ATenSelectIntDimIsOneConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor):
