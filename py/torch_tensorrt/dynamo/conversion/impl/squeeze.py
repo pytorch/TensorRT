@@ -18,11 +18,6 @@ def squeeze(
     input: TRTTensor,
     dim: Optional[Any] = None,
 ) -> TRTTensor:
-    if not isinstance(input, TRTTensor):
-        raise RuntimeError(
-            f"squeeze received input {input} that is not part "
-            "of the TensorRT region!"
-        )
     dims = []
     if dim is not None:
         if isinstance(dim, int):
@@ -35,6 +30,7 @@ def squeeze(
     # dim, which is a very rare case. For now we just claim not supporting dim=None.
     assert not (len(dims) == 0), "We don't support dim=None right now for squeeze."
 
+    new_dims = []
     for dim in dims:
         dim = get_positive_dim(
             dim,
@@ -48,13 +44,14 @@ def squeeze(
         assert (
             len(get_dynamic_dims(input.shape)) <= 1
         ), "Currently more than one dynamic dim for input to squeeze is not supported."
+        new_dims.append(dim)
 
     output_shape = []
     for i, s in enumerate(input.shape):
-        if (i in dims) and s == 1:
+        if (i in new_dims) and s == 1:
             continue
         output_shape.append(s)
     layer = network.add_shuffle(input)
     layer.reshape_dims = tuple(output_shape)
-    set_layer_name(layer, target, name)
+    set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
