@@ -1289,3 +1289,22 @@ def aten_ops_convolution(
         dilation=args[5],
         groups=args[8],
     )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.linear)
+def aten_ops_linear(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.linear.linear(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        weight=args[1],
+        bias=args_bounds_check(args, 2, None),
+    )
