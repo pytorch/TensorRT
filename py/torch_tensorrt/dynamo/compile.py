@@ -189,9 +189,6 @@ def compile_module(
             torch_executed_ops=settings.torch_executed_ops,
         )
 
-    # Store TRT replicas of Torch subgraphs
-    trt_modules = {}
-
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
     for name, _ in partitioned_module.named_children():
@@ -200,6 +197,17 @@ def compile_module(
             continue
 
         submodule = getattr(partitioned_module, name)
+
+        # Store the input nodes for this TRT subgraph
+        submodule_input_nodes = []
+        submodule_node = None
+        for node in partitioned_module.graph.nodes:
+            if node.name == name:
+                submodule_node = node
+                if len(node.args) > 0:
+                    for i in range(len(node.args)):
+                        if node.args[i].op == "placeholder":
+                            submodule_input_nodes.append(node.args[i])
 
         logger.debug(
             "Submodule name: " + str(name) + " Graph: \n" + str(submodule.graph)
@@ -224,11 +232,27 @@ def compile_module(
             name=name,
         )
 
-        trt_modules[name] = trt_mod
+        # Get the engine and engine_str
+        assert trt_mod.engine
 
-    # Replace all FX Modules with TRT Modules
-    for name, trt_mod in trt_modules.items():
-        setattr(partitioned_module, name, trt_mod)
+        # Insert a call_function node to perform inference on TRT engine
+        with partitioned_module.graph.inserting_before(submodule_node):
+            new_node = partitioned_module.graph.call_function(
+                torch.ops.tensorrt.execute_engine,
+                (submodule_input_nodes, trt_mod.engine),
+            )
+
+        # Replace uses of submodule with the new_node
+        if submodule_node:
+            submodule_node.replace_all_uses_with(new_node)
+
+        # Erase the submodule node
+        partitioned_module.graph.erase_node(submodule_node)
+
+        # Clean the graph
+        partitioned_module.graph.eliminate_dead_code()
+        partitioned_module.graph.lint()
+        # partitioned_module.recompile()
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:
