@@ -152,20 +152,147 @@ def aten_ops_fmod(
     return impl.elementwise.fmod(network, target, SourceIR.ATEN, name, args[0], args[1])
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.gelu.default)  # type: ignore[misc]
-def aten_ops_gelu(
+@dynamo_tensorrt_converter(torch.ops.aten.relu.default)
+def aten_ops_relu(
     network: TRTNetwork,
     target: Target,
     args: Tuple[Argument, ...],
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.activation.gelu(
+    return impl.activation.relu(
         network,
         target,
         SourceIR.ATEN,
         name,
         args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.sigmoid.default)
+def aten_ops_sigmoid(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.activation.sigmoid(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.tanh.default)
+def aten_ops_tanh(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.activation.tanh(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.leaky_relu.default)
+def aten_ops_leaky_relu(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.activation.leaky_relu(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, 0.01),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.elu.default)
+def aten_ops_elu(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.activation.elu(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        alpha=args_bounds_check(args, 1, 1.0),
+        beta=args_bounds_check(args, 2, None),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.softplus.default)
+def aten_ops_softplus(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.activation.softplus(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        beta=args_bounds_check(args, 1, 1),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.clip.default)
+def aten_ops_clip(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.activation.clip(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        alpha=args_bounds_check(args, 1),
+        beta=args_bounds_check(args, 2),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.hardsigmoid.default)
+def aten_ops_hard_sigmoid(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.activation.hard_sigmoid(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        alpha=args_bounds_check(args, 1, 1 / 6),
+        beta=args_bounds_check(args, 2, 1 / 2),
     )
 
 
@@ -207,23 +334,6 @@ def aten_ops_layernorm(
         args[2],
         args[3],
         args[4],
-    )
-
-
-@dynamo_tensorrt_converter(torch.ops.aten.relu.default)  # type: ignore[misc]
-def aten_ops_relu(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.activation.relu(
-        network,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
     )
 
 
