@@ -420,3 +420,21 @@ def aten_ops_clone(
         name,
         args[0],
     )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.expand.default)
+def aten_ops_expand(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.slice.expand(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
