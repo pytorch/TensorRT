@@ -913,6 +913,9 @@ jobs:
       ci-image:
         type: string
         default: "linux-cuda-12:2023.05.1"
+      platform:
+        type: string
+        default: "x86_64"
     machine:
       image: << parameters.ci-image >>
     resource_class: gpu.nvidia.medium
@@ -939,7 +942,8 @@ jobs:
           name: "Install torch-tensorrt"
           command: pip3 install /tmp/dist/x86_64-linux/*cp310-cp310*.whl
       - dump-test-env
-      - test-ts-core
+      - test-ts-core:
+        platform: << parameters.platform >>
 
   test-py-ts-x86_64-linux:
     parameters:
@@ -1457,6 +1461,9 @@ parameters:
   ci-image-legacy:
     type: string
     default: "linux-cuda-11:2023.02.1"
+  platform-legacy:
+    type: string
+    default: "x86_64.legacy"
 
   # Jetson platform config
   cuda-jetson-version:
@@ -1570,6 +1577,7 @@ workflows:
           trt-version-short: << pipeline.parameters.trt-version-short-legacy >>
           trt-version-long: << pipeline.parameters.trt-version-long-legacy >>
           cudnn-version: << pipeline.parameters.cudnn-version-legacy >>
+          platform: << pipeline.parameters.platform-legacy >>
           python-version: << pipeline.parameters.python-version >>
           requires:
             - build-x86_64-linux-legacy
@@ -1719,6 +1727,7 @@ workflows:
           trt-version-short: << pipeline.parameters.trt-version-short-legacy >>
           trt-version-long: << pipeline.parameters.trt-version-long-legacy >>
           cudnn-version: << pipeline.parameters.cudnn-version-legacy >>
+          platform: << pipeline.parameters.platform-legacy >>
           python-version: << pipeline.parameters.python-version >>
           ci-image: << pipeline.parameters.ci-image-legacy >>
           requires:
