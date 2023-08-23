@@ -27,7 +27,7 @@ def unsqueeze(
         )
 
     dim = cast(int, dim)
-    input_shape = input_val.shape
+
     input_shape_size = (
         len(input_val.shape) + 1
         if network.has_implicit_batch_dimension
@@ -46,5 +46,5 @@ def unsqueeze(
     layer.reshape_dims = (
         tuple(input_val.shape)[:dim] + (1,) + tuple(input_val.shape)[dim:]
     )
-    set_layer_name(layer, target, name)
+    set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)

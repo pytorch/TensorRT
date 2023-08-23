@@ -24,7 +24,7 @@ def args_bounds_check(
     return args[i] if len(args) > i else replacement
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.batch_norm)
+@dynamo_tensorrt_converter(torch.ops.aten.batch_norm)  # type: ignore[misc]
 def aten_ops_batch_norm(
     network: TRTNetwork,
     target: Target,
@@ -48,9 +48,9 @@ def aten_ops_batch_norm(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.div.default)
-@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode)
-@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.div.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor)  # type: ignore[misc]
 def aten_ops_div(
     network: TRTNetwork,
     target: Target,
@@ -119,7 +119,7 @@ def embedding_param_validator(embedding_node: Node) -> bool:
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.embedding.default, capability_validator=embedding_param_validator
-)
+)  # type: ignore[misc]
 def aten_ops_embedding(
     network: TRTNetwork,
     target: Target,
@@ -140,8 +140,8 @@ def aten_ops_embedding(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar)
-@dynamo_tensorrt_converter(torch.ops.aten.fmod.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.fmod.Tensor)  # type: ignore[misc]
 def aten_ops_fmod(
     network: TRTNetwork,
     target: Target,
@@ -152,7 +152,7 @@ def aten_ops_fmod(
     return impl.elementwise.fmod(network, target, SourceIR.ATEN, name, args[0], args[1])
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.gelu.default)
+@dynamo_tensorrt_converter(torch.ops.aten.gelu.default)  # type: ignore[misc]
 def aten_ops_gelu(
     network: TRTNetwork,
     target: Target,
@@ -169,8 +169,8 @@ def aten_ops_gelu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.matmul)
-@dynamo_tensorrt_converter(torch.ops.aten.mm.default)
+@dynamo_tensorrt_converter(torch.ops.aten.matmul)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.mm.default)  # type: ignore[misc]
 def aten_ops_matmul(
     network: TRTNetwork,
     target: Target,
@@ -183,7 +183,7 @@ def aten_ops_matmul(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.layer_norm.default)
+@dynamo_tensorrt_converter(torch.ops.aten.layer_norm.default)  # type: ignore[misc]
 def aten_ops_layernorm(
     network: TRTNetwork,
     target: Target,
@@ -204,7 +204,7 @@ def aten_ops_layernorm(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.relu.default)
+@dynamo_tensorrt_converter(torch.ops.aten.relu.default)  # type: ignore[misc]
 def aten_ops_relu(
     network: TRTNetwork,
     target: Target,
@@ -221,7 +221,7 @@ def aten_ops_relu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.rsqrt.default)
+@dynamo_tensorrt_converter(torch.ops.aten.rsqrt.default)  # type: ignore[misc]
 def aten_ops_rsqrt(
     network: TRTNetwork,
     target: Target,
@@ -238,8 +238,8 @@ def aten_ops_rsqrt(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim)
-@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims)
+@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims)  # type: ignore[misc]
 def aten_ops_squeeze(
     network: TRTNetwork,
     target: Target,
@@ -250,7 +250,7 @@ def aten_ops_squeeze(
     return impl.squeeze.squeeze(network, target, SourceIR.ATEN, name, args[0], args[1])
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.unsqueeze.default)
+@dynamo_tensorrt_converter(torch.ops.aten.unsqueeze.default)  # type: ignore[misc]
 def aten_ops_unsqueeze(
     network: TRTNetwork,
     target: Target,
@@ -263,7 +263,7 @@ def aten_ops_unsqueeze(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten._softmax.default)
+@dynamo_tensorrt_converter(torch.ops.aten._softmax.default)  # type: ignore[misc]
 def aten_ops_softmax(
     network: TRTNetwork,
     target: Target,
@@ -276,7 +276,7 @@ def aten_ops_softmax(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.where.self)
+@dynamo_tensorrt_converter(torch.ops.aten.where.self)  # type: ignore[misc]
 def aten_ops_where(
     network: TRTNetwork,
     target: Target,
@@ -295,7 +295,7 @@ def aten_ops_where(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.clamp.default)
+@dynamo_tensorrt_converter(torch.ops.aten.clamp.default)  # type: ignore[misc]
 def aten_ops_clamp(
     network: TRTNetwork,
     target: Target,
@@ -314,7 +314,7 @@ def aten_ops_clamp(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.select.int)
+@dynamo_tensorrt_converter(torch.ops.aten.select.int)  # type: ignore[misc]
 def aten_ops_select(
     network: TRTNetwork,
     target: Target,
@@ -327,7 +327,7 @@ def aten_ops_select(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.slice.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.slice.Tensor)  # type: ignore[misc]
 def aten_ops_slice(
     network: TRTNetwork,
     target: Target,
@@ -348,7 +348,7 @@ def aten_ops_slice(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.permute.default)
+@dynamo_tensorrt_converter(torch.ops.aten.permute.default)  # type: ignore[misc]
 def aten_ops_permute(
     network: TRTNetwork,
     target: Target,
@@ -387,7 +387,7 @@ def to_copy_dtype_validator(to_copy_node: Node) -> bool:
 
 @dynamo_tensorrt_converter(
     torch.ops.aten._to_copy.default, capability_validator=to_copy_dtype_validator
-)
+)  # type: ignore[misc]
 def aten_ops_to_copy_dtype(
     network: TRTNetwork,
     target: Target,
@@ -405,7 +405,7 @@ def aten_ops_to_copy_dtype(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.clone.default)
+@dynamo_tensorrt_converter(torch.ops.aten.clone.default)  # type: ignore[misc]
 def aten_ops_clone(
     network: TRTNetwork,
     target: Target,
