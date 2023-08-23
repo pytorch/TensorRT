@@ -25,14 +25,11 @@ def amax(
     ):
         input_val = cast_trt_tensor(network, input_val, trt.float32, name)
 
-    if dim is None:
-        raise ValueError("amax requires specifying dimension(s) (dim).")
-
     layer = network.add_reduce(
         input_val,
         trt.ReduceOperation.MAX,
         axes=get_axes_for_reduce_op(dim),
         keep_dims=keepdim,
     )
-    set_layer_name(layer, target, name)
+    set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
