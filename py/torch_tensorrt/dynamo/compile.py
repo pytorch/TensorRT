@@ -186,9 +186,6 @@ def compile_module(
 
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
-    import pdb
-
-    pdb.set_trace()
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
     for name, _ in partitioned_module.named_children():
@@ -197,21 +194,31 @@ def compile_module(
             continue
 
         submodule = getattr(partitioned_module, name)
+        # if name == "_run_on_acc_0":
+        #     import pdb
 
+        #     pdb.set_trace()
+        #     print("done")
         logger.debug(
-            "Submodule name: " + str(name) + " Graph: \n" + str(submodule.graph)
+            "Submodule name: %s\n Input shapes: %s\n %s",
+            str(name),
+            [input.shape for input in sample_inputs],
+            str(submodule.graph),
         )
-
-        if name == "_run_on_acc_0":
-            import pdb
-
-            pdb.set_trace()
-            print("done")
-
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
         submodule_inputs = partitioning.get_submod_inputs(
             partitioned_module, submodule, sample_inputs
         )
+
+        logger.debug(
+            "Submodule name: %s\n Input shapes: %s\n %s",
+            str(name),
+            [input.shape for input in sample_inputs],
+            str(submodule.graph),
+        )
+        import pdb
+
+        pdb.set_trace()
         # import pdb; pdb.set_trace()
         assert submodule_inputs is not None
         # Handle long/double inputs if requested by the user
