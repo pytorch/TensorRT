@@ -58,7 +58,9 @@ def aot_torch_tensorrt_aten_backend(
             gm,
             sample_inputs,
             trace_joint=False,
-            decompositions=get_decompositions(),
+            decompositions=get_decompositions(
+                settings.enable_experimental_decompositions
+            ),
         )
 
         constant_fold(graph_module)

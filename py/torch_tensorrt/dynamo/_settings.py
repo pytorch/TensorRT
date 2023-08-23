@@ -4,6 +4,7 @@ from typing import Optional, Set
 import torch
 from torch_tensorrt.dynamo._defaults import (
     DEBUG,
+    ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     OPTIMIZATION_LEVEL,
@@ -19,6 +20,27 @@ from torch_tensorrt.dynamo._defaults import (
 
 @dataclass
 class CompilationSettings:
+    """Compilation settings for Torch-TensorRT Dynamo Paths
+
+    Args:
+        precision (torch.dtype): Model Layer precision
+        debug (bool): Whether to print out verbose debugging information
+        workspace_size (int): Workspace TRT is allowed to use for the module (0 is default)
+        min_block_size (int): Minimum number of operators per TRT-Engine Block
+        torch_executed_ops (Sequence[str]): Sequence of operations to run in Torch, regardless of converter coverage
+        pass_through_build_failures (bool): Whether to fail on TRT engine build errors (True) or not (False)
+        max_aux_streams (Optional[int]): Maximum number of allowed auxiliary TRT streams for each engine
+        version_compatible (bool): Provide version forward-compatibility for engine plan files
+        optimization_level (Optional[int]): Builder optimization 0-5, higher levels imply longer build time,
+            searching for more optimization options. TRT defaults to 3
+        use_python_runtime (Optional[bool]): Whether to strictly use Python runtime or C++ runtime. To auto-select a runtime
+            based on C++ dependency presence (preferentially choosing C++ runtime if available), leave the
+            argument as None
+        truncate_long_and_double (bool): Truncate int64/float64 TRT engine inputs or weights to int32/float32
+        enable_experimental_decompositions (bool): Whether to enable all core aten decompositions
+            or only a selected subset of them
+    """
+
     precision: torch.dtype = PRECISION
     debug: bool = DEBUG
     workspace_size: int = WORKSPACE_SIZE
@@ -31,3 +53,4 @@ class CompilationSettings:
     use_python_runtime: Optional[bool] = USE_PYTHON_RUNTIME
     truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE
     use_fast_partitioner: bool = USE_FAST_PARTITIONER
+    enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS

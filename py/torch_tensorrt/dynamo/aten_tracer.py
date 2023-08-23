@@ -20,8 +20,12 @@ def trace(
     # Set log level at the top of compilation (torch_tensorrt.dynamo)
     if ("debug" in kwargs and kwargs["debug"]) and logger.parent:
         logger.parent.setLevel(logging.DEBUG)
-
-    with unittest.mock.patch("torch._export.DECOMP_TABLE", get_decompositions()):
+    experimental_decompositions = kwargs.get(
+        "enable_experimental_decompositions", False
+    )
+    with unittest.mock.patch(
+        "torch._export.DECOMP_TABLE", get_decompositions(experimental_decompositions)
+    ):
         graph_module = export(model, tuple(inputs)).module()
         constant_fold(graph_module)
     logger.debug("Post export graph: " + str(graph_module.graph))
