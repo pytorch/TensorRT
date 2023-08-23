@@ -34,16 +34,17 @@ def get_submod_inputs(
         acc_inputs = inputs
         return
 
-    # Register a hook to capture submodule input
-    handle = submod.register_forward_pre_hook(get_input)
-
     # Iterate over min, opt, max shapes for dynamic inputs
     inputs_map = {}
     if input_is_dynamic(inputs):
         for mode in ["min_shape", "opt_shape", "max_shape"]:
+            # Register a hook to capture submodule input
+            handle = submod.register_forward_pre_hook(get_input)
             torch_inputs = [input.example_tensor(mode).cuda() for input in inputs]
             mod(*torch_inputs)
+            handle.remove()
             inputs_map[mode] = acc_inputs
+            acc_inputs = []
     else:
         torch_inputs = [input.example_tensor().cuda() for input in inputs]
         mod(*torch_inputs)

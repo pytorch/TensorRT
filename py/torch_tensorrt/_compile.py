@@ -216,7 +216,7 @@ def compile(
             input_list = [input_list]
         device = kwargs.get("device", Device._current_device())
         torchtrt_inputs, torch_inputs = prepare_inputs(
-            input_list, prepare_device(device)
+            input_list, prepare_device(device), shape_mode="min_shape"
         )
 
         for idx, torchtrt_input in enumerate(torchtrt_inputs):

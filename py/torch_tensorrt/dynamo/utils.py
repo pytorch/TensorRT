@@ -70,11 +70,12 @@ def input_is_dynamic(inputs: Sequence[Input]) -> bool:
 def prepare_inputs(
     inputs: Input | torch.Tensor | Sequence[Any] | Dict[Any, Any],
     device: torch.device = torch.device("cuda"),
+    shape_mode: str = "opt_shape",
 ) -> Any:
     if isinstance(inputs, Input):
         if isinstance(inputs.shape, dict):
             return inputs, inputs.example_tensor(
-                optimization_profile_field="opt_shape"
+                optimization_profile_field=shape_mode
             ).to(device)
         else:
             return inputs, inputs.example_tensor().to(device)
@@ -86,7 +87,7 @@ def prepare_inputs(
         torchtrt_input_list = []
         torch_input_list = []
         for input_obj in inputs:
-            torchtrt_input, torch_input = prepare_inputs(input_obj)
+            torchtrt_input, torch_input = prepare_inputs(input_obj, device, shape_mode)
             torchtrt_input_list.append(torchtrt_input)
             torch_input_list.append(torch_input)
 
@@ -96,7 +97,7 @@ def prepare_inputs(
         torchtrt_inputs_tup = []
         torch_inputs_tup = []
         for input_obj in inputs:
-            torchtrt_input, torch_input = prepare_inputs(input_obj)
+            torchtrt_input, torch_input = prepare_inputs(input_obj, device, shape_mode)
             torchtrt_inputs_tup.append(torchtrt_input)
             torch_inputs_tup.append(torch_input)
 
@@ -107,7 +108,7 @@ def prepare_inputs(
         torch_inputs_dict: Dict[Any, Any] = dict()
 
         for key, input_obj in inputs.items():
-            torchtrt_input, torch_input = prepare_inputs(input_obj)
+            torchtrt_input, torch_input = prepare_inputs(input_obj, device, shape_mode)
             torchtrt_inputs_dict[key] = torchtrt_input
             torch_inputs_dict[key] = torch_input
 
