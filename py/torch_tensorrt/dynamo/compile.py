@@ -10,6 +10,7 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
     EngineCapability,
 )
+from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import CompilationSettings, partitioning
 from torch_tensorrt.dynamo._defaults import (
     DEBUG,
@@ -24,11 +25,9 @@ from torch_tensorrt.dynamo._defaults import (
     VERSION_COMPATIBLE,
     WORKSPACE_SIZE,
 )
-from torch_tensorrt.dynamo.conversion import (
+from torch_tensorrt.dynamo.conversion import (  # repair_long_or_double_inputs,
     convert_module,
-    repair_long_or_double_inputs,
 )
-from torch_tensorrt.dynamo.utils import prepare_device, prepare_inputs
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +78,6 @@ def compile(
     if not isinstance(inputs, collections.abc.Sequence):
         inputs = [inputs]
 
-    _, torch_inputs = prepare_inputs(inputs, prepare_device(device))
-
     if (
         torch.float16 in enabled_precisions
         or torch_tensorrt.dtype.half in enabled_precisions
@@ -118,12 +115,13 @@ def compile(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-    return compile_module(gm, torch_inputs, settings)
+    return compile_module(gm, inputs, device, settings)
 
 
 def compile_module(
     gm: torch.fx.GraphModule,
-    sample_inputs: Sequence[torch.Tensor],
+    sample_inputs: Sequence[Input],
+    device: torch.device | Device,
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
@@ -137,6 +135,7 @@ def compile_module(
     Returns:
         Compiled FX GraphModule
     """
+
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops = partitioning.get_graph_converter_support(
         gm, settings.debug, settings.torch_executed_ops
@@ -187,7 +186,9 @@ def compile_module(
 
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
+    import pdb
 
+    pdb.set_trace()
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
     for name, _ in partitioned_module.named_children():
@@ -200,17 +201,24 @@ def compile_module(
         logger.debug(
             "Submodule name: " + str(name) + " Graph: \n" + str(submodule.graph)
         )
-        # Get submodule inputs
+
+        if name == "_run_on_acc_0":
+            import pdb
+
+            pdb.set_trace()
+            print("done")
+
+        # Get the submodule inputs for min, opt, max shapes of the graph inputs
         submodule_inputs = partitioning.get_submod_inputs(
             partitioned_module, submodule, sample_inputs
         )
-
+        # import pdb; pdb.set_trace()
         assert submodule_inputs is not None
         # Handle long/double inputs if requested by the user
-        if settings.truncate_long_and_double:
-            submodule_inputs = repair_long_or_double_inputs(
-                partitioned_module, submodule, submodule_inputs, name
-            )
+        # if settings.truncate_long_and_double:
+        #     submodule_inputs = repair_long_or_double_inputs(
+        #         partitioned_module, submodule, submodule_inputs, name
+        #     )
 
         # Create TRT Module from submodule
         trt_mod = convert_module(

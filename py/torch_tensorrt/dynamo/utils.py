@@ -63,6 +63,10 @@ def cosine_similarity(gt_tensor: torch.Tensor, pred_tensor: torch.Tensor) -> flo
     return res
 
 
+def input_is_dynamic(inputs: Sequence[Input]) -> bool:
+    return any(input.shape_mode == Input._ShapeMode.DYNAMIC for input in inputs)
+
+
 def prepare_inputs(
     inputs: Input | torch.Tensor | Sequence[Any] | Dict[Any, Any],
     device: torch.device = torch.device("cuda"),

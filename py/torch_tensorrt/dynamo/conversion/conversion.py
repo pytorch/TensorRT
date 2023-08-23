@@ -3,18 +3,17 @@ from __future__ import annotations
 import io
 from typing import Sequence
 
+import tensorrt as trt
 import torch
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 
-import tensorrt as trt
-
 
 def convert_module(
     module: torch.fx.GraphModule,
-    inputs: Sequence[torch.Tensor],
+    inputs: Sequence[Input],
     settings: CompilationSettings = CompilationSettings(),
     name: str = "",
 ) -> PythonTorchTensorRTModule | TorchTensorRTModule:
@@ -29,7 +28,8 @@ def convert_module(
     """
     # Specify module output data types to ensure TRT output types agree with
     # that of the equivalent Torch module
-    module_outputs = module(*inputs)
+    torch_inputs = [input.example_tensor("opt_shape").cuda() for input in inputs]
+    module_outputs = module(*torch_inputs)
 
     if not isinstance(module_outputs, (list, tuple)):
         module_outputs = [module_outputs]
@@ -37,7 +37,7 @@ def convert_module(
     output_dtypes = [output.dtype for output in module_outputs]
     interpreter = TRTInterpreter(
         module,
-        Input.from_tensors(inputs, disable_memory_format_check=True),
+        inputs,
         logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
         output_dtypes=output_dtypes,
     )

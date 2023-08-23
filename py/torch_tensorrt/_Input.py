@@ -46,6 +46,7 @@ class Input(object):
     low_tensor_domain_incl: float = 0.0
     high_tensor_domain_excl: float = low_tensor_domain_incl + DOMAIN_OFFSET
     torch_dtype: torch.dtype = torch.float32
+    torch_tensor: torch.Tensor = None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """__init__ Method for torch_tensorrt.Input
@@ -170,6 +171,12 @@ class Input(object):
             domain = None
 
         self.tensor_domain = Input._parse_tensor_domain(domain)
+
+        # if "torch_tensor" in kwargs:
+        #     if (self.shape_mode == Input._ShapeMode.DYNAMIC):
+        #         self.torch_tensor = Input.example_tensor("opt_shape")
+        #     else:
+        #         self.torch_tensor = Input.example_tensor()
 
     def __str__(self) -> str:
         if self.shape_mode == Input._ShapeMode.STATIC:
@@ -354,7 +361,7 @@ class Input(object):
             )
             else torch.channels_last
         )
-        return cls(shape=t.shape, dtype=t.dtype, format=frmt)
+        return cls(shape=t.shape, dtype=t.dtype, format=frmt, torch_tensor=t)
 
     @classmethod
     def from_tensors(
@@ -377,6 +384,12 @@ class Input(object):
             cls.from_tensor(t, disable_memory_format_check=disable_memory_format_check)
             for t in ts
         ]
+
+    def set_torch_tensor(self, torch_tensor: torch.Tensor) -> None:
+        """
+        Set the user provided torch tensor for the Input class.
+        """
+        self.torch_tensor = torch_tensor
 
     def example_tensor(
         self, optimization_profile_field: Optional[str] = None
