@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections.abc
 import logging
+import operator
 from typing import Any, List, Optional, Sequence, Set, Tuple
 
 import torch
@@ -232,27 +233,37 @@ def compile_module(
             name=name,
         )
 
-        # Get the engine and engine_str
-        assert trt_mod.engine
-
         # Insert a call_function node to perform inference on TRT engine
         with partitioned_module.graph.inserting_before(submodule_node):
-            new_node = partitioned_module.graph.call_function(
-                torch.ops.tensorrt.execute_engine,
+            trt_node = partitioned_module.graph.call_function(
+                torch.ops.tensorrt.execute_engine.default,
                 (submodule_input_nodes, trt_mod.engine),
             )
+            trt_node.meta["val"] = torch.ones((1, 16, 222, 222))
 
-        # Replace uses of submodule with the new_node
+        # Replace uses of submodule with the trt_node
         if submodule_node:
-            submodule_node.replace_all_uses_with(new_node)
+            submodule_node.replace_all_uses_with(trt_node)
 
-        # Erase the submodule node
+        # Erase the submodule node and the output nodes
         partitioned_module.graph.erase_node(submodule_node)
+        output_nodes = [
+            node for node in partitioned_module.graph.nodes if node.op == "output"
+        ]
+        for output_node in output_nodes:
+            partitioned_module.graph.erase_node(output_node)
+
+        # Insert the getitem node which is the output
+        with partitioned_module.graph.inserting_after(trt_node):
+            output = partitioned_module.graph.call_function(
+                operator.getitem, (trt_node, 0)
+            )
+            output.meta["val"] = torch.ones((1, 16, 222, 222))
+        partitioned_module.graph.output(output)
 
         # Clean the graph
         partitioned_module.graph.eliminate_dead_code()
         partitioned_module.graph.lint()
-        # partitioned_module.recompile()
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:

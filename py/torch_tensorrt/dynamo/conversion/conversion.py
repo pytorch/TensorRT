@@ -52,7 +52,6 @@ def convert_module(
         version_compatible=settings.version_compatible,
         optimization_level=settings.optimization_level,
     )
-    return interpreter_result
 
     if settings.use_python_runtime:
         return PythonTorchTensorRTModule(
