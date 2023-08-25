@@ -9,6 +9,7 @@ from . import (
     matmul,
     normalization,
     permutation,
+    reduce,
     select,
     shape,
     slice,

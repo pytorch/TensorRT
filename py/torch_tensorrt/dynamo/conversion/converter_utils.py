@@ -1,3 +1,4 @@
+import functools
 import logging
 import re
 from typing import List, Optional
@@ -7,6 +8,7 @@ import torch
 from torch.fx.node import Target
 from torch_tensorrt.fx.converters.converter_utils import (
     Frameworks,
+    get_axes_for_reduce_op,
     unified_dtype_converter,
 )
 from torch_tensorrt.fx.types import TRTDataType, TRTNetwork, TRTTensor
@@ -157,3 +159,8 @@ def broadcastable(
         if not (a_shape[i] == b_shape[i] or a_shape[i] == 1 or b_shape[i] == 1):
             return False
     return True
+
+
+get_axes_for_reduce_op = functools.partial(
+    get_axes_for_reduce_op, has_implicit_batch_dimension=False
+)

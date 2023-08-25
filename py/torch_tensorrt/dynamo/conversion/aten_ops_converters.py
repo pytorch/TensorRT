@@ -440,6 +440,37 @@ def aten_ops_expand(
     )
 
 
+def amax_param_validator(amax_node: Node) -> bool:
+    if len(amax_node.args) < 2:
+        _LOGGER.debug(
+            f"At least two args input and dim should be provided, but only got {len(amax_node.args)} args."
+        )
+        return False
+
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.amax.default, capability_validator=amax_param_validator
+)
+def aten_ops_amax(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.amax(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args_bounds_check(args, 2, replacement=False),
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.exp.default)  # type: ignore[misc]
 def aten_ops_exp(
     network: TRTNetwork,
