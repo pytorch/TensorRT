@@ -8,11 +8,10 @@ else:
 
 import warnings
 
-import torch
-from torch_tensorrt import logging
-
 # from torch_tensorrt import _enums
 import tensorrt as trt
+import torch
+from torch_tensorrt import logging
 
 try:
     from torch_tensorrt import _C
@@ -119,6 +118,9 @@ class Device(object):
                 self.dla_core, self.allow_gpu_fallback
             )
         )
+
+    def __repr__(self) -> str:
+        return self.__str__()
 
     def _to_internal(self) -> _C.Device:
         internal_dev = _C.Device()

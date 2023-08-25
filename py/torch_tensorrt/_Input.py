@@ -346,9 +346,9 @@ class Input(object):
             A Input object.
         """
         if not (
-            t.is_contiguous(memory_format=torch.contiguous_format)
+            disable_memory_format_check
+            or t.is_contiguous(memory_format=torch.contiguous_format)
             or t.is_contiguous(memory_format=torch.channels_last)
-            or disable_memory_format_check
         ):
             raise ValueError(
                 "Tensor does not have a supported memory format, supported formats are contiguous or channel_last"
@@ -356,8 +356,8 @@ class Input(object):
         frmt = (
             torch.contiguous_format
             if (
-                t.is_contiguous(memory_format=torch.contiguous_format)
-                or disable_memory_format_check
+                disable_memory_format_check
+                or t.is_contiguous(memory_format=torch.contiguous_format)
             )
             else torch.channels_last
         )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import collections.abc
 import logging
-from typing import Any, List, Optional, Sequence, Set, Tuple
+from typing import Any, List, Optional, Sequence, Set, Tuple, Union
 
 import torch
 import torch_tensorrt
@@ -14,6 +14,7 @@ from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import CompilationSettings, partitioning
 from torch_tensorrt.dynamo._defaults import (
     DEBUG,
+    DEVICE,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
@@ -29,6 +30,11 @@ from torch_tensorrt.dynamo._defaults import (
 from torch_tensorrt.dynamo.conversion import (  # repair_long_or_double_inputs,
     convert_module,
 )
+from torch_tensorrt.dynamo.utils import (
+    prepare_inputs,
+    to_torch_device,
+    to_torch_tensorrt_device,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +43,7 @@ def compile(
     gm: Any,
     inputs: Any,
     *,
-    device: Device = Device._current_device(),
+    device: Optional[Union[Device, torch.device, str]] = DEVICE,
     disable_tf32: bool = False,
     sparse_weights: bool = False,
     enabled_precisions: Set[torch.dtype] | Tuple[torch.dtype] = (torch.float32,),
@@ -81,6 +87,10 @@ def compile(
     if not isinstance(inputs, collections.abc.Sequence):
         inputs = [inputs]
 
+    device = to_torch_tensorrt_device(device)
+
+    _, torch_inputs = prepare_inputs(inputs, to_torch_device(device))
+
     if (
         torch.float16 in enabled_precisions
         or torch_tensorrt.dtype.half in enabled_precisions
@@ -102,6 +112,7 @@ def compile(
     compilation_options = {
         "precision": precision,
         "debug": debug,
+        "device": device,
         "workspace_size": workspace_size,
         "min_block_size": min_block_size,
         "torch_executed_ops": torch_executed_ops
