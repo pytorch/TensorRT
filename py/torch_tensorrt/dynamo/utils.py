@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import fields, replace
-from typing import Any, Callable, Dict, Optional, Sequence
+from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import torch
 import torch_tensorrt
@@ -116,23 +116,45 @@ def prepare_inputs(
         )
 
 
-def prepare_device(device: Device | torch.device) -> torch.device:
-    _device: torch.device
+def to_torch_device(device: Optional[Union[Device, torch.device, str]]) -> torch.device:
+    """Cast a device-type to torch.device
+
+    Returns the corresponding torch.device
+    """
     if isinstance(device, Device):
         if device.gpu_id != -1:
-            _device = torch.device(device.gpu_id)
+            return torch.device(device.gpu_id)
         else:
             raise ValueError("Invalid GPU ID provided for the CUDA device provided")
 
     elif isinstance(device, torch.device):
-        _device = device
+        return device
+
+    elif device is None:
+        return torch.device(torch.cuda.current_device())
 
     else:
-        raise ValueError(
-            "Invalid device provided. Supported options: torch.device | torch_tensorrt.Device"
-        )
+        return torch.device(device)
 
-    return _device
+
+def to_torch_tensorrt_device(
+    device: Optional[Union[Device, torch.device, str]]
+) -> Device:
+    """Cast a device-type to torch_tensorrt.Device
+
+    Returns the corresponding torch_tensorrt.Device
+    """
+    if isinstance(device, Device):
+        return device
+
+    elif isinstance(device, torch.device):
+        return Device(gpu_id=device.index)
+
+    elif device is None:
+        return Device(gpu_id=torch.cuda.current_device())
+
+    else:
+        return Device(device)
 
 
 def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
@@ -184,7 +206,17 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
     # Parse input runtime specification
     settings.use_python_runtime = use_python_runtime_parser(settings.use_python_runtime)
 
-    logger.info("Compilation Settings: %s\n", settings)
+    # Ensure device is a torch_tensorrt Device
+    settings.device = to_torch_tensorrt_device(settings.device)
+
+    # Check and update device settings
+    if "device" not in kwargs:
+        logger.info(
+            f"Device not specified, using Torch default current device - cuda:{settings.device.gpu_id}. "
+            "If this is incorrect, please specify an input device, via the device keyword."
+        )
+
+    logger.info(f"Compiling with Settings:\n{settings}")
 
     return settings
 
