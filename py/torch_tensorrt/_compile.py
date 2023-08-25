@@ -209,12 +209,12 @@ def compile(
         import collections.abc
 
         from torch_tensorrt import Device
-        from torch_tensorrt.dynamo.utils import prepare_device, prepare_inputs
+        from torch_tensorrt.dynamo.utils import prepare_inputs, to_torch_device
 
         if not isinstance(inputs, collections.abc.Sequence):
             inputs = [inputs]
         device = kwargs.get("device", Device._current_device())
-        torchtrt_inputs, torch_inputs = prepare_inputs(inputs, prepare_device(device))
+        torchtrt_inputs, torch_inputs = prepare_inputs(inputs, to_torch_device(device))
         module = torch_tensorrt.dynamo.trace(module, torch_inputs, **kwargs)
         compiled_aten_module: torch.fx.GraphModule = dynamo_compile(
             module,
@@ -239,7 +239,10 @@ def torch_compile(module: torch.nn.Module, **kwargs: Any) -> Any:
     """
     from torch_tensorrt.dynamo.backend import torch_tensorrt_backend
 
-    boxed_fn = torch.compile(module, backend=torch_tensorrt_backend, options={**kwargs})
+    # TODO: Remove dynamic=False when SymInt Dynamic shape support is ready
+    boxed_fn = torch.compile(
+        module, backend=torch_tensorrt_backend, dynamic=False, options={**kwargs}
+    )
 
     return boxed_fn
 

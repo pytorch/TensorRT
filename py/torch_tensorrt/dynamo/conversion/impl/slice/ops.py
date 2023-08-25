@@ -5,10 +5,10 @@ from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion.impl.slice.base import slice
 from torch_tensorrt.fx.converters.converter_utils import (
-    broadcast,
     get_positive_dim,
-    get_trt_tensor,
     has_dynamic_shape,
+    prepend_ones,
+    set_layer_name,
 )
 from torch_tensorrt.fx.types import Shape, TRTNetwork, TRTTensor
 
@@ -65,33 +65,46 @@ def expand(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
-    sizes: Shape,
+    input_t: TRTTensor,
+    shape: Shape,
 ) -> TRTTensor:
-    shape = list(sizes)
-
-    input_val = get_trt_tensor(network, input, f"{name}_input")
-
-    if network.has_implicit_batch_dimension:
-        shape = shape[1:]
-
-    ranks = len(input_val.shape)
-    # TRT does not support different dimension size
-    # though this condition is not seen in the case of bmm
-    # where input_t and shape dimensions are not equal
-    assert len(shape) >= ranks
-    if len(shape) != ranks:
-        shape_tuple = tuple([0] * len(shape))
-        shape_tensor = get_trt_tensor(network, input, f"{name}_shape")
-        input_val, shape_tensor = broadcast(
-            network, input_val, shape_tensor, f"{name}_input_val", f"{name}_shape_val"
+    if not isinstance(input_t, TRTTensor):
+        raise RuntimeError(
+            f"expand received input {input_t} that is not a TensorRT ITensor"
         )
-        ranks = len(shape)
 
-    inshape = tuple(input_val.shape)
-    shape_t = tuple(shape)
-    start = tuple([0] * ranks)
+    shape_rank = len(shape)
+    initial_tensor_rank = len(input_t.shape)
+
+    # If the rank of the input tensor is less than the shape's rank, pad with ones
+    if initial_tensor_rank < shape_rank:
+        input_t = prepend_ones(
+            network,
+            input_t,
+            name + "_expand_broadcast",
+            shape_rank - initial_tensor_rank,
+        )
+    # If the rank of the input tensor is more than the shape's rank, raise error
+    elif initial_tensor_rank > shape_rank:
+        raise RuntimeError(
+            f"expand called with {shape_rank}-dimensional shape on Tensor with {len(shape)} dimensions. "
+            "Cannot expand to shape with rank smaller than original tensor."
+        )
+
+    # After the above padding, the shape and tensor rank must be equal
+    assert len(input_t.shape) == shape_rank
+
+    # -1 denotes taking the shape from the original input tensor
+    shape = tuple(
+        [input_t.shape[i] if shape[i] == -1 else shape[i] for i in range(shape_rank)]
+    )
+
+    # Establish the desired output shape, strides, and starting indices
+    input_tensor_shape = tuple(input_t.shape)
+    start = tuple([0] * shape_rank)
     stride = tuple(
-        [int(i == o) for i, o in zip(inshape, shape)]
+        [int(i == o) for i, o in zip(input_tensor_shape, shape)]
     )  # stride == 1 if dimensions match, 0 otherwise
-    return slice(network, target, source_ir, name, input_val, start, shape_t, stride)
+    layer = network.add_slice(input_t, start=start, shape=shape, stride=stride)
+    set_layer_name(layer, target, name, source_ir)
+    return layer.get_output(0)

@@ -106,8 +106,17 @@ COPY --from=torch-tensorrt-builder  /workspace/torch_tensorrt/src/dist/ .
 
 RUN cp /opt/torch_tensorrt/docker/WORKSPACE.docker /opt/torch_tensorrt/WORKSPACE
 RUN pip install -r /opt/torch_tensorrt/py/requirements.txt
+# Install all dependency wheel files and user-specified TensorRT
+RUN pip install *.whl
 RUN pip install tensorrt==${TENSORRT_VERSION}.*
-RUN pip install *.whl && rm -fr /workspace/torch_tensorrt/dist/* *.whl
+
+# Add the Torch-TensorRT wheel file to the dist directory and delete all other .whl files
+RUN rm -fr /workspace/torch_tensorrt/dist/*
+RUN mkdir -p /opt/torch_tensorrt/dist/ && mv torch_tensorrt*.whl /opt/torch_tensorrt/dist/
+RUN rm -fr *.whl
+
+# Remove other cache files if present
+RUN pip cache purge && rm -rf /opt/torch_tensorrt/.mypy_cache
 
 WORKDIR /opt/torch_tensorrt
 
