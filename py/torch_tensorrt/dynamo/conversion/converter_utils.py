@@ -45,6 +45,20 @@ def get_node_name(node: torch.fx.Node) -> str:
     return node_name
 
 
+def is_only_operator_on_placeholder(node: torch.fx.Node) -> bool:
+    """Detects whether a call_function node is the only operator on a placeholder"""
+    # Returns true if the node operates on a placeholder and is a direct output
+    return (
+        node.op == "call_function"
+        and any(
+            arg.op == "placeholder"
+            for arg in node.args
+            if isinstance(arg, torch.fx.Node)
+        )
+        and any(user.op == "output" for user in list(node.users.keys()))
+    )
+
+
 def dynamic_unsupported(node: torch.fx.Node) -> bool:
     # Validate that none of the inputs to the node have Dynamic shapes
     assert isinstance(
@@ -52,12 +66,17 @@ def dynamic_unsupported(node: torch.fx.Node) -> bool:
     ), "Inputs to validator functions must be FX Nodes"
 
     # Check node value itself
-    if getattr(node.meta["val"], "_has_symbolic_sizes_strides", False):
+    if ("val" in node.meta) and getattr(
+        node.meta["val"], "_has_symbolic_sizes_strides", False
+    ):
         return False
 
     # Check node arguments individually
     if any(
-        getattr(arg.meta["val"], "_has_symbolic_sizes_strides", False)
+        (
+            ("val" in arg.meta)
+            and getattr(arg.meta["val"], "_has_symbolic_sizes_strides", False)
+        )
         for arg in node.args
         if isinstance(arg, torch.fx.Node)
     ):
@@ -65,7 +84,10 @@ def dynamic_unsupported(node: torch.fx.Node) -> bool:
 
     # Check node keyword arguments individually
     if any(
-        getattr(kwarg.meta["val"], "_has_symbolic_sizes_strides", False)
+        (
+            ("val" in kwarg.meta)
+            and getattr(kwarg.meta["val"], "_has_symbolic_sizes_strides", False)
+        )
         for kwarg in node.kwargs.values()
         if isinstance(kwarg, torch.fx.Node)
     ):
@@ -82,9 +104,12 @@ def cast_trt_tensor(
     target: Target = "",
     source_ir: Optional[SourceIR] = None,
 ) -> TRTTensor:
-    """
-    Given a TRT Tensor, convert that Tensor to the specified dtype
+    """Given a TRT Tensor, convert that Tensor to the specified dtype
+
     Adds an Identity layer to the network which performs the conversion
+    if the input's dtype is different from the cast type. Otherwise returns
+    input unchanged
+
     Args:
         network (TRTNetwork): A TensorRT network
         input_val (TRTTensor): A TRT Tensor to cast to a new data type
@@ -191,7 +216,7 @@ def extend_attr_to_tuple(
     if isinstance(val, tuple):
         return val
     else:
-        raise AssertionError(f"Could not extend attribute {val}")
+        raise AssertionError(f"Object {val} could not be extended to tuple")
 
 
 def cast_int_or_float_to_bool(
