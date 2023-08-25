@@ -27,8 +27,9 @@ from torch_tensorrt.dynamo._defaults import (
     VERSION_COMPATIBLE,
     WORKSPACE_SIZE,
 )
-from torch_tensorrt.dynamo.conversion import (  # repair_long_or_double_inputs,
+from torch_tensorrt.dynamo.conversion import (
     convert_module,
+    repair_long_or_double_inputs,
 )
 from torch_tensorrt.dynamo.utils import (
     prepare_inputs,
@@ -224,10 +225,10 @@ def compile_module(
 
         assert submodule_inputs is not None
         # Handle long/double inputs if requested by the user
-        # if settings.truncate_long_and_double:
-        #     submodule_inputs = repair_long_or_double_inputs(
-        #         partitioned_module, submodule, submodule_inputs, name
-        #     )
+        if settings.truncate_long_and_double:
+            submodule_inputs = repair_long_or_double_inputs(
+                partitioned_module, submodule, submodule_inputs, name
+            )
 
         # Create TRT Module from submodule
         trt_mod = convert_module(

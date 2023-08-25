@@ -53,7 +53,7 @@ def get_submod_inputs(
             for acc_input in acc_inputs
         ]
 
-    num_submodule_inputs: int = (
+    num_submodule_inputs = (
         len(inputs_map["min_shape"]) if inputs_map["min_shape"] else 0
     )
     submodule_inputs = []
@@ -66,8 +66,6 @@ def get_submod_inputs(
                 torch_tensor=inputs_map["opt_shape"],
             )
         )
-
-    handle.remove()
 
     return submodule_inputs
 
