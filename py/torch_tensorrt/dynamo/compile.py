@@ -199,16 +199,6 @@ def compile_module(
 
         submodule = getattr(partitioned_module, name)
 
-        logger.debug(
-            "Submodule name: %s\n Input shapes: %s\n %s",
-            str(name),
-            [input.shape for input in sample_inputs],
-            str(submodule.graph),
-        )
-
-        import pdb
-
-        pdb.set_trace()
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
         submodule_inputs = partitioning.get_submod_inputs(
             partitioned_module, submodule, sample_inputs
@@ -217,7 +207,7 @@ def compile_module(
         logger.debug(
             "Submodule name: %s\n Input shapes: %s\n %s",
             str(name),
-            [input.shape for input in sample_inputs],
+            [input.shape for input in submodule_inputs],
             str(submodule.graph),
         )
 

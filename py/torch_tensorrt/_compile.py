@@ -222,7 +222,7 @@ def compile(
         for idx, torchtrt_input in enumerate(torchtrt_inputs):
             torchtrt_input.set_torch_tensor(torch_inputs[idx])
         # Export the module
-        module = torch_tensorrt.dynamo.trace(module, torch_inputs, **kwargs)
+        module = torch_tensorrt.dynamo.trace(module, torchtrt_inputs, **kwargs)
         compiled_aten_module: torch.fx.GraphModule = dynamo_compile(
             module,
             inputs=torchtrt_inputs,
