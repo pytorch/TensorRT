@@ -1,16 +1,16 @@
-from typing import Any, Callable, Dict, Set
+from typing import Any, Callable, Dict, Set, Union
 
 import torch
 from torch._decomp import core_aten_decompositions
 from torch._decomp import get_decompositions as get_torch_decompositions
-from torch._ops import OpOverload
+from torch._ops import OpOverload, OpOverloadPacket
 
 aten = torch.ops.aten
 
 _core_aten_decompositions: Dict[
     OpOverload, Callable[[Any], Any]
 ] = core_aten_decompositions()
-torch_enabled_decompositions: Set[OpOverload] = {
+torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten._adaptive_avg_pool2d_backward,
     aten.addcdiv,
     aten.addcdiv_,
@@ -140,7 +140,7 @@ torch_enabled_decompositions: Set[OpOverload] = {
     aten.smooth_l1_loss_backward,
     aten.soft_margin_loss,
     aten.soft_margin_loss_backward,
-    aten._softmax,
+    aten._softmax.out,
     aten._softmax_backward_data,
     aten.softplus,
     aten.softplus_backward,
@@ -176,7 +176,9 @@ torch_enabled_decompositions: Set[OpOverload] = {
     aten.full,
     aten.repeat,
 }
-torch_disabled_decompositions: Set[OpOverload] = set()
+torch_disabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
+    aten._softmax.default,
+}
 
 
 ENABLED_TORCH_DECOMPOSITIONS: Dict[
