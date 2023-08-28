@@ -65,7 +65,7 @@ def where(
         condition_val = condition_layer.get_output(0)
     else:
         assert condition.dtype == trt.bool, "mask dtype is not bool!"
-        if condition_shape != condition_dim:  # TODO: What is this checking?
+        if len(condition_shape) != condition_dim:
             condition_val = expand(
                 network, target, source_ir, f"{name}_expand", condition, output_shape
             )
@@ -73,7 +73,7 @@ def where(
             condition_val = condition
 
     if type(input) != TRTTensor:
-        if x_shape != input_dim:  # TODO: What is this checking?
+        if x_shape != output_shape:
             # special case where 1 element in input
             if len(input.shape) == 0:
                 input = input.unsqueeze(0)
@@ -95,7 +95,7 @@ def where(
         y_val = get_trt_tensor(network, other, f"{name}_y")
     else:
         y_val = other
-        if y_shape != other_dim:  # TODO: What is this checking?
+        if y_shape != output_shape:
             y_val = expand(
                 network, target, source_ir, f"{name}_y_expand", y_val, output_shape
             )

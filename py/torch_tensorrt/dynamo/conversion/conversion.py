@@ -71,4 +71,5 @@ def convert_module(
             name=name,
             input_binding_names=list(interpreter_result.input_names),
             output_binding_names=list(interpreter_result.output_names),
+            target_device=settings.device,
         )
