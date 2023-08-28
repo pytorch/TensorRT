@@ -276,6 +276,9 @@ def compile_module(
         # Erase the TRT submodule
         partitioned_module.graph.erase_node(submodule_node)
 
+    # Inline pytorch submodules
+    partitioning.inline_pytorch_submodules(partitioned_module)
+
     # Clean the graph
     partitioned_module.graph.eliminate_dead_code()
     partitioned_module.graph.lint()

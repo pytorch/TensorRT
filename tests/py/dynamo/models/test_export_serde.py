@@ -169,92 +169,94 @@ def test_base_full_compile_save_load(ir):
         )
 
 
-# @pytest.mark.unit
-# def test_resnet18_save_load(ir):
-#     """
-#     This tests export save and load functionality on Resnet18 model
-#     """
-#     model = models.resnet18().eval().cuda()
-#     input = torch.randn((1, 3, 224, 224)).to("cuda")
+@pytest.mark.unit
+def test_hybrid_save_load(ir):
+    """
+    This tests export save and load functionality on a hybrid
+    model with Pytorch and TRT segments.
+    """
 
-#     compile_spec = {
-#         "inputs": [
-#             torchtrt.Input(
-#                 input.shape, dtype=torch.float, format=torch.contiguous_format
-#             )
-#         ],
-#         "ir": ir,
-#         "min_block_size": 1,
-#     }
+    class MyModule(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = torch.nn.Conv2d(3, 16, 3, stride=1, bias=True)
+            self.relu = torch.nn.ReLU()
 
-#     trt_exp_program = torchtrt.compile(model, **compile_spec)
-#     torch._export.save(trt_exp_program, "/tmp/trt.ep")
-#     deser_trt_exp_program = torch._export.load("/tmp/trt.ep")
+        def forward(self, x):
+            conv = self.conv(x)
+            relu = self.relu(conv)
+            mul = relu * 0.5
+            return mul
 
-#     outputs_pyt = model(input)
-#     outputs_trt = trt_exp_program(input)
-#     cos_sim = cosine_similarity(outputs_pyt, outputs_trt)
-#     assertions.assertTrue(
-#         cos_sim > COSINE_THRESHOLD,
-#         msg=f"test_resnet18_save_load TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
-#     )
+    model = MyModule().eval().cuda()
+    input = torch.randn((1, 3, 224, 224)).to("cuda")
 
-#     outputs_trt_deser = deser_trt_exp_program(input)
-#     cos_sim = cosine_similarity(outputs_pyt, outputs_trt_deser)
-#     assertions.assertTrue(
-#         cos_sim > COSINE_THRESHOLD,
-#         msg=f"test_resnet18_save_load TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
-#     )
+    compile_spec = {
+        "inputs": [
+            torchtrt.Input(
+                input.shape, dtype=torch.float, format=torch.contiguous_format
+            )
+        ],
+        "ir": ir,
+        "min_block_size": 1,
+        "torch_executed_ops": "torch.ops.aten.relu.default",
+    }
 
-# @pytest.mark.unit
-# def test_hybrid_save_load(ir):
-#     """
-#     This tests export save and load functionality on a hybrid
-#     model with Pytorch and TRT segments.
-#     """
-#     class MyModule(torch.nn.Module):
-#         def __init__(self):
-#             super().__init__()
-#             self.conv = torch.nn.Conv2d(3, 16, 3, stride=1, bias=True)
-#             self.relu = torch.nn.ReLU()
+    trt_exp_program = torchtrt.compile(model, **compile_spec)
+    torch._export.save(trt_exp_program, "/tmp/trt.ep")
+    deser_trt_exp_program = torch._export.load("/tmp/trt.ep")
 
-#         def forward(self, x):
-#             conv = self.conv(x)
-#             relu = self.relu(conv)
-#             mul = relu*0.5
-#             return mul
+    outputs_pyt = model(input)
+    outputs_trt = trt_exp_program(input)
+    for idx in range(len(outputs_pyt)):
+        cos_sim = cosine_similarity(outputs_pyt[idx], outputs_trt[idx])
+        assertions.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"test_base_full_compile_multiple_outputs TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
-#     model = MyModule().eval().cuda()
-#     input = torch.randn((1, 3, 224, 224)).to("cuda")
+    outputs_trt_deser = deser_trt_exp_program(input)
+    for idx in range(len(outputs_pyt)):
+        cos_sim = cosine_similarity(outputs_pyt[idx], outputs_trt_deser[idx])
+        assertions.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"test_base_full_compile_save_load TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
 
-#     compile_spec = {
-#         "inputs": [
-#             torchtrt.Input(
-#                 input.shape, dtype=torch.float, format=torch.contiguous_format
-#             )
-#         ],
-#         "ir": ir,
-#         "min_block_size": 1,
-#         "torch_executed_ops": "torch.ops.aten.relu.default"
-#     }
 
-#     trt_exp_program = torchtrt.compile(model, **compile_spec)
-#     torch._export.save(trt_exp_program, "/tmp/trt.ep")
-#     deser_trt_exp_program = torch._export.load("/tmp/trt.ep")
+@pytest.mark.unit
+def test_resnet18_save_load(ir):
+    """
+    This tests export save and load functionality on Resnet18 model
+    """
+    model = models.resnet18().eval().cuda()
+    input = torch.randn((1, 3, 224, 224)).to("cuda")
 
-#     outputs_pyt = model(input)
-#     outputs_trt = trt_exp_program(input)
-#     for idx in range(len(outputs_pyt)):
-#         cos_sim = cosine_similarity(outputs_pyt[idx], outputs_trt[idx])
-#         assertions.assertTrue(
-#             cos_sim > COSINE_THRESHOLD,
-#             msg=f"test_base_full_compile_multiple_outputs TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
-#         )
+    compile_spec = {
+        "inputs": [
+            torchtrt.Input(
+                input.shape, dtype=torch.float, format=torch.contiguous_format
+            )
+        ],
+        "ir": ir,
+        "min_block_size": 1,
+    }
 
-#     outputs_trt_deser = deser_trt_exp_program(input)
-#     for idx in range(len(outputs_pyt)):
-#         cos_sim = cosine_similarity(outputs_pyt[idx], outputs_trt_deser[idx])
-#         assertions.assertTrue(
-#             cos_sim > COSINE_THRESHOLD,
-#             msg=f"test_base_full_compile_save_load TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
-#         )
+    trt_exp_program = torchtrt.compile(model, **compile_spec)
+    torch._export.save(trt_exp_program, "/tmp/trt.ep")
+    deser_trt_exp_program = torch._export.load("/tmp/trt.ep")
+
+    outputs_pyt = model(input)
+    outputs_trt = trt_exp_program(input)
+    cos_sim = cosine_similarity(outputs_pyt, outputs_trt)
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_resnet18_save_load TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
+
+    outputs_trt_deser = deser_trt_exp_program(input)
+    cos_sim = cosine_similarity(outputs_pyt, outputs_trt_deser)
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_resnet18_save_load TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
