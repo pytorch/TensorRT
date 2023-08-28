@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import Any, Callable, List, Optional, Sequence, Set
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Union
 
 import torch
 import torch.fx
 import torch_tensorrt.ts
 from torch._export import ExportedProgram
+from torch._export.exported_program import CallSpec
+from torch.export import ExportGraphSignature
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo.compile import compile as dynamo_compile
@@ -215,20 +217,54 @@ def compile(
             inputs = [inputs]
         device = kwargs.get("device", Device._current_device())
         torchtrt_inputs, torch_inputs = prepare_inputs(inputs, prepare_device(device))
-        module = torch_tensorrt.dynamo.trace(module, torch_inputs, **kwargs)
+        exp_program = torch_tensorrt.dynamo.trace(module, torch_inputs, **kwargs)
         compiled_aten_module: torch.fx.GraphModule = dynamo_compile(
-            module,
+            exp_program.module(),
             inputs=input_list,
             enabled_precisions=enabled_precisions_set,
             **kwargs,
         )
-        return compiled_aten_module
+        trt_exp_program = create_trt_exp_program(
+            compiled_aten_module, exp_program.call_spec, exp_program.state_dict
+        )
+        return trt_exp_program
     elif target_ir == _IRType.torch_compile:
         return torch_compile(
             module, enabled_precisions=enabled_precisions_set, **kwargs
         )
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
+
+
+def create_trt_exp_program(
+    gm: torch.fx.GraphModule,
+    call_spec: CallSpec,
+    state_dict: Dict[str, Union[torch.Tensor, torch.nn.Parameter]],
+) -> ExportedProgram:
+    """Creates a new Exported Program. This function takes an torch.fx.GraphModule which has TRT engines
+    and constructs an Exported Program object with the new IO node names, call_spec and state_dict
+    """
+    input_node_names = [
+        node.name for node in gm.graph.nodes if node.op == "placeholder"
+    ]
+    output_node_names = [node.name for node in gm.graph.nodes if node.op == "output"]
+    trt_graph_signature = ExportGraphSignature(
+        parameters=[],
+        buffers=[],
+        user_inputs=input_node_names,
+        user_outputs=output_node_names,
+        inputs_to_parameters={},
+        inputs_to_buffers={},
+        buffers_to_mutate={},
+        backward_signature=None,
+        assertion_dep_token=None,
+    )
+
+    trt_exp_program = ExportedProgram(
+        gm, gm.graph, trt_graph_signature, call_spec, state_dict, {}, [], []
+    )
+
+    return trt_exp_program
 
 
 def torch_compile(module: torch.nn.Module, **kwargs: Any) -> Any:

@@ -784,7 +784,7 @@ commands:
       - store_artifacts:
           path: /tmp/testlogs
 
-  test-dynamo-models_torch_export:
+  test-dynamo-models_export:
     description: "Test the Dynamo models via torch_export path"
     steps:
       - run:
@@ -794,6 +794,20 @@ commands:
             pip3 install timm
             pip3 install transformers
             pytest test_models_export.py --junitxml=/tmp/artifacts/test_results/dynamo/backend/test_results.xml --ir dynamo
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-dynamo-export_serde:
+    description: "Test the export serialize/deserialize functionality for Dynamo models"
+    steps:
+      - run:
+          name: Run Dynamo models and test export serde with TRT compiled modules
+          command: |
+            cd tests/py/dynamo/models
+            pytest test_export_serde.py --junitxml=/tmp/artifacts/test_results/dynamo/backend/test_results.xml --ir dynamo
 
       - store_test_results:
           path: /tmp/artifacts
@@ -1081,7 +1095,8 @@ jobs:
       - test-dynamo-converters
       - test-dynamo-torch_compile
       - test-dynamo-models_torch_compile
-      - test-dynamo-models_torch_export
+      - test-dynamo-models_export
+      - test-dynamo-export_serde
 
   package-x86_64-linux:
     parameters:

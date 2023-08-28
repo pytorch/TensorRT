@@ -3,10 +3,11 @@ from __future__ import annotations
 import collections.abc
 import logging
 import operator
-from typing import Any, List, Optional, Sequence, Set, Tuple
+from typing import Any, List, Optional, Sequence, Set, Tuple, cast
 
 import torch
 import torch_tensorrt
+from torch._subclasses.fake_tensor import FakeTensor
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
     EngineCapability,
@@ -30,7 +31,7 @@ from torch_tensorrt.dynamo.conversion import (
     convert_module,
     repair_long_or_double_inputs,
 )
-from torch_tensorrt.dynamo.utils import prepare_device, prepare_inputs
+from torch_tensorrt.dynamo.utils import constant_fold, prepare_device, prepare_inputs
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,8 @@ def compile(
         "enable_experimental_decompositions}"
     )
 
+    logger.debug("Post export graph: " + str(gm.graph))
+
     if not isinstance(inputs, collections.abc.Sequence):
         inputs = [inputs]
 
@@ -123,6 +126,8 @@ def compile(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
+    # Run constant folding before TRT compilation
+    constant_fold(gm)
     return compile_module(gm, torch_inputs, settings)
 
 
@@ -190,30 +195,32 @@ def compile_module(
             torch_executed_ops=settings.torch_executed_ops,
         )
 
+    # Get submodule IO shape map
+    submod_inputs_shape_map, submod_outputs_shape_map = partitioning.run_shape_analysis(
+        partitioned_module, sample_inputs
+    )
+
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
     for name, _ in partitioned_module.named_children():
+        submodule = getattr(partitioned_module, name)
+        logger.debug(
+            "Submodule name: " + str(name) + " Graph: \n" + str(submodule.graph)
+        )
+
         # Criteria for a module to be convertible to TRT
         if settings.use_fast_partitioner and "_run_on_acc" not in name:
             continue
 
-        submodule = getattr(partitioned_module, name)
+        # Ensure the submodule has inputs
+        submodule_node = [
+            node for node in partitioned_module.graph.nodes if node.name == name
+        ]
+        assert submodule_node
+        submodule_node = submodule_node[0]
+        assert submodule_node.args
 
-        # Store the input nodes for this TRT subgraph
-        submodule_input_nodes = []
-        submodule_node = None
-        for node in partitioned_module.graph.nodes:
-            if node.name == name:
-                submodule_node = node
-                if len(node.args) > 0:
-                    for i in range(len(node.args)):
-                        if node.args[i].op == "placeholder":
-                            submodule_input_nodes.append(node.args[i])
-
-        logger.debug(
-            "Submodule name: " + str(name) + " Graph: \n" + str(submodule.graph)
-        )
-        # Get submodule inputs
+        # Get example submodule inputs
         submodule_inputs = partitioning.get_submod_inputs(
             partitioned_module, submodule, sample_inputs
         )
@@ -233,37 +240,45 @@ def compile_module(
             name=name,
         )
 
+        num_outputs = len(submod_outputs_shape_map[name])
         # Insert a call_function node to perform inference on TRT engine
         with partitioned_module.graph.inserting_before(submodule_node):
             trt_node = partitioned_module.graph.call_function(
                 torch.ops.tensorrt.execute_engine.default,
-                (submodule_input_nodes, trt_mod.engine),
+                (submodule_node.args, trt_mod.engine),
             )
-            trt_node.meta["val"] = torch.ones((1, 16, 222, 222))
+            trt_node.meta["val"] = []
+            # Generate meta data for TRT node (a FakeTensor with corresponding output shape)
+            for idx in range(num_outputs):
+                trt_node.meta["val"].append(
+                    cast(
+                        FakeTensor,
+                        torch.empty_strided(
+                            tuple(submod_outputs_shape_map[name][idx]),
+                            tuple([1] * len(submod_outputs_shape_map[name][idx])),
+                        ),
+                    )
+                )
 
-        # Replace uses of submodule with the trt_node
-        if submodule_node:
+        if num_outputs == 1:
+            # Insert getitem nodes as outputs (for export serialization to work)
+            with partitioned_module.graph.inserting_after(trt_node):
+                getitem_output = partitioned_module.graph.call_function(
+                    operator.getitem, (trt_node, 0)
+                )
+            submodule_node.replace_all_uses_with(getitem_output)
+        else:
+            # Multiple outputs case:
+            # Replace uses of submodule with the trt_node.
+            # getitem nodes are already added inherently by the partitioner
             submodule_node.replace_all_uses_with(trt_node)
 
-        # Erase the submodule node and the output nodes
+        # Erase the TRT submodule
         partitioned_module.graph.erase_node(submodule_node)
-        output_nodes = [
-            node for node in partitioned_module.graph.nodes if node.op == "output"
-        ]
-        for output_node in output_nodes:
-            partitioned_module.graph.erase_node(output_node)
 
-        # Insert the getitem node which is the output
-        with partitioned_module.graph.inserting_after(trt_node):
-            output = partitioned_module.graph.call_function(
-                operator.getitem, (trt_node, 0)
-            )
-            output.meta["val"] = torch.ones((1, 16, 222, 222))
-        partitioned_module.graph.output(output)
-
-        # Clean the graph
-        partitioned_module.graph.eliminate_dead_code()
-        partitioned_module.graph.lint()
+    # Clean the graph
+    partitioned_module.graph.eliminate_dead_code()
+    partitioned_module.graph.lint()
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:
