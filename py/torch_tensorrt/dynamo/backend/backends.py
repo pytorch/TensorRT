@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import logging
 import unittest
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Dict, Optional, Sequence
 
 import torch
 import torch._dynamo as td
+import torch.utils._pytree as pytree
 from torch._dynamo.utils import detect_fake_mode
-from torch._functorch.aot_autograd import aot_export_joint_simple
+from torch._functorch.aot_autograd import _aot_export_function
 from torch._inductor.freezing import ConstantFolder, replace_node_with_constant
+from torch._ops import OpOverload
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.compile import compile_module
 from torch_tensorrt.dynamo.lowering._decompositions import get_decompositions
@@ -73,10 +75,9 @@ def _pretraced_backend(
             fake_mode, "allow_non_fake_inputs", True
         ), fake_mode:
             # Invoke AOTAutograd to translate operators to aten
-            graph_module = aot_export_joint_simple(
+            graph_module = aot_export_for_compile(
                 gm,
                 sample_inputs,
-                trace_joint=False,
                 decompositions=get_decompositions(
                     settings.enable_experimental_decompositions
                 ),
@@ -131,3 +132,50 @@ def constant_fold(gm: torch.fx.GraphModule) -> Any:
     gm.graph.eliminate_dead_code()
     gm.graph.lint()
     gm.recompile()
+
+
+def aot_export_for_compile(
+    func: torch.fx.GraphModule,
+    args: Sequence[torch.Tensor],
+    *,
+    decompositions: Optional[Dict[OpOverload, Callable[[Any], Any]]] = None,
+) -> torch.fx.GraphModule:
+    """Adapted from:
+    https://github.com/pytorch/pytorch/blob/054f3f1d8f9eb63ef8437991eba5b8f2aeee920f/torch/_functorch/aot_autograd.py#L4133-L4134
+
+    Removed check for input aliasing in resultant subgraph - TRT is functional-only
+    """
+    with torch.no_grad():
+        fx_g, metadata, in_spec, out_spec = _aot_export_function(
+            func,
+            args,
+            decompositions=decompositions,
+        )
+
+    # No input mutations
+    if (
+        len([x for x in metadata.input_info if x.mutates_data or x.mutates_metadata])
+        != 0
+    ):
+        raise RuntimeError(
+            f"aot_export_joint_simple does not support input mutations. {str(metadata)}"
+        )
+    # No pytrees
+    if type(in_spec) == pytree.LeafSpec:
+        raise RuntimeError(
+            f"aot_export_for_compile requires inputs to be a single list/tuple. in_spec={str(in_spec)}"
+        )
+    if len([x for x in in_spec.children_specs if type(x) != pytree.LeafSpec]) != 0:
+        raise RuntimeError(
+            f"aot_export_for_compile requires individual inputs not to be pytrees. in_spec={str(in_spec)}"
+        )
+    if type(out_spec) == pytree.LeafSpec:
+        raise RuntimeError(
+            f"aot_export_for_compile requires outputs to be a single list/tuple. out_spec={str(out_spec)}"
+        )
+    if len([x for x in out_spec.children_specs if type(x) != pytree.LeafSpec]) != 0:
+        raise RuntimeError(
+            f"aot_export_for_compile requires individual outputs not to be pytrees. out_spec={str(out_spec)}"
+        )
+
+    return fx_g
