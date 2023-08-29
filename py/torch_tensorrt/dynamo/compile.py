@@ -20,6 +20,7 @@ from torch_tensorrt.dynamo._defaults import (
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
     PRECISION,
+    REQUIRE_FULL_COMPILATION,
     TRUNCATE_LONG_AND_DOUBLE,
     USE_FAST_PARTITIONER,
     USE_PYTHON_RUNTIME,
@@ -57,7 +58,7 @@ def compile(
     dla_global_dram_size: int = 536870912,
     calibrator: object = None,
     truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE,
-    require_full_compilation: bool = False,
+    require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Optional[List[str]] = None,
     torch_executed_modules: Optional[List[str]] = None,
@@ -80,8 +81,10 @@ def compile(
         "The Dynamo backend is an experimental feature, for which only the "
         "following arguments are supported: "
         "{enabled_precisions, debug, workspace_size, min_block_size, "
-        "torch_executed_ops, pass_through_build_failures, use_fast_partitioner, "
-        "enable_experimental_decompositions}"
+        "max_aux_streams, version_compatible, optimization_level, "
+        "torch_executed_ops, pass_through_build_failures, "
+        "use_fast_partitioner, enable_experimental_decompositions, "
+        "require_full_compilation}"
     )
 
     if not isinstance(inputs, collections.abc.Sequence):
@@ -126,6 +129,7 @@ def compile(
         "truncate_long_and_double": truncate_long_and_double,
         "use_fast_partitioner": use_fast_partitioner,
         "enable_experimental_decompositions": enable_experimental_decompositions,
+        "require_full_compilation": require_full_compilation,
     }
 
     settings = CompilationSettings(**compilation_options)

@@ -5,7 +5,11 @@ import torch
 from torch.fx.graph_module import GraphModule
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
 from torch.fx.passes.operator_support import OperatorSupport, SupportDict
-from torch_tensorrt.dynamo._defaults import DEBUG, MIN_BLOCK_SIZE
+from torch_tensorrt.dynamo._defaults import (
+    DEBUG,
+    MIN_BLOCK_SIZE,
+    REQUIRE_FULL_COMPILATION,
+)
 from torch_tensorrt.dynamo.conversion.converter_registry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
@@ -26,6 +30,7 @@ class TRTPartitioner(CapabilityBasedPartitioner):  # type: ignore[misc]
         allowed_single_node_partition_ops: Nodes which can be included in single-node partitons.
             Generally useful for module-level exclusion ops which are intensive despite being single functions
         min_block_size: Minimum number of computational operators per block
+        require_full_compilation: Require that all computational operators be run in TRT
     Returns:
         torch.fx.GraphModule
     """
@@ -40,6 +45,7 @@ class TRTPartitioner(CapabilityBasedPartitioner):  # type: ignore[misc]
             Collection[str]
         ] = DEFAULT_SINGLE_NODE_PARTITIONS,
         min_block_size: int = MIN_BLOCK_SIZE,
+        require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
     ) -> None:
         super().__init__(
             graph_module,
@@ -50,11 +56,33 @@ class TRTPartitioner(CapabilityBasedPartitioner):  # type: ignore[misc]
         )
 
         self.min_block_size = min_block_size
+        self.require_full_compilation = require_full_compilation
 
     def propose_partitions(self) -> List[Partition]:
         # Propose partitions using the default, then refine the results
         initial_proposed_partitions = super().propose_partitions()
         partitions = dict(enumerate(initial_proposed_partitions))
+
+        # A graph is fully supported if there is a single partition and all operators are supported/convertible
+        full_support = len(partitions) == 1 and not getattr(
+            self.operator_support, "unsupported_operators", True
+        )
+
+        if not full_support and self.require_full_compilation:
+            raise AssertionError(
+                "require_full_compilation=True was specified, but model is not fully supported"
+            )
+
+        if (
+            full_support
+            and self.require_full_compilation
+            and self.min_block_size != MIN_BLOCK_SIZE
+        ):
+            logger.warning(
+                "Detected both require_full_compilation and min_block_size compilation "
+                "arguments were specified. Disregarding min_block_size argument for "
+                "fully supported model."
+            )
 
         # For each partition, determine whether or not the number of computational operators
         # exceeds the threshold, and if not, remove that partition
@@ -81,7 +109,11 @@ class TRTPartitioner(CapabilityBasedPartitioner):  # type: ignore[misc]
                 ):
                     compute_node_count += 1
 
-            if compute_node_count < self.min_block_size and not exempted_partition:
+            if (
+                compute_node_count < self.min_block_size
+                and not exempted_partition
+                and not (full_support and self.require_full_compilation)
+            ):
                 partitions_to_remove[id] = compute_node_count
 
         # Remove any nodes violating the criteria specified by the user
@@ -172,6 +204,7 @@ def partition(
     verbose: bool = DEBUG,
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Optional[Set[str]] = None,
+    require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
 ) -> torch.fx.GraphModule:
     """Partition an FX GraphModule with aten ops into TRT engines
     Partitioning is based on converter operator support
@@ -181,6 +214,7 @@ def partition(
         verbose: Bool representing whether to print operator support
         min_block_size: Minimum number of operators per TRT-Engine Block
         torch_executed_ops: Sequence of operations to run in Torch, regardless of converter coverage
+        require_full_compilation: Whether to require that all operators be run in TRT
     Returns:
         torch.fx.GraphModule
     """
@@ -189,7 +223,12 @@ def partition(
         if torch_executed_ops is not None
         else set()
     )
-    partitioner = TRTPartitioner(gm, supported_ops, min_block_size=min_block_size)
+    partitioner = TRTPartitioner(
+        gm,
+        supported_ops,
+        min_block_size=min_block_size,
+        require_full_compilation=require_full_compilation,
+    )
 
     # Determine partitions based on user specifications and operator support
     # Then, fuse partitions and display overview of supported/unsupported operators
