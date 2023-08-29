@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 from enum import Enum
-from typing import List, Dict, Any, Tuple, Optional
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import torch
-
 from torch_tensorrt import _enums
 
 
@@ -27,22 +28,26 @@ class Input(object):
         STATIC = 0
         DYNAMIC = 1
 
-    shape_mode = None  #: (torch_tensorrt.Input._ShapeMode): Is input statically or dynamically shaped
-    shape = None  #: (Tuple or Dict): Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ "min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple }``
-    dtype = (
+    shape_mode: Optional[
+        _ShapeMode
+    ] = None  #: Is input statically or dynamically shaped
+    shape: Optional[
+        Tuple[int, ...] | Dict[str, Tuple[int, ...]]
+    ] = None  #: Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ "min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple }``
+    dtype: _enums.dtype = (
         _enums.dtype.unknown
     )  #: The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)
-    _explicit_set_dtype = False
-    format = (
+    _explicit_set_dtype: bool = False
+    format: _enums.TensorFormat = (
         _enums.TensorFormat.contiguous
     )  #: The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)
 
-    DOMAIN_OFFSET = 2.0
-    low_tensor_domain_incl = 0.0
-    high_tensor_domain_excl = low_tensor_domain_incl + DOMAIN_OFFSET
-    torch_dtype = torch.float32
+    DOMAIN_OFFSET: float = 2.0
+    low_tensor_domain_incl: float = 0.0
+    high_tensor_domain_excl: float = low_tensor_domain_incl + DOMAIN_OFFSET
+    torch_dtype: torch.dtype = torch.float32
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """__init__ Method for torch_tensorrt.Input
 
         Input accepts one of a few construction patterns
@@ -93,7 +98,7 @@ class Input(object):
             self.shape_mode = Input._ShapeMode.STATIC
 
         elif len(args) == 0:
-            if not ("shape" in kwargs) and not (
+            if "shape" not in kwargs and not (
                 all(k in kwargs for k in ["min_shape", "opt_shape", "max_shape"])
             ):
                 raise ValueError(
@@ -176,15 +181,20 @@ class Input(object):
                 str(self.tensor_domain[1]),
             )
         elif self.shape_mode == Input._ShapeMode.DYNAMIC:
-            return "Input(min_shape={}, opt_shape={}, max_shape={}, dtype={}, format={}, domain=[{}, {}))".format(
-                self.shape["min_shape"],
-                self.shape["opt_shape"],
-                self.shape["max_shape"],
-                str(self.dtype),
-                str(self.format),
-                str(self.tensor_domain[0]),
-                str(self.tensor_domain[1]),
-            )
+            if isinstance(self.shape, dict):
+                return "Input(min_shape={}, opt_shape={}, max_shape={}, dtype={}, format={}, domain=[{}, {}))".format(
+                    self.shape["min_shape"],
+                    self.shape["opt_shape"],
+                    self.shape["max_shape"],
+                    str(self.dtype),
+                    str(self.format),
+                    str(self.tensor_domain[0]),
+                    str(self.tensor_domain[1]),
+                )
+            else:
+                raise RuntimeError(
+                    f"Input shape is dynamic but shapes are not provided as dictionary (found: {self.shape})"
+                )
         else:
             raise RuntimeError("Unknown input shape mode")
 
@@ -244,7 +254,7 @@ class Input(object):
             return torch.float32
 
     def is_trt_dtype(self) -> bool:
-        return self.dtype != _enums.dtype.long
+        return bool(self.dtype != _enums.dtype.long)
 
     @staticmethod
     def _parse_format(format: Any) -> _enums.TensorFormat:
@@ -267,7 +277,9 @@ class Input(object):
             )
 
     @staticmethod
-    def _parse_tensor_domain(domain: Optional[Tuple[float, float]]) -> Tuple:
+    def _parse_tensor_domain(
+        domain: Optional[Tuple[float, float]]
+    ) -> Tuple[float, float]:
         """
         Produce a tuple of integers which specifies a tensor domain in the interval format: [lo, hi)
 
@@ -287,8 +299,8 @@ class Input(object):
             domain_lo, domain_hi = domain
 
             # Validate type and provided values for domain
-            valid_type_lo = isinstance(domain_lo, int) or isinstance(domain_lo, float)
-            valid_type_hi = isinstance(domain_hi, int) or isinstance(domain_hi, float)
+            valid_type_lo = isinstance(domain_lo, (int, float))
+            valid_type_hi = isinstance(domain_hi, (int, float))
 
             if not valid_type_lo:
                 raise ValueError(
@@ -327,9 +339,9 @@ class Input(object):
             A Input object.
         """
         if not (
-            t.is_contiguous(memory_format=torch.contiguous_format)
+            disable_memory_format_check
+            or t.is_contiguous(memory_format=torch.contiguous_format)
             or t.is_contiguous(memory_format=torch.channels_last)
-            or disable_memory_format_check
         ):
             raise ValueError(
                 "Tensor does not have a supported memory format, supported formats are contiguous or channel_last"
@@ -337,8 +349,8 @@ class Input(object):
         frmt = (
             torch.contiguous_format
             if (
-                t.is_contiguous(memory_format=torch.contiguous_format)
-                or disable_memory_format_check
+                disable_memory_format_check
+                or t.is_contiguous(memory_format=torch.contiguous_format)
             )
             else torch.channels_last
         )
@@ -346,7 +358,7 @@ class Input(object):
 
     @classmethod
     def from_tensors(
-        cls, ts: torch.Tensor, disable_memory_format_check: bool = False
+        cls, ts: Sequence[torch.Tensor], disable_memory_format_check: bool = False
     ) -> List["Input"]:
         """
         Produce a list of Inputs which contain
@@ -366,7 +378,9 @@ class Input(object):
             for t in ts
         ]
 
-    def example_tensor(self, optimization_profile_field: str = None) -> torch.Tensor:
+    def example_tensor(
+        self, optimization_profile_field: Optional[str] = None
+    ) -> torch.Tensor:
         """
         Get an example tensor of the shape specified by the Input object
 
@@ -376,38 +390,41 @@ class Input(object):
         Returns:
             A PyTorch Tensor
         """
-        if optimization_profile_field is not None:
-            try:
-                assert any(
-                    [
+        if self.shape_mode == Input._ShapeMode.STATIC:
+            if optimization_profile_field is not None:
+                raise ValueError(
+                    "Specified a optimization profile field but the input is static"
+                )
+            else:
+                if isinstance(self.shape, tuple):
+                    return torch.rand(self.shape).to(dtype=self.torch_dtype)
+                else:
+                    RuntimeError(
+                        f"Input shape is dynamic but shapes are not provided as sequence (found: {self.shape})"
+                    )
+        else:
+            if optimization_profile_field is not None:
+                try:
+                    assert any(
                         optimization_profile_field == field_name
                         for field_name in ["min_shape", "opt_shape", "max_shape"]
-                    ]
-                )
-            except:
+                    )
+                except AssertionError:
+                    raise ValueError(
+                        "Invalid field name, expected one of min_shape, opt_shape, max_shape"
+                    )
+
+                if isinstance(self.shape, dict):
+                    return torch.rand(self.shape[optimization_profile_field]).to(
+                        dtype=self.torch_dtype
+                    )
+                else:
+                    raise RuntimeError(
+                        f"Input shape is dynamic but shapes are not provided as dictionary (found: {self.shape})"
+                    )
+
+            else:
                 raise ValueError(
-                    "Invalid field name, expected one of min_shape, opt_shape, max_shape"
+                    "Requested an example tensor from a dynamic shaped input but did not specific which profile field to use."
                 )
-
-        if (
-            optimization_profile_field is not None
-            and self.shape_mode == Input._ShapeMode.STATIC
-        ):
-            raise ValueError(
-                "Specified a optimization profile field but the input is static"
-            )
-
-        if (
-            optimization_profile_field is None
-            and self.shape_mode == Input._ShapeMode.DYNAMIC
-        ):
-            raise ValueError(
-                "Requested an example tensor from a dynamic shaped input but did not specific which profile field to use."
-            )
-
-        if self.shape_mode == Input._ShapeMode.STATIC:
-            return torch.rand(self.shape).to(dtype=self.torch_dtype)
-        else:
-            return torch.rand(self.shape[optimization_profile_field]).to(
-                dtype=self.torch_dtype
-            )
+        raise

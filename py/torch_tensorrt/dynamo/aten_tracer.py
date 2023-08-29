@@ -1,13 +1,15 @@
+from __future__ import annotations
+
 import copy
+import logging
 import sys
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Union
-from packaging import version
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 import torch
 import torch._dynamo as torchdynamo
-
-from torch_tensorrt.fx.utils import req_torch_version
+from torch.fx.passes.infra.pass_base import PassResult
+from torch_tensorrt.dynamo.utils import req_torch_version
 from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
     compose_bmm,
     compose_chunk,
@@ -23,11 +25,9 @@ from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
 )
 from typing_extensions import TypeAlias
 
-Value: TypeAlias = Union[
-    Tuple["Value", ...],
-    List["Value"],
-    Dict[str, "Value"],
-]
+Value: TypeAlias = Union[Tuple["Value", ...], List["Value"], Dict[str, "Value"]]
+
+logger = logging.getLogger(__name__)
 
 
 class DynamoConfig:
@@ -43,7 +43,6 @@ class DynamoConfig:
         specialize_int: bool = True,
         verbose: bool = True,
     ) -> None:
-
         self.capture_scalar_outputs = capture_scalar_outputs
         self.guard_nn_modules = guard_nn_modules
         self.dynamic_shapes = dynamic_shapes
@@ -97,7 +96,7 @@ def dynamo_trace(
     aten_graph: bool,
     tracing_mode: str = "real",
     dynamo_config: Optional[DynamoConfig] = None,
-) -> Tuple[torch.fx.GraphModule, Set]:
+) -> Any:  # Tuple[torch.fx.GraphModule, Set[_guards.Guard]]:
     """
     TODO: Once we fully migrate to torchdynamo frontend, we will remove
     this config option alltogether.  For now, it helps with quick
@@ -126,7 +125,11 @@ def dynamo_trace(
 
 
 @req_torch_version("2.dev")
-def trace(model, inputs, **kwargs):
+def trace(
+    model: torch.nn.Module | torch.fx.GraphModule,
+    inputs: Tuple[Any, ...],
+    **kwargs: Any,
+) -> torch.fx.GraphModule:
     """
     Optimized trace with necessary passes which re-compose some ops or replace some ops
     These passes should be general and functional purpose
@@ -145,7 +148,7 @@ def trace(model, inputs, **kwargs):
     ]
 
     fx_module, __package__ = dynamo_trace(model, inputs, True, "symbolic")
-    print(fx_module.graph)
+
     for passes in passes_list:
         pr: PassResult = passes(fx_module)
         fx_module = pr.graph_module
@@ -153,5 +156,5 @@ def trace(model, inputs, **kwargs):
     fx_module(*inputs)
 
     fx_module = run_const_fold(fx_module)
-    print(fx_module.graph)
+    logger.info("Post export graph : %s\n", fx_module.graph)
     return fx_module

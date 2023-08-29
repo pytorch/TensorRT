@@ -43,6 +43,40 @@ TEST(Converters, ATenMaskedFillZerosConvertsCorrectly) {
       torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
 
+TEST(Converters, ATenMaskedFillZerosDynamicConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+      %44 : Device = prim::Constant[value="cuda"]()
+      %8 : bool = prim::Constant[value=0]()
+      %7 : None = prim::Constant()
+      %f32_dtype: int = prim::Constant[value=11]()
+      %1 : int = prim::Constant[value=0]() # bert.py:5:26
+      %2 : int = prim::Constant[value=1]() # bert.py:5:32
+      %33 : int = prim::Constant[value=2]() # bert.py:6:31
+      %3 : int[] = prim::ListConstruct(%1, %1, %2)
+      %9 : Tensor = aten::tensor(%3, %f32_dtype, %7, %8) # bert.py:5:11
+      %mask.1 : Tensor = aten::to(%9, %44, %7, %8, %8) # bert.py:5:11
+      %mask.2 : Tensor = trt::const(%mask.1)
+      %34 : Tensor = aten::masked_fill(%x.1, %mask.1, %33) # bert.py:6:11
+      return (%34, %mask.2))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, &*g);
+
+  auto in = at::zeros({1, 2, 3}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  torch_tensorrt::core::lowering::passes::RemoveNOPs(g);
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {trt_in});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
+}
+
 TEST(Converters, ATenMaskedFillMixedTypesFloatIntConvertsCorrectly) {
   const auto graph = R"IR(
     graph(%x.1 : Tensor, %x.2 : Tensor):

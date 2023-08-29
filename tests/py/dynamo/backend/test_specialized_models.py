@@ -1,7 +1,8 @@
-from utils import lower_graph_testing
-from torch.testing._internal.common_utils import run_tests, TestCase
 import torch
 import torch_tensorrt
+from torch.testing._internal.common_utils import TestCase, run_tests
+
+from ..testing_utilities import lower_graph_testing
 
 
 class TestFakeTensors(TestCase):
@@ -115,6 +116,44 @@ class TestFakeTensors(TestCase):
             msg=f"AddFloat TRT outputs don't match with the original model.",
         )
 
+        torch._dynamo.reset()
+
+
+class Test0DTensors(TestCase):
+    def test_0D_input(self):
+        class Tensor0DInput(torch.nn.Module):
+            def forward(self, x):
+                return x * 7
+
+        inputs = [
+            torch.tensor(
+                3,
+            )
+            .cuda()
+            .int(),
+        ]
+
+        fx_graph = torch.fx.symbolic_trace(Tensor0DInput())
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            msg=f"0D-Tensor TRT outputs don't match with the original model.",
+        )
         torch._dynamo.reset()
 
 

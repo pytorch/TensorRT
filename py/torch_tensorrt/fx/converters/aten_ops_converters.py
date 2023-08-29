@@ -24,6 +24,7 @@ from torch_tensorrt.fx.converters.impl import activation, convolution
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
+
 ## converter list in alphabetic order
 @tensorrt_converter(torch.ops.aten.add.Tensor)
 def aten_ops_add(
@@ -199,7 +200,6 @@ def aten_ops_elu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     if len(args) > 2:
         return activation.selu(
             network,
@@ -257,7 +257,6 @@ def aten_ops_hardtanh(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return activation.hardtanh(
         network, target, SourceIR.ATEN, name, args[0], args[1], args[2]
     )
@@ -286,7 +285,6 @@ def aten_ops_leaky_relu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return activation.leaky_relu(network, target, SourceIR.ATEN, name, args[0], args[1])
 
 
@@ -380,7 +378,6 @@ def aten_ops_relu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return activation.relu(
         network,
         target,
@@ -450,7 +447,6 @@ def aten_ops_tanh(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return activation.tanh(
         network,
         target,
@@ -601,7 +597,6 @@ def aten_ops_sigmoid(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return activation.sigmoid(
         network,
         target,

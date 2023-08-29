@@ -8,7 +8,7 @@ import torch.fx as fx
 import torch.nn as nn
 
 import torch_tensorrt.fx.passes.remove_duplicate_output_args as dedup
-from torch_tensorrt._util import sanitized_torch_version
+from torch_tensorrt._utils import sanitized_torch_version
 
 from torch.testing._internal.common_utils import run_tests, TestCase
 

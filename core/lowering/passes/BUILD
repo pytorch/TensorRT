@@ -31,6 +31,7 @@ cc_library(
         "replace_aten_pad.cpp",
         "rewrite_inputs_with_params.cpp",
         "silu_to_sigmoid_multiplication.cpp",
+        "tile_to_repeat.cpp",
         "unpack_addmm.cpp",
         "unpack_batch_norm.cpp",
         "unpack_hardsigmoid.cpp",
@@ -48,7 +49,7 @@ cc_library(
         "//core/util:prelude",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
 )
 

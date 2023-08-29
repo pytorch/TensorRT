@@ -1,13 +1,21 @@
-import torch
+import sys
+from typing import Any, Optional, Tuple
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
+import warnings
 
 # from torch_tensorrt import _enums
 import tensorrt as trt
+import torch
 from torch_tensorrt import logging
-import warnings
 
 try:
     from torch_tensorrt import _C
-except:
+except ImportError:
     warnings.warn(
         "Unable to import torchscript frontend core and torch-tensorrt runtime. Some dependent features may be unavailable."
     )
@@ -24,12 +32,14 @@ class Device(object):
         allow_gpu_fallback (bool): Whether falling back to GPU if DLA cannot support an op should be allowed
     """
 
-    device_type = None  #: (torch_tensorrt.DeviceType): Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.
-    gpu_id = -1  #: (int) Device ID for target GPU
-    dla_core = -1  #: (int) Core ID for target DLA core
-    allow_gpu_fallback = False  #: (bool) Whether falling back to GPU if DLA cannot support an op should be allowed
+    device_type: Optional[
+        trt.DeviceType
+    ] = None  #: Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.
+    gpu_id: int = -1  #: Device ID for target GPU
+    dla_core: int = -1  #: Core ID for target DLA core
+    allow_gpu_fallback: bool = False  #: Whether falling back to GPU if DLA cannot support an op should be allowed
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         """__init__ Method for torch_tensorrt.Device
 
         Device accepts one of a few construction patterns
@@ -109,6 +119,9 @@ class Device(object):
             )
         )
 
+    def __repr__(self) -> str:
+        return self.__str__()
+
     def _to_internal(self) -> _C.Device:
         internal_dev = _C.Device()
         if self.device_type == trt.DeviceType.GPU:
@@ -127,29 +140,28 @@ class Device(object):
 
     def _to_serialized_rt_device(self) -> str:
         internal_dev = self._to_internal()
-        return internal_dev._to_serialized_rt_device()
+        serialized_rt_device: str = internal_dev._to_serialized_rt_device()
+        return serialized_rt_device
 
     @classmethod
-    def _from_torch_device(cls, torch_dev: torch.device):
+    def _from_torch_device(cls, torch_dev: torch.device) -> Self:
         if torch_dev.type != "cuda":
             raise ValueError('Torch Device specs must have type "cuda"')
         gpu_id = torch_dev.index
         return cls(gpu_id=gpu_id)
 
     @classmethod
-    def _current_device(cls):
-        try:
-            dev = _C._get_current_device()
-        except RuntimeError:
-            logging.log(logging.Level.Error, "Cannot get current device")
-            return None
+    def _current_device(cls) -> Self:
+        dev = _C._get_current_device()
         return cls(gpu_id=dev.gpu_id)
 
     @staticmethod
-    def _parse_device_str(s):
+    def _parse_device_str(s: str) -> Tuple[trt.DeviceType, int]:
         s = s.lower()
         spec = s.split(":")
         if spec[0] == "gpu" or spec[0] == "cuda":
             return (trt.DeviceType.GPU, int(spec[1]))
         elif spec[0] == "dla":
             return (trt.DeviceType.DLA, int(spec[1]))
+        else:
+            raise ValueError(f"Unknown device type {spec[0]}")

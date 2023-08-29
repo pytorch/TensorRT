@@ -14,8 +14,8 @@ config_setting(
 py_test(
     name = "test_api",
     srcs = [
-        "test_api.py",
         "model_test_case.py",
+        "test_api.py",
     ] + select({
         ":aarch64_linux": [
             "test_api_dla.py",

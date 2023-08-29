@@ -1,53 +1,46 @@
-import os
-import sys
 import glob
-import yaml
+import os
+import platform
+import subprocess
+import sys
+import warnings
 from dataclasses import dataclass
-import setuptools
-from setuptools import setup, Extension, find_namespace_packages
-from setuptools.command.build_ext import build_ext
-from setuptools.command.develop import develop
-from setuptools.command.install import install
-from setuptools.command.editable_wheel import editable_wheel
 from distutils.cmd import Command
-from wheel.bdist_wheel import bdist_wheel
-
-from torch.utils import cpp_extension
 from shutil import copyfile, rmtree
 
+import setuptools
+import yaml
+from setuptools import Extension, find_namespace_packages, setup
+from setuptools.command.build_ext import build_ext
+from setuptools.command.develop import develop
+from setuptools.command.editable_wheel import editable_wheel
+from setuptools.command.install import install
+from torch.utils import cpp_extension
+from wheel.bdist_wheel import bdist_wheel
+
+import yaml
+import re
+import os
 import subprocess
-import platform
-import warnings
 
-dir_path = os.path.dirname(os.path.realpath(__file__)) + "/py"
-
-CXX11_ABI = False
-JETPACK_VERSION = None
-FX_ONLY = False
-LEGACY = False
-RELEASE = False
-CI_RELEASE = False
+from datetime import datetime
+from pathlib import Path
+from typing import List
 
 __version__: str = "0.0.0"
 __cuda_version__: str = "0.0"
 __cudnn_version__: str = "0.0"
 __tensorrt_version__: str = "0.0"
 
-
-def load_version_info():
-    global __version__
-    global __cuda_version__
-    global __cudnn_version__
-    global __tensorrt_version__
-    with open("versions.yml", "r") as stream:
-        versions = yaml.safe_load(stream)
-        __version__ = versions["__version__"]
-        __cuda_version__ = versions["__cuda_version__"]
-        __cudnn_version__ = versions["__cudnn_version__"]
-        __tensorrt_version__ = versions["__tensorrt_version__"]
+LEGACY_BASE_VERSION_SUFFIX_PATTERN = re.compile("a0$")
 
 
-load_version_info()
+def get_root_dir() -> Path:
+    return Path(
+        subprocess.check_output(["git", "rev-parse", "--show-toplevel"])
+        .decode("ascii")
+        .strip()
+    )
 
 
 def get_git_revision_short_hash() -> str:
@@ -58,6 +51,45 @@ def get_git_revision_short_hash() -> str:
     )
 
 
+def get_base_version() -> str:
+    root = get_root_dir()
+    try:
+        dirty_version = open(root / "version.txt", "r").read().strip()
+    except FileNotFoundError:
+        print("# WARNING: Base version not found defaulting BUILD_VERSION to 0.1.0")
+        dirty_version = "0.1.0"
+    # Strips trailing a0 from version.txt, not too sure why it's there in the
+    # first place
+    return re.sub(LEGACY_BASE_VERSION_SUFFIX_PATTERN, "", dirty_version)
+
+
+def load_dep_info():
+    global __cuda_version__
+    global __cudnn_version__
+    global __tensorrt_version__
+    with open("dev_dep_versions.yml", "r") as stream:
+        versions = yaml.safe_load(stream)
+        if (gpu_arch_version := os.environ.get("CU_VERSION")) is not None:
+            __cuda_version__ = (
+                (gpu_arch_version[2:])[:-1] + "." + (gpu_arch_version[2:])[-1:]
+            )
+        else:
+            __cuda_version__ = versions["__cuda_version__"]
+        __cudnn_version__ = versions["__cudnn_version__"]
+        __tensorrt_version__ = versions["__tensorrt_version__"]
+
+
+load_dep_info()
+
+dir_path = str(get_root_dir()) + "/py"
+
+CXX11_ABI = False
+JETPACK_VERSION = None
+FX_ONLY = False
+LEGACY = False
+RELEASE = False
+CI_BUILD = False
+
 if "--fx-only" in sys.argv:
     FX_ONLY = True
     sys.argv.remove("--fx-only")
@@ -66,16 +98,31 @@ if "--legacy" in sys.argv:
     LEGACY = True
     sys.argv.remove("--legacy")
 
-if "--release" not in sys.argv:
-    __version__ = __version__ + "+" + get_git_revision_short_hash()
-else:
+if "--release" in sys.argv:
     RELEASE = True
     sys.argv.remove("--release")
+
+if (release_env_var := os.environ.get("RELEASE")) is not None:
+    if release_env_var == "1":
+        RELEASE = True
+
+if (gpu_arch_version := os.environ.get("CU_VERSION")) is None:
+    gpu_arch_version = f"cu{__cuda_version__.replace('.','')}"
+
+
+if RELEASE:
+    __version__ = os.environ.get("BUILD_VERSION")
+else:
+    __version__ = f"{get_base_version()}.dev0+{get_git_revision_short_hash()}"
 
 if "--ci" in sys.argv:
     sys.argv.remove("--ci")
     if RELEASE:
-        CI_RELEASE = True
+        CI_BUILD = True
+
+if (ci_env_var := os.environ.get("CI_BUILD")) is not None:
+    if ci_env_var == "1":
+        CI_BUILD = True
 
 if "--use-cxx11-abi" in sys.argv:
     sys.argv.remove("--use-cxx11-abi")
@@ -159,7 +206,7 @@ def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=F
         cmd.append("--platforms=//toolchains:jetpack_5.0")
         print("Jetpack version: 5.0")
 
-    if CI_RELEASE:
+    if CI_BUILD:
         cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
         print("CI based build")
 
@@ -349,7 +396,9 @@ packages = [
     "torch_tensorrt.dynamo.conversion.impl.unary",
     "torch_tensorrt.dynamo.lowering",
     "torch_tensorrt.dynamo.lowering.substitutions",
+    "torch_tensorrt.dynamo.partitioning",
     "torch_tensorrt.dynamo.runtime",
+    "torch_tensorrt.dynamo.tools",
     "torch_tensorrt.fx",
     "torch_tensorrt.fx.converters",
     "torch_tensorrt.fx.converters.impl",
@@ -373,7 +422,9 @@ package_dir = {
     "torch_tensorrt.dynamo.conversion.impl.unary": "py/torch_tensorrt/dynamo/conversion/impl/unary",
     "torch_tensorrt.dynamo.lowering": "py/torch_tensorrt/dynamo/lowering",
     "torch_tensorrt.dynamo.lowering.substitutions": "py/torch_tensorrt/dynamo/lowering/substitutions",
+    "torch_tensorrt.dynamo.partitioning": "py/torch_tensorrt/dynamo/partitioning",
     "torch_tensorrt.dynamo.runtime": "py/torch_tensorrt/dynamo/runtime",
+    "torch_tensorrt.dynamo.tools": "py/torch_tensorrt/dynamo/tools",
     "torch_tensorrt.fx": "py/torch_tensorrt/fx",
     "torch_tensorrt.fx.converters": "py/torch_tensorrt/fx/converters",
     "torch_tensorrt.fx.converters.impl": "py/torch_tensorrt/fx/converters/impl",
@@ -412,6 +463,7 @@ if not FX_ONLY:
                 dir_path + "/../bazel-TensorRT/external/tensorrt/include",
                 dir_path + "/../bazel-tensorrt/external/tensorrt/include",
                 dir_path + "/../",
+                "/usr/local/cuda",
             ],
             extra_compile_args=[
                 "-Wno-deprecated",

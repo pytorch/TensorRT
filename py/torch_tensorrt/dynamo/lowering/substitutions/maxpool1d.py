@@ -1,14 +1,12 @@
-from typing import Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
+
 import torch
 from torch._custom_op.impl import custom_op
 from torch.fx.node import Argument, Target
-
+from torch_tensorrt.dynamo.lowering._pre_aot_lowering import register_substitution
 from torch_tensorrt.fx.converter_registry import tensorrt_converter
 from torch_tensorrt.fx.converters import acc_ops_converters
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
-
-from torch_tensorrt.dynamo.lowering import register_substitution
-
 
 # This file serves as an example and a tutorial for excluding custom modules from
 # torch.compile tracing. Each required step is labeled with a number indicating the
@@ -26,7 +24,7 @@ from torch_tensorrt.dynamo.lowering import register_substitution
     qualname="tensorrt::maxpool1d",
     manual_schema="(Tensor x, int[1] kernel_size, int[1] stride, int[1] padding, int[1] dilation, bool ceil_mode) -> Tensor",
 )
-def maxpool1d(x, kernel_size, stride, padding, dilation, ceil_mode):
+def maxpool1d(x, kernel_size, stride, padding, dilation, ceil_mode):  # type: ignore[no-untyped-def]
     # Defines operator schema, name, namespace, and function header
     ...
 
@@ -38,13 +36,13 @@ def maxpool1d(x, kernel_size, stride, padding, dilation, ceil_mode):
 # is desirable. If the operator to replace is a custom module you've written, then add its Torch
 # implementation here. Note that the function header to the generic function can have specific arguments
 # as in the above placeholder
-@maxpool1d.impl("cpu")
-@maxpool1d.impl("cuda")
-@maxpool1d.impl_abstract()
+@maxpool1d.impl("cpu")  # type: ignore[misc]
+@maxpool1d.impl("cuda")  # type: ignore[misc]
+@maxpool1d.impl_abstract()  # type: ignore[misc]
 def maxpool1d_generic(
-    *args,
-    **kwargs,
-):
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
     # Defines an implementation for AOT Autograd to use for shape analysis/propagation
     return torch.nn.functional.max_pool1d(
         *args,
@@ -75,10 +73,11 @@ def maxpool1d_generic(
 def maxpool1d_insertion_fn(
     gm: torch.fx.GraphModule,
     node: torch.fx.Node,
-    submodule: torch.nn.Module,
+    submodule: Optional[torch.nn.Module],
 ) -> torch.fx.Node:
     # Defines insertion function for new node
-    new_node = gm.graph.call_function(
+    assert submodule is not None
+    new_node: torch.fx.Node = gm.graph.call_function(
         torch.ops.tensorrt.maxpool1d,
         args=node.args,
         kwargs={
@@ -99,7 +98,7 @@ def maxpool1d_insertion_fn(
 # This accelerated implementation should consume the args/kwargs specified in step 3.
 # One should expect that torch.compile will compress all kwargs into the args field in
 # the order specified in the schema written in step 1.
-@tensorrt_converter(torch.ops.tensorrt.maxpool1d.default)
+@tensorrt_converter(torch.ops.tensorrt.maxpool1d.default)  # type: ignore[misc]
 def tensorrt_maxpool1d(
     network: TRTNetwork,
     target: Target,

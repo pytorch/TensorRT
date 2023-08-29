@@ -29,12 +29,12 @@ cc_library(
         "-lpthread",
     ],
     deps = [
+        "//core/util:prelude",
         "@tensorrt//:nvinfer",
         "@tensorrt//:nvinferplugin",
-        "//core/util:prelude",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
     alwayslink = True,
 )

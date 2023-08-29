@@ -1,15 +1,16 @@
-from typing import List, Dict, Any, Set
-import torch
-from torch_tensorrt import _C
-import torch_tensorrt._C.ts as _ts_C
-from torch_tensorrt import _enums
-from torch_tensorrt._Input import Input
-from torch_tensorrt._Device import Device
-from torch_tensorrt.logging import Level, log
-from typing import Tuple, List, Dict
-import warnings
+from __future__ import annotations
+
 from copy import deepcopy
-from torch_tensorrt.ts.ts_input import TSInput
+from typing import Any, Dict, List, Optional, Set
+
+import torch
+import torch_tensorrt._C.ts as _ts_C
+from torch_tensorrt import _C, _enums
+from torch_tensorrt._Device import Device
+from torch_tensorrt._Input import Input
+from torch_tensorrt.logging import Level, log
+from torch_tensorrt.ts._Input import TorchScriptInput
+
 import tensorrt as trt
 
 
@@ -64,9 +65,9 @@ def _parse_op_precision(precision: Any) -> _enums.dtype:
         )
 
 
-def _parse_enabled_precisions(precisions: Any) -> Set:
+def _parse_enabled_precisions(precisions: Any) -> Set[_enums.dtype]:
     parsed_precisions = set()
-    if any([isinstance(precisions, type) for type in [list, tuple, set]]):
+    if any(isinstance(precisions, type) for type in [list, tuple, set]):
         for p in precisions:
             parsed_precisions.add(_parse_op_precision(p))
     else:
@@ -159,7 +160,7 @@ def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> _ts_C.TorchFallback:
     return info
 
 
-def _parse_input_signature(input_signature: Any, depth: int = 0):
+def _parse_input_signature(input_signature: Any, depth: int = 0) -> Any:
     if depth > 2:
         raise AssertionError(
             "Input nesting depth exceeds max supported depth, use 1 level: [A, B], or 2 level: [A, (B, C)]"
@@ -177,9 +178,7 @@ def _parse_input_signature(input_signature: Any, depth: int = 0):
             input = _parse_input_signature(item, depth + 1)
             input_list.append(input)
         return input_list
-    elif isinstance(input_signature, Input) or isinstance(
-        input_signature, torch.Tensor
-    ):
+    elif isinstance(input_signature, (Input, torch.Tensor)):
         i = (
             Input.from_tensor(input_signature)
             if isinstance(input_signature, torch.Tensor)
@@ -195,15 +194,20 @@ def _parse_input_signature(input_signature: Any, depth: int = 0):
 
         ts_i = i
         if i.shape_mode == Input._ShapeMode.STATIC:
-            ts_i = TSInput(shape=i.shape, dtype=i.dtype, format=i.format)
+            ts_i = TorchScriptInput(shape=i.shape, dtype=i.dtype, format=i.format)
         elif i.shape_mode == Input._ShapeMode.DYNAMIC:
-            ts_i = TSInput(
-                min_shape=i.shape["min_shape"],
-                opt_shape=i.shape["opt_shape"],
-                max_shape=i.shape["max_shape"],
-                dtype=i.dtype,
-                format=i.format,
-            )
+            if isinstance(i.shape, dict):
+                ts_i = TorchScriptInput(
+                    min_shape=i.shape["min_shape"],
+                    opt_shape=i.shape["opt_shape"],
+                    max_shape=i.shape["max_shape"],
+                    dtype=i.dtype,
+                    format=i.format,
+                )
+            else:
+                raise ValueError(
+                    f"Input set as dynamic, expected dictionary of shapes but found {i.shape}"
+                )
         else:
             raise ValueError(
                 "Invalid shape mode detected for input while parsing the input_signature"
@@ -226,10 +230,7 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
 
     if len(compile_spec["inputs"]) > 0:
         if not all(
-            [
-                isinstance(i, torch.Tensor) or isinstance(i, Input)
-                for i in compile_spec["inputs"]
-            ]
+            isinstance(i, (torch.Tensor, Input)) for i in compile_spec["inputs"]
         ):
             raise KeyError(
                 "Input specs should be either torch_tensorrt.Input or torch.Tensor, found types: {}".format(
@@ -245,13 +246,13 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
         for i in inputs:
             if i.shape_mode == Input._ShapeMode.STATIC:
                 ts_inputs.append(
-                    TSInput(
+                    TorchScriptInput(
                         shape=i.shape, dtype=i.dtype, format=i.format
                     )._to_internal()
                 )
             elif i.shape_mode == Input._ShapeMode.DYNAMIC:
                 ts_inputs.append(
-                    TSInput(
+                    TorchScriptInput(
                         min_shape=i.shape["min_shape"],
                         opt_shape=i.shape["opt_shape"],
                         max_shape=i.shape["max_shape"],
@@ -342,23 +343,23 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
 
 
 def TensorRTCompileSpec(
-    inputs=[],
-    input_signature=None,
-    device=Device._current_device(),
-    disable_tf32=False,
-    sparse_weights=False,
-    enabled_precisions=set(),
-    refit=False,
-    debug=False,
-    capability=_enums.EngineCapability.default,
-    num_avg_timing_iters=1,
-    workspace_size=0,
-    dla_sram_size=1048576,
-    dla_local_dram_size=1073741824,
-    dla_global_dram_size=536870912,
-    truncate_long_and_double=False,
-    calibrator=None,
-    allow_shape_tensors=False,
+    inputs: Optional[List[torch.Tensor | Input]] = None,
+    input_signature: Optional[Any] = None,
+    device: torch.device | Device = Device._current_device(),
+    disable_tf32: bool = False,
+    sparse_weights: bool = False,
+    enabled_precisions: Optional[Set[torch.dtype | _enums.dtype]] = None,
+    refit: bool = False,
+    debug: bool = False,
+    capability: _enums.EngineCapability = _enums.EngineCapability.default,
+    num_avg_timing_iters: int = 1,
+    workspace_size: int = 0,
+    dla_sram_size: int = 1048576,
+    dla_local_dram_size: int = 1073741824,
+    dla_global_dram_size: int = 536870912,
+    truncate_long_and_double: bool = False,
+    calibrator: object = None,
+    allow_shape_tensors: bool = False,
 ) -> torch.classes.tensorrt.CompileSpec:
     """Utility to create a formated spec dictionary for using the PyTorch TensorRT backend
 
@@ -400,12 +401,14 @@ def TensorRTCompileSpec(
     """
 
     compile_spec = {
-        "inputs": inputs,
+        "inputs": inputs if inputs is not None else [],
         # "input_signature": input_signature,
         "device": device,
         "disable_tf32": disable_tf32,  # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
         "sparse_weights": sparse_weights,  # Enable sparsity for convolution and fully connected layers.
-        "enabled_precisions": enabled_precisions,  # Enabling FP16 kernels
+        "enabled_precisions": enabled_precisions
+        if enabled_precisions is not None
+        else set(),  # Enabling FP16 kernels
         "refit": refit,  # enable refit
         "debug": debug,  # enable debuggable engine
         "capability": capability,  # Restrict kernel selection to safe gpu kernels or safe dla kernels

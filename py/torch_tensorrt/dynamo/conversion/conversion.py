@@ -1,13 +1,14 @@
-from typing import Sequence, Union
-import torch
-import io
-from torch_tensorrt.dynamo.runtime import _PythonTorchTRTModule
-from torch_tensorrt.dynamo import CompilationSettings
-from torch_tensorrt import Input
-from torch_tensorrt.dynamo.conversion import TRTInterpreter
+from __future__ import annotations
 
+import io
+from typing import Sequence
 
 import tensorrt as trt
+import torch
+from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo import CompilationSettings
+from torch_tensorrt.dynamo.conversion import TRTInterpreter
+from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 
 
 def convert_module(
@@ -15,7 +16,7 @@ def convert_module(
     inputs: Sequence[torch.Tensor],
     settings: CompilationSettings = CompilationSettings(),
     name: str = "",
-):
+) -> PythonTorchTensorRTModule | TorchTensorRTModule:
     """Convert an FX module to a TRT module
     Args:
         module: FX GraphModule to convert
@@ -23,7 +24,7 @@ def convert_module(
         settings: Compilation settings
         name: TRT engine name
     Returns:
-        _PythonTorchTRTModule or TorchTensorRTModule
+        _PythonTorchTensorRTModule or TorchTensorRTModule
     """
     # Specify module output data types to ensure TRT output types agree with
     # that of the equivalent Torch module
@@ -32,7 +33,7 @@ def convert_module(
     if not isinstance(module_outputs, (list, tuple)):
         module_outputs = [module_outputs]
 
-    output_dtypes = list(output.dtype for output in module_outputs)
+    output_dtypes = [output.dtype for output in module_outputs]
     interpreter = TRTInterpreter(
         module,
         Input.from_tensors(inputs, disable_memory_format_check=True),
@@ -53,10 +54,10 @@ def convert_module(
     )
 
     if settings.use_python_runtime:
-        return _PythonTorchTRTModule(
+        return PythonTorchTensorRTModule(
             engine=interpreter_result.engine,
-            input_names=interpreter_result.input_names,
-            output_names=interpreter_result.output_names,
+            input_names=list(interpreter_result.input_names),
+            output_names=list(interpreter_result.output_names),
         )
 
     else:
@@ -68,6 +69,7 @@ def convert_module(
         return TorchTensorRTModule(
             serialized_engine=engine_str,
             name=name,
-            input_binding_names=interpreter_result.input_names,
-            output_binding_names=interpreter_result.output_names,
+            input_binding_names=list(interpreter_result.input_names),
+            output_binding_names=list(interpreter_result.output_names),
+            target_device=settings.device,
         )

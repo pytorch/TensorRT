@@ -1,24 +1,20 @@
-import numpy as np
-from typing import Any, Optional
 import math
+from typing import Any, Optional, Tuple
 
-import tensorrt as trt
+import numpy as np
 import torch
+from torch import Tensor
 from torch.fx.node import Target
-
 from torch_tensorrt.dynamo._SourceIR import SourceIR
-from torch_tensorrt.fx.converters.impl.activation import *
 from torch_tensorrt.fx.converters.converter_utils import (
+    get_trt_plugin,
     mark_as_int8_layer,
     set_layer_name,
-    get_trt_plugin,
 )
+from torch_tensorrt.fx.converters.impl.activation import *  # noqa: F403
+from torch_tensorrt.fx.types import TRTNetwork, TRTPluginFieldCollection, TRTTensor
 
-from torch_tensorrt.fx.types import (
-    TRTNetwork,
-    TRTTensor,
-    TRTPluginFieldCollection,
-)
+import tensorrt as trt
 
 
 def gelu(
@@ -28,7 +24,7 @@ def gelu(
     name: str,
     input_val: TRTTensor,
     alpha: Optional[Any] = None,
-):
+) -> TRTTensor:
     approximate = alpha
     if approximate is not None:
         raise RuntimeError("GeLU converter currently doesn't support fast gelu compute")
@@ -53,7 +49,9 @@ def gelu(
 
     layer = network.add_plugin_v2([input_val], plugin)
 
-    def gelu_dyn_range_fn(dyn_range):
+    def gelu_dyn_range_fn(
+        dyn_range: Tuple[Tensor, Tensor]
+    ) -> Tuple[Tensor, Tensor]:  # TODO: This probably will not work with fake tensor
         return (
             dyn_range[0] * 0.5 * (1.0 + torch.erf(dyn_range[0] / math.sqrt(2.0)))
         ), (dyn_range[1] * 0.5 * (1.0 + torch.erf(dyn_range[0] / math.sqrt(2.0))))

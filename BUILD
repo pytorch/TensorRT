@@ -47,8 +47,8 @@ pkg_tar(
         ":windows": ["//cpp/lib:torch_tensorrt.dll"],
         "//conditions:default": [
             "//cpp/lib:libtorchtrt.so",
-            "//cpp/lib:libtorchtrt_runtime.so",
             "//cpp/lib:libtorchtrt_plugins.so",
+            "//cpp/lib:libtorchtrt_runtime.so",
         ],
     }),
     mode = "0755",
@@ -74,9 +74,9 @@ pkg_tar(
     extension = "tar.gz",
     package_dir = "torch_tensorrt",
     deps = [
-        ":lib",
         ":include",
         ":include_core",
+        ":lib",
     ] + select({
         ":windows": [],
         "//conditions:default": [":bin"],

@@ -1,13 +1,15 @@
 from enum import Enum
+from typing import Any
+
 from torch_tensorrt._C import (
-    _get_logging_prefix,
-    _set_logging_prefix,
-    _get_reportable_log_level,
-    _set_reportable_log_level,
-    _get_is_colored_output_on,
-    _set_is_colored_output_on,
-    _log,
     LogLevel,
+    _get_is_colored_output_on,
+    _get_logging_prefix,
+    _get_reportable_log_level,
+    _log,
+    _set_is_colored_output_on,
+    _set_logging_prefix,
+    _set_reportable_log_level,
 )
 
 
@@ -22,19 +24,21 @@ class Level(Enum):
     Graph = LogLevel.GRAPH
 
     @staticmethod
-    def _to_internal_level(external) -> LogLevel:
+    def _to_internal_level(external: "Level") -> LogLevel:
         if external == Level.InternalError:
             return LogLevel.INTERNAL_ERROR
-        if external == Level.Error:
+        elif external == Level.Error:
             return LogLevel.ERROR
-        if external == Level.Warning:
+        elif external == Level.Warning:
             return LogLevel.WARNING
-        if external == Level.Info:
+        elif external == Level.Info:
             return LogLevel.INFO
-        if external == Level.Debug:
+        elif external == Level.Debug:
             return LogLevel.DEBUG
-        if external == Level.Graph:
+        elif external == Level.Graph:
             return LogLevel.GRAPH
+        else:
+            raise ValueError("Unknown log severity")
 
 
 def get_logging_prefix() -> str:
@@ -43,10 +47,10 @@ def get_logging_prefix() -> str:
     Returns:
         str: Prefix used for logger
     """
-    return _get_logging_prefix()
+    return str(_get_logging_prefix())
 
 
-def set_logging_prefix(prefix: str):
+def set_logging_prefix(prefix: str) -> None:
     """Set the prefix used when logging messages
 
     Args:
@@ -64,7 +68,7 @@ def get_reportable_log_level() -> Level:
     return Level(_get_reportable_log_level())
 
 
-def set_reportable_log_level(level: Level):
+def set_reportable_log_level(level: Level) -> None:
     """Set the level required for a message to be printed to the log
 
     Args:
@@ -79,10 +83,10 @@ def get_is_colored_output_on() -> bool:
     Returns:
         bool: If colored output is one
     """
-    return _get_is_colored_output_on()
+    return bool(_get_is_colored_output_on())
 
 
-def set_is_colored_output_on(colored_output_on: bool):
+def set_is_colored_output_on(colored_output_on: bool) -> None:
     """Enable or disable color in the log output
 
     Args:
@@ -91,7 +95,7 @@ def set_is_colored_output_on(colored_output_on: bool):
     _set_is_colored_output_on(colored_output_on)
 
 
-def log(level: Level, msg: str):
+def log(level: Level, msg: str) -> None:
     """Add a new message to the log
 
     Adds a new message to the log at a specified level. The message
@@ -120,11 +124,11 @@ class internal_errors:
         outputs = model_torchtrt(inputs)
     """
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.InternalError)
 
-    def __exit__(self, exc_type, exc_value, exc_tb):
+    def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
         set_reportable_log_level(self.external_lvl)
 
 
@@ -137,11 +141,11 @@ class errors:
         outputs = model_torchtrt(inputs)
     """
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.Error)
 
-    def __exit__(self, exc_type, exc_value, exc_tb):
+    def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
         set_reportable_log_level(self.external_lvl)
 
 
@@ -154,11 +158,11 @@ class warnings:
         model_trt = torch_tensorrt.compile(model, **spec)
     """
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.Warning)
 
-    def __exit__(self, exc_type, exc_value, exc_tb):
+    def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
         set_reportable_log_level(self.external_lvl)
 
 
@@ -171,11 +175,11 @@ class info:
         model_trt = torch_tensorrt.compile(model, **spec)
     """
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.Info)
 
-    def __exit__(self, exc_type, exc_value, exc_tb):
+    def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
         set_reportable_log_level(self.external_lvl)
 
 
@@ -188,11 +192,11 @@ class debug:
         model_trt = torch_tensorrt.compile(model, **spec)
     """
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.Debug)
 
-    def __exit__(self, exc_type, exc_value, exc_tb):
+    def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
         set_reportable_log_level(self.external_lvl)
 
 
@@ -206,9 +210,9 @@ class graphs:
         model_trt = torch_tensorrt.compile(model, **spec)
     """
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.Graph)
 
-    def __exit__(self, exc_type, exc_value, exc_tb):
+    def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
         set_reportable_log_level(self.external_lvl)

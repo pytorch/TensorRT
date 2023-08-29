@@ -1,25 +1,30 @@
 import logging
-from typing import Dict, Sequence, Tuple, Union
-import torch
-import tensorrt as trt
-from torch_tensorrt.fx.converters import acc_ops_converters
-from .converter_registry import dynamo_tensorrt_converter
-from torch.fx.node import Argument, Target, Node
+from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+import tensorrt as trt
+import torch
+from torch.fx.node import Argument, Node, Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
-from torch_tensorrt.dynamo.conversion.converter_utils import cast_trt_tensor
-from torch_tensorrt.dynamo.conversion.converter_utils import cast_int_int_div_trt_tensor
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_int_int_div_trt_tensor,
+    cast_trt_tensor,
+)
+from torch_tensorrt.fx.converters import acc_ops_converters
+from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+
+from .converter_registry import dynamo_tensorrt_converter
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-def args_bounds_check(args, i, replacement=None):
+def args_bounds_check(
+    args: Tuple[Argument, ...], i: int, replacement: Optional[Any] = None
+) -> Any:
     return args[i] if len(args) > i else replacement
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.batch_norm)
+@dynamo_tensorrt_converter(torch.ops.aten.batch_norm)  # type: ignore[misc]
 def aten_ops_batch_norm(
     network: TRTNetwork,
     target: Target,
@@ -43,9 +48,9 @@ def aten_ops_batch_norm(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.div.default)
-@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode)
-@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.div.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor)  # type: ignore[misc]
 def aten_ops_div(
     network: TRTNetwork,
     target: Target,
@@ -70,13 +75,13 @@ def aten_ops_div(
         kwargs_new["input"].dtype == trt.int8 or kwargs_new["input"].dtype == trt.int32
     ):
         kwargs_new["input"] = cast_trt_tensor(
-            network, kwargs_new["input"], trt.float32, name
+            network, kwargs_new["input"], trt.float32, name, target
         )
     elif isinstance(args[1], TRTTensor) and (
         kwargs_new["other"].dtype == trt.int8 or kwargs_new["other"].dtype == trt.int32
     ):
         kwargs_new["other"] = cast_trt_tensor(
-            network, kwargs_new["other"], trt.float32, name
+            network, kwargs_new["other"], trt.float32, name, target
         )
     rounding_mode = kwargs.get("rounding_mode")
     if rounding_mode is None:
@@ -95,24 +100,9 @@ def aten_ops_div(
         )
 
 
-def embedding_param_validator(embedding_node: Node):
-
-    max_norm = args_bounds_check(embedding_node.args, 2)
-    norm_type = args_bounds_check(embedding_node.args, 3)
-    scale_grad_by_freq = args_bounds_check(embedding_node.args, 4)
-    sparse = args_bounds_check(embedding_node.args, 5)
-
-    if max_norm is not None:
-        _LOGGER.debug(
-            f"Currently we don't support specifying max_norm, got {max_norm}."
-        )
-        return False
-
-    if norm_type is not None and norm_type != 2.0:
-        _LOGGER.debug(
-            f"Currently we don't support specifying norm_type, got {norm_type}."
-        )
-        return False
+def embedding_param_validator(embedding_node: Node) -> bool:
+    scale_grad_by_freq = args_bounds_check(embedding_node.args, 3)
+    sparse = args_bounds_check(embedding_node.args, 4)
 
     if scale_grad_by_freq is not None:
         _LOGGER.debug(
@@ -129,7 +119,7 @@ def embedding_param_validator(embedding_node: Node):
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.embedding.default, capability_validator=embedding_param_validator
-)
+)  # type: ignore[misc]
 def aten_ops_embedding(
     network: TRTNetwork,
     target: Target,
@@ -144,15 +134,14 @@ def aten_ops_embedding(
         name,
         input=args[1],
         weight=args[0],
-        max_norm=args_bounds_check(args, 2),
-        norm_type=args_bounds_check(args, 3),
-        scale_grad_by_freq=args_bounds_check(args, 4),
-        sparse=args_bounds_check(args, 5),
+        # args[2] is the padding index, which is useful for training only
+        scale_grad_by_freq=args_bounds_check(args, 3),
+        sparse=args_bounds_check(args, 4),
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar)
-@dynamo_tensorrt_converter(torch.ops.aten.fmod.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.fmod.Tensor)  # type: ignore[misc]
 def aten_ops_fmod(
     network: TRTNetwork,
     target: Target,
@@ -163,7 +152,7 @@ def aten_ops_fmod(
     return impl.elementwise.fmod(network, target, SourceIR.ATEN, name, args[0], args[1])
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.gelu.default)
+@dynamo_tensorrt_converter(torch.ops.aten.gelu.default)  # type: ignore[misc]
 def aten_ops_gelu(
     network: TRTNetwork,
     target: Target,
@@ -180,8 +169,8 @@ def aten_ops_gelu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.matmul)
-@dynamo_tensorrt_converter(torch.ops.aten.mm.default)
+@dynamo_tensorrt_converter(torch.ops.aten.matmul)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.mm.default)  # type: ignore[misc]
 def aten_ops_matmul(
     network: TRTNetwork,
     target: Target,
@@ -194,7 +183,7 @@ def aten_ops_matmul(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.layer_norm.default)
+@dynamo_tensorrt_converter(torch.ops.aten.layer_norm.default)  # type: ignore[misc]
 def aten_ops_layernorm(
     network: TRTNetwork,
     target: Target,
@@ -215,7 +204,7 @@ def aten_ops_layernorm(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.relu.default)
+@dynamo_tensorrt_converter(torch.ops.aten.relu.default)  # type: ignore[misc]
 def aten_ops_relu(
     network: TRTNetwork,
     target: Target,
@@ -223,7 +212,6 @@ def aten_ops_relu(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return impl.activation.relu(
         network,
         target,
@@ -233,7 +221,7 @@ def aten_ops_relu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.rsqrt.default)
+@dynamo_tensorrt_converter(torch.ops.aten.rsqrt.default)  # type: ignore[misc]
 def aten_ops_rsqrt(
     network: TRTNetwork,
     target: Target,
@@ -241,7 +229,6 @@ def aten_ops_rsqrt(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     return impl.elementwise.rsqrt(
         network,
         target,
@@ -251,8 +238,8 @@ def aten_ops_rsqrt(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim)
-@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims)
+@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims)  # type: ignore[misc]
 def aten_ops_squeeze(
     network: TRTNetwork,
     target: Target,
@@ -263,7 +250,7 @@ def aten_ops_squeeze(
     return impl.squeeze.squeeze(network, target, SourceIR.ATEN, name, args[0], args[1])
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.unsqueeze.default)
+@dynamo_tensorrt_converter(torch.ops.aten.unsqueeze.default)  # type: ignore[misc]
 def aten_ops_unsqueeze(
     network: TRTNetwork,
     target: Target,
@@ -276,7 +263,7 @@ def aten_ops_unsqueeze(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten._softmax.default)
+@dynamo_tensorrt_converter(torch.ops.aten._softmax.default)  # type: ignore[misc]
 def aten_ops_softmax(
     network: TRTNetwork,
     target: Target,
@@ -289,7 +276,7 @@ def aten_ops_softmax(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.where.self)
+@dynamo_tensorrt_converter(torch.ops.aten.where.self)  # type: ignore[misc]
 def aten_ops_where(
     network: TRTNetwork,
     target: Target,
@@ -308,7 +295,7 @@ def aten_ops_where(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.clamp.default)
+@dynamo_tensorrt_converter(torch.ops.aten.clamp.default)  # type: ignore[misc]
 def aten_ops_clamp(
     network: TRTNetwork,
     target: Target,
@@ -327,7 +314,7 @@ def aten_ops_clamp(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.select.int)
+@dynamo_tensorrt_converter(torch.ops.aten.select.int)  # type: ignore[misc]
 def aten_ops_select(
     network: TRTNetwork,
     target: Target,
@@ -340,7 +327,7 @@ def aten_ops_select(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.slice.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.slice.Tensor)  # type: ignore[misc]
 def aten_ops_slice(
     network: TRTNetwork,
     target: Target,
@@ -361,7 +348,7 @@ def aten_ops_slice(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.permute.default)
+@dynamo_tensorrt_converter(torch.ops.aten.permute.default)  # type: ignore[misc]
 def aten_ops_permute(
     network: TRTNetwork,
     target: Target,
@@ -376,4 +363,483 @@ def aten_ops_permute(
         name,
         args[0],
         args[1],
+    )
+
+
+def to_copy_dtype_validator(to_copy_node: Node) -> bool:
+    allowed_casts = {torch.float, torch.int32, torch.bool, torch.int8, torch.float16}
+
+    # Validate input node has convertible kwargs
+    if "dtype" in to_copy_node.kwargs:
+        if to_copy_node.kwargs["dtype"] in allowed_casts:
+            return True
+        else:
+            _LOGGER.debug(
+                f"_to_copy converter rejected node {to_copy_node} with dtype {to_copy_node.kwargs['dtype']}"
+            )
+            return False
+    else:
+        _LOGGER.debug(
+            f"_to_copy converter rejected node {to_copy_node} with kwargs {to_copy_node.kwargs}"
+        )
+        return False
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._to_copy.default, capability_validator=to_copy_dtype_validator
+)  # type: ignore[misc]
+def aten_ops_to_copy_dtype(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.cast.to_copy(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        kwargs["dtype"],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.clone.default)  # type: ignore[misc]
+def aten_ops_clone(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.cast.clone(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.expand.default)
+def aten_ops_expand(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.slice.expand(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+def amax_param_validator(amax_node: Node) -> bool:
+    if len(amax_node.args) < 2:
+        _LOGGER.debug(
+            f"At least two args input and dim should be provided, but only got {len(amax_node.args)} args."
+        )
+        return False
+
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.amax.default, capability_validator=amax_param_validator
+)
+def aten_ops_amax(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.amax(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args_bounds_check(args, 2, replacement=False),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.exp.default)  # type: ignore[misc]
+def aten_ops_exp(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.exp(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.log.default)  # type: ignore[misc]
+def aten_ops_log(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.log(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.sqrt.default)  # type: ignore[misc]
+def aten_ops_sqrt(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.sqrt(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.reciprocal.default)  # type: ignore[misc]
+def aten_ops_recip(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.recip(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.abs.default)  # type: ignore[misc]
+def aten_ops_abs(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.abs(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.sin.default)  # type: ignore[misc]
+def aten_ops_sin(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.sin(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.cos.default)  # type: ignore[misc]
+def aten_ops_cos(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.cos(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.tan.default)  # type: ignore[misc]
+def aten_ops_tan(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.tan(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.sinh.default)  # type: ignore[misc]
+def aten_ops_sinh(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.sinh(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.cosh.default)  # type: ignore[misc]
+def aten_ops_cosh(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.cosh(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.asin.default)  # type: ignore[misc]
+def aten_ops_asin(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.asin(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.acos.default)  # type: ignore[misc]
+def aten_ops_acos(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.acos(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.atan.default)  # type: ignore[misc]
+def aten_ops_atan(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.atan(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.asinh.default)  # type: ignore[misc]
+def aten_ops_asinh(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.asinh(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.acosh.default)  # type: ignore[misc]
+def aten_ops_acosh(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.acosh(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.atanh.default)  # type: ignore[misc]
+def aten_ops_atanh(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.atanh(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.ceil.default)  # type: ignore[misc]
+def aten_ops_ceil(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.ceil(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.floor.default)  # type: ignore[misc]
+def aten_ops_floor(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.floor(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.logical_not.default)  # type: ignore[misc]
+def aten_ops_logical_not(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.logical_not(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.sign.default)  # type: ignore[misc]
+def aten_ops_sign(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.sign(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.round.default)  # type: ignore[misc]
+def aten_ops_round(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.round(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.isinf.default)  # type: ignore[misc]
+def aten_ops_isinf(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.isinf(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
     )

@@ -1,15 +1,13 @@
 from typing import Optional, cast
 
 from torch.fx.node import Target
-
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.fx.converters.converter_utils import (
     get_positive_dim,
     get_trt_tensor,
     set_layer_name,
 )
-
+from torch_tensorrt.fx.types import Shape, TRTNetwork, TRTTensor
 from torch_tensorrt.fx.utils import get_dynamic_dims
 
 
@@ -18,8 +16,8 @@ def unsqueeze(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input_t,
-    dim,
+    input_t: TRTTensor,
+    dim: Shape,
 ) -> TRTTensor:
     input_val = get_trt_tensor(network, input_t, f"{name}_input_t")
     if not isinstance(input_val, TRTTensor):
@@ -29,7 +27,7 @@ def unsqueeze(
         )
 
     dim = cast(int, dim)
-    input_shape = input_val.shape
+
     input_shape_size = (
         len(input_val.shape) + 1
         if network.has_implicit_batch_dimension
@@ -48,5 +46,5 @@ def unsqueeze(
     layer.reshape_dims = (
         tuple(input_val.shape)[:dim] + (1,) + tuple(input_val.shape)[dim:]
     )
-    set_layer_name(layer, target, name)
+    set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)

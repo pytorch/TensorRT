@@ -1,9 +1,11 @@
+from copy import deepcopy
+
 import torch
 import torch_tensorrt
-from torch_tensorrt.dynamo.lowering import partition
-from torch.testing._internal.common_utils import run_tests, TestCase
-from copy import deepcopy
-from utils import lower_graph_testing, DECIMALS_OF_AGREEMENT
+from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo.partitioning import fast_partition
+
+from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
 
 class TestTRTModuleNextCompilation(TestCase):
@@ -17,10 +19,16 @@ class TestTRTModuleNextCompilation(TestCase):
                 return torch.mean(out, dim=1)
 
         fx_graph = torch.fx.symbolic_trace(FullySupportedMultiOp())
-        partitioned_graph = partition(deepcopy(fx_graph), min_block_size=3)
+        partitioned_graph = fast_partition(deepcopy(fx_graph), min_block_size=3)
 
         self.assertEquals(
-            len(list(partitioned_graph.named_children())),
+            len(
+                [
+                    1
+                    for submod in list(partitioned_graph.named_children())
+                    if "_run_on_acc" in submod[0]
+                ]
+            ),
             1,
             "All operators are supported, there should be one segment",
         )
@@ -74,7 +82,11 @@ class TestTRTModuleNextCompilation(TestCase):
             torch.randint(1, 40, (16, 7, 5), dtype=torch.int).cuda(),
         ]
 
-        (unexpected_ops_seen, _, partitioned_graphs,) = lower_graph_testing(
+        (
+            unexpected_ops_seen,
+            _,
+            partitioned_graphs,
+        ) = lower_graph_testing(
             fx_graph,
             inputs,
             unexpected_ops=unexpected_ops,
@@ -94,7 +106,13 @@ class TestTRTModuleNextCompilation(TestCase):
             "Without control flow breaks, there should only be a single graph",
         )
         self.assertEquals(
-            len(list(partitioned_graphs[0].named_children())),
+            len(
+                [
+                    1
+                    for submod in list(partitioned_graphs[0].named_children())
+                    if "_run_on_acc" in submod[0]
+                ]
+            ),
             2,
             "Certain operators are set to run in Torch, expected 2 segments",
         )
@@ -180,7 +198,7 @@ class Test64BitInput(TestCase):
                 )
 
         fx_graph = torch.fx.symbolic_trace(FullySupportedMultiOp())
-        partitioned_graph = partition(deepcopy(fx_graph), min_block_size=3)
+        partitioned_graph = fast_partition(deepcopy(fx_graph), min_block_size=3)
 
         self.assertEquals(
             len(list(partitioned_graph.named_children())),
@@ -233,7 +251,11 @@ class Test64BitInput(TestCase):
             torch.randint(1, 40, (16, 7, 5), dtype=torch.long).cuda(),
         ]
 
-        (unexpected_ops_seen, _, partitioned_graphs,) = lower_graph_testing(
+        (
+            unexpected_ops_seen,
+            _,
+            partitioned_graphs,
+        ) = lower_graph_testing(
             fx_graph,
             inputs,
             unexpected_ops=unexpected_ops,
@@ -253,7 +275,13 @@ class Test64BitInput(TestCase):
             "Without control flow breaks, there should only be a single graph",
         )
         self.assertEquals(
-            len(list(partitioned_graphs[0].named_children())),
+            len(
+                [
+                    1
+                    for submod in list(partitioned_graphs[0].named_children())
+                    if "_run_on_acc" in submod[0]
+                ]
+            ),
             1,
             "Certain operators are set to run in Torch, expected 1 segment",
         )

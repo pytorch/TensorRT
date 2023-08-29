@@ -134,30 +134,30 @@ cc_library(
     hdrs = select({
         ":aarch64_linux": [
             "include/aarch64-linux-gnu/NvCaffeParser.h",
+            "include/aarch64-linux-gnu/NvOnnxConfig.h",
             "include/aarch64-linux-gnu/NvOnnxParser.h",
             "include/aarch64-linux-gnu/NvOnnxParserRuntime.h",
-            "include/aarch64-linux-gnu/NvOnnxConfig.h",
             "include/aarch64-linux-gnu/NvUffParser.h",
         ],
         ":ci_rhel_x86_64_linux": [
             "include/NvCaffeParser.h",
+            "include/NvOnnxConfig.h",
             "include/NvOnnxParser.h",
             "include/NvOnnxParserRuntime.h",
-            "include/NvOnnxConfig.h",
             "include/NvUffParser.h",
         ],
         ":windows": [
             "include/NvCaffeParser.h",
+            "include/NvOnnxConfig.h",
             "include/NvOnnxParser.h",
             "include/NvOnnxParserRuntime.h",
-            "include/NvOnnxConfig.h",
             "include/NvUffParser.h",
         ],
         "//conditions:default": [
             "include/x86_64-linux-gnu/NvCaffeParser.h",
+            "include/x86_64-linux-gnu/NvOnnxConfig.h",
             "include/x86_64-linux-gnu/NvOnnxParser.h",
             "include/x86_64-linux-gnu/NvOnnxParserRuntime.h",
-            "include/x86_64-linux-gnu/NvOnnxConfig.h",
             "include/x86_64-linux-gnu/NvUffParser.h",
         ],
     }),
@@ -197,24 +197,24 @@ cc_library(
     name = "nvonnxparser_headers",
     hdrs = select({
         ":aarch64_linux": [
+            "include/aarch64-linux-gnu/NvOnnxConfig.h",
             "include/aarch64-linux-gnu/NvOnnxParser.h",
             "include/aarch64-linux-gnu/NvOnnxParserRuntime.h",
-            "include/aarch64-linux-gnu/NvOnnxConfig.h",
         ],
         ":ci_rhel_x86_64_linux": [
+            "include/NvOnnxConfig.h",
             "include/NvOnnxParser.h",
             "include/NvOnnxParserRuntime.h",
-            "include/NvOnnxConfig.h",
         ],
         ":windows": [
+            "include/NvOnnxConfig.h",
             "include/NvOnnxParser.h",
             "include/NvOnnxParserRuntime.h",
-            "include/NvOnnxConfig.h",
         ],
         "//conditions:default": [
+            "include/x86_64-linux-gnu/NvOnnxConfig.h",
             "include/x86_64-linux-gnu/NvOnnxParser.h",
             "include/x86_64-linux-gnu/NvOnnxParserRuntime.h",
-            "include/x86_64-linux-gnu/NvOnnxConfig.h",
         ],
     }),
     includes = select({

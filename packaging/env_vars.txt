@@ -1,0 +1,2 @@
+export CI_BUILD="1"
+export RELEASE="1"

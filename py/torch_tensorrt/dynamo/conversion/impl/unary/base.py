@@ -1,14 +1,11 @@
 from typing import Optional
 
-import tensorrt as trt
 from torch.fx.node import Target
-
-from torch_tensorrt.fx.types import (
-    TRTNetwork,
-    TRTTensor,
-)
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
+from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+
+import tensorrt as trt
 
 
 def convert_unary(
@@ -40,5 +37,6 @@ def convert_unary(
     layer = network.add_unary(input_val, operation_type)
     set_layer_name(layer, target, name, source_ir)
     output = layer.get_output(0)
-    output.name = output.name + "_" + target.__name__
+    kind: str = str(target.__name__) if callable(target) else target
+    output.name = output.name + "_" + kind
     return layer.get_output(0)

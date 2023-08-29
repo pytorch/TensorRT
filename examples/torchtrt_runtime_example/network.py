@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch_tensorrt as torchtrt
 
+
 # create a simple norm layer.
 # This norm layer uses NormalizePlugin from Torch-TensorRT
 class Norm(torch.nn.Module):
@@ -27,7 +28,6 @@ class ConvGelu(torch.nn.Module):
 
 
 def main():
-
     model = ConvGelu().eval().cuda()
     scripted_model = torch.jit.script(model)
 

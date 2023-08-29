@@ -32,7 +32,6 @@ class ObserverGPUTests(TestCase):
         mod(*inp)
 
         with execution_verifier() as verify_execution:
-
             lowerer = lower.Lowerer.create(
                 lower_setting=LowerSetting(min_acc_module_size=0)
             )
