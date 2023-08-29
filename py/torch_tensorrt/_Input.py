@@ -172,11 +172,13 @@ class Input(object):
 
         self.tensor_domain = Input._parse_tensor_domain(domain)
 
-        # if "torch_tensor" in kwargs:
-        #     if (self.shape_mode == Input._ShapeMode.DYNAMIC):
-        #         self.torch_tensor = Input.example_tensor("opt_shape")
-        #     else:
-        #         self.torch_tensor = Input.example_tensor()
+        if "torch_tensor" in kwargs:
+            self.torch_tensor = kwargs["torch_tensor"]
+        else:
+            if self.shape_mode == Input._ShapeMode.DYNAMIC:
+                self.torch_tensor = self.example_tensor("min_shape")
+            else:
+                self.torch_tensor = self.example_tensor()
 
     def __str__(self) -> str:
         if self.shape_mode == Input._ShapeMode.STATIC:

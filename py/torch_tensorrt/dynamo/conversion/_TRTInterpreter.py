@@ -265,6 +265,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self.input_specs_iter += 1
         # Set optimization profile for dynamic input shape
         shape = None
+        # import pdb; pdb.set_trace()
         if current_input.shape_mode == Input._ShapeMode.DYNAMIC:
             assert isinstance(current_input.shape, dict)
             shape = []
@@ -273,9 +274,15 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             max_shape = current_input.shape["max_shape"]
             # TODO: Does not support disjoint optimization profiles?
             assert self.optimization_profiles is not None
-            self.optimization_profiles[0].set_shape(
-                target, min_shape, opt_shape, max_shape
-            )
+            if target == "sym_size":
+                self.optimization_profiles[0].set_shape_input(
+                    target, min_shape, opt_shape, max_shape
+                )
+            else:
+                self.optimization_profiles[0].set_shape(
+                    target, min_shape, opt_shape, max_shape
+                )
+
             assert len(min_shape) == len(opt_shape) == len(max_shape)
             for i in range(len(min_shape)):
                 if min_shape[i] == opt_shape[i] == max_shape[i]:

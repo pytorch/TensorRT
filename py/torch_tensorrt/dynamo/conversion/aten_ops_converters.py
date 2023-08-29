@@ -238,6 +238,20 @@ def aten_ops_rsqrt(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.sym_size.int)  # type: ignore[misc]
+def aten_ops_sym_size_int(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_tensor = args[0]
+    axis = args[1]
+    input_shape = network.add_shape(input_tensor).get_output(axis)
+    return input_shape
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims)  # type: ignore[misc]
 def aten_ops_squeeze(
@@ -422,7 +436,7 @@ def aten_ops_clone(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.expand.default)
+@dynamo_tensorrt_converter(torch.ops.aten.expand.default)  # type: ignore[misc]
 def aten_ops_expand(
     network: TRTNetwork,
     target: Target,

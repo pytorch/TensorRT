@@ -27,7 +27,7 @@ def get_submod_inputs(
     Returns:
         Sequence of Tensors representing inputs to child module
     """
-    acc_inputs: Any = []
+    acc_inputs: Any = None
 
     def get_input(self: Any, inputs: Sequence[torch.Tensor]) -> None:
         nonlocal acc_inputs
@@ -44,28 +44,48 @@ def get_submod_inputs(
             mod(*torch_inputs)
             handle.remove()
             inputs_map[mode] = acc_inputs
-            acc_inputs = []
     else:
         torch_inputs = [input.example_tensor().cuda() for input in inputs]
         mod(*torch_inputs)
-        return [
-            Input(shape=acc_input.shape, dtype=acc_input.dtype)
-            for acc_input in acc_inputs
-        ]
+        if isinstance(acc_inputs, list):
+            return [
+                Input(shape=acc_input.shape, dtype=acc_input.dtype)
+                for acc_input in acc_inputs
+            ]
+        else:
+            return [Input(shape=acc_inputs.shape, dtype=acc_inputs.dtype)]
 
     num_submodule_inputs = (
         len(inputs_map["min_shape"]) if inputs_map["min_shape"] else 0
     )
     submodule_inputs = []
     for idx in range(num_submodule_inputs):
-        submodule_inputs.append(
-            Input(
-                min_shape=inputs_map["min_shape"][idx].shape,
-                opt_shape=inputs_map["opt_shape"][idx].shape,
-                max_shape=inputs_map["max_shape"][idx].shape,
-                torch_tensor=inputs_map["opt_shape"],
+        if not isinstance(inputs_map["min_shape"][idx], torch.Tensor):
+            input_val = torch.tensor(inputs_map["min_shape"][idx]).to(torch.int32)
+            submodule_inputs.append(
+                Input(
+                    min_shape=[1],
+                    opt_shape=[1],
+                    max_shape=[1],
+                    torch_tensor=input_val,
+                    dtype=input_val.dtype,
+                )
             )
-        )
+            # submodule_inputs.append(Input(shape=[0],
+            #                               torch_tensor=input_val,
+            #                               dtype=input_val.dtype))
+            # import pdb; pdb.set_trace()
+            # print("done")
+        else:
+            submodule_inputs.append(
+                Input(
+                    min_shape=inputs_map["min_shape"][idx].shape,
+                    opt_shape=inputs_map["opt_shape"][idx].shape,
+                    max_shape=inputs_map["max_shape"][idx].shape,
+                    torch_tensor=inputs_map["min_shape"][idx],
+                    dtype=inputs_map["max_shape"][idx].dtype,
+                )
+            )
 
     return submodule_inputs
 
