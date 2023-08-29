@@ -31,7 +31,7 @@ http_archive(
     sha256 = "755f9a39bc7205f5a0c428e920ddad092c33c8a1b46997def3f1d4a82aded6e1",
     strip_prefix = "googletest-5ab508a01f9eb089207ee87fd547d290da39d015",
     urls = ["https://github.com/google/googletest/archive/5ab508a01f9eb089207ee87fd547d290da39d015.zip"],
-) shallow_since = "1570114335 -0400",
+)
 
 # External dependency for torch_tensorrt if you already have precompiled binaries.
 local_repository(
@@ -43,7 +43,7 @@ local_repository(
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",
-    path = "/usr/local/cuda-12.1",
+    path = "/usr/local/cuda-11.8",
 )
 
 new_local_repository(

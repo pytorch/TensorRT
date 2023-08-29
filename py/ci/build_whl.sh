@@ -6,11 +6,23 @@ export CXX=g++
 export CUDA_HOME=/usr/local/cuda-12.1
 export PROJECT_DIR=/workspace/project
 
-cp -r $CUDA_HOME /usr/local/cuda
+rm -rf /usr/local/cuda
+
+if [[ $CUDA_HOME == "/usr/local/cuda-12.1" ]]; then
+    cp -r /usr/local/cuda-11.8 /usr/local/cuda
+    cp -r /usr/local/cuda-12.0/ /usr/local/cuda/
+    rsync -a /usr/local/cuda-12.1/ /usr/local/cuda/
+    export CUDA_HOME=/usr/local/cuda
+else
+    ln -s $CUDA_HOME /usr/local/cuda
+fi
 
 build_wheel() {
-    $1/bin/python -m pip install --upgrade pip
-    $1/bin/python -m pip wheel . --config-setting="--build-option=--release" --config-setting="--build-option=--ci" -w dist
+    $1/bin/python -m pip install --upgrade pip setuptools
+    $1/bin/python -m pip install -r py/requirements.txt
+    #$1/bin/python -m pip wheel . -w dist
+    export BUILD_VERSION=$(cd ${PROJECT_DIR} && $1/bin/python3 -c "import versions; versions.torch_tensorrt_version_release()")
+    CI_BUILD=1 RELEASE=1 $1/bin/python setup.py bdist_wheel
 }
 
 patch_wheel() {
@@ -86,7 +98,7 @@ libtorchtrt() {
     ${PY_DIR}/bin/python -m pip install setuptools wheel auditwheel
     bazel build //:libtorchtrt --platforms //toolchains:ci_rhel_x86_64_linux -c opt --noshow_progress
     CUDA_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.cuda_version()")
-    TORCHTRT_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.torch_tensorrt_version()")
+    TORCHTRT_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.torch_tensorrt_version_release()")
     TRT_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.tensorrt_version()")
     CUDNN_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.cudnn_version()")
     TORCH_VERSION=$(${PY_DIR}/bin/python -c "from torch import __version__;print(__version__.split('+')[0])")
@@ -106,7 +118,7 @@ libtorchtrt_pre_cxx11_abi() {
     ${PY_DIR}/bin/python -m pip install setuptools wheel auditwheel
     bazel build //:libtorchtrt --config pre_cxx11_abi --platforms //toolchains:ci_rhel_x86_64_linux -c opt --noshow_progress
     CUDA_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.cuda_version()")
-    TORCHTRT_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.torch_tensorrt_version()")
+    TORCHTRT_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.torch_tensorrt_version_release()")
     TRT_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.tensorrt_version()")
     CUDNN_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.cudnn_version()")
     TORCH_VERSION=$(${PY_DIR}/bin/python -c "from torch import __version__;print(__version__.split('+')[0])")
