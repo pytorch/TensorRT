@@ -43,29 +43,7 @@ def aot_torch_tensorrt_aten_backend(
     gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor], **kwargs: Any
 ) -> torch.nn.Module:
     settings = parse_dynamo_kwargs(kwargs)
-
-    # Perform Pre-AOT Lowering for Module-Level Replacement
-    gm = pre_aot_substitutions(gm)
-
-    fake_mode = detect_fake_mode(sample_inputs)
-
-    # Place backend tracing within FakeTensor context allowing nonfake Tensors
-    with unittest.mock.patch.object(
-        fake_mode, "allow_non_fake_inputs", True
-    ), fake_mode:
-        # Invoke AOTAutograd to translate operators to aten
-        graph_module = aot_export_joint_simple(
-            gm,
-            sample_inputs,
-            trace_joint=False,
-            decompositions=get_decompositions(
-                settings.enable_experimental_decompositions
-            ),
-        )
-
-        constant_fold(graph_module)
-
-        return _pretraced_backend(graph_module, sample_inputs, settings)
+    return _pretraced_backend(gm, sample_inputs, settings)
 
 
 def _pretraced_backend(
@@ -83,15 +61,38 @@ def _pretraced_backend(
         Compiled FX GraphModule
     """
     try:
-        logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
+        logger.debug("Pre-AOT Autograd graph:\n" + str(gm.graph))
 
-        trt_compiled = compile_module(
-            gm,
-            sample_inputs,
-            settings=settings,
-        )
-        return trt_compiled
-    except AssertionError:
+        # Perform Pre-AOT Lowering for Module-Level Replacement
+        gm = pre_aot_substitutions(gm)
+
+        fake_mode = detect_fake_mode(sample_inputs)
+
+        # Place backend tracing within FakeTensor context allowing nonfake Tensors
+        with unittest.mock.patch.object(
+            fake_mode, "allow_non_fake_inputs", True
+        ), fake_mode:
+            # Invoke AOTAutograd to translate operators to aten
+            graph_module = aot_export_joint_simple(
+                gm,
+                sample_inputs,
+                trace_joint=False,
+                decompositions=get_decompositions(
+                    settings.enable_experimental_decompositions
+                ),
+            )
+
+            logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
+
+            constant_fold(graph_module)
+
+            trt_compiled = compile_module(
+                graph_module,
+                sample_inputs,
+                settings=settings,
+            )
+            return trt_compiled
+    except (AssertionError, RuntimeError):
         if not settings.pass_through_build_failures:
             logger.warning(
                 "TRT conversion failed on the subgraph. See trace above. "
