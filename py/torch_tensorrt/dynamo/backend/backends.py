@@ -9,7 +9,7 @@ import torch._dynamo as td
 import torch.utils._pytree as pytree
 from torch._dynamo.utils import detect_fake_mode
 from torch._functorch.aot_autograd import _aot_export_function
-from torch._inductor.freezing import ConstantFolder, replace_node_with_constant
+from torch._inductor.constant_folding import ConstantFolder, replace_node_with_constant
 from torch._ops import OpOverload
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.compile import compile_module
@@ -100,7 +100,7 @@ def _pretraced_backend(
                 + "Returning GraphModule forward instead.",
                 exc_info=True,
             )
-            return gm.forward
+            return gm
         else:
             logger.critical(
                 "Halting compilation on build failure since "
@@ -114,6 +114,13 @@ def _pretraced_backend(
 
 @torch.utils._python_dispatch._disable_current_modes()  # type: ignore
 def constant_fold(gm: torch.fx.GraphModule) -> Any:
+    """Adapted from:
+    https://github.com/pytorch/pytorch/blob/3a79621c9dce17f77fbddc06aab21f6bc477f313/torch/_inductor/freezing.py#L178-L197
+
+    Folds constants in the graph module, not skipping constructors
+
+    Modifies the graph in-place and replaces node with constants
+    """
     cf = ConstantFolder(gm, skip_constructors=False)
     cf.run()
 
@@ -141,10 +148,13 @@ def aot_export_for_compile(
     decompositions: Optional[Dict[OpOverload, Callable[[Any], Any]]] = None,
 ) -> torch.fx.GraphModule:
     """Adapted from:
-    https://github.com/pytorch/pytorch/blob/054f3f1d8f9eb63ef8437991eba5b8f2aeee920f/torch/_functorch/aot_autograd.py#L4133-L4134
+    https://github.com/pytorch/pytorch/blob/1a5fdc2458b98697c75c32eb6f4b8b34d76429cf/torch/_functorch/aot_autograd.py#L4084-L4158
 
     Removed check for input aliasing in resultant subgraph - TRT is functional-only
+
+    Exports the function to ATen for torch compile
     """
+    # Trace function with input arguments and decompositions
     with torch.no_grad():
         fx_g, metadata, in_spec, out_spec = _aot_export_function(
             func,

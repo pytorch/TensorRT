@@ -124,7 +124,6 @@ def pre_aot_substitutions(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
 
                 # Replace all original node uses and clean up graph
                 n.replace_all_uses_with(new_node)
-                gm.graph.eliminate_dead_code()
                 gm.graph.lint()
                 gm.recompile()
 
@@ -138,7 +137,6 @@ def pre_aot_substitutions(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
                 continue
 
     # Perform cleanup and recompilation before returning module
-    gm.graph.eliminate_dead_code()
     gm.graph.lint()
     gm.recompile()
 

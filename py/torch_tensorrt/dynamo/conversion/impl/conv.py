@@ -7,11 +7,13 @@ import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo.conversion import impl
-from torch_tensorrt.dynamo.conversion.converter_utils import extend_attr_to_tuple
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    extend_attr_to_tuple,
+    get_trt_tensor,
+)
 from torch_tensorrt.fx.converters.converter_utils import (
     SourceIR,
     get_dyn_range,
-    get_trt_tensor,
     has_dynamic_shape,
     mark_as_int8_layer,
     set_layer_name,
@@ -27,8 +29,8 @@ def convNd(
     name: str,
     is_conv1d: bool,
     input: TRTTensor,
-    weight: Union[TRTTensor, torch.Tensor],
-    bias: Optional[Union[TRTTensor, torch.Tensor]],
+    weight: Union[TRTTensor, torch.Tensor, np.ndarray],
+    bias: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
     stride: Optional[Union[int, Sequence[int]]],
     padding: Optional[Union[int, Sequence[int]]],
     dilation: Optional[Union[int, Sequence[int]]],
@@ -97,19 +99,28 @@ def convNd(
     if isinstance(bias, TRTTensor):
         conv_layer.set_input(2, bias)
 
+    # Cast certain fields to tuples, in accordance with TRT requirements
+    padding = (padding,) if isinstance(padding, int) else padding
+    stride = (stride,) if isinstance(stride, int) else stride
+    dilation = (dilation,) if isinstance(dilation, int) else dilation
+
     # Expand parameters manually for Conv1D computations
     if is_conv1d:
-        padding = tuple(padding) + (0,)
-        stride = extend_attr_to_tuple(stride, 2)
-        dilation = extend_attr_to_tuple(dilation, 2)
+        padding = (tuple(padding) + (0,)) if padding is not None else padding
+        stride = extend_attr_to_tuple(stride, 2) if stride is not None else stride
+        dilation = (
+            extend_attr_to_tuple(dilation, 2) if dilation is not None else dilation
+        )
 
     set_layer_name(conv_layer, target, name, source_ir)
 
     # Set relevant attributes of convolution layer
-    conv_layer.padding_nd = padding
-    conv_layer.stride_nd = stride
-    conv_layer.dilation_nd = dilation
-
+    if padding is not None:
+        conv_layer.padding_nd = padding
+    if stride is not None:
+        conv_layer.stride_nd = stride
+    if dilation is not None:
+        conv_layer.dilation_nd = dilation
     if groups is not None:
         conv_layer.num_groups = groups
 

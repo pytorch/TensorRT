@@ -12,6 +12,7 @@ class TestLowering(TestCase):
                 super().__init__(*args, **kwargs)
 
             def forward(self, x, y):
+                x += 1
                 x = torch.ops.aten.add_.Tensor(x, y)
                 x = torch.ops.aten.relu_.default(x)
                 return x
