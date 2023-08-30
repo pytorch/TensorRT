@@ -4,8 +4,8 @@ on:
   pull_request:
   push:
     branches:
-      - nightly
       - main
+      - nightly
       - release/*
     tags:
         # NOTE: Binary build pipelines should only get triggered on release candidate builds
