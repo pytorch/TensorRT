@@ -2,6 +2,7 @@
 
 set -euxo pipefail
 
+#
 # Prepare conda
 set +x && eval "$($(which conda) shell.bash hook)" && set -x
 
