@@ -3,11 +3,8 @@ from typing import Optional
 import tensorrt as trt
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
-from torch_tensorrt.fx.converters.converter_utils import (
-    broadcast,
-    get_trt_tensor,
-    set_layer_name,
-)
+from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
+from torch_tensorrt.fx.converters.converter_utils import broadcast, set_layer_name
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 

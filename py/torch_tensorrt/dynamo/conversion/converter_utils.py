@@ -1,14 +1,16 @@
 import functools
 import logging
 import re
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Union
 
+import numpy as np
 import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.fx.converters.converter_utils import (
     Frameworks,
     get_axes_for_reduce_op,
+    to_numpy,
     unified_dtype_converter,
 )
 from torch_tensorrt.fx.types import TRTDataType, TRTNetwork, TRTTensor
@@ -187,4 +189,76 @@ def extend_attr_to_tuple(
 
     if isinstance(val, list):
         val = tuple(val)
-    return val
+
+    if isinstance(val, tuple):
+        return val
+    else:
+        raise AssertionError(f"Could not extend attribute {val}")
+
+
+def create_constant(
+    network: TRTNetwork,
+    value: Union[int, float, np.ndarray, torch.Tensor],
+    name: str,
+    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]],
+) -> TRTTensor:
+    """
+    Add a TensorRT constant layer whose value is `value` to `network`.
+    Args:
+        network (TRTNetwork): A TensorRT network to which we want to add
+            a constant layer.
+        value (Union[int, float, np.ndarray, torch.Tensor]): A literal value, Numpy array,
+            or a PyTorch tensor that will be used as value of the added TensorRT Constant layer.
+        name (str): Name of the added TensorRT Constant layer.
+        dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
+            If a dtype is given, we will convert the type of the given `value` to this dtype.
+    Returns:
+        A TensorRT ITensor that represents the given value.
+    """
+    constant = network.add_constant(
+        (1,) if isinstance(value, (int, float)) else value.shape,
+        to_numpy(value, dtype).copy(),
+    )
+    constant.name = name
+    return constant.get_output(0)
+
+
+def get_trt_tensor(
+    network: TRTNetwork,
+    input_val: Any,
+    name: str,
+    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]] = None,
+) -> TRTTensor:
+    """
+    Given a value of random type, we try to convert it to a TensorRT ITensor.
+    An runtime error is raised if we're not able to do that.
+    Args:
+        network (TRTNetwork): A TensorRT network. If we want to
+            add a TensorRT Constant layer, we will add it to this network.
+        input_val (Any): An value that we want to convert to a TensorRT ITensor.
+        name (str): The name of the created TensorRT Constant layer if there's
+            one.
+        dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
+            If dtype is provided, the given value will be converted to this dtype.
+    Returns:
+        A TensorRT ITensor that represents the given value.
+    """
+    # TRT can not add constant for bool type. We do a work around to 1) cast it to int and 2)cast to bool later
+    # This is useful for logical operations which require input to be bool type
+    if isinstance(input_val, bool):
+        input_val = int(input_val)
+    elif isinstance(input_val, torch.Tensor) and (
+        input_val.dtype == torch.bool or input_val.dtype == torch.int64
+    ):
+        input_val = input_val.to(torch.int32)
+    elif isinstance(input_val, np.ndarray) and (
+        input_val.dtype == np.bool_ or input_val.dtype == np.int64
+    ):
+        input_val = input_val.astype(np.int32)
+
+    if isinstance(input_val, (torch.Tensor, np.ndarray, int, float)):
+        return create_constant(network, input_val, name, dtype)
+    elif isinstance(input_val, TRTTensor):
+        return input_val
+    else:
+        raise AssertionError(f"Cannot convert {input_val} to TRT constant")

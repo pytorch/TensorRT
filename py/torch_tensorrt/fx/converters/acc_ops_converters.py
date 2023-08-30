@@ -2711,14 +2711,8 @@ def acc_ops_linear(
         "dim for linear and it can't be the last dim."
     )
 
-    if isinstance(kwargs["weight"], (torch.Tensor, np.ndarray)):
-        weight = get_trt_tensor(
-            network,
-            kwargs["weight"].t()
-            if isinstance(kwargs["weight"], torch.Tensor)
-            else kwargs["weight"].T,
-            f"{name}_weight",
-        )
+    if isinstance(kwargs["weight"], torch.Tensor):
+        weight = get_trt_tensor(network, kwargs["weight"].t(), f"{name}_weight")
         if target not in (acc_ops.linear, torch.ops.aten.linear):
             weight_op = trt.MatrixOperation.TRANSPOSE
         else:

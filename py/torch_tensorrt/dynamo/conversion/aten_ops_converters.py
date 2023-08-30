@@ -538,7 +538,7 @@ def aten_ops_clone(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.expand.default)
+@dynamo_tensorrt_converter(torch.ops.aten.expand.default)  # type: ignore[misc]
 def aten_ops_expand(
     network: TRTNetwork,
     target: Target,
@@ -568,7 +568,7 @@ def amax_param_validator(amax_node: Node) -> bool:
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.amax.default, capability_validator=amax_param_validator
-)
+)  # type: ignore[misc]
 def aten_ops_amax(
     network: TRTNetwork,
     target: Target,
@@ -982,12 +982,13 @@ def aten_ops_isinf(
 
 
 def conv_param_validator(conv_node: Node) -> bool:
+    # Output padding and transposed convolutions not supported currently
     return (not conv_node.args[6]) and (conv_node.args[7] in ([0], [0, 0], [0, 0, 0]))
 
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.convolution.default, capability_validator=conv_param_validator
-)
+)  # type: ignore[misc]
 def aten_ops_convolution(
     network: TRTNetwork,
     target: Target,
