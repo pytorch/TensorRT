@@ -110,11 +110,6 @@ jobs:
       script: |
         export USE_HOST_DEPS=1
         pushd .
-        cd tests/modules
-        ${CONDA_RUN} python -m pip install -r requirements.txt
-        ${CONDA_RUN} python hub.py
-        popd
-        pushd .
         cd tests/py/dynamo
         ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest --use-deprecated=legacy-resolver
         ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 10 conversion/
