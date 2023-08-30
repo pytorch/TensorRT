@@ -361,7 +361,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             outputs = (args[0],)
 
         for output_idx in range(len(outputs)):
-            from torch_tensorrt.fx.converters import get_trt_tensor
+            from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
 
             output = outputs[output_idx]
 
