@@ -1466,6 +1466,13 @@ parameters:
   cuda-version:
     type: string
     default: "12.1"
+  # torch-build and torchvision-build won't be used since we use nightly version now
+  torch-build:
+    type: string
+    default: "1.13.1+cu117"
+  torchvision-build:
+    type: string
+    default: "0.14.1+cu117"
   torch-build-index:
     type: string
     default: "https://download.pytorch.org/whl/nightly/cu121"
@@ -1559,11 +1566,15 @@ workflows:
     jobs:
       - build-x86_64-linux:
           name: build-x86_64-linux
+          torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           python-version: << pipeline.parameters.python-version >>
           cuda-version: << pipeline.parameters.cuda-version >>
 
       - test-core-cpp-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-short: << pipeline.parameters.trt-version-short >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
@@ -1573,6 +1584,8 @@ workflows:
             - build-x86_64-linux
 
       - test-py-ts-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
@@ -1580,6 +1593,8 @@ workflows:
             - build-x86_64-linux
 
       - test-py-fx-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
@@ -1587,6 +1602,8 @@ workflows:
             - build-x86_64-linux
 
       - test-py-dynamo-x86_64-linux:
+          torch-build: << pipeline.parameters.torch-build >>
+          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
