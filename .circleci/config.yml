@@ -274,7 +274,7 @@ commands:
         type: string
         default: "https://download.pytorch.org/whl/nightly/cu121"
       legacy:
-        type: bool
+        type: boolean
         default: false
     steps:
       - when:
