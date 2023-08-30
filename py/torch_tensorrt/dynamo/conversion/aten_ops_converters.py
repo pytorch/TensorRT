@@ -843,3 +843,33 @@ def aten_ops_isinf(
         name,
         args[0],
     )
+
+
+def conv_param_validator(conv_node: Node) -> bool:
+    return (not conv_node.args[6]) and (conv_node.args[7] in ([0], [0, 0], [0, 0, 0]))
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.convolution.default, capability_validator=conv_param_validator
+)
+def aten_ops_convolution(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.conv.convNd(
+        network,
+        target,
+        source_ir=SourceIR.ATEN,
+        name=name,
+        is_conv1d=len(args[3]) == 1,
+        input=args[0],
+        weight=args[1],
+        bias=args[2],
+        stride=args[3],
+        padding=args[4],
+        dilation=args[5],
+        groups=args[8],
+    )

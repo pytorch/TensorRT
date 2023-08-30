@@ -4,6 +4,7 @@ from . import (
     activation,
     cast,
     condition,
+    conv,
     elementwise,
     embedding,
     matmul,
