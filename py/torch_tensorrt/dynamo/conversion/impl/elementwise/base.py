@@ -7,10 +7,12 @@ import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
-from torch_tensorrt.dynamo.conversion.converter_utils import cast_trt_tensor
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_trt_tensor,
+    get_trt_tensor,
+)
 from torch_tensorrt.fx.converters.converter_utils import (
     broadcast,
-    get_trt_tensor,
     set_layer_name,
     squeeze_left,
 )

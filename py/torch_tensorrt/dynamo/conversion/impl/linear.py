@@ -5,7 +5,7 @@ import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo.conversion import impl
-from torch_tensorrt.fx.converters.converter_utils import SourceIR, get_trt_tensor
+from torch_tensorrt.dynamo.conversion.converter_utils import SourceIR, get_trt_tensor
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 
 

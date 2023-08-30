@@ -1,18 +1,18 @@
+import unittest
 from copy import deepcopy
 from functools import partial
 from typing import Any, List, Sequence, Set
 
 import torch
-from torch._dynamo.backends.common import fake_tensor_unsupported
-from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
+from torch._dynamo.utils import detect_fake_mode
 from torch_tensorrt.dynamo import partitioning
+from torch_tensorrt.dynamo.backend.backends import aot_export_for_compile, constant_fold
 from torch_tensorrt.dynamo.lowering._decompositions import get_decompositions
 from torch_tensorrt.dynamo.lowering._pre_aot_lowering import pre_aot_substitutions
 
 DECIMALS_OF_AGREEMENT = 4
 
 
-@fake_tensor_unsupported
 def fx_dynamo_testing_backend(
     gm: torch.fx.GraphModule,
     sample_inputs: Sequence[torch.Tensor],
@@ -33,13 +33,26 @@ def fx_dynamo_testing_backend(
 
     gm = pre_aot_substitutions(gm)
 
-    # Invoke AOTAutograd to translate operators to aten
-    return aot_module_simplified(
-        gm,
-        sample_inputs,
-        fw_compiler=make_boxed_compiler(custom_backend),
-        decompositions=get_decompositions(),
-    )
+    fake_mode = detect_fake_mode(sample_inputs)
+
+    # Place backend tracing within FakeTensor context allowing nonfake Tensors
+    with unittest.mock.patch.object(
+        fake_mode, "allow_non_fake_inputs", True
+    ), fake_mode:
+        # Invoke AOTAutograd to translate operators to aten
+        graph_module = aot_export_for_compile(
+            gm,
+            sample_inputs,
+            decompositions=get_decompositions(),
+        )
+
+        constant_fold(graph_module)
+
+        trt_compiled = custom_backend(
+            graph_module,
+            sample_inputs,
+        )
+        return trt_compiled
 
 
 def compile_module_testing(
