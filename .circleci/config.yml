@@ -273,12 +273,26 @@ commands:
       torchvision-build-index:
         type: string
         default: "https://download.pytorch.org/whl/nightly/cu121"
+      legacy:
+        type: bool
+        default: false
     steps:
-      - run:
-          name: Install Torch
-          command: |
-            pip3 install --upgrade pip
-            pip3 install torch==<< parameters.torch-build >>  torchvision==<< parameters.torchvision-build >> --extra-index-url https://pypi.nvidia.com --extra-index-url << parameters.torch-build-index >> --extra-index-url << parameters.torchvision-build-index >>
+      - when:
+          condition: << parameters.legacy >>
+          steps:
+            - run:
+              name: Install Torch
+              command: |
+                pip3 install --upgrade pip
+                pip3 install torch==<< parameters.torch-build >>  torchvision==<< parameters.torchvision-build >> --extra-index-url https://pypi.nvidia.com --extra-index-url << parameters.torch-build-index >> --extra-index-url << parameters.torchvision-build-index >>
+      - unless:
+          condition: << parameters.legacy >>
+          steps:
+            - run:
+              name: Install Torch
+              command: |
+                pip3 install --upgrade pip
+                pip3 install --pre torch torchvision --index-url << parameters.torch-build-index >>
 
   build-py:
     description: "Build the torch-tensorrt python release (pre-cxx11-abi)"
@@ -876,6 +890,7 @@ jobs:
           torch-build:  << parameters.torch-build >>
           torchvision-build: << parameters.torchvision-build >>
           torch-build-index: << parameters.torch-build-index >>
+          legacy: << parameters.legacy >>
       - when:
           condition: << parameters.cxx11-abi >>
           steps:
@@ -932,6 +947,9 @@ jobs:
       platform:
         type: string
         default: "x86_64"
+      legacy:
+        type: boolean
+        default: false
     machine:
       image: << parameters.ci-image >>
     resource_class: gpu.nvidia.medium
@@ -952,6 +970,7 @@ jobs:
           torch-build:  << parameters.torch-build >>
           torchvision-build:  << parameters.torchvision-build >>
           torch-build-index: << parameters.torch-build-index >>
+          legacy: << parameters.legacy >>
       - attach_workspace:
           at: /tmp/dist
       - run:
@@ -976,6 +995,9 @@ jobs:
       ci-image:
         type: string
         default: "linux-cuda-12:2023.05.1"
+      legacy:
+        type: boolean
+        default: false
     machine:
       image: << parameters.ci-image >>
     resource_class: gpu.nvidia.medium
@@ -991,6 +1013,7 @@ jobs:
           torch-build:  << parameters.torch-build >>
           torchvision-build:  << parameters.torchvision-build >>
           torch-build-index: << parameters.torch-build-index >>
+          legacy: << parameters.legacy >>
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install --pre /tmp/dist/x86_64-linux/*cp310-cp310*.whl
@@ -1012,6 +1035,8 @@ jobs:
       ci-image:
         type: string
         default: "linux-cuda-12:2023.05.1"
+      legacy:
+        type: boolean
     parallelism: 8
     machine:
       image: << parameters.ci-image >>
@@ -1026,6 +1051,7 @@ jobs:
           torch-build:  << parameters.torch-build >>
           torchvision-build:  << parameters.torchvision-build >>
           torch-build-index: << parameters.torch-build-index >>
+          legacy: << parameters.legacy >>
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
       - install-cudnn
@@ -1051,6 +1077,8 @@ jobs:
       ci-image:
         type: string
         default: "linux-cuda-12:2023.05.1"
+      legacy:
+        type: boolean
     parallelism: 8
     machine:
       image: << parameters.ci-image >>
@@ -1065,6 +1093,7 @@ jobs:
           torch-build:  << parameters.torch-build >>
           torchvision-build:  << parameters.torchvision-build >>
           torch-build-index: << parameters.torch-build-index >>
+          legacy: << parameters.legacy >>
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
       - install-cudnn
@@ -1093,6 +1122,8 @@ jobs:
       ci-image:
         type: string
         default: "linux-cuda-12:2023.05.1"
+      legacy:
+        type: string
     parallelism: 4
     machine:
       image: << parameters.ci-image >>
@@ -1107,6 +1138,7 @@ jobs:
           torch-build:  << parameters.torch-build >>
           torchvision-build:  << parameters.torchvision-build >>
           torch-build-index: << parameters.torch-build-index >>
+          legacy: << parameters.legacy >>
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
       - install-cudnn
@@ -1434,12 +1466,6 @@ parameters:
   cuda-version:
     type: string
     default: "12.1"
-  torch-build:
-    type: string
-    default: "2.1.0.dev20230703+cu121"
-  torchvision-build:
-    type: string
-    default: "0.16.0.dev20230703+cu121"
   torch-build-index:
     type: string
     default: "https://download.pytorch.org/whl/nightly/cu121"
@@ -1533,15 +1559,11 @@ workflows:
     jobs:
       - build-x86_64-linux:
           name: build-x86_64-linux
-          torch-build: << pipeline.parameters.torch-build >>
-          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           python-version: << pipeline.parameters.python-version >>
           cuda-version: << pipeline.parameters.cuda-version >>
 
       - test-core-cpp-x86_64-linux:
-          torch-build: << pipeline.parameters.torch-build >>
-          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-short: << pipeline.parameters.trt-version-short >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
@@ -1551,8 +1573,6 @@ workflows:
             - build-x86_64-linux
 
       - test-py-ts-x86_64-linux:
-          torch-build: << pipeline.parameters.torch-build >>
-          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
@@ -1560,8 +1580,6 @@ workflows:
             - build-x86_64-linux
 
       - test-py-fx-x86_64-linux:
-          torch-build: << pipeline.parameters.torch-build >>
-          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
@@ -1569,8 +1587,6 @@ workflows:
             - build-x86_64-linux
 
       - test-py-dynamo-x86_64-linux:
-          torch-build: << pipeline.parameters.torch-build >>
-          torchvision-build: << pipeline.parameters.torchvision-build >>
           torch-build-index: << pipeline.parameters.torch-build-index >>
           trt-version-long: << pipeline.parameters.trt-version-long >>
           python-version: << pipeline.parameters.python-version >>
@@ -1598,6 +1614,7 @@ workflows:
           python-version: << pipeline.parameters.python-version >>
           ci-image: << pipeline.parameters.ci-image-legacy >>
           platform: << pipeline.parameters.platform-legacy >>
+          legacy: << pipeline.parameters.enable-legacy >>
           requires:
             - build-x86_64-linux-legacy
 
@@ -1609,6 +1626,7 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-version-long-legacy >>
           python-version: << pipeline.parameters.python-version >>
           ci-image: << pipeline.parameters.ci-image-legacy >>
+          legacy: << pipeline.parameters.enable-legacy >>
           requires:
             - build-x86_64-linux-legacy
 
@@ -1619,6 +1637,7 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-version-long-legacy >>
           python-version: << pipeline.parameters.python-version >>
           ci-image: << pipeline.parameters.ci-image-legacy >>
+          legacy: << pipeline.parameters.enable-legacy >>
           requires:
             - build-x86_64-linux-legacy
 
