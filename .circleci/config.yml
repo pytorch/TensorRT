@@ -1124,7 +1124,8 @@ jobs:
         type: string
         default: "linux-cuda-12:2023.05.1"
       legacy:
-        type: string
+        type: boolean
+        default: false
     parallelism: 4
     machine:
       image: << parameters.ci-image >>
