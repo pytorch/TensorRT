@@ -1,12 +1,16 @@
 import glob
 import os
 import platform
+import re
 import subprocess
 import sys
 import warnings
 from dataclasses import dataclass
+from datetime import datetime
 from distutils.cmd import Command
+from pathlib import Path
 from shutil import copyfile, rmtree
+from typing import List
 
 import setuptools
 import yaml
@@ -17,15 +21,6 @@ from setuptools.command.editable_wheel import editable_wheel
 from setuptools.command.install import install
 from torch.utils import cpp_extension
 from wheel.bdist_wheel import bdist_wheel
-
-import yaml
-import re
-import os
-import subprocess
-
-from datetime import datetime
-from pathlib import Path
-from typing import List
 
 __version__: str = "0.0.0"
 __cuda_version__: str = "0.0"
@@ -389,6 +384,7 @@ packages = [
     "torch_tensorrt.dynamo.backend",
     "torch_tensorrt.dynamo.conversion",
     "torch_tensorrt.dynamo.conversion.impl",
+    "torch_tensorrt.dynamo.conversion.impl.activation",
     "torch_tensorrt.dynamo.conversion.impl.condition",
     "torch_tensorrt.dynamo.conversion.impl.elementwise",
     "torch_tensorrt.dynamo.conversion.impl.normalization",
@@ -415,6 +411,7 @@ package_dir = {
     "torch_tensorrt.dynamo.backend": "py/torch_tensorrt/dynamo/backend",
     "torch_tensorrt.dynamo.conversion": "py/torch_tensorrt/dynamo/conversion",
     "torch_tensorrt.dynamo.conversion.impl": "py/torch_tensorrt/dynamo/conversion/impl",
+    "torch_tensorrt.dynamo.conversion.impl.activation": "py/torch_tensorrt/dynamo/conversion/impl/activation",
     "torch_tensorrt.dynamo.conversion.impl.condition": "py/torch_tensorrt/dynamo/conversion/impl/condition",
     "torch_tensorrt.dynamo.conversion.impl.elementwise": "py/torch_tensorrt/dynamo/conversion/impl/elementwise",
     "torch_tensorrt.dynamo.conversion.impl.normalization": "py/torch_tensorrt/dynamo/conversion/impl/normalization",

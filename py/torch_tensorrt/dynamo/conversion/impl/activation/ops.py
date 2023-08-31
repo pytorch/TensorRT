@@ -5,9 +5,8 @@ import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion.impl.activation.base import convert_activation
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
-
-from .base import convert_activation
 
 
 def relu(
