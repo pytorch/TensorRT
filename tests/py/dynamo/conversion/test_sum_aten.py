@@ -9,6 +9,26 @@ from .harness import DispatchTestCase
 class TestSumConverter(DispatchTestCase):
     @parameterized.expand(
         [
+            ((3, 2, 4),),
+            ((2, 3, 4, 5),),
+            ((2, 3, 4, 5),),
+            ((6, 7, 5, 4, 5),),
+        ]
+    )
+    def test_sum_dim_int_default(self, input_shape):
+        class Sum(nn.Module):
+            def forward(self, x):
+                return torch.sum(x)
+
+        inputs = [torch.randn(*input_shape)]
+        self.run_test(
+            Sum(),
+            inputs,
+            expected_ops={torch.ops.aten.sum.default},
+        )
+
+    @parameterized.expand(
+        [
             ((3, 2, 4), 1, True),
             ((2, 3, 4, 5), 3, True),
             ((2, 3, 4, 5), None, False),
