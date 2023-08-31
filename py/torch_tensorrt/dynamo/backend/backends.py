@@ -13,7 +13,7 @@ from torch_tensorrt.dynamo.compile import compile_module
 from torch_tensorrt.dynamo.lowering import (
     apply_lowering_passes,
     get_decompositions,
-    replace_builtin_inplace_ops,
+    repair_input_aliasing,
 )
 from torch_tensorrt.dynamo.lowering._pre_aot_lowering import pre_aot_substitutions
 from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs, set_log_level
@@ -73,12 +73,13 @@ def _pretraced_backend(
         with unittest.mock.patch.object(
             fake_mode, "allow_non_fake_inputs", True
         ), fake_mode:
-            replace_builtin_inplace_ops(gm)
+            repair_input_aliasing(gm)
 
             # Invoke AOTAutograd to translate operators to aten
             gm = aot_export_joint_simple(
                 gm,
                 sample_inputs,
+                trace_joint=False,
                 decompositions=get_decompositions(
                     settings.enable_experimental_decompositions
                 ),

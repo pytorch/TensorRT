@@ -317,14 +317,20 @@ class TestInputModifications(TestCase):
 
     def test_input_modifications_mul(self):
         class InplaceMul(torch.nn.Module):
-            def forward(self, x):
+            def forward(self, x, y):
                 x *= 5.0
                 x *= 1.9
-                y = x + 1
-                y /= 1.3
-                return y
+                z = x + y
+                z /= 1.3
+                return z
 
         inputs = [
+            torch.rand(
+                1,
+                3,
+                5,
+                7,
+            ).cuda(),
             torch.rand(
                 1,
                 3,
