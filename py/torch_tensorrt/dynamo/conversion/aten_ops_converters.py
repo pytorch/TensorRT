@@ -471,6 +471,7 @@ def aten_ops_amax(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.sum.default)
 @dynamo_tensorrt_converter(torch.ops.aten.sum.dim_IntList)
 def aten_ops_sum(
     network: TRTNetwork,
@@ -479,7 +480,7 @@ def aten_ops_sum(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.reduce.sum_dim_IntList(
+    return impl.reduce.sum(
         network,
         target,
         SourceIR.ATEN,

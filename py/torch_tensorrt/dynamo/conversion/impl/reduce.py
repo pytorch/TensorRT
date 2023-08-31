@@ -35,7 +35,7 @@ def amax(
     return layer.get_output(0)
 
 
-def sum_dim_IntList(
+def sum(
     network: TRTNetwork,
     target: Target,
     source_ir: Optional[SourceIR],
