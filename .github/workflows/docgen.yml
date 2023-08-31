@@ -23,7 +23,9 @@ jobs:
           ref: ${{github.head_ref}}
       - name: Select Python / CUDA
         run: |
+          git config --global --add safe.directory /__w/TensorRT/TensorRT
           echo "/opt/python/cp311-cp311/bin/" >> $GITHUB_PATH
+          
       - name: Install base deps
         run: |
           python3 -m pip install pyyaml torch --pre --extra-index-url https://download.pytorch.org/whl/nightly/cu121
