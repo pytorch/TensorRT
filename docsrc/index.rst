@@ -73,6 +73,7 @@ Tutorials
    tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
    tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
    tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
+   tutorials/_rendered_examples/dynamo/dynamo_aten_lowering_passes
 
 Python API Documenation
 ------------------------
