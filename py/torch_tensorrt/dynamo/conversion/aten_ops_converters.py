@@ -171,6 +171,7 @@ def aten_ops_gelu(
 
 @dynamo_tensorrt_converter(torch.ops.aten.matmul)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.mm.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.mv.default)  # type: ignore[misc]
 def aten_ops_matmul(
     network: TRTNetwork,
     target: Target,
@@ -179,7 +180,12 @@ def aten_ops_matmul(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.matmul.matrix_multiply(
-        network, target, SourceIR.ATEN, name, args[0], args[1]
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
     )
 
 
