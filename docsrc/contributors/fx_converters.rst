@@ -199,7 +199,7 @@ Tests
 
 * Dynamo testing: 
     
-    Dynamo tests are present for the lowering ops in ``py/torch_tensorrt/dynamo/backend/test/test_decompositions.py``. The above converters will soon be ported to dynamo tests
+    Dynamo tests are present for the lowering ops in ``tests/py/dynamo/lowering/test_decompositions.py``. The above converters will soon be ported to dynamo tests
     
     #. Compare the results for ``fx.symbolic_trace`` and ``torch_tensorrt.dynamo.compile``.
     #. Test for the ``expected_op`` and the ``unexpected_op``. 
