@@ -9986,7 +9986,7 @@ pre {
 
 .site-footer .privacy-policy-links {
     background: #000000;
-    display: flex;
+    display: flex; 
     padding-top: 1rem;
     padding-right: 1rem;
     display: inline-flex;

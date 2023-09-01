@@ -9,38 +9,48 @@
   <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>torch_tensorrt.ts &mdash; Torch-TensorRT v2.0.0.dev0+664b158 documentation</title>
+  
 
-  <title>torch_tensorrt.ts &mdash; Torch-TensorRT v1.4.0+7d1d80773 documentation</title>
+  
+  
+  
+  
 
+  
 
+  
+  
+    
 
-
-
-
-
-
-
-
-
-
-
-
+  
 
   <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!-- <link rel="stylesheet" href="../_static/pygments.css" type="text/css" /> -->
   <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
   <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery-binder.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery-dataframe.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery-rendered-html.css" type="text/css" />
   <link rel="stylesheet" href="../_static/collapsible-lists/css/tree_view.css" type="text/css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="torch_tensorrt.fx" href="fx.html" />
     <link rel="prev" title="torch_tensorrt.ptq" href="ptq.html" />
-  <!-- Google Analytics -->
+  <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','');</script>
+    <!-- End Google Tag Manager -->
+  
 
-  <!-- End Google Analytics -->
-
-
-
+  
   <script src="../_static/js/modernizr.min.js"></script>
 
   <!-- Preload the theme fonts -->
@@ -196,9 +206,9 @@
 
 <body class="pytorch-body">
 
+   
 
-
-
+    
 
     <div class="table-of-contents-link-wrapper">
       <span>Table of Contents</span>
@@ -209,21 +219,21 @@
       <div class="pytorch-side-scroll">
         <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           <div class="pytorch-left-menu-search">
+            
 
-
-
-
-
+            
+              
+              
                 <div class="version">
-                  v1.4.0+7d1d80773
+                  v2.0.0.dev0+664b158
                 </div>
+              
+            
+
+            
 
 
-
-
-
-
-
+  
 
 
 <div role="search">
@@ -234,15 +244,15 @@
   </form>
 </div>
 
-
+            
           </div>
 
-
-
-
-
-
-
+          
+            
+            
+              
+            
+            
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
@@ -251,18 +261,24 @@
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_windows.html#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
 </ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/using_dla.html">DLA</a></li>
+</ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/ptq.html">Post Training Quantization (PTQ)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/using_dla.html">DLA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Example notebooks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
 <ul class="current">
@@ -295,8 +311,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
 </ul>
 
-
-
+            
+          
         </div>
       </div>
     </nav>
@@ -304,7 +320,7 @@
     <div class="pytorch-container">
       <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
         <div class="pytorch-breadcrumbs-wrapper">
-
+          
 
 
 
@@ -323,32 +339,32 @@
 <div role="navigation" aria-label="breadcrumbs navigation">
 
   <ul class="pytorch-breadcrumbs">
-
+    
       <li>
         <a href="../index.html">
-
+          
             Docs
-
+          
         </a> &gt;
       </li>
 
-
+        
           <li><a href="torch_tensorrt.html">torch_tensorrt</a> &gt;</li>
-
+        
       <li>torch_tensorrt.ts</li>
-
-
+    
+    
       <li class="pytorch-breadcrumbs-aside">
-
-
+        
+            
             <a href="../_sources/py_api/ts.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
-
-
+          
+        
       </li>
-
+    
   </ul>
 
-
+  
 </div>
         </div>
 
@@ -360,20 +376,24 @@
       <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
         <div class="pytorch-content-left">
 
-
-
+        
+          <!-- Google Tag Manager (noscript) -->
+          <noscript><iframe src="https://www.googletagmanager.com/ns.html?id="
+          height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+          <!-- End Google Tag Manager (noscript) -->
+          
           <div class="rst-content">
-
+          
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
-
+              
   <section id="torch-tensorrt-ts">
 <span id="torch-tensorrt-ts-py"></span><h1>torch_tensorrt.ts<a class="headerlink" href="#torch-tensorrt-ts" title="Permalink to this headline">¶</a></h1>
 <span class="target" id="module-torch_tensorrt.ts"></span><section id="functions">
 <h2>Functions<a class="headerlink" href="#functions" title="Permalink to this headline">¶</a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="torch_tensorrt.ts.compile">
-<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ts.</span></span><span class="sig-name descname"><span class="pre">compile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module:</span> <span class="pre">torch.jit._script.ScriptModule</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs=[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_signature=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device=&lt;torch_tensorrt._Device.Device</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">disable_tf32=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparse_weights=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enabled_precisions={}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refit=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">capability=&lt;EngineCapability.default:</span> <span class="pre">0&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_avg_timing_iters=1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workspace_size=0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_sram_size=1048576</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_local_dram_size=1073741824</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_global_dram_size=536870912</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">calibrator=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truncate_long_and_double=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">require_full_compilation=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_block_size=3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">torch_executed_ops=[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">torch_executed_modules=[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_shape_tensors=False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">torch.jit._script.ScriptModule</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/ts/_compiler.html#compile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ts.compile" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ts.</span></span><span class="sig-name descname"><span class="pre">compile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module:</span> <span class="pre">torch.jit._script.ScriptModule</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs:</span> <span class="pre">typing.Optional[typing.Sequence[torch_tensorrt._Input.Input</span> <span class="pre">|</span> <span class="pre">torch.Tensor]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_signature:</span> <span class="pre">typing.Optional[typing.Tuple[typing.Union[torch_tensorrt._Input.Input</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">torch.Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">typing.Sequence[typing.Any]]]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device:</span> <span class="pre">torch_tensorrt._Device.Device</span> <span class="pre">=</span> <span class="pre">Device(type=DeviceType.GPU</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gpu_id=0)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">disable_tf32:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparse_weights:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enabled_precisions:</span> <span class="pre">typing.Optional[typing.Set[torch.dtype</span> <span class="pre">|</span> <span class="pre">torch_tensorrt._C.dtype]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refit:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">capability:</span> <span class="pre">torch_tensorrt._C.EngineCapability</span> <span class="pre">=</span> <span class="pre">&lt;EngineCapability.default:</span> <span class="pre">0&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_avg_timing_iters:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workspace_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_sram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1048576</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_local_dram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1073741824</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_global_dram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">536870912</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">calibrator:</span> <span class="pre">object</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truncate_long_and_double:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">require_full_compilation:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_block_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">torch_executed_ops:</span> <span class="pre">typing.Optional[typing.List[str]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">torch_executed_modules:</span> <span class="pre">typing.Optional[typing.List[str]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_shape_tensors:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">torch.jit._script.ScriptModule</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/ts/_compiler.html#compile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ts.compile" title="Permalink to this definition">¶</a></dt>
 <dd><p>Compile a TorchScript module for NVIDIA GPUs using TensorRT</p>
 <p>Takes a existing TorchScript module and a set of settings to configure the compiler
 and will convert methods to JIT Graphs which call equivalent TensorRT engines</p>
@@ -453,16 +473,13 @@ torch datatypes or torch_tensorrt datatypes and you can use either torch devices
 
 <dl class="py function">
 <dt class="sig sig-object py" id="torch_tensorrt.ts.convert_method_to_trt_engine">
-<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ts.</span></span><span class="sig-name descname"><span class="pre">convert_method_to_trt_engine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module:</span> <span class="pre">torch.jit._script.ScriptModule</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method_name:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">'forward'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs=[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device=&lt;torch_tensorrt._Device.Device</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">disable_tf32=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparse_weights=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enabled_precisions={}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refit=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">capability=&lt;EngineCapability.default:</span> <span class="pre">0&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_avg_timing_iters=1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workspace_size=0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_sram_size=1048576</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_local_dram_size=1073741824</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_global_dram_size=536870912</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truncate_long_and_double=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">calibrator=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_shape_tensors=False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bytearray</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/ts/_compiler.html#convert_method_to_trt_engine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ts.convert_method_to_trt_engine" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ts.</span></span><span class="sig-name descname"><span class="pre">convert_method_to_trt_engine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module:</span> <span class="pre">torch.jit._script.ScriptModule</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method_name:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">'forward'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs:</span> <span class="pre">typing.Optional[typing.Sequence[torch_tensorrt._Input.Input</span> <span class="pre">|</span> <span class="pre">torch.Tensor]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device:</span> <span class="pre">torch_tensorrt._Device.Device</span> <span class="pre">=</span> <span class="pre">Device(type=DeviceType.GPU</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gpu_id=0)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">disable_tf32:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparse_weights:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enabled_precisions:</span> <span class="pre">typing.Optional[typing.Set[torch.dtype</span> <span class="pre">|</span> <span class="pre">torch_tensorrt._C.dtype]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refit:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">capability:</span> <span class="pre">torch_tensorrt._C.EngineCapability</span> <span class="pre">=</span> <span class="pre">&lt;EngineCapability.default:</span> <span class="pre">0&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_avg_timing_iters:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workspace_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_sram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1048576</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_local_dram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1073741824</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_global_dram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">536870912</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truncate_long_and_double:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">calibrator:</span> <span class="pre">object</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_shape_tensors:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bytes</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/ts/_compiler.html#convert_method_to_trt_engine"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ts.convert_method_to_trt_engine" title="Permalink to this definition">¶</a></dt>
 <dd><p>Convert a TorchScript module method to a serialized TensorRT engine</p>
 <p>Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>module</strong> (<em>torch.jit.ScriptModule</em>) – Source module, a result of tracing or scripting a PyTorch
-<code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code></p></li>
-<li><p><strong>method_name</strong> (<em>str</em>) – Name of method to convert</p></li>
-</ul>
+<dd class="field-odd"><p><strong>module</strong> (<em>torch.jit.ScriptModule</em>) – Source module, a result of tracing or scripting a PyTorch
+<code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code></p>
 </dd>
 <dt class="field-even">Keyword Arguments</dt>
 <dd class="field-even"><ul class="simple">
@@ -483,6 +500,7 @@ to select device type.</p>
 </pre></div>
 </div>
 </p></li>
+<li><p><strong>method_name</strong> (<em>str</em>) – Name of method to convert</p></li>
 <li><p><strong>Union</strong> (<em>input_signature</em>) – <p>A formatted collection of input specifications for the module. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
 torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum to select device type. <strong>This API should be considered beta-level stable and may change in the future</strong></p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span>input_signature=([
@@ -523,7 +541,7 @@ torch datatypes or torch_tensorrt datatypes and you can use either torch devices
 <dd class="field-odd"><p>Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs</p>
 </dd>
 <dt class="field-even">Return type</dt>
-<dd class="field-even"><p>bytearray</p>
+<dd class="field-even"><p>bytes</p>
 </dd>
 </dl>
 </dd></dl>
@@ -553,7 +571,7 @@ that are not supported are printed out and the function returns false, else true
 
 <dl class="py function">
 <dt class="sig sig-object py" id="torch_tensorrt.ts.embed_engine_in_new_module">
-<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ts.</span></span><span class="sig-name descname"><span class="pre">embed_engine_in_new_module</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">serialized_engine:</span> <span class="pre">bytes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device:</span> <span class="pre">torch_tensorrt._Device.Device</span> <span class="pre">=</span> <span class="pre">&lt;torch_tensorrt._Device.Device</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_binding_names:</span> <span class="pre">typing.List[str]</span> <span class="pre">=</span> <span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_binding_names:</span> <span class="pre">typing.List[str]</span> <span class="pre">=</span> <span class="pre">[]</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">torch.jit._script.ScriptModule</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/ts/_compiler.html#embed_engine_in_new_module"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ts.embed_engine_in_new_module" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ts.</span></span><span class="sig-name descname"><span class="pre">embed_engine_in_new_module</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">serialized_engine</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bytes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_binding_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_binding_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.Device" title="torch_tensorrt._Device.Device"><span class="pre">torch_tensorrt._Device.Device</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">Device(type=DeviceType.GPU,</span> <span class="pre">gpu_id=0)</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">torch.jit._script.ScriptModule</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/ts/_compiler.html#embed_engine_in_new_module"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ts.embed_engine_in_new_module" title="Permalink to this definition">¶</a></dt>
 <dd><p>Takes a pre-built serialized TensorRT engine and embeds it within a TorchScript module</p>
 <p>Takes a pre-built serialied TensorRT engine (as bytes) and embeds it within a TorchScript module.
 Registers the forward method to execute the TensorRT engine with the function signature:</p>
@@ -571,13 +589,13 @@ Registers the forward method to execute the TensorRT engine with the function si
 <p>Module can be save with engine embedded with torch.jit.save and moved / loaded according to torch_tensorrt portability rules</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>serialized_engine</strong> (<em>bytes</em>) – Serialized TensorRT engine from either torch_tensorrt or TensorRT APIs</p>
+<dd class="field-odd"><p><strong>serialized_engine</strong> (<em>bytearray</em>) – Serialized TensorRT engine from either torch_tensorrt or TensorRT APIs</p>
 </dd>
 <dt class="field-even">Keyword Arguments</dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>device</strong> (<em>Union</em><em>(</em><a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.Device" title="torch_tensorrt.Device"><em>torch_tensorrt.Device</em></a><em>, </em><em>torch.device</em><em>, </em><em>dict</em><em>)</em>) – Target device to run engine on. Must be compatible with engine provided. Default: Current active device</p></li>
 <li><p><strong>input_binding_names</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – List of names of TensorRT bindings in order to be passed to the encompassing PyTorch module</p></li>
 <li><p><strong>output_binding_names</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – List of names of TensorRT bindings in order that should be returned from the encompassing PyTorch module</p></li>
+<li><p><strong>device</strong> (<em>Union</em><em>(</em><a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.Device" title="torch_tensorrt.Device"><em>torch_tensorrt.Device</em></a><em>, </em><em>torch.device</em><em>, </em><em>dict</em><em>)</em>) – Target device to run engine on. Must be compatible with engine provided. Default: Current active device</p></li>
 </ul>
 </dd>
 <dt class="field-odd">Returns</dt>
@@ -591,7 +609,7 @@ Registers the forward method to execute the TensorRT engine with the function si
 
 <dl class="py function">
 <dt class="sig sig-object py" id="torch_tensorrt.ts.TensorRTCompileSpec">
-<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ts.</span></span><span class="sig-name descname"><span class="pre">TensorRTCompileSpec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inputs=[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_signature=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device=&lt;torch_tensorrt._Device.Device</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">disable_tf32=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparse_weights=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enabled_precisions={}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refit=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">capability=&lt;EngineCapability.default:</span> <span class="pre">0&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_avg_timing_iters=1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workspace_size=0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_sram_size=1048576</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_local_dram_size=1073741824</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_global_dram_size=536870912</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truncate_long_and_double=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">calibrator=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_shape_tensors=False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">&lt;torch.ScriptClass</span> <span class="pre">object</span> <span class="pre">at</span> <span class="pre">0x7fd048795770&gt;</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/ts/_compile_spec.html#TensorRTCompileSpec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ts.TensorRTCompileSpec" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ts.</span></span><span class="sig-name descname"><span class="pre">TensorRTCompileSpec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inputs:</span> <span class="pre">typing.Optional[typing.List[torch.Tensor</span> <span class="pre">|</span> <span class="pre">torch_tensorrt._Input.Input]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_signature:</span> <span class="pre">typing.Optional[typing.Any]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device:</span> <span class="pre">torch.device</span> <span class="pre">|</span> <span class="pre">torch_tensorrt._Device.Device</span> <span class="pre">=</span> <span class="pre">Device(type=DeviceType.GPU</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gpu_id=0)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">disable_tf32:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparse_weights:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enabled_precisions:</span> <span class="pre">typing.Optional[typing.Set[torch.dtype</span> <span class="pre">|</span> <span class="pre">torch_tensorrt._C.dtype]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refit:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">capability:</span> <span class="pre">torch_tensorrt._C.EngineCapability</span> <span class="pre">=</span> <span class="pre">&lt;EngineCapability.default:</span> <span class="pre">0&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_avg_timing_iters:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workspace_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_sram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1048576</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_local_dram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1073741824</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_global_dram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">536870912</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truncate_long_and_double:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">calibrator:</span> <span class="pre">object</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_shape_tensors:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">&lt;torch.ScriptClass</span> <span class="pre">object</span> <span class="pre">at</span> <span class="pre">0x7ff17585fdf0&gt;</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/ts/_compile_spec.html#TensorRTCompileSpec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ts.TensorRTCompileSpec" title="Permalink to this definition">¶</a></dt>
 <dd><p>Utility to create a formated spec dictionary for using the PyTorch TensorRT backend</p>
 <dl class="field-list simple">
 <dt class="field-odd">Keyword Arguments</dt>
@@ -644,25 +662,25 @@ to select device type.</p>
 
 
              </article>
-
+             
             </div>
             <footer>
-
+  
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-
+      
         <a href="fx.html" class="btn btn-neutral float-right" title="torch_tensorrt.fx" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
-
-
+      
+      
         <a href="ptq.html" class="btn btn-neutral" title="torch_tensorrt.ptq" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
-
+      
     </div>
+  
 
-
-
+  
 
     <hr>
 
-
+  
 
   <div role="contentinfo">
     <p>
@@ -670,11 +688,11 @@ to select device type.</p>
 
     </p>
   </div>
-
+    
       <div>
         Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
       </div>
-
+     
 
 </footer>
 
@@ -697,12 +715,12 @@ to select device type.</p>
       </section>
     </div>
 
+  
 
 
+  
 
-
-
-
+     
        <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
          <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
          <script src="../_static/jquery.js"></script>
@@ -711,9 +729,9 @@ to select device type.</p>
          <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
          <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
          <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+     
 
-
-
+  
 
   <script type="text/javascript" src="../_static/js/vendor/popper.min.js"></script>
   <script type="text/javascript" src="../_static/js/vendor/bootstrap.min.js"></script>
@@ -724,7 +742,7 @@ to select device type.</p>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
   <!-- Begin Footer -->
 
@@ -788,7 +806,7 @@ to select device type.</p>
             <li><a href="https://twitter.com/pytorch" target="_blank">Twitter</a></li>
             <li><a href="https://www.youtube.com/pytorch" target="_blank">YouTube</a></li>
             <li><a href="https://www.linkedin.com/company/pytorch" target="_blank">LinkedIn</a></li>
-          </ul>
+          </ul>  
           </div>
 
         <div class="footer-links-col">
@@ -801,7 +819,7 @@ to select device type.</p>
           </ul>
          </div>
         </div>
-
+        
         <div class="privacy-policy">
           <ul>
             <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/terms/" target="_blank">Terms</a></li>
@@ -851,7 +869,7 @@ to select device type.</p>
           <li>
             <a href="https://pytorch.org/ecosystem">Ecosystem</a>
           </li>
-
+            
           <li>
             <a href="https://pytorch.org/mobile">Mobile</a>
           </li>
@@ -913,7 +931,7 @@ to select device type.</p>
           <li class="resources-mobile-menu-title">
             Resources
           </li>
-
+            
            <ul class="resources-mobile-menu-items">
 
             <li>
