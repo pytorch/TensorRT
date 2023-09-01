@@ -1,26 +1,25 @@
 import torch
 import torch.nn as nn
+from .harness import DispatchTestCase
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
-from .harness import DispatchTestCase
 
-
-class TestSeLUConverter(DispatchTestCase):
-    def test_selu(self):
+class TestSoftplusConverter(DispatchTestCase):
+    def test_softplus(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.selu(x)
+                return nn.functional.softplus(x)
 
         inputs = [torch.randn(1, 10)]
+        self.run_test(
+            TestModule(), inputs, expected_ops={torch.ops.aten.softplus.default}
+        )
 
-        # Here, selu re-uses elu op
-        self.run_test(TestModule(), inputs, expected_ops={torch.ops.aten.elu.default})
-
-    def test_selu_with_dynamic_shape(self):
+    def test_softplus_with_dynamic_shape(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.selu(x)
+                return nn.functional.softplus(x)
 
         input_specs = [
             Input(
@@ -30,13 +29,13 @@ class TestSeLUConverter(DispatchTestCase):
             ),
         ]
         self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.elu.default}
+            TestModule(), input_specs, expected_ops={torch.ops.aten.softplus.default}
         )
 
-    def test_selu_with_dynamic_shape_four_dimensions(self):
+    def test_softplus_with_dynamic_shape_four_dimensions(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.selu(x)
+                return nn.functional.softplus(x)
 
         input_specs = [
             Input(
@@ -47,7 +46,7 @@ class TestSeLUConverter(DispatchTestCase):
         ]
 
         self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.elu.default}
+            TestModule(), input_specs, expected_ops={torch.ops.aten.softplus.default}
         )
 
 
