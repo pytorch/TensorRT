@@ -28,7 +28,6 @@ def split(
             f"split received input {input} that is not part " "of the TensorRT region!"
         )
 
-    dim = cast(int, dim)
     dynamic_shape = has_dynamic_shape(input.shape)
     if dynamic_shape > 0:
         # Check whether slice target dim is dynamic shape dim
@@ -36,10 +35,10 @@ def split(
 
     split_sizes = []
     if isinstance(split_size_or_sections, int):
-        split_sizes.append(cast(int, split_size_or_sections))
+        split_sizes.append(split_size_or_sections)
     else:
         for split_size_or_section in split_size_or_sections:
-            split_sizes.append(cast(int, split_size_or_section))
+            split_sizes.append(split_size_or_section)
 
     start = [0] * len(input.shape)
     stride = [1] * len(start)
@@ -65,7 +64,7 @@ def split(
     output = []
     for i in range(num_splits):
         shape = list(input.shape)
-        shape[dim] = min(split_sizes[i], cast(int, max_offset - offset))
+        shape[dim] = min(split_sizes[i], max_offset - offset)
         start[dim] = offset
         if dynamic_shape:
             shape = get_shape_with_dynamic_shape(

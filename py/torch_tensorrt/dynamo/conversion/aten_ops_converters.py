@@ -11,6 +11,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 
 from .converter_registry import dynamo_tensorrt_converter
+from .converter_utils import dynamic_unsupported_with_args
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
