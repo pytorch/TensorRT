@@ -12,61 +12,6 @@ DEFAULT_SINGLE_NODE_PARTITIONS: Set[str] = {
 }
 
 
-def inline_pytorch_submodules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
-    """
-    Inline a submodule within the parent graph (gm). All `call_module` nodes
-    should be replaced by their submodule nodes.
-    """
-    # Clean the graph
-    gm.graph.eliminate_dead_code()
-    gm.graph.lint()
-
-    for node in gm.graph.nodes:
-        if node.op == "call_module":
-            submodule = getattr(gm, node.name)
-            with gm.graph.inserting_before(node):
-                # Copy all nodes in the submodule into gm and
-                # store the output node of this submodule which is now present in gm
-                submodule_output = gm.graph.graph_copy(submodule.graph, {})
-
-                # Get inputs of submodule node which are most likely outputs of a previous TRT node
-                submodule_inputs = node.args
-
-                # Gather the placeholder input names from submodule graph
-                submodule_placeholder_input_names = [
-                    node.name
-                    for node in submodule.graph.nodes
-                    if node.op == "placeholder"
-                ]
-
-                # Get their references (since we copied) in the parent graph (gm)
-                gm_added_placeholder_inputs = [
-                    node
-                    for node in gm.graph.nodes
-                    if node.name in submodule_placeholder_input_names
-                ]
-
-                assert len(submodule_inputs) == len(gm_added_placeholder_inputs)
-
-                # Replace the added placeholder inputs with original inputs to this submodule node
-                for idx in range(len(submodule_inputs)):
-                    gm_added_placeholder_inputs[idx].replace_all_uses_with(
-                        submodule_inputs[idx]
-                    )
-
-                # Erase the placeholder input nodes in the gm
-                for idx in range(len(gm_added_placeholder_inputs)):
-                    gm.graph.erase_node(gm_added_placeholder_inputs[idx])
-
-                # Replace the pytorch submodule node (call_module) with the inlined subgraph output
-                node.replace_all_uses_with(submodule_output)
-
-            # Erase the pytorch submodule (call_module) node
-            gm.graph.erase_node(node)
-
-    return gm
-
-
 def run_shape_analysis(
     parent_module: torch.fx.GraphModule, inputs: Sequence[Input]
 ) -> Tuple[Dict[Any, Sequence[Any]], Dict[Any, Sequence[Any]]]:

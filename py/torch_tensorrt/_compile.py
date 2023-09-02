@@ -225,7 +225,9 @@ def compile(
             **kwargs,
         )
         trt_exp_program = create_trt_exp_program(
-            compiled_aten_module, exp_program.call_spec, exp_program.state_dict
+            compiled_aten_module,
+            exp_program.call_spec,
+            compiled_aten_module.state_dict(),
         )
         return trt_exp_program
     elif target_ir == _IRType.torch_compile:
