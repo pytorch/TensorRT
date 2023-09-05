@@ -6,24 +6,24 @@
 <!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
 <head>
   <meta charset="utf-8">
-
+  
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>torch_tensorrt._Input &mdash; Torch-TensorRT v2.0.0.dev0+5af4103 documentation</title>
+  
 
-  <title>torch_tensorrt._Input &mdash; Torch-TensorRT v1.5.0.dev0+9eabefd1a documentation</title>
+  
+  
+  
+  
 
+  
 
+  
+  
+    
 
-
-
-
-
-
-
-
-
-
-
-
+  
 
   <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <!-- <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" /> -->
@@ -34,14 +34,20 @@
   <link rel="stylesheet" href="../../_static/sg_gallery-dataframe.css" type="text/css" />
   <link rel="stylesheet" href="../../_static/sg_gallery-rendered-html.css" type="text/css" />
   <link rel="stylesheet" href="../../_static/collapsible-lists/css/tree_view.css" type="text/css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-  <!-- Google Analytics -->
+  <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','');</script>
+    <!-- End Google Tag Manager -->
+  
 
-  <!-- End Google Analytics -->
-
-
-
+  
   <script src="../../_static/js/modernizr.min.js"></script>
 
   <!-- Preload the theme fonts -->
@@ -197,9 +203,9 @@
 
 <body class="pytorch-body">
 
+   
 
-
-
+    
 
     <div class="table-of-contents-link-wrapper">
       <span>Table of Contents</span>
@@ -210,21 +216,21 @@
       <div class="pytorch-side-scroll">
         <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           <div class="pytorch-left-menu-search">
+            
 
-
-
-
-
+            
+              
+              
                 <div class="version">
-                  v1.5.0.dev0+9eabefd1a
+                  v2.0.0.dev0+5af4103
                 </div>
+              
+            
+
+            
 
 
-
-
-
-
-
+  
 
 
 <div role="search">
@@ -235,15 +241,15 @@
   </form>
 </div>
 
-
+            
           </div>
 
-
-
-
-
-
-
+          
+            
+            
+              
+            
+            
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
@@ -267,6 +273,9 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/notebooks.html">Example notebooks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
 <ul>
@@ -299,8 +308,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../indices/supported_ops.html">Operators Supported</a></li>
 </ul>
 
-
-
+            
+          
         </div>
       </div>
     </nav>
@@ -308,7 +317,7 @@
     <div class="pytorch-container">
       <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
         <div class="pytorch-breadcrumbs-wrapper">
-
+          
 
 
 
@@ -327,28 +336,28 @@
 <div role="navigation" aria-label="breadcrumbs navigation">
 
   <ul class="pytorch-breadcrumbs">
-
+    
       <li>
         <a href="../../index.html">
-
+          
             Docs
-
+          
         </a> &gt;
       </li>
 
-
+        
           <li><a href="../index.html">Module code</a> &gt;</li>
-
+        
       <li>torch_tensorrt._Input</li>
-
-
+    
+    
       <li class="pytorch-breadcrumbs-aside">
-
+        
       </li>
-
+    
   </ul>
 
-
+  
 </div>
         </div>
 
@@ -360,19 +369,24 @@
       <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
         <div class="pytorch-content-left">
 
-
-
+        
+          <!-- Google Tag Manager (noscript) -->
+          <noscript><iframe src="https://www.googletagmanager.com/ns.html?id="
+          height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+          <!-- End Google Tag Manager (noscript) -->
+          
           <div class="rst-content">
-
+          
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
-
+              
   <h1>Source code for torch_tensorrt._Input</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">enum</span> <span class="kn">import</span> <span class="n">Enum</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Optional</span>
+<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span> <span class="nn">enum</span> <span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
 
 <span class="kn">import</span> <span class="nn">torch</span>
-
 <span class="kn">from</span> <span class="nn">torch_tensorrt</span> <span class="kn">import</span> <span class="n">_enums</span>
 
 
@@ -397,22 +411,26 @@
         <span class="n">STATIC</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="n">DYNAMIC</span> <span class="o">=</span> <span class="mi">1</span>
 
-    <span class="n">shape_mode</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1">#: (torch_tensorrt.Input._ShapeMode): Is input statically or dynamically shaped</span>
-    <span class="n">shape</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1">#: (Tuple or Dict): Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ &quot;min_shape&quot;: Tuple, &quot;opt_shape&quot;: Tuple, &quot;max_shape&quot;: Tuple }``</span>
-    <span class="n">dtype</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">shape_mode</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
+        <span class="n">_ShapeMode</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1">#: Is input statically or dynamically shaped</span>
+    <span class="n">shape</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
+        <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1">#: Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ &quot;min_shape&quot;: Tuple, &quot;opt_shape&quot;: Tuple, &quot;max_shape&quot;: Tuple }``</span>
+    <span class="n">dtype</span><span class="p">:</span> <span class="n">_enums</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">_enums</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">unknown</span>
     <span class="p">)</span>  <span class="c1">#: The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)</span>
-    <span class="n">_explicit_set_dtype</span> <span class="o">=</span> <span class="kc">False</span>
-    <span class="nb">format</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">_explicit_set_dtype</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="nb">format</span><span class="p">:</span> <span class="n">_enums</span><span class="o">.</span><span class="n">TensorFormat</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">_enums</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">contiguous</span>
     <span class="p">)</span>  <span class="c1">#: The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)</span>
 
-    <span class="n">DOMAIN_OFFSET</span> <span class="o">=</span> <span class="mf">2.0</span>
-    <span class="n">low_tensor_domain_incl</span> <span class="o">=</span> <span class="mf">0.0</span>
-    <span class="n">high_tensor_domain_excl</span> <span class="o">=</span> <span class="n">low_tensor_domain_incl</span> <span class="o">+</span> <span class="n">DOMAIN_OFFSET</span>
-    <span class="n">torch_dtype</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span>
+    <span class="n">DOMAIN_OFFSET</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span>
+    <span class="n">low_tensor_domain_incl</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">high_tensor_domain_excl</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">low_tensor_domain_incl</span> <span class="o">+</span> <span class="n">DOMAIN_OFFSET</span>
+    <span class="n">torch_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span>
 
-<div class="viewcode-block" id="Input.__init__"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Input.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<div class="viewcode-block" id="Input.__init__"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Input.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;__init__ Method for torch_tensorrt.Input</span>
 
 <span class="sd">        Input accepts one of a few construction patterns</span>
@@ -438,6 +456,17 @@
 <span class="sd">            - Input(shape=(1,3,32,32), dtype=torch_tensorrt.dtype.int32, format=torch_tensorrt.TensorFormat.NCHW)</span>
 <span class="sd">            - Input(min_shape=(1,3,32,32), opt_shape=[2,3,32,32], max_shape=(3,3,32,32)) #Implicitly dtype=torch_tensorrt.dtype.float32, format=torch_tensorrt.TensorFormat.NCHW</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Compatibility code for switching over from InputTensorSpec</span>
+        <span class="k">if</span> <span class="s2">&quot;shape&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">and</span> <span class="s2">&quot;shape_ranges&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="p">(</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape_ranges&quot;</span><span class="p">])</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape_ranges&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="mi">3</span>
+            <span class="p">)</span>
+            <span class="k">del</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape&quot;</span><span class="p">]</span>
+
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape_ranges&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape_ranges&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape_ranges&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span>
+
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">Input</span><span class="o">.</span><span class="n">_supported_input_size_type</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
                 <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
@@ -452,7 +481,7 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">STATIC</span>
 
         <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="s2">&quot;shape&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span>
+            <span class="k">if</span> <span class="s2">&quot;shape&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span>
                 <span class="nb">all</span><span class="p">(</span><span class="n">k</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;opt_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;max_shape&quot;</span><span class="p">])</span>
             <span class="p">):</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -535,15 +564,20 @@
                 <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tensor_domain</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">:</span>
-            <span class="k">return</span> <span class="s2">&quot;Input(min_shape=</span><span class="si">{}</span><span class="s2">, opt_shape=</span><span class="si">{}</span><span class="s2">, max_shape=</span><span class="si">{}</span><span class="s2">, dtype=</span><span class="si">{}</span><span class="s2">, format=</span><span class="si">{}</span><span class="s2">, domain=[</span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">))&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">],</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">],</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">],</span>
-                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span>
-                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">),</span>
-                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tensor_domain</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
-                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tensor_domain</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
-            <span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                <span class="k">return</span> <span class="s2">&quot;Input(min_shape=</span><span class="si">{}</span><span class="s2">, opt_shape=</span><span class="si">{}</span><span class="s2">, max_shape=</span><span class="si">{}</span><span class="s2">, dtype=</span><span class="si">{}</span><span class="s2">, format=</span><span class="si">{}</span><span class="s2">, domain=[</span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">))&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">],</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">],</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">],</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">),</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tensor_domain</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tensor_domain</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Input shape is dynamic but shapes are not provided as dictionary (found: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">)&quot;</span>
+                <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Unknown input shape mode&quot;</span><span class="p">)</span>
 
@@ -603,7 +637,7 @@
             <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span>
 
     <span class="k">def</span> <span class="nf">is_trt_dtype</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">_enums</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">long</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">_enums</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">long</span><span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">_parse_format</span><span class="p">(</span><span class="nb">format</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_enums</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">:</span>
@@ -626,7 +660,9 @@
             <span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">_parse_tensor_domain</span><span class="p">(</span><span class="n">domain</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">_parse_tensor_domain</span><span class="p">(</span>
+        <span class="n">domain</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Produce a tuple of integers which specifies a tensor domain in the interval format: [lo, hi)</span>
 
@@ -646,8 +682,8 @@
             <span class="n">domain_lo</span><span class="p">,</span> <span class="n">domain_hi</span> <span class="o">=</span> <span class="n">domain</span>
 
             <span class="c1"># Validate type and provided values for domain</span>
-            <span class="n">valid_type_lo</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">domain_lo</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">domain_lo</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span>
-            <span class="n">valid_type_hi</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">domain_hi</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">domain_hi</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span>
+            <span class="n">valid_type_lo</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">domain_lo</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">))</span>
+            <span class="n">valid_type_hi</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">domain_hi</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">))</span>
 
             <span class="k">if</span> <span class="ow">not</span> <span class="n">valid_type_lo</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -672,49 +708,62 @@
         <span class="k">return</span> <span class="n">result_domain</span>
 
 <div class="viewcode-block" id="Input.from_tensor"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Input.from_tensor">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_tensor</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Input&quot;</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">from_tensor</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">disable_memory_format_check</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Input&quot;</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Produce a Input which contains the information of the given PyTorch tensor.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            tensor (torch.Tensor): A PyTorch tensor.</span>
+<span class="sd">            disable_memory_format_check (bool): Whether to validate the memory formats of input tensors</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            A Input object.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span>
-            <span class="p">[</span>
-                <span class="n">t</span><span class="o">.</span><span class="n">is_contiguous</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">contiguous_format</span><span class="p">),</span>
-                <span class="n">t</span><span class="o">.</span><span class="n">is_contiguous</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">),</span>
-            <span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span>
+            <span class="n">disable_memory_format_check</span>
+            <span class="ow">or</span> <span class="n">t</span><span class="o">.</span><span class="n">is_contiguous</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">contiguous_format</span><span class="p">)</span>
+            <span class="ow">or</span> <span class="n">t</span><span class="o">.</span><span class="n">is_contiguous</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
         <span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="s2">&quot;Tensor does not have a supported memory format, supported formats are contiguous or channel_last&quot;</span>
             <span class="p">)</span>
         <span class="n">frmt</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">contiguous_format</span>
-            <span class="k">if</span> <span class="n">t</span><span class="o">.</span><span class="n">is_contiguous</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">contiguous_format</span><span class="p">)</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">disable_memory_format_check</span>
+                <span class="ow">or</span> <span class="n">t</span><span class="o">.</span><span class="n">is_contiguous</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">contiguous_format</span><span class="p">)</span>
+            <span class="p">)</span>
             <span class="k">else</span> <span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="n">t</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">t</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="n">frmt</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="Input.from_tensors"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Input.from_tensors">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_tensors</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">ts</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;Input&quot;</span><span class="p">]:</span>
+    <span class="k">def</span> <span class="nf">from_tensors</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">ts</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">disable_memory_format_check</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;Input&quot;</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Produce a list of Inputs which contain</span>
 <span class="sd">        the information of all the given PyTorch tensors.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            tensors (Iterable[torch.Tensor]): A list of PyTorch tensors.</span>
+<span class="sd">            disable_memory_format_check (bool): Whether to validate the memory formats of input tensors</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            A list of Inputs.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ts</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span>
-        <span class="k">return</span> <span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="n">from_tensor</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">ts</span><span class="p">]</span></div>
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">from_tensor</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">disable_memory_format_check</span><span class="o">=</span><span class="n">disable_memory_format_check</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">ts</span>
+        <span class="p">]</span></div>
 
-<div class="viewcode-block" id="Input.example_tensor"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Input.example_tensor">[docs]</a>    <span class="k">def</span> <span class="nf">example_tensor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">optimization_profile_field</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<div class="viewcode-block" id="Input.example_tensor"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Input.example_tensor">[docs]</a>    <span class="k">def</span> <span class="nf">example_tensor</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">optimization_profile_field</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get an example tensor of the shape specified by the Input object</span>
 
@@ -724,54 +773,57 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            A PyTorch Tensor</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">optimization_profile_field</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">try</span><span class="p">:</span>
-                <span class="k">assert</span> <span class="nb">any</span><span class="p">(</span>
-                    <span class="p">[</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">STATIC</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">optimization_profile_field</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Specified a optimization profile field but the input is static&quot;</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">torch_dtype</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="ne">RuntimeError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Input shape is dynamic but shapes are not provided as sequence (found: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">)&quot;</span>
+                    <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">optimization_profile_field</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">assert</span> <span class="nb">any</span><span class="p">(</span>
                         <span class="n">optimization_profile_field</span> <span class="o">==</span> <span class="n">field_name</span>
                         <span class="k">for</span> <span class="n">field_name</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;opt_shape&quot;</span><span class="p">,</span> <span class="s2">&quot;max_shape&quot;</span><span class="p">]</span>
-                    <span class="p">]</span>
-                <span class="p">)</span>
-            <span class="k">except</span><span class="p">:</span>
+                    <span class="p">)</span>
+                <span class="k">except</span> <span class="ne">AssertionError</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="s2">&quot;Invalid field name, expected one of min_shape, opt_shape, max_shape&quot;</span>
+                    <span class="p">)</span>
+
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="n">optimization_profile_field</span><span class="p">])</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+                        <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">torch_dtype</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Input shape is dynamic but shapes are not provided as dictionary (found: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">)&quot;</span>
+                    <span class="p">)</span>
+
+            <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;Invalid field name, expected one of min_shape, opt_shape, max_shape&quot;</span>
+                    <span class="s2">&quot;Requested an example tensor from a dynamic shaped input but did not specific which profile field to use.&quot;</span>
                 <span class="p">)</span>
-
-        <span class="k">if</span> <span class="p">(</span>
-            <span class="n">optimization_profile_field</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">STATIC</span>
-        <span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">&quot;Specified a optimization profile field but the input is static&quot;</span>
-            <span class="p">)</span>
-
-        <span class="k">if</span> <span class="p">(</span>
-            <span class="n">optimization_profile_field</span> <span class="ow">is</span> <span class="kc">None</span>
-            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span>
-        <span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">&quot;Requested an example tensor from a dynamic shaped input but did not specific which profile field to use.&quot;</span>
-            <span class="p">)</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">STATIC</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">torch_dtype</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="n">optimization_profile_field</span><span class="p">])</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
-                <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">torch_dtype</span>
-            <span class="p">)</span></div></div>
+        <span class="k">raise</span></div></div>
 </pre></div>
 
              </article>
-
+             
             </div>
             <footer>
+  
 
-
-
+  
 
     <hr>
 
-
+  
 
   <div role="contentinfo">
     <p>
@@ -779,11 +831,11 @@
 
     </p>
   </div>
-
+    
       <div>
         Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
       </div>
-
+     
 
 </footer>
 
@@ -793,19 +845,19 @@
         <div class="pytorch-content-right" id="pytorch-content-right">
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
-
+              
             </div>
           </div>
         </div>
       </section>
     </div>
 
+  
 
 
+  
 
-
-
-
+     
        <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
          <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
          <script src="../../_static/jquery.js"></script>
@@ -814,9 +866,9 @@
          <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
          <script src="../../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
          <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+     
 
-
-
+  
 
   <script type="text/javascript" src="../../_static/js/vendor/popper.min.js"></script>
   <script type="text/javascript" src="../../_static/js/vendor/bootstrap.min.js"></script>
@@ -827,7 +879,7 @@
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
   <!-- Begin Footer -->
 
@@ -891,7 +943,7 @@
             <li><a href="https://twitter.com/pytorch" target="_blank">Twitter</a></li>
             <li><a href="https://www.youtube.com/pytorch" target="_blank">YouTube</a></li>
             <li><a href="https://www.linkedin.com/company/pytorch" target="_blank">LinkedIn</a></li>
-          </ul>
+          </ul>  
           </div>
 
         <div class="footer-links-col">
@@ -904,7 +956,7 @@
           </ul>
          </div>
         </div>
-
+        
         <div class="privacy-policy">
           <ul>
             <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/terms/" target="_blank">Terms</a></li>
@@ -954,7 +1006,7 @@
           <li>
             <a href="https://pytorch.org/ecosystem">Ecosystem</a>
           </li>
-
+            
           <li>
             <a href="https://pytorch.org/mobile">Mobile</a>
           </li>
@@ -1016,7 +1068,7 @@
           <li class="resources-mobile-menu-title">
             Resources
           </li>
-
+            
            <ul class="resources-mobile-menu-items">
 
             <li>

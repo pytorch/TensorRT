@@ -8,7 +8,7 @@ Program Listing for File ptq.h
 
 .. |exhale_lsh| unicode:: U+021B0 .. UPWARDS ARROW WITH TIP LEFTWARDS
 
-.. code-block:: cpp
+.. code-block:: none
 
    /*
     * Copyright (c) NVIDIA Corporation.

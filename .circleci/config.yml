@@ -317,9 +317,11 @@ commands:
           name: Build torch-tensorrt python legacy release (pre-cxx11-abi)
           command: |
             export CUDA_HOME=/usr/local/cuda-<< parameters.cuda-version >>/
-            mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
-            python3 -m pip install pip==22.0.2
-            python3 -m pip wheel --no-deps --verbose --pre . --extra-index-url https://pypi.nvidia.com --extra-index-url << parameters.torch-build-index >> --config-setting="--build-option=--legacy" -w dist
+            mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >>.legacy WORKSPACE
+            mv toolchains/legacy/pyproject.toml pyproject.toml
+            python3 -m pip install wheel setuptools pyyaml
+            python3 -m pip install pybind11==2.6.2
+            python3 setup.py bdist_wheel --legacy
             python3 -m pip install dist/torch_tensorrt*
             mkdir -p /tmp/dist/builds
             cp dist/torch_tensorrt* /tmp/dist/builds
@@ -754,14 +756,30 @@ commands:
 
 # =================== Dynamo tests start ======================== #
 
-  test-dynamo-torch_compile:
-    description: "Test Dynamo torch_compile tests"
+  test-dynamo-backend:
+    description: "Test Dynamo backend tests"
     steps:
       - run:
-          name: Run Dynamo torch_compile tests
+          name: Run Dynamo backend tests
           command: |
             cd tests/py/dynamo/backend/
-            pytest --junitxml=/tmp/artifacts/test_results/dynamo/torch_compile/test_results.xml
+            TESTS_TO_RUN=$(circleci tests glob "test_*.py" | circleci tests split --split-by=timings)
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/backend/test_results.xml $TESTS_TO_RUN
+
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
+
+  test-dynamo-shared_utilities:
+    description: "Test Dynamo shared utilities tests"
+    steps:
+      - run:
+          name: Run Dynamo lowering, partitioning, runtime tests
+          command: |
+            cd tests/py/dynamo/
+            TESTS_TO_RUN=$(circleci tests glob "runtime/test_*.py" "partitioning/test_*.py" "lowering/test_*.py" | circleci tests split --split-by=timings)
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/shared_utilities/test_results.xml $TESTS_TO_RUN
 
       - store_test_results:
           path: /tmp/artifacts
@@ -806,9 +824,9 @@ commands:
       - run:
           name: Run Dynamo converter tests
           command: |
-            cd tests/py/dynamo/converters
+            cd tests/py/dynamo/conversion
             TESTS_TO_RUN=$(circleci tests glob "test_*.py" | circleci tests split --split-by=timings)
-            pytest --junitxml=/tmp/artifacts/test_results/dynamo/converters/test_results.xml $TESTS_TO_RUN
+            pytest --junitxml=/tmp/artifacts/test_results/dynamo/conversion/test_results.xml $TESTS_TO_RUN
 
       - store_test_results:
           path: /tmp/artifacts
@@ -838,8 +856,11 @@ jobs:
       legacy:
         type: boolean
         default: false
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.small
     steps:
       - checkout
@@ -905,8 +926,14 @@ jobs:
         type: string
       cudnn-version:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
+      platform:
+        type: string
+        default: "x86_64"
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.medium
     parallelism: 4
     steps:
@@ -931,7 +958,8 @@ jobs:
           name: "Install torch-tensorrt"
           command: pip3 install /tmp/dist/x86_64-linux/*cp310-cp310*.whl
       - dump-test-env
-      - test-ts-core
+      - test-ts-core:
+          platform: << parameters.platform >>
 
   test-py-ts-x86_64-linux:
     parameters:
@@ -945,8 +973,11 @@ jobs:
         type: string
       python-version:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.medium
     steps:
       - checkout
@@ -978,9 +1009,12 @@ jobs:
         type: string
       python-version:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     parallelism: 8
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.medium
     steps:
       - checkout
@@ -1014,9 +1048,12 @@ jobs:
         type: string
       python-version:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     parallelism: 8
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.medium
     steps:
       - checkout
@@ -1053,9 +1090,12 @@ jobs:
         type: string
       python-version:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     parallelism: 4
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.medium
     steps:
       - checkout
@@ -1079,7 +1119,8 @@ jobs:
       # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - dump-test-env
       - test-dynamo-converters
-      - test-dynamo-torch_compile
+      - test-dynamo-backend
+      - test-dynamo-shared_utilities
       - test-dynamo-models_torch_compile
       - test-dynamo-models_torch_export
 
@@ -1092,9 +1133,12 @@ jobs:
         type: string
       torch-build-index:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     parallelism: 4
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.small
     steps:
       - when:
@@ -1142,8 +1186,11 @@ jobs:
         type: string
       torch-build-index:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.small
     steps:
       - when:
@@ -1278,8 +1325,11 @@ jobs:
         type: string
       python-version:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.small
     steps:
       - checkout
@@ -1315,8 +1365,11 @@ jobs:
     parameters:
       torch-base-image:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.small
     steps:
       - checkout
@@ -1343,8 +1396,11 @@ jobs:
         default: false
       torch-base-image:
         type: string
+      ci-image:
+        type: string
+        default: "linux-cuda-12:2023.05.1"
     machine:
-      image: linux-cuda-12:2023.05.1
+      image: << parameters.ci-image >>
     resource_class: gpu.nvidia.small
     steps:
       - when:
@@ -1400,7 +1456,7 @@ parameters:
   # Legacy platform config
   cuda-version-legacy:
     type: string
-    default: "11.7"
+    default: "11.8"
   torch-build-legacy:
     type: string
     default: "1.13.1+cu117"
@@ -1419,6 +1475,12 @@ parameters:
   trt-version-long-legacy:
     type: string
     default: "8.6.1"
+  ci-image-legacy:
+    type: string
+    default: "linux-cuda-11:2023.02.1"
+  platform-legacy:
+    type: string
+    default: "x86_64.legacy"
 
   # Jetson platform config
   cuda-jetson-version:
@@ -1523,6 +1585,7 @@ workflows:
           torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
           python-version: << pipeline.parameters.python-version >>
           legacy: << pipeline.parameters.enable-legacy >>
+          ci-image: << pipeline.parameters.ci-image-legacy >>
 
       - test-core-cpp-x86_64-linux:
           name: test-core-cpp-x86_64-linux-legacy
@@ -1533,6 +1596,8 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-version-long-legacy >>
           cudnn-version: << pipeline.parameters.cudnn-version-legacy >>
           python-version: << pipeline.parameters.python-version >>
+          ci-image: << pipeline.parameters.ci-image-legacy >>
+          platform: << pipeline.parameters.platform-legacy >>
           requires:
             - build-x86_64-linux-legacy
 
@@ -1543,6 +1608,7 @@ workflows:
           torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
           trt-version-long: << pipeline.parameters.trt-version-long-legacy >>
           python-version: << pipeline.parameters.python-version >>
+          ci-image: << pipeline.parameters.ci-image-legacy >>
           requires:
             - build-x86_64-linux-legacy
 
@@ -1552,6 +1618,7 @@ workflows:
           torch-build-index: << pipeline.parameters.torch-build-index-legacy >>
           trt-version-long: << pipeline.parameters.trt-version-long-legacy >>
           python-version: << pipeline.parameters.python-version >>
+          ci-image: << pipeline.parameters.ci-image-legacy >>
           requires:
             - build-x86_64-linux-legacy
 

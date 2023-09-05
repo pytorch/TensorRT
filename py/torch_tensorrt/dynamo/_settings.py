@@ -11,6 +11,7 @@ from torch_tensorrt.dynamo._defaults import (
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
     PRECISION,
+    REQUIRE_FULL_COMPILATION,
     TRUNCATE_LONG_AND_DOUBLE,
     USE_FAST_PARTITIONER,
     USE_PYTHON_RUNTIME,
@@ -57,3 +58,4 @@ class CompilationSettings:
     use_fast_partitioner: bool = USE_FAST_PARTITIONER
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS
     device: Device = field(default_factory=default_device)
+    require_full_compilation: bool = REQUIRE_FULL_COMPILATION
