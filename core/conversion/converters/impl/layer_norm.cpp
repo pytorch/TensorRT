@@ -90,16 +90,16 @@ auto layer_norm_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
 
       auto normalized = div_out;
 
-      //gamma
-      if (args[2].IValue()->isTensor()){
+      // gamma
+      if (args[2].IValue()->isTensor()) {
         auto gamma = args[2].ITensorOrFreeze(ctx);
         auto gamma_prod = add_elementwise(
             ctx, nvinfer1::ElementWiseOperation::kPROD, normalized, gamma, (util::node_info(n) + "_gamma").c_str());
         normalized = gamma_prod->getOutput(0);
       }
 
-      //beta
-      if (args[3].IValue()->isTensor()){
+      // beta
+      if (args[3].IValue()->isTensor()) {
         auto beta = args[3].ITensorOrFreeze(ctx);
         auto beta_sum = add_elementwise(
             ctx, nvinfer1::ElementWiseOperation::kSUM, normalized, beta, (util::node_info(n) + "_beta").c_str());
