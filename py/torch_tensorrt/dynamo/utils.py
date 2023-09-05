@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import torch
 import torch_tensorrt
-from torch._inductor.freezing import ConstantFolder, replace_node_with_constant
+from torch._inductor.constant_folding import ConstantFolder, replace_node_with_constant
 from torch_tensorrt._Device import Device
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import CompilationSettings

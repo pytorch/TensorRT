@@ -250,7 +250,25 @@ def compile_module(
     if fast_partitioner_failed:
         settings.use_fast_partitioner = True
 
+    lower_attributes(partitioned_module)
+    # import pdb; pdb.set_trace()
     return partitioned_module
+
+
+def lower_attributes(gm: torch.fx.GraphModule) -> None:
+    for node in gm.graph.nodes:
+        if node.op == "get_attr":
+            # import pdb; pdb.set_trace()
+            attribute_name = node.target
+            node.target = node.target.lower()
+            # node.name = node.name.lower()
+            attribute = getattr(gm, attribute_name)
+            # delete the existing attribute
+            delattr(gm, attribute_name)
+            if isinstance(attribute, torch.nn.Parameter):
+                gm.register_parameter(attribute_name.lower(), attribute)
+            else:
+                gm.register_buffer(attribute_name.lower(), attribute)
 
 
 def replace_trt_submodule(

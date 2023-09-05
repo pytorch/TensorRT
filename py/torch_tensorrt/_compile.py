@@ -7,9 +7,8 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Union
 import torch
 import torch.fx
 import torch_tensorrt.ts
-from torch._export import ExportedProgram
 from torch._export.exported_program import CallSpec
-from torch.export import ExportGraphSignature
+from torch.export import ExportedProgram, ExportGraphSignature
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo.compile import compile as dynamo_compile
@@ -250,18 +249,31 @@ def create_trt_exp_program(
         node.name for node in gm.graph.nodes if node.op == "placeholder"
     ]
     output_node_names = [node.name for node in gm.graph.nodes if node.op == "output"]
+    param_names = [param[0] for param in gm.named_parameters()]
+    buffer_names = [buffer[0] for buffer in gm.named_buffers()]
+    inputs_to_parameters = {}
+    inputs_to_buffers = {}
+    for node in gm.graph.nodes:
+        if node.op == "get_attr":
+            attribute_name = node.target
+            attribute = getattr(gm, attribute_name)
+            if isinstance(attribute, torch.nn.Parameter):
+                inputs_to_parameters[node.name] = attribute_name
+            else:
+                inputs_to_buffers[node.name] = attribute_name
+
     trt_graph_signature = ExportGraphSignature(
-        parameters=[],
-        buffers=[],
+        parameters=param_names,
+        buffers=buffer_names,
         user_inputs=input_node_names,
         user_outputs=output_node_names,
-        inputs_to_parameters={},
-        inputs_to_buffers={},
+        inputs_to_parameters=inputs_to_parameters,
+        inputs_to_buffers=inputs_to_buffers,
         buffers_to_mutate={},
         backward_signature=None,
         assertion_dep_token=None,
     )
-
+    # import pdb; pdb.set_trace()
     trt_exp_program = ExportedProgram(
         gm, gm.graph, trt_graph_signature, call_spec, state_dict, {}, [], []
     )
