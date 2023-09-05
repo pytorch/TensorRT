@@ -330,6 +330,22 @@ def aten_ops_fmod(
     return impl.elementwise.fmod(ctx, target, SourceIR.ATEN, name, args[0], args[1])
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler.out)
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_backward.out)
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_2d.out)
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_2d_backward.out)
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_3d.out)
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_3d_backward.out)
+def aten_ops_grid(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.grid.grid(ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2], args[3], args[4])
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.relu.default)
 def aten_ops_relu(
     ctx: ConversionContext,

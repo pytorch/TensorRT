@@ -24,6 +24,32 @@ import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
+#nearesr, linear, cubc
+class GridSamplerInterpolation:
+    def __init__(self):
+        self.interpolator_mode = None
+    def __call__(self, interpolator_int):  
+        if(interpolator_int == 0) :
+            self.interpolator_mode = trt.InterpolationMode.NEAREST
+        elif(interpolator_int == 1) :
+            self.interpolator_mode = trt.InterpolationMode.LINEAR
+        elif(interpolator_int == 2) :
+            self.interpolator_mode = trt.InterpolationMode.CUBIC
+        return self.interpolator_mode
+    
+
+#zeros, border, reflection
+class GridSamplerPadding:
+    def __init__(self):
+        self.padding_mode = None
+    def __call__(self, padding_int):  
+        if(padding_int == 0) :
+            self.padding_mode = trt.SampleMode.kFILL
+        elif(padding_int == 1) :
+            self.padding_mode = trt.SampleMode.kCLAMP
+        elif(padding_int == 2) :
+            self.padding_mode = trt.SampleMode.kREFLECT
+        return self.padding_mode
 
 def get_node_name(node: torch.fx.Node) -> str:
     # nn_module_stack preserves the call stack of pytorch nn.modules
