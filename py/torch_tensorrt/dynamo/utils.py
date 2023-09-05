@@ -221,7 +221,15 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
             "If this is incorrect, please specify an input device, via the device keyword."
         )
 
-    logger.info(f"Compiling with Settings:\n{settings}")
+    # Ignore and warn about require_full_compilation flag
+    if settings.require_full_compilation:
+        logger.warning(
+            "Detected require_full_compilation=True for a torch.compile run. "
+            "This option has no effect in torch.compile."
+        )
+        settings.require_full_compilation = False
+
+    logger.info("Compilation Settings: %s\n", settings)
 
     return settings
 

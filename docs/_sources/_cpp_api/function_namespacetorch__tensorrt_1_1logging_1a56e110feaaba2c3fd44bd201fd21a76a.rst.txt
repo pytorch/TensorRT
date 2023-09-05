@@ -1,0 +1,14 @@
+.. _exhale_function_namespacetorch__tensorrt_1_1logging_1a56e110feaaba2c3fd44bd201fd21a76a:
+
+Function torch_tensorrt::logging::get_is_colored_output_on
+==========================================================
+
+.. did not find file this was defined in
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::logging::get_is_colored_output_on()
+   :project: Torch-TensorRT

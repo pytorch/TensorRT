@@ -1,0 +1,14 @@
+.. _exhale_function_namespacetorch__tensorrt_1_1logging_1ac46ac0901cb97e3ae6e93b45f24e90b8:
+
+Function torch_tensorrt::logging::log
+=====================================
+
+.. did not find file this was defined in
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::logging::log(Level, std::string)
+   :project: Torch-TensorRT

@@ -12,7 +12,11 @@ from torch.fx.passes.splitter_base import (
     _SplitterSettingBase,
 )
 from torch.fx.passes.tools_common import CALLABLE_NODE_OPS, NodeSet
-from torch_tensorrt.dynamo._defaults import DEBUG, MIN_BLOCK_SIZE
+from torch_tensorrt.dynamo._defaults import (
+    DEBUG,
+    MIN_BLOCK_SIZE,
+    REQUIRE_FULL_COMPILATION,
+)
 from torch_tensorrt.dynamo.conversion.converter_registry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
@@ -94,6 +98,7 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         allowed_single_node_partition_ops: Nodes which can be included in single-node partitons.
             Generally useful for module-level exclusion ops which are intensive despite being single functions
         min_block_size: Minimum number of computational operators per block
+        require_full_compilation: Require that all computational operators be run in TRT
     Returns:
         torch.fx.GraphModule
     """
@@ -106,6 +111,7 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
             Collection[str]
         ] = DEFAULT_SINGLE_NODE_PARTITIONS,
         min_block_size: int = MIN_BLOCK_SIZE,
+        require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
     ):
         """
         Preprocesses graph before splitting:
@@ -144,6 +150,7 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
 
         self.num_trt_accelerated_subgraphs: Optional[int] = None
         self.allowed_single_node_partition_ops = allowed_single_node_partition_ops
+        self.require_full_compilation = require_full_compilation
 
     def remove_small_acc_subgraphs(self, subgraphs: List[Subgraph]) -> List[Subgraph]:
         """
@@ -153,12 +160,16 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         result: List[Subgraph] = []
         for subgraph in subgraphs:
             if subgraph.is_acc:
-                if len(subgraph.nodes) >= self.settings.min_acc_module_size or (
-                    self.allowed_single_node_partition_ops is not None
-                    and any(
-                        ConverterRegistry.qualified_name_or_str(node.target)
-                        in self.allowed_single_node_partition_ops
-                        for node in subgraph.nodes
+                if (
+                    len(subgraph.nodes) >= self.settings.min_acc_module_size
+                    or self.require_full_compilation
+                    or (
+                        self.allowed_single_node_partition_ops is not None
+                        and any(
+                            ConverterRegistry.qualified_name_or_str(node.target)
+                            in self.allowed_single_node_partition_ops
+                            for node in subgraph.nodes
+                        )
                     )
                 ):
                     result.append(subgraph)
@@ -186,6 +197,27 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         """
         # Delegate nodes based on operator coverage
         subgraphs = self.put_nodes_into_subgraphs()
+
+        # A graph is fully supported if there is a single partition and all operators are supported/convertible
+        full_support = len([s for s in subgraphs if s.is_acc]) == 1 and not getattr(
+            self.operator_support, "unsupported_operators", True
+        )
+
+        if not full_support and self.require_full_compilation:
+            raise AssertionError(
+                "require_full_compilation=True was specified, but model is not fully supported"
+            )
+
+        if (
+            full_support
+            and self.require_full_compilation
+            and self.settings.min_acc_module_size != MIN_BLOCK_SIZE
+        ):
+            logger.warning(
+                "Detected both require_full_compilation and min_block_size compilation "
+                "arguments were specified. Disregarding min_block_size argument for "
+                "fully supported model."
+            )
 
         # Remove segments smaller than the block size (with exceptions)
         subgraphs = self.remove_small_acc_subgraphs(subgraphs)
@@ -219,6 +251,7 @@ def partition(
     verbose: bool = DEBUG,
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Collection[Target] = set(),
+    require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
 ) -> torch.fx.GraphModule:
     """Partition an FX GraphModule with aten ops into TRT engines
     Partitioning is based on converter operator support
@@ -228,6 +261,7 @@ def partition(
         verbose: Bool representing whether to print operator support
         min_block_size: Minimum number of operators per TRT-Engine Block
         torch_executed_ops: Collection of operations to run in Torch, regardless of converter coverage
+        require_full_compilation: Require that all computational operators be run in TRT
     Returns:
         torch.fx.GraphModule
     """
@@ -238,7 +272,12 @@ def partition(
 
     # Construct
     supported_ops = OpSupportTester(torch_executed_ops=torch_executed_ops)
-    partitioner = TRTPartitioner(gm, supported_ops, min_block_size=min_block_size)
+    partitioner = TRTPartitioner(
+        gm,
+        supported_ops,
+        min_block_size=min_block_size,
+        require_full_compilation=require_full_compilation,
+    )
 
     partitioned_graph = partitioner.partition_graph()
 

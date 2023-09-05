@@ -36,30 +36,43 @@ Getting Started
    getting_started/getting_started_with_windows
 
 
-Tutorials
+User Guide
 ------------
 * :ref:`creating_a_ts_mod`
 * :ref:`getting_started_with_fx`
 * :ref:`ptq`
 * :ref:`runtime`
-* :ref:`serving_torch_tensorrt_with_triton`
 * :ref:`use_from_pytorch`
 * :ref:`using_dla`
+
+.. toctree::
+   :caption: User Guide
+   :maxdepth: 1
+   :hidden:
+
+   user_guide/creating_torchscript_module_in_python
+   user_guide/getting_started_with_fx_path
+   user_guide/ptq
+   user_guide/runtime
+   user_guide/use_from_pytorch
+   user_guide/using_dla
+
+Tutorials
+------------
+* :ref:`torch_tensorrt_tutorials`
+* :ref:`serving_torch_tensorrt_with_triton`
 * :ref:`notebooks`
 
 .. toctree::
    :caption: Tutorials
-   :maxdepth: 1
+   :maxdepth: 3
    :hidden:
 
-   tutorials/creating_torchscript_module_in_python
-   tutorials/getting_started_with_fx_path
-   tutorials/ptq
-   tutorials/runtime
    tutorials/serving_torch_tensorrt_with_triton
-   tutorials/use_from_pytorch
-   tutorials/using_dla
    tutorials/notebooks
+   tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
+   tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
+   tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
 
 Python API Documenation
 ------------------------

@@ -59,9 +59,7 @@ except ImportError:
             ctypes.CDLL(_find_lib(lib, WIN_PATHS))
 
     elif sys.platform.startswith("linux"):
-        LINUX_PATHS = [
-            "/usr/local/cuda-12.1/lib64",
-        ]
+        LINUX_PATHS = ["/usr/local/cuda-12.1/lib64", "/usr/lib", "/usr/lib64"]
 
         if "LD_LIBRARY_PATH" in os.environ:
             LINUX_PATHS += os.environ["LD_LIBRARY_PATH"].split(os.path.pathsep)
