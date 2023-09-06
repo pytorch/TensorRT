@@ -34,12 +34,12 @@ def get_submod_inputs(
         acc_inputs = inputs
         return
 
+    # Register a hook to capture submodule input
+    handle = submod.register_forward_pre_hook(get_input)
     # Iterate over min, opt, max shapes for dynamic inputs
     inputs_map = {}
     if input_is_dynamic(inputs):
         for mode in ["min_shape", "opt_shape", "max_shape"]:
-            # Register a hook to capture submodule input
-            handle = submod.register_forward_pre_hook(get_input)
             torch_inputs = [input.example_tensor(mode).cuda() for input in inputs]
             mod(*torch_inputs)
             handle.remove()
@@ -47,13 +47,11 @@ def get_submod_inputs(
     else:
         torch_inputs = [input.example_tensor().cuda() for input in inputs]
         mod(*torch_inputs)
-        if isinstance(acc_inputs, list):
-            return [
-                Input(shape=acc_input.shape, dtype=acc_input.dtype)
-                for acc_input in acc_inputs
-            ]
-        else:
-            return [Input(shape=acc_inputs.shape, dtype=acc_inputs.dtype)]
+        assert isinstance(acc_inputs, tuple)
+        return [
+            Input(shape=acc_input.shape, dtype=acc_input.dtype)
+            for acc_input in acc_inputs
+        ]
 
     num_submodule_inputs = (
         len(inputs_map["min_shape"]) if inputs_map["min_shape"] else 0
@@ -71,11 +69,6 @@ def get_submod_inputs(
                     dtype=input_val.dtype,
                 )
             )
-            # submodule_inputs.append(Input(shape=[0],
-            #                               torch_tensor=input_val,
-            #                               dtype=input_val.dtype))
-            # import pdb; pdb.set_trace()
-            # print("done")
         else:
             submodule_inputs.append(
                 Input(

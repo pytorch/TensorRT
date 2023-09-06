@@ -28,7 +28,7 @@ def convert_module(
     """
     # Specify module output data types to ensure TRT output types agree with
     # that of the equivalent Torch module
-    torch_inputs = [input.torch_tensor for input in inputs]
+    torch_inputs = [input.torch_tensor.cuda() for input in inputs]
     # import pdb; pdb.set_trace()
     module_outputs = module(*torch_inputs)
 

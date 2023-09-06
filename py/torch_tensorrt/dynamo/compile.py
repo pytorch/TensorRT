@@ -135,13 +135,12 @@ def compile(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-    return compile_module(gm, inputs, device, settings)
+    return compile_module(gm, inputs, settings)
 
 
 def compile_module(
     gm: torch.fx.GraphModule,
     sample_inputs: Sequence[Input],
-    device: torch.device | Device,
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
