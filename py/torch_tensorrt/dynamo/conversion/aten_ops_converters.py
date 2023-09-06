@@ -354,6 +354,29 @@ def aten_ops_rsqrt(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.neg.default)
+def aten_ops_neg(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = args[0]
+    if (isinstance(input_val, TRTTensor)) and (
+        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+    ):
+        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+
+    return impl.unary.neg(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        input_val,
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims)  # type: ignore[misc]
 def aten_ops_squeeze(
