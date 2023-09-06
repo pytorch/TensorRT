@@ -67,52 +67,61 @@ def input_is_dynamic(inputs: Sequence[Input]) -> bool:
     return any(input.shape_mode == Input._ShapeMode.DYNAMIC for input in inputs)
 
 
+def get_torch_inputs(
+    inputs: Sequence[Input], device: Union[Device, torch.device, str], mode: str = ""
+) -> Sequence[torch.tensor]:
+    """
+    Return the torch_tensor from the Input object. If mode is set, this implies
+    user is using dynamic shaped inputs and return the corresponding input based
+    on the mode requested.
+    """
+    device = to_torch_device(device)
+    if mode:
+        return [
+            input.example_tensor(mode).to(device)
+            for input in inputs
+            if isinstance(input, Input)
+        ]
+    return [
+        input.torch_tensor.to(device) for input in inputs if isinstance(input, Input)
+    ]
+
+
 def prepare_inputs(
     inputs: Input | torch.Tensor | Sequence[Any] | Dict[Any, Any],
     device: torch.device = torch.device("cuda"),
     shape_mode: str = "opt_shape",
 ) -> Any:
     if isinstance(inputs, Input):
-        if isinstance(inputs.shape, dict):
-            return inputs, inputs.example_tensor(
-                optimization_profile_field=shape_mode
-            ).to(device)
-        else:
-            return inputs, inputs.example_tensor().to(device)
+        return inputs
 
     elif isinstance(inputs, torch.Tensor):
-        return Input.from_tensor(inputs), inputs
+        return Input.from_tensor(inputs)
 
     elif isinstance(inputs, list):
         torchtrt_input_list = []
-        torch_input_list = []
         for input_obj in inputs:
-            torchtrt_input, torch_input = prepare_inputs(input_obj, device, shape_mode)
+            torchtrt_input = prepare_inputs(input_obj, device, shape_mode)
             torchtrt_input_list.append(torchtrt_input)
-            torch_input_list.append(torch_input)
 
-        return torchtrt_input_list, torch_input_list
+        return torchtrt_input_list
 
     elif isinstance(inputs, tuple):
         torchtrt_inputs_tup = []
-        torch_inputs_tup = []
         for input_obj in inputs:
-            torchtrt_input, torch_input = prepare_inputs(input_obj, device, shape_mode)
+            torchtrt_input = prepare_inputs(input_obj, device, shape_mode)
             torchtrt_inputs_tup.append(torchtrt_input)
-            torch_inputs_tup.append(torch_input)
 
-        return tuple(torchtrt_inputs_tup), tuple(torch_inputs_tup)
+        return tuple(torchtrt_inputs_tup)
 
     elif isinstance(inputs, dict):
         torchtrt_inputs_dict: Dict[Any, Any] = dict()
-        torch_inputs_dict: Dict[Any, Any] = dict()
 
         for key, input_obj in inputs.items():
-            torchtrt_input, torch_input = prepare_inputs(input_obj, device, shape_mode)
+            torchtrt_input = prepare_inputs(input_obj, device, shape_mode)
             torchtrt_inputs_dict[key] = torchtrt_input
-            torch_inputs_dict[key] = torch_input
 
-        return torchtrt_inputs_dict, torch_inputs_dict
+        return torchtrt_inputs_dict
 
     else:
         raise ValueError(

@@ -9,6 +9,7 @@ from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
+from torch_tensorrt.dynamo.utils import get_torch_inputs
 
 
 def convert_module(
@@ -28,8 +29,7 @@ def convert_module(
     """
     # Specify module output data types to ensure TRT output types agree with
     # that of the equivalent Torch module
-    torch_inputs = [input.torch_tensor.cuda() for input in inputs]
-    # import pdb; pdb.set_trace()
+    torch_inputs = get_torch_inputs(inputs, settings.device)
     module_outputs = module(*torch_inputs)
 
     if not isinstance(module_outputs, (list, tuple)):

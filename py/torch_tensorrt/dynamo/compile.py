@@ -32,11 +32,7 @@ from torch_tensorrt.dynamo.conversion import (
     convert_module,
     repair_long_or_double_inputs,
 )
-from torch_tensorrt.dynamo.utils import (
-    prepare_inputs,
-    to_torch_device,
-    to_torch_tensorrt_device,
-)
+from torch_tensorrt.dynamo.utils import to_torch_device, to_torch_tensorrt_device
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +88,6 @@ def compile(
         inputs = [inputs]
 
     device = to_torch_tensorrt_device(device)
-
-    _, torch_inputs = prepare_inputs(inputs, to_torch_device(device))
 
     if (
         torch.float16 in enabled_precisions
@@ -216,7 +210,10 @@ def compile_module(
 
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
         submodule_inputs = partitioning.get_submod_inputs(
-            partitioned_module, submodule, sample_inputs
+            partitioned_module,
+            submodule,
+            sample_inputs,
+            to_torch_device(settings.device),
         )
 
         logger.debug(
@@ -230,7 +227,11 @@ def compile_module(
         # Handle long/double inputs if requested by the user
         if settings.truncate_long_and_double:
             submodule_inputs = repair_long_or_double_inputs(
-                partitioned_module, submodule, submodule_inputs, name
+                partitioned_module,
+                submodule,
+                submodule_inputs,
+                to_torch_device(settings.device),
+                name,
             )
 
         # Create TRT Module from submodule

@@ -176,7 +176,7 @@ class Input(object):
             self.torch_tensor = kwargs["torch_tensor"]
         else:
             if self.shape_mode == Input._ShapeMode.DYNAMIC:
-                self.torch_tensor = self.example_tensor("min_shape")
+                self.torch_tensor = self.example_tensor("opt_shape")
             else:
                 self.torch_tensor = self.example_tensor()
 

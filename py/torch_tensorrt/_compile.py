@@ -217,19 +217,13 @@ def compile(
         # Prepare torch and torchtrt inputs
         import collections.abc
 
-        from torch_tensorrt import Device
-        from torch_tensorrt.dynamo.utils import prepare_inputs, to_torch_device
+        from torch_tensorrt.dynamo.utils import prepare_inputs
 
         if not isinstance(input_list, collections.abc.Sequence):
             input_list = [input_list]
-        device = kwargs.get("device", Device._current_device())
-        torchtrt_inputs, torch_inputs = prepare_inputs(
-            input_list, to_torch_device(device), shape_mode="min_shape"
-        )
 
-        for idx, torchtrt_input in enumerate(torchtrt_inputs):
-            torchtrt_input.set_torch_tensor(torch_inputs[idx])
         # Export the module
+        torchtrt_inputs = prepare_inputs(input_list)
         module = torch_tensorrt.dynamo.trace(module, torchtrt_inputs, **kwargs)
         compiled_aten_module: torch.fx.GraphModule = dynamo_compile(
             module,

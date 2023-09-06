@@ -5,7 +5,7 @@ from torch.fx.node import _get_qualified_name
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import DEBUG
 from torch_tensorrt.dynamo.lowering import SUBSTITUTION_REGISTRY
-from torch_tensorrt.dynamo.utils import input_is_dynamic
+from torch_tensorrt.dynamo.utils import get_torch_inputs, input_is_dynamic
 
 DEFAULT_SINGLE_NODE_PARTITIONS: Set[str] = {
     _get_qualified_name(to_replace.new_operator)
@@ -17,6 +17,7 @@ def get_submod_inputs(
     mod: torch.fx.GraphModule,
     submod: torch.fx.GraphModule,
     inputs: Sequence[Input],
+    device: torch.device,
 ) -> Optional[Sequence[torch.Tensor]]:
     """Helper function to get inputs to a Torch submodule
 
@@ -38,15 +39,17 @@ def get_submod_inputs(
     handle = submod.register_forward_pre_hook(get_input)
     # Iterate over min, opt, max shapes for dynamic inputs
     inputs_map = {}
+
     if input_is_dynamic(inputs):
         for mode in ["min_shape", "opt_shape", "max_shape"]:
-            torch_inputs = [input.example_tensor(mode).cuda() for input in inputs]
+            torch_inputs = get_torch_inputs(inputs, device, mode)
             mod(*torch_inputs)
-            handle.remove()
             inputs_map[mode] = acc_inputs
+        handle.remove()
     else:
-        torch_inputs = [input.example_tensor().cuda() for input in inputs]
+        torch_inputs = get_torch_inputs(inputs, device)
         mod(*torch_inputs)
+        handle.remove()
         assert isinstance(acc_inputs, tuple)
         return [
             Input(shape=acc_input.shape, dtype=acc_input.dtype)

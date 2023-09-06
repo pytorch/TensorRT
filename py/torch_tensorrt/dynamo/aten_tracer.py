@@ -7,8 +7,10 @@ from typing import Any, Tuple
 import torch
 from torch._export import dynamic_dim, export
 from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo.backend.backends import constant_fold
 from torch_tensorrt.dynamo.lowering import get_decompositions
+from torch_tensorrt.dynamo.utils import get_torch_inputs, to_torch_device
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +27,8 @@ def trace(
     # Determine the dynamic dimension and setup constraints to input dimensions as dictated by TensorRT
     # Torch dynamo does not allow 0/1 value for dynamic dimensions
     # for inputs during tracing. Hence we create new inputs for export
-    torch_inputs = [input.torch_tensor for input in inputs]
+    device = to_torch_device(kwargs.get("device", default_device()))
+    torch_inputs = get_torch_inputs(inputs, device)
     trace_inputs = []
     constraints = []
     for idx, input in enumerate(inputs):
@@ -46,7 +49,9 @@ def trace(
                         new_shape.append(torch_inputs[idx].shape[dim] + 1)
                     else:
                         new_shape.append(torch_inputs[idx].shape[dim])
-            trace_input = torch.randn(new_shape, dtype=torch_inputs[idx].dtype).cuda()
+            trace_input = torch.randn(
+                new_shape, dtype=torch_inputs[idx].dtype, device=device
+            )
 
             for dim in constraint_dims:
                 if min_shape[dim] > 1:

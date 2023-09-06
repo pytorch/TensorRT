@@ -5,6 +5,7 @@ from typing import Optional, Sequence, Set
 import torch
 from torch.fx.node import _get_qualified_name
 from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo.utils import get_torch_inputs
 
 
 def _extract_downstream_get_nodes(
@@ -159,6 +160,7 @@ def repair_long_or_double_inputs(
     parent_graph: torch.fx.GraphModule,
     submodule: torch.fx.GraphModule,
     submodule_inputs: Sequence[Input],
+    device: torch.device,
     submodule_name: Optional[str] = None,
 ) -> Sequence[Input]:
     """Fixes all Long/Double type inputs to a TRT-accelerated subgraph
@@ -176,7 +178,7 @@ def repair_long_or_double_inputs(
     Returns:
         New submodule inputs, updated accordingly with long/double truncation
     """
-    submodule_torch_inputs = [input.torch_tensor for input in submodule_inputs]
+    submodule_torch_inputs = get_torch_inputs(submodule_inputs, device)
     num_submodule_inputs = len(submodule_inputs)
     repaired_outputs_once = False
 
