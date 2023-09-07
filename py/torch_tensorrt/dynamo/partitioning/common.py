@@ -62,7 +62,7 @@ def get_submod_inputs(
     submodule_inputs = []
     for idx in range(num_submodule_inputs):
         if not isinstance(inputs_map["min_shape"][idx], torch.Tensor):
-            input_val = torch.tensor(inputs_map["min_shape"][idx]).to(torch.int32)
+            input_val = torch.tensor(inputs_map["min_shape"][idx], dtype=torch.int32)
             submodule_inputs.append(
                 Input(
                     min_shape=[1],

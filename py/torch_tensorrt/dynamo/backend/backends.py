@@ -15,7 +15,7 @@ from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.compile import compile_module
 from torch_tensorrt.dynamo.lowering._decompositions import get_decompositions
 from torch_tensorrt.dynamo.lowering._pre_aot_lowering import pre_aot_substitutions
-from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs
+from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs, prepare_inputs
 
 logger = logging.getLogger(__name__)
 
@@ -87,9 +87,10 @@ def _pretraced_backend(
 
             constant_fold(graph_module)
 
+            torchtrt_inputs = prepare_inputs(sample_inputs)
             trt_compiled = compile_module(
                 graph_module,
-                sample_inputs,
+                torchtrt_inputs,
                 settings=settings,
             )
             return trt_compiled

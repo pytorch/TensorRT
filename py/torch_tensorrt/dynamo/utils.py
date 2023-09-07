@@ -64,6 +64,11 @@ def cosine_similarity(gt_tensor: torch.Tensor, pred_tensor: torch.Tensor) -> flo
 
 
 def input_is_dynamic(inputs: Sequence[Input]) -> bool:
+    """
+    Return true if the provided inputs are dynamic.
+    """
+    if any(isinstance(input, torch.Tensor) for input in inputs):
+        return False
     return any(input.shape_mode == Input._ShapeMode.DYNAMIC for input in inputs)
 
 

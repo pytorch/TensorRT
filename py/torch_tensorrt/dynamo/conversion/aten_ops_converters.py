@@ -152,7 +152,7 @@ def aten_ops_fmod(
     return impl.elementwise.fmod(network, target, SourceIR.ATEN, name, args[0], args[1])
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.relu.default)
+@dynamo_tensorrt_converter(torch.ops.aten.relu.default)  # type: ignore[misc]
 def aten_ops_relu(
     network: TRTNetwork,
     target: Target,
@@ -169,7 +169,7 @@ def aten_ops_relu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sigmoid.default)
+@dynamo_tensorrt_converter(torch.ops.aten.sigmoid.default)  # type: ignore[misc]
 def aten_ops_sigmoid(
     network: TRTNetwork,
     target: Target,
@@ -186,7 +186,7 @@ def aten_ops_sigmoid(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.tanh.default)
+@dynamo_tensorrt_converter(torch.ops.aten.tanh.default)  # type: ignore[misc]
 def aten_ops_tanh(
     network: TRTNetwork,
     target: Target,
@@ -203,7 +203,7 @@ def aten_ops_tanh(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.leaky_relu.default)
+@dynamo_tensorrt_converter(torch.ops.aten.leaky_relu.default)  # type: ignore[misc]
 def aten_ops_leaky_relu(
     network: TRTNetwork,
     target: Target,
@@ -221,7 +221,7 @@ def aten_ops_leaky_relu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.elu.default)
+@dynamo_tensorrt_converter(torch.ops.aten.elu.default)  # type: ignore[misc]
 def aten_ops_elu(
     network: TRTNetwork,
     target: Target,
@@ -240,7 +240,7 @@ def aten_ops_elu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.softplus.default)
+@dynamo_tensorrt_converter(torch.ops.aten.softplus.default)  # type: ignore[misc]
 def aten_ops_softplus(
     network: TRTNetwork,
     target: Target,
@@ -258,7 +258,7 @@ def aten_ops_softplus(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.clip.default)
+@dynamo_tensorrt_converter(torch.ops.aten.clip.default)  # type: ignore[misc]
 def aten_ops_clip(
     network: TRTNetwork,
     target: Target,
@@ -277,7 +277,7 @@ def aten_ops_clip(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.hardsigmoid.default)
+@dynamo_tensorrt_converter(torch.ops.aten.hardsigmoid.default)  # type: ignore[misc]
 def aten_ops_hard_sigmoid(
     network: TRTNetwork,
     target: Target,
@@ -352,20 +352,6 @@ def aten_ops_rsqrt(
         name,
         args[0],
     )
-
-
-@dynamo_tensorrt_converter(torch.ops.aten.sym_size.int)  # type: ignore[misc]
-def aten_ops_sym_size_int(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_tensor = args[0]
-    axis = args[1]
-    input_shape = network.add_shape(input_tensor).get_output(axis)
-    return input_shape
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim)  # type: ignore[misc]
@@ -601,8 +587,8 @@ def aten_ops_amax(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sum.default)
-@dynamo_tensorrt_converter(torch.ops.aten.sum.dim_IntList)
+@dynamo_tensorrt_converter(torch.ops.aten.sum.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.sum.dim_IntList)  # type: ignore[misc]
 def aten_ops_sum(
     network: TRTNetwork,
     target: Target,
