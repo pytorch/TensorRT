@@ -265,7 +265,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self.input_specs_iter += 1
         # Set optimization profile for dynamic input shape
         shape = None
-        # import pdb; pdb.set_trace()
         if current_input.shape_mode == Input._ShapeMode.DYNAMIC:
             assert isinstance(current_input.shape, dict)
             shape = []
@@ -275,8 +274,16 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             # TODO: Does not support disjoint optimization profiles?
             assert self.optimization_profiles is not None
             if target == "sym_size":
+                # This implies it is a shape tensor input
                 self.optimization_profiles[0].set_shape_input(
                     target, min_shape, opt_shape, max_shape
+                )
+                return self.network.add_input(
+                    name=target,
+                    shape=[1],
+                    dtype=unified_dtype_converter(
+                        current_input.torch_dtype, Frameworks.TRT
+                    ),
                 )
             else:
                 self.optimization_profiles[0].set_shape(

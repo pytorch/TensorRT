@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Optional, Sequence, Set, Tuple
 
 import torch
@@ -6,6 +7,8 @@ from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import DEBUG
 from torch_tensorrt.dynamo.lowering import SUBSTITUTION_REGISTRY
 from torch_tensorrt.dynamo.utils import get_torch_inputs, input_is_dynamic
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_SINGLE_NODE_PARTITIONS: Set[str] = {
     _get_qualified_name(to_replace.new_operator)
@@ -62,12 +65,13 @@ def get_submod_inputs(
     submodule_inputs = []
     for idx in range(num_submodule_inputs):
         if not isinstance(inputs_map["min_shape"][idx], torch.Tensor):
-            input_val = torch.tensor(inputs_map["min_shape"][idx], dtype=torch.int32)
+            input_val = torch.tensor(inputs_map["opt_shape"][idx], dtype=torch.int32)
+            logger.warning(
+                "Detected a zero-dimensional input. This might be a shape tensor input which is not currently supported. This might result in undefined behavior"
+            )
             submodule_inputs.append(
                 Input(
-                    min_shape=[1],
-                    opt_shape=[1],
-                    max_shape=[1],
+                    shape=[1],
                     torch_tensor=input_val,
                     dtype=input_val.dtype,
                 )
@@ -78,8 +82,8 @@ def get_submod_inputs(
                     min_shape=inputs_map["min_shape"][idx].shape,
                     opt_shape=inputs_map["opt_shape"][idx].shape,
                     max_shape=inputs_map["max_shape"][idx].shape,
-                    torch_tensor=inputs_map["min_shape"][idx],
-                    dtype=inputs_map["max_shape"][idx].dtype,
+                    torch_tensor=inputs_map["opt_shape"][idx],
+                    dtype=inputs_map["opt_shape"][idx].dtype,
                 )
             )
 
