@@ -273,22 +273,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             max_shape = current_input.shape["max_shape"]
             # TODO: Does not support disjoint optimization profiles?
             assert self.optimization_profiles is not None
-            if target == "sym_size":
-                # This implies it is a shape tensor input
-                self.optimization_profiles[0].set_shape_input(
-                    target, min_shape, opt_shape, max_shape
-                )
-                return self.network.add_input(
-                    name=target,
-                    shape=[1],
-                    dtype=unified_dtype_converter(
-                        current_input.torch_dtype, Frameworks.TRT
-                    ),
-                )
-            else:
-                self.optimization_profiles[0].set_shape(
-                    target, min_shape, opt_shape, max_shape
-                )
+            self.optimization_profiles[0].set_shape(
+                target, min_shape, opt_shape, max_shape
+            )
 
             assert len(min_shape) == len(opt_shape) == len(max_shape)
             for i in range(len(min_shape)):

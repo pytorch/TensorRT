@@ -35,18 +35,7 @@ def convert_module(
     if not isinstance(module_outputs, (list, tuple)):
         module_outputs = [module_outputs]
 
-    output_dtypes = []
-    for output in module_outputs:
-        if isinstance(output, torch.Tensor):
-            output_dtypes.append(output.dtype)
-        else:
-            output_tensor = torch.tensor(output)
-            if output_tensor.dtype == torch.float64:
-                output_tensor = output_tensor.to(torch.float32)
-            elif output_tensor.dtype == torch.int64:
-                output_tensor = output_tensor.to(torch.int32)
-
-            output_dtypes.append(output_tensor.dtype)
+    output_dtypes = [output.dtype for output in module_outputs]
 
     interpreter = TRTInterpreter(
         module,
