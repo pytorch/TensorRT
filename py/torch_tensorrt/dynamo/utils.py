@@ -94,8 +94,6 @@ def get_torch_inputs(
 
 def prepare_inputs(
     inputs: Input | torch.Tensor | Sequence[Any] | Dict[Any, Any],
-    device: torch.device = torch.device("cuda"),
-    shape_mode: str = "opt_shape",
 ) -> Any:
     if isinstance(inputs, Input):
         return inputs
@@ -106,7 +104,7 @@ def prepare_inputs(
     elif isinstance(inputs, list):
         torchtrt_input_list = []
         for input_obj in inputs:
-            torchtrt_input = prepare_inputs(input_obj, device, shape_mode)
+            torchtrt_input = prepare_inputs(input_obj)
             torchtrt_input_list.append(torchtrt_input)
 
         return torchtrt_input_list
@@ -114,7 +112,7 @@ def prepare_inputs(
     elif isinstance(inputs, tuple):
         torchtrt_inputs_tup = []
         for input_obj in inputs:
-            torchtrt_input = prepare_inputs(input_obj, device, shape_mode)
+            torchtrt_input = prepare_inputs(input_obj)
             torchtrt_inputs_tup.append(torchtrt_input)
 
         return tuple(torchtrt_inputs_tup)
@@ -123,7 +121,7 @@ def prepare_inputs(
         torchtrt_inputs_dict: Dict[Any, Any] = dict()
 
         for key, input_obj in inputs.items():
-            torchtrt_input = prepare_inputs(input_obj, device, shape_mode)
+            torchtrt_input = prepare_inputs(input_obj)
             torchtrt_inputs_dict[key] = torchtrt_input
 
         return torchtrt_inputs_dict
