@@ -18,6 +18,8 @@ std::string to_str(DataType value) {
       return "Float";
     case DataType::kLong:
       return "Long";
+    case DataType::kDouble:
+      return "Double";
     default:
       return "Unknown data type";
   }
@@ -33,6 +35,8 @@ nvinfer1::DataType toTRTDataType(DataType value) {
       return nvinfer1::DataType::kINT32;
     case DataType::kLong:
       return nvinfer1::DataType::kINT32;
+    case DataType::kDouble:
+      return nvinfer1::DataType::kFLOAT;
     case DataType::kBool:
       return nvinfer1::DataType::kBOOL;
     case DataType::kFloat:
@@ -58,6 +62,8 @@ at::ScalarType toAtenDataType(DataType value) {
       return at::kBool;
     case DataType::kFloat:
       return at::kFloat;
+    case DataType::kDouble:
+      return at::kDouble;
     case DataType::kUnknown:
       return at::kFloat;
     default:

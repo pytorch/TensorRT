@@ -184,7 +184,7 @@ def repair_long_or_double_inputs(
 
     # For each input to the TRT subgraph, check if its type is long/double
     for position in range(num_submodule_inputs):
-        param = submodule_inputs[position]
+        param = submodule_torch_inputs[position]
 
         # If the data type of the input is long/double, insert necessary
         # casts to replace the operation
@@ -213,5 +213,11 @@ def repair_long_or_double_inputs(
                 ]
                 + list(submodule_torch_inputs[position + 1 :])
             )
+
+            # Set the 32bit inputs and their types to the submodule Inputs
+            for idx in range(len(submodule_inputs)):
+                submodule_inputs[idx].set_torch_tensor(submodule_torch_inputs[idx])
+                submodule_inputs[idx].torch_dtype = submodule_torch_inputs[idx].dtype
+                submodule_inputs[idx].dtype = submodule_torch_inputs[idx].dtype
 
     return submodule_inputs

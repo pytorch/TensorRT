@@ -229,6 +229,8 @@ class Input(object):
                 return _enums.dtype.half
             elif dtype == torch.float:
                 return _enums.dtype.float
+            elif dtype == torch.float64:
+                return _enums.dtype.double
             elif dtype == torch.bool:
                 return _enums.dtype.bool
             else:
@@ -258,6 +260,8 @@ class Input(object):
             return torch.float
         elif dtype == _enums.dtype.bool:
             return torch.bool
+        elif dtype == _enums.dtype.double:
+            return torch.float64
         else:
             # Default torch_dtype used in FX path
             return torch.float32
