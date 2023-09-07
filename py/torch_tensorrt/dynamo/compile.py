@@ -15,6 +15,7 @@ from torch_tensorrt.dynamo._defaults import (
     DEBUG,
     DEVICE,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    FALLBACK_TO_INDUCTOR,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     OPTIMIZATION_LEVEL,
@@ -69,6 +70,7 @@ def compile(
     use_python_runtime: bool = USE_PYTHON_RUNTIME,
     use_fast_partitioner: bool = USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    fallback_to_inductor: bool = FALLBACK_TO_INDUCTOR,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     if debug:
@@ -84,7 +86,7 @@ def compile(
         "max_aux_streams, version_compatible, optimization_level, "
         "torch_executed_ops, pass_through_build_failures, "
         "use_fast_partitioner, enable_experimental_decompositions, "
-        "require_full_compilation}"
+        "require_full_compilation, fallback_to_inductor}"
     )
 
     if not isinstance(inputs, collections.abc.Sequence):
@@ -130,6 +132,7 @@ def compile(
         "use_fast_partitioner": use_fast_partitioner,
         "enable_experimental_decompositions": enable_experimental_decompositions,
         "require_full_compilation": require_full_compilation,
+        "fallback_to_inductor": fallback_to_inductor,
     }
 
     settings = CompilationSettings(**compilation_options)

@@ -6,6 +6,7 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt.dynamo._defaults import (
     DEBUG,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    FALLBACK_TO_INDUCTOR,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     OPTIMIZATION_LEVEL,
@@ -42,6 +43,8 @@ class CompilationSettings:
         truncate_long_and_double (bool): Truncate int64/float64 TRT engine inputs or weights to int32/float32
         enable_experimental_decompositions (bool): Whether to enable all core aten decompositions
             or only a selected subset of them
+        fallback_to_inductor (bool): Whether to fallback to inductor on Torch-TRT Compilation Errors.
+            Is overridden by pass_through_build_failures.
     """
 
     precision: torch.dtype = PRECISION
@@ -59,3 +62,4 @@ class CompilationSettings:
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS
     device: Device = field(default_factory=default_device)
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION
+    fallback_to_inductor: bool = FALLBACK_TO_INDUCTOR

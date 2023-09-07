@@ -83,14 +83,17 @@ def _pretraced_backend(
             settings=settings,
         )
         return trt_compiled
-    except AssertionError:
+    except (AssertionError, RuntimeError):
         if not settings.pass_through_build_failures:
             logger.warning(
                 "TRT conversion failed on the subgraph. See trace above. "
                 + "Returning GraphModule forward instead.",
                 exc_info=True,
             )
-            return gm.forward
+            if settings.fallback_to_inductor:
+                pass
+            else:
+                return gm
         else:
             logger.critical(
                 "Halting compilation on build failure since "
@@ -100,3 +103,18 @@ def _pretraced_backend(
                 + "specify pass_through_build_failures=False."
             )
             raise
+
+    # If Inductor fallback is desired, attempt model compilation with inductor
+    try:
+        inductor_compiled = torch._inductor.compile(
+            gm,
+            sample_inputs,
+        )
+        return inductor_compiled
+    except (AssertionError, RuntimeError):
+        logger.warning(
+            "Inductor compilation failed on the subgraph. See trace above. "
+            + "Returning GraphModule forward instead.",
+            exc_info=True,
+        )
+        return gm
