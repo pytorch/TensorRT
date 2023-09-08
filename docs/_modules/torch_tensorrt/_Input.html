@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._Input &mdash; Torch-TensorRT v2.2.0.dev0+0f5d6d4 documentation</title>
+  <title>torch_tensorrt._Input &mdash; Torch-TensorRT v2.2.0.dev0+6f0e265 documentation</title>
   
 
   
@@ -222,7 +222,7 @@
               
               
                 <div class="version">
-                  v2.2.0.dev0+0f5d6d4
+                  v2.2.0.dev0+6f0e265
                 </div>
               
             
@@ -648,7 +648,7 @@
                 <span class="k">return</span> <span class="n">_enums</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">channels_last</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;Provided an unsupported tensor format (support: NHCW/contiguous_format, NHWC/channel_last)&quot;</span>
+                    <span class="s2">&quot;Provided an unsupported tensor format (support: NCHW/contiguous_format, NHWC/channel_last)&quot;</span>
                 <span class="p">)</span>
 
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="nb">format</span><span class="p">,</span> <span class="n">_enums</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">):</span>
