@@ -13,6 +13,8 @@ class TestSeLUConverter(DispatchTestCase):
                 return nn.functional.selu(x)
 
         inputs = [torch.randn(1, 10)]
+
+        # Here, selu re-uses elu op
         self.run_test(TestModule(), inputs, expected_ops={torch.ops.aten.elu.default})
 
     def test_selu_with_dynamic_shape(self):

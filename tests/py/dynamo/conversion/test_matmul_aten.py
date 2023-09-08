@@ -9,18 +9,44 @@ from .harness import DispatchTestCase
 class TestMatMulConverter(DispatchTestCase):
     @parameterized.expand(
         [
-            ("2_2", (2, 3), (3, 2)),
-            ("2_2", (2, 3), (3, 1)),
-            # FIXME torch.ops.aten.mv.default for (2,3), (3,1) - should mv be lowered to mm?
-            # (2,3), (3,) torch.ops.aten.mv.default
-            # Following cases use torch.ops.aten.bmm.defauly
+            (
+                "2_2",
+                (2, 3),
+                (3, 2),
+            ),
+            (
+                "4_6",
+                (4, 5),
+                (5, 6),
+            ),
+            (
+                "2_1",
+                (2, 3),
+                (3, 1),
+            ),
+            (
+                "4_1",
+                (4, 1),
+                (1, 1),
+            ),
+            (
+                "1_2",
+                (1, 3),
+                (3, 2),
+            ),
+            (
+                "1_3",
+                (1, 2),
+                (2, 3),
+            ),
+            # Following cases use torch.ops.aten.bmm.default
             # ("4_3", (3,1,3,2), (2,2,3)),
             # ("3_4", (3,1,3,2), (2,2,3)),
             # ("3_4", (2, 2, 3), (3, 1, 3, 3)),
             # ("4_2", (1, 2, 2, 3), (3, 2)),
         ]
     )
-    def test_matmul_other_constant(self, _, input_shape, other_shape):
+    def test_matmul_mm(self, _, input_shape, other_shape):
         class MatMul(nn.Module):
             def __init__(self):
                 super().__init__()
@@ -39,32 +65,43 @@ class TestMatMulConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
-            ("2_2", (2, 3), (3, 2)),
-            ("1_2", (1, 3), (3, 2)),
-            # FIXME torch.ops.aten.mv.default for (2,3), (3,1) - should mv be lowered to mm?
-            # (2,3), (3,) torch.ops.aten.mv.default
-            # Following cases use torch.ops.aten.bmm.defauly
-            # ("4_3", (3,1,3,2), (2,2,3)),
-            # ("3_4", (3,1,3,2), (2,2,3)),
-            # ("3_4", (2, 2, 3), (3, 1, 3, 3)),
-            # ("4_2", (1, 2, 2, 3), (3, 2)),
+            (
+                "1_1",
+                (1, 1),
+                (1,),
+            ),
+            (
+                "1_1",
+                (1, 2),
+                (2,),
+            ),
+            (
+                "2_1",
+                (2, 1),
+                (1,),
+            ),
+            (
+                "3_1",
+                (3, 4),
+                (4,),
+            ),
         ]
     )
-    def test_matmul_input_constant(self, _, input_shape, other_shape):
+    def test_matmul_mv(self, _, input_shape, other_shape):
         class MatMul(nn.Module):
             def __init__(self):
                 super().__init__()
-                self.input = nn.Parameter(torch.randn(*input_shape))
+                self.other = nn.Parameter(torch.randn(*other_shape))
 
-            def forward(self, other):
-                return torch.matmul(self.input, other)
+            def forward(self, input):
+                return torch.matmul(input, self.other)
 
-        inputs = [torch.randn(*other_shape)]
+        inputs = [torch.randn(*input_shape)]
 
         self.run_test(
             MatMul(),
             inputs,
-            expected_ops={torch.ops.aten.mm.default},
+            expected_ops={torch.ops.aten.mv.default},
         )
 
     @parameterized.expand(

@@ -205,3 +205,10 @@ Unroll Loops
     `torch/csrc/jit/passes/loop_unrolling.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/loop_unrolling.h>`_
 
 Unrolls the operations of compatable loops (e.g. sufficently short) so that you only have to go through the loop once.
+
+Replace Tile with Repeat
+***************************************
+
+    `Torch-TensorRT/core/lowering/passes/tile_to_repeat.cpp <https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/tile_to_repeat.cpp>`_
+
+Removes dropout operators since we are doing inference.

@@ -10,27 +10,34 @@ on:
 
 jobs:
   build-docs:
-    runs-on: ubuntu-latest
+    runs-on: linux.g5.4xlarge.nvidia.gpu
     container:
       image: docker.io/pytorch/manylinux-builder:cuda12.1
+      options: --gpus all
+    env:
+      CUDA_HOME: /usr/local/cuda-12.1
+      VERSION_SUFFIX: cu121
+      CI_BUILD: 1
     steps:
       - uses: actions/checkout@v3
         with:
           ref: ${{github.head_ref}}
-      - name: Select python
+      - name: Select Python / CUDA
         run: |
-          export PATH=/opt/python/cp311-cp311/bin/:$PATH
+          git config --global --add safe.directory /__w/TensorRT/TensorRT
+          echo "/opt/python/cp311-cp311/bin/" >> $GITHUB_PATH
+
       - name: Install base deps
         run: |
-          python3 -m pip install pyyaml
-          VERSION_SUFFIX=cu121 ./packaging/pre_build_script.sh
+          python3 -m pip install pip --upgrade
+          python3 -m pip install pyyaml numpy torch --pre --extra-index-url https://download.pytorch.org/whl/nightly/cu121
+          ./packaging/pre_build_script.sh
       - name: Get HEAD SHA
         id: vars
         run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
       - name: Build Python Package
         run: |
-          python3 -m pip install pip --upgrade
-          CUDA_HOME=/usr/local/cuda-12.1 CI_BUILD=1 python3 -m pip install --pre -e . --extra-index-url https://download.pytorch.org/whl/nightly/cu121
+          python3 -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu121
       - name: Generate New Docs
         run: |
           cd docsrc

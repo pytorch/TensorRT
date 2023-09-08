@@ -8,16 +8,18 @@ on:
 jobs:
   cut_nightly:
     runs-on: ubuntu-latest
+    environment: trigger-nightly
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v3
         with:
           ref: main
+          token: ${{ secrets.GH_PYTORCHBOT_TOKEN }}
       - name: Create nightly commit
         shell: bash
         run: |
-          git config --global user.email "torch-tensorrt.github.bot@nvidia.com"
-          git config --global user.name "Torch-TensorRT Github Bot"
+          git config --global user.email "pytorchbot@pytorch.com"
+          git config --global user.name "pytorchbot"
           git fetch origin nightly
           HEAD_COMMIT_HASH=$(git rev-parse HEAD)
           NIGHTLY_DATE=$(date +"%Y-%m-%d")

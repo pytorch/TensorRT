@@ -125,8 +125,7 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.renorm,
     aten.renorm_,
     aten.rot90,
-    aten.rsub.Scalar,
-    aten.rsub.Tensor,
+    aten.rsub,
     aten.select_backward,
     aten.select_scatter,
     aten.sgn,
@@ -175,6 +174,7 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.linalg_vector_norm,
     aten.full,
     aten.repeat,
+    aten.var_mean,
 }
 torch_disabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten._softmax.default,

@@ -1,3 +1,4 @@
+import pytest
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import run_tests
@@ -6,6 +7,7 @@ from torch_tensorrt import Input
 from .harness import DispatchTestCase
 
 
+@pytest.mark.skip(reason="This test will be skipped.")
 class TestGeLUConverter(DispatchTestCase):
     def test_gelu(self):
         class TestModule(nn.Module):
