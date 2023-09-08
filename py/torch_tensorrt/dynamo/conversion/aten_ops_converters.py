@@ -1291,7 +1291,7 @@ def aten_ops_convolution(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.linear)
+@dynamo_tensorrt_converter(torch.ops.aten.linear.default)
 def aten_ops_linear(
     network: TRTNetwork,
     target: Target,
