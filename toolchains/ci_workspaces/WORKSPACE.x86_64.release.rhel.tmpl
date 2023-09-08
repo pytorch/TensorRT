@@ -36,7 +36,7 @@ http_archive(
 # External dependency for torch_tensorrt if you already have precompiled binaries.
 local_repository(
     name = "torch_tensorrt",
-    path = "/opt/circleci/.pyenv/versions/3.10.9/lib/python3.10/site-packages/torch_tensorrt"
+    path = "${TORCHTRT_PATH}"
 )
 
 # CUDA should be installed on the system locally
