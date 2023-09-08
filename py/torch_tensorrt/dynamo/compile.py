@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import collections.abc
+import copy
 import logging
 import operator
-from typing import Any, List, Optional, Sequence, Set, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union, cast
 
 import torch
 import torch_tensorrt
+from torch._export.exported_program import CallSpec
+from torch._guards import detect_fake_mode
 from torch._subclasses.fake_tensor import FakeTensor
+from torch.export import ExportedProgram, ExportGraphSignature
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
     EngineCapability,
@@ -43,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 
 def compile(
-    gm: Any,
+    exported_program: ExportedProgram,
     inputs: Any,
     *,
     device: Optional[Union[Device, torch.device, str]] = DEVICE,
@@ -87,6 +91,7 @@ def compile(
         "enable_experimental_decompositions}"
     )
 
+    gm = exported_program.module()
     logger.debug("Post export graph: " + str(gm.graph))
 
     if not isinstance(inputs, collections.abc.Sequence):
@@ -137,7 +142,43 @@ def compile(
     logger.info("Compilation Settings: %s\n", settings)
     # Run constant folding before TRT compilation
     constant_fold(gm)
-    return compile_module(gm, torch_inputs, settings)
+    trt_gm = compile_module(gm, torch_inputs, settings)
+    trt_gm = lift_constant_pass(trt_gm)
+    trt_exp_program = create_trt_exp_program(
+        trt_gm, exported_program.call_spec, trt_gm.state_dict()
+    )
+
+    return trt_exp_program
+
+
+def lift_constant_pass(trt_gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+    fake_mode = detect_fake_mode(
+        tuple(
+            node.meta["val"] for node in trt_gm.graph.nodes if node.op == "placeholder"
+        )
+    )
+
+    first_user_input = None
+    for node in trt_gm.graph.nodes:
+        if node.op == "placeholder":
+            first_user_input = node
+            break
+
+    for node in trt_gm.graph.nodes:
+        if node.op == "get_attr":
+            constant_tensor = getattr(trt_gm, node.target)
+            with trt_gm.graph.inserting_before(first_user_input):
+                const_placeholder_node = trt_gm.graph.placeholder(node.target)
+                const_placeholder_node.meta = copy.deepcopy(node.meta)
+                const_placeholder_node.meta["val"] = fake_mode.from_tensor(
+                    constant_tensor
+                )
+                node.replace_all_uses_with(const_placeholder_node)
+                trt_gm.graph.erase_node(node)
+
+    trt_gm.graph.eliminate_dead_code()
+    trt_gm.graph.lint()
+    return trt_gm
 
 
 def compile_module(
@@ -243,6 +284,7 @@ def compile_module(
     inline_torch_submodules(partitioned_module)
 
     # Clean the graph
+    partitioned_module.delete_all_unused_submodules()
     partitioned_module.graph.eliminate_dead_code()
     partitioned_module.graph.lint()
 
@@ -250,25 +292,8 @@ def compile_module(
     if fast_partitioner_failed:
         settings.use_fast_partitioner = True
 
-    lower_attributes(partitioned_module)
     # import pdb; pdb.set_trace()
     return partitioned_module
-
-
-def lower_attributes(gm: torch.fx.GraphModule) -> None:
-    for node in gm.graph.nodes:
-        if node.op == "get_attr":
-            # import pdb; pdb.set_trace()
-            attribute_name = node.target
-            node.target = node.target.lower()
-            # node.name = node.name.lower()
-            attribute = getattr(gm, attribute_name)
-            # delete the existing attribute
-            delattr(gm, attribute_name)
-            if isinstance(attribute, torch.nn.Parameter):
-                gm.register_parameter(attribute_name.lower(), attribute)
-            else:
-                gm.register_buffer(attribute_name.lower(), attribute)
 
 
 def replace_trt_submodule(
@@ -410,7 +435,8 @@ def inline_torch_submodules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
                 gm_node.replace_all_uses_with(submodule_output)
 
                 # copy the attributes of the submodule into gm (graph_copy doesn't do this)
-                copy_submodule_attributes(submodule, gm)
+                copy_submodule_attributes(submodule, gm, gm_node.name)
+
             # Erase the pytorch submodule (call_module) node
             gm.graph.erase_node(gm_node)
 
@@ -418,23 +444,59 @@ def inline_torch_submodules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
 
 
 def copy_submodule_attributes(
-    submodule: torch.fx.GraphModule, gm: torch.fx.GraphModule
+    submodule: torch.fx.GraphModule, gm: torch.fx.GraphModule, submod_name: str
 ) -> None:
     """
     Copy the getattr attriibutes from submodule to parent module gm.
     The graph_copy call doesn't do this for us unfortunately.
     """
-    # Get the submodule attributes mapping
-    submodule_attrs = {}
-    for node in submodule.graph.nodes:
-        if node.op == "get_attr":
-            submodule_attr_target = node.target
-            submodule_attr = getattr(submodule, submodule_attr_target)
-            submodule_attrs[submodule_attr_target] = submodule_attr
-    # import pdb; pdb.set_trace()
-    # Set the submodule attributes mapping in gm
-    for target, attr in submodule_attrs.items():
-        if isinstance(attr, torch.nn.Parameter):
-            gm.register_parameter(target, attr)
-        else:
-            gm.register_buffer(target, attr)
+    for idx, param in enumerate(gm.named_parameters()):
+        if submod_name in param[0]:
+            attr_name = param[0].replace(submod_name + ".", "")
+            gm.register_parameter(attr_name, param[1])
+
+    for idx, buffer in enumerate(gm.named_buffers()):
+        if submod_name in buffer[0]:
+            attr_name = buffer[0].replace(submod_name + ".", "")
+            gm.register_buffer(attr_name, buffer[1])
+
+
+def create_trt_exp_program(
+    gm: torch.fx.GraphModule,
+    call_spec: CallSpec,
+    state_dict: Dict[str, Union[torch.Tensor, torch.nn.Parameter]],
+) -> ExportedProgram:
+    """Creates a new Exported Program. This function takes an torch.fx.GraphModule which has TRT engines
+    and constructs an Exported Program object with the new IO node names, call_spec and state_dict
+    """
+    input_node_names = [
+        node.name for node in gm.graph.nodes if node.op == "placeholder"
+    ]
+    output_node_names = [node.name for node in gm.graph.nodes if node.op == "output"]
+    param_names = [param[0] for param in gm.named_parameters()]
+    buffer_names = [buffer[0] for buffer in gm.named_buffers()]
+    inputs_to_parameters = {}
+    inputs_to_buffers = {}
+    for node in gm.graph.nodes:
+        if node.target in param_names:
+            inputs_to_parameters[node.name] = node.target
+        if node.target in buffer_names:
+            inputs_to_buffers[node.name] = node.target
+
+    trt_graph_signature = ExportGraphSignature(
+        parameters=param_names,
+        buffers=buffer_names,
+        user_inputs=input_node_names,
+        user_outputs=output_node_names,
+        inputs_to_parameters=inputs_to_parameters,
+        inputs_to_buffers=inputs_to_buffers,
+        buffers_to_mutate={},
+        backward_signature=None,
+        assertion_dep_token=None,
+    )
+
+    trt_exp_program = ExportedProgram(
+        gm, gm.graph, trt_graph_signature, call_spec, state_dict, {}, [], []
+    )
+
+    return trt_exp_program
