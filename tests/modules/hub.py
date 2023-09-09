@@ -1,12 +1,13 @@
+import json
+import os
+
+import custom_models as cm
+import timm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
-import timm
-from transformers import BertModel, BertTokenizer, BertConfig
-import os
-import json
-import custom_models as cm
+from transformers import BertConfig, BertModel, BertTokenizer
 
 torch.hub._validate_not_a_forked_repo = lambda a, b, c: True
 
@@ -50,10 +51,11 @@ models = {
         "model": timm.create_model("efficientnet_b0", pretrained=True),
         "path": "script",
     },
-    "vit": {
-        "model": timm.create_model("vit_base_patch16_224", pretrained=True),
-        "path": "script",
-    },
+    # NOTE: Disabling ViT until support in 3.11 is fixed https://github.com/huggingface/pytorch-image-models/issues/1946
+    # "vit": {
+    #     "model": timm.create_model("vit_base_patch16_224", pretrained=True),
+    #     "path": "script",
+    # },
     "pooling": {"model": cm.Pool(), "path": "trace"},
     "module_fallback": {"model": cm.ModuleFallbackMain(), "path": "script"},
     "loop_fallback_eval": {"model": cm.LoopFallbackEval(), "path": "script"},
