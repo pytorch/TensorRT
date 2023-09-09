@@ -2,6 +2,7 @@ import operator
 import warnings
 from typing import Any, Callable, Optional, Union
 
+import numpy as np
 import tensorrt as trt
 import torch
 from torch.fx.node import Target
@@ -26,12 +27,30 @@ def get_python_op_from_trt_elementwise_op(
         return operator.add
     elif trt_op == trt.ElementWiseOperation.PROD:
         return operator.mul
+    elif trt_op == trt.ElementWiseOperation.MAX:
+        return lambda a, b: max(a, b)
+    elif trt_op == trt.ElementWiseOperation.MIN:
+        return lambda a, b: min(a, b)
     elif trt_op == trt.ElementWiseOperation.SUB:
         return operator.sub
     elif trt_op == trt.ElementWiseOperation.DIV:
         return operator.truediv
+    elif trt_op == trt.ElementWiseOperation.POW:
+        return operator.pow
     elif trt_op == trt.ElementWiseOperation.FLOOR_DIV:
         return operator.floordiv
+    elif trt_op == trt.ElementWiseOperation.AND:
+        return lambda a, b: a and b
+    elif trt_op == trt.ElementWiseOperation.OR:
+        return lambda a, b: a or b
+    elif trt_op == trt.ElementWiseOperation.XOR:
+        return lambda a, b: (a or b) and not (a and b)
+    elif trt_op == trt.ElementWiseOperation.EQUAL:
+        return operator.eq
+    elif trt_op == trt.ElementWiseOperation.GREATER:
+        return operator.gt
+    elif trt_op == trt.ElementWiseOperation.LESS:
+        return operator.lt
     else:
         raise RuntimeError(f"{trt_op} is not supported yet!")
 
@@ -77,10 +96,10 @@ def convert_binary_elementwise(
     is_rhs_trt_tensor = False
 
     if isinstance(lhs_val, TRTTensor):
-        lhs_dtype = unified_dtype_converter(lhs_val.dtype, Frameworks.TORCH)
+        lhs_dtype = unified_dtype_converter(lhs_val.dtype, Frameworks.NUMPY)
         is_lhs_trt_tensor = True
     if isinstance(rhs_val, TRTTensor):
-        rhs_dtype = unified_dtype_converter(rhs_val.dtype, Frameworks.TORCH)
+        rhs_dtype = unified_dtype_converter(rhs_val.dtype, Frameworks.NUMPY)
         is_rhs_trt_tensor = True
 
     if not is_lhs_trt_tensor and not is_rhs_trt_tensor:
@@ -105,9 +124,9 @@ def convert_binary_elementwise(
     # dtype but we don't have a way to detect whether it makes sense for the
     # scalar to be float or half. Hence we go with the lhs dtype.
     if is_lhs_trt_tensor and isinstance(rhs_val, (float, int)):
-        rhs_val = torch.tensor([rhs_val], dtype=lhs_dtype)
+        rhs_val = np.array([rhs_val], dtype=lhs_dtype)
     if is_rhs_trt_tensor and isinstance(lhs_val, (float, int)):
-        lhs_val = torch.tensor([lhs_val], dtype=rhs_dtype)
+        lhs_val = np.array([lhs_val], dtype=rhs_dtype)
 
     # When lhs is scalar, and rhs has shape [1,], then currently the assert
     # will fail because lhs shape has fewer dimensions than rhs shape.  This
