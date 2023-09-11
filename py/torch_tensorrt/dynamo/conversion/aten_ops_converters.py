@@ -304,18 +304,12 @@ def aten_ops_neg(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = args[0]
-    if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
-    ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
-
     return impl.unary.neg(
         network,
         target,
         SourceIR.ATEN,
         name,
-        input_val,
+        args[0],
     )
 
 
