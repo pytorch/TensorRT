@@ -116,6 +116,33 @@ jobs:
         ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 10 conversion/
         popd
 
+  tracks-py-dynamo-converters:
+    name: Generate status for Dynamo converters [Python]
+    needs: [generate-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+    with:
+      job-name: tests-py-dynamo-converters
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      script: |
+        export USE_HOST_DEPS=1
+        pushd .
+        cd py/torch_tensorrt/dynamo/tools
+        ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest --use-deprecated=legacy-resolver
+        ${CONDA_RUN} python opset_coverage.py
+        popd
+
   tests-py-dynamo-fe:
     name: Test dynamo frontend [Python]
     needs: [generate-matrix, build]
