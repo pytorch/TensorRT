@@ -384,3 +384,15 @@ def isinf(
     return convert_unary(
         network, target, source_ir, name, trt.UnaryOperation.ISINF, input_val
     )
+
+
+def neg(
+    network: TRTNetwork,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+) -> TRTTensor:
+    return convert_unary(
+        network, target, source_ir, name, trt.UnaryOperation.NEG, input_val
+    )
