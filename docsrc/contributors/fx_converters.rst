@@ -15,8 +15,8 @@ The converters in dynamo are produced by ``aten_trace`` and falls under ``aten_o
 has the arguments - ``network, target, args, kwargs, name``,  which is common across all the operators schema.
 These functions are mapped in the ``aten`` converter registry dictionary (at present a compilation of FX and dynamo converters, FX will be deprecated soon), with key as the function target name.
     
-    * aten_trace is produced by ``torch_tensorrt.dynamo.backend.compile`` or  ``torch_tensorrt.dynamo.backend.export``.
-    The second round of trace in compile  produced by ``aot_torch_tensorrt_aten_backend`` by invoking ``aot_module_simplified`` from ``torch._functorch.aot_autograd``,
+    * aten_trace is produced by ``torch_tensorrt.dynamo.trace(..)`` for the export path and ``torch_tensorrt.compile(ir=dynamo)`` for the compile path.
+    The export path makes use of ``aten_tracer`` whereas the alternate trace in compile is produced by the AOT Autograd library.
     Both these simplify the torch operators to reduced set of Aten operations.
         
 
