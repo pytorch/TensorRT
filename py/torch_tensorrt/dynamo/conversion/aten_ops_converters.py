@@ -1256,7 +1256,6 @@ def aten_ops_less(
 
 
 def conv_param_validator(conv_node: Node) -> bool:
-    # Output padding and transposed convolutions not supported currently
     return (not conv_node.args[6]) and (conv_node.args[7] in ([0], [0, 0], [0, 0, 0]))
 
 
