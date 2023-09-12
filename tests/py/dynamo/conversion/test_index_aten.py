@@ -86,6 +86,54 @@ class TestIndexConverter(DispatchTestCase):
             expected_ops={torch.ops.aten.index.Tensor, operator.getitem},
         )
 
+    def test_index_zero_index_one_SD(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                index0 = torch.tensor([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7])
+                index1 = torch.tensor([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7])
+                indices = [None, index0, index1, None]
+                out = torch.ops.aten.index.Tensor(x, indices)
+                return out
+
+        input = [torch.randn(2, 1280, 8, 8)]
+        self.run_test(
+            TestModule(),
+            input,
+            expected_ops={torch.ops.aten.index.Tensor, operator.getitem},
+        )
+
+    def test_index_zero_index_one_SD_unsqueeze(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                index0 = torch.tensor([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7])
+                index1 = index0.unsqueeze(0).T.long()
+                indices = [None, None, index1, index1]
+                out = torch.ops.aten.index.Tensor(x, indices)
+                return out
+
+        input = [torch.randn(2, 1280, 8, 8)]
+        self.run_test(
+            TestModule(),
+            input,
+            expected_ops={torch.ops.aten.index.Tensor},
+        )
+
+    def test_index_zero_index_one_index_two_SD_unsqueeze(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                index0 = torch.tensor([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7])
+                index1 = index0.unsqueeze(0).T.long()
+                indices = [None, None, index0, index1]
+                out = torch.ops.aten.index.Tensor(x, indices)
+                return out
+
+        input = [torch.randn(2, 1280, 8, 8)]
+        self.run_test(
+            TestModule(),
+            input,
+            expected_ops={torch.ops.aten.index.Tensor},
+        )
+
 
 if __name__ == "__main__":
     run_tests()

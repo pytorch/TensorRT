@@ -6,6 +6,7 @@ import tensorrt as trt
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.converter_utils import broadcastable
 from torch_tensorrt.dynamo.conversion.impl.elementwise import convert_binary_elementwise
 from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
 from torch_tensorrt.fx.converters.converter_utils import (
@@ -85,12 +86,21 @@ def index(
     # check if the input is dynamic
     dynamic_shape = has_dynamic_shape(input.shape)
 
+    # here we need to check if all the index are broadcastable
+    # if no, then we need to broadcast
+
+    last_index = None
+    broadcast_shape_len = 0
     for i, ind in enumerate(index):
         if ind is not None:
             _LOGGER.debug(f"Shape of {i} index is {ind.shape}")
             adv_indx_indices.append(i)
             # torch.nn.parameter.Parameter=> torch.Tensor
             ind = get_trt_tensor(network, ind, f"parameter_to_fp32_tensor_{i}")
+            if last_index is not None:
+                if not (broadcastable(ind, last_index)):
+                    assert "The indices should be broadcastable"
+            last_index = ind
             tensor_indices.append(ind)
 
     if not tensor_indices:
