@@ -8,6 +8,7 @@ import torch
 from torch._export import export
 from torch_tensorrt.dynamo.backend.backends import constant_fold
 from torch_tensorrt.dynamo.lowering import get_decompositions
+from torch_tensorrt.dynamo.utils import set_log_level
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +19,9 @@ def trace(
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     # Set log level at the top of compilation (torch_tensorrt.dynamo)
-    if ("debug" in kwargs and kwargs["debug"]) and logger.parent:
-        logger.parent.setLevel(logging.DEBUG)
+    if "debug" in kwargs and kwargs["debug"]:
+        set_log_level(logger.parent, logging.DEBUG)
+
     experimental_decompositions = kwargs.get(
         "enable_experimental_decompositions", False
     )

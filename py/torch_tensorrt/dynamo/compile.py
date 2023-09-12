@@ -33,6 +33,7 @@ from torch_tensorrt.dynamo.conversion import (
 )
 from torch_tensorrt.dynamo.utils import (
     prepare_inputs,
+    set_log_level,
     to_torch_device,
     to_torch_tensorrt_device,
 )
@@ -72,8 +73,7 @@ def compile(
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     if debug:
-        if logger.parent:
-            logger.parent.setLevel(logging.DEBUG)
+        set_log_level(logger.parent, logging.DEBUG)
 
     enabled_precisions = set(enabled_precisions)
 

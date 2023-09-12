@@ -15,7 +15,7 @@ from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.compile import compile_module
 from torch_tensorrt.dynamo.lowering._decompositions import get_decompositions
 from torch_tensorrt.dynamo.lowering._pre_aot_lowering import pre_aot_substitutions
-from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs
+from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs, set_log_level
 
 from packaging import version
 
@@ -37,14 +37,11 @@ def torch_tensorrt_backend(
 ) -> torch.nn.Module:
     # Set log level at the top of compilation (torch_tensorrt.dynamo)
     if (
-        (
-            "options" in kwargs
-            and "debug" in kwargs["options"]
-            and kwargs["options"]["debug"]
-        )
-        or ("debug" in kwargs and kwargs["debug"])
-    ) and logger.parent:
-        logger.parent.setLevel(logging.DEBUG)
+        "options" in kwargs
+        and "debug" in kwargs["options"]
+        and kwargs["options"]["debug"]
+    ) or ("debug" in kwargs and kwargs["debug"]):
+        set_log_level(logger.parent, logging.DEBUG)
 
     DEFAULT_BACKEND = aot_torch_tensorrt_aten_backend
 
