@@ -81,13 +81,13 @@ def index(
 ) -> TRTTensor:
     adv_indx_indices = []
     tensor_indices = []
-    _LOGGER.debug(f"The index shape is", index.shape)
+    # _LOGGER.debug(f"The index shape is {index.shape}")
     # check if the input is dynamic
     dynamic_shape = has_dynamic_shape(input.shape)
 
-    for i in range(0, len(index)):
-        ind = index[i]
+    for i, ind in enumerate(index):
         if ind is not None:
+            _LOGGER.debug(f"Shape of {i} index is {ind.shape}")
             adv_indx_indices.append(i)
             # torch.nn.parameter.Parameter=> torch.Tensor
             ind = get_trt_tensor(network, ind, f"parameter_to_fp32_tensor_{i}")
@@ -108,7 +108,7 @@ def index(
         return gather_layer.get_output(0)
     else:
         input_shape = input.shape
-        _LOGGER.debug(f"The index shape is {input.shape}")
+        _LOGGER.debug(f"The input shape is {input.shape}")
         if dynamic_shape:
             input_shape = get_shape_with_dynamic_shape(
                 network, target, source_ir, name, input_shape, input
@@ -139,8 +139,7 @@ def index(
             if i not in adv_indx_indices:
                 new_order.append(i)
         _LOGGER.debug(f"The new transpose order is {new_order}")
-        permute_order = trt.Permutation(new_order)
-        transpose_layer.second_transpose = permute_order
+        transpose_layer.second_transpose = tuple(new_order)
         set_layer_name(transpose_layer, target, name + "_index_transpose", source_ir)
         transpose_tensor = transpose_layer.get_output(0)
 
@@ -176,13 +175,13 @@ def index(
             network, dim_tensor_list[adv_indx_indices[adv_indx_count - 1]], "dim_last"
         )
         cum_adv_index = tensor_indices[adv_indx_count - 1]
-        for i in range(adv_indx_count - 2, 0):
+        for i in range(adv_indx_count - 2, -1, -1):
             adv_index = convert_binary_elementwise(
                 network,
                 target,
                 source_ir,
                 name + "index_intermediate",
-                trt.ElementWisePROD,
+                trt.ElementWiseOperation.PROD,
                 multiplier,
                 tensor_indices[i],
             )
@@ -191,7 +190,7 @@ def index(
                 target,
                 source_ir,
                 name + "index_sum_intermediate",
-                trt.ElementWiseSUM,
+                trt.ElementWiseOperation.SUM,
                 cum_adv_index,
                 adv_index,
             )
@@ -200,9 +199,9 @@ def index(
                 target,
                 source_ir,
                 name + "index_intermediate",
-                trt.ElementWisePROD,
+                trt.ElementWiseOperation.PROD,
                 multiplier,
-                dim_tensor_list[adv_indx_count[i]],
+                dim_tensor_list[adv_indx_indices[i]],
             )
 
         gather_layer_element = network.add_gather(flatten_tensor, cum_adv_index, 0)
@@ -210,7 +209,7 @@ def index(
             gather_layer_element, target, name + "_index_gather_element", source_ir
         )
         gather_out = gather_layer_element.get_output(0)
-        _LOGGER.debug(f"The shape after cumultative gather is {new_order}")
+        _LOGGER.debug(f"The shape after cumultative gather is {gather_out.shape}")
         _LOGGER.debug(f"The shape for cumulative adv index is {cum_adv_index}")
 
         cum_adv_index_shape_layer = network.add_shape(cum_adv_index)
@@ -218,8 +217,8 @@ def index(
             cum_adv_index_shape_layer, target, name + "_cum_adv_index_shape", source_ir
         )
         cum_adv_index_shape_tensor = cum_adv_index_shape_layer.get_output(0)
-
         cum_adv_index_shape = cum_adv_index.shape
+        _LOGGER.debug(f"The shape for cumulative adv index is {cum_adv_index_shape}")
         # check if all advanced indices are consecutive
         concat_tensor_reshape = []
         if (
@@ -248,7 +247,8 @@ def index(
                 source_ir,
             )
             unfold_tensor = regular_index_shuffle_layer.get_output(0)
-            _LOGGER.debug(f"Unfold tensor shape is {unfold_tensor.shape}")
+            _LOGGER.debug(f"The tensor is unfolded now")
+            _LOGGER.debug(f"The unfolded tensor shape is {unfold_tensor.shape}")
 
             # Transpose folded advanced indexed axis to its original location.
             transpose_advanced_shuffle_layer = network.add_shuffle(unfold_tensor)
@@ -256,15 +256,11 @@ def index(
             for i in range(1, adv_indx_indices[0] + 1):
                 new_order.append(i)
             new_order.append(0)
-            for i in range(adv_indx_indices[0] + 1, rank - adv_indx_count):
+            for i in range(adv_indx_indices[0] + 1, rank - adv_indx_count + 1):
                 new_order.append(i)
-            print("new_order is ====", new_order)
-            _LOGGER.debug(
-                f"The shape to be transposed to after cumulative gather is {new_order}"
-            )
+            _LOGGER.debug(f"Transposing the indices to correct position {new_order}")
 
-            permute_order = trt.Permutation(new_order)
-            transpose_advanced_shuffle_layer.second_transpose = permute_order
+            transpose_advanced_shuffle_layer.second_transpose = tuple(new_order)
             set_layer_name(
                 transpose_advanced_shuffle_layer,
                 target,
