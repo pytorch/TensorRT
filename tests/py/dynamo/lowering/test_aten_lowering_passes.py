@@ -55,5 +55,43 @@ class TestInputAsOutput(TestCase):
         torch._dynamo.reset()
 
 
+class TestLoweringPassMembership(TestCase):
+    def insert_at_end(self):
+        from torch_tensorrt.dynamo.lowering.passes import (
+            ATEN_LOWERING_PASSES,
+            add_lowering_pass,
+            remove_lowering_pass,
+        )
+
+        def identity_pass(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+            return gm
+
+        add_lowering_pass(identity_pass)
+
+        self.assertEqual(identity_pass, ATEN_LOWERING_PASSES.passes[-1])
+
+        remove_lowering_pass(-1)
+
+        self.assertNotIn(identity_pass, ATEN_LOWERING_PASSES.passes)
+
+    def insert_at_index(self):
+        from torch_tensorrt.dynamo.lowering.passes import (
+            ATEN_LOWERING_PASSES,
+            add_lowering_pass,
+            remove_lowering_pass,
+        )
+
+        def identity_pass(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+            return gm
+
+        add_lowering_pass(identity_pass, 0)
+
+        self.assertEqual(identity_pass, ATEN_LOWERING_PASSES.passes[0])
+
+        remove_lowering_pass(0)
+
+        self.assertNotIn(identity_pass, ATEN_LOWERING_PASSES.passes)
+
+
 if __name__ == "__main__":
     run_tests()

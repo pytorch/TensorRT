@@ -86,7 +86,23 @@ def repair_input_as_output(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
 # %%
 from torch_tensorrt.dynamo.lowering.passes import add_lowering_pass
 
+# Adds the lowering pass at the end of the pass list
 add_lowering_pass(repair_input_as_output)
+
+# Alternatively, specify an index to insert the lowering pass at a specific location
+add_lowering_pass(repair_input_as_output, 1)
+
+# To remove a lowering pass, specify the index of the pass to remove:
+from torch_tensorrt.dynamo.lowering.passes import remove_lowering_pass
+
+# Removes the lowering pass at index 1
+remove_lowering_pass(1)
+
+
+# To view all lowering passes, in the order they will be run, use the following
+from torch_tensorrt.dynamo.lowering.passes import dump_lowering_passes
+
+print(dump_lowering_passes())
 
 # %%
 # 3. Apply Available Lowering Passes
