@@ -7,17 +7,14 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_int_int_div_trt_tensor,
     cast_int_or_float_to_bool,
+    get_trt_tensor,
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
 )
 from torch_tensorrt.dynamo.conversion.impl.unary import sign
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
-from torch_tensorrt.fx.converters.converter_utils import (
-    get_trt_tensor,
-    set_layer_name,
-    squeeze_left,
-)
+from torch_tensorrt.fx.converters.converter_utils import set_layer_name, squeeze_left
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
