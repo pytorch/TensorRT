@@ -31,6 +31,7 @@ else:
 logger = logging.getLogger(__name__)
 
 
+@td.register_backend(name="tensorrt")  # type: ignore[misc]
 @td.register_backend(name="torch_tensorrt")  # type: ignore[misc]
 def torch_tensorrt_backend(
     gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor], **kwargs: Any
