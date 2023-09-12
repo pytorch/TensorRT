@@ -312,5 +312,13 @@ class Test64BitInput(TestCase):
         )
 
 
+class TestRegistration(TestCase):
+    def test_torch_tensorrt_registration(self):
+        self.assertIn("torch_tensorrt", torch._dynamo.list_backends())
+
+    def test_tensorrt_registration(self):
+        self.assertIn("tensorrt", torch._dynamo.list_backends())
+
+
 if __name__ == "__main__":
     run_tests()

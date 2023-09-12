@@ -20,7 +20,7 @@ from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs, set_log_level
 from packaging import version
 
 # Modify import location of utilities based on Torch version
-if version.parse(torch_tensorrt.sanitized_torch_version()) <= version.parse("2.1.0"):
+if version.parse(torch_tensorrt.sanitized_torch_version()) < version.parse("2.1.1"):
     from torch._inductor.freezing import ConstantFolder, replace_node_with_constant
 else:
     from torch._inductor.constant_folding import (
@@ -31,6 +31,7 @@ else:
 logger = logging.getLogger(__name__)
 
 
+@td.register_backend(name="tensorrt")  # type: ignore[misc]
 @td.register_backend(name="torch_tensorrt")  # type: ignore[misc]
 def torch_tensorrt_backend(
     gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor], **kwargs: Any

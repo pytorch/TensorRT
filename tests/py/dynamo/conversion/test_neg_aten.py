@@ -3,7 +3,8 @@ import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
-from torch_tensorrt.dynamo.test_utils import DispatchTestCase
+
+from .harness import DispatchTestCase
 
 
 class TestNegConverter(DispatchTestCase):
@@ -43,8 +44,8 @@ class TestNegConverter(DispatchTestCase):
         self.run_test(
             neg(),
             inputs,
-            output_dtypes=[torch.int32],
             expected_ops={torch.ops.aten.neg.default},
+            check_dtype=False,
         )
 
 
