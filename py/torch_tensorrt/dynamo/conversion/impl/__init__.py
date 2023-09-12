@@ -11,6 +11,7 @@ from . import (
     matmul,
     normalization,
     permutation,
+    pool,
     reduce,
     select,
     shape,
