@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import collections.abc
 import logging
 from typing import Any, List, Optional, Sequence, Set, Tuple, Union
 
@@ -86,9 +85,6 @@ def compile(
         "use_fast_partitioner, enable_experimental_decompositions, "
         "require_full_compilation}"
     )
-
-    if not isinstance(inputs, collections.abc.Sequence):
-        inputs = [inputs]
 
     device = to_torch_tensorrt_device(device)
 

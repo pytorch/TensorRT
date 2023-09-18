@@ -391,12 +391,6 @@ class Input(object):
             for t in ts
         ]
 
-    def set_torch_tensor(self, torch_tensor: torch.Tensor) -> None:
-        """
-        Set the user provided torch tensor for the Input class.
-        """
-        self.torch_tensor = torch_tensor
-
     def example_tensor(
         self, optimization_profile_field: Optional[str] = None
     ) -> torch.Tensor:
