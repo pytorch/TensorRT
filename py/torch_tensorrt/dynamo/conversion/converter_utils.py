@@ -1,13 +1,18 @@
 import functools
 import logging
 import re
-from typing import Any, Callable, List, Optional, Sequence, Tuple, Union, overload
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
 import tensorrt as trt
 import torch
 from torch import SymBool, SymFloat, SymInt
-from torch.fx.node import Target
+from torch.fx.node import Argument, Target
+from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion.converter_registry import (
+    ConverterImplSignature,
+    ConverterRegistry,
+)
 from torch_tensorrt.fx.converters.converter_utils import (
     Frameworks,
     get_axes_for_reduce_op,
@@ -15,9 +20,6 @@ from torch_tensorrt.fx.converters.converter_utils import (
     unified_dtype_converter,
 )
 from torch_tensorrt.fx.types import TRTDataType, TRTNetwork, TRTTensor
-
-from .._SourceIR import SourceIR
-from .converter_registry import ConverterRegistry
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -250,7 +252,7 @@ def cast_int_or_float_to_bool(
 
 def create_constant(
     network: TRTNetwork,
-    value: Union[int, float, np.ndarray, torch.Tensor],
+    value: Union[int, float, bool, np.ndarray, torch.Tensor],
     name: str,
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]],
 ) -> TRTTensor:
@@ -259,7 +261,7 @@ def create_constant(
     Args:
         network (TRTNetwork): A TensorRT network to which we want to add
             a constant layer.
-        value (Union[int, float, np.ndarray, torch.Tensor]): A literal value, Numpy array,
+        value (Union[int, float, bool, np.ndarray, torch.Tensor]): A literal value, Numpy array,
             or a PyTorch tensor that will be used as value of the added TensorRT Constant layer.
         name (str): Name of the added TensorRT Constant layer.
         dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
@@ -268,7 +270,7 @@ def create_constant(
         A TensorRT ITensor that represents the given value.
     """
     constant = network.add_constant(
-        (1,) if isinstance(value, (int, float)) else value.shape,
+        (1,) if isinstance(value, (int, float, bool)) else value.shape,
         to_numpy(value, dtype).copy(),
     )
     constant.name = name
@@ -295,20 +297,19 @@ def get_trt_tensor(
     Returns:
         A TensorRT ITensor that represents the given value.
     """
-    # TRT can not add constant for bool type. We do a work around to 1) cast it to int and 2)cast to bool later
-    # This is useful for logical operations which require input to be bool type
-    if isinstance(input_val, bool):
-        input_val = int(input_val)
-    elif isinstance(input_val, torch.Tensor) and (
-        input_val.dtype == torch.bool or input_val.dtype == torch.int64
-    ):
-        input_val = input_val.to(torch.int32)
-    elif isinstance(input_val, np.ndarray) and (
-        input_val.dtype == np.bool_ or input_val.dtype == np.int64
-    ):
-        input_val = input_val.astype(np.int32)
+    # If the input is 64-bit, cast it to 32-bit for TRT freezing
+    if isinstance(input_val, torch.Tensor):
+        if input_val.dtype == torch.int64:
+            input_val = input_val.to(torch.int32)
+        elif input_val.dtype == torch.float64:
+            input_val = input_val.to(torch.float32)
+    elif isinstance(input_val, np.ndarray):
+        if input_val.dtype == np.int64:
+            input_val = input_val.astype(np.int32)
+        elif input_val.dtype == np.float64:
+            input_val = input_val.astype(np.float32)
 
-    if isinstance(input_val, (torch.Tensor, np.ndarray, int, float)):
+    if isinstance(input_val, (torch.Tensor, np.ndarray, int, float, bool)):
         return create_constant(network, input_val, name, dtype)
     elif isinstance(input_val, TRTTensor):
         return input_val
@@ -352,3 +353,95 @@ def get_positive_dim(
         if isinstance(dim, int)
         else tuple(positive_dim(d) for d in dim)
     )
+
+
+def enforce_tensor_types(
+    type_dictionary: Dict[Union[int, str], Tuple[Union[TRTTensor, np.ndarray], ...]],
+    promote: bool = True,
+) -> Callable[[ConverterImplSignature], ConverterImplSignature]:
+    """Decorator to enforce tensor types for input arguments to converters
+
+    Keys in the type dictionary must be integers if they refer to a positional
+    argument in args, or strings if they refer to a keyword argument in kwargs
+
+    Values must be tuples of data types denoting the approved data types for a given position
+    The approved types are TRTTensor, np.ndarray, and torch.Tensor.
+
+    Note: torch.Tensor cannot be present without np.ndarray
+
+    The promote argument controls whether tensors will be promoted if they are of the
+    incorrect format
+    """
+    assert all(
+        isinstance(key, (int, str)) for key in type_dictionary
+    ), "Invalid key for type enforcement"
+    assert all(
+        (
+            isinstance(val, tuple)
+            and not (torch.Tensor in val and np.ndarray not in val)
+            and all((dtype in (TRTTensor, np.ndarray, torch.Tensor)) for dtype in val)
+        )
+        for val in type_dictionary.values()
+    ), "Invalid value(s) specified in type enforcement"
+
+    def wrapper(func: ConverterImplSignature) -> ConverterImplSignature:
+        @functools.wraps(func)
+        def convert_with_type_enforcement(
+            network: TRTNetwork,
+            target: Target,
+            args: Tuple[Argument, ...],
+            kwargs: Dict[str, Argument],
+            name: str,
+        ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+            new_args = args
+            new_kwargs = {**kwargs}
+            new_value = None
+
+            # Go through type dictionary and promote types accordingly
+            for index, approved_dtypes in type_dictionary.items():
+                # Referencing an arg
+                if isinstance(index, int):
+                    candidate = args[index]
+                # Referencing a kwarg
+                elif isinstance(index, str):
+                    candidate = kwargs[index]
+
+                # If the candidate Tensor is already an approved type, do nothing
+                if isinstance(candidate, approved_dtypes):
+                    continue
+                # If the candidate Tensor is not an approved type, but promotion is disabled, error
+                elif not promote:
+                    raise AssertionError(
+                        f"Detected argument at index {index} had type {type(candidate)} "
+                        f"which is not one of the approved types {approved_dtypes}"
+                    )
+                # Numpy arrays are preferred in general - if approved, promote to Numpy first
+                elif np.ndarray in approved_dtypes and not isinstance(
+                    candidate, TRTTensor
+                ):
+                    new_value = to_numpy(candidate)
+                # As a fallback, freeze tensors to IConstantLayers if they cannot be handled as Numpy arrays
+                elif TRTTensor in approved_dtypes:
+                    _LOGGER.debug(
+                        f"Freezing tensor {name}_constant_{index} to TRT IConstantLayer"
+                    )
+                    new_value = get_trt_tensor(
+                        network, candidate, name + f"_constant_{index}"
+                    )
+                else:
+                    raise AssertionError(
+                        f"Argument at index {index} was not able to be converted to one of "
+                        f"the following types: {approved_dtypes}"
+                    )
+
+                # Reassemble args or kwargs if the value was modified
+                if isinstance(index, int):
+                    new_args = new_args[:index] + (new_value,) + new_args[index + 1 :]
+                elif isinstance(index, str):
+                    new_kwargs[index] = new_value
+
+            return func(network, target, new_args, new_kwargs, name)
+
+        return convert_with_type_enforcement
+
+    return wrapper

@@ -67,7 +67,7 @@ def dynamo_tensorrt_converter(
     enabled: bool = True,
     capability_validator: Optional[Callable[[Node], bool]] = None,
     priority: ConverterPriority = ConverterPriority.STANDARD,
-) -> Callable[[Any], Union[TRTTensor, Sequence[TRTTensor]]]:
+) -> Callable[[ConverterImplSignature], ConverterImplSignature]:
     """Decorator for Dynamo TensorRT Converter
 
     Registers the decorated function in the DYNAMO_ATEN_CONVERTERS registry
