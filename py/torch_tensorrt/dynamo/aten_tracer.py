@@ -10,7 +10,7 @@ from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo.backend.backends import constant_fold
 from torch_tensorrt.dynamo.lowering import get_decompositions
-from torch_tensorrt.dynamo.utils import get_torch_inputs, to_torch_device
+from torch_tensorrt.dynamo.utils import get_torch_inputs, set_log_level, to_torch_device
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +21,8 @@ def trace(
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     # Set log level at the top of compilation (torch_tensorrt.dynamo)
-    if ("debug" in kwargs and kwargs["debug"]) and logger.parent:
-        logger.parent.setLevel(logging.DEBUG)
+    if "debug" in kwargs and kwargs["debug"]:
+        set_log_level(logger.parent, logging.DEBUG)
 
     # Determine the dynamic dimension and setup constraints to input dimensions as dictated by TensorRT
     # Torch dynamo does not allow 0/1 value for dynamic dimensions
