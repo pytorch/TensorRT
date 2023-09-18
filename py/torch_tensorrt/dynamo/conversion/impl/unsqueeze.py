@@ -2,9 +2,9 @@ from typing import Optional, cast
 
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
 from torch_tensorrt.fx.converters.converter_utils import (
     get_positive_dim,
-    get_trt_tensor,
     set_layer_name,
 )
 from torch_tensorrt.fx.types import Shape, TRTNetwork, TRTTensor

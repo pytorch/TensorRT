@@ -9,38 +9,48 @@
   <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Template Class Int8CacheCalibrator &mdash; Torch-TensorRT v2.2.0.dev0+bcf7641 documentation</title>
+  
 
-  <title>Template Class Int8CacheCalibrator &mdash; Torch-TensorRT v1.4.0+7d1d80773 documentation</title>
+  
+  
+  
+  
 
+  
 
+  
+  
+    
 
-
-
-
-
-
-
-
-
-
-
-
+  
 
   <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!-- <link rel="stylesheet" href="../_static/pygments.css" type="text/css" /> -->
   <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
   <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery-binder.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery-dataframe.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery-rendered-html.css" type="text/css" />
   <link rel="stylesheet" href="../_static/collapsible-lists/css/tree_view.css" type="text/css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Template Class Int8Calibrator" href="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html" />
     <link rel="prev" title="Class Device::DeviceType" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html" />
-  <!-- Google Analytics -->
+  <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','');</script>
+    <!-- End Google Tag Manager -->
+  
 
-  <!-- End Google Analytics -->
-
-
-
+  
   <script src="../_static/js/modernizr.min.js"></script>
 
   <!-- Preload the theme fonts -->
@@ -196,9 +206,9 @@
 
 <body class="pytorch-body">
 
+   
 
-
-
+    
 
     <div class="table-of-contents-link-wrapper">
       <span>Table of Contents</span>
@@ -209,21 +219,21 @@
       <div class="pytorch-side-scroll">
         <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           <div class="pytorch-left-menu-search">
+            
 
-
-
-
-
+            
+              
+              
                 <div class="version">
-                  v1.4.0+7d1d80773
+                  v2.2.0.dev0+bcf7641
                 </div>
+              
+            
+
+            
 
 
-
-
-
-
-
+  
 
 
 <div role="search">
@@ -234,15 +244,15 @@
   </form>
 </div>
 
-
+            
           </div>
 
-
-
-
-
-
-
+          
+            
+            
+              
+            
+            
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
@@ -251,18 +261,24 @@
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_windows.html#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
 </ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/using_dla.html">DLA</a></li>
+</ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/ptq.html">Post Training Quantization (PTQ)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/using_dla.html">DLA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Example notebooks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
 <ul>
@@ -295,8 +311,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
 </ul>
 
-
-
+            
+          
         </div>
       </div>
     </nav>
@@ -304,7 +320,7 @@
     <div class="pytorch-container">
       <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
         <div class="pytorch-breadcrumbs-wrapper">
-
+          
 
 
 
@@ -323,32 +339,32 @@
 <div role="navigation" aria-label="breadcrumbs navigation">
 
   <ul class="pytorch-breadcrumbs">
-
+    
       <li>
         <a href="../index.html">
-
+          
             Docs
-
+          
         </a> &gt;
       </li>
 
-
+        
           <li><a href="torch_tensort_cpp.html">Torch-TensorRT C++ API</a> &gt;</li>
-
+        
       <li>Template Class Int8CacheCalibrator</li>
-
-
+    
+    
       <li class="pytorch-breadcrumbs-aside">
-
-
+        
+            
             <a href="../_sources/_cpp_api/classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
-
-
+          
+        
       </li>
-
+    
   </ul>
 
-
+  
 </div>
         </div>
 
@@ -360,13 +376,17 @@
       <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
         <div class="pytorch-content-left">
 
-
-
+        
+          <!-- Google Tag Manager (noscript) -->
+          <noscript><iframe src="https://www.googletagmanager.com/ns.html?id="
+          height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+          <!-- End Google Tag Manager (noscript) -->
+          
           <div class="rst-content">
-
+          
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
-
+              
   <section id="template-class-int8cachecalibrator">
 <span id="exhale-class-classtorch-tensorrt-1-1ptq-1-1int8cachecalibrator"></span><h1>Template Class Int8CacheCalibrator<a class="headerlink" href="#template-class-int8cachecalibrator" title="Permalink to this headline">¶</a></h1>
 <ul class="simple">
@@ -389,7 +409,7 @@
 <dd><p>Generic <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html#classtorch__tensorrt_1_1ptq_1_1Int8Calibrator"><span class="std std-ref">Int8Calibrator</span></a> implementation based on a specified TensorRT calibration algorithm that only reads from a calibration file. </p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters</dt>
-<dd class="field-odd"><p><strong>Algorithm</strong> – class nvinfer1::IInt8Calibrator (Default: nvinfer1::IInt8EntropyCalibrator2) - Algorithm to use </p>
+<dd class="field-odd"><p><strong>Algorithm, :</strong> – class nvinfer1::IInt8Calibrator (Default: nvinfer1::IInt8EntropyCalibrator2) - Algorithm to use </p>
 </dd>
 </dl>
 <div class="breathe-sectiondef docutils container">
@@ -406,8 +426,8 @@
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4NK14torch_tensorrt3ptq19Int8CacheCalibrator12getBatchSizeEv">
-<span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator_1ab118606e734d860a0689fabb8e08447c"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">getBatchSize</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4NK14torch_tensorrt3ptq19Int8CacheCalibrator12getBatchSizeEv" title="Permalink to this definition">¶</a><br /></dt>
+<dt class="sig sig-object cpp">
+<span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator_1a2f3cf58c87c4303e0b5b21ee943b124e"></span><span class="sig-name descname"><span class="pre">inline</span> <span class="pre">int</span> <span class="pre">getBatchSize</span> <span class="pre">()</span> <span class="pre">const</span> <span class="pre">noexceptoverride</span></span></dt>
 <dd><p>Get the Batch Size for the next batch (always 1 due to issues with TRT and explicit batch) </p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns</dt>
@@ -417,16 +437,16 @@
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt3ptq19Int8CacheCalibrator8getBatchEA_PvA_PKci">
-<span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator_1a63ffe6457b752cf3405990158f2fac96"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">getBatch</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">bindings</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">names</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">nbBindings</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt3ptq19Int8CacheCalibrator8getBatchEA_PvA_PKci" title="Permalink to this definition">¶</a><br /></dt>
+<dt class="sig sig-object cpp">
+<span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator_1ae8f900f799e860caa48edfaeb5b9584b"></span><span class="sig-name descname"><span class="pre">inline</span> <span class="pre">bool</span> <span class="pre">getBatch</span> <span class="pre">(void</span> <span class="pre">*bindings[],</span> <span class="pre">const</span> <span class="pre">char</span> <span class="pre">*names[],</span> <span class="pre">int</span> <span class="pre">nbBindings)</span> <span class="pre">noexceptoverride</span></span></dt>
 <dd><p>Get the next Batch. </p>
 <p>Not used always returns false</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>bindings</strong> – void*[] - An array of binding pointers (fed in from TensorRT calibrator), these buffers should be filed with batch data for each input </p></li>
-<li><p><strong>names</strong> – const char*[] - Names of bindings </p></li>
-<li><p><strong>nbBindings</strong> – int - Number of bindings </p></li>
+<li><p><strong>bindings, :</strong> – void*[] - An array of binding pointers (fed in from TensorRT calibrator), these buffers should be filed with batch data for each input </p></li>
+<li><p><strong>names, :</strong> – const char*[] - Names of bindings </p></li>
+<li><p><strong>nbBindings, :</strong> – int - Number of bindings </p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
@@ -436,8 +456,8 @@
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt3ptq19Int8CacheCalibrator20readCalibrationCacheER6size_t">
-<span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator_1ad4b4808923d96f3cfe2e7616c1825cf0"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">readCalibrationCache</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">length</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt3ptq19Int8CacheCalibrator20readCalibrationCacheER6size_t" title="Permalink to this definition">¶</a><br /></dt>
+<dt class="sig sig-object cpp">
+<span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator_1a28563672df0203f2f8ccd968d08dfe7f"></span><span class="sig-name descname"><span class="pre">inline</span> <span class="pre">const</span> <span class="pre">void</span> <span class="pre">*</span> <span class="pre">readCalibrationCache</span> <span class="pre">(size_t</span> <span class="pre">&amp;length)</span> <span class="pre">noexceptoverride</span></span></dt>
 <dd><p>Read calibration cache. </p>
 <p>How to read from the calibration cache, only enabled if use_cache is set</p>
 <dl class="field-list simple">
@@ -451,15 +471,15 @@
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt3ptq19Int8CacheCalibrator21writeCalibrationCacheEPKv6size_t">
-<span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator_1a1a31513eea8017a31852afc9e49eddd9"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">writeCalibrationCache</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">cache</span></span>, <span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">length</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt3ptq19Int8CacheCalibrator21writeCalibrationCacheEPKv6size_t" title="Permalink to this definition">¶</a><br /></dt>
+<dt class="sig sig-object cpp">
+<span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator_1a349c3fefa4d0157abefe9bc9b9866b12"></span><span class="sig-name descname"><span class="pre">inline</span> <span class="pre">void</span> <span class="pre">writeCalibrationCache</span> <span class="pre">(const</span> <span class="pre">void</span> <span class="pre">*cache,</span> <span class="pre">size_t</span> <span class="pre">length)</span> <span class="pre">noexceptoverride</span></span></dt>
 <dd><p>Write calibration cache. </p>
 <p>Write a the calibration cache provided by TensorRT to a specified file</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>cache</strong> – const void* - cache data </p></li>
-<li><p><strong>length</strong> – size_t - length of cache </p></li>
+<li><p><strong>cache, :</strong> – const void* - cache data </p></li>
+<li><p><strong>length, :</strong> – size_t - length of cache </p></li>
 </ul>
 </dd>
 </dl>
@@ -485,25 +505,25 @@
 
 
              </article>
-
+             
             </div>
             <footer>
-
+  
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-
+      
         <a href="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html" class="btn btn-neutral float-right" title="Template Class Int8Calibrator" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
-
-
+      
+      
         <a href="classtorch__tensorrt_1_1Device_1_1DeviceType.html" class="btn btn-neutral" title="Class Device::DeviceType" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
-
+      
     </div>
+  
 
-
-
+  
 
     <hr>
 
-
+  
 
   <div role="contentinfo">
     <p>
@@ -511,11 +531,11 @@
 
     </p>
   </div>
-
+    
       <div>
         Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
       </div>
-
+     
 
 </footer>
 
@@ -542,12 +562,12 @@
       </section>
     </div>
 
+  
 
 
+  
 
-
-
-
+     
        <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
          <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
          <script src="../_static/jquery.js"></script>
@@ -556,9 +576,9 @@
          <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
          <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
          <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+     
 
-
-
+  
 
   <script type="text/javascript" src="../_static/js/vendor/popper.min.js"></script>
   <script type="text/javascript" src="../_static/js/vendor/bootstrap.min.js"></script>
@@ -569,7 +589,7 @@
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
   <!-- Begin Footer -->
 
@@ -633,7 +653,7 @@
             <li><a href="https://twitter.com/pytorch" target="_blank">Twitter</a></li>
             <li><a href="https://www.youtube.com/pytorch" target="_blank">YouTube</a></li>
             <li><a href="https://www.linkedin.com/company/pytorch" target="_blank">LinkedIn</a></li>
-          </ul>
+          </ul>  
           </div>
 
         <div class="footer-links-col">
@@ -646,7 +666,7 @@
           </ul>
          </div>
         </div>
-
+        
         <div class="privacy-policy">
           <ul>
             <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/terms/" target="_blank">Terms</a></li>
@@ -696,7 +716,7 @@
           <li>
             <a href="https://pytorch.org/ecosystem">Ecosystem</a>
           </li>
-
+            
           <li>
             <a href="https://pytorch.org/mobile">Mobile</a>
           </li>
@@ -758,7 +778,7 @@
           <li class="resources-mobile-menu-title">
             Resources
           </li>
-
+            
            <ul class="resources-mobile-menu-items">
 
             <li>

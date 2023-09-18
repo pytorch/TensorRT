@@ -265,7 +265,7 @@ class Input(object):
                 return _enums.TensorFormat.channels_last
             else:
                 raise ValueError(
-                    "Provided an unsupported tensor format (support: NHCW/contiguous_format, NHWC/channel_last)"
+                    "Provided an unsupported tensor format (support: NCHW/contiguous_format, NHWC/channel_last)"
                 )
 
         elif isinstance(format, _enums.TensorFormat):

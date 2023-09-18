@@ -1,9 +1,11 @@
+from copy import deepcopy
+
 import torch
 import torch_tensorrt
+from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo.partitioning import fast_partition
-from torch.testing._internal.common_utils import run_tests, TestCase
-from copy import deepcopy
-from utils import lower_graph_testing, DECIMALS_OF_AGREEMENT
+
+from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
 
 class TestTRTModuleNextCompilation(TestCase):
@@ -308,6 +310,14 @@ class Test64BitInput(TestCase):
             DECIMALS_OF_AGREEMENT,
             f"TRT outputs don't match with the original model.",
         )
+
+
+class TestRegistration(TestCase):
+    def test_torch_tensorrt_registration(self):
+        self.assertIn("torch_tensorrt", torch._dynamo.list_backends())
+
+    def test_tensorrt_registration(self):
+        self.assertIn("tensorrt", torch._dynamo.list_backends())
 
 
 if __name__ == "__main__":

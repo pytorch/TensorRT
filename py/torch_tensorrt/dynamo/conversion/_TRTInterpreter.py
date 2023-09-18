@@ -13,7 +13,10 @@ from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch.utils._python_dispatch import _disable_current_modes
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo.conversion.converter_utils import get_node_name
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    get_node_name,
+    get_trt_tensor,
+)
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
@@ -361,8 +364,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             outputs = (args[0],)
 
         for output_idx in range(len(outputs)):
-            from torch_tensorrt.fx.converters import get_trt_tensor
-
             output = outputs[output_idx]
 
             if not isinstance(output, trt.tensorrt.ITensor):

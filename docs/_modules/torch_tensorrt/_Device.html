@@ -6,24 +6,24 @@
 <!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
 <head>
   <meta charset="utf-8">
-
+  
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>torch_tensorrt._Device &mdash; Torch-TensorRT v2.2.0.dev0+bcf7641 documentation</title>
+  
 
-  <title>torch_tensorrt._Device &mdash; Torch-TensorRT v1.5.0.dev0+9eabefd1a documentation</title>
+  
+  
+  
+  
 
+  
 
+  
+  
+    
 
-
-
-
-
-
-
-
-
-
-
-
+  
 
   <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <!-- <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" /> -->
@@ -34,14 +34,20 @@
   <link rel="stylesheet" href="../../_static/sg_gallery-dataframe.css" type="text/css" />
   <link rel="stylesheet" href="../../_static/sg_gallery-rendered-html.css" type="text/css" />
   <link rel="stylesheet" href="../../_static/collapsible-lists/css/tree_view.css" type="text/css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-  <!-- Google Analytics -->
+  <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','');</script>
+    <!-- End Google Tag Manager -->
+  
 
-  <!-- End Google Analytics -->
-
-
-
+  
   <script src="../../_static/js/modernizr.min.js"></script>
 
   <!-- Preload the theme fonts -->
@@ -197,9 +203,9 @@
 
 <body class="pytorch-body">
 
+   
 
-
-
+    
 
     <div class="table-of-contents-link-wrapper">
       <span>Table of Contents</span>
@@ -210,21 +216,21 @@
       <div class="pytorch-side-scroll">
         <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           <div class="pytorch-left-menu-search">
+            
 
-
-
-
-
+            
+              
+              
                 <div class="version">
-                  v1.5.0.dev0+9eabefd1a
+                  v2.2.0.dev0+bcf7641
                 </div>
+              
+            
+
+            
 
 
-
-
-
-
-
+  
 
 
 <div role="search">
@@ -235,15 +241,15 @@
   </form>
 </div>
 
-
+            
           </div>
 
-
-
-
-
-
-
+          
+            
+            
+              
+            
+            
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
@@ -267,6 +273,9 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/notebooks.html">Example notebooks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
 <ul>
@@ -299,8 +308,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../indices/supported_ops.html">Operators Supported</a></li>
 </ul>
 
-
-
+            
+          
         </div>
       </div>
     </nav>
@@ -308,7 +317,7 @@
     <div class="pytorch-container">
       <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
         <div class="pytorch-breadcrumbs-wrapper">
-
+          
 
 
 
@@ -327,28 +336,28 @@
 <div role="navigation" aria-label="breadcrumbs navigation">
 
   <ul class="pytorch-breadcrumbs">
-
+    
       <li>
         <a href="../../index.html">
-
+          
             Docs
-
+          
         </a> &gt;
       </li>
 
-
+        
           <li><a href="../index.html">Module code</a> &gt;</li>
-
+        
       <li>torch_tensorrt._Device</li>
-
-
+    
+    
       <li class="pytorch-breadcrumbs-aside">
-
+        
       </li>
-
+    
   </ul>
 
-
+  
 </div>
         </div>
 
@@ -360,24 +369,36 @@
       <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
         <div class="pytorch-content-left">
 
-
-
+        
+          <!-- Google Tag Manager (noscript) -->
+          <noscript><iframe src="https://www.googletagmanager.com/ns.html?id="
+          height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+          <!-- End Google Tag Manager (noscript) -->
+          
           <div class="rst-content">
-
+          
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
-
+              
   <h1>Source code for torch_tensorrt._Device</h1><div class="highlight"><pre>
-<span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span></span><span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span> <span class="o">&gt;=</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">11</span><span class="p">):</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Self</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">typing_extensions</span> <span class="kn">import</span> <span class="n">Self</span>
+
+<span class="kn">import</span> <span class="nn">warnings</span>
 
 <span class="c1"># from torch_tensorrt import _enums</span>
 <span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
+<span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt</span> <span class="kn">import</span> <span class="n">logging</span>
-<span class="kn">import</span> <span class="nn">warnings</span>
 
 <span class="k">try</span><span class="p">:</span>
     <span class="kn">from</span> <span class="nn">torch_tensorrt</span> <span class="kn">import</span> <span class="n">_C</span>
-<span class="k">except</span><span class="p">:</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
     <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
         <span class="s2">&quot;Unable to import torchscript frontend core and torch-tensorrt runtime. Some dependent features may be unavailable.&quot;</span>
     <span class="p">)</span>
@@ -394,12 +415,14 @@
 <span class="sd">        allow_gpu_fallback (bool): Whether falling back to GPU if DLA cannot support an op should be allowed</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="n">device_type</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1">#: (torch_tensorrt.DeviceType): Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.</span>
-    <span class="n">gpu_id</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1">#: (int) Device ID for target GPU</span>
-    <span class="n">dla_core</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1">#: (int) Core ID for target DLA core</span>
-    <span class="n">allow_gpu_fallback</span> <span class="o">=</span> <span class="kc">False</span>  <span class="c1">#: (bool) Whether falling back to GPU if DLA cannot support an op should be allowed</span>
+    <span class="n">device_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
+        <span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1">#: Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.</span>
+    <span class="n">gpu_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1">#: Device ID for target GPU</span>
+    <span class="n">dla_core</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1">#: Core ID for target DLA core</span>
+    <span class="n">allow_gpu_fallback</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>  <span class="c1">#: Whether falling back to GPU if DLA cannot support an op should be allowed</span>
 
-<div class="viewcode-block" id="Device.__init__"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Device.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<div class="viewcode-block" id="Device.__init__"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Device.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;__init__ Method for torch_tensorrt.Device</span>
 
 <span class="sd">        Device accepts one of a few construction patterns</span>
@@ -479,6 +502,9 @@
             <span class="p">)</span>
         <span class="p">)</span>
 
+    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="fm">__str__</span><span class="p">()</span>
+
     <span class="k">def</span> <span class="nf">_to_internal</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_C</span><span class="o">.</span><span class="n">Device</span><span class="p">:</span>
         <span class="n">internal_dev</span> <span class="o">=</span> <span class="n">_C</span><span class="o">.</span><span class="n">Device</span><span class="p">()</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_type</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">:</span>
@@ -497,45 +523,44 @@
 
     <span class="k">def</span> <span class="nf">_to_serialized_rt_device</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="n">internal_dev</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_internal</span><span class="p">()</span>
-        <span class="k">return</span> <span class="n">internal_dev</span><span class="o">.</span><span class="n">_to_serialized_rt_device</span><span class="p">()</span>
+        <span class="n">serialized_rt_device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">internal_dev</span><span class="o">.</span><span class="n">_to_serialized_rt_device</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">serialized_rt_device</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">_from_torch_device</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">torch_dev</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_from_torch_device</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">torch_dev</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">torch_dev</span><span class="o">.</span><span class="n">type</span> <span class="o">!=</span> <span class="s2">&quot;cuda&quot;</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Torch Device specs must have type &quot;cuda&quot;&#39;</span><span class="p">)</span>
         <span class="n">gpu_id</span> <span class="o">=</span> <span class="n">torch_dev</span><span class="o">.</span><span class="n">index</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">gpu_id</span><span class="o">=</span><span class="n">gpu_id</span><span class="p">)</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">_current_device</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="n">dev</span> <span class="o">=</span> <span class="n">_C</span><span class="o">.</span><span class="n">_get_current_device</span><span class="p">()</span>
-        <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
-            <span class="n">logging</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Level</span><span class="o">.</span><span class="n">Error</span><span class="p">,</span> <span class="s2">&quot;Cannot get current device&quot;</span><span class="p">)</span>
-            <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">def</span> <span class="nf">_current_device</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+        <span class="n">dev</span> <span class="o">=</span> <span class="n">_C</span><span class="o">.</span><span class="n">_get_current_device</span><span class="p">()</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">gpu_id</span><span class="o">=</span><span class="n">dev</span><span class="o">.</span><span class="n">gpu_id</span><span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">_parse_device_str</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_parse_device_str</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
         <span class="n">s</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
         <span class="n">spec</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;gpu&quot;</span> <span class="ow">or</span> <span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;cuda&quot;</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
         <span class="k">elif</span> <span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;dla&quot;</span><span class="p">:</span>
-            <span class="k">return</span> <span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span></div>
+            <span class="k">return</span> <span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">DLA</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown device type </span><span class="si">{</span><span class="n">spec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
 </pre></div>
 
              </article>
-
+             
             </div>
             <footer>
+  
 
-
-
+  
 
     <hr>
 
-
+  
 
   <div role="contentinfo">
     <p>
@@ -543,11 +568,11 @@
 
     </p>
   </div>
-
+    
       <div>
         Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
       </div>
-
+     
 
 </footer>
 
@@ -557,19 +582,19 @@
         <div class="pytorch-content-right" id="pytorch-content-right">
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
-
+              
             </div>
           </div>
         </div>
       </section>
     </div>
 
+  
 
 
+  
 
-
-
-
+     
        <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
          <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
          <script src="../../_static/jquery.js"></script>
@@ -578,9 +603,9 @@
          <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
          <script src="../../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
          <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+     
 
-
-
+  
 
   <script type="text/javascript" src="../../_static/js/vendor/popper.min.js"></script>
   <script type="text/javascript" src="../../_static/js/vendor/bootstrap.min.js"></script>
@@ -591,7 +616,7 @@
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
   <!-- Begin Footer -->
 
@@ -655,7 +680,7 @@
             <li><a href="https://twitter.com/pytorch" target="_blank">Twitter</a></li>
             <li><a href="https://www.youtube.com/pytorch" target="_blank">YouTube</a></li>
             <li><a href="https://www.linkedin.com/company/pytorch" target="_blank">LinkedIn</a></li>
-          </ul>
+          </ul>  
           </div>
 
         <div class="footer-links-col">
@@ -668,7 +693,7 @@
           </ul>
          </div>
         </div>
-
+        
         <div class="privacy-policy">
           <ul>
             <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/terms/" target="_blank">Terms</a></li>
@@ -718,7 +743,7 @@
           <li>
             <a href="https://pytorch.org/ecosystem">Ecosystem</a>
           </li>
-
+            
           <li>
             <a href="https://pytorch.org/mobile">Mobile</a>
           </li>
@@ -780,7 +805,7 @@
           <li class="resources-mobile-menu-title">
             Resources
           </li>
-
+            
            <ul class="resources-mobile-menu-items">
 
             <li>

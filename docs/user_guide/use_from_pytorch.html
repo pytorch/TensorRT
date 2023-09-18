@@ -9,22 +9,22 @@
   <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Using Torch-TensorRT Directly From PyTorch &mdash; Torch-TensorRT v2.2.0.dev0+bcf7641 documentation</title>
+  
 
-  <title>Using Torch-TensorRT Directly From PyTorch &mdash; Torch-TensorRT v1.5.0.dev0+9eabefd1a documentation</title>
+  
+  
+  
+  
 
+  
 
+  
+  
+    
 
-
-
-
-
-
-
-
-
-
-
-
+  
 
   <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!-- <link rel="stylesheet" href="../_static/pygments.css" type="text/css" /> -->
@@ -41,12 +41,16 @@
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="DLA" href="using_dla.html" />
     <link rel="prev" title="Deploying Torch-TensorRT Programs" href="runtime.html" />
-  <!-- Google Analytics -->
+  <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','');</script>
+    <!-- End Google Tag Manager -->
+  
 
-  <!-- End Google Analytics -->
-
-
-
+  
   <script src="../_static/js/modernizr.min.js"></script>
 
   <!-- Preload the theme fonts -->
@@ -202,9 +206,9 @@
 
 <body class="pytorch-body">
 
+   
 
-
-
+    
 
     <div class="table-of-contents-link-wrapper">
       <span>Table of Contents</span>
@@ -215,21 +219,21 @@
       <div class="pytorch-side-scroll">
         <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           <div class="pytorch-left-menu-search">
+            
 
-
-
-
-
+            
+              
+              
                 <div class="version">
-                  v1.5.0.dev0+9eabefd1a
+                  v2.2.0.dev0+bcf7641
                 </div>
+              
+            
+
+            
 
 
-
-
-
-
-
+  
 
 
 <div role="search">
@@ -240,15 +244,15 @@
   </form>
 </div>
 
-
+            
           </div>
 
-
-
-
-
-
-
+          
+            
+            
+              
+            
+            
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
@@ -272,9 +276,9 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Example notebooks</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/dynamo_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT Dyanmo Frontend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/dynamo_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/dynamo_compile_advanced_usage.html">Dynamo Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
 <ul>
@@ -307,8 +311,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
 </ul>
 
-
-
+            
+          
         </div>
       </div>
     </nav>
@@ -316,7 +320,7 @@
     <div class="pytorch-container">
       <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
         <div class="pytorch-breadcrumbs-wrapper">
-
+          
 
 
 
@@ -335,30 +339,30 @@
 <div role="navigation" aria-label="breadcrumbs navigation">
 
   <ul class="pytorch-breadcrumbs">
-
+    
       <li>
         <a href="../index.html">
-
+          
             Docs
-
+          
         </a> &gt;
       </li>
 
-
+        
       <li>Using Torch-TensorRT Directly From PyTorch</li>
-
-
+    
+    
       <li class="pytorch-breadcrumbs-aside">
-
-
+        
+            
             <a href="../_sources/user_guide/use_from_pytorch.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
-
-
+          
+        
       </li>
-
+    
   </ul>
 
-
+  
 </div>
         </div>
 
@@ -370,13 +374,17 @@
       <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
         <div class="pytorch-content-left">
 
-
-
+        
+          <!-- Google Tag Manager (noscript) -->
+          <noscript><iframe src="https://www.googletagmanager.com/ns.html?id="
+          height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+          <!-- End Google Tag Manager (noscript) -->
+          
           <div class="rst-content">
-
+          
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
-
+              
   <section id="using-torch-tensorrt-directly-from-pytorch">
 <span id="use-from-pytorch"></span><h1>Using Torch-TensorRT Directly From PyTorch<a class="headerlink" href="#using-torch-tensorrt-directly-from-pytorch" title="Permalink to this headline">¶</a></h1>
 <p>You will now be able to directly access TensorRT from PyTorch APIs. The process to use this feature
@@ -431,25 +439,25 @@ at the documentation for the Torch-TensorRT <code class="docutils literal notran
 
 
              </article>
-
+             
             </div>
             <footer>
-
+  
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-
+      
         <a href="using_dla.html" class="btn btn-neutral float-right" title="DLA" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
-
-
+      
+      
         <a href="runtime.html" class="btn btn-neutral" title="Deploying Torch-TensorRT Programs" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
-
+      
     </div>
+  
 
-
-
+  
 
     <hr>
 
-
+  
 
   <div role="contentinfo">
     <p>
@@ -457,11 +465,11 @@ at the documentation for the Torch-TensorRT <code class="docutils literal notran
 
     </p>
   </div>
-
+    
       <div>
         Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
       </div>
-
+     
 
 </footer>
 
@@ -481,12 +489,12 @@ at the documentation for the Torch-TensorRT <code class="docutils literal notran
       </section>
     </div>
 
+  
 
 
+  
 
-
-
-
+     
        <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
          <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
          <script src="../_static/jquery.js"></script>
@@ -495,9 +503,9 @@ at the documentation for the Torch-TensorRT <code class="docutils literal notran
          <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
          <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
          <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+     
 
-
-
+  
 
   <script type="text/javascript" src="../_static/js/vendor/popper.min.js"></script>
   <script type="text/javascript" src="../_static/js/vendor/bootstrap.min.js"></script>
@@ -508,7 +516,7 @@ at the documentation for the Torch-TensorRT <code class="docutils literal notran
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
+  </script> 
 
   <!-- Begin Footer -->
 
@@ -572,7 +580,7 @@ at the documentation for the Torch-TensorRT <code class="docutils literal notran
             <li><a href="https://twitter.com/pytorch" target="_blank">Twitter</a></li>
             <li><a href="https://www.youtube.com/pytorch" target="_blank">YouTube</a></li>
             <li><a href="https://www.linkedin.com/company/pytorch" target="_blank">LinkedIn</a></li>
-          </ul>
+          </ul>  
           </div>
 
         <div class="footer-links-col">
@@ -585,7 +593,7 @@ at the documentation for the Torch-TensorRT <code class="docutils literal notran
           </ul>
          </div>
         </div>
-
+        
         <div class="privacy-policy">
           <ul>
             <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/terms/" target="_blank">Terms</a></li>
@@ -635,7 +643,7 @@ at the documentation for the Torch-TensorRT <code class="docutils literal notran
           <li>
             <a href="https://pytorch.org/ecosystem">Ecosystem</a>
           </li>
-
+            
           <li>
             <a href="https://pytorch.org/mobile">Mobile</a>
           </li>
@@ -697,7 +705,7 @@ at the documentation for the Torch-TensorRT <code class="docutils literal notran
           <li class="resources-mobile-menu-title">
             Resources
           </li>
-
+            
            <ul class="resources-mobile-menu-items">
 
             <li>

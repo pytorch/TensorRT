@@ -64,6 +64,16 @@ def cosine_similarity(gt_tensor: torch.Tensor, pred_tensor: torch.Tensor) -> flo
     return res
 
 
+def set_log_level(parent_logger: Any, level: Any) -> None:
+    """
+    Sets the log level to the user provided level.
+    This is used to set debug logging at a global level
+    at entry points of tracing, dynamo and torch_compile compilation.
+    """
+    if parent_logger:
+        parent_logger.setLevel(level)
+
+
 def prepare_inputs(
     inputs: Input | torch.Tensor | Sequence[Any] | Dict[Any, Any],
     device: torch.device = torch.device("cuda"),
@@ -217,7 +227,15 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
             "If this is incorrect, please specify an input device, via the device keyword."
         )
 
-    logger.info(f"Compiling with Settings:\n{settings}")
+    # Ignore and warn about require_full_compilation flag
+    if settings.require_full_compilation:
+        logger.warning(
+            "Detected require_full_compilation=True for a torch.compile run. "
+            "This option has no effect in torch.compile."
+        )
+        settings.require_full_compilation = False
+
+    logger.info("Compilation Settings: %s\n", settings)
 
     return settings
 
