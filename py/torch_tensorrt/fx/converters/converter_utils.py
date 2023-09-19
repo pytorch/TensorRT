@@ -129,7 +129,6 @@ def set_layer_name(
         output = layer.get_output(i)
         output.name = f"[{output.name}]"
 
-
 def extend_attr_to_tuple(
     val: Any,
     num_elem: int,
