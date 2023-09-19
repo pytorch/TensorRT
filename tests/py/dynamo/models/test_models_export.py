@@ -1,17 +1,13 @@
-import torch
-import timm
-import pytest
 import unittest
 
+import pytest
+import timm
+import torch
 import torch_tensorrt as torchtrt
 import torchvision.models as models
-
+from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 from transformers import BertModel
-
-from torch_tensorrt.dynamo.utils import (
-    COSINE_THRESHOLD,
-    cosine_similarity,
-)
+from transformers.utils.fx import symbolic_trace as transformers_trace
 
 assertions = unittest.TestCase()
 
@@ -46,9 +42,6 @@ def test_resnet18(ir):
     # Clean up model env
     torch._dynamo.reset()
 
-    with torch.no_grad():
-        torch.cuda.empty_cache()
-
 
 @pytest.mark.unit
 def test_mobilenet_v2(ir):
@@ -79,9 +72,6 @@ def test_mobilenet_v2(ir):
 
     # Clean up model env
     torch._dynamo.reset()
-
-    with torch.no_grad():
-        torch.cuda.empty_cache()
 
 
 @pytest.mark.unit
@@ -114,8 +104,54 @@ def test_efficientnet_b0(ir):
     # Clean up model env
     torch._dynamo.reset()
 
-    with torch.no_grad():
-        torch.cuda.empty_cache()
+
+@pytest.mark.unit
+def test_bert_base_uncased(ir):
+    model = BertModel.from_pretrained("bert-base-uncased").cuda().eval()
+    input = torch.randint(0, 1, (1, 14), dtype=torch.int32).to("cuda")
+    input2 = torch.randint(0, 1, (1, 14), dtype=torch.int32).to("cuda")
+    model = (
+        transformers_trace(model, input_names=["input_ids", "attention_mask"])
+        .eval()
+        .cuda()
+    )
+
+    compile_spec = {
+        "inputs": [
+            torchtrt.Input(
+                input.shape,
+                dtype=input.dtype,
+                format=torch.contiguous_format,
+            ),
+            torchtrt.Input(
+                input.shape,
+                dtype=input.dtype,
+                format=torch.contiguous_format,
+            ),
+        ],
+        "device": torchtrt.Device("cuda:0"),
+        "enabled_precisions": {torch.float},
+        "truncate_long_and_double": True,
+        "ir": ir,
+        "min_block_size": 10,
+    }
+    trt_mod = torchtrt.compile(model, **compile_spec)
+    model_outputs = model(input, input2)
+    trt_model_outputs = trt_mod(input, input2)
+    assertions.assertTrue(
+        len(model_outputs) == len(trt_model_outputs),
+        msg=f"Number of outputs for BERT model compilation is different with Pytorch {len(model_outputs)} and TensorRT {len(trt_model_outputs)}. Please check the compilation.",
+    )
+    for index, key in enumerate(model_outputs):
+        out, trt_out = model_outputs[key], trt_model_outputs[index]
+        cos_sim = cosine_similarity(out, trt_out)
+        assertions.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"HF BERT base-uncased TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
+
+    # Clean up model env
+    torch._dynamo.reset()
 
 
 @pytest.mark.unit
@@ -147,6 +183,3 @@ def test_resnet18_half(ir):
 
     # Clean up model env
     torch._dynamo.reset()
-
-    with torch.no_grad():
-        torch.cuda.empty_cache()
