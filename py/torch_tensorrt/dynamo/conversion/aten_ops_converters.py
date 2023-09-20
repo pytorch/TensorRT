@@ -59,14 +59,37 @@ def aten_ops_batch_norm(
         target,
         SourceIR.ATEN,
         name,
-        args[0],
-        args[1],
-        args[2],
-        args[3],
-        args[4],
-        args[5],
-        args[6],
-        args[7],
+        input=args[0],
+        weight=args_bounds_check(args, 1, replacement=1),
+        bias=args_bounds_check(args, 2, replacement=0),
+        running_mean=args_bounds_check(args, 3),
+        running_var=args_bounds_check(args, 4),
+        training=args_bounds_check(args, 5),
+        momentum=args_bounds_check(args, 6, replacement=0.1),
+        eps=args_bounds_check(args, 7, replacement=1e-05),
+        cudnn_enabled=args_bounds_check(args, 8, replacement=False),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.layer_norm.default)  # type: ignore[misc]
+def aten_ops_layer_norm(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.normalization.layer_norm(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        normalized_shape=args[1],
+        weight=args_bounds_check(args, 2, replacement=1),
+        bias=args_bounds_check(args, 3, replacement=0),
+        eps=args_bounds_check(args, 4, replacement=1e-05),
+        cudnn_enable=args_bounds_check(args, 5, replacement=True),
     )
 
 
@@ -325,27 +348,6 @@ def aten_ops_matmul(
         name,
         args[0],
         args[1],
-    )
-
-
-@dynamo_tensorrt_converter(torch.ops.aten.layer_norm.default)  # type: ignore[misc]
-def aten_ops_layernorm(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.normalization.layer_norm(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-        args[1],
-        args[2],
-        args[3],
-        args[4],
     )
 
 

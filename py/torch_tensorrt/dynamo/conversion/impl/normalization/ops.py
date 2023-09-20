@@ -36,6 +36,7 @@ def batch_norm(
     training: torch.Tensor,
     momentum: torch.Tensor,
     eps: List[float],
+    cudnn_enabled: bool,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if not isinstance(input, TRTTensor):
         raise RuntimeError(
@@ -69,7 +70,7 @@ def batch_norm(
                 input.shape[2],
                 1,
             )
-        set_layer_name(reshape_layer, target, f"{name}_reshape_2d")
+        set_layer_name(reshape_layer, target, f"{name}_reshape_2d", source_ir)
         input = reshape_layer.get_output(0)
     layer = ctx.net.add_scale(input, trt.ScaleMode.CHANNEL, bias, scale, power)
     set_layer_name(layer, target, name)
@@ -78,7 +79,7 @@ def batch_norm(
     if not ctx.net.has_implicit_batch_dimension and len(output_shape) < 4:
         reshape_output_layer = ctx.net.add_shuffle(layer.get_output(0))
         reshape_output_layer.reshape_dims = tuple(output_shape)
-        set_layer_name(reshape_output_layer, target, f"{name}_reshape_1d")
+        set_layer_name(reshape_output_layer, target, f"{name}_reshape_1d", source_ir)
         layer = reshape_output_layer
     return layer.get_output(0)
 
@@ -93,6 +94,7 @@ def layer_norm(
     weight: torch.Tensor,
     bias: torch.Tensor,
     eps: List[float],
+    cudnn_enable: bool,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if not isinstance(input, trt.tensorrt.ITensor):
         raise RuntimeError(
@@ -173,7 +175,7 @@ def layer_norm_no_plugin(
     mean_expected_layer = ctx.net.add_reduce(
         input, trt.ReduceOperation.AVG, axes, keep_dims=True
     )
-    set_layer_name(mean_expected_layer, target, f"{name}_mean_expected")
+    set_layer_name(mean_expected_layer, target, f"{name}_mean_expected", source_ir)
 
     # X-E[x]
     sub_trt = convert_binary_elementwise(
@@ -203,7 +205,7 @@ def layer_norm_no_plugin(
     mean_trt_layer = ctx.net.add_reduce(
         pow_var, trt.ReduceOperation.AVG, axes, keep_dims=True
     )
-    set_layer_name(mean_trt_layer, target, f"{name}_mean")
+    set_layer_name(mean_trt_layer, target, f"{name}_mean", source_ir)
     # Variance + eps
     eps_tensor = ctx.net.add_constant(
         (1,) * len(input.shape),
