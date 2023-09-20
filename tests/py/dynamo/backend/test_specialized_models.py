@@ -236,5 +236,42 @@ class TestTensorFreezing(TestCase):
         torch._dynamo.reset()
 
 
+class TestPacketOperator(TestCase):
+    def test_packet_operator(self):
+        class PacketAsOperator(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.tanh(x)
+
+        # Operations expected to be removed in the traced graph
+        expected_ops = {torch.ops.aten.tanh.default}
+        unexpected_ops = {
+            torch.ops.aten.tanh,
+        }
+
+        inputs = [torch.rand((3, 5)).cuda()]
+
+        fx_graph = torch.fx.symbolic_trace(PacketAsOperator())
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEquals(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEquals(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+        torch._dynamo.reset()
+
+
 if __name__ == "__main__":
     run_tests()
