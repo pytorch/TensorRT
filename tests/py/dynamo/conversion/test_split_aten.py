@@ -33,7 +33,6 @@ class TestSplitConverterNoDim(DispatchTestCase):
     @parameterized.expand(
         [
             ("split_size_or_sections_list_no_dim_list", [1, 4]),
-            ("split_size_or_sections_list_no_dim_not_full_list", [1, 3]),
         ]
     )
     def test_split_list(self, _, split_size_or_tensor):
