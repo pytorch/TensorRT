@@ -11,11 +11,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_trt_tensor,
 )
-from torch_tensorrt.fx.converters.converter_utils import (
-    broadcast,
-    set_layer_name,
-    squeeze_left,
-)
+from torch_tensorrt.fx.converters.converter_utils import broadcast, set_layer_name
 from torch_tensorrt.fx.types import TRTElementWiseOp, TRTNetwork, TRTTensor
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
@@ -96,10 +92,10 @@ def convert_binary_elementwise(
     is_rhs_trt_tensor = False
 
     if isinstance(lhs_val, TRTTensor):
-        lhs_dtype = unified_dtype_converter(lhs_val.dtype, Frameworks.NUMPY)
+        lhs_dtype = lhs_val.dtype
         is_lhs_trt_tensor = True
     if isinstance(rhs_val, TRTTensor):
-        rhs_dtype = unified_dtype_converter(rhs_val.dtype, Frameworks.NUMPY)
+        rhs_dtype = rhs_val.dtype
         is_rhs_trt_tensor = True
 
     if not is_lhs_trt_tensor and not is_rhs_trt_tensor:
@@ -124,23 +120,13 @@ def convert_binary_elementwise(
     # dtype but we don't have a way to detect whether it makes sense for the
     # scalar to be float or half. Hence we go with the lhs dtype.
     if is_lhs_trt_tensor and isinstance(rhs_val, (float, int)):
-        rhs_val = np.array([rhs_val], dtype=lhs_dtype)
+        rhs_val = np.array(
+            [rhs_val], dtype=unified_dtype_converter(lhs_dtype, Frameworks.NUMPY)
+        )
     if is_rhs_trt_tensor and isinstance(lhs_val, (float, int)):
-        lhs_val = np.array([lhs_val], dtype=rhs_dtype)
-
-    # When lhs is scalar, and rhs has shape [1,], then currently the assert
-    # will fail because lhs shape has fewer dimensions than rhs shape.  This
-    # happens when using implicit batch dimension, when we removed the 1st
-    # dimension from input tensor, causing it to have shape [] - a scalar.  We
-    # fix it by reducing the rhs constant with a squeeze_left, so it becomes a
-    # scalar too. More generally, we squeeze_left on input if it's a constant
-    # tensor. This is safe because broadcast will pad dimensions on the left
-    # (prepend) to make lhs and rhs shape compatible.
-    if network.has_implicit_batch_dimension:
-        if isinstance(lhs_val, torch.Tensor):
-            lhs_val = squeeze_left(lhs_val)
-        if isinstance(rhs_val, torch.Tensor):
-            rhs_val = squeeze_left(rhs_val)
+        lhs_val = np.array(
+            [lhs_val], dtype=unified_dtype_converter(rhs_dtype, Frameworks.NUMPY)
+        )
 
     lhs_val = get_trt_tensor(network, lhs_val, f"{name}_lhs", lhs_dtype)
     rhs_val = get_trt_tensor(network, rhs_val, f"{name}_rhs", rhs_dtype)
