@@ -1,11 +1,12 @@
 import functools
 import logging
 import re
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorrt as trt
 import torch
+from torch import SymBool, SymFloat, SymInt
 from torch.fx.node import Target
 from torch_tensorrt.fx.converters.converter_utils import (
     Frameworks,
@@ -60,34 +61,53 @@ def is_only_operator_on_placeholder(node: torch.fx.Node) -> bool:
 
 
 def dynamic_unsupported(node: torch.fx.Node) -> bool:
+    """Validates that a node has no dynamic args, kwargs, or outputs"""
+    return _dynamic_unsupported(node=node)
+
+
+def dynamic_unsupported_with_args(
+    arg_positions_to_check: Optional[List[int]] = None,
+) -> Callable[[torch.fx.Node], bool]:
+    """Returns a validator that a node has no dynamic args at specific positions"""
+    return functools.partial(
+        _dynamic_unsupported, arg_positions_to_check=arg_positions_to_check
+    )
+
+
+def _dynamic_unsupported(
+    node: torch.fx.Node, arg_positions_to_check: Optional[List[int]] = None
+) -> bool:
     # Validate that none of the inputs to the node have Dynamic shapes
     assert isinstance(
         node, torch.fx.Node
     ), "Inputs to validator functions must be FX Nodes"
 
+    def _is_subnode_dynamic(subnode: torch.fx.Node) -> bool:
+        """Checks if a node itself has Dynamic properties"""
+        return getattr(
+            subnode.meta["val"], "_has_symbolic_sizes_strides", False
+        ) or isinstance(subnode.meta["val"], (SymFloat, SymInt, SymBool))
+
     # Check node value itself
-    if ("val" in node.meta) and getattr(
-        node.meta["val"], "_has_symbolic_sizes_strides", False
-    ):
+    if arg_positions_to_check is None and _is_subnode_dynamic(node):
         return False
 
     # Check node arguments individually
-    if any(
-        (
-            ("val" in arg.meta)
-            and getattr(arg.meta["val"], "_has_symbolic_sizes_strides", False)
-        )
-        for arg in node.args
-        if isinstance(arg, torch.fx.Node)
+    if arg_positions_to_check is None and any(
+        _is_subnode_dynamic(arg) for arg in node.args if isinstance(arg, torch.fx.Node)
+    ):
+        return False
+    # Check specific arg positions if the caller has specified positions to check
+    elif arg_positions_to_check is not None and any(
+        _is_subnode_dynamic(node.args[i])
+        for i in arg_positions_to_check
+        if isinstance(node.args[i], torch.fx.Node)
     ):
         return False
 
     # Check node keyword arguments individually
-    if any(
-        (
-            ("val" in kwarg.meta)
-            and getattr(kwarg.meta["val"], "_has_symbolic_sizes_strides", False)
-        )
+    if arg_positions_to_check is None and any(
+        _is_subnode_dynamic(kwarg)
         for kwarg in node.kwargs.values()
         if isinstance(kwarg, torch.fx.Node)
     ):
