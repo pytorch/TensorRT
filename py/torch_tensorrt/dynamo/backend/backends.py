@@ -20,7 +20,7 @@ from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs, set_log_level
 from packaging import version
 
 # Modify import location of utilities based on Torch version
-if version.parse(sanitized_torch_version()) < version.parse("2.1.1"):
+if version.parse(sanitized_torch_version()) <= version.parse("2.1.0.dev20230902"):
     from torch._inductor.freezing import ConstantFolder, replace_node_with_constant
 else:
     from torch._inductor.constant_folding import (
