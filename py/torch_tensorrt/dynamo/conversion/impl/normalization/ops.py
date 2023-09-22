@@ -29,13 +29,13 @@ def batch_norm(
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    weight: torch.Tensor,
-    bias: torch.Tensor,
-    running_mean: torch.Tensor,
-    running_var: torch.Tensor,
-    training: torch.Tensor,
-    momentum: torch.Tensor,
-    eps: List[float],
+    weight: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
+    bias: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
+    running_mean: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
+    running_var: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
+    training: bool,
+    momentum: float,
+    eps: float,
     cudnn_enabled: bool,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if not isinstance(input, TRTTensor):
@@ -47,8 +47,20 @@ def batch_norm(
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for batch norm."
 
+    if weight is None:
+        weight = np.array(1.0)
+
+    if bias is None:
+        bias = np.array(0.0)
+
+    if running_mean is None:
+        running_mean = np.array(0.0)
+
+    if running_var is None:
+        running_var = np.array(1.0)
+
     scale = cast(torch.Tensor, to_numpy(weight)) / np.sqrt(
-        cast(torch.Tensor, to_numpy(running_var)) + cast(float, eps)
+        cast(torch.Tensor, to_numpy(running_var)) + eps
     )
 
     bias = to_numpy(bias) - to_numpy(running_mean) * scale
@@ -91,9 +103,9 @@ def layer_norm(
     name: str,
     input: TRTTensor,
     normalized_shape: List[int],
-    weight: torch.Tensor,
-    bias: torch.Tensor,
-    eps: List[float],
+    weight: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
+    bias: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
+    eps: float,
     cudnn_enable: bool,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if not isinstance(input, trt.tensorrt.ITensor):
@@ -101,6 +113,12 @@ def layer_norm(
             f"LayerNorm received input {input} that is not part "
             "of the TensorRT region!"
         )
+
+    if weight is None:
+        weight = np.array(1.0)
+
+    if bias is None:
+        bias = np.array(0.0)
 
     gamma = (
         weight.detach().cpu().float().numpy()
@@ -152,15 +170,21 @@ def layer_norm_no_plugin(
     name: str,
     input: TRTTensor,
     normalized_shape: List[int],
-    weight: torch.Tensor,
-    bias: torch.Tensor,
-    eps: List[float],
+    weight: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
+    bias: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
+    eps: float,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if not isinstance(input, TRTTensor):
         raise RuntimeError(
             f"LayerNorm received input {input} that is not part "
             "of the TensorRT region!"
         )
+
+    if weight is None:
+        weight = np.array(1.0)
+
+    if bias is None:
+        bias = np.array(0.0)
 
     shape = weight.shape
     broadcasted_shape = (1,) * (len(input.shape) - len(shape)) + shape

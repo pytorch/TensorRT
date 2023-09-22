@@ -46,6 +46,7 @@ def get_ir(target: Target) -> SourceIR:
     return SourceIR.UNKNOWN
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.native_batch_norm.default)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.batch_norm)  # type: ignore[misc]
 def aten_ops_batch_norm(
     ctx: ConversionContext,
@@ -60,17 +61,18 @@ def aten_ops_batch_norm(
         SourceIR.ATEN,
         name,
         input=args[0],
-        weight=args_bounds_check(args, 1, replacement=1),
-        bias=args_bounds_check(args, 2, replacement=0),
-        running_mean=args_bounds_check(args, 3),
-        running_var=args_bounds_check(args, 4),
-        training=args_bounds_check(args, 5),
-        momentum=args_bounds_check(args, 6, replacement=0.1),
-        eps=args_bounds_check(args, 7, replacement=1e-05),
-        cudnn_enabled=args_bounds_check(args, 8, replacement=False),
+        weight=args[1],
+        bias=args[2],
+        running_mean=args[3],
+        running_var=args[4],
+        training=args[5],
+        momentum=args[6],
+        eps=args[7],
+        cudnn_enabled=args_bounds_check(args, 8, replacement=True),
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.native_layer_norm.default)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.layer_norm.default)  # type: ignore[misc]
 def aten_ops_layer_norm(
     ctx: ConversionContext,
@@ -86,9 +88,9 @@ def aten_ops_layer_norm(
         name,
         input=args[0],
         normalized_shape=args[1],
-        weight=args_bounds_check(args, 2, replacement=1),
-        bias=args_bounds_check(args, 3, replacement=0),
-        eps=args_bounds_check(args, 4, replacement=1e-05),
+        weight=args[2],
+        bias=args[3],
+        eps=args[4],
         cudnn_enable=args_bounds_check(args, 5, replacement=True),
     )
 
