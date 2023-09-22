@@ -224,6 +224,7 @@ def compile(
         device = kwargs.get("device", Device._current_device())
         torchtrt_inputs, torch_inputs = prepare_inputs(inputs, to_torch_device(device))
         exp_program = torch_tensorrt.dynamo.trace(module, torch_inputs, **kwargs)
+
         trt_exp_program = dynamo_compile(
             exp_program,
             inputs=torch_inputs,

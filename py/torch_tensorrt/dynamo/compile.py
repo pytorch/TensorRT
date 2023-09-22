@@ -1,17 +1,12 @@
 from __future__ import annotations
 
 import collections.abc
-import copy
 import logging
-import operator
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union, cast
+from typing import Any, List, Optional, Sequence, Set, Tuple, Union
 
 import torch
 import torch_tensorrt
-from torch._export.exported_program import CallSpec
-from torch._guards import detect_fake_mode
-from torch._subclasses.fake_tensor import FakeTensor
-from torch.export import ExportedProgram, ExportGraphSignature
+from torch.export import ExportedProgram
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
     EngineCapability,
@@ -37,6 +32,7 @@ from torch_tensorrt.dynamo.conversion import (
     convert_module,
     repair_long_or_double_inputs,
 )
+from torch_tensorrt.dynamo.export import create_trt_exp_program, transform
 from torch_tensorrt.dynamo.utils import (
     constant_fold,
     prepare_inputs,
@@ -147,42 +143,13 @@ def compile(
     # Run constant folding before TRT compilation
     constant_fold(gm)
     trt_gm = compile_module(gm, torch_inputs, settings)
-    trt_gm = lift_constant_pass(trt_gm)
+    # trt_gm = lift_constant_pass(trt_gm)
+    trt_gm = transform(trt_gm, torch_inputs)
     trt_exp_program = create_trt_exp_program(
         trt_gm, exported_program.call_spec, trt_gm.state_dict()
     )
 
     return trt_exp_program
-
-
-def lift_constant_pass(trt_gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
-    fake_mode = detect_fake_mode(
-        tuple(
-            node.meta["val"] for node in trt_gm.graph.nodes if node.op == "placeholder"
-        )
-    )
-
-    first_user_input = None
-    for node in trt_gm.graph.nodes:
-        if node.op == "placeholder":
-            first_user_input = node
-            break
-
-    for node in trt_gm.graph.nodes:
-        if node.op == "get_attr":
-            constant_tensor = getattr(trt_gm, node.target)
-            with trt_gm.graph.inserting_before(first_user_input):
-                const_placeholder_node = trt_gm.graph.placeholder(node.target)
-                const_placeholder_node.meta = copy.deepcopy(node.meta)
-                const_placeholder_node.meta["val"] = fake_mode.from_tensor(
-                    constant_tensor
-                )
-                node.replace_all_uses_with(const_placeholder_node)
-                trt_gm.graph.erase_node(node)
-
-    trt_gm.graph.eliminate_dead_code()
-    trt_gm.graph.lint()
-    return trt_gm
 
 
 def compile_module(
@@ -249,6 +216,9 @@ def compile_module(
             torch_executed_ops=settings.torch_executed_ops,
         )
 
+    # Store TRT replicas of Torch subgraphs
+    trt_modules = {}
+
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
     for name, _ in partitioned_module.named_children():
@@ -281,226 +251,14 @@ def compile_module(
             name=name,
         )
 
-        # Replace the TRT submodules with TRT nodes
-        replace_trt_submodule(partitioned_module, trt_module, sample_inputs)
+        trt_modules[name] = trt_module
 
-    # Inline pytorch submodules
-    inline_torch_submodules(partitioned_module)
-
-    # Clean the graph
-    partitioned_module.delete_all_unused_submodules()
-    partitioned_module.graph.eliminate_dead_code()
-    partitioned_module.graph.lint()
+    # Replace all FX Modules with TRT Modules
+    for name, trt_module in trt_modules.items():
+        setattr(partitioned_module, name, trt_module)
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:
         settings.use_fast_partitioner = True
 
-    # import pdb; pdb.set_trace()
     return partitioned_module
-
-
-def replace_trt_submodule(
-    gm: torch.fx.GraphModule,
-    trt_mod: torch.nn.Module,
-    sample_inputs: Sequence[torch.Tensor],
-) -> torch.fx.GraphModule:
-    """
-    Replaces TRT submodules (which are call_module nodes) with TRT nodes(call_function)
-    This is necessary for torch.export to work since it cannot handle call_module nodes
-    currently.
-    """
-    # Get submodule IO shape map
-    _, submod_outputs_shape_map = partitioning.run_shape_analysis(gm, sample_inputs)
-
-    # Ensure the trt module node in the main graph (gm) has inputs
-    submodule_node = [node for node in gm.graph.nodes if node.name == trt_mod.name]
-    assert submodule_node
-    submodule_node = submodule_node[0]
-    assert submodule_node.args
-
-    num_outputs = len(submod_outputs_shape_map[submodule_node.name])
-    # Insert a call_function node to perform inference on TRT engine
-    with gm.graph.inserting_before(submodule_node):
-        trt_node = gm.graph.call_function(
-            torch.ops.tensorrt.execute_engine.default,
-            (submodule_node.args, trt_mod.engine),
-        )
-        trt_node.meta["val"] = []
-        # Generate meta data for TRT node (a FakeTensor with corresponding output shape)
-        for idx in range(num_outputs):
-            trt_node.meta["val"].append(
-                cast(
-                    FakeTensor,
-                    torch.empty_strided(
-                        tuple(submod_outputs_shape_map[trt_mod.name][idx]),
-                        tuple([1] * len(submod_outputs_shape_map[trt_mod.name][idx])),
-                    ),
-                )
-            )
-
-    if num_outputs == 1:
-        # Insert getitem nodes as outputs (for export serialization to work)
-        with gm.graph.inserting_after(trt_node):
-            getitem_output = gm.graph.call_function(operator.getitem, (trt_node, 0))
-        submodule_node.replace_all_uses_with(getitem_output)
-    else:
-        # Multiple outputs case:
-        # Replace uses of submodule with the trt_node.
-        # getitem nodes are already added inherently by the partitioner
-        submodule_node.replace_all_uses_with(trt_node)
-
-    # Erase the TRT submodule (call_module) node.
-    gm.graph.erase_node(submodule_node)
-
-    return gm
-
-
-def get_duplicate_nodes(
-    gm: torch.fx.GraphModule, submodule: torch.fx.GraphModule
-) -> Tuple[Sequence[Any], Sequence[Any]]:
-    """
-    We check if there are duplicate nodes when we copy submodule graph into gm.
-    Handle the case where the subgraph input placeholders are same as
-    gm placeholders. This happens when the first submodule in the graph is
-    a pytorch submodule
-    """
-    submodule_placeholder_inputs = [
-        node for node in submodule.graph.nodes if node.op == "placeholder"
-    ]
-    submodule_input_node_names = [node.name for node in submodule_placeholder_inputs]
-    gm_node_names = [node.name for node in gm.graph.nodes]
-    submodule_duplicate_inputs = [
-        node for node in submodule_placeholder_inputs if node.name in gm_node_names
-    ]
-    gm_duplicate_inputs = [
-        node for node in gm.graph.nodes if node.name in submodule_input_node_names
-    ]
-    return submodule_duplicate_inputs, gm_duplicate_inputs
-
-
-def inline_torch_submodules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
-    """
-    Inline a submodule within the parent graph (gm). All `call_module` nodes
-    should be replaced by their submodule nodes.
-    """
-    # Clean the graph
-    gm.graph.eliminate_dead_code()
-    gm.graph.lint()
-
-    for gm_node in gm.graph.nodes:
-        if gm_node.op == "call_module" and "_run_on_gpu" in gm_node.name:
-            submodule = getattr(gm, gm_node.name)
-            with gm.graph.inserting_before(gm_node):
-                # Get inputs of submodule node which are most likely outputs of a previous TRT node
-                # or a placeholder of the main graph
-                submodule_inputs = gm_node.args
-                # import pdb; pdb.set_trace()
-                submodule_duplicate_inputs, gm_duplicate_inputs = get_duplicate_nodes(
-                    gm, submodule
-                )
-                assert len(submodule_duplicate_inputs) == len(gm_duplicate_inputs)
-                # Avoid creating new copies of duplicate inputs by creating a mapping
-                val_map = {}
-                for i in range(len(submodule_duplicate_inputs)):
-                    val_map[submodule_duplicate_inputs[i]] = gm_duplicate_inputs[i]
-
-                # Copy all nodes in the submodule into gm and
-                # store the output node of this submodule which is now present in gm
-
-                submodule_output = gm.graph.graph_copy(submodule.graph, val_map)
-
-                # Get their references (since we copied) in the parent graph (gm)
-                if len(submodule_duplicate_inputs) == 0:
-                    submodule_placeholder_input_names = [
-                        node.name
-                        for node in submodule.graph.nodes
-                        if node.op == "placeholder"
-                    ]
-                    gm_added_placeholder_inputs = [
-                        node
-                        for node in gm.graph.nodes
-                        if node.name in submodule_placeholder_input_names
-                    ]
-
-                    assert len(submodule_inputs) == len(gm_added_placeholder_inputs)
-
-                    # Replace the added placeholder inputs with original inputs to this submodule node
-                    for idx in range(len(gm_added_placeholder_inputs)):
-                        gm_added_placeholder_inputs[idx].replace_all_uses_with(
-                            submodule_inputs[idx]
-                        )
-
-                    # Erase the placeholder input nodes in the gm
-                    for idx in range(len(gm_added_placeholder_inputs)):
-                        gm.graph.erase_node(gm_added_placeholder_inputs[idx])
-
-                # Replace the pytorch submodule node (call_module) with the inlined subgraph output
-                gm_node.replace_all_uses_with(submodule_output)
-
-                # copy the attributes of the submodule into gm (graph_copy doesn't do this)
-                copy_submodule_attributes(submodule, gm, gm_node.name)
-
-            # Erase the pytorch submodule (call_module) node
-            gm.graph.erase_node(gm_node)
-
-    return gm
-
-
-def copy_submodule_attributes(
-    submodule: torch.fx.GraphModule, gm: torch.fx.GraphModule, submod_name: str
-) -> None:
-    """
-    Copy the getattr attriibutes from submodule to parent module gm.
-    The graph_copy call doesn't do this for us unfortunately.
-    """
-    for idx, param in enumerate(gm.named_parameters()):
-        if submod_name in param[0]:
-            attr_name = param[0].replace(submod_name + ".", "")
-            gm.register_parameter(attr_name, param[1])
-
-    for idx, buffer in enumerate(gm.named_buffers()):
-        if submod_name in buffer[0]:
-            attr_name = buffer[0].replace(submod_name + ".", "")
-            gm.register_buffer(attr_name, buffer[1])
-
-
-def create_trt_exp_program(
-    gm: torch.fx.GraphModule,
-    call_spec: CallSpec,
-    state_dict: Dict[str, Union[torch.Tensor, torch.nn.Parameter]],
-) -> ExportedProgram:
-    """Creates a new Exported Program. This function takes an torch.fx.GraphModule which has TRT engines
-    and constructs an Exported Program object with the new IO node names, call_spec and state_dict
-    """
-    input_node_names = [
-        node.name for node in gm.graph.nodes if node.op == "placeholder"
-    ]
-    output_node_names = [node.name for node in gm.graph.nodes if node.op == "output"]
-    param_names = [param[0] for param in gm.named_parameters()]
-    buffer_names = [buffer[0] for buffer in gm.named_buffers()]
-    inputs_to_parameters = {}
-    inputs_to_buffers = {}
-    for node in gm.graph.nodes:
-        if node.target in param_names:
-            inputs_to_parameters[node.name] = node.target
-        if node.target in buffer_names:
-            inputs_to_buffers[node.name] = node.target
-
-    trt_graph_signature = ExportGraphSignature(
-        parameters=param_names,
-        buffers=buffer_names,
-        user_inputs=input_node_names,
-        user_outputs=output_node_names,
-        inputs_to_parameters=inputs_to_parameters,
-        inputs_to_buffers=inputs_to_buffers,
-        buffers_to_mutate={},
-        backward_signature=None,
-        assertion_dep_token=None,
-    )
-
-    trt_exp_program = ExportedProgram(
-        gm, gm.graph, trt_graph_signature, call_spec, state_dict, {}, [], []
-    )
-
-    return trt_exp_program
