@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Partitioning Phase &mdash; Torch-TensorRT v2.2.0.dev0+65feab1 documentation</title>
+  <title>Writing Dynamo ATen Lowering Passes &mdash; Torch-TensorRT v2.2.0.dev0+65feab1 documentation</title>
   
 
   
@@ -39,8 +39,8 @@
   <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Conversion Phase" href="conversion.html" />
-    <link rel="prev" title="Lowering Phase" href="lowering.html" />
+    <link rel="next" title="Useful Links for Torch-TensorRT Development" href="useful_links.html" />
+    <link rel="prev" title="Writing Converters" href="writing_converters.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -302,9 +302,9 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
 <ul class="current">
-<li class="toctree-l1 current"><a class="reference internal" href="system_overview.html">System Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="system_overview.html">System Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="writing_converters.html">Writing Converters</a></li>
-<li class="toctree-l1"><a class="reference internal" href="writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Writing Dynamo ATen Lowering Passes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Indices</span></p>
@@ -350,15 +350,13 @@
       </li>
 
         
-          <li><a href="system_overview.html">System Overview</a> &gt;</li>
-        
-      <li>Partitioning Phase</li>
+      <li>Writing Dynamo ATen Lowering Passes</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
         
             
-            <a href="../_sources/contributors/partitioning.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+            <a href="../_sources/contributors/writing_dynamo_aten_lowering_passes.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
           
         
       </li>
@@ -388,224 +386,100 @@
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
-  <section id="partitioning-phase">
-<span id="partitioning"></span><h1>Partitioning Phase<a class="headerlink" href="#partitioning-phase" title="Permalink to this headline">¶</a></h1>
-<p>The phase is optional and enabled by the user. It instructs the compiler to separate nodes into ones that should run in PyTorch and ones that should run in TensorRT.
-Criteria for separation include: Lack of a converter, operator is explicitly set to run in PyTorch by the user or the node has a flag which tells partitioning to
-run in PyTorch by the module fallback passes.</p>
-<p>On a high level, Torch-TensorRT partitioning phase does the following:</p>
-<ul class="simple">
-<li><p>Segmentation. Go through the set of operators in order and verify if there is converter for each operator. Then, roughly separate the graph into parts that Torch-TensorRT can support and parts Torch-TensorRT cannot.</p></li>
-<li><p>Dependency Analysis. For every to be compiled operator there is a “complete dependency graph”, which means that every input can to traced back to an input as Tensor or TensorList. Go through all segments after segmentation then do dependency analysis to ensure that there are only Tensor/TensorList inputs and outputs for TensorRT segments.</p></li>
-<li><p>Shape Analysis. For each segments, figure out the input and outputs shapes starting from the provided input shape from the user. Shapes can be calculated by running the graphs with JIT.</p></li>
-<li><p>Conversion. Every TensorRT segments will be converted to TensorRT engine. This part is done in compiler.cpp, but it’s still a phase in our partitioning process.</p></li>
-<li><p>Stitching. Stitch all TensorRT engines with PyTorch nodes altogether.</p></li>
-</ul>
-<p>Here are the brief description of these functions of each file:</p>
-<section id="partitoninfo-h-cpp">
-<h2>PartitonInfo.h/.cpp<a class="headerlink" href="#partitoninfo-h-cpp" title="Permalink to this headline">¶</a></h2>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/partitioning/PartitionInfo.h">core/partitioning/PartitionInfo.h</a></p>
-</div></blockquote>
-<p>The automatic fallback APIs that is used for partitioning.</p>
+  <section id="writing-dynamo-aten-lowering-passes">
+<span id="id1"></span><h1>Writing Dynamo ATen Lowering Passes<a class="headerlink" href="#writing-dynamo-aten-lowering-passes" title="Permalink to this headline">¶</a></h1>
+<section id="basics-of-a-lowering-pass">
+<h2>Basics of a Lowering Pass<a class="headerlink" href="#basics-of-a-lowering-pass" title="Permalink to this headline">¶</a></h2>
+<p>ATen lowering passes are Python functions which take as input a graph of ATen operators, apply some desired modification such as operator coalescing/fusion, operator replacement, subgraph rewriting, custom operator insertion, or other operation on a <cite>torch.fx.GraphModule</cite>, then return the modified graph to the caller. These lowering passes generally modify the graph in-place and return the same input object.</p>
 </section>
-<section id="segmentedblock-h-cpp">
-<h2>SegmentedBlock.h/.cpp<a class="headerlink" href="#segmentedblock-h-cpp" title="Permalink to this headline">¶</a></h2>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/partitioning/SegmentedBlock.h">core/partitioning/SegmentedBlock.h</a></p>
-</div></blockquote>
-<p>The main data structures that is used to maintain information for each segments after segmentation.</p>
+<section id="lowering-pass-requirements">
+<h2>Lowering Pass Requirements<a class="headerlink" href="#lowering-pass-requirements" title="Permalink to this headline">¶</a></h2>
+<p>An ATen lowering pass function in Torch-TRT must satisfy two requirements:
+- The function must take as input a single <cite>torch.fx.GraphModule</cite> and return the lowered <cite>torch.fx.GraphModule</cite>
+- The function must leave the graph in a valid and invoke-able state, including performing any necessary linting and recompilation</p>
+<p>See this link for information on <a class="reference external" href="https://pytorch.org/docs/stable/fx.html#graph-manipulation">Graph Manipulations</a> in FX. See below for an example of a lowering pass which repairs graphs that have inputs which are also outputs, a disallowed configuration for TRT Engines.</p>
 </section>
-<section id="shape-analysis-h-cpp">
-<h2>shape_analysis.h/.cpp<a class="headerlink" href="#shape-analysis-h-cpp" title="Permalink to this headline">¶</a></h2>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/partitioning/shape_analysis.h">core/partitioning/shape_analysis.h</a></p>
-</div></blockquote>
-<p>Code implementation to get the shapes for each segments by running them in JIT.</p>
-</section>
-<section id="partitioning-h-cpp">
-<h2>partitioning.h/.cpp<a class="headerlink" href="#partitioning-h-cpp" title="Permalink to this headline">¶</a></h2>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/partitioning/partitioning.h">core/partitioning/partitioning.h</a></p>
-</div></blockquote>
-<p>APIs and main code implementation for partitioning phase.</p>
-</section>
-</section>
-<section id="automatic-fallback">
-<h1>Automatic Fallback<a class="headerlink" href="#automatic-fallback" title="Permalink to this headline">¶</a></h1>
-<p>To enable automatic fallback feature, you can set following attributes in Python:</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>import torch
-import torch_tensorrt as torchtrt
+<section id="example-lowering-pass">
+<h2>Example Lowering Pass<a class="headerlink" href="#example-lowering-pass" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">repair_input_as_output</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Repair scenarios where inputs are also outputs of the graph</span>
 
-...
-model = MyModel()
-ts_model = torch.jit.script(model)
-trt_model = torchtrt.ts.compile(model, **{
-  ...
-  &quot;min_block_size&quot; : 3,
-  &quot;torch_executed_ops&quot;: [&quot;aten::add&quot;],
-  &quot;torch_executed_modules&quot;: [],
-})
-</pre></div>
-</div>
-<ul class="simple">
-<li><p>enabled: By default automatic fallback will be off. It is enabled by setting it to True.</p></li>
-<li><p>min_block_size: The minimum number of consecutive operations that must satisfy to be converted to TensorRT. For example, if it’s set to 3, then there must be 3 consecutive supported operators then this segments will be converted.</p></li>
-<li><p>forced_fallback_ops: A list of strings that will be the names of operations that the user explicitly want to be in PyTorch nodes.</p></li>
-</ul>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>#include &quot;torch/script.h&quot;
-#include &quot;torch_tensorrt/torch_tensorrt.h&quot;
+<span class="sd">    TRT does not allow such cases, so we insert a clone (identity) layer</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">modified_graph</span> <span class="o">=</span> <span class="kc">False</span>
 
-...
-auto in = torch::randn({1, 3, 224, 224}, {torch::kCUDA});
+    <span class="c1"># Extract graph placeholder Tensors</span>
+    <span class="n">placeholders</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">node</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;placeholder&quot;</span>
+            <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">type</span><span class="p">,</span> <span class="nb">type</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">type</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="p">]</span>
 
-auto mod = torch::jit::load(&quot;trt_ts_module.ts&quot;);
-auto input_sizes =  std::vector&lt;torchtrt::InputRange&gt;{{in.sizes()}};
-torchtrt::ts::CompileSpec cfg(input_sizes);
-cfg.min_block_size = 2;
-cfg.torch_executed_ops.push_back(&quot;aten::relu&quot;);
-auto trt_mod = torchtrt::ts::compile(mod, cfg);
-auto out = trt_mod.forward({in});
+    <span class="k">for</span> <span class="n">placeholder</span> <span class="ow">in</span> <span class="n">placeholders</span><span class="p">:</span>
+        <span class="c1"># If any placeholder has any users which are direct graph outputs</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">placeholder</span><span class="o">.</span><span class="n">users</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">1</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="n">user</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;output&quot;</span> <span class="k">for</span> <span class="n">user</span> <span class="ow">in</span> <span class="n">placeholder</span><span class="o">.</span><span class="n">users</span>
+        <span class="p">):</span>
+            <span class="n">modified_graph</span> <span class="o">=</span> <span class="kc">True</span>
+
+            <span class="c1"># Get direct graph outputs which are direct uses of placeholders</span>
+            <span class="n">direct_outputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">user</span> <span class="k">for</span> <span class="n">user</span> <span class="ow">in</span> <span class="n">placeholder</span><span class="o">.</span><span class="n">users</span> <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;output&quot;</span><span class="p">]</span>
+
+            <span class="c1"># Insert clone node for placeholder to ensure</span>
+            <span class="c1"># placeholder is not a direct output</span>
+            <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_after</span><span class="p">(</span><span class="n">placeholder</span><span class="p">):</span>
+                <span class="n">cloned_placeholder</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">clone</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
+                    <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">placeholder</span><span class="p">,),</span>
+                <span class="p">)</span>
+
+            <span class="c1"># Replace placeholder as output with cloned version</span>
+            <span class="k">for</span> <span class="n">output</span> <span class="ow">in</span> <span class="n">direct_outputs</span><span class="p">:</span>
+                <span class="n">output</span><span class="o">.</span><span class="n">replace_input_with</span><span class="p">(</span><span class="n">placeholder</span><span class="p">,</span> <span class="n">cloned_placeholder</span><span class="p">)</span>
+
+    <span class="c1"># If the graph was modified, clean up the graph and ensure it is up-to-date</span>
+    <span class="k">if</span> <span class="n">modified_graph</span><span class="p">:</span>
+        <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">eliminate_dead_code</span><span class="p">()</span>
+        <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">lint</span><span class="p">()</span>
+        <span class="n">gm</span><span class="o">.</span><span class="n">recompile</span><span class="p">()</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Graph after repair_input_as_output:</span><span class="se">\n</span><span class="si">{</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">gm</span>
 </pre></div>
 </div>
 </section>
-<section id="dependency-aware-partitioning">
-<h1>Dependency Aware Partitioning<a class="headerlink" href="#dependency-aware-partitioning" title="Permalink to this headline">¶</a></h1>
-<p>During segmentation, Torch-TensorRT uses a dependency graph of the input TorchScript nodes to reduce the number of segments created. Consider this example from test Partitioning.SegmentModelWithDependencyAwareness in <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/tests/core/partitioning/test_segmentation.cpp">tests/core/partitioning/test_segmentation.cpp</a></p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>graph(%x : Tensor, %y : Tensor):
-    %3 : int = prim::Constant[value=0]()
-    %20 : int = prim::Constant[value=1]()
-    %add : Tensor = aten::add(%x, %y, %20)
-    %x_lgamma : Tensor = aten::lgamma(%x)
-    %mul : Tensor = aten::mul(%x, %y)
-    %y_lgamma : Tensor = aten::lgamma(%y)
-    %div : Tensor = aten::div(%x, %y)
-    %div_lgamma : Tensor = aten::lgamma(%div)
-    %27 : Tensor[] = prim::ListConstruct(%x_lgamma, %y_lgamma, %div_lgamma, %add, %mul)
-    %12 : Tensor = aten::cat(%27, %3)
-    return (%12)
+<section id="registering-lowering-passes">
+<h2>Registering Lowering Passes<a class="headerlink" href="#registering-lowering-passes" title="Permalink to this headline">¶</a></h2>
+<p>Lowering passes are currently registered in <cite>py/torch_tensorrt/dynamo/lowering/passes/__init__.py</cite>, using the <cite>torch.fx.passes.pass_manager.PassManager</cite> utility to assemble the list of passes in a desired order. New passes added directly to that list will be applied to graphs in the Torch-TensorRT <cite>torch.compile</cite> backend. Currently, we offer an ATen lowering pass registration decorator for convenience, which can be invoked either directly, or with the optional <cite>index</cite> keyword argument which controls where in the pass list the lowering pass will be inserted.</p>
+<p>For instance, to insert the pass at the default location (end of the list), the following code can be used:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@_aten_lowering_pass</span>
+<span class="k">def</span> <span class="nf">my_custom_pass</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
+    <span class="o">...</span>
 </pre></div>
 </div>
-<p>In this graph <cite>aten::lgamma</cite> is not supported by conversion and must be partitioned in a Torch fallback segment. If Torch-TensorRT uses a greedy segmentation strategy that traverses nodes in the input graph in order and gathers ops with the same target (TensorRT or Torch) into a segment until it encounters an op with a different target, the resulting partition includes 7 segments, many with just a single op.</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Segment Block @0:
-    Target: TensorRT
-
-    Graph: graph(%x : Tensor,
-        %y : Tensor):
-    %3 : int = prim::Constant[value=1]()
-    %0 : Tensor = aten::add(%x, %y, %3)
-    return ()
-
-Segment Block @1:
-    Target: Torch
-
-    Graph: graph(%x : Tensor):
-    %0 : Tensor = aten::lgamma(%x)
-    return ()
-
-Segment Block @2:
-    Target: TensorRT
-
-    Graph: graph(%x : Tensor,
-        %y : Tensor):
-    %0 : Tensor = aten::mul(%x, %y)
-    return ()
-
-Segment Block @3:
-    Target: Torch
-
-    Graph: graph(%y : Tensor):
-    %0 : Tensor = aten::lgamma(%y)
-    return ()
-
-Segment Block @4:
-    Target: TensorRT
-
-    Graph: graph(%x : Tensor,
-        %y : Tensor):
-    %0 : Tensor = aten::div(%x, %y)
-    return ()
-
-Segment Block @5:
-    Target: Torch
-
-    Graph: graph(%1 : Tensor):
-    %0 : Tensor = aten::lgamma(%1)
-    return ()
-
-Segment Block @6:
-    Target: TensorRT
-
-    Graph: graph(%1 : Tensor,
-        %2 : Tensor,
-        %3 : Tensor,
-        %4 : Tensor,
-        %5 : Tensor):
-    %7 : int = prim::Constant[value=0]()
-    %0 : Tensor[] = prim::ListConstruct(%1, %2, %3, %4, %5)
-    %6 : Tensor = aten::cat(%0, %7)
-    return ()
+<p>Alternatively, to insert the pass at a custom index (such as the front of the list) in the passlist, the following code can be used:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@_aten_lowering_pass</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">my_custom_pass</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
+    <span class="o">...</span>
 </pre></div>
 </div>
-<p>This partition is valid, but the segmentation is suboptimal. These arithmetic ops and <cite>aten::lgamma</cite> ops are each split into their own segment as we alternate between Torch and TensorRT targets in the linear traversal of the graph.</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>%add : Tensor = aten::add(%x, %y, %20)
-%x_lgamma : Tensor = aten::lgamma(%x)
-%mul : Tensor = aten::mul(%x, %y)
-%y_lgamma : Tensor = aten::lgamma(%y)
-%div : Tensor = aten::div(%x, %y)
-%div_lgamma : Tensor = aten::lgamma(%div)
+<p>There are also provided utilities in <cite>torch_tensorrt.dynamo.lowering.passes</cite> for displaying the currently-available lowering pass list, applying those passes to an arbitrary <cite>torch.fx.GraphModule</cite>, and removing the lowering pass at a specific index.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Print all lowering passes in the list</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">dump_lowering_passes</span><span class="p">())</span>
+
+<span class="c1"># Apply lowering passes to a GraphModule</span>
+<span class="n">apply_lowering_passes</span><span class="p">(</span><span class="n">graph_module</span><span class="p">)</span>
+
+<span class="c1"># Remove the lowering pass at index 1</span>
+<span class="n">_remove_lowering_pass</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Each of the arithmetic ops in this segment is only dependent on constants and the inputs <cite>%x</cite> and <cite>%y</cite>. The <cite>aten::lgamma</cite> ops are dependent on the inputs <cite>%x</cite>, <cite>%y</cite> and the output of the <cite>aten::div</cite>. This means that we could rewrite this portion of the input graph as below without changing the behavior of the graph. This reordered series of ops could be cleanly partitioned into just 2 segments using the greedy segmentation approach described above.</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>%add : Tensor = aten::add(%x, %y, %20)
-%mul : Tensor = aten::mul(%x, %y)
-%div : Tensor = aten::div(%x, %y)
-%x_lgamma : Tensor = aten::lgamma(%x)
-%y_lgamma : Tensor = aten::lgamma(%y)
-%div_lgamma : Tensor = aten::lgamma(%div)
-</pre></div>
-</div>
-<p>By adding awareness of the dependencies between ops to the basic greedy segmentation approach we can achieve the same partition without rewriting the graph. Now we will maintain both Torch and TensorRT targeted segments at the same time as we traverse the graph. We will only finalize a segment once we hit an op that is both dependent on an op in the segment and has a different target. This will allow the partition to create larger segments by reordering nodes across the segment boundary while guaranteeing that we will not modify the behavior of the graph by reordering nodes relative to their dependencies.
-In this example we will collect the arithmetic ops in a TensorRT segment and the <cite>aten::lgamma</cite> ops in a Torch segment. When we encounter the <cite>%div_lgamma : Tensor = aten::lgamma(%div)</cite> op we can see it is dependent on <cite>%div : Tensor = aten::div(%x, %y)</cite> in the current TensorRT segment. This triggers finalization of the TensorRT segment containing the <cite>aten::div</cite> op to guarantee it will appear before its dependency in the final partition. The Torch segment containing the <cite>aten::lgamma</cite> op is finalized when we encounter the <cite>prim::ListConstruct</cite> op which targets TensorRT and is dependent on the results of the <cite>aten::lgamma</cite> ops.</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Segment Block @0:
-    Target: TensorRT
-
-    Graph: graph(%x : Tensor,
-        %y : Tensor):
-    %3 : int = prim::Constant[value=1]()
-    %0 : Tensor = aten::add(%x, %y, %3)
-    %4 : Tensor = aten::mul(%x, %y)
-    %5 : Tensor = aten::div(%x, %y)
-    return ()
-
-Segment Block @1:
-    Target: Torch
-
-    Graph: graph(%x : Tensor,
-        %y : Tensor,
-        %5 : Tensor):
-    %0 : Tensor = aten::lgamma(%x)
-    %2 : Tensor = aten::lgamma(%y)
-    %4 : Tensor = aten::lgamma(%5)
-    return ()
-
-Segment Block @2:
-    Target: TensorRT
-
-    Graph: graph(%1 : Tensor,
-        %2 : Tensor,
-        %3 : Tensor,
-        %4 : Tensor,
-        %5 : Tensor):
-    %7 : int = prim::Constant[value=0]()
-    %0 : Tensor[] = prim::ListConstruct(%1, %2, %3, %4, %5)
-    %6 : Tensor = aten::cat(%0, %7)
-    return ()
-</pre></div>
-</div>
-<p>In some cases this approach may create adjacent segments in the partition which have the same target. As a clean-up step we can consolidate these adjacent segments to further reduce the number of segments in the final partition.
-The merge segments step identifies a list of segments that are adjacent in the graph, have the same target, and are not marked as <cite>do_not_merge</cite>. The nodes from these segments will be combined into a single new segment that will replace the merged segments in the partition.
-The <cite>do_not_merge</cite> marking is used to prevent merging of segments created for conditional nodes and loops that are handled as special cases in graph stitching and should not be merged with adjacent segments of the same type.</p>
+<p><strong>Note:</strong> The above APIs are subject to change, as the lowering pass system evolves.</p>
+</section>
 </section>
 
 
@@ -616,10 +490,10 @@ The <cite>do_not_merge</cite> marking is used to prevent merging of segments cre
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="conversion.html" class="btn btn-neutral float-right" title="Conversion Phase" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+        <a href="useful_links.html" class="btn btn-neutral float-right" title="Useful Links for Torch-TensorRT Development" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
       
       
-        <a href="lowering.html" class="btn btn-neutral" title="Lowering Phase" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+        <a href="writing_converters.html" class="btn btn-neutral" title="Writing Converters" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
       
     </div>
   
@@ -651,15 +525,13 @@ The <cite>do_not_merge</cite> marking is used to prevent merging of segments cre
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Partitioning Phase</a><ul>
-<li><a class="reference internal" href="#partitoninfo-h-cpp">PartitonInfo.h/.cpp</a></li>
-<li><a class="reference internal" href="#segmentedblock-h-cpp">SegmentedBlock.h/.cpp</a></li>
-<li><a class="reference internal" href="#shape-analysis-h-cpp">shape_analysis.h/.cpp</a></li>
-<li><a class="reference internal" href="#partitioning-h-cpp">partitioning.h/.cpp</a></li>
+<li><a class="reference internal" href="#">Writing Dynamo ATen Lowering Passes</a><ul>
+<li><a class="reference internal" href="#basics-of-a-lowering-pass">Basics of a Lowering Pass</a></li>
+<li><a class="reference internal" href="#lowering-pass-requirements">Lowering Pass Requirements</a></li>
+<li><a class="reference internal" href="#example-lowering-pass">Example Lowering Pass</a></li>
+<li><a class="reference internal" href="#registering-lowering-passes">Registering Lowering Passes</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#automatic-fallback">Automatic Fallback</a></li>
-<li><a class="reference internal" href="#dependency-aware-partitioning">Dependency Aware Partitioning</a></li>
 </ul>
 
             </div>

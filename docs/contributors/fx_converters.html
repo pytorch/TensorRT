@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Partitioning Phase &mdash; Torch-TensorRT v2.2.0.dev0+65feab1 documentation</title>
+  <title>Dynamo Converters &mdash; Torch-TensorRT v2.2.0.dev0+65feab1 documentation</title>
   
 
   
@@ -39,8 +39,6 @@
   <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Conversion Phase" href="conversion.html" />
-    <link rel="prev" title="Lowering Phase" href="lowering.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -301,8 +299,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
-<ul class="current">
-<li class="toctree-l1 current"><a class="reference internal" href="system_overview.html">System Overview</a></li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="system_overview.html">System Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="writing_converters.html">Writing Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
@@ -350,15 +348,13 @@
       </li>
 
         
-          <li><a href="system_overview.html">System Overview</a> &gt;</li>
-        
-      <li>Partitioning Phase</li>
+      <li>Dynamo Converters</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
         
             
-            <a href="../_sources/contributors/partitioning.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+            <a href="../_sources/contributors/fx_converters.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
           
         
       </li>
@@ -388,224 +384,212 @@
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
-  <section id="partitioning-phase">
-<span id="partitioning"></span><h1>Partitioning Phase<a class="headerlink" href="#partitioning-phase" title="Permalink to this headline">¶</a></h1>
-<p>The phase is optional and enabled by the user. It instructs the compiler to separate nodes into ones that should run in PyTorch and ones that should run in TensorRT.
-Criteria for separation include: Lack of a converter, operator is explicitly set to run in PyTorch by the user or the node has a flag which tells partitioning to
-run in PyTorch by the module fallback passes.</p>
-<p>On a high level, Torch-TensorRT partitioning phase does the following:</p>
-<ul class="simple">
-<li><p>Segmentation. Go through the set of operators in order and verify if there is converter for each operator. Then, roughly separate the graph into parts that Torch-TensorRT can support and parts Torch-TensorRT cannot.</p></li>
-<li><p>Dependency Analysis. For every to be compiled operator there is a “complete dependency graph”, which means that every input can to traced back to an input as Tensor or TensorList. Go through all segments after segmentation then do dependency analysis to ensure that there are only Tensor/TensorList inputs and outputs for TensorRT segments.</p></li>
-<li><p>Shape Analysis. For each segments, figure out the input and outputs shapes starting from the provided input shape from the user. Shapes can be calculated by running the graphs with JIT.</p></li>
-<li><p>Conversion. Every TensorRT segments will be converted to TensorRT engine. This part is done in compiler.cpp, but it’s still a phase in our partitioning process.</p></li>
-<li><p>Stitching. Stitch all TensorRT engines with PyTorch nodes altogether.</p></li>
+  <section id="dynamo-converters">
+<span id="dynamo-conversion"></span><h1>Dynamo Converters<a class="headerlink" href="#dynamo-converters" title="Permalink to this headline">¶</a></h1>
+<p>The dynamo converter library in Torch-TensorRT is located in <code class="docutils literal notranslate"><span class="pre">TensorRT/py/torch_tensorrt/dynamo/conversion</span></code>.</p>
+</section>
+<section id="steps">
+<h1>Steps<a class="headerlink" href="#steps" title="Permalink to this headline">¶</a></h1>
+<section id="operation-set">
+<h2>Operation Set<a class="headerlink" href="#operation-set" title="Permalink to this headline">¶</a></h2>
+<p>The converters in dynamo are produced by <code class="docutils literal notranslate"><span class="pre">aten_trace</span></code> and falls under <code class="docutils literal notranslate"><span class="pre">aten_ops_converters</span></code> ( FX earlier had <code class="docutils literal notranslate"><span class="pre">acc_ops_converters</span></code>, <code class="docutils literal notranslate"><span class="pre">aten_ops_converters</span></code> or <code class="docutils literal notranslate"><span class="pre">nn_ops_converters</span></code> depending on the trace through which it was produced).  The converters are registered using  <code class="docutils literal notranslate"><span class="pre">dynamo_tensorrt_converter</span></code> for dynamo. The function decorated
+has the arguments - <code class="docutils literal notranslate"><span class="pre">network,</span> <span class="pre">target,</span> <span class="pre">args,</span> <span class="pre">kwargs,</span> <span class="pre">name</span></code>,  which is common across all the operators schema.
+These functions are mapped in the <code class="docutils literal notranslate"><span class="pre">aten</span></code> converter registry dictionary (at present a compilation of FX and dynamo converters, FX will be deprecated soon), with key as the function target name.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>aten_trace is produced by <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace(..)</span></code> for the export path and <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile(ir=dynamo)</span></code> for the compile path.</p></li>
 </ul>
-<p>Here are the brief description of these functions of each file:</p>
-<section id="partitoninfo-h-cpp">
-<h2>PartitonInfo.h/.cpp<a class="headerlink" href="#partitoninfo-h-cpp" title="Permalink to this headline">¶</a></h2>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/partitioning/PartitionInfo.h">core/partitioning/PartitionInfo.h</a></p>
+<p>The export path makes use of <code class="docutils literal notranslate"><span class="pre">aten_tracer</span></code> whereas the alternate trace in compile is produced by the AOT Autograd library.
+Both these simplify the torch operators to reduced set of Aten operations.</p>
 </div></blockquote>
-<p>The automatic fallback APIs that is used for partitioning.</p>
+<p>As mentioned above, if you would like to add a new converter, its implementation will be included in <code class="docutils literal notranslate"><span class="pre">TensorRT/py/torch_tensorrt/dynamo/conversion/impl</span></code>
+Although there is a corresponding implementation of the converters  included in the common implementation library present in <code class="docutils literal notranslate"><span class="pre">TensorRT/py/torch_tensorrt/fx/impl</span></code> for FX converters, this documentation focuses on the implementation of the <code class="docutils literal notranslate"><span class="pre">aten_ops</span></code> converters in dynamo.</p>
 </section>
-<section id="segmentedblock-h-cpp">
-<h2>SegmentedBlock.h/.cpp<a class="headerlink" href="#segmentedblock-h-cpp" title="Permalink to this headline">¶</a></h2>
+<section id="converter-implementation">
+<h2>Converter implementation<a class="headerlink" href="#converter-implementation" title="Permalink to this headline">¶</a></h2>
+<p>In this section, we illustrate the steps to be implemented for writing a converter. We divide them according to activation, operator, lowering pass implementation or evaluator.
+Each of them is detailed with the help of an example</p>
 <blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/partitioning/SegmentedBlock.h">core/partitioning/SegmentedBlock.h</a></p>
-</div></blockquote>
-<p>The main data structures that is used to maintain information for each segments after segmentation.</p>
-</section>
-<section id="shape-analysis-h-cpp">
-<h2>shape_analysis.h/.cpp<a class="headerlink" href="#shape-analysis-h-cpp" title="Permalink to this headline">¶</a></h2>
+<div><ul>
+<li><p>Registration</p>
 <blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/partitioning/shape_analysis.h">core/partitioning/shape_analysis.h</a></p>
-</div></blockquote>
-<p>Code implementation to get the shapes for each segments by running them in JIT.</p>
-</section>
-<section id="partitioning-h-cpp">
-<h2>partitioning.h/.cpp<a class="headerlink" href="#partitioning-h-cpp" title="Permalink to this headline">¶</a></h2>
+<div><p>The converter needs to be registered with the appropriate op code in the <code class="docutils literal notranslate"><span class="pre">dynamo_tensorrt_converter</span></code>.</p>
+<ul>
+<li><p>Activation type</p>
 <blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/partitioning/partitioning.h">core/partitioning/partitioning.h</a></p>
-</div></blockquote>
-<p>APIs and main code implementation for partitioning phase.</p>
-</section>
-</section>
-<section id="automatic-fallback">
-<h1>Automatic Fallback<a class="headerlink" href="#automatic-fallback" title="Permalink to this headline">¶</a></h1>
-<p>To enable automatic fallback feature, you can set following attributes in Python:</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>import torch
-import torch_tensorrt as torchtrt
-
-...
-model = MyModel()
-ts_model = torch.jit.script(model)
-trt_model = torchtrt.ts.compile(model, **{
-  ...
-  &quot;min_block_size&quot; : 3,
-  &quot;torch_executed_ops&quot;: [&quot;aten::add&quot;],
-  &quot;torch_executed_modules&quot;: [],
-})
+<div><p>Example: <code class="docutils literal notranslate"><span class="pre">leaky_relu</span></code></p>
+<ul>
+<li><p>aten_ops_converters: Dynamo_converters</p>
+<blockquote>
+<div><p>Define in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/aten_ops_converters</span></code>. One needs to register the opcode generated in the trace with <code class="docutils literal notranslate"><span class="pre">dynamo_tensorrt_converter</span></code> decorator. Op code to be used for the registration or the converter registry key in this case is <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.leaky_relu.default</span></code></p>
+<blockquote>
+<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@dynamo_tensorrt_converter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">leaky_relu</span><span class="o">.</span><span class="n">default</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">aten_ops_leaky_relu</span><span class="p">(</span>
+        <span class="n">network</span><span class="p">:</span> <span class="n">TRTNetwork</span><span class="p">,</span>
+        <span class="n">target</span><span class="p">:</span> <span class="n">Target</span><span class="p">,</span>
+        <span class="n">args</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Argument</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+        <span class="n">kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Argument</span><span class="p">],</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">TRTTensor</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">TRTTensor</span><span class="p">]]:</span>
+            <span class="k">return</span> <span class="n">activation</span><span class="o">.</span><span class="n">leaky_relu</span><span class="p">(</span><span class="n">network</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">SourceIR</span><span class="o">.</span><span class="n">ATEN</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
 </pre></div>
 </div>
-<ul class="simple">
-<li><p>enabled: By default automatic fallback will be off. It is enabled by setting it to True.</p></li>
-<li><p>min_block_size: The minimum number of consecutive operations that must satisfy to be converted to TensorRT. For example, if it’s set to 3, then there must be 3 consecutive supported operators then this segments will be converted.</p></li>
-<li><p>forced_fallback_ops: A list of strings that will be the names of operations that the user explicitly want to be in PyTorch nodes.</p></li>
+</div></blockquote>
+</div></blockquote>
+</li>
 </ul>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>#include &quot;torch/script.h&quot;
-#include &quot;torch_tensorrt/torch_tensorrt.h&quot;
-
-...
-auto in = torch::randn({1, 3, 224, 224}, {torch::kCUDA});
-
-auto mod = torch::jit::load(&quot;trt_ts_module.ts&quot;);
-auto input_sizes =  std::vector&lt;torchtrt::InputRange&gt;{{in.sizes()}};
-torchtrt::ts::CompileSpec cfg(input_sizes);
-cfg.min_block_size = 2;
-cfg.torch_executed_ops.push_back(&quot;aten::relu&quot;);
-auto trt_mod = torchtrt::ts::compile(mod, cfg);
-auto out = trt_mod.forward({in});
+<p>The <code class="docutils literal notranslate"><span class="pre">tensorrt_converter</span></code> (used for FX registration) and <code class="docutils literal notranslate"><span class="pre">dynamo_tensorrt_converter</span></code> are similar decorator functions with some differences.</p>
+<ol class="arabic">
+<li><p>Both register the converters in the registeries (python dictionaries) - <code class="docutils literal notranslate"><span class="pre">CONVERTERS</span></code> and <code class="docutils literal notranslate"><span class="pre">DYNAMO_CONVERTERS</span></code> respectively. These are two dictioneries which are concatenated to form the overall converter registry</p></li>
+<li><p>The dictionary is keyed on the <code class="docutils literal notranslate"><span class="pre">OpOverLoad</span></code> which is mentioned in more detail below with examples</p></li>
+<li><p>Both return the decorated converter implementation</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">CONVERTERS</span></code> directly registers the decorated <code class="docutils literal notranslate"><span class="pre">converter_implementation</span></code> function, while <code class="docutils literal notranslate"><span class="pre">DYNAMO_CONVERTERS</span></code> has additionational arguments and registers the <code class="docutils literal notranslate"><span class="pre">ConverterSupport</span></code> object</p></li>
+<li><p>The additional arguments are:</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li><p>key: Node target for which the converter is implemented for (for example, torch.ops.aten.leaky_relu.Tensor)</p></li>
+<li><p>enabled: Whether the converter should be enabled/cached or not</p></li>
+<li><p>capability_validator: Function which evaluates whether a node is valid for conversion by the decorated converter. It defaults to None, implying the capability_validator function is always true. This means all nodes of “key” kind can be supported by this converter by default. See <code class="docutils literal notranslate"><span class="pre">embedding</span></code> example for more details</p></li>
+<li><p>priority: Converter’s level of priority relative to other converters with the same target</p></li>
+</ol>
+</div></blockquote>
+</li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">ConverterSupport</span></code> is a compilation of <code class="docutils literal notranslate"><span class="pre">converter_implementation</span></code> and <code class="docutils literal notranslate"><span class="pre">capability_validator</span></code>.</p></li>
+</ol>
+<p>The function decorated by <code class="docutils literal notranslate"><span class="pre">tensorrt_converter</span></code> and <code class="docutils literal notranslate"><span class="pre">dynamo_tensorrt_converter</span></code> has the following arguments which are automatically generated by the trace functions mentioned above.</p>
+<ol class="arabic simple">
+<li><p>network : Node in the form of <code class="docutils literal notranslate"><span class="pre">call_module</span></code> or <code class="docutils literal notranslate"><span class="pre">call_function</span></code> having the target as the key</p></li>
+<li><p>target: Target key in the <code class="docutils literal notranslate"><span class="pre">call_module</span></code> or <code class="docutils literal notranslate"><span class="pre">call_function</span></code> above. eg: <code class="docutils literal notranslate"><span class="pre">torch.ops.aten_.leaky_relu.default</span></code>. Note that <code class="docutils literal notranslate"><span class="pre">torch.ops.aten._leaky_relu</span></code> is the <code class="docutils literal notranslate"><span class="pre">OpOverloadPacket</span></code> while <code class="docutils literal notranslate"><span class="pre">torch.ops.aten_.leaky_relu.default</span></code> is <code class="docutils literal notranslate"><span class="pre">OpOverload</span></code>.</p></li>
+<li><p>args: The arguments passed in the <code class="docutils literal notranslate"><span class="pre">call_module</span></code> or <code class="docutils literal notranslate"><span class="pre">call_function</span></code> above</p></li>
+<li><p>kwargs: The kwargs passed in the <code class="docutils literal notranslate"><span class="pre">call_module</span></code> or <code class="docutils literal notranslate"><span class="pre">call_function</span></code> above</p></li>
+<li><p>name: String containing the name of the target</p></li>
+</ol>
+<p>As a user writing new converters, one just needs to take care that the approriate arguments are extracted from the trace generated to the implementation function in the implementation lib function <code class="docutils literal notranslate"><span class="pre">activation.leaky_relu</span></code> (which we will discuss below in detail).</p>
+</div></blockquote>
+</li>
+<li><p>Operation type</p>
+<blockquote>
+<div><p>Example: <code class="docutils literal notranslate"><span class="pre">fmod</span></code></p>
+<p>It follows the same steps as the above converter. In this case the opcode is <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.fmod.Scalar</span></code> or <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.fmod.Tensor</span></code>.
+Hence both the opcodes are registered in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/aten_ops_converters</span></code>.
+Note that <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.fmod</span></code> is the <code class="docutils literal notranslate"><span class="pre">OpOverLoadPacket</span></code> while the registry is keyed on <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.fmod.Scalar</span></code> or <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.fmod.Tensor</span></code>, which is <code class="docutils literal notranslate"><span class="pre">OpOverLoad</span></code></p>
+<p>Example: <code class="docutils literal notranslate"><span class="pre">embedding</span></code></p>
+<p>It follows the same steps as the above converter. In this case the opcode is <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.embedding.default</span></code>.
+There are some converters which have special cases to be accounted for. In those cases, one should use <code class="docutils literal notranslate"><span class="pre">capability_validators</span></code> to register the converter using <code class="docutils literal notranslate"><span class="pre">&#64;dynamo_tensorrt_converter</span></code>
+We illustrate this through <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.embedding.default</span></code>. It has parameters - <code class="docutils literal notranslate"><span class="pre">scale_grad_by_freq</span></code> and <code class="docutils literal notranslate"><span class="pre">sparse</span></code> which are not currently supported by the implementation.
+In such cases we can write validator <code class="docutils literal notranslate"><span class="pre">embedding_param_validator</span></code> which implements that given those paramters the converter is not supported and register the converter by</p>
+<blockquote>
+<div></div></blockquote>
+<p>So if there is a new converter in which certain special cases are not to be supported then they can be specified in the <code class="docutils literal notranslate"><span class="pre">capability_validator</span></code>.</p>
+</div></blockquote>
+</li>
+<li><p>Evaluator type</p>
+<blockquote>
+<div><p>Example: <code class="docutils literal notranslate"><span class="pre">operator.getitem</span></code></p>
+<p>Evaluators are categorized as so since they do not make any modification to the graph. This is implemented in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/op_evaluators.py</span></code>, with the corresponding <code class="docutils literal notranslate"><span class="pre">capbility_validator</span></code>.
+The opcode is <code class="docutils literal notranslate"><span class="pre">operator.getitem</span></code>.</p>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Implementation Library</p>
+<blockquote>
+<div><p>The dynamo converters would be located in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl</span></code></p>
+<ul>
+<li><p>Activation</p>
+<blockquote>
+<div><p>Example: <code class="docutils literal notranslate"><span class="pre">leaky_relu</span></code></p>
+<p>The implementation is to be placed in present in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/activation.py</span></code>. This is where all the activation functions are defined and implemented.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">leaky_relu</span><span class="p">(</span>
+    <span class="n">network</span><span class="p">:</span> <span class="n">TRTNetwork</span><span class="p">,</span>
+    <span class="n">target</span><span class="p">:</span> <span class="n">Target</span><span class="p">,</span>
+    <span class="n">source_ir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SourceIR</span><span class="p">],</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">input_val</span><span class="p">:</span> <span class="n">TRTTensor</span><span class="p">,</span>
+    <span class="n">alpha</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span>
+<span class="p">):</span>
+    <span class="c1">#implementation</span>
 </pre></div>
 </div>
+<p>The implementation function has the following arguments.</p>
+<ol class="arabic simple">
+<li><p>network : <code class="docutils literal notranslate"><span class="pre">network</span></code> passed from the decorated function registration</p></li>
+<li><p>target: <code class="docutils literal notranslate"><span class="pre">target</span></code> passed from the decorated function registration</p></li>
+<li><p>source_ir: Enum attribute. <code class="docutils literal notranslate"><span class="pre">SourceIR</span></code> enum is defined in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/converter_utils</span></code></p></li>
+<li><p>name: <code class="docutils literal notranslate"><span class="pre">name</span></code> passed from the decorated function registration</p></li>
+<li><p>input_val: Approriate arguments extracted from the decorated function registration from args or kwargs</p></li>
+<li><p>alpha: Approriate arguments extracted from the decorated function registration from args or kwargs. If not None, it will set the alpha attribute of the created TensorRT activation layer eg: Used in leaky_relu, elu, hardtanh</p></li>
+<li><p>beta: Approriate arguments extracted from the decorated function registration from args or kwargs. If not None, it will set the beta attribute of the created TensorRT activation layer eg: Used in hardtanh</p></li>
+<li><p>dyn_range_fn: A optional function which takes the dynamic range of a TensorRT Tensor and returns the output dynamic range</p></li>
+</ol>
+<p>The implementation functions call the <code class="docutils literal notranslate"><span class="pre">convert_activation</span></code> function in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/activation.py</span></code>. This function will add the approriate activation layer via <code class="docutils literal notranslate"><span class="pre">network.add_activation</span></code>.</p>
+</div></blockquote>
+</li>
+<li><p>Operator</p>
+<blockquote>
+<div><p>The implementation is to be placed in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/elementwise/ops.py</span></code> for dynamo. This is where all the elementwise functions are defined and implemented.
+For a new operator, one should identify the category to which it belongs. Following are some examples</p>
+<ol class="arabic simple">
+<li><p>Elementwise operators like <code class="docutils literal notranslate"><span class="pre">fmod</span></code> is present in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/elementwise</span></code>. The <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/elementwise/base</span></code> contains base functions for elementwise operator.</p></li>
+<li><p>Unary operators like <code class="docutils literal notranslate"><span class="pre">sqrt</span></code> will be present in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/unary</span></code>. The <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/unary/base</span></code> contains base functions for unary operator.</p></li>
+<li><p>Normalization operators like <code class="docutils literal notranslate"><span class="pre">softmax</span></code>, <code class="docutils literal notranslate"><span class="pre">layer_norm</span></code>, <code class="docutils literal notranslate"><span class="pre">batch_norm</span></code> will be present in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/normalization</span></code>. Since there are no base operations common to all, there is no base file. But one can choose to implement a base file, if there are common functions across all normalization operations</p></li>
+<li><p>Individual operators like <code class="docutils literal notranslate"><span class="pre">slice</span></code>, <code class="docutils literal notranslate"><span class="pre">select</span></code>, <code class="docutils literal notranslate"><span class="pre">where</span></code>, <code class="docutils literal notranslate"><span class="pre">embedding</span></code> will be present in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/*.py</span></code>. They will have individual operator implementation with the same API structure as above but with different individual arguments</p></li>
+</ol>
+<p>Please note that the above operators would have common functions to be implemented which should be placed in
+<code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/converter_utils.py</span></code></p>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Lowering type</p>
+<blockquote>
+<div><p>There are some converters which can be decomposed into suboperations and need not have seperate converter registration.
+Such converters can be implemented via <code class="docutils literal notranslate"><span class="pre">lowering</span> <span class="pre">passes</span></code></p>
+<p>Example: <code class="docutils literal notranslate"><span class="pre">addmm</span></code></p>
+<p>The decompositions are registered via <code class="docutils literal notranslate"><span class="pre">register_decomposition</span></code> in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/backend/lowering/_decompositions.py</span></code>
+We define <code class="docutils literal notranslate"><span class="pre">addmm_replacement</span></code> and replace it with the torch ops, which will have their corresponding converters called.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@register_decomposition</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">addmm</span><span class="p">,</span> <span class="n">registry</span><span class="o">=</span><span class="n">DECOMPOSITIONS</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">addmm_replacement</span><span class="p">(</span>
+    <span class="n">input_</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">mat1</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">mat2</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mi">1</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">mul</span><span class="p">(</span><span class="n">input_</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">mul</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">mat1</span><span class="p">,</span> <span class="n">mat2</span><span class="p">),</span> <span class="n">alpha</span><span class="p">)</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+<p>Note that there are some pre-existing dynamo decompositions in torch directory, in which case they should be used,
+In that case please enable the decompositions in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/lowering/_decomposition_groups.py</span></code> in <code class="docutils literal notranslate"><span class="pre">torch_enabled_decompositions</span></code>.
+Similarly you can choose to disable any in <code class="docutils literal notranslate"><span class="pre">torch_disabled_decompositions</span></code>. Please note that the ones already defined in the lowering will take precedence over torch lowering ops.</p>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
 </section>
-<section id="dependency-aware-partitioning">
-<h1>Dependency Aware Partitioning<a class="headerlink" href="#dependency-aware-partitioning" title="Permalink to this headline">¶</a></h1>
-<p>During segmentation, Torch-TensorRT uses a dependency graph of the input TorchScript nodes to reduce the number of segments created. Consider this example from test Partitioning.SegmentModelWithDependencyAwareness in <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/tests/core/partitioning/test_segmentation.cpp">tests/core/partitioning/test_segmentation.cpp</a></p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>graph(%x : Tensor, %y : Tensor):
-    %3 : int = prim::Constant[value=0]()
-    %20 : int = prim::Constant[value=1]()
-    %add : Tensor = aten::add(%x, %y, %20)
-    %x_lgamma : Tensor = aten::lgamma(%x)
-    %mul : Tensor = aten::mul(%x, %y)
-    %y_lgamma : Tensor = aten::lgamma(%y)
-    %div : Tensor = aten::div(%x, %y)
-    %div_lgamma : Tensor = aten::lgamma(%div)
-    %27 : Tensor[] = prim::ListConstruct(%x_lgamma, %y_lgamma, %div_lgamma, %add, %mul)
-    %12 : Tensor = aten::cat(%27, %3)
-    return (%12)
-</pre></div>
-</div>
-<p>In this graph <cite>aten::lgamma</cite> is not supported by conversion and must be partitioned in a Torch fallback segment. If Torch-TensorRT uses a greedy segmentation strategy that traverses nodes in the input graph in order and gathers ops with the same target (TensorRT or Torch) into a segment until it encounters an op with a different target, the resulting partition includes 7 segments, many with just a single op.</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Segment Block @0:
-    Target: TensorRT
-
-    Graph: graph(%x : Tensor,
-        %y : Tensor):
-    %3 : int = prim::Constant[value=1]()
-    %0 : Tensor = aten::add(%x, %y, %3)
-    return ()
-
-Segment Block @1:
-    Target: Torch
-
-    Graph: graph(%x : Tensor):
-    %0 : Tensor = aten::lgamma(%x)
-    return ()
-
-Segment Block @2:
-    Target: TensorRT
-
-    Graph: graph(%x : Tensor,
-        %y : Tensor):
-    %0 : Tensor = aten::mul(%x, %y)
-    return ()
-
-Segment Block @3:
-    Target: Torch
-
-    Graph: graph(%y : Tensor):
-    %0 : Tensor = aten::lgamma(%y)
-    return ()
-
-Segment Block @4:
-    Target: TensorRT
-
-    Graph: graph(%x : Tensor,
-        %y : Tensor):
-    %0 : Tensor = aten::div(%x, %y)
-    return ()
-
-Segment Block @5:
-    Target: Torch
-
-    Graph: graph(%1 : Tensor):
-    %0 : Tensor = aten::lgamma(%1)
-    return ()
-
-Segment Block @6:
-    Target: TensorRT
-
-    Graph: graph(%1 : Tensor,
-        %2 : Tensor,
-        %3 : Tensor,
-        %4 : Tensor,
-        %5 : Tensor):
-    %7 : int = prim::Constant[value=0]()
-    %0 : Tensor[] = prim::ListConstruct(%1, %2, %3, %4, %5)
-    %6 : Tensor = aten::cat(%0, %7)
-    return ()
-</pre></div>
-</div>
-<p>This partition is valid, but the segmentation is suboptimal. These arithmetic ops and <cite>aten::lgamma</cite> ops are each split into their own segment as we alternate between Torch and TensorRT targets in the linear traversal of the graph.</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>%add : Tensor = aten::add(%x, %y, %20)
-%x_lgamma : Tensor = aten::lgamma(%x)
-%mul : Tensor = aten::mul(%x, %y)
-%y_lgamma : Tensor = aten::lgamma(%y)
-%div : Tensor = aten::div(%x, %y)
-%div_lgamma : Tensor = aten::lgamma(%div)
-</pre></div>
-</div>
-<p>Each of the arithmetic ops in this segment is only dependent on constants and the inputs <cite>%x</cite> and <cite>%y</cite>. The <cite>aten::lgamma</cite> ops are dependent on the inputs <cite>%x</cite>, <cite>%y</cite> and the output of the <cite>aten::div</cite>. This means that we could rewrite this portion of the input graph as below without changing the behavior of the graph. This reordered series of ops could be cleanly partitioned into just 2 segments using the greedy segmentation approach described above.</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>%add : Tensor = aten::add(%x, %y, %20)
-%mul : Tensor = aten::mul(%x, %y)
-%div : Tensor = aten::div(%x, %y)
-%x_lgamma : Tensor = aten::lgamma(%x)
-%y_lgamma : Tensor = aten::lgamma(%y)
-%div_lgamma : Tensor = aten::lgamma(%div)
-</pre></div>
-</div>
-<p>By adding awareness of the dependencies between ops to the basic greedy segmentation approach we can achieve the same partition without rewriting the graph. Now we will maintain both Torch and TensorRT targeted segments at the same time as we traverse the graph. We will only finalize a segment once we hit an op that is both dependent on an op in the segment and has a different target. This will allow the partition to create larger segments by reordering nodes across the segment boundary while guaranteeing that we will not modify the behavior of the graph by reordering nodes relative to their dependencies.
-In this example we will collect the arithmetic ops in a TensorRT segment and the <cite>aten::lgamma</cite> ops in a Torch segment. When we encounter the <cite>%div_lgamma : Tensor = aten::lgamma(%div)</cite> op we can see it is dependent on <cite>%div : Tensor = aten::div(%x, %y)</cite> in the current TensorRT segment. This triggers finalization of the TensorRT segment containing the <cite>aten::div</cite> op to guarantee it will appear before its dependency in the final partition. The Torch segment containing the <cite>aten::lgamma</cite> op is finalized when we encounter the <cite>prim::ListConstruct</cite> op which targets TensorRT and is dependent on the results of the <cite>aten::lgamma</cite> ops.</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Segment Block @0:
-    Target: TensorRT
-
-    Graph: graph(%x : Tensor,
-        %y : Tensor):
-    %3 : int = prim::Constant[value=1]()
-    %0 : Tensor = aten::add(%x, %y, %3)
-    %4 : Tensor = aten::mul(%x, %y)
-    %5 : Tensor = aten::div(%x, %y)
-    return ()
-
-Segment Block @1:
-    Target: Torch
-
-    Graph: graph(%x : Tensor,
-        %y : Tensor,
-        %5 : Tensor):
-    %0 : Tensor = aten::lgamma(%x)
-    %2 : Tensor = aten::lgamma(%y)
-    %4 : Tensor = aten::lgamma(%5)
-    return ()
-
-Segment Block @2:
-    Target: TensorRT
-
-    Graph: graph(%1 : Tensor,
-        %2 : Tensor,
-        %3 : Tensor,
-        %4 : Tensor,
-        %5 : Tensor):
-    %7 : int = prim::Constant[value=0]()
-    %0 : Tensor[] = prim::ListConstruct(%1, %2, %3, %4, %5)
-    %6 : Tensor = aten::cat(%0, %7)
-    return ()
-</pre></div>
-</div>
-<p>In some cases this approach may create adjacent segments in the partition which have the same target. As a clean-up step we can consolidate these adjacent segments to further reduce the number of segments in the final partition.
-The merge segments step identifies a list of segments that are adjacent in the graph, have the same target, and are not marked as <cite>do_not_merge</cite>. The nodes from these segments will be combined into a single new segment that will replace the merged segments in the partition.
-The <cite>do_not_merge</cite> marking is used to prevent merging of segments created for conditional nodes and loops that are handled as special cases in graph stitching and should not be merged with adjacent segments of the same type.</p>
+<section id="tests">
+<h2>Tests<a class="headerlink" href="#tests" title="Permalink to this headline">¶</a></h2>
+<ul>
+<li><p>Dynamo testing:</p>
+<blockquote>
+<div><p>Dynamo tests are present for the lowering ops in <code class="docutils literal notranslate"><span class="pre">tests/py/dynamo/lowering/test_decompositions.py</span></code>. The above converters will soon be ported to dynamo tests</p>
+<ol class="arabic">
+<li><p>Compare the results for <code class="docutils literal notranslate"><span class="pre">fx.symbolic_trace</span></code> and <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile</span></code>.</p></li>
+<li><p>Test for the <code class="docutils literal notranslate"><span class="pre">expected_op</span></code> and the <code class="docutils literal notranslate"><span class="pre">unexpected_op</span></code>.</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">expected_op</span></code>: Operations the operations are lowered to. eg: <code class="docutils literal notranslate"><span class="pre">mul</span></code> and <code class="docutils literal notranslate"><span class="pre">add</span></code> for <code class="docutils literal notranslate"><span class="pre">addmm</span></code></p></li>
+<li><p>Note that specify that <code class="docutils literal notranslate"><span class="pre">disable_passes=</span> <span class="pre">True</span></code> for cases where you would not want lowering passes (which should be the default when testing converters)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">unexpected_op</span></code>: Original operation. eg: <code class="docutils literal notranslate"><span class="pre">addmm</span></code> for <code class="docutils literal notranslate"><span class="pre">addmm</span></code></p></li>
+</ol>
+</div></blockquote>
+</li>
+</ol>
+</div></blockquote>
+</li>
+</ul>
+<p>The tests should fail if any of the above two conditions fail</p>
+</section>
 </section>
 
 
@@ -613,15 +597,6 @@ The <cite>do_not_merge</cite> marking is used to prevent merging of segments cre
              
             </div>
             <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="conversion.html" class="btn btn-neutral float-right" title="Conversion Phase" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
-      
-      
-        <a href="lowering.html" class="btn btn-neutral" title="Lowering Phase" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
-      
-    </div>
   
 
   
@@ -651,15 +626,13 @@ The <cite>do_not_merge</cite> marking is used to prevent merging of segments cre
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Partitioning Phase</a><ul>
-<li><a class="reference internal" href="#partitoninfo-h-cpp">PartitonInfo.h/.cpp</a></li>
-<li><a class="reference internal" href="#segmentedblock-h-cpp">SegmentedBlock.h/.cpp</a></li>
-<li><a class="reference internal" href="#shape-analysis-h-cpp">shape_analysis.h/.cpp</a></li>
-<li><a class="reference internal" href="#partitioning-h-cpp">partitioning.h/.cpp</a></li>
+<li><a class="reference internal" href="#">Dynamo Converters</a></li>
+<li><a class="reference internal" href="#steps">Steps</a><ul>
+<li><a class="reference internal" href="#operation-set">Operation Set</a></li>
+<li><a class="reference internal" href="#converter-implementation">Converter implementation</a></li>
+<li><a class="reference internal" href="#tests">Tests</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#automatic-fallback">Automatic Fallback</a></li>
-<li><a class="reference internal" href="#dependency-aware-partitioning">Dependency Aware Partitioning</a></li>
 </ul>
 
             </div>
