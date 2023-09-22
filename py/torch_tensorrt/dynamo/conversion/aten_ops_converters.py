@@ -329,6 +329,23 @@ def aten_ops_squeeze(
     return impl.squeeze.squeeze(network, target, SourceIR.ATEN, name, args[0], args[1])
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.erf.default)  # type: ignore[misc]
+def aten_ops_erf(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.erf(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.unsqueeze.default)  # type: ignore[misc]
 def aten_ops_unsqueeze(
     network: TRTNetwork,
@@ -357,14 +374,14 @@ def aten_ops_softmax(
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.split.Tensor, capability_validator=dynamic_unsupported_with_args([1])
-)
+)  # type: ignore[misc]
 @dynamo_tensorrt_converter(
     torch.ops.aten.split.sizes, capability_validator=dynamic_unsupported_with_args([1])
-)
+)  # type: ignore[misc]
 @dynamo_tensorrt_converter(
     torch.ops.aten.split_with_sizes.default,
     capability_validator=dynamic_unsupported_with_args([1]),
-)
+)  # type: ignore[misc]
 def aten_ops_split(
     network: TRTNetwork,
     target: Target,
