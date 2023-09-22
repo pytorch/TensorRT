@@ -15,6 +15,7 @@ from . import (
     select,
     shape,
     slice,
+    split,
     squeeze,
     unary,
     unsqueeze,

@@ -9,24 +9,28 @@ http_archive(
         sha256 = "778197e26c5fbeb07ac2a2c5ae405b30f6cb7ad1f5510ea6fdac03bded96cc6f",
     )
 
-load("@rules_python//python:pip.bzl", "pip_install")
+load("@rules_python//python:repositories.bzl", "py_repositories")
+
+py_repositories()
 
 http_archive(
     name = "rules_pkg",
+    sha256 = "8f9ee2dc10c1ae514ee599a8b42ed99fa262b757058f65ad3c384289ff70c4b8",
     urls = [
-    	"https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.4.0/rules_pkg-0.4.0.tar.gz",
-	"https://github.com/bazelbuild/rules_pkg/releases/download/0.4.0/rules_pkg-0.4.0.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.9.1/rules_pkg-0.9.1.tar.gz",
+        "https://github.com/bazelbuild/rules_pkg/releases/download/0.9.1/rules_pkg-0.9.1.tar.gz",
     ],
-    sha256 = "038f1caa773a7e35b3663865ffb003169c6a71dc995e39bf4815792f385d837d",
 )
+
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
+
 rules_pkg_dependencies()
 
-git_repository(
+http_archive(
     name = "googletest",
-    remote = "https://github.com/google/googletest",
-    commit = "703bd9caab50b139428cea1aaff9974ebee5742e",
-    shallow_since = "1570114335 -0400"
+    sha256 = "755f9a39bc7205f5a0c428e920ddad092c33c8a1b46997def3f1d4a82aded6e1",
+    strip_prefix = "googletest-5ab508a01f9eb089207ee87fd547d290da39d015",
+    urls = ["https://github.com/google/googletest/archive/5ab508a01f9eb089207ee87fd547d290da39d015.zip"],
 )
 
 # External dependency for torch_tensorrt if you already have precompiled binaries.
@@ -80,17 +84,13 @@ new_local_repository(
 #########################################################################
 # Testing Dependencies (optional - comment out on aarch64)
 #########################################################################
-pip_install(
-    name = "torch_tensorrt_py_deps",
-    requirements = "//py:requirements.txt",
+load("@rules_python//python:pip.bzl", "pip_parse")
+
+pip_parse(
+    name = "devtools_deps",
+    requirements_lock = "//:requirements-dev.txt",
 )
 
-pip_install(
-    name = "py_test_deps",
-    requirements = "//tests/py:requirements.txt",
-)
+load("@devtools_deps//:requirements.bzl", "install_deps")
 
-pip_install(
-    name = "pylinter_deps",
-    requirements = "//tools/linter:requirements.txt",
-)
+install_deps()
