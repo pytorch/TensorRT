@@ -20,7 +20,12 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                auto in_shape = util::toVec(in->getDimensions());
                std::vector<int64_t> out_shape;
                if (ctx->input_is_dynamic) {
-                 end_dim = (end_dim == -1) ? in_shape.size() - 1 : end_dim;
+                 if (start_dim < 0) {
+                   start_dim = start_dim + in_shape.size();
+                 }
+                 if (end_dim < 0) {
+                   end_dim = end_dim + in_shape.size();
+                 }
                  int nbDynamicFlattenedDims = 0;
                  int nbDynamicUnflattenedDims = 0;
                  for (int i = 0; i < (int)in_shape.size(); i++) {

@@ -128,6 +128,7 @@ Contributor Documentation
 --------------------------------
 * :ref:`system_overview`
 * :ref:`writing_converters`
+* :ref:`writing_dynamo_aten_lowering_passes`
 * :ref:`useful_links`
 
 .. toctree::
@@ -137,6 +138,7 @@ Contributor Documentation
 
    contributors/system_overview
    contributors/writing_converters
+   contributors/writing_dynamo_aten_lowering_passes
    contributors/useful_links
 
 Indices
