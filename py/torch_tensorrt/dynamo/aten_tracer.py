@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import unittest.mock
-from typing import Any, Tuple
+from typing import Any, List, Tuple
 
 import torch
 from torch._export import dynamic_dim, export
@@ -13,6 +13,20 @@ from torch_tensorrt.dynamo.lowering import get_decompositions
 from torch_tensorrt.dynamo.utils import get_torch_inputs, set_log_level, to_torch_device
 
 logger = logging.getLogger(__name__)
+
+
+def get_random_tensor(
+    shape: List[Any], dtype: torch.dtype, device: torch.device
+) -> torch.Tensor:
+    if dtype == torch.int32 or dtype == torch.int64:
+        return torch.randint(2, 10, shape, dtype=dtype, device=device)
+    elif dtype in (torch.float64, torch.float32, torch.float16):
+        return torch.randn(shape, dtype=dtype, device=device)
+    else:
+        logger.critical(
+            "Invalid dtype detected in creating input tensors for tracing the graph."
+        )
+        raise
 
 
 def trace(
@@ -49,9 +63,8 @@ def trace(
                         new_shape.append(torch_inputs[idx].shape[dim] + 1)
                     else:
                         new_shape.append(torch_inputs[idx].shape[dim])
-            trace_input = torch.randn(
-                new_shape, dtype=torch_inputs[idx].dtype, device=device
-            )
+
+            trace_input = get_random_tensor(new_shape, torch_inputs[idx].dtype, device)
 
             for dim in constraint_dims:
                 if min_shape[dim] > 1:
