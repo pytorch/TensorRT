@@ -33,8 +33,8 @@ from torch_tensorrt.dynamo.conversion import (
     repair_long_or_double_inputs,
 )
 from torch_tensorrt.dynamo.export import create_trt_exp_program, transform
+from torch_tensorrt.dynamo.lowering import apply_lowering_passes
 from torch_tensorrt.dynamo.utils import (
-    constant_fold,
     prepare_inputs,
     set_log_level,
     to_torch_device,
@@ -91,6 +91,7 @@ def compile(
     )
 
     gm = exported_program.module()
+    gm = apply_lowering_passes(gm)
     logger.debug("Post export graph: " + str(gm.graph))
 
     if not isinstance(inputs, collections.abc.Sequence):
@@ -140,8 +141,6 @@ def compile(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-    # Run constant folding before TRT compilation
-    constant_fold(gm)
     trt_gm = compile_module(gm, torch_inputs, settings)
     trt_gm = transform(trt_gm, torch_inputs)
     trt_exp_program = create_trt_exp_program(

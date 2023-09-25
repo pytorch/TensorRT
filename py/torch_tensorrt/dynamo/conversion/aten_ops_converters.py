@@ -1,13 +1,17 @@
 import logging
-from typing import Any, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import torch
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    is_only_operator_on_placeholder,
+)
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 
 from .converter_registry import dynamo_tensorrt_converter
+from .converter_utils import dynamic_unsupported_with_args
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -325,6 +329,23 @@ def aten_ops_squeeze(
     return impl.squeeze.squeeze(network, target, SourceIR.ATEN, name, args[0], args[1])
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.erf.default)  # type: ignore[misc]
+def aten_ops_erf(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.erf(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.unsqueeze.default)  # type: ignore[misc]
 def aten_ops_unsqueeze(
     network: TRTNetwork,
@@ -348,6 +369,34 @@ def aten_ops_softmax(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.normalization.softmax(
         network, target, SourceIR.ATEN, name, args[0], args[1]
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.split.Tensor, capability_validator=dynamic_unsupported_with_args([1])
+)  # type: ignore[misc]
+@dynamo_tensorrt_converter(
+    torch.ops.aten.split.sizes, capability_validator=dynamic_unsupported_with_args([1])
+)  # type: ignore[misc]
+@dynamo_tensorrt_converter(
+    torch.ops.aten.split_with_sizes.default,
+    capability_validator=dynamic_unsupported_with_args([1]),
+)  # type: ignore[misc]
+def aten_ops_split(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.split.split(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        split_size_or_sections=args[1],
+        dim=args_bounds_check(args, 2, 0),
     )
 
 
@@ -441,29 +490,59 @@ def aten_ops_permute(
     )
 
 
-def to_copy_dtype_validator(to_copy_node: Node) -> bool:
-    allowed_casts = {torch.float, torch.int32, torch.bool, torch.int8, torch.float16}
+def to_copy_dtype_validator(placeholder_only: bool) -> Callable[[Node], bool]:
+    """Return validator for to_copy node with placeholder restrictions"""
 
-    # Validate input node has convertible kwargs
-    if "dtype" in to_copy_node.kwargs:
-        if to_copy_node.kwargs["dtype"] in allowed_casts:
-            return True
+    def validate_dtype(to_copy_node: Node) -> bool:
+        """Returns true if the to_copy node can be converted to TRT
+
+        Based on data type being casted to
+        """
+        allowed_casts = {
+            torch.float,
+            torch.int32,
+            torch.bool,
+            torch.int8,
+            torch.float16,
+        }
+
+        # Validate input node has convertible kwargs
+        if "dtype" in to_copy_node.kwargs:
+            if to_copy_node.kwargs["dtype"] in allowed_casts:
+                return True
+            else:
+                _LOGGER.debug(
+                    f"_to_copy converter rejected node {to_copy_node} with dtype {to_copy_node.kwargs['dtype']}"
+                )
+                return False
         else:
             _LOGGER.debug(
-                f"_to_copy converter rejected node {to_copy_node} with dtype {to_copy_node.kwargs['dtype']}"
+                f"_to_copy converter rejected node {to_copy_node} with kwargs {to_copy_node.kwargs}"
             )
             return False
-    else:
-        _LOGGER.debug(
-            f"_to_copy converter rejected node {to_copy_node} with kwargs {to_copy_node.kwargs}"
+
+    def validator(to_copy_node: Node) -> bool:
+        """Returns true if the to_copy node can be converted to TRT
+        and the placeholder restriction is satisfied
+        """
+        # The placeholder restriction is satsfied if placeholder_only is the same
+        # truth value as is_only_operator_on_placeholder(to_copy_node)
+        return validate_dtype(to_copy_node) and (
+            (not placeholder_only) ^ is_only_operator_on_placeholder(to_copy_node)
         )
-        return False
+
+    return validator
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten._to_copy.default, capability_validator=to_copy_dtype_validator
+    torch.ops.aten.clone.default,
+    capability_validator=lambda node: not is_only_operator_on_placeholder(node),
 )  # type: ignore[misc]
-def aten_ops_to_copy_dtype(
+@dynamo_tensorrt_converter(
+    torch.ops.aten._to_copy.default,
+    capability_validator=to_copy_dtype_validator(placeholder_only=False),
+)  # type: ignore[misc]
+def aten_ops_clone_copy_dtype(
     network: TRTNetwork,
     target: Target,
     args: Tuple[Argument, ...],
@@ -476,24 +555,37 @@ def aten_ops_to_copy_dtype(
         SourceIR.ATEN,
         name,
         args[0],
-        kwargs["dtype"],
+        kwargs.get("dtype", args[0].dtype),
+        force_layer=False,
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.clone.default)  # type: ignore[misc]
-def aten_ops_clone(
+@dynamo_tensorrt_converter(
+    torch.ops.aten.clone.default,
+    capability_validator=is_only_operator_on_placeholder,
+)  # type: ignore[misc]
+@dynamo_tensorrt_converter(
+    torch.ops.aten._to_copy.default,
+    capability_validator=to_copy_dtype_validator(placeholder_only=True),
+)  # type: ignore[misc]
+def aten_ops_clone_copy_placeholder(
     network: TRTNetwork,
     target: Target,
     args: Tuple[Argument, ...],
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.cast.clone(
+    # For clone or copy nodes where the input is also the output,
+    # we need to force cast to ensure a layer is added to the TRT engine
+    # since TRT engine inputs cannot also be TRT engine outputs
+    return impl.cast.to_copy(
         network,
         target,
         SourceIR.ATEN,
         name,
         args[0],
+        kwargs.get("dtype", args[0].dtype),
+        force_layer=True,
     )
 
 
