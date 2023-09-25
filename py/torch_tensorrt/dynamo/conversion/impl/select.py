@@ -90,16 +90,16 @@ def index(
     # if no, then we need to broadcast
 
     last_index = None
-    broadcast_shape_len = 0
     for i, ind in enumerate(index):
         if ind is not None:
             _LOGGER.debug(f"Shape of {i} index is {ind.shape}")
             adv_indx_indices.append(i)
             # torch.nn.parameter.Parameter=> torch.Tensor
-            ind = get_trt_tensor(network, ind, f"parameter_to_fp32_tensor_{i}")
+            ind = get_trt_tensor(network, ind, name + f"_parameter_to_fp32_tensor_{i}")
             if last_index is not None:
-                if not (broadcastable(ind, last_index)):
-                    assert "The indices should be broadcastable"
+                assert broadcastable(
+                    ind, last_index
+                ), "The indices should be broadcastable!"
             last_index = ind
             tensor_indices.append(ind)
 
@@ -129,7 +129,7 @@ def index(
 
         for i in range(rank):
             dim = input_shape[i]
-            dim_tensor = get_trt_tensor(network, dim, f"individual_dim_{i}")
+            dim_tensor = get_trt_tensor(network, dim, name + f"_individual_dim_{i}")
             # dim_tensor_list is a list of tensors
             dim_tensor_list.append(dim_tensor)
 
@@ -166,8 +166,8 @@ def index(
 
         concat_tensor_layer = network.add_concatenation(
             [
-                get_trt_tensor(network, mult_d0, "d0_shape"),
-                get_trt_tensor(network, mult_d1, "d1_shape"),
+                get_trt_tensor(network, mult_d0, name + "_d0_shape"),
+                get_trt_tensor(network, mult_d1, name + "_d1_shape"),
             ]
         )
         set_layer_name(concat_tensor_layer, target, name + "_index_Concat", source_ir)
@@ -182,7 +182,9 @@ def index(
         # tensor index = \sum_{i=1}^m (ind_i * \prod_{j=i+1}^m (x_j)),  ind_i is input indices[i], x_j is the
         # // j dimension of input x.
         multiplier = get_trt_tensor(
-            network, dim_tensor_list[adv_indx_indices[adv_indx_count - 1]], "dim_last"
+            network,
+            dim_tensor_list[adv_indx_indices[adv_indx_count - 1]],
+            name + "_dim_last",
         )
         cum_adv_index = tensor_indices[adv_indx_count - 1]
         for i in range(adv_indx_count - 2, -1, -1):
@@ -190,7 +192,7 @@ def index(
                 network,
                 target,
                 source_ir,
-                name + "index_intermediate",
+                name + f"_index_intermediate_{i}",
                 trt.ElementWiseOperation.PROD,
                 multiplier,
                 tensor_indices[i],
@@ -199,7 +201,7 @@ def index(
                 network,
                 target,
                 source_ir,
-                name + "index_sum_intermediate",
+                name + f"_index_sum_intermediate_{i}",
                 trt.ElementWiseOperation.SUM,
                 cum_adv_index,
                 adv_index,
@@ -208,7 +210,7 @@ def index(
                 network,
                 target,
                 source_ir,
-                name + "index_intermediate",
+                name + f"_index_intermediate_xj_{i}",
                 trt.ElementWiseOperation.PROD,
                 multiplier,
                 dim_tensor_list[adv_indx_indices[i]],
@@ -236,7 +238,9 @@ def index(
             == adv_indx_indices[adv_indx_count - 1] - adv_indx_indices[0] + 1
         ):
             _LOGGER.debug(f"The indices are continuous in this case")
-            concat_tensor_reshape.append(get_trt_tensor(network, -1, "dynamic_concat"))
+            concat_tensor_reshape.append(
+                get_trt_tensor(network, -1, name + "_dynamic_concat")
+            )
             for i in range(0, rank):
                 if i not in adv_indx_indices:
                     curr_dim = dim_tensor_list[i]
@@ -295,7 +299,7 @@ def index(
             set_layer_name(
                 concat_final_shape_layer,
                 target,
-                name + "_index_concat_final_shape_layer",
+                name + "_index_continuous_concat_final_shape_layer",
                 source_ir,
             )
             concat_final_tensor = concat_final_shape_layer.get_output(0)
@@ -312,17 +316,19 @@ def index(
             reshape_output = unfold_advanced_shuffle_layer.get_output(0)
 
         else:
-            concat_tensor = []
+            _LOGGER.debug(f"The indices are not continuous in this case")
+            concat_final_tensor = []
+            concat_final_tensor.append(cum_adv_index_shape_tensor)
             for i in range(0, rank):
                 if i not in adv_indx_indices:
                     curr_dim = dim_tensor_list[i]
-                    concat_tensor.append(curr_dim)
+                    concat_final_tensor.append(curr_dim)
 
-            concat_layer = network.add_concatenation(concat_tensor)
+            concat_final_shape_layer = network.add_concatenation(concat_final_tensor)
             set_layer_name(
-                concat_layer,
+                concat_final_shape_layer,
                 target,
-                name + "_index_concat_final_shape_layer",
+                name + "_index_non_continuous_concat_final_shape_layer",
                 source_ir,
             )
             concat_final_tensor = concat_final_shape_layer.get_output(0)
@@ -332,7 +338,7 @@ def index(
             set_layer_name(
                 reshape_layer,
                 target,
-                name + "_index_shuffle_final_shape_layer",
+                name + "_index_non_continuous_shuffle_final_shape_layer",
                 source_ir,
             )
             reshape_output = reshape_layer.get_output(0)
