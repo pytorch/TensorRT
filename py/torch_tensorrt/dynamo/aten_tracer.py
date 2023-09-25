@@ -8,8 +8,7 @@ import torch
 from torch._export import dynamic_dim, export
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import default_device
-from torch_tensorrt.dynamo.backend.backends import constant_fold
-from torch_tensorrt.dynamo.lowering import get_decompositions
+from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decompositions
 from torch_tensorrt.dynamo.utils import get_torch_inputs, set_log_level, to_torch_device
 
 logger = logging.getLogger(__name__)
@@ -84,6 +83,6 @@ def trace(
         graph_module = export(
             model, tuple(trace_inputs), constraints=constraints
         ).module()
-        constant_fold(graph_module)
+        graph_module = apply_lowering_passes(graph_module)
     logger.debug("Post export graph: " + str(graph_module.graph))
     return graph_module

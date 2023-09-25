@@ -16,6 +16,7 @@ from typing import (
     cast,
 )
 
+from torch._ops import OpOverloadPacket
 from torch.fx.node import Argument, Node, Target, _get_qualified_name
 from torch_tensorrt.fx.converter_registry import CONVERTERS
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
@@ -99,6 +100,19 @@ def dynamo_tensorrt_converter(
             converter_support = ConverterSupport(
                 converter_implementation=converter,
                 capability_validator=capability_validator,
+            )
+
+        # OpOverloadPackets are only valid if they have a single overload, or
+        # only the ["default", "out"] overloads, due to PyTorch conventions
+        if isinstance(key, OpOverloadPacket) and (
+            len(key.overloads()) >= 3
+            or (len(key.overloads()) == 2 and "out" not in key.overloads())
+        ):
+            raise AssertionError(
+                f"Detected converter for OpOverloadPacket {key}. "
+                "We do not support OpOverloadPacket-keyed converters with multiple overloads. "
+                "Make sure to explicitly specify each converter overload. For instance "
+                "aten.mean is not a valid key, but aten.mean.default is."
             )
 
         # If a converter for this operator already exists, append the new converter to the list

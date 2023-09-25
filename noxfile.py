@@ -191,7 +191,7 @@ def cleanup(session):
 
 def run_base_tests(session):
     print("Running basic tests")
-    session.chdir(os.path.join(TOP_DIR, "tests/py"))
+    session.chdir(os.path.join(TOP_DIR, "tests/py/ts"))
     tests = [
         "api",
         "integrations/test_to_backend_api.py",
@@ -298,7 +298,7 @@ def run_fx_tools_tests(session):
 
 def run_model_tests(session):
     print("Running model tests")
-    session.chdir(os.path.join(TOP_DIR, "tests/py"))
+    session.chdir(os.path.join(TOP_DIR, "tests/py/ts"))
     tests = [
         "models",
     ]
@@ -311,7 +311,7 @@ def run_model_tests(session):
 
 def run_accuracy_tests(session):
     print("Running accuracy tests")
-    session.chdir(os.path.join(TOP_DIR, "tests/py"))
+    session.chdir(os.path.join(TOP_DIR, "tests/py/ts"))
     tests = []
     for test in tests:
         if USE_HOST_DEPS:
@@ -340,7 +340,7 @@ def copy_model(session):
 def run_int8_accuracy_tests(session):
     print("Running accuracy tests")
     copy_model(session)
-    session.chdir(os.path.join(TOP_DIR, "tests/py"))
+    session.chdir(os.path.join(TOP_DIR, "tests/py/ts"))
     tests = [
         "ptq/test_ptq_to_backend.py",
         "ptq/test_ptq_dataloader_calibrator.py",
@@ -356,7 +356,7 @@ def run_int8_accuracy_tests(session):
 def run_trt_compatibility_tests(session):
     print("Running TensorRT compatibility tests")
     copy_model(session)
-    session.chdir(os.path.join(TOP_DIR, "tests/py"))
+    session.chdir(os.path.join(TOP_DIR, "tests/py/ts"))
     tests = [
         "integrations/test_trt_intercompatibility.py",
         # "ptq/test_ptq_trt_calibrator.py",
@@ -370,7 +370,7 @@ def run_trt_compatibility_tests(session):
 
 def run_dla_tests(session):
     print("Running DLA tests")
-    session.chdir(os.path.join(TOP_DIR, "tests/py"))
+    session.chdir(os.path.join(TOP_DIR, "tests/py/ts"))
     tests = [
         "hw/test_api_dla.py",
     ]
@@ -383,7 +383,7 @@ def run_dla_tests(session):
 
 def run_multi_gpu_tests(session):
     print("Running multi GPU tests")
-    session.chdir(os.path.join(TOP_DIR, "tests/py"))
+    session.chdir(os.path.join(TOP_DIR, "tests/py/ts"))
     tests = [
         "hw/test_multi_gpu.py",
     ]

@@ -401,3 +401,20 @@ def neg(
     return convert_unary(
         network, target, source_ir, name, trt.UnaryOperation.NEG, input_val
     )
+
+
+def erf(
+    network: TRTNetwork,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+) -> TRTTensor:
+    if (isinstance(input_val, TRTTensor)) and (
+        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+    ):
+        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+
+    return convert_unary(
+        network, target, source_ir, name, trt.UnaryOperation.ERF, input_val
+    )

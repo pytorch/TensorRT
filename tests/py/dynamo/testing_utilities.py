@@ -6,8 +6,8 @@ from typing import Any, List, Sequence, Set
 import torch
 from torch._dynamo.utils import detect_fake_mode
 from torch_tensorrt.dynamo import partitioning
-from torch_tensorrt.dynamo.backend.backends import aot_export_for_compile, constant_fold
-from torch_tensorrt.dynamo.lowering._decompositions import get_decompositions
+from torch_tensorrt.dynamo.backend.backends import aot_export_for_compile
+from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decompositions
 from torch_tensorrt.dynamo.lowering._pre_aot_lowering import pre_aot_substitutions
 
 DECIMALS_OF_AGREEMENT = 4
@@ -40,16 +40,16 @@ def fx_dynamo_testing_backend(
         fake_mode, "allow_non_fake_inputs", True
     ), fake_mode:
         # Invoke AOTAutograd to translate operators to aten
-        graph_module = aot_export_for_compile(
+        gm = aot_export_for_compile(
             gm,
             sample_inputs,
             decompositions=get_decompositions(),
         )
 
-        constant_fold(graph_module)
+        gm = apply_lowering_passes(gm)
 
         trt_compiled = custom_backend(
-            graph_module,
+            gm,
             sample_inputs,
         )
         return trt_compiled
