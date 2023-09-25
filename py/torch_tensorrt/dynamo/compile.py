@@ -143,7 +143,6 @@ def compile(
     # Run constant folding before TRT compilation
     constant_fold(gm)
     trt_gm = compile_module(gm, torch_inputs, settings)
-    # trt_gm = lift_constant_pass(trt_gm)
     trt_gm = transform(trt_gm, torch_inputs)
     trt_exp_program = create_trt_exp_program(
         trt_gm, exported_program.call_spec, trt_gm.state_dict()
