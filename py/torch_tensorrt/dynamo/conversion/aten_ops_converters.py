@@ -51,6 +51,24 @@ def aten_ops_batch_norm(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.cat.default)
+def aten_ops_cat(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.cat.cat(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        tensors=args[0],
+        dim = args_bounds_check(args, 2, 1),
+    )
+
+
 def embedding_param_validator(embedding_node: Node) -> bool:
     scale_grad_by_freq = args_bounds_check(embedding_node.args, 3)
     sparse = args_bounds_check(embedding_node.args, 4)

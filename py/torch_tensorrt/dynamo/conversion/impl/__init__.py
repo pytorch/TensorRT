@@ -4,6 +4,7 @@ from . import (
     activation,
     attention,
     cast,
+    cat,
     condition,
     conv,
     deconv,
