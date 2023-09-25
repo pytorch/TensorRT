@@ -65,7 +65,7 @@ def aten_ops_cat(
         SourceIR.ATEN,
         name,
         tensors=args[0],
-        dim = args_bounds_check(args, 2, 1),
+        dim=args_bounds_check(args, 2, 1),
     )
 
 

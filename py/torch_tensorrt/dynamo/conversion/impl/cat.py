@@ -1,10 +1,11 @@
-from typing import Optional, Union, Sequence, Dict
+from typing import Dict, Optional, Sequence, Union
 
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+
 
 def cat(
     network: TRTNetwork,
@@ -13,9 +14,7 @@ def cat(
     name: str,
     input: TRTNetwork,
     dim: int,
-    
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-
     if any(not isinstance(t, TRTTensor) for t in input):  # type: ignore[union-attr]
         raise RuntimeError(
             f"cat received inputs {input} that is not part " "of the TensorRT region!"
