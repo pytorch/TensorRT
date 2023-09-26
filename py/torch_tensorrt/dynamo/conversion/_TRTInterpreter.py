@@ -13,7 +13,13 @@ from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch.utils._python_dispatch import _disable_current_modes
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo.conversion.converter_utils import get_node_name
+from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.converter_registry import CallingConvention
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    get_node_name,
+    get_trt_tensor,
+)
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
@@ -46,6 +52,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         input_specs: List[Input],
         logger_level: trt.ILogger.Severity = trt.ILogger.Severity.WARNING,
         output_dtypes: Optional[List[torch.dtype]] = None,
+        compilation_settings: CompilationSettings = CompilationSettings(),
     ):
         super().__init__(module)
 
@@ -59,7 +66,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         EXPLICIT_BATCH = 1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
         flag |= EXPLICIT_BATCH
 
-        self.network = self.builder.create_network(flag)
+        self.ctx = ConversionContext(
+            self.builder.create_network(flag), compilation_settings
+        )
 
         missing_ops = self.validate_conversion()
         if missing_ops:
@@ -95,14 +104,14 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         missing_converters: Set[str] = set()
 
         for node in self.module.graph.nodes:
-            if node.op == "call_function" and not CONVERTERS.get(node):
+            if node.op == "call_function" and CONVERTERS.get(node) is None:
                 missing_converters.add(f"{node.op} {_get_qualified_name(node.target)}")
-            elif node.op == "call_method" and not CONVERTERS.get(node):
+            elif node.op == "call_method" and CONVERTERS.get(node) is None:
                 missing_converters.add(f"{node.op} torch.Tensor.{node.target}")
             elif node.op == "call_module":
                 submod = self.fetch_attr(node.target)
                 submod_type = getattr(submod, "_base_class_origin", type(submod))
-                if not CONVERTERS.get(node):
+                if CONVERTERS.get(node) is None:
                     missing_converters.add(f"{node.op} {torch.typename(submod_type)}")
 
         return missing_converters
@@ -221,7 +230,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if tactic_sources is not None:
             builder_config.set_tactic_sources(tactic_sources=tactic_sources)
 
-        engine = self.builder.build_engine(self.network, builder_config)
+        engine = self.builder.build_engine(self.ctx.net, builder_config)
         assert engine
 
         serialized_cache = (
@@ -291,7 +300,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 f"Unable to access shape spec for input: {target} (got: {current_input})"
             )
 
-        return self.network.add_input(
+        return self.ctx.net.add_input(
             name=target,
             shape=tuple(shape),
             dtype=unified_dtype_converter(current_input.torch_dtype, Frameworks.TRT),
@@ -303,26 +312,36 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         assert isinstance(target, str)
         submod = self.fetch_attr(target)
         submod_type = getattr(submod, "_base_class_origin", type(submod))
-        converter = CONVERTERS.get(self._cur_node)
+        converter_packet = CONVERTERS.get(self._cur_node)
 
-        if not converter:
+        if converter_packet is None:
             raise UnsupportedOperatorException(
                 f"Conversion of module of type {submod_type} not currently supported!"
             )
 
+        converter, calling_convention = converter_packet
+
         assert self._cur_node_name is not None
-        return converter(self.network, submod, args, kwargs, self._cur_node_name)
+        if calling_convention is CallingConvention.LEGACY:
+            return converter(self.ctx.net, submod, args, kwargs, self._cur_node_name)
+        else:
+            return converter(self.ctx, submod, args, kwargs, self._cur_node_name)
 
     def call_function(self, target: str, args: Any, kwargs: Any) -> Any:
         # TODO: Why is this stateful? We should be able to take in the inputs
-        converter = CONVERTERS.get(self._cur_node)
-        if not converter:
+        converter_packet = CONVERTERS.get(self._cur_node)
+        if converter_packet is None:
             raise UnsupportedOperatorException(
                 f"Conversion of function {torch.typename(target)} not currently supported!"
             )
 
+        converter, calling_convention = converter_packet
+
         assert self._cur_node_name is not None
-        return converter(self.network, target, args, kwargs, self._cur_node_name)
+        if calling_convention is CallingConvention.LEGACY:
+            return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
+        else:
+            return converter(self.ctx, target, args, kwargs, self._cur_node_name)
 
     def get_attr(self, target: str, args: Any, kwargs: Any) -> np.ndarray:
         with _disable_current_modes():
@@ -341,15 +360,19 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
     def call_method(self, target: str, args: Any, kwargs: Any) -> Any:
         assert isinstance(target, str)
-        converter = CONVERTERS.get(self._cur_node)
+        converter_packet = CONVERTERS.get(self._cur_node)
 
-        if not converter:
+        if converter_packet is None:
             raise UnsupportedOperatorException(
                 f"Conversion of method {target} not currently supported!"
             )
+        converter, calling_convention = converter_packet
 
         assert self._cur_node_name is not None
-        return converter(self.network, target, args, kwargs, self._cur_node_name)
+        if calling_convention is CallingConvention.LEGACY:
+            return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
+        else:
+            return converter(self.ctx, target, args, kwargs, self._cur_node_name)
 
     def output(self, target: str, args: Any, kwargs: Any) -> List[Any]:
         assert len(args) == 1
@@ -361,12 +384,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             outputs = (args[0],)
 
         for output_idx in range(len(outputs)):
-            from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
-
             output = outputs[output_idx]
 
             if not isinstance(output, trt.tensorrt.ITensor):
-                new_output = get_trt_tensor(self.network, output, target)
+                new_output = get_trt_tensor(self.ctx, output, target)
                 outputs = (
                     outputs[:output_idx] + (new_output,) + outputs[output_idx + 1 :]
                 )
@@ -400,7 +421,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 output_bool = False
             name = f"output{i}"
             output.name = name
-            self.network.mark_output(output)
+            self.ctx.net.mark_output(output)
             if output_bool:
                 output.dtype = trt.bool
             elif self.output_dtypes is not None:

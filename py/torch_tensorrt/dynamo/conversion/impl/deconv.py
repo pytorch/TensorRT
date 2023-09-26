@@ -7,6 +7,7 @@ import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo.conversion import impl
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     extend_attr_to_tuple,
     get_trt_tensor,
@@ -19,11 +20,11 @@ from torch_tensorrt.fx.converters.converter_utils import (
     set_layer_name,
     to_numpy,
 )
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+from torch_tensorrt.fx.types import TRTTensor
 
 
 def deconvNd(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Union[Target, str],
     source_ir: Optional[SourceIR],
     name: str,
@@ -44,7 +45,7 @@ def deconvNd(
     if is_deconv1d:
         # Apply an unsqueeze operation to transform the deconv1d problem into deconv2d
         input = impl.unsqueeze.unsqueeze(
-            network, target, source_ir, name + "_unsqueeze_deconv1d", input, -1
+            ctx, target, source_ir, name + "_unsqueeze_deconv1d", input, -1
         )
 
     # Process bias terms
@@ -53,7 +54,7 @@ def deconvNd(
         bias = to_numpy(bias)
 
     elif isinstance(bias, TRTTensor):
-        bias = get_trt_tensor(network, bias, f"{name}_bias")
+        bias = get_trt_tensor(ctx, bias, f"{name}_bias")
 
     elif bias is not None:
         raise RuntimeError(
@@ -61,12 +62,12 @@ def deconvNd(
         )
 
     # Process weight terms
-    if network.has_explicit_precision or isinstance(weight, TRTTensor):
-        weight = get_trt_tensor(network, weight, f"{name}_weight")
+    if ctx.net.has_explicit_precision or isinstance(weight, TRTTensor):
+        weight = get_trt_tensor(ctx, weight, f"{name}_weight")
         # Append new dimension (unsqueeze) if the deconvolution is 1d
         if is_deconv1d:
             input = impl.unsqueeze.unsqueeze(
-                network, target, source_ir, name + "_unsqueeze_weight", weight, -1
+                ctx, target, source_ir, name + "_unsqueeze_weight", weight, -1
             )
 
     elif isinstance(weight, (torch.Tensor, np.ndarray)):
@@ -83,7 +84,7 @@ def deconvNd(
         )
 
     # add deconv layer
-    deconv_layer = network.add_deconvolution_nd(
+    deconv_layer = ctx.net.add_deconvolution_nd(
         input=input,
         num_output_maps=weight.shape[0],
         kernel_shape=weight.shape[2:],
@@ -134,7 +135,7 @@ def deconvNd(
     if is_deconv1d:
         # Apply a squeeze operation to transform the deconv2d problem back into deconv1d
         result = impl.squeeze.squeeze(
-            network, target, source_ir, name + "_squeeze_deconv1d", result, -1
+            ctx, target, source_ir, name + "_squeeze_deconv1d", result, -1
         )
 
     return result

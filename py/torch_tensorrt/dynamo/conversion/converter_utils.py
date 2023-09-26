@@ -9,9 +9,10 @@ import torch
 from torch import SymBool, SymFloat, SymInt
 from torch.fx.node import Argument, Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_registry import (
-    ConverterImplSignature,
     ConverterRegistry,
+    DynamoConverterImplSignature,
 )
 from torch_tensorrt.fx.converters.converter_utils import (
     Frameworks,
@@ -19,7 +20,7 @@ from torch_tensorrt.fx.converters.converter_utils import (
     to_numpy,
     unified_dtype_converter,
 )
-from torch_tensorrt.fx.types import TRTDataType, TRTNetwork, TRTTensor
+from torch_tensorrt.fx.types import TRTDataType, TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -119,7 +120,7 @@ def _dynamic_unsupported(
 
 
 def cast_trt_tensor(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     input_val: TRTTensor,
     dtype: TRTDataType,
     name: str,
@@ -133,7 +134,7 @@ def cast_trt_tensor(
     input unchanged
 
     Args:
-        network (TRTNetwork): A TensorRT network
+        ctx (ConversionContext): A ConversionContext containing the TensorRT network
         input_val (TRTTensor): A TRT Tensor to cast to a new data type
         dtype (TRTDataType, torch.dtype, np.dtype): The data type to cast the input Tensor to
         name (str): Name of the calling layer
@@ -149,7 +150,7 @@ def cast_trt_tensor(
         target_str = ConverterRegistry.qualified_name_or_str(target)
         target_name = f"{source_ir}_ops{('.' + target_str) if target_str else ''}"
 
-        identity_layer = network.add_identity(input_val)
+        identity_layer = ctx.net.add_identity(input_val)
         identity_layer.set_output_type(0, trt_dtype)
         identity_layer.name = f"Cast ITensor {input_val.name} from {input_val.dtype} to {trt_dtype} - [{target_name}]-[{name}]"
         return identity_layer.get_output(0)
@@ -158,7 +159,7 @@ def cast_trt_tensor(
 
 
 def cast_int_int_div_trt_tensor(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     lhs_val: TRTTensor,
     rhs_val: TRTTensor,
     name: str,
@@ -166,7 +167,7 @@ def cast_int_int_div_trt_tensor(
     """
     Given two `int` data type TRT Tensor to div operation, cast the TRT Tensor to float type
     Args:
-        network (TRTNetwork): A TensorRT network
+        ctx (ConversionContext): A ConversionContext object
         lhs_val (TRTTensor): A TRT Tensor numerator
         rhs_val (TRTTensor): A TRT Tensor numerator
         name (str): Name of calling layer
@@ -174,8 +175,8 @@ def cast_int_int_div_trt_tensor(
         A list of lhs_val and rhs_val casted to the approriate datatype
     """
     if lhs_val.dtype == trt.int32 and rhs_val.dtype == trt.int32:
-        lhs_val = cast_trt_tensor(network, lhs_val, trt.float32, name)
-        rhs_val = cast_trt_tensor(network, rhs_val, trt.float32, name)
+        lhs_val = cast_trt_tensor(ctx, lhs_val, trt.float32, name)
+        rhs_val = cast_trt_tensor(ctx, rhs_val, trt.float32, name)
     return [lhs_val, rhs_val]
 
 
@@ -242,24 +243,24 @@ def extend_attr_to_tuple(
 
 
 def cast_int_or_float_to_bool(
-    network: TRTNetwork, name: str, tensor: TRTTensor
+    ctx: ConversionContext, name: str, tensor: TRTTensor
 ) -> TRTTensor:
     if tensor.dtype != trt.bool:
-        return cast_trt_tensor(network, tensor, trt.bool, name)
+        return cast_trt_tensor(ctx, tensor, trt.bool, name)
 
     return tensor
 
 
 def create_constant(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     value: Union[int, float, bool, np.ndarray, torch.Tensor],
     name: str,
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]],
 ) -> TRTTensor:
     """
-    Add a TensorRT constant layer whose value is `value` to `network`.
+    Add a TensorRT constant layer whose value is `value` to `ctx.net`.
     Args:
-        network (TRTNetwork): A TensorRT network to which we want to add
+        ctx (ConversionContext): A TensorRT ConversionContext to which we want to add
             a constant layer.
         value (Union[int, float, bool, np.ndarray, torch.Tensor]): A literal value, Numpy array,
             or a PyTorch tensor that will be used as value of the added TensorRT Constant layer.
@@ -269,7 +270,7 @@ def create_constant(
     Returns:
         A TensorRT ITensor that represents the given value.
     """
-    constant = network.add_constant(
+    constant = ctx.net.add_constant(
         (1,) if isinstance(value, (int, float, bool)) else value.shape,
         to_numpy(value, dtype).copy(),
     )
@@ -278,7 +279,7 @@ def create_constant(
 
 
 def get_trt_tensor(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     input_val: Any,
     name: str,
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]] = None,
@@ -287,7 +288,7 @@ def get_trt_tensor(
     Given a value of random type, we try to convert it to a TensorRT ITensor.
     An runtime error is raised if we're not able to do that.
     Args:
-        network (TRTNetwork): A TensorRT network. If we want to
+        ctx (ConversionContext): A TensorRT ConversionContext. If we want to
             add a TensorRT Constant layer, we will add it to this network.
         input_val (Any): An value that we want to convert to a TensorRT ITensor.
         name (str): The name of the created TensorRT Constant layer if there's
@@ -298,19 +299,25 @@ def get_trt_tensor(
         A TensorRT ITensor that represents the given value.
     """
     # If the input is 64-bit, cast it to 32-bit for TRT freezing
-    if isinstance(input_val, torch.Tensor):
+    if (
+        isinstance(input_val, torch.Tensor)
+        and ctx.compilation_settings.truncate_long_and_double
+    ):
         if input_val.dtype == torch.int64:
             input_val = input_val.to(torch.int32)
         elif input_val.dtype == torch.float64:
             input_val = input_val.to(torch.float32)
-    elif isinstance(input_val, np.ndarray):
+    elif (
+        isinstance(input_val, np.ndarray)
+        and ctx.compilation_settings.truncate_long_and_double
+    ):
         if input_val.dtype == np.int64:
             input_val = input_val.astype(np.int32)
         elif input_val.dtype == np.float64:
             input_val = input_val.astype(np.float32)
 
     if isinstance(input_val, (torch.Tensor, np.ndarray, int, float, bool)):
-        return create_constant(network, input_val, name, dtype)
+        return create_constant(ctx, input_val, name, dtype)
     elif isinstance(input_val, TRTTensor):
         return input_val
     else:
@@ -358,7 +365,7 @@ def get_positive_dim(
 def enforce_tensor_types(
     type_dictionary: Dict[Union[int, str], Tuple[Union[TRTTensor, np.ndarray], ...]],
     promote: bool = True,
-) -> Callable[[ConverterImplSignature], ConverterImplSignature]:
+) -> Callable[[DynamoConverterImplSignature], DynamoConverterImplSignature]:
     """Decorator to enforce tensor types for input arguments to converters
 
     Keys in the type dictionary must be integers if they refer to a positional
@@ -384,10 +391,10 @@ def enforce_tensor_types(
         for val in type_dictionary.values()
     ), "Invalid value(s) specified in type enforcement"
 
-    def wrapper(func: ConverterImplSignature) -> ConverterImplSignature:
+    def wrapper(func: DynamoConverterImplSignature) -> DynamoConverterImplSignature:
         @functools.wraps(func)
         def convert_with_type_enforcement(
-            network: TRTNetwork,
+            ctx: ConversionContext,
             target: Target,
             args: Tuple[Argument, ...],
             kwargs: Dict[str, Argument],
@@ -426,7 +433,7 @@ def enforce_tensor_types(
                         f"Freezing tensor {name}_constant_{index} to TRT IConstantLayer"
                     )
                     new_value = get_trt_tensor(
-                        network, candidate, name + f"_constant_{index}"
+                        ctx, candidate, name + f"_constant_{index}"
                     )
                 else:
                     raise AssertionError(
@@ -440,7 +447,7 @@ def enforce_tensor_types(
                 elif isinstance(index, str):
                     new_kwargs[index] = new_value
 
-            return func(network, target, new_args, new_kwargs, name)
+            return func(ctx, target, new_args, new_kwargs, name)
 
         return convert_with_type_enforcement
 
