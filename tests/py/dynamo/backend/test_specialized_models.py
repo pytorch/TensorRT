@@ -57,6 +57,7 @@ class TestFakeTensors(TestCase):
         self.assertAlmostEqual(
             max_diff,
             0,
+            DECIMALS_OF_AGREEMENT,
             msg=f"MulInt TRT outputs don't match with the original model.",
         )
         torch._dynamo.reset()
@@ -113,6 +114,7 @@ class TestFakeTensors(TestCase):
         self.assertAlmostEqual(
             max_diff,
             0,
+            DECIMALS_OF_AGREEMENT,
             msg=f"AddFloat TRT outputs don't match with the original model.",
         )
 
@@ -269,6 +271,95 @@ class TestPacketOperator(TestCase):
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+        torch._dynamo.reset()
+
+
+class TestInputModifications(TestCase):
+    def test_input_modifications_add(self):
+        class InplaceAdd(torch.nn.Module):
+            def forward(self, x):
+                x += 3
+                y = x + 1
+                return y
+
+        inputs = [
+            torch.rand(
+                3,
+                5,
+                7,
+            ).cuda(),
+        ]
+
+        fx_graph = torch.fx.symbolic_trace(InplaceAdd())
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            msg=f"InplaceAdd TRT outputs don't match with the original model.",
+        )
+        torch._dynamo.reset()
+
+    def test_input_modifications_mul(self):
+        class InplaceMul(torch.nn.Module):
+            def forward(self, x, y):
+                x *= 5.0
+                x *= 1.9
+                z = x + y
+                z /= 1.3
+                return z
+
+        inputs = [
+            torch.rand(
+                1,
+                3,
+                5,
+                7,
+            ).cuda(),
+            torch.rand(
+                1,
+                3,
+                5,
+                7,
+            ).cuda(),
+        ]
+
+        fx_graph = torch.fx.symbolic_trace(InplaceMul())
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            msg=f"InplaceMul TRT outputs don't match with the original model.",
         )
         torch._dynamo.reset()
 
