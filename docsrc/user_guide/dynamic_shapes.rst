@@ -8,7 +8,7 @@ However, Torch-TensorRT is an AOT compiler which requires some prior information
 In the case of dynamic input shapes, we must provide the (min_shape, opt_shape, max_shape) arguments so that the model can be optimized for
 these range of input shapes. An example usage of static and dynamic shapes is as follows.
 
-NOTE: The following code uses dynamo IR. Incase of Torchscript IR, please swap out `ir=dynamo` with `ir=ts` and the behavior is exactly the same.
+NOTE: The following code uses dynamo IR. Incase of Torchscript IR, please swap out ``ir=dynamo`` with ``ir=ts`` and the behavior is exactly the same.
 
 .. code-block:: python
 
@@ -28,7 +28,7 @@ NOTE: The following code uses dynamo IR. Incase of Torchscript IR, please swap o
 Under the hood
 --------------
 
-There are two phases of compilation when we use `torch_tensorrt.compile` API with `ir=dynamo` (default).
+There are two phases of compilation when we use ``torch_tensorrt.compile`` API with ``ir=dynamo`` (default).
 
 - aten_tracer.trace (which uses torch.export to trace the graph with the given inputs)
 
@@ -37,7 +37,7 @@ dynamic shaped inputs, the range can be provided to the tracing via constraints.
 refer to this `docstring <https://github.com/pytorch/pytorch/blob/5dcee01c2b89f6bedeef9dd043fd8d6728286582/torch/export/__init__.py#L372-L434>`_
 for detailed information on how to set constraints. In short, we create new inputs for 
 torch.export tracing and provide constraints on the min and max values(provided by the user), a particular dimension can take. 
-Please take a look at `aten_tracer.py` file to understand how this works under the hood. 
+Please take a look at ``aten_tracer.py`` file to understand how this works under the hood. 
 
 - dynamo.compile (which compiles a torch.fx.GraphModule object using TensorRT)
 
@@ -50,7 +50,7 @@ Limitations
 -----------
 
 If there are operations in the graph that use the dynamic dimension of the input, Pytorch 
-introduces `torch.ops.aten.sym_size.int` ops in the graph. Currently, we cannot handle these operators and 
+introduces ``torch.ops.aten.sym_size.int`` ops in the graph. Currently, we cannot handle these operators and 
 the compilation results in undefined behavior. We plan to add support for these operators and implement 
 robust support for shape tensors in the next release. Here is an example of the limitation described above
 
@@ -90,13 +90,13 @@ The traced graph of `MyModule()` looks as follows
     return (view,)
 
 
-Here the `%sym_size` node captures the dynamic batch and uses it in the `aten.view` layer. This requires shape tensors support 
+Here the ``%sym_size`` node captures the dynamic batch and uses it in the ``aten.view`` layer. This requires shape tensors support 
 which would be a part of our next release.
 
 Workaround (BERT static compilation example)
 ------------------------------------------
 
-In the case where you encounter the issues mentioned in the `Limitations` section, 
+In the case where you encounter the issues mentioned in the **Limitations** section, 
 you can compile the model (static mode) with max input size that can be provided. In the cases of smaller inputs, 
 we can pad them accordingly. This is only a workaround until we address the limitations.
 
@@ -127,8 +127,8 @@ we can pad them accordingly. This is only a workaround until we address the limi
 Dynamic shapes with ir=torch_compile
 ------------------------------------
 
-`torch_tensorrt.compile(model, inputs, ir="torch_compile")` returns a torch.compile boxed function with the backend 
-configured to Tensorrt. In the case of `ir=torch_compile`, users have to recompile for different input shapes. 
+``torch_tensorrt.compile(model, inputs, ir="torch_compile")`` returns a torch.compile boxed function with the backend 
+configured to Tensorrt. In the case of ``ir=torch_compile``, users have to recompile for different input shapes. 
 In the future, we plan to explore the option of compiling with dynamic shapes in the first execution of the model.
 
 .. code-block:: python
