@@ -32,7 +32,6 @@ from torch_tensorrt.dynamo.conversion import (
     convert_module,
     repair_long_or_double_inputs,
 )
-from torch_tensorrt.dynamo.export import create_trt_exp_program, transform
 from torch_tensorrt.dynamo.lowering import apply_lowering_passes
 from torch_tensorrt.dynamo.utils import (
     prepare_inputs,
@@ -142,12 +141,8 @@ def compile(
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
     trt_gm = compile_module(gm, torch_inputs, settings)
-    trt_gm = transform(trt_gm, torch_inputs)
-    trt_exp_program = create_trt_exp_program(
-        trt_gm, exported_program.call_spec, trt_gm.state_dict()
-    )
 
-    return trt_exp_program
+    return trt_gm
 
 
 def compile_module(
