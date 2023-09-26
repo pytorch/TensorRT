@@ -46,6 +46,67 @@ We perform shape analysis using dummy inputs (across min, opt and max shapes) an
 intermediate output shapes which can be used in case the graph has a mix of Pytorch 
 and TensorRT submodules.
 
+Custom Constraints
+------------------
+
+Given an input ``x = torch_tensorrt.Input(min_shape, opt_shape, max_shape, dtype)``, 
+Torch-TensorRT automatically sets the constraints during ``torch.export`` tracing as follows 
+
+.. code-block:: python
+
+    for dim in constraint_dims:
+        if min_shape[dim] > 1:
+            constraints.append(min_shape[dim] <= dynamic_dim(trace_input, dim))
+        if max_shape[dim] > 1:
+            constraints.append(dynamic_dim(trace_input, dim) <= max_shape[dim])
+
+Sometimes, we might need to set additional constraints and Torchdynamo errors out if we don't specify them.
+For example, in the case of BERT model compilation, there are two inputs and a constraint has to be set involving the sequence length size of these two inputs.
+
+.. code-block:: python
+
+    constraints.append(dynamic_dim(trace_inputs[0], 0) == dynamic_dim(trace_inputs[1], 0))
+
+
+If you have to provide any custom constraints to your model, the overall workflow for model compilation using ``ir=dynamo`` would involve a few steps.
+
+.. code-block:: python
+
+    import torch
+    import torch_tensorrt
+    from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decompositions
+    # Assume the model has two inputs
+    model = MyModel()
+    torch_input_1 = torch.randn((1, 14), dtype=torch.int32).cuda()
+    torch_input_2 = torch.randn((1, 14), dtype=torch.int32).cuda()
+
+    dynamic_inputs = [torch_tensorrt.Input(min_shape=[1, 14], 
+                        opt_shape=[4, 14],
+                        max_shape=[8, 14],
+                        dtype=torch.int32), 
+                      torch_tensorrt.Input(min_shape=[1, 14], 
+                        opt_shape=[4, 14],
+                        max_shape=[8, 14],
+                        dtype=torch.int32)]
+
+    # Export the model with additional constraints
+    constraints = []
+    # The following constraints are automatically added by Torch-TensorRT in the 
+    # general case when you call torch_tensorrt.compile directly on MyModel()
+    constraints.append(dynamic_dim(torch_input_1, 0) < 8)
+    constraints.append(dynamic_dim(torch_input_2, 0) < 8)
+    # This is an additional constraint as instructed by Torchdynamo
+    constraints.append(dynamic_dim(torch_input_1, 0) == dynamic_dim(torch_input_2, 0))
+    with unittest.mock.patch(
+        "torch._export.DECOMP_TABLE", get_decompositions(experimental_decompositions)
+    ):
+        graph_module = export(
+            model, (torch_input_1, torch_input_2), constraints=constraints
+        ).module()
+
+    # Use the dynamo.compile API
+    trt_mod = torch_tensorrt.dynamo.compile(graph_module, inputs=dynamic_inputs, **compile_spec)
+
 Limitations
 -----------
 
