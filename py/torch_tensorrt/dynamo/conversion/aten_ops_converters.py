@@ -1348,7 +1348,7 @@ def aten_ops_less(
 
 
 def conv_param_validator(conv_node: Node) -> bool:
-    return (not conv_node.args[6]) and (conv_node.args[7] in ([0], [0, 0], [0, 0, 0]))
+    return conv_node.args[7] in ([0], [0, 0], [0, 0, 0])
 
 
 @dynamo_tensorrt_converter(
@@ -1361,20 +1361,37 @@ def aten_ops_convolution(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.conv.convNd(
-        network,
-        target,
-        source_ir=SourceIR.ATEN,
-        name=name,
-        is_conv1d=len(args[3]) == 1,
-        input=args[0],
-        weight=args[1],
-        bias=args[2],
-        stride=args[3],
-        padding=args[4],
-        dilation=args[5],
-        groups=args[8],
-    )
+    is_transposed = args[6]
+    if not is_transposed:
+        return impl.conv.convNd(
+            network,
+            target,
+            source_ir=SourceIR.ATEN,
+            name=name,
+            is_conv1d=len(args[3]) == 1,
+            input=args[0],
+            weight=args[1],
+            bias=args[2],
+            stride=args[3],
+            padding=args[4],
+            dilation=args[5],
+            groups=args[8],
+        )
+    else:
+        return impl.deconv.deconvNd(
+            network,
+            target,
+            source_ir=SourceIR.ATEN,
+            name=name,
+            is_deconv1d=len(args[3]) == 1,
+            input=args[0],
+            weight=args[1],
+            bias=args[2],
+            stride=args[3],
+            padding=args[4],
+            dilation=args[5],
+            groups=args[8],
+        )
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.linear.default)  # type: ignore[misc]
