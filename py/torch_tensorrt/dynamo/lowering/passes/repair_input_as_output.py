@@ -1,6 +1,10 @@
 import logging
 
 import torch
+from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
+    clean_up_graph_after_modifications,
+    get_tensor_placeholders,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -13,15 +17,7 @@ def repair_input_as_output(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     modified_graph = False
 
     # Extract graph placeholder Tensors
-    placeholders = [
-        node
-        for node in gm.graph.nodes
-        if (
-            node.op == "placeholder"
-            and isinstance(node.type, type)
-            and issubclass(node.type, torch.Tensor)
-        )
-    ]
+    placeholders = get_tensor_placeholders(gm)
 
     for placeholder in placeholders:
         # If any placeholder has any users which are direct graph outputs
@@ -34,7 +30,7 @@ def repair_input_as_output(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
             direct_outputs = [user for user in placeholder.users if user.op == "output"]
 
             # Insert clone node for placeholder to ensure placeholder is not a direct output
-            with gm.graph.inserting_after(placeholder):
+            with gm.graph.inserting_after(placeholders[-1]):
                 cloned_placeholder = gm.graph.call_function(
                     torch.ops.aten.clone.default,
                     args=(placeholder,),
@@ -45,9 +41,7 @@ def repair_input_as_output(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
                 output.replace_input_with(placeholder, cloned_placeholder)
 
     if modified_graph:
-        gm.graph.eliminate_dead_code()
-        gm.graph.lint()
-        gm.recompile()
+        gm = clean_up_graph_after_modifications(gm)
         logger.debug(f"Graph after repair_input_as_output:\n{gm.graph}")
 
     return gm
