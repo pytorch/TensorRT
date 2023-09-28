@@ -40,9 +40,6 @@ def test_resnet18(ir):
     # Clean up model env
     torch._dynamo.reset()
 
-    with torch.no_grad():
-        torch.cuda.empty_cache()
-
 
 @pytest.mark.unit
 def test_mobilenet_v2(ir):
@@ -74,9 +71,6 @@ def test_mobilenet_v2(ir):
     # Clean up model env
     torch._dynamo.reset()
 
-    with torch.no_grad():
-        torch.cuda.empty_cache()
-
 
 @pytest.mark.unit
 def test_efficientnet_b0(ir):
@@ -107,9 +101,6 @@ def test_efficientnet_b0(ir):
 
     # Clean up model env
     torch._dynamo.reset()
-
-    with torch.no_grad():
-        torch.cuda.empty_cache()
 
 
 @pytest.mark.unit
@@ -155,9 +146,6 @@ def test_bert_base_uncased(ir):
     # Clean up model env
     torch._dynamo.reset()
 
-    with torch.no_grad():
-        torch.cuda.empty_cache()
-
 
 @pytest.mark.unit
 def test_resnet18_half(ir):
@@ -187,6 +175,3 @@ def test_resnet18_half(ir):
 
     # Clean up model env
     torch._dynamo.reset()
-
-    with torch.no_grad():
-        torch.cuda.empty_cache()

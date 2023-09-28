@@ -1,4 +1,5 @@
 tensorboard>=1.14.0
+protobuf==3.20.*
 nvidia-pyindex
 --extra-index-url https://pypi.ngc.nvidia.com
 pytorch-quantization>=2.1.2

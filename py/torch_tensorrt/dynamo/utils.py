@@ -63,6 +63,16 @@ def cosine_similarity(gt_tensor: torch.Tensor, pred_tensor: torch.Tensor) -> flo
     return res
 
 
+def set_log_level(parent_logger: Any, level: Any) -> None:
+    """
+    Sets the log level to the user provided level.
+    This is used to set debug logging at a global level
+    at entry points of tracing, dynamo and torch_compile compilation.
+    """
+    if parent_logger:
+        parent_logger.setLevel(level)
+
+
 def prepare_inputs(
     inputs: Input | torch.Tensor | Sequence[Any] | Dict[Any, Any],
     device: torch.device = torch.device("cuda"),
