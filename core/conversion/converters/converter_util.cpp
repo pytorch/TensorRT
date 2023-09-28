@@ -118,7 +118,6 @@ nvinfer1::ILayer* add_elementwise(
 
   auto selfDim = util::toVec(self->getDimensions());
   auto otherDim = util::toVec(other->getDimensions());
-
   if (selfDim.size() != otherDim.size()) {
     // other is with dynamic shape, need to expand its dimension now and get its
     // shape at runtime
@@ -152,30 +151,9 @@ nvinfer1::ILayer* add_elementwise(
     } else {
       // other is with static shape, expand dimension to make tow tensor have
       // the same number of dimension
-
-      // first check if the selfDim can be reduced to the other
-      int diff = selfDim.size() - otherDim.size();
-      bool canSqueeze = true;
-      for (int i = 0; i < diff; i++) {
-        if (selfDim[i] != 1) {
-          canSqueeze = false;
-        }
-      }
-      if (canSqueeze) {
-        LOG_WARNING("The self tensor is getting unpadded");
-        auto selfShuffle = ctx->net->addShuffle(*self);
-        nvinfer1::Dims self_dim = util::toDims(selfDim);
-        auto squeezed_self_dim = self_dim;
-        for (int dim = self_dim.nbDims; dim > otherDim.size(); --dim) {
-          squeezed_self_dim = util::squeezeDims(squeezed_self_dim, 0);
-        }
-        selfShuffle->setReshapeDimensions(squeezed_self_dim);
-        self = selfShuffle->getOutput(0);
-      } else {
-        auto otherShuffle = ctx->net->addShuffle(*other);
-        otherShuffle->setReshapeDimensions(util::toDimsPad(otherDim, selfDim.size()));
-        other = otherShuffle->getOutput(0);
-      }
+      auto otherShuffle = ctx->net->addShuffle(*other);
+      otherShuffle->setReshapeDimensions(util::toDimsPad(otherDim, selfDim.size()));
+      other = otherShuffle->getOutput(0);
     }
   }
   if (swapSelfOther) {
