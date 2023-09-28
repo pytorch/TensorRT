@@ -1,11 +1,10 @@
 from typing import Optional, Sequence, Union
 
-# @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 from torch.fx.node import Target
+from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion.converter_utils import extend_attr_to_tuple
 from torch_tensorrt.fx.converters.converter_utils import (
-    SourceIR,
     has_dynamic_shape,
     set_layer_name,
 )
@@ -38,7 +37,7 @@ def avg_poolNd(
 
     kernel_size = extend_attr_to_tuple(kernel_size, dim)
 
-    if stride is None:
+    if stride == []:
         stride = kernel_size
     else:
         stride = extend_attr_to_tuple(stride, dim)
@@ -85,7 +84,7 @@ def max_poolNd(
 
     kernel_size = extend_attr_to_tuple(kernel_size, dim)
 
-    if stride is None:
+    if stride == []:
         stride = kernel_size
     else:
         stride = extend_attr_to_tuple(stride, dim)

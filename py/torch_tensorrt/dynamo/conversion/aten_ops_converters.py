@@ -1325,6 +1325,7 @@ def avg_pool_param_validator(pool_node: Node) -> bool:
 
 
 # Note: AvgPool1d uses avg_pool2d as it converts to 2D first.
+@dynamo_tensorrt_converter(torch.ops.aten.avg_pool1d.default, capability_validator=avg_pool_param_validator)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.avg_pool2d.default, capability_validator=avg_pool_param_validator)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.avg_pool3d.default, capability_validator=avg_pool_param_validator)  # type: ignore[misc]
 def aten_ops_avg_pool(
@@ -1341,7 +1342,7 @@ def aten_ops_avg_pool(
         name=name,
         input=args[0],
         kernel_size=args[1],
-        stride=args_bounds_check(args, 2, replacement=None),
+        stride=args_bounds_check(args, 2, replacement=[]),
         padding=args_bounds_check(args, 3, replacement=0),
         ceil_mode=args_bounds_check(args, 4, replacement=False),
         count_include_pad=args_bounds_check(args, 5, replacement=True),
@@ -1367,6 +1368,7 @@ def max_pool_param_validator(pool_node: Node) -> bool:
 
 
 # Note: MaxPool1d uses max_pool2d as it converts to 2D first.
+@dynamo_tensorrt_converter(torch.ops.aten.max_pool1d.default, capability_validator=max_pool_param_validator)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.max_pool2d.default, capability_validator=max_pool_param_validator)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.max_pool3d.default, capability_validator=max_pool_param_validator)  # type: ignore[misc]
 def aten_ops_max_pool(
@@ -1383,7 +1385,7 @@ def aten_ops_max_pool(
         name=name,
         input=args[0],
         kernel_size=args[1],
-        stride=args_bounds_check(args, 2, replacement=None),
+        stride=args_bounds_check(args, 2, replacement=[]),
         padding=args_bounds_check(args, 3, replacement=0),
         dilation=args_bounds_check(args, 4, replacement=1),
         ceil_mode=args_bounds_check(args, 5, replacement=False),
