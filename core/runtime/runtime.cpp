@@ -7,9 +7,16 @@ namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
-c10::optional<RTDevice> get_most_compatible_device(const RTDevice& target_device) {
+c10::optional<RTDevice> get_most_compatible_device(const RTDevice& target_device, const RTDevice& curr_device) {
   LOG_DEBUG("Target Device: " << target_device);
   auto device_options = find_compatible_devices(target_device);
+  RTDevice current_device;
+  if (current_device.id == -1) {
+    current_device = get_current_device();
+  } else {
+    current_device = curr_device;
+  }
+
   if (device_options.size() == 0) {
     return {};
   } else if (device_options.size() == 1) {
@@ -21,10 +28,20 @@ c10::optional<RTDevice> get_most_compatible_device(const RTDevice& target_device
   dev_list << "[" << std::endl;
   for (auto device : device_options) {
     dev_list << "    " << device << ',' << std::endl;
-    if (device.device_name == target_device.device_name && best_match.device_name != target_device.device_name) {
-      best_match = device;
-    } else if (device.device_name == target_device.device_name && best_match.device_name == target_device.device_name) {
-      if (device.id == target_device.id && best_match.id != target_device.id) {
+    if (device.device_name == target_device.device_name) {
+      // First priority is selecting a candidate which agrees with the current device ID
+      // If such a device is found, we can select it and break out of the loop
+      if (device.id == current_device.id && best_match.id != current_device.id) {
+        best_match = device;
+        break;
+      }
+      // Second priority is selecting a candidate which agrees with the target device ID
+      // At deserialization time, the current device and target device may not agree
+      else if (device.id == target_device.id && best_match.id != target_device.id) {
+        best_match = device;
+      }
+      // If no such GPU ID is found, select the first available candidate GPU
+      else if (best_match.device_name != target_device.device_name) {
         best_match = device;
       }
     }

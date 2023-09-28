@@ -5,6 +5,7 @@ from . import (
     cast,
     condition,
     conv,
+    deconv,
     elementwise,
     embedding,
     linear,
