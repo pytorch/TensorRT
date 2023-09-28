@@ -345,7 +345,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
     def get_attr(self, target: str, args: Any, kwargs: Any) -> np.ndarray:
         with _disable_current_modes():
-            from torch_tensorrt.fx.converters import to_numpy
+            from torch_tensorrt.dynamo.conversion.converter_utils import to_numpy
 
             frozen_attr = self.fetch_attr(target)
 

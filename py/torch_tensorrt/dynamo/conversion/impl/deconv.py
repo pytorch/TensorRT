@@ -11,6 +11,7 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     extend_attr_to_tuple,
     get_trt_tensor,
+    to_numpy,
 )
 from torch_tensorrt.fx.converters.converter_utils import (
     SourceIR,
@@ -18,7 +19,6 @@ from torch_tensorrt.fx.converters.converter_utils import (
     has_dynamic_shape,
     mark_as_int8_layer,
     set_layer_name,
-    to_numpy,
 )
 from torch_tensorrt.fx.types import TRTTensor
 

@@ -17,7 +17,6 @@ from torch_tensorrt.dynamo.conversion.converter_registry import (
 from torch_tensorrt.fx.converters.converter_utils import (
     Frameworks,
     get_axes_for_reduce_op,
-    to_numpy,
     unified_dtype_converter,
 )
 from torch_tensorrt.fx.types import TRTDataType, TRTTensor
@@ -270,9 +269,10 @@ def create_constant(
     Returns:
         A TensorRT ITensor that represents the given value.
     """
+    numpy_value = to_numpy(value, dtype)
     constant = ctx.net.add_constant(
         (1,) if isinstance(value, (int, float, bool)) else value.shape,
-        to_numpy(value, dtype).copy(),
+        numpy_value.copy() if isinstance(numpy_value, np.ndarray) else numpy_value,
     )
     constant.name = name
     return constant.get_output(0)
@@ -389,7 +389,10 @@ def enforce_tensor_types(
             and all((dtype in (TRTTensor, np.ndarray, torch.Tensor)) for dtype in val)
         )
         for val in type_dictionary.values()
-    ), "Invalid value(s) specified in type enforcement"
+    ), (
+        "Invalid value(s) specified in type enforcement."
+        "Note that torch.Tensor cannot be present as a type without np.ndarray."
+    )
 
     def wrapper(func: DynamoConverterImplSignature) -> DynamoConverterImplSignature:
         @functools.wraps(func)
@@ -422,23 +425,32 @@ def enforce_tensor_types(
                         f"Detected argument at index {index} had type {type(candidate)} "
                         f"which is not one of the approved types {approved_dtypes}"
                     )
-                # Numpy arrays are preferred in general - if approved, promote to Numpy first
-                elif np.ndarray in approved_dtypes and not isinstance(
-                    candidate, TRTTensor
-                ):
-                    new_value = to_numpy(candidate)
-                # As a fallback, freeze tensors to IConstantLayers if they cannot be handled as Numpy arrays
-                elif TRTTensor in approved_dtypes:
-                    _LOGGER.debug(
-                        f"Freezing tensor {name}_constant_{index} to TRT IConstantLayer"
-                    )
-                    new_value = get_trt_tensor(
-                        ctx, candidate, name + f"_constant_{index}"
-                    )
-                else:
+
+                promoted = False
+
+                # Type-promotion preference order depends on tuple order
+                for dtype in approved_dtypes:
+                    # Currently, we do not cast to Torch tensor, due to issues with such casts
+                    # in FakeTensor contexts
+                    if dtype == np.ndarray and not isinstance(candidate, TRTTensor):
+                        new_value = to_numpy(candidate)
+                        promoted = True
+                        break
+                    # As a fallback, freeze tensors to IConstantLayers if they cannot be handled as Numpy arrays
+                    elif dtype == TRTTensor:
+                        _LOGGER.debug(
+                            f"Freezing tensor {name}_constant_{index} to TRT IConstantLayer"
+                        )
+                        new_value = get_trt_tensor(
+                            ctx, candidate, name + f"_constant_{index}"
+                        )
+                        promoted = True
+                        break
+
+                if not promoted:
                     raise AssertionError(
-                        f"Argument at index {index} was not able to be converted to one of "
-                        f"the following types: {approved_dtypes}"
+                        f"Argument {candidate} at index {index} was not able to be "
+                        f"converted to one of the following types: {approved_dtypes}"
                     )
 
                 # Reassemble args or kwargs if the value was modified
@@ -452,3 +464,50 @@ def enforce_tensor_types(
         return convert_with_type_enforcement
 
     return wrapper
+
+
+def to_numpy(
+    value: Optional[Union[torch.Tensor, np.ndarray, int, float, bool]],
+    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]] = None,
+) -> Optional[np.ndarray]:
+    """
+    Convert a PyTorch Tensor, Numpy array, or scalar to a Numpy Array. If the tensor is
+    quantized it will be dequantized first.
+    Args:
+        value (Optional[Union[torch.Tensor, np.ndarray, int, float, bool]]):
+            A PyTorch tensor, Numpy array, int, float, or bool
+        dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
+            If a dtype is given, we will convert the type of the given `value` to this dtype.
+    Returns:
+        A Numpy array or None, if the input was None.
+    """
+    output = None
+
+    if value is None or isinstance(value, np.ndarray):
+        output = value
+
+    elif isinstance(value, torch.Tensor):
+        if value.is_quantized:
+            value = value.dequantize()
+
+        output = value.cpu().detach().contiguous().numpy()
+
+    elif isinstance(value, int):
+        output = np.array([value], dtype=np.int32)
+
+    elif isinstance(value, float):
+        output = np.array([value], dtype=np.float32)
+
+    elif isinstance(value, bool):
+        output = np.array([value], dtype=np.bool_)
+
+    if isinstance(output, np.ndarray) or output is None:
+        return (
+            output
+            if (dtype is None or output is None)
+            else output.astype(unified_dtype_converter(dtype, Frameworks.NUMPY))
+        )
+    else:
+        raise AssertionError(
+            f"to_numpy can only be called on None, bool, int, float, np.ndarray, or torch.Tensor, got: {value}"
+        )

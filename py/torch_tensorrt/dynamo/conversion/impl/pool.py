@@ -3,16 +3,17 @@ from typing import Optional, Sequence, Union
 import tensorrt as trt
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import extend_attr_to_tuple
 from torch_tensorrt.fx.converters.converter_utils import (
     has_dynamic_shape,
     set_layer_name,
 )
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+from torch_tensorrt.fx.types import TRTTensor
 
 
 def avg_poolNd(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Union[Target, str],
     source_ir: Optional[SourceIR],
     name: str,
@@ -45,7 +46,7 @@ def avg_poolNd(
     padding = extend_attr_to_tuple(padding, dim)
 
     # add average pooling layer
-    pool_layer = network.add_pooling_nd(
+    pool_layer = ctx.net.add_pooling_nd(
         input=input,
         type=trt.PoolingType.AVERAGE,
         window_size=kernel_size,
@@ -60,7 +61,7 @@ def avg_poolNd(
 
 
 def max_poolNd(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Union[Target, str],
     source_ir: Optional[SourceIR],
     name: str,
@@ -92,7 +93,7 @@ def max_poolNd(
     padding = extend_attr_to_tuple(padding, dim)
 
     # add max pooling layer
-    pool_layer = network.add_pooling_nd(
+    pool_layer = ctx.net.add_pooling_nd(
         input=input,
         type=trt.PoolingType.MAX,
         window_size=kernel_size,

@@ -27,7 +27,7 @@ def args_bounds_check(
     return args[i] if len(args) > i else replacement
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.batch_norm)
+@dynamo_tensorrt_converter(torch.ops.aten.batch_norm)  # type: ignore[misc]
 def aten_ops_batch_norm(
     ctx: ConversionContext,
     target: Target,
@@ -70,7 +70,7 @@ def embedding_param_validator(embedding_node: Node) -> bool:
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.embedding.default, capability_validator=embedding_param_validator
-)
+)  # type: ignore[misc]
 def aten_ops_embedding(
     ctx: ConversionContext,
     target: Target,
@@ -91,8 +91,8 @@ def aten_ops_embedding(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar)
-@dynamo_tensorrt_converter(torch.ops.aten.fmod.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.fmod.Tensor)  # type: ignore[misc]
 def aten_ops_fmod(
     ctx: ConversionContext,
     target: Target,
@@ -103,7 +103,7 @@ def aten_ops_fmod(
     return impl.elementwise.fmod(ctx, target, SourceIR.ATEN, name, args[0], args[1])
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.relu.default)
+@dynamo_tensorrt_converter(torch.ops.aten.relu.default)  # type: ignore[misc]
 def aten_ops_relu(
     ctx: ConversionContext,
     target: Target,
@@ -120,7 +120,7 @@ def aten_ops_relu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sigmoid.default)
+@dynamo_tensorrt_converter(torch.ops.aten.sigmoid.default)  # type: ignore[misc]
 def aten_ops_sigmoid(
     ctx: ConversionContext,
     target: Target,
@@ -137,7 +137,7 @@ def aten_ops_sigmoid(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.tanh.default)
+@dynamo_tensorrt_converter(torch.ops.aten.tanh.default)  # type: ignore[misc]
 def aten_ops_tanh(
     ctx: ConversionContext,
     target: Target,
@@ -154,7 +154,7 @@ def aten_ops_tanh(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.leaky_relu.default)
+@dynamo_tensorrt_converter(torch.ops.aten.leaky_relu.default)  # type: ignore[misc]
 def aten_ops_leaky_relu(
     ctx: ConversionContext,
     target: Target,
@@ -172,7 +172,7 @@ def aten_ops_leaky_relu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.elu.default)
+@dynamo_tensorrt_converter(torch.ops.aten.elu.default)  # type: ignore[misc]
 def aten_ops_elu(
     ctx: ConversionContext,
     target: Target,
@@ -191,7 +191,7 @@ def aten_ops_elu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.softplus.default)
+@dynamo_tensorrt_converter(torch.ops.aten.softplus.default)  # type: ignore[misc]
 def aten_ops_softplus(
     ctx: ConversionContext,
     target: Target,
@@ -209,7 +209,7 @@ def aten_ops_softplus(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.clip.default)
+@dynamo_tensorrt_converter(torch.ops.aten.clip.default)  # type: ignore[misc]
 def aten_ops_clip(
     ctx: ConversionContext,
     target: Target,
@@ -228,7 +228,7 @@ def aten_ops_clip(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.hardsigmoid.default)
+@dynamo_tensorrt_converter(torch.ops.aten.hardsigmoid.default)  # type: ignore[misc]
 def aten_ops_hard_sigmoid(
     ctx: ConversionContext,
     target: Target,
@@ -247,10 +247,10 @@ def aten_ops_hard_sigmoid(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.matmul)
-@dynamo_tensorrt_converter(torch.ops.aten.mm.default)
-@dynamo_tensorrt_converter(torch.ops.aten.mv.default)
-@dynamo_tensorrt_converter(torch.ops.aten.bmm.default)
+@dynamo_tensorrt_converter(torch.ops.aten.matmul)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.mm.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.mv.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.bmm.default)  # type: ignore[misc]
 def aten_ops_matmul(
     ctx: ConversionContext,
     target: Target,
@@ -268,7 +268,7 @@ def aten_ops_matmul(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.layer_norm.default)
+@dynamo_tensorrt_converter(torch.ops.aten.layer_norm.default)  # type: ignore[misc]
 def aten_ops_layernorm(
     ctx: ConversionContext,
     target: Target,
@@ -289,7 +289,7 @@ def aten_ops_layernorm(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.rsqrt.default)
+@dynamo_tensorrt_converter(torch.ops.aten.rsqrt.default)  # type: ignore[misc]
 def aten_ops_rsqrt(
     ctx: ConversionContext,
     target: Target,
@@ -306,7 +306,7 @@ def aten_ops_rsqrt(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.neg.default)
+@dynamo_tensorrt_converter(torch.ops.aten.neg.default)  # type: ignore[misc]
 def aten_ops_neg(
     ctx: ConversionContext,
     target: Target,
@@ -323,8 +323,8 @@ def aten_ops_neg(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim)
-@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims)
+@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims)  # type: ignore[misc]
 def aten_ops_squeeze(
     ctx: ConversionContext,
     target: Target,
@@ -335,7 +335,7 @@ def aten_ops_squeeze(
     return impl.squeeze.squeeze(ctx, target, SourceIR.ATEN, name, args[0], args[1])
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.erf.default)
+@dynamo_tensorrt_converter(torch.ops.aten.erf.default)  # type: ignore[misc]
 def aten_ops_erf(
     ctx: ConversionContext,
     target: Target,
@@ -352,7 +352,7 @@ def aten_ops_erf(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.unsqueeze.default)
+@dynamo_tensorrt_converter(torch.ops.aten.unsqueeze.default)  # type: ignore[misc]
 def aten_ops_unsqueeze(
     ctx: ConversionContext,
     target: Target,
@@ -365,7 +365,7 @@ def aten_ops_unsqueeze(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten._softmax.default)
+@dynamo_tensorrt_converter(torch.ops.aten._softmax.default)  # type: ignore[misc]
 def aten_ops_softmax(
     ctx: ConversionContext,
     target: Target,
@@ -380,14 +380,14 @@ def aten_ops_softmax(
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.split.Tensor, capability_validator=dynamic_unsupported_with_args([1])
-)
+)  # type: ignore[misc]
 @dynamo_tensorrt_converter(
     torch.ops.aten.split.sizes, capability_validator=dynamic_unsupported_with_args([1])
-)
+)  # type: ignore[misc]
 @dynamo_tensorrt_converter(
     torch.ops.aten.split_with_sizes.default,
     capability_validator=dynamic_unsupported_with_args([1]),
-)
+)  # type: ignore[misc]
 def aten_ops_split(
     ctx: ConversionContext,
     target: Target,
@@ -406,7 +406,7 @@ def aten_ops_split(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.where.self)
+@dynamo_tensorrt_converter(torch.ops.aten.where.self)  # type: ignore[misc]
 def aten_ops_where(
     ctx: ConversionContext,
     target: Target,
@@ -425,7 +425,7 @@ def aten_ops_where(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.clamp.default)
+@dynamo_tensorrt_converter(torch.ops.aten.clamp.default)  # type: ignore[misc]
 def aten_ops_clamp(
     ctx: ConversionContext,
     target: Target,
@@ -444,7 +444,7 @@ def aten_ops_clamp(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.select.int)
+@dynamo_tensorrt_converter(torch.ops.aten.select.int)  # type: ignore[misc]
 def aten_ops_select(
     ctx: ConversionContext,
     target: Target,
@@ -457,7 +457,7 @@ def aten_ops_select(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.slice.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.slice.Tensor)  # type: ignore[misc]
 def aten_ops_slice(
     ctx: ConversionContext,
     target: Target,
@@ -478,12 +478,12 @@ def aten_ops_slice(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.permute.default)
+@dynamo_tensorrt_converter(torch.ops.aten.permute.default)  # type: ignore[misc]
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
     }
-)
+)  # type: ignore[misc]
 def aten_ops_permute(
     ctx: ConversionContext,
     target: Target,
@@ -548,11 +548,11 @@ def to_copy_dtype_validator(placeholder_only: bool) -> Callable[[Node], bool]:
 @dynamo_tensorrt_converter(
     torch.ops.aten.clone.default,
     capability_validator=lambda node: not is_only_operator_on_placeholder(node),
-)
+)  # type: ignore[misc]
 @dynamo_tensorrt_converter(
     torch.ops.aten._to_copy.default,
     capability_validator=to_copy_dtype_validator(placeholder_only=False),
-)
+)  # type: ignore[misc]
 def aten_ops_clone_copy_dtype(
     ctx: ConversionContext,
     target: Target,
@@ -574,11 +574,11 @@ def aten_ops_clone_copy_dtype(
 @dynamo_tensorrt_converter(
     torch.ops.aten.clone.default,
     capability_validator=is_only_operator_on_placeholder,
-)
+)  # type: ignore[misc]
 @dynamo_tensorrt_converter(
     torch.ops.aten._to_copy.default,
     capability_validator=to_copy_dtype_validator(placeholder_only=True),
-)
+)  # type: ignore[misc]
 def aten_ops_clone_copy_placeholder(
     ctx: ConversionContext,
     target: Target,
@@ -600,7 +600,7 @@ def aten_ops_clone_copy_placeholder(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.expand.default)
+@dynamo_tensorrt_converter(torch.ops.aten.expand.default)  # type: ignore[misc]
 def aten_ops_expand(
     ctx: ConversionContext,
     target: Target,
@@ -630,7 +630,7 @@ def amax_param_validator(amax_node: Node) -> bool:
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.amax.default, capability_validator=amax_param_validator
-)
+)  # type: ignore[misc]
 def aten_ops_amax(
     ctx: ConversionContext,
     target: Target,
@@ -649,8 +649,8 @@ def aten_ops_amax(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sum.default)
-@dynamo_tensorrt_converter(torch.ops.aten.sum.dim_IntList)
+@dynamo_tensorrt_converter(torch.ops.aten.sum.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.sum.dim_IntList)  # type: ignore[misc]
 def aten_ops_sum(
     ctx: ConversionContext,
     target: Target,
@@ -669,7 +669,7 @@ def aten_ops_sum(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.exp.default)
+@dynamo_tensorrt_converter(torch.ops.aten.exp.default)  # type: ignore[misc]
 def aten_ops_exp(
     ctx: ConversionContext,
     target: Target,
@@ -686,7 +686,7 @@ def aten_ops_exp(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.log.default)
+@dynamo_tensorrt_converter(torch.ops.aten.log.default)  # type: ignore[misc]
 def aten_ops_log(
     ctx: ConversionContext,
     target: Target,
@@ -703,7 +703,7 @@ def aten_ops_log(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sqrt.default)
+@dynamo_tensorrt_converter(torch.ops.aten.sqrt.default)  # type: ignore[misc]
 def aten_ops_sqrt(
     ctx: ConversionContext,
     target: Target,
@@ -720,7 +720,7 @@ def aten_ops_sqrt(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.reciprocal.default)
+@dynamo_tensorrt_converter(torch.ops.aten.reciprocal.default)  # type: ignore[misc]
 def aten_ops_recip(
     ctx: ConversionContext,
     target: Target,
@@ -737,7 +737,7 @@ def aten_ops_recip(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.abs.default)
+@dynamo_tensorrt_converter(torch.ops.aten.abs.default)  # type: ignore[misc]
 def aten_ops_abs(
     ctx: ConversionContext,
     target: Target,
@@ -754,7 +754,7 @@ def aten_ops_abs(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sin.default)
+@dynamo_tensorrt_converter(torch.ops.aten.sin.default)  # type: ignore[misc]
 def aten_ops_sin(
     ctx: ConversionContext,
     target: Target,
@@ -771,7 +771,7 @@ def aten_ops_sin(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.cos.default)
+@dynamo_tensorrt_converter(torch.ops.aten.cos.default)  # type: ignore[misc]
 def aten_ops_cos(
     ctx: ConversionContext,
     target: Target,
@@ -788,7 +788,7 @@ def aten_ops_cos(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.tan.default)
+@dynamo_tensorrt_converter(torch.ops.aten.tan.default)  # type: ignore[misc]
 def aten_ops_tan(
     ctx: ConversionContext,
     target: Target,
@@ -805,7 +805,7 @@ def aten_ops_tan(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sinh.default)
+@dynamo_tensorrt_converter(torch.ops.aten.sinh.default)  # type: ignore[misc]
 def aten_ops_sinh(
     ctx: ConversionContext,
     target: Target,
@@ -822,7 +822,7 @@ def aten_ops_sinh(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.cosh.default)
+@dynamo_tensorrt_converter(torch.ops.aten.cosh.default)  # type: ignore[misc]
 def aten_ops_cosh(
     ctx: ConversionContext,
     target: Target,
@@ -839,7 +839,7 @@ def aten_ops_cosh(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.asin.default)
+@dynamo_tensorrt_converter(torch.ops.aten.asin.default)  # type: ignore[misc]
 def aten_ops_asin(
     ctx: ConversionContext,
     target: Target,
@@ -856,7 +856,7 @@ def aten_ops_asin(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.acos.default)
+@dynamo_tensorrt_converter(torch.ops.aten.acos.default)  # type: ignore[misc]
 def aten_ops_acos(
     ctx: ConversionContext,
     target: Target,
@@ -873,7 +873,7 @@ def aten_ops_acos(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.atan.default)
+@dynamo_tensorrt_converter(torch.ops.aten.atan.default)  # type: ignore[misc]
 def aten_ops_atan(
     ctx: ConversionContext,
     target: Target,
@@ -890,7 +890,7 @@ def aten_ops_atan(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.asinh.default)
+@dynamo_tensorrt_converter(torch.ops.aten.asinh.default)  # type: ignore[misc]
 def aten_ops_asinh(
     ctx: ConversionContext,
     target: Target,
@@ -907,7 +907,7 @@ def aten_ops_asinh(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.acosh.default)
+@dynamo_tensorrt_converter(torch.ops.aten.acosh.default)  # type: ignore[misc]
 def aten_ops_acosh(
     ctx: ConversionContext,
     target: Target,
@@ -924,7 +924,7 @@ def aten_ops_acosh(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.atanh.default)
+@dynamo_tensorrt_converter(torch.ops.aten.atanh.default)  # type: ignore[misc]
 def aten_ops_atanh(
     ctx: ConversionContext,
     target: Target,
@@ -941,7 +941,7 @@ def aten_ops_atanh(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.ceil.default)
+@dynamo_tensorrt_converter(torch.ops.aten.ceil.default)  # type: ignore[misc]
 def aten_ops_ceil(
     ctx: ConversionContext,
     target: Target,
@@ -958,7 +958,7 @@ def aten_ops_ceil(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.floor.default)
+@dynamo_tensorrt_converter(torch.ops.aten.floor.default)  # type: ignore[misc]
 def aten_ops_floor(
     ctx: ConversionContext,
     target: Target,
@@ -975,7 +975,7 @@ def aten_ops_floor(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.logical_not.default)
+@dynamo_tensorrt_converter(torch.ops.aten.logical_not.default)  # type: ignore[misc]
 def aten_ops_logical_not(
     ctx: ConversionContext,
     target: Target,
@@ -992,7 +992,7 @@ def aten_ops_logical_not(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sign.default)
+@dynamo_tensorrt_converter(torch.ops.aten.sign.default)  # type: ignore[misc]
 def aten_ops_sign(
     ctx: ConversionContext,
     target: Target,
@@ -1009,7 +1009,7 @@ def aten_ops_sign(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.round.default)
+@dynamo_tensorrt_converter(torch.ops.aten.round.default)  # type: ignore[misc]
 def aten_ops_round(
     ctx: ConversionContext,
     target: Target,
@@ -1026,7 +1026,7 @@ def aten_ops_round(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.isinf.default)
+@dynamo_tensorrt_converter(torch.ops.aten.isinf.default)  # type: ignore[misc]
 def aten_ops_isinf(
     ctx: ConversionContext,
     target: Target,
@@ -1043,8 +1043,8 @@ def aten_ops_isinf(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.add.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.add.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.add.Tensor)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.add.Scalar)  # type: ignore[misc]
 def aten_ops_add(
     ctx: ConversionContext,
     target: Target,
@@ -1075,8 +1075,8 @@ def aten_ops_add(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.mul.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.mul.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.mul.Tensor)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.mul.Scalar)  # type: ignore[misc]
 def aten_ops_mul(
     ctx: ConversionContext,
     target: Target,
@@ -1094,7 +1094,7 @@ def aten_ops_mul(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.maximum.default)
+@dynamo_tensorrt_converter(torch.ops.aten.maximum.default)  # type: ignore[misc]
 def aten_ops_max(
     ctx: ConversionContext,
     target: Target,
@@ -1112,7 +1112,7 @@ def aten_ops_max(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.minimum.default)
+@dynamo_tensorrt_converter(torch.ops.aten.minimum.default)  # type: ignore[misc]
 def aten_ops_min(
     ctx: ConversionContext,
     target: Target,
@@ -1130,8 +1130,8 @@ def aten_ops_min(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sub.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.sub.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.sub.Tensor)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.sub.Scalar)  # type: ignore[misc]
 def aten_ops_sub(
     ctx: ConversionContext,
     target: Target,
@@ -1162,10 +1162,10 @@ def aten_ops_sub(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode)
-@dynamo_tensorrt_converter(torch.ops.aten.div.Scalar)
-@dynamo_tensorrt_converter(torch.ops.aten.div.Scalar_mode)
+@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.div.Scalar)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.div.Scalar_mode)  # type: ignore[misc]
 def aten_ops_div(
     ctx: ConversionContext,
     target: Target,
@@ -1208,9 +1208,9 @@ def aten_ops_div(
         )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.pow.Tensor_Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.pow.Scalar)
-@dynamo_tensorrt_converter(torch.ops.aten.pow.Tensor_Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.pow.Tensor_Tensor)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.pow.Scalar)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.pow.Tensor_Scalar)  # type: ignore[misc]
 def aten_ops_pow(
     ctx: ConversionContext,
     target: Target,
@@ -1228,8 +1228,8 @@ def aten_ops_pow(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.floor_divide.default)
-@dynamo_tensorrt_converter(torch.ops.aten.floor_divide.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.floor_divide.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.floor_divide.Scalar)  # type: ignore[misc]
 def aten_ops_floor_div(
     ctx: ConversionContext,
     target: Target,
@@ -1247,7 +1247,7 @@ def aten_ops_floor_div(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.logical_and.default)
+@dynamo_tensorrt_converter(torch.ops.aten.logical_and.default)  # type: ignore[misc]
 def aten_ops_logical_and(
     ctx: ConversionContext,
     target: Target,
@@ -1265,7 +1265,7 @@ def aten_ops_logical_and(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.logical_or.default)
+@dynamo_tensorrt_converter(torch.ops.aten.logical_or.default)  # type: ignore[misc]
 def aten_ops_logical_or(
     ctx: ConversionContext,
     target: Target,
@@ -1283,7 +1283,7 @@ def aten_ops_logical_or(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.logical_xor.default)
+@dynamo_tensorrt_converter(torch.ops.aten.logical_xor.default)  # type: ignore[misc]
 def aten_ops_logical_xor(
     ctx: ConversionContext,
     target: Target,
@@ -1301,8 +1301,8 @@ def aten_ops_logical_xor(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.eq.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.eq.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.eq.Tensor)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.eq.Scalar)  # type: ignore[misc]
 def aten_ops_equal(
     ctx: ConversionContext,
     target: Target,
@@ -1320,8 +1320,8 @@ def aten_ops_equal(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.gt.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.gt.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.gt.Tensor)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.gt.Scalar)  # type: ignore[misc]
 def aten_ops_greater(
     ctx: ConversionContext,
     target: Target,
@@ -1339,8 +1339,8 @@ def aten_ops_greater(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.lt.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.lt.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.lt.Tensor)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.lt.Scalar)  # type: ignore[misc]
 def aten_ops_less(
     ctx: ConversionContext,
     target: Target,
@@ -1364,14 +1364,14 @@ def conv_param_validator(conv_node: Node) -> bool:
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.convolution.default, capability_validator=conv_param_validator
-)
+)  # type: ignore[misc]
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
-        1: (TRTTensor, np.ndarray, torch.Tensor),
-        2: (TRTTensor, np.ndarray, torch.Tensor),
+        1: (np.ndarray, torch.Tensor, TRTTensor),
+        2: (np.ndarray, torch.Tensor, TRTTensor),
     }
-)
+)  # type: ignore[misc]
 def aten_ops_convolution(
     ctx: ConversionContext,
     target: Target,
@@ -1412,8 +1412,8 @@ def aten_ops_convolution(
         )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.linear.default)
-@dynamo_tensorrt_converter(torch.ops.aten.linear)
+@dynamo_tensorrt_converter(torch.ops.aten.linear.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.linear)  # type: ignore[misc]
 def aten_ops_linear(
     ctx: ConversionContext,
     target: Target,
