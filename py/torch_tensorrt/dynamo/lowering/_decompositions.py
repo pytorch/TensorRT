@@ -83,11 +83,6 @@ replace_inplace_op(aten.scatter_add_, aten.scatter_add)
 replace_inplace_op(aten.scatter_reduce_, aten.scatter_reduce)
 
 
-@register_torch_trt_decomposition(aten.std, registry=TORCH_TRT_DECOMPOSITIONS)
-def std_replacement(*args, **kwargs) -> torch.Tensor:  # type: ignore
-    return torch.sqrt(torch.var(*args, **kwargs))
-
-
 @register_torch_trt_decomposition(aten.rsqrt, registry=TORCH_TRT_DECOMPOSITIONS)
 def rsqrt_replacement(*args, **kwargs) -> torch.Tensor:  # type: ignore
     return torch.reciprocal(torch.sqrt(*args, **kwargs))

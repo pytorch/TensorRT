@@ -5,6 +5,7 @@ import torch
 
 from .constant_folding import constant_fold
 from .fuse_prims_broadcast import fuse_prims_broadcast
+from .lower_efficient_attention import lower_efficient_attention
 from .pass_manager import DynamoPassManager
 from .remove_input_alias_fixing_clones import remove_input_alias_fixing_clones
 from .repair_input_as_output import repair_input_as_output
@@ -14,6 +15,7 @@ ATEN_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
         remove_input_alias_fixing_clones,
         constant_fold,
         repair_input_as_output,
+        lower_efficient_attention,
         fuse_prims_broadcast,
     ]
 )

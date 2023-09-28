@@ -1517,3 +1517,18 @@ def aten_ops_max_pool(
         dilation=args_bounds_check(args, 4, replacement=1),
         ceil_mode=args_bounds_check(args, 5, replacement=False),
     )
+
+
+@dynamo_tensorrt_converter(
+    torch.nn.functional.scaled_dot_product_attention,
+)  # type: ignore[misc]
+def tensorrt_scaled_dot_product_attention(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.attention.scaled_dot_product_attention(
+        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2]
+    )
