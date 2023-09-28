@@ -108,5 +108,26 @@ class TestSumConverter(DispatchTestCase):
         )
 
 
+class TestPrimsSumConverter(DispatchTestCase):
+    @parameterized.expand(
+        [
+            ((3, 2, 4), [1]),
+            ((2, 1, 4, 5), [1, 2]),
+            ((2, 3, 4, 5), [0, 1, 2, 3]),
+            ((6, 7, 5, 4, 5), [1, 3, 4]),
+        ]
+    )
+    def test_sum_dim_sequence(self, input_shape, dim):
+        class Sum(nn.Module):
+            def forward(self, x):
+                return torch.ops.prims.sum.default(x, dim)
+
+        inputs = [torch.randn(*input_shape)]
+        self.run_test(
+            Sum(),
+            inputs,
+        )
+
+
 if __name__ == "__main__":
     run_tests()
