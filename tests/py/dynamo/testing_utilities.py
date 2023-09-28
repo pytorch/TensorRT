@@ -53,7 +53,7 @@ def fx_dynamo_testing_backend(
             decompositions=get_decompositions(),
         )
 
-        gm = apply_lowering_passes(gm)
+        gm = apply_lowering_passes(gm, sample_inputs)
 
         trt_compiled = custom_backend(
             gm,

@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import torch
 from torch._decomp import register_decomposition
@@ -133,6 +133,54 @@ def reciprocal_replacement(
     input_: torch.Tensor,
 ) -> torch.Tensor:
     return torch.div(1, input_)
+
+
+@register_torch_trt_decomposition(
+    torch.ops.prims.var.default, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def var_decomposition(
+    input_tensor: torch.Tensor,
+    dims: Optional[List[int]],
+    correction: int,
+    output_dtype: Optional[torch.dtype] = None,
+) -> torch.Tensor:
+    if dims is None:
+        dims = []
+
+    # If the dimensions are empty, variance is taken over all dimensions
+    if isinstance(dims, (tuple, list)) and len(dims) == 0:
+        N = input_tensor.numel()
+    # Otherwise, the number of samples is the product of the dimensions reduced over
+    else:
+        N = 1
+        for dim_i in dims:
+            N *= input_tensor.shape[dim_i]
+
+    # Compute the mean, difference, and correction term as per the formula:
+    # https://pytorch.org/docs/stable/generated/torch.var.html
+
+    # Additionally, prims does not support keepdim, and so we only keep dimensions
+    # on the first reduction, then remove it for the second
+    sample_mean = torch.mean(input_tensor, dims, keepdim=True)
+    diff = input_tensor - sample_mean
+    squared_diff = diff * diff
+    variance_unnormalized = torch.sum(squared_diff, dims, keepdim=False)
+
+    if correction is None:
+        correction_term = float(N - 1)
+    elif isinstance(correction, int):
+        correction_term = float(N - correction)
+    elif isinstance(correction, float):
+        correction_term = float(N) - correction
+    else:
+        raise RuntimeError("correction must be int or float")
+
+    if correction_term <= 0:
+        raise RuntimeError(f"correction term was non-positive, got: {correction_term}")
+
+    variance = variance_unnormalized / correction_term
+
+    return variance
 
 
 def get_decompositions(

@@ -1,4 +1,5 @@
 import logging
+from typing import Sequence
 
 import torch
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
@@ -9,7 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: Delete this lowering pass once aot_export_joint_simple is patched
-def remove_input_alias_fixing_clones(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+def remove_input_alias_fixing_clones(
+    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]
+) -> torch.fx.GraphModule:
     """Remove the auxiliary clone nodes inserted to fix input aliasing
 
     See: https://github.com/pytorch/pytorch/issues/108079
