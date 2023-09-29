@@ -87,7 +87,7 @@ def _pretraced_backend(
 
             logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
 
-            gm = apply_lowering_passes(gm)
+            gm = apply_lowering_passes(gm, sample_inputs)
 
             trt_compiled = compile_module(
                 gm,

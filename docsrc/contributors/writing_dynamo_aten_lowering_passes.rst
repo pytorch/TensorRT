@@ -12,7 +12,7 @@ Lowering Pass Requirements
 ------------
 
 An ATen lowering pass function in Torch-TRT must satisfy two requirements:
-- The function must take as input a single `torch.fx.GraphModule` and return the lowered `torch.fx.GraphModule`
+- The function must take as input a `torch.fx.GraphModule` and a sequence of torch Tensors, `Sequence[torch.Tensor]`, and return the lowered `torch.fx.GraphModule`
 - The function must leave the graph in a valid and invoke-able state, including performing any necessary linting and recompilation
 
 See this link for information on `Graph Manipulations <https://pytorch.org/docs/stable/fx.html#graph-manipulation>`_ in FX. See below for an example of a lowering pass which repairs graphs that have inputs which are also outputs, a disallowed configuration for TRT Engines.
@@ -22,7 +22,7 @@ Example Lowering Pass
 
 .. code-block:: python
 
-    def repair_input_as_output(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+    def repair_input_as_output(gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]) -> torch.fx.GraphModule:
         """Repair scenarios where inputs are also outputs of the graph
 
         TRT does not allow such cases, so we insert a clone (identity) layer
@@ -82,7 +82,7 @@ For instance, to insert the pass at the default location (end of the list), the 
 .. code-block:: python
 
     @_aten_lowering_pass
-    def my_custom_pass(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+    def my_custom_pass(gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]) -> torch.fx.GraphModule:
         ...
 
 Alternatively, to insert the pass at a custom index (such as the front of the list) in the passlist, the following code can be used:
@@ -90,7 +90,7 @@ Alternatively, to insert the pass at a custom index (such as the front of the li
 .. code-block:: python
 
     @_aten_lowering_pass(index=0)
-    def my_custom_pass(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+    def my_custom_pass(gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]) -> torch.fx.GraphModule:
         ...
 
 There are also provided utilities in `torch_tensorrt.dynamo.lowering.passes` for displaying the currently-available lowering pass list, applying those passes to an arbitrary `torch.fx.GraphModule`, and removing the lowering pass at a specific index.
@@ -101,7 +101,7 @@ There are also provided utilities in `torch_tensorrt.dynamo.lowering.passes` for
     print(dump_lowering_passes())
 
     # Apply lowering passes to a GraphModule
-    apply_lowering_passes(graph_module)
+    apply_lowering_passes(graph_module, sample_inputs)
 
     # Remove the lowering pass at index 1
     _remove_lowering_pass(index=1)
