@@ -31,11 +31,8 @@ LEGACY_BASE_VERSION_SUFFIX_PATTERN = re.compile("a0$")
 
 
 def get_root_dir() -> Path:
-    return Path(
-        subprocess.check_output(["git", "rev-parse", "--show-toplevel"])
-        .decode("ascii")
-        .strip()
-    )
+    dir_path = os.path.dirname(os.path.realpath(__file__)) 
+    return dir_path
 
 
 def get_git_revision_short_hash() -> str:
@@ -70,6 +67,7 @@ def load_dep_info():
             )
         else:
             __cuda_version__ = versions["__cuda_version__"]
+        __version__ = versions["__version__"]
         __cudnn_version__ = versions["__cudnn_version__"]
         __tensorrt_version__ = versions["__tensorrt_version__"]
 
@@ -105,9 +103,7 @@ if (gpu_arch_version := os.environ.get("CU_VERSION")) is None:
     gpu_arch_version = f"cu{__cuda_version__.replace('.','')}"
 
 
-if RELEASE:
-    __version__ = os.environ.get("BUILD_VERSION")
-else:
+if not RELEASE:
     __version__ = f"{get_base_version()}.dev0+{get_git_revision_short_hash()}"
 
 if "--ci" in sys.argv:
