@@ -1413,3 +1413,90 @@ def aten_ops_linear(
         weight=args[1],
         bias=args_bounds_check(args, 2, None),
     )
+
+
+def avg_pool_param_validator(pool_node: Node) -> bool:
+    ceil_mode = args_bounds_check(pool_node.args, 4, False)
+    divisor_override = args_bounds_check(pool_node.args, 6)
+
+    if ceil_mode is not False:
+        _LOGGER.debug(
+            f"Currently we don't support specifying ceil_mode, got ceil_mode={ceil_mode}."
+        )
+        return False
+
+    if divisor_override is not None:
+        _LOGGER.debug(
+            f"Currently we don't support divisor_override, got divisor_override={divisor_override}."
+        )
+        return False
+
+    return True
+
+
+# Note: AvgPool1d uses avg_pool2d as it converts to 2D first.
+@dynamo_tensorrt_converter(torch.ops.aten.avg_pool1d.default, capability_validator=avg_pool_param_validator)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.avg_pool2d.default, capability_validator=avg_pool_param_validator)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.avg_pool3d.default, capability_validator=avg_pool_param_validator)  # type: ignore[misc]
+def aten_ops_avg_pool(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.pool.avg_poolNd(
+        network,
+        target,
+        source_ir=SourceIR.ATEN,
+        name=name,
+        input=args[0],
+        kernel_size=args[1],
+        stride=args_bounds_check(args, 2, replacement=[]),
+        padding=args_bounds_check(args, 3, replacement=0),
+        ceil_mode=args_bounds_check(args, 4, replacement=False),
+        count_include_pad=args_bounds_check(args, 5, replacement=True),
+        divisor_override=args_bounds_check(args, 6, replacement=None),
+    )
+
+
+def max_pool_param_validator(pool_node: Node) -> bool:
+    dilation = args_bounds_check(pool_node.args, 4, 1)
+    ceil_mode = args_bounds_check(pool_node.args, 5, False)
+
+    if dilation != 1:
+        _LOGGER.debug(f"Currently we don't support dilation, got dilation={dilation}.")
+        return False
+
+    if ceil_mode is not False:
+        _LOGGER.debug(
+            f"Currently we don't support specifying ceil_mode, got ceil_mode={ceil_mode}."
+        )
+        return False
+
+    return True
+
+
+# Note: MaxPool1d uses max_pool2d as it converts to 2D first.
+@dynamo_tensorrt_converter(torch.ops.aten.max_pool1d.default, capability_validator=max_pool_param_validator)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.max_pool2d.default, capability_validator=max_pool_param_validator)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.max_pool3d.default, capability_validator=max_pool_param_validator)  # type: ignore[misc]
+def aten_ops_max_pool(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.pool.max_poolNd(
+        network,
+        target,
+        source_ir=SourceIR.ATEN,
+        name=name,
+        input=args[0],
+        kernel_size=args[1],
+        stride=args_bounds_check(args, 2, replacement=[]),
+        padding=args_bounds_check(args, 3, replacement=0),
+        dilation=args_bounds_check(args, 4, replacement=1),
+        ceil_mode=args_bounds_check(args, 5, replacement=False),
+    )
