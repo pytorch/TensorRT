@@ -1,7 +1,7 @@
 import functools
 import logging
 import re
-from typing import Any, Callable, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
 import tensorrt as trt
@@ -314,3 +314,41 @@ def get_trt_tensor(
         return input_val
     else:
         raise AssertionError(f"Cannot convert {input_val} to TRT constant")
+
+
+@overload
+def get_positive_dim(dim: int, dim_size: int) -> int:
+    ...
+
+
+@overload
+def get_positive_dim(dim: Sequence[int], dim_size: int) -> Tuple[int, ...]:
+    ...
+
+
+def get_positive_dim(
+    dim: Union[int, Sequence[int]], dim_size: int
+) -> Union[int, Tuple[int, ...]]:
+    """
+    Given an integer number or tuple that represents dimension(s) in the array,
+    transform it to a positive integer dim if it's negative. Otherwise, do
+    nothing.
+
+    Args:
+        dim (Union[int, Sequence[int]]): A integer or Sequence of integers that represent dimension(s) in an array.
+        dim_size (int): The size of the dimension in the array.
+
+    Returns:
+        A positive integer or tuple of integers that represent the same dimension as the given dim.
+    """
+
+    def positive_dim(d: int) -> int:
+        if d < 0:
+            return d % dim_size
+        return d
+
+    return (
+        positive_dim(dim)
+        if isinstance(dim, int)
+        else tuple(positive_dim(d) for d in dim)
+    )

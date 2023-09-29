@@ -1,4 +1,4 @@
-from typing import Optional, Sequence, Tuple, Union
+from typing import Optional, Sequence, Union
 
 import tensorrt as trt
 from torch.fx.node import Target
@@ -6,6 +6,7 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_axes_for_reduce_op,
+    get_positive_dim,
 )
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
@@ -17,7 +18,7 @@ def amax(
     source_ir: Optional[SourceIR],
     name: str,
     input_val: TRTTensor,
-    dim: Union[int, Tuple[int]],
+    dim: Union[int, Sequence[int]],
     keepdim: bool = False,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
@@ -28,7 +29,7 @@ def amax(
     layer = network.add_reduce(
         input_val,
         trt.ReduceOperation.MAX,
-        axes=get_axes_for_reduce_op(dim),
+        axes=get_axes_for_reduce_op(get_positive_dim(dim, len(input_val.shape))),
         keep_dims=keepdim,
     )
     set_layer_name(layer, target, name, source_ir)
@@ -54,7 +55,7 @@ def sum(
     layer = network.add_reduce(
         input_val,
         trt.ReduceOperation.SUM,
-        axes=get_axes_for_reduce_op(dim),
+        axes=get_axes_for_reduce_op(get_positive_dim(dim, len(input_val.shape))),
         keep_dims=keepdim,
     )
     set_layer_name(layer, target, name, source_ir)

@@ -33,6 +33,8 @@ class TestSumConverter(DispatchTestCase):
             ((2, 3, 4, 5), 3, True),
             ((2, 3, 4, 5), None, False),
             ((6, 7, 5, 4, 5), 4, False),
+            ((1, 5, 2, 1), -3, False),
+            ((1, 5, 2, 3), -2, True),
         ]
     )
     def test_sum_dim_int(self, input_shape, dim, keep_dims):
@@ -53,6 +55,7 @@ class TestSumConverter(DispatchTestCase):
             ((2, 1, 4, 5), None, True),
             ((2, 3, 4, 5), [0, 1, 2, 3], False),
             ((6, 7, 5, 4, 5), [1, 3, 4], False),
+            ((6, 7, 5, 4, 5), [-5, -4, -2], False),
         ]
     )
     def test_sum_dim_tuple(self, input_shape, dim, keep_dims):

@@ -3,9 +3,9 @@ from typing import Optional
 
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
 from torch_tensorrt.dynamo.conversion.impl.slice.base import slice
 from torch_tensorrt.fx.converters.converter_utils import (
-    get_positive_dim,
     has_dynamic_shape,
     prepend_ones,
     set_layer_name,
