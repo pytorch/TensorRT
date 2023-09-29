@@ -1555,3 +1555,27 @@ def tensorrt_scaled_dot_product_attention(
     return impl.attention.scaled_dot_product_attention(
         ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2]
     )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.reshape.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.view.default)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)  # type: ignore[misc]
+def aten_ops_reshape(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.shuffle.reshape(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        shape=args[1],
+    )

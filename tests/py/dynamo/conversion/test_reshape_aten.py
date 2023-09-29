@@ -65,6 +65,7 @@ class TestReshapeConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             TestModule(target_shape),
             input_specs,
+            expected_ops={torch.ops.aten.view.default},
         )
 
 
