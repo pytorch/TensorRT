@@ -1,12 +1,13 @@
-import unittest
-import torch_tensorrt as torchtrt
-import torch
-import torchvision.models as models
 import copy
-import timm
-import custom_models as cm
+import unittest
 from typing import Dict
-from utils import cosine_similarity, COSINE_THRESHOLD
+
+import custom_models as cm
+import timm
+import torch
+import torch_tensorrt as torchtrt
+import torchvision.models as models
+from utils import COSINE_THRESHOLD, cosine_similarity
 
 
 class TestModels(unittest.TestCase):
@@ -150,6 +151,45 @@ class TestModels(unittest.TestCase):
         self.assertTrue(
             cos_sim > COSINE_THRESHOLD,
             msg=f"Resnet50 Half TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
+
+    def test_aten_unbind_dynamic(self):
+        class ATenUnbindDynamic(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+
+            def forward(self, x):
+                x1, x2, x3 = x.unbind(1)
+                y = torch.cat([x1, x2, x3], dim=0)
+                return y
+
+        self.model = ATenUnbindDynamic().eval().to("cuda")
+        self.input = torch.randn((5, 3, 7, 64)).to("cuda")
+        self.scripted_model = torch.jit.script(self.model)
+
+        compile_spec = {
+            "inputs": [
+                torchtrt.Input(
+                    min_shape=[1, 3, 1, 64],
+                    opt_shape=[5, 3, 32, 64],
+                    max_shape=[10, 3, 64, 64],
+                    dtype=torch.float,
+                    format=torch.contiguous_format,
+                )
+            ],
+            "device": {
+                "device_type": torchtrt.DeviceType.GPU,
+                "gpu_id": 0,
+            },
+            "enabled_precisions": {torch.float},
+            "ir": "ts",
+        }
+
+        trt_mod = torchtrt.compile(self.scripted_model, **compile_spec)
+        cos_sim = cosine_similarity(self.model(self.input), trt_mod(self.input))
+        self.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"ATen Unbind Dynamic TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
 
