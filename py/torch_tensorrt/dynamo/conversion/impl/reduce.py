@@ -3,17 +3,18 @@ from typing import Optional, Sequence, Union
 import tensorrt as trt
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_axes_for_reduce_op,
     get_positive_dim,
 )
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+from torch_tensorrt.fx.types import TRTTensor
 
 
 def amax(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -24,9 +25,9 @@ def amax(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
-    layer = network.add_reduce(
+    layer = ctx.net.add_reduce(
         input_val,
         trt.ReduceOperation.MAX,
         axes=get_axes_for_reduce_op(get_positive_dim(dim, len(input_val.shape))),
@@ -37,7 +38,7 @@ def amax(
 
 
 def sum(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -48,11 +49,11 @@ def sum(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     if dim is None:
         dim = tuple(range(len(input_val.shape)))
-    layer = network.add_reduce(
+    layer = ctx.net.add_reduce(
         input_val,
         trt.ReduceOperation.SUM,
         axes=get_axes_for_reduce_op(get_positive_dim(dim, len(input_val.shape))),

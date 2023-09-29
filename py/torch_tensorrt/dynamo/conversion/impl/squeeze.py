@@ -2,14 +2,15 @@ from typing import Optional, Sequence, Union
 
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+from torch_tensorrt.fx.types import TRTTensor
 from torch_tensorrt.fx.utils import get_dynamic_dims
 
 
 def squeeze(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -31,9 +32,9 @@ def squeeze(
     for dim in dims:
         dim = get_positive_dim(
             dim,
-            len(input.shape) + (1 if network.has_implicit_batch_dimension else 0),
+            len(input.shape) + (1 if ctx.net.has_implicit_batch_dimension else 0),
         )
-        if network.has_implicit_batch_dimension:
+        if ctx.net.has_implicit_batch_dimension:
             assert dim != 0, "We don't support squeeze batch dim when it's implicit."
             dim -= 1
 
@@ -48,7 +49,7 @@ def squeeze(
         if (i in new_dims) and s == 1:
             continue
         output_shape.append(s)
-    layer = network.add_shuffle(input)
+    layer = ctx.net.add_shuffle(input)
     layer.reshape_dims = tuple(output_shape)
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)

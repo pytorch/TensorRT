@@ -3,14 +3,15 @@ from typing import Optional, cast
 import numpy as np
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
-from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim, to_numpy
 from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
-from torch_tensorrt.fx.converters.converter_utils import has_dynamic_shape, to_numpy
-from torch_tensorrt.fx.types import Shape, TRTNetwork, TRTTensor
+from torch_tensorrt.fx.converters.converter_utils import has_dynamic_shape
+from torch_tensorrt.fx.types import Shape, TRTTensor
 
 
 def select(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -24,10 +25,10 @@ def select(
             "of the TensorRT region!"
         )
 
-    ranks = len(input.shape) + (1 if network.has_implicit_batch_dimension else 0)
+    ranks = len(input.shape) + (1 if ctx.net.has_implicit_batch_dimension else 0)
     dim = get_positive_dim(cast(int, dim), ranks)
     dynamic_shape = has_dynamic_shape(input.shape)
-    if network.has_implicit_batch_dimension:
+    if ctx.net.has_implicit_batch_dimension:
         if dim == 0:
             raise RuntimeError(
                 f"We do not support slice_tensor at batch dim when it's implicit, got {dim}!"
@@ -47,14 +48,14 @@ def select(
     output_shape[dim] = 1
     if dynamic_shape > 0:
         output_shape = get_shape_with_dynamic_shape(
-            network, target, source_ir, name, output_shape, input
+            ctx, target, source_ir, name, output_shape, input
         )
     index_value = np.array(index, dtype=np.int32)
-    indices_tensor = network.add_constant(
+    indices_tensor = ctx.net.add_constant(
         index_value.shape, to_numpy(index_value)
     ).get_output(0)
-    layer = network.add_gather(input, indices_tensor, dim)
+    layer = ctx.net.add_gather(input, indices_tensor, dim)
     out = layer.get_output(0)
     if len(out.shape) != 1:
-        layer = network.add_shuffle(out)
+        layer = ctx.net.add_shuffle(out)
     return layer.get_output(0)

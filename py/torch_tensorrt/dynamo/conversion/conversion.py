@@ -39,6 +39,7 @@ def convert_module(
         Input.from_tensors(inputs, disable_memory_format_check=True),
         logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
         output_dtypes=output_dtypes,
+        compilation_settings=settings,
     )
     interpreter_result = interpreter.run(
         workspace_size=settings.workspace_size,

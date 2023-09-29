@@ -3,20 +3,21 @@ from __future__ import annotations
 from typing import List, Optional, Tuple
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.converter_utils import to_numpy
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
 )
-from torch_tensorrt.fx.converters.converter_utils import set_layer_name, to_numpy
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
-
-import tensorrt as trt
+from torch_tensorrt.fx.converters.converter_utils import set_layer_name
+from torch_tensorrt.fx.types import TRTTensor
 
 
 def get_shape_with_dynamic_shape(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -37,7 +38,7 @@ def get_shape_with_dynamic_shape(
         5. output shape with actual batch_size as [2048, 128, 256]
 
     Args:
-        network (TRTNetwork): TensorRT network object.
+        ctx (ConversionContext): TensorRT ConversionContext object.
         shape: calculated shape of the expected output tensor
         input_val (TRTTensor): A TensorRT ITensor.
         target (Target): Target of fx node.
@@ -46,22 +47,22 @@ def get_shape_with_dynamic_shape(
         TensorRT ITensors that represents the actual shape of the input_val
     """
     # Ger real shape info for input_val
-    input_shape = network.add_shape(input_val).get_output(0)
+    input_shape = ctx.net.add_shape(input_val).get_output(0)
 
-    scale_layer = network.add_constant(
+    scale_layer = ctx.net.add_constant(
         input_shape.shape, np.ascontiguousarray(shape, dtype=np.int32)
     )
     set_layer_name(scale_layer, target, f"{name}_scale")
     scale_res = scale_layer.get_output(0)
 
     length = input_shape.shape[0]
-    zero_layer = network.add_constant(
+    zero_layer = ctx.net.add_constant(
         input_shape.shape, to_numpy(torch.zeros((length), dtype=torch.int32))
     )
     set_layer_name(zero_layer, target, f"{name}_zeros")
 
     condition_val = convert_binary_elementwise(
-        network,
+        ctx,
         target,
         source_ir,
         f"{name}_shape",
@@ -69,6 +70,6 @@ def get_shape_with_dynamic_shape(
         scale_res,
         zero_layer.get_output(0),
     )
-    select_layer = network.add_select(condition_val, input_shape, scale_res)
+    select_layer = ctx.net.add_select(condition_val, input_shape, scale_res)
     set_layer_name(select_layer, target, f"{name}_select")
     return select_layer.get_output(0)
