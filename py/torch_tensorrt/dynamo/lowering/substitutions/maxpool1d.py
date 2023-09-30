@@ -65,7 +65,7 @@ def maxpool1d_generic(
 #               "bias": bias,
 #               ...
 #
-@register_substitution(torch.nn.MaxPool1d, torch.ops.tensorrt.maxpool1d)  # type: ignore
+@register_substitution(torch.nn.MaxPool1d, torch.ops.tensorrt.maxpool1d)  # type: ignore[misc]
 def maxpool1d_insertion_fn(
     gm: torch.fx.GraphModule,
     node: torch.fx.Node,

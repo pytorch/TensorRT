@@ -1,21 +1,18 @@
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import List, Optional, Sequence, Union
 
-import numpy as np
-import torch
-import torch_tensorrt as trt
-from torch import Tensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
 from torch_tensorrt.fx.converters.converter_utils import (
     has_dynamic_shape,
     set_layer_name,
 )
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+from torch_tensorrt.fx.types import TRTTensor
 
 
 def split(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -51,7 +48,7 @@ def split(
         sum_split_sizes = sum(split_sizes)
         if sum_split_sizes != input.shape[dim]:
             raise RuntimeError(
-                f"split sizes don't add up to the tensor's size in the given dimension"
+                "split sizes don't add up to the tensor's size in the given dimension"
             )
 
     if num_splits < 1:
@@ -68,9 +65,9 @@ def split(
         start[dim] = offset
         if dynamic_shape:
             shape = get_shape_with_dynamic_shape(
-                network, target, source_ir, f"{name}_shape_{i}", shape, input
+                ctx, target, source_ir, f"{name}_shape_{i}", shape, input
             )
-        layer = network.add_slice(
+        layer = ctx.net.add_slice(
             input, start=start, shape=[] if dynamic_shape else shape, stride=stride
         )
         if dynamic_shape:

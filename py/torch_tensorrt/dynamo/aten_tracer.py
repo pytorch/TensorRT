@@ -28,6 +28,6 @@ def trace(
         "torch._export.DECOMP_TABLE", get_decompositions(experimental_decompositions)
     ):
         graph_module = export(model, tuple(inputs)).module()
-        graph_module = apply_lowering_passes(graph_module)
+        graph_module = apply_lowering_passes(graph_module, inputs)
     logger.debug("Post export graph: " + str(graph_module.graph))
     return graph_module

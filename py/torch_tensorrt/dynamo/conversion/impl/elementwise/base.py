@@ -7,12 +7,13 @@ import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_trt_tensor,
 )
 from torch_tensorrt.fx.converters.converter_utils import broadcast, set_layer_name
-from torch_tensorrt.fx.types import TRTElementWiseOp, TRTNetwork, TRTTensor
+from torch_tensorrt.fx.types import TRTElementWiseOp, TRTTensor
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
 
@@ -52,7 +53,7 @@ def get_python_op_from_trt_elementwise_op(
 
 
 def convert_binary_elementwise(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -73,7 +74,7 @@ def convert_binary_elementwise(
     tensor are not allowed to have larger ranks than the trt tensor operand.
 
     Args:
-        network (TRTNetwork): TensorRT network object.
+        ctx (ConversionContext): TensorRT ConversionContext object.
         target (Target): Target of fx node.
         source_ir (SourceIR): The IR that is calling the function.
         name (str): The name we want to assign to the created TensorRT layer.
@@ -128,8 +129,8 @@ def convert_binary_elementwise(
             [lhs_val], dtype=unified_dtype_converter(rhs_dtype, Frameworks.NUMPY)
         )
 
-    lhs_val = get_trt_tensor(network, lhs_val, f"{name}_lhs", lhs_dtype)
-    rhs_val = get_trt_tensor(network, rhs_val, f"{name}_rhs", rhs_dtype)
+    lhs_val = get_trt_tensor(ctx, lhs_val, f"{name}_lhs", lhs_dtype)
+    rhs_val = get_trt_tensor(ctx, rhs_val, f"{name}_rhs", rhs_dtype)
 
     promoted_type = torch.promote_types(
         unified_dtype_converter(lhs_val.dtype, Frameworks.TORCH),
@@ -139,15 +140,15 @@ def convert_binary_elementwise(
 
     if trt_promoted_type != lhs_val.dtype:
         lhs_val = cast_trt_tensor(
-            network, lhs_val, trt_promoted_type, name, target, source_ir
+            ctx, lhs_val, trt_promoted_type, name, target, source_ir
         )
     if trt_promoted_type != rhs_val.dtype:
         rhs_val = cast_trt_tensor(
-            network, rhs_val, trt_promoted_type, name, target, source_ir
+            ctx, rhs_val, trt_promoted_type, name, target, source_ir
         )
 
     # Check the limitation in the doc string.
-    if network.has_implicit_batch_dimension:
+    if ctx.net.has_implicit_batch_dimension:
         if is_lhs_trt_tensor and not is_rhs_trt_tensor:
             assert len(lhs_val.shape) >= len(
                 rhs_val.shape
@@ -158,9 +159,9 @@ def convert_binary_elementwise(
             ), f"{rhs_val.shape} >= {lhs_val.shape}"
 
     lhs_val, rhs_val = broadcast(
-        network, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
+        ctx.net, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
     )
-    layer = network.add_elementwise(lhs_val, rhs_val, op_type)
+    layer = ctx.net.add_elementwise(lhs_val, rhs_val, op_type)
     set_layer_name(layer, target, name, source_ir)
     output = layer.get_output(0)
     kind: str = str(target.__name__) if callable(target) else target
