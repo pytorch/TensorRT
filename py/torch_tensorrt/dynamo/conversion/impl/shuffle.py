@@ -1,11 +1,14 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Sequence, Union
 
+import numpy as np
+import torch
 from torch.fx.node import Target
-from torch_tensorrt.dynamo.conversion.converter_utils import SourceIR
-from torch_tensorrt.fx.converters.converter_utils import (
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    SourceIR,
     get_positive_dim,
-    set_layer_name,
+    get_trt_tensor,
 )
+from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 
 
@@ -14,9 +17,11 @@ def reshape(
     target: Union[Target, str],
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
+    input: Sequence[Union[TRTTensor, torch.Tensor, np.ndarray]],
     shape: List[int],
 ) -> TRTTensor:
+    if not isinstance(input, TRTTensor):
+        input = get_trt_tensor(network, input, f"{name}_input")
     layer = network.add_shuffle(input)
     layer.reshape_dims = tuple(shape)
     set_layer_name(layer, target, f"{name}_reshape", source_ir)
@@ -28,7 +33,7 @@ def flatten(
     target: Union[Target, str],
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
+    input: Sequence[Union[TRTTensor, torch.Tensor, np.ndarray]],
     start_dim: int,
     end_dim: int,
 ) -> TRTTensor:
@@ -36,6 +41,9 @@ def flatten(
     dim_size = len(shape)
     start_dim = get_positive_dim(start_dim, dim_size)
     end_dim = get_positive_dim(end_dim, dim_size)
+
+    if not isinstance(input, TRTTensor):
+        input = get_trt_tensor(network, input, f"{name}_input")
 
     num_elements = 1
     for i in range(start_dim, end_dim + 1):
