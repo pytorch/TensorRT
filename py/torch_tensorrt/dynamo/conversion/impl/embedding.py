@@ -3,13 +3,14 @@ from typing import Optional
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+from torch_tensorrt.fx.types import TRTTensor
 
 
 def embedding(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -24,10 +25,8 @@ def embedding(
         raise RuntimeError(
             "The `embedding` op has indices_tensor dtype=int64. This is incorrect since it has to be int32 to run on TRT."
         )
-    indices_tensor = get_trt_tensor(network, indices_tensor, f"{name}_indices_tensor")
-    embedding_tensor = get_trt_tensor(
-        network, embedding_tensor, f"{name}_embedding_tensor"
-    )
+    indices_tensor = get_trt_tensor(ctx, indices_tensor, f"{name}_indices_tensor")
+    embedding_tensor = get_trt_tensor(ctx, embedding_tensor, f"{name}_embedding_tensor")
     # unsupported parameters
     # ignore padding_idx since it is meaningful for training only
 
@@ -40,6 +39,6 @@ def embedding(
         raise RuntimeError("Currently we don't support sparse gradient.")
 
     # Implement embedding lookup with gather layer
-    gather_layer = network.add_gather(embedding_tensor, indices_tensor, axis=0)
+    gather_layer = ctx.net.add_gather(embedding_tensor, indices_tensor, axis=0)
     set_layer_name(gather_layer, target, name + "_gather", source_ir)
     return gather_layer.get_output(0)

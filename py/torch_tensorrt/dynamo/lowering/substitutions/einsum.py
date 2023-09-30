@@ -1,26 +1,21 @@
 from typing import Any, Dict, Optional, Sequence, Tuple
 
 import torch
-from torch._custom_op.impl import custom_op
+import torch._custom_ops as library
 from torch.fx.node import Argument, Target
 from torch_tensorrt.dynamo.lowering._pre_aot_lowering import register_substitution
 from torch_tensorrt.fx.converter_registry import tensorrt_converter
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 
-
-@custom_op(
-    qualname="tensorrt::einsum",
-    manual_schema="(str equation, Tensor[] tensors) -> Tensor",
+library.custom_op(
+    "tensorrt::einsum",
+    "(str equation, Tensor[] tensors) -> Tensor",
 )
-def einsum(equation, tensors):  # type: ignore[no-untyped-def]
-    # Defines operator schema, name, namespace, and function header
-    ...
 
 
-@einsum.impl("cpu")  # type: ignore[misc]
-@einsum.impl("cuda")  # type: ignore[misc]
-@einsum.impl_abstract()  # type: ignore[misc]
+@library.impl("tensorrt::einsum")  # type: ignore[misc]
+@library.impl_abstract("tensorrt::einsum")  # type: ignore[misc]
 def einsum_generic(
     *args: Any,
     **kwargs: Any,

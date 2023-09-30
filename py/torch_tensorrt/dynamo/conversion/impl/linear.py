@@ -5,12 +5,13 @@ import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo.conversion import impl
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import SourceIR, get_trt_tensor
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+from torch_tensorrt.fx.types import TRTTensor
 
 
 def linear(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Union[Target, str],
     source_ir: Optional[SourceIR],
     name: str,
@@ -24,7 +25,7 @@ def linear(
             f"Linear layer {name} has weight of type {type(weight)}, Expect Union[TRTTensor, torch.Tensor, np.ndarray],"
         )
     elif isinstance(weight, (torch.Tensor, np.ndarray)):
-        weight = get_trt_tensor(network, weight, f"{name}_weight")
+        weight = get_trt_tensor(ctx, weight, f"{name}_weight")
 
     # Process bias terms
     if bias is not None and not isinstance(bias, (TRTTensor, torch.Tensor, np.ndarray)):
@@ -32,11 +33,11 @@ def linear(
             f"Linear layer {name} has bias of type {type(bias)}, Expect Union[TRTTensor, torch.Tensor, np.ndarray],"
         )
     elif isinstance(bias, (torch.Tensor, np.ndarray)):
-        bias = get_trt_tensor(network, bias, f"{name}_bias")
+        bias = get_trt_tensor(ctx, bias, f"{name}_bias")
 
     # add IMatrixMultiplyLayer
     out = impl.matmul.matrix_multiply(
-        network,
+        ctx,
         target,
         source_ir,
         name,
@@ -48,6 +49,6 @@ def linear(
 
     if bias is not None:
         # add bias
-        out = impl.elementwise.add(network, target, source_ir, name, out, bias)
+        out = impl.elementwise.add(ctx, target, source_ir, name, out, bias)
 
     return out

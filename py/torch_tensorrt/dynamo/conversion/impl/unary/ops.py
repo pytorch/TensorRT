@@ -3,13 +3,14 @@ from typing import Optional
 import tensorrt as trt
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import cast_trt_tensor
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+from torch_tensorrt.fx.types import TRTTensor
 
 
 def exp(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -17,7 +18,7 @@ def exp(
 ) -> TRTTensor:
     """
     Args:
-        network (TRTNetwork): TensorRT network object.
+        ctx (ConversionContext): TensorRT ConversionContext object.
         target (Target): fx node target.
         source_ir (SourceIR): Source IR calling the function
         name (str): Name of the fx node with optional suffix.
@@ -29,15 +30,15 @@ def exp(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.EXP, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.EXP, input_val
     )
 
 
 def log(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -46,15 +47,15 @@ def log(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.LOG, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.LOG, input_val
     )
 
 
 def sqrt(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -63,15 +64,15 @@ def sqrt(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.SQRT, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.SQRT, input_val
     )
 
 
 def recip(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -80,27 +81,27 @@ def recip(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.RECIP, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.RECIP, input_val
     )
 
 
 def abs(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
     input_val: TRTTensor,
 ) -> TRTTensor:
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.ABS, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.ABS, input_val
     )
 
 
 def sin(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -109,15 +110,15 @@ def sin(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.SIN, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.SIN, input_val
     )
 
 
 def cos(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -126,15 +127,15 @@ def cos(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.COS, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.COS, input_val
     )
 
 
 def tan(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -143,15 +144,15 @@ def tan(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.TAN, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.TAN, input_val
     )
 
 
 def sinh(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -160,15 +161,15 @@ def sinh(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.SINH, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.SINH, input_val
     )
 
 
 def cosh(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -177,15 +178,15 @@ def cosh(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.COSH, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.COSH, input_val
     )
 
 
 def asin(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -194,15 +195,15 @@ def asin(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.ASIN, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.ASIN, input_val
     )
 
 
 def acos(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -211,15 +212,15 @@ def acos(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.ACOS, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.ACOS, input_val
     )
 
 
 def atan(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -228,15 +229,15 @@ def atan(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.ATAN, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.ATAN, input_val
     )
 
 
 def asinh(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -245,15 +246,15 @@ def asinh(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.ASINH, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.ASINH, input_val
     )
 
 
 def acosh(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -262,15 +263,15 @@ def acosh(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.ACOSH, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.ACOSH, input_val
     )
 
 
 def atanh(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -279,15 +280,15 @@ def atanh(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.ATANH, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.ATANH, input_val
     )
 
 
 def ceil(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -296,15 +297,15 @@ def ceil(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.CEIL, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.CEIL, input_val
     )
 
 
 def floor(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -313,30 +314,30 @@ def floor(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.FLOOR, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.FLOOR, input_val
     )
 
 
 def logical_not(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and input_val.dtype != trt.bool:
-        input_val = cast_trt_tensor(network, input_val, trt.bool, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.bool, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.NOT, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.NOT, input_val
     )
 
 
 def sign(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -345,15 +346,15 @@ def sign(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.SIGN, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.SIGN, input_val
     )
 
 
 def round(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -362,15 +363,15 @@ def round(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.ROUND, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.ROUND, input_val
     )
 
 
 def isinf(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -379,15 +380,15 @@ def isinf(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.ISINF, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.ISINF, input_val
     )
 
 
 def neg(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -396,15 +397,15 @@ def neg(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.NEG, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.NEG, input_val
     )
 
 
 def erf(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -413,8 +414,8 @@ def erf(
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
     ):
-        input_val = cast_trt_tensor(network, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
-        network, target, source_ir, name, trt.UnaryOperation.ERF, input_val
+        ctx, target, source_ir, name, trt.UnaryOperation.ERF, input_val
     )

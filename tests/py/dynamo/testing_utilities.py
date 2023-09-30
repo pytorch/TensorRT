@@ -5,9 +5,13 @@ from typing import Any, List, Sequence, Set
 
 import torch
 from torch._dynamo.utils import detect_fake_mode
+from torch._functorch.aot_autograd import aot_export_joint_simple
 from torch_tensorrt.dynamo import partitioning
-from torch_tensorrt.dynamo.backend.backends import aot_export_for_compile
-from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decompositions
+from torch_tensorrt.dynamo.lowering import (
+    apply_lowering_passes,
+    get_decompositions,
+    repair_input_aliasing,
+)
 from torch_tensorrt.dynamo.lowering._pre_aot_lowering import pre_aot_substitutions
 
 DECIMALS_OF_AGREEMENT = 4
@@ -39,14 +43,17 @@ def fx_dynamo_testing_backend(
     with unittest.mock.patch.object(
         fake_mode, "allow_non_fake_inputs", True
     ), fake_mode:
+        repair_input_aliasing(gm)
+
         # Invoke AOTAutograd to translate operators to aten
-        gm = aot_export_for_compile(
+        gm = aot_export_joint_simple(
             gm,
             sample_inputs,
+            trace_joint=False,
             decompositions=get_decompositions(),
         )
 
-        gm = apply_lowering_passes(gm)
+        gm = apply_lowering_passes(gm, sample_inputs)
 
         trt_compiled = custom_backend(
             gm,

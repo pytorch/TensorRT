@@ -2,15 +2,14 @@ from typing import Optional, Sequence
 
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
-from torch_tensorrt.fx.converters.converter_utils import (
-    get_positive_dim,
-    set_layer_name,
-)
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
+from torch_tensorrt.fx.converters.converter_utils import set_layer_name
+from torch_tensorrt.fx.types import TRTTensor
 
 
 def permute(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -22,9 +21,9 @@ def permute(
             f"permute received input {input} that is not a TensorRT ITensor"
         )
 
-    permutation = [get_positive_dim(i, len(input.shape)) for i in permutation]
+    permutation = get_positive_dim(permutation, len(input.shape))
 
-    layer = network.add_shuffle(input)
+    layer = ctx.net.add_shuffle(input)
     layer.second_transpose = tuple(permutation)
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)

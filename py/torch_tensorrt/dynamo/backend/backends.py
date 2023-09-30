@@ -2,17 +2,19 @@ from __future__ import annotations
 
 import logging
 import unittest
-from typing import Any, Callable, Dict, Optional, Sequence
+from typing import Any, Callable, Sequence
 
 import torch
 import torch._dynamo as td
-import torch.utils._pytree as pytree
 from torch._dynamo.utils import detect_fake_mode
-from torch._functorch.aot_autograd import _aot_export_function
-from torch._ops import OpOverload
+from torch._functorch.aot_autograd import aot_export_joint_simple
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.compile import compile_module
-from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decompositions
+from torch_tensorrt.dynamo.lowering import (
+    apply_lowering_passes,
+    get_decompositions,
+    repair_input_aliasing,
+)
 from torch_tensorrt.dynamo.lowering._pre_aot_lowering import pre_aot_substitutions
 from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs, set_log_level
 
@@ -71,10 +73,13 @@ def _pretraced_backend(
         with unittest.mock.patch.object(
             fake_mode, "allow_non_fake_inputs", True
         ), fake_mode:
+            repair_input_aliasing(gm)
+
             # Invoke AOTAutograd to translate operators to aten
-            gm = aot_export_for_compile(
+            gm = aot_export_joint_simple(
                 gm,
                 sample_inputs,
+                trace_joint=False,
                 decompositions=get_decompositions(
                     settings.enable_experimental_decompositions
                 ),
@@ -82,7 +87,7 @@ def _pretraced_backend(
 
             logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
 
-            gm = apply_lowering_passes(gm)
+            gm = apply_lowering_passes(gm, sample_inputs)
 
             trt_compiled = compile_module(
                 gm,
@@ -107,53 +112,3 @@ def _pretraced_backend(
                 + "specify pass_through_build_failures=False."
             )
             raise
-
-
-def aot_export_for_compile(
-    func: torch.fx.GraphModule,
-    args: Sequence[torch.Tensor],
-    *,
-    decompositions: Optional[Dict[OpOverload, Callable[[Any], Any]]] = None,
-) -> torch.fx.GraphModule:
-    """Adapted from:
-    https://github.com/pytorch/pytorch/blob/1a5fdc2458b98697c75c32eb6f4b8b34d76429cf/torch/_functorch/aot_autograd.py#L4084-L4158
-
-    Removed check for input aliasing in resultant subgraph - TRT is functional-only
-
-    Exports the function to ATen for torch compile
-    """
-    # Trace function with input arguments and decompositions
-    with torch.no_grad():
-        fx_g, metadata, in_spec, out_spec = _aot_export_function(
-            func,
-            args,
-            decompositions=decompositions,
-        )
-
-    # No input mutations
-    if (
-        len([x for x in metadata.input_info if x.mutates_data or x.mutates_metadata])
-        != 0
-    ):
-        raise RuntimeError(
-            f"aot_export_joint_simple does not support input mutations. {str(metadata)}"
-        )
-    # No pytrees
-    if type(in_spec) == pytree.LeafSpec:
-        raise RuntimeError(
-            f"aot_export_for_compile requires inputs to be a single list/tuple. in_spec={str(in_spec)}"
-        )
-    if len([x for x in in_spec.children_specs if type(x) != pytree.LeafSpec]) != 0:
-        raise RuntimeError(
-            f"aot_export_for_compile requires individual inputs not to be pytrees. in_spec={str(in_spec)}"
-        )
-    if type(out_spec) == pytree.LeafSpec:
-        raise RuntimeError(
-            f"aot_export_for_compile requires outputs to be a single list/tuple. out_spec={str(out_spec)}"
-        )
-    if len([x for x in out_spec.children_specs if type(x) != pytree.LeafSpec]) != 0:
-        raise RuntimeError(
-            f"aot_export_for_compile requires individual outputs not to be pytrees. out_spec={str(out_spec)}"
-        )
-
-    return fx_g

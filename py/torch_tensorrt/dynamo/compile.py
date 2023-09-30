@@ -80,8 +80,7 @@ def compile(
     enabled_precisions = set(enabled_precisions)
 
     logger.warning(
-        "The Dynamo backend is an experimental feature, for which only the "
-        "following arguments are supported: "
+        "The Dynamo backend only supports the following arguments: "
         "{enabled_precisions, debug, workspace_size, min_block_size, "
         "max_aux_streams, version_compatible, optimization_level, "
         "torch_executed_ops, pass_through_build_failures, "

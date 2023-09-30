@@ -26,7 +26,9 @@ typedef enum {
   SERIALIZATION_LEN, // NEVER USED FOR DATA, USED TO DETERMINE LENGTH OF SERIALIZED INFO
 } SerializedInfoIndex;
 
-c10::optional<RTDevice> get_most_compatible_device(const RTDevice& target_device);
+c10::optional<RTDevice> get_most_compatible_device(
+    const RTDevice& target_device,
+    const RTDevice& curr_device = RTDevice());
 std::vector<RTDevice> find_compatible_devices(const RTDevice& target_device);
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine);
