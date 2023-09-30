@@ -13,8 +13,7 @@ from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
 )
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
 from torch_tensorrt.fx.converters.converter_utils import (
-    get_trt_plugin,
-    get_trt_tensor,
+    get_positive_dim,
     has_dynamic_shape,
     set_layer_name,
 )
@@ -53,10 +52,7 @@ def native_batch_norm(
     if running_var is None:
         running_var = 1.0
 
-    scale = cast(torch.Tensor, to_numpy(weight)) / np.sqrt(
-        cast(torch.Tensor, to_numpy(running_var)) + eps
-    )
-
+    scale = to_numpy(weight) / np.sqrt(to_numpy(running_var) + eps)
     bias = to_numpy(bias) - to_numpy(running_mean) * scale
     power = np.ones_like(scale)
 
@@ -135,78 +131,6 @@ def layer_norm(
     eps: float,
     cudnn_enable: bool,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    if not isinstance(input, trt.tensorrt.ITensor):
-        raise RuntimeError(
-            f"LayerNorm received input {input} that is not part "
-            "of the TensorRT region!"
-        )
-
-    if weight is None:
-        weight = to_numpy(1.0)
-
-    if bias is None:
-        bias = to_numpy(0.0)
-
-    gamma = (
-        weight.detach().cpu().float().numpy()
-        if isinstance(weight, torch.Tensor)
-        else weight
-    )
-    gamma_field = trt.PluginField("gamma", gamma, trt.PluginFieldType.FLOAT32)
-    beta = (
-        bias.detach().cpu().float().numpy() if isinstance(bias, torch.Tensor) else bias
-    )
-    beta_field = trt.PluginField("beta", beta, trt.PluginFieldType.FLOAT32)
-    eps_field = trt.PluginField(
-        "eps", np.array(eps, dtype=np.float32), trt.PluginFieldType.FLOAT32
-    )
-    try:
-        normalized_shape_arr = np.array(normalized_shape, dtype=np.int32)
-    except TypeError:
-        _LOGGER.error("Unable to convert normalized_shape to a field, fall back to []")
-        normalized_shape_arr = np.array([], dtype=np.int32)
-
-    normalized_shape_filed = trt.PluginField(
-        "normalized_shape", normalized_shape_arr, trt.PluginFieldType.INT32
-    )
-    field_collection = trt.PluginFieldCollection(
-        [gamma_field, beta_field, eps_field, normalized_shape_filed]
-    )
-
-    try:
-        if ctx.net.has_implicit_batch_dimension:
-            plugin = get_trt_plugin("layer_norm", field_collection, "1", "fx2trt")
-        else:
-            plugin = get_trt_plugin("LayerNormDynamic", field_collection, "1", "fx2trt")
-    except AssertionError:
-        _LOGGER.error(
-            "Unable to find layer norm plugin, fall back to TensorRT implementation."
-        )
-        return layer_norm_no_plugin(
-            ctx, target, source_ir, name, input, normalized_shape, weight, bias, eps
-        )
-    layer = ctx.net.add_plugin_v2([input], plugin)
-    layer.name = name
-    return layer.get_output(0)
-
-
-def layer_norm_no_plugin(
-    ctx: ConversionContext,
-    target: Target,
-    source_ir: Optional[SourceIR],
-    name: str,
-    input: TRTTensor,
-    normalized_shape: List[int],
-    weight: Optional[Union[torch.Tensor, np.ndarray]],
-    bias: Optional[Union[torch.Tensor, np.ndarray]],
-    eps: float,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    if not isinstance(input, TRTTensor):
-        raise RuntimeError(
-            f"LayerNorm received input {input} that is not part "
-            "of the TensorRT region!"
-        )
-
     if weight is None:
         weight = to_numpy(1.0)
 
@@ -357,45 +281,180 @@ def group_norm(
     eps: float,
     cudnn_enabled: bool,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    if not isinstance(input, trt.tensorrt.ITensor):
-        raise RuntimeError(
-            f"LayerNorm received input {input} that is not part "
-            "of the TensorRT region!"
-        )
-
     if weight is None:
         weight = to_numpy(1.0)
 
     if bias is None:
         bias = to_numpy(0.0)
 
-    scale = get_trt_tensor(network, weight, "scale")
-    bias = get_trt_tensor(network, bias, "bias")
+    assert (
+        len(input.shape) >= 3
+    ), f"The input dimension should not be less than 3, got {len(input.shape)}!"
+    B, C = input.shape[0], input.shape[1]
 
-    eps_field = trt.PluginField(
-        "eps", np.array(eps, dtype=np.float32), trt.PluginFieldType.FLOAT32
+    # Groups are a subdivision of the channel dimension.
+    assert (
+        C % num_groups == 0
+    ), f"The num of channels ({C}) should be divisible by num_groups ({num_groups})!"
+
+    # Normalize every group.
+    reshaped_input = impl.shuffle.reshape(
+        network,
+        target,
+        SourceIR.ATEN,
+        name,
+        input,
+        shape=(B * num_groups, -1),
     )
-    num_groups_filed = trt.PluginField(
-        "num_groups", np.array(num_groups), trt.PluginFieldType.INT32
+    dim = (
+        len(reshaped_input.shape) - 1
+    )  # TODO: PR #2347 supported negtive dimension in reduce, could be -1
+
+    # E[X]
+    mean_trt = impl.reduce.mean(
+        network,
+        target,
+        SourceIR.ATEN,
+        f"{name}_mean",
+        reshaped_input,
+        dim=dim,
+        keepdim=True,
     )
 
-    field_collection = trt.PluginFieldCollection([eps_field, num_groups_filed])
+    # X - E[X]
+    sub_trt = impl.elementwise.sub(
+        network,
+        target,
+        source_ir,
+        f"{name}_sub",
+        reshaped_input,
+        mean_trt,
+    )
 
-    try:
-        # Here's the schema of the plugin:
-        # https://github.com/NVIDIA/TensorRT/blob/release/8.6/plugin/groupNormalizationPlugin/GroupNormalizationPlugin_PluginConfig.yaml
-        plugin = get_trt_plugin("GroupNormalizationPlugin", field_collection, "1")
-    except AssertionError:
-        _LOGGER.error(
-            "Unable to find group norm plugin, fall back to TensorRT implementation."
-        )
+    # variance = mean(pow(sub_trt, 2))
+    pow_layer = network.add_constant(
+        (1,) * len(sub_trt.shape),
+        trt.Weights(np.ascontiguousarray([2.0], dtype=np.float32)),
+    )
+    pow_layer.name = f"{name}_power"
 
-    layer = network.add_plugin_v2([input, scale, bias], plugin)
-    set_layer_name(layer, target, f"{name}_GroupNormalizationPlugin", source_ir)
+    pow_var = impl.elementwise.pow(
+        network,
+        target,
+        source_ir,
+        f"{name}_pow",
+        sub_trt,
+        pow_layer.get_output(0),
+    )
 
-    # PyTorch requires three return values: (out, mean, rstd)
-    dummy_tensor = torch.tensor(0)
-    return layer.get_output(0), dummy_tensor, dummy_tensor
+    var_trt = impl.reduce.mean(
+        network,
+        target,
+        SourceIR.ATEN,
+        f"{name}_mean_var",
+        pow_var,
+        dim=dim,
+        keepdim=True,
+    )
+
+    # sqrt((var + eps))
+    eps_layer = network.add_constant(
+        (1,) * len(reshaped_input.shape),
+        trt.Weights(np.ascontiguousarray([eps], dtype=np.float32)),
+    )
+    eps_layer.name = f"{name}_eps"
+
+    add_trt = impl.elementwise.add(
+        network,
+        target,
+        source_ir,
+        f"{name}_add",
+        var_trt,
+        eps_layer.get_output(0),
+    )
+    sqrt_trt = impl.unary.sqrt(
+        network,
+        target,
+        source_ir,
+        f"{name}_sqrt",
+        add_trt,
+    )
+
+    # (X - E[X]) / sqrt((var + eps))
+    div_trt = impl.elementwise.div(
+        network,
+        target,
+        source_ir,
+        f"{name}_div",
+        sub_trt,
+        sqrt_trt,
+    )
+
+    # Apply per-channel scale and bias.
+    output = impl.shuffle.reshape(
+        network,
+        target,
+        SourceIR.ATEN,
+        f"{name}_reshape_div",
+        div_trt,
+        shape=input.shape,
+    )
+
+    weight_bias_shape = (1, C) + (1,) * (len(input.shape) - 2)
+
+    reshaped_weight = impl.shuffle.reshape(
+        network,
+        target,
+        SourceIR.ATEN,
+        f"{name}_reshape_weight",
+        weight,
+        shape=weight_bias_shape,
+    )
+
+    output = impl.elementwise.mul(
+        network,
+        target,
+        SourceIR.ATEN,
+        f"{name}_mul_scale",
+        output,
+        reshaped_weight,
+    )
+
+    reshaped_bias = impl.shuffle.reshape(
+        network,
+        target,
+        SourceIR.ATEN,
+        f"{name}_reshape_bias",
+        bias,
+        shape=weight_bias_shape,
+    )
+
+    add_trt = impl.elementwise.add(
+        network,
+        target,
+        source_ir,
+        f"{name}_add_bias",
+        output,
+        reshaped_bias,
+    )
+
+    # TODO: compute the last two return values
+    # const1_layer = network.add_constant(
+    #     (1,) * len(sqrt_trt.shape),
+    #     trt.Weights(np.ascontiguousarray([1.0], dtype=np.float32)),
+    # )
+    # const1_layer.name = f"{name}_const1"
+
+    # rsqrt_trt = impl.elementwise.div(
+    #     network,
+    #     target,
+    #     source_ir,
+    #     f"{name}_rsqrt",
+    #     const1_layer.get_output(0),
+    #     sqrt_trt,
+    # )
+
+    return add_trt, torch.tensor(0), torch.tensor(0)
 
 
 def softmax(
