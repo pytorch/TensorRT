@@ -692,6 +692,86 @@ def aten_ops_sum(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.prod.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.prod.dim_int)  # type: ignore[misc]
+def aten_ops_prod(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.prod(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, replacement=None),
+        args_bounds_check(args, 2, replacement=False),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.max.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.max.dim)  # type: ignore[misc]
+def aten_ops_max(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.max(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, replacement=None),
+        args_bounds_check(args, 2, replacement=False),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.min.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.min.dim)  # type: ignore[misc]
+def aten_ops_min(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.min(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, replacement=None),
+        args_bounds_check(args, 2, replacement=False),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.mean.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.mean.dim)  # type: ignore[misc]
+def aten_ops_mean(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.mean(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, replacement=None),
+        args_bounds_check(args, 2, replacement=False),
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.exp.default)  # type: ignore[misc]
 def aten_ops_exp(
     ctx: ConversionContext,
@@ -1118,7 +1198,7 @@ def aten_ops_mul(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.maximum.default)  # type: ignore[misc]
-def aten_ops_max(
+def aten_ops_maximum(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
@@ -1136,7 +1216,7 @@ def aten_ops_max(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.minimum.default)  # type: ignore[misc]
-def aten_ops_min(
+def aten_ops_minimum(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
