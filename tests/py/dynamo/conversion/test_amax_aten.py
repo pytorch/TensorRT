@@ -13,6 +13,7 @@ class TestAmaxConverter(DispatchTestCase):
             ((2, 3, 4, 5), 3, True),
             ((2, 3, 4, 5), 2, False),
             ((6, 7, 5, 4, 5), 4, False),
+            ((1, 5, 2, 1), -1, True),
         ]
     )
     def test_amax_dim_int_default(self, input_shape, dim, keep_dims):
@@ -53,6 +54,7 @@ class TestAmaxConverter(DispatchTestCase):
             ((2, 3, 4, 5), 3, True, torch.int, -10, 10),
             ((2, 3, 4, 5), 2, False, torch.int32, -5, 0),
             ((6, 7, 5, 4, 5), 4, False, torch.int32, -5, 5),
+            ((1, 5, 2, 1), -4, False, torch.int32, -5, 5),
         ]
     )
     def test_amax_dim_int_int(self, input_shape, dim, keep_dims, dtype, low, high):
@@ -74,6 +76,7 @@ class TestAmaxConverter(DispatchTestCase):
             ((2, 1, 4, 5), [0, 3], True, torch.int, -10, 10),
             ((2, 3, 4, 5), [0, 1, 2, 3], False, torch.int32, -5, 0),
             ((6, 7, 5, 4, 5), [1, 3, 4], False, torch.int32, -5, 5),
+            ((1, 5, 2, 1), [-3, -1], False, torch.int32, -5, 5),
         ]
     )
     def test_amax_dim_tuple_int(self, input_shape, dim, keep_dims, dtype, low, high):

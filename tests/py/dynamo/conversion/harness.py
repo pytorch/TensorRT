@@ -8,6 +8,7 @@ import torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer as aten_tracer
 from torch.fx.passes.infra.pass_base import PassResult
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo._settings import CompilationSettings
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
@@ -282,10 +283,15 @@ class DispatchTestCase(TRTTestCase):
             pass_tracer = chain_passes(*apply_passes)
             mod = pass_tracer(mod, inputs)
 
+        # Previous instance of the interpreter auto-casted 64-bit inputs
+        # We replicate this behavior here
+        compilation_settings = CompilationSettings(truncate_long_and_double=True)
+
         interp = TRTInterpreter(
             mod,
             Input.from_tensors(inputs),
             output_dtypes=output_dtypes,
+            compilation_settings=compilation_settings,
         )
         super().run_test(
             mod,
@@ -321,10 +327,15 @@ class DispatchTestCase(TRTTestCase):
             disable_passes=disable_passes,
         )
 
+        # Previous instance of the interpreter auto-casted 64-bit inputs
+        # We replicate this behavior here
+        compilation_settings = CompilationSettings(truncate_long_and_double=True)
+
         interp = TRTInterpreter(
             mod,
             input_specs,
             output_dtypes=output_dtypes,
+            compilation_settings=compilation_settings,
         )
         # Since the lowering is based on optimal shape. We need to test with
         # different shape(for ex. max shape) for testing dynamic shape

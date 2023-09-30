@@ -3,18 +3,19 @@ from typing import Optional
 
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
 from torch_tensorrt.dynamo.conversion.impl.slice.base import slice
 from torch_tensorrt.fx.converters.converter_utils import (
-    get_positive_dim,
     has_dynamic_shape,
     prepend_ones,
     set_layer_name,
 )
-from torch_tensorrt.fx.types import Shape, TRTNetwork, TRTTensor
+from torch_tensorrt.fx.types import Shape, TRTTensor
 
 
 def slice_op(  # TODO: This should be slice not whatever is in base
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -30,10 +31,10 @@ def slice_op(  # TODO: This should be slice not whatever is in base
             "of the TensorRT region!"
         )
 
-    ranks = len(input.shape) + (1 if network.has_implicit_batch_dimension else 0)
+    ranks = len(input.shape) + (1 if ctx.net.has_implicit_batch_dimension else 0)
     dim = get_positive_dim(dim, ranks)
     dynamic_shape = has_dynamic_shape(input.shape)
-    if network.has_implicit_batch_dimension:
+    if ctx.net.has_implicit_batch_dimension:
         if dim == 0:
             raise RuntimeError(
                 f"We do not support slice_tensor at batch dim when it's implicit, got {dim}!"
@@ -56,12 +57,12 @@ def slice_op(  # TODO: This should be slice not whatever is in base
     output_shape[dim] = math.ceil((stop_int - start_int) / step_int)
 
     return slice(
-        network, target, source_ir, name, input, start_slice, output_shape, stride_slice
+        ctx, target, source_ir, name, input, start_slice, output_shape, stride_slice
     )
 
 
 def expand(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -79,7 +80,7 @@ def expand(
     # If the rank of the input tensor is less than the shape's rank, pad with ones
     if initial_tensor_rank < shape_rank:
         input_t = prepend_ones(
-            network,
+            ctx.net,
             input_t,
             name + "_expand_broadcast",
             shape_rank - initial_tensor_rank,
@@ -105,6 +106,6 @@ def expand(
     stride = tuple(
         [int(i == o) for i, o in zip(input_tensor_shape, shape)]
     )  # stride == 1 if dimensions match, 0 otherwise
-    layer = network.add_slice(input_t, start=start, shape=shape, stride=stride)
+    layer = ctx.net.add_slice(input_t, start=start, shape=shape, stride=stride)
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)

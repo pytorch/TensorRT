@@ -42,6 +42,7 @@ def convert_module(
         inputs,
         logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
         output_dtypes=output_dtypes,
+        compilation_settings=settings,
     )
     interpreter_result = interpreter.run(
         workspace_size=settings.workspace_size,

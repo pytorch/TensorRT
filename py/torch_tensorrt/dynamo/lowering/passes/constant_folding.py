@@ -1,7 +1,11 @@
 import logging
+from typing import Sequence
 
 import torch
 from torch_tensorrt._utils import sanitized_torch_version
+from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
+    clean_up_graph_after_modifications,
+)
 
 from packaging import version
 
@@ -18,7 +22,9 @@ logger = logging.getLogger(__name__)
 
 
 @torch.utils._python_dispatch._disable_current_modes()  # type: ignore
-def constant_fold(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+def constant_fold(
+    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]
+) -> torch.fx.GraphModule:
     """Adapted from:
     https://github.com/pytorch/pytorch/blob/3a79621c9dce17f77fbddc06aab21f6bc477f313/torch/_inductor/freezing.py#L178-L197
 
@@ -47,9 +53,7 @@ def constant_fold(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     for node in erased_params:
         gm.graph.erase_node(node)
 
-    gm.graph.eliminate_dead_code()
-    gm.graph.lint()
-    gm.recompile()
+    gm = clean_up_graph_after_modifications(gm)
 
     logger.debug(f"Graph after constant folding:\n{gm.graph}")
 
