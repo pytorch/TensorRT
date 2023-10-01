@@ -31,7 +31,9 @@ from torch_tensorrt.dynamo.conversion import (
     convert_module,
     repair_long_or_double_inputs,
 )
+from torch_tensorrt.dynamo.lowering import apply_lowering_passes
 from torch_tensorrt.dynamo.utils import (
+    get_torch_inputs,
     set_log_level,
     to_torch_device,
     to_torch_tensorrt_device,
@@ -73,6 +75,10 @@ def compile(
 ) -> torch.fx.GraphModule:
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
+
+    # Apply lowering on the graph module
+    torch_inputs = get_torch_inputs(inputs, device)
+    gm = apply_lowering_passes(gm, torch_inputs)
 
     enabled_precisions = set(enabled_precisions)
 
