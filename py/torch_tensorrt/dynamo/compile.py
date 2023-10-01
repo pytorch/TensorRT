@@ -89,7 +89,7 @@ def compile(
     )
 
     gm = exported_program.module()
-    gm = apply_lowering_passes(gm)
+    gm = apply_lowering_passes(gm, inputs)
     logger.debug("Post export graph: " + str(gm.graph))
 
     if not isinstance(inputs, collections.abc.Sequence):
