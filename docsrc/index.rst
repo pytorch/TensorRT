@@ -42,6 +42,7 @@ User Guide
 * :ref:`getting_started_with_fx`
 * :ref:`ptq`
 * :ref:`runtime`
+* :ref:`saving_models`
 * :ref:`use_from_pytorch`
 * :ref:`using_dla`
 
@@ -55,6 +56,7 @@ User Guide
    user_guide/ptq
    user_guide/runtime
    user_guide/use_from_pytorch
+   user_guide/saving_models
    user_guide/using_dla
 
 Tutorials
