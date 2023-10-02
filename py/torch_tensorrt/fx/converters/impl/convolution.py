@@ -50,7 +50,7 @@ def convNd(
         )
 
     # Process bias terms
-    if isinstance(bias, (torch.Tensor, np.ndarray)):
+    if isinstance(bias, torch.Tensor):
         # Transform the bias constant into a Numpy array
         bias = to_numpy(bias)
 
@@ -75,7 +75,7 @@ def convNd(
                 network, target, tuple(), kwargs, name + "_unsqueeze_weight"
             )
 
-    elif isinstance(weight, (torch.Tensor, np.ndarray)):
+    elif isinstance(weight, torch.Tensor):
         # Transform the weight constant into a Numpy array
         weight = to_numpy(weight)
 

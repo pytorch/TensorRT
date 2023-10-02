@@ -271,7 +271,7 @@ def create_constant(
     """
     constant = network.add_constant(
         (1,) if isinstance(value, (int, float)) else value.shape,
-        to_numpy(value, dtype).copy(),
+        to_numpy(value, dtype),
     )
     constant.name = name
     return constant.get_output(0)
@@ -311,7 +311,7 @@ def get_trt_tensor(
     elif isinstance(input_val, np.ndarray) and (
         input_val.dtype == np.bool_ or input_val.dtype == np.int64
     ):
-        input_val = input_val.astype(np.int32)
+        input_val = input_val.to(np.int32)
 
     if isinstance(input_val, (torch.Tensor, np.ndarray, int, float)):
         return create_constant(network, input_val, name, dtype)
