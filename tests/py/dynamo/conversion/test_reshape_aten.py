@@ -12,6 +12,8 @@ from .harness import DispatchTestCase
 class TestReshapeConverter(DispatchTestCase):
     @parameterized.expand(
         [
+            ((-1,),),
+            ((20,),),
             ((1, 20),),
             ((1, 10, -1),),
         ]
@@ -37,6 +39,7 @@ class TestReshapeConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
+            ((-1,),),
             ((-1, 10),),
             ((-1, 5),),
             ((2, 2, -1),),
