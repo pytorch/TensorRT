@@ -246,6 +246,8 @@ PYBIND11_MODULE(_C, m) {
       .value("int32", DataType::kInt32, "32 bit integer number")
       .value("long", DataType::kLong, "64 bit integer number")
       .value("int64", DataType::kLong, "64 bit integer number")
+      .value("double", DataType::kDouble, "64 bit floating point number")
+      .value("float64", DataType::kDouble, "64 bit floating point number")
       .value("bool", DataType::kBool, "Boolean value")
       .value("unknown", DataType::kUnknown, "Unknown data type")
       .export_values();
