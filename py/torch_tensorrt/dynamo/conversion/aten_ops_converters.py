@@ -506,7 +506,7 @@ def aten_ops_slice(
     {
         0: (TRTTensor,),
     }
-)  # type: ignore[misc]
+)
 def aten_ops_permute(
     ctx: ConversionContext,
     target: Target,
@@ -1394,7 +1394,7 @@ def conv_param_validator(conv_node: Node) -> bool:
         1: (np.ndarray, torch.Tensor, TRTTensor),
         2: (np.ndarray, torch.Tensor, TRTTensor),
     }
-)  # type: ignore[misc]
+)
 def aten_ops_convolution(
     ctx: ConversionContext,
     target: Target,
