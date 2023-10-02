@@ -208,7 +208,7 @@ class DispatchTestCase(TRTTestCase):
         customized_passes: List[Callable] = None,
         disable_passes: bool = False,
     ):
-        fx_module = aten_tracer.trace(mod, original_inputs)
+        fx_module = aten_tracer.trace(mod, original_inputs).module()
         fx_module = apply_lowering_passes(fx_module, original_inputs)
         _LOGGER.info(f"FX graph= {fx_module.graph}")
 
