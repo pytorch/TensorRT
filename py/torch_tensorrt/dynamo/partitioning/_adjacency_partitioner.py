@@ -22,8 +22,6 @@ from torch_tensorrt.dynamo.conversion.converter_registry import (
 )
 from torch_tensorrt.dynamo.conversion.converter_registry import ConverterRegistry
 
-from .common import DEFAULT_SINGLE_NODE_PARTITIONS
-
 logger = logging.getLogger(__name__)
 
 
@@ -107,9 +105,7 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         self,
         module: torch.fx.GraphModule,
         operator_support: ops.OperatorSupportBase,
-        allowed_single_node_partition_ops: Optional[
-            Collection[str]
-        ] = DEFAULT_SINGLE_NODE_PARTITIONS,
+        allowed_single_node_partition_ops: Optional[Collection[str]] = None,
         min_block_size: int = MIN_BLOCK_SIZE,
         require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
     ):

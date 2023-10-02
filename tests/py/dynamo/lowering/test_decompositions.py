@@ -313,6 +313,185 @@ class TestLowering(TestCase):
             f"Var TRT outputs don't match with the original model.",
         )
 
+    def test_lowering_maxpool1d_functional(self):
+        class MaxPool1d(torch.nn.Module):
+            def forward(self, x):
+                y = torch.nn.functional.max_pool1d(x, 3)
+                return y
+
+        # Operations expected to be removed in the traced graph after decompositions
+        expected_ops = {torch.ops.aten.max_pool2d.default}
+        unexpected_ops = {
+            torch.ops.aten.max_pool1d_with_indices.default,
+            torch.ops.aten.max_pool2d_with_indices.default,
+        }
+
+        inputs = [torch.randn(4, 8, 27).cuda()]
+
+        fx_graph = torch.fx.symbolic_trace(MaxPool1d())
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEquals(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEquals(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            f"MaxPool1d TRT outputs don't match with the original model.",
+        )
+
+    def test_lowering_maxpool_2d_module(self):
+        class MaxPool2d(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+                self.maxpool = torch.nn.MaxPool2d((5, 3), stride=(2, 1))
+
+            def forward(self, x):
+                y = self.maxpool(x)
+                return y
+
+        # Operations expected to be removed in the traced graph after decompositions
+        expected_ops = {torch.ops.aten.max_pool2d.default}
+        unexpected_ops = {torch.ops.aten.max_pool2d_with_indices.default}
+
+        inputs = [torch.randn(1, 3, 25, 30).cuda()]
+
+        fx_graph = torch.fx.symbolic_trace(MaxPool2d())
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEquals(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEquals(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            f"MaxPool2d TRT outputs don't match with the original model.",
+        )
+
+    def test_lowering_maxpool_3d_module(self):
+        class MaxPool3d(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+                self.maxpool = torch.nn.MaxPool3d(3)
+
+            def forward(self, x):
+                y = self.maxpool(x)
+                return y
+
+        # Operations expected to be removed in the traced graph after decompositions
+        expected_ops = {torch.ops.aten.max_pool3d.default}
+        unexpected_ops = {torch.ops.aten.max_pool3d_with_indices.default}
+
+        inputs = [torch.randn(4, 8, 27, 72, 96).cuda()]
+
+        fx_graph = torch.fx.symbolic_trace(MaxPool3d())
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEquals(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEquals(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            f"MaxPool3d TRT outputs don't match with the original model.",
+        )
+
 
 if __name__ == "__main__":
     run_tests()
