@@ -1,8 +1,8 @@
 import operator
 import warnings
-from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
+from enum import Enum, auto
 import numpy as np
 
 # @manual=//deeplearning/trt/python:py_tensorrt
@@ -20,7 +20,7 @@ from ..types import (
     TRTPluginFieldCollection,
     TRTTensor,
 )
-from ..utils import Frameworks, unified_dtype_converter
+from ..utils import unified_dtype_converter, Frameworks
 
 
 class SourceIR(Enum):
