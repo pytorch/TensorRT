@@ -6,6 +6,7 @@ import torch
 import torch_tensorrt as torchtrt
 import torchvision.models as models
 from torch._export.serde.serialize import deserialize, serialize
+from torch_tensorrt.dynamo.export import create_trt_exp_program, transform
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 assertions = unittest.TestCase()
@@ -42,9 +43,15 @@ def test_base_full_compile(ir):
         "min_block_size": 1,
     }
 
-    trt_exp_program = torchtrt.compile(model, **compile_spec)
+    exp_program = torchtrt.dynamo.trace(model, **compile_spec)
+    trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
+    trt_gm = transform(trt_gm, [input])
+    trt_exp_program = create_trt_exp_program(
+        trt_gm, exp_program.call_spec, trt_gm.state_dict()
+    )
     serialized_prog = serialize(trt_exp_program)
     deserialized_prog = deserialize(*serialized_prog)
+
     # Check Pyt and TRT exported program outputs
     cos_sim = cosine_similarity(model(input), trt_exp_program(input))
     assertions.assertTrue(
@@ -91,7 +98,13 @@ def test_base_full_compile_multiple_outputs(ir):
         "min_block_size": 1,
     }
 
-    trt_exp_program = torchtrt.compile(model, **compile_spec)
+    exp_program = torchtrt.dynamo.trace(model, **compile_spec)
+    trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
+    trt_gm = transform(trt_gm, [input])
+    trt_exp_program = create_trt_exp_program(
+        trt_gm, exp_program.call_spec, trt_gm.state_dict()
+    )
+
     serialized_prog = serialize(trt_exp_program)
     deserialized_prog = deserialize(*serialized_prog)
     # Check Pyt and TRT exported program outputs
@@ -146,7 +159,13 @@ def test_base_full_compile_save_load(ir):
         "min_block_size": 1,
     }
 
-    trt_exp_program = torchtrt.compile(model, **compile_spec)
+    exp_program = torchtrt.dynamo.trace(model, **compile_spec)
+    trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
+    trt_gm = transform(trt_gm, [input])
+    trt_exp_program = create_trt_exp_program(
+        trt_gm, exp_program.call_spec, trt_gm.state_dict()
+    )
+
     torch._export.save(trt_exp_program, "/tmp/trt.ep")
     deser_trt_exp_program = torch._export.load("/tmp/trt.ep")
 
@@ -203,7 +222,13 @@ def test_hybrid_relu_fallback(ir):
         "torch_executed_ops": "torch.ops.aten.relu.default",
     }
 
-    trt_exp_program = torchtrt.compile(model, **compile_spec)
+    exp_program = torchtrt.dynamo.trace(model, **compile_spec)
+    trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
+    trt_gm = transform(trt_gm, [input])
+    trt_exp_program = create_trt_exp_program(
+        trt_gm, exp_program.call_spec, trt_gm.state_dict()
+    )
+
     torch._export.save(trt_exp_program, "/tmp/trt.ep")
     deser_trt_exp_program = torch._export.load("/tmp/trt.ep")
 
@@ -243,7 +268,12 @@ def test_resnet18_save_load(ir):
         "min_block_size": 1,
     }
 
-    trt_exp_program = torchtrt.compile(model, **compile_spec)
+    exp_program = torchtrt.dynamo.trace(model, **compile_spec)
+    trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
+    trt_gm = transform(trt_gm, [input])
+    trt_exp_program = create_trt_exp_program(
+        trt_gm, exp_program.call_spec, trt_gm.state_dict()
+    )
     torch._export.save(trt_exp_program, "/tmp/trt.ep")
     deser_trt_exp_program = torch._export.load("/tmp/trt.ep")
 

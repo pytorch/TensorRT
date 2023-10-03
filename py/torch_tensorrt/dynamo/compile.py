@@ -36,6 +36,7 @@ from torch_tensorrt.dynamo.conversion import (
 from torch_tensorrt.dynamo.lowering import apply_lowering_passes
 from torch_tensorrt.dynamo.utils import (
     get_torch_inputs,
+    prepare_inputs,
     set_log_level,
     to_torch_device,
     to_torch_tensorrt_device,
@@ -80,6 +81,9 @@ def compile(
 
     if not isinstance(inputs, collections.abc.Sequence):
         inputs = [inputs]
+
+    # Prepare torch_trt inputs
+    inputs = prepare_inputs(inputs)
     device = to_torch_tensorrt_device(device)
 
     gm = exported_program.module()
