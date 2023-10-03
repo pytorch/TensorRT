@@ -7,7 +7,10 @@ from typing import Any, List, Tuple
 import torch
 from torch._export import dynamic_dim, export
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo._defaults import default_device
+from torch_tensorrt.dynamo._defaults import (
+    ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    default_device,
+)
 from torch_tensorrt.dynamo.lowering import get_decompositions
 from torch_tensorrt.dynamo.utils import get_torch_inputs, set_log_level, to_torch_device
 
@@ -75,7 +78,7 @@ def trace(
             trace_inputs.append(torch_inputs[idx])
 
     experimental_decompositions = kwargs.get(
-        "enable_experimental_decompositions", False
+        "enable_experimental_decompositions", ENABLE_EXPERIMENTAL_DECOMPOSITIONS
     )
     with unittest.mock.patch(
         "torch._export.DECOMP_TABLE", get_decompositions(experimental_decompositions)
