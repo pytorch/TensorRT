@@ -97,6 +97,8 @@ at::ScalarType toAtenDataType(DataType value) {
       return at::kInt;
     case DataType::kLong:
       return at::kLong;
+    case DataType::kDouble:
+      return at::kDouble;
     case DataType::kBool:
       return at::kBool;
     case DataType::kFloat:
@@ -119,7 +121,8 @@ nvinfer1::TensorFormat toTRTTensorFormat(TensorFormat value) {
 
 DataType::DataType(c10::ScalarType t) {
   TORCHTRT_CHECK(
-      t == at::kHalf || t == at::kFloat || t == at::kChar || t == at::kLong || t == at::kInt || t == at::kBool,
+      t == at::kHalf || t == at::kFloat || t == at::kChar || t == at::kLong || t == at::kDouble || t == at::kInt ||
+          t == at::kBool,
       "Data type is unsupported (" << t << ")");
   switch (t) {
     case at::kHalf:
@@ -133,6 +136,9 @@ DataType::DataType(c10::ScalarType t) {
       break;
     case at::kLong:
       value = DataType::kLong;
+      break;
+    case at::kDouble:
+      value = DataType::kDouble;
       break;
     case at::kBool:
       value = DataType::kBool;

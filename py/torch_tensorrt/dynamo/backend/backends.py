@@ -16,7 +16,11 @@ from torch_tensorrt.dynamo.lowering import (
     repair_input_aliasing,
 )
 from torch_tensorrt.dynamo.lowering._pre_aot_lowering import pre_aot_substitutions
-from torch_tensorrt.dynamo.utils import parse_dynamo_kwargs, set_log_level
+from torch_tensorrt.dynamo.utils import (
+    parse_dynamo_kwargs,
+    prepare_inputs,
+    set_log_level,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +93,10 @@ def _pretraced_backend(
 
             gm = apply_lowering_passes(gm, sample_inputs)
 
+            torchtrt_inputs = prepare_inputs(sample_inputs)
             trt_compiled = compile_module(
                 gm,
-                sample_inputs,
+                torchtrt_inputs,
                 settings=settings,
             )
             return trt_compiled
