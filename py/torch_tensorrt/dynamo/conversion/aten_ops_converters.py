@@ -138,6 +138,11 @@ def aten_ops_sigmoid(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.index.Tensor)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
 def aten_ops_index(
     ctx: ConversionContext,
     target: Target,

@@ -8,15 +8,15 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     broadcastable,
+    get_positive_dim,
     get_trt_tensor,
+    to_numpy,
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise import convert_binary_elementwise
 from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
 from torch_tensorrt.fx.converters.converter_utils import (
-    get_positive_dim,
     has_dynamic_shape,
     set_layer_name,
-    to_numpy,
 )
 from torch_tensorrt.fx.types import Shape, TRTTensor
 
@@ -90,8 +90,6 @@ def index(
 
     # here we need to check if all the index are broadcastable
     # if no, then we need to broadcast
-    input = get_trt_tensor(ctx, input, name + f"_input_to_tensor")
-
     last_index = None
     for i, ind in enumerate(index):
         if ind is not None:
