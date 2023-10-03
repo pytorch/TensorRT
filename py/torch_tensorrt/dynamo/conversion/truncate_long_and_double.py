@@ -4,6 +4,8 @@ from typing import Optional, Sequence, Set
 
 import torch
 from torch.fx.node import _get_qualified_name
+from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo.utils import get_torch_inputs
 
 
 def _extract_downstream_get_nodes(
@@ -157,9 +159,10 @@ def _repair_64bit_input(
 def repair_long_or_double_inputs(
     parent_graph: torch.fx.GraphModule,
     submodule: torch.fx.GraphModule,
-    submodule_inputs: Sequence[torch.Tensor],
+    submodule_inputs: Sequence[Input],
+    device: torch.device,
     submodule_name: Optional[str] = None,
-) -> Sequence[torch.Tensor]:
+) -> Sequence[Input]:
     """Fixes all Long/Double type inputs to a TRT-accelerated subgraph
 
     In-Place modifies the provided graph
@@ -175,12 +178,13 @@ def repair_long_or_double_inputs(
     Returns:
         New submodule inputs, updated accordingly with long/double truncation
     """
+    submodule_torch_inputs = get_torch_inputs(submodule_inputs, device)
     num_submodule_inputs = len(submodule_inputs)
     repaired_outputs_once = False
 
     # For each input to the TRT subgraph, check if its type is long/double
     for position in range(num_submodule_inputs):
-        param = submodule_inputs[position]
+        param = submodule_torch_inputs[position]
 
         # If the data type of the input is long/double, insert necessary
         # casts to replace the operation
@@ -188,7 +192,7 @@ def repair_long_or_double_inputs(
             # Ensure outputs are only repaired once per submodule to avoid
             # unnecessary ops showing up in the graph
             if not repaired_outputs_once:
-                submodule_outputs = submodule(*submodule_inputs)
+                submodule_outputs = submodule(*submodule_torch_inputs)
 
             _repair_64bit_input(
                 parent_graph,
@@ -202,12 +206,17 @@ def repair_long_or_double_inputs(
 
             # Repair submodule inputs in accordance with inserted casts
             dtype_32bit = torch.int32 if (param.dtype == torch.int64) else torch.float32
-            submodule_inputs = (
-                list(submodule_inputs[:position])
+            submodule_torch_inputs = (
+                list(submodule_torch_inputs[:position])
                 + [
                     param.to(dtype_32bit),
                 ]
-                + list(submodule_inputs[position + 1 :])
+                + list(submodule_torch_inputs[position + 1 :])
             )
+
+            # Set the 32bit inputs and their types to the submodule Inputs
+            for idx in range(len(submodule_inputs)):
+                submodule_inputs[idx].torch_tensor = submodule_torch_inputs[idx]
+                submodule_inputs[idx].torch_dtype = submodule_torch_inputs[idx].dtype
 
     return submodule_inputs

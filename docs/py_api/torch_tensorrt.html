@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt &mdash; Torch-TensorRT v2.2.0.dev0+8ebf24d documentation</title>
+  <title>torch_tensorrt &mdash; Torch-TensorRT v2.2.0.dev0+6571252 documentation</title>
   
 
   
@@ -225,7 +225,7 @@
               
               
                 <div class="version">
-                  v2.2.0.dev0+8ebf24d
+                  v2.2.0.dev0+6571252
                 </div>
               
             
@@ -269,6 +269,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/using_dla.html">DLA</a></li>
 </ul>
@@ -563,7 +564,7 @@ Note: Entering “None” (or not specifying) will set the bound to [0, 2)</p></
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="torch_tensorrt.Input.dtype">
-<span class="sig-name descname"><span class="pre">dtype</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">_enums.dtype</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;dtype.unknown:</span> <span class="pre">6&gt;</span></em><a class="headerlink" href="#torch_tensorrt.Input.dtype" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">dtype</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">_enums.dtype</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;dtype.unknown:</span> <span class="pre">7&gt;</span></em><a class="headerlink" href="#torch_tensorrt.Input.dtype" title="Permalink to this definition">¶</a></dt>
 <dd><p>torch_tensorrt.dtype.float32)</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type</dt>
@@ -731,6 +732,8 @@ the information of all the given PyTorch tensors.</p>
 <p>int32 : 32 bit integer number</p>
 <p>long : 64 bit integer number</p>
 <p>int64 : 64 bit integer number</p>
+<p>double : 64 bit floating point number</p>
+<p>float64 : 64 bit floating point number</p>
 <p>bool : Boolean value</p>
 <p>unknown : Unknown data type</p>
 </div></blockquote>

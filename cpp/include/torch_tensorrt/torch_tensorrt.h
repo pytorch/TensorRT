@@ -60,6 +60,8 @@ class DataType {
   enum Value : int8_t {
     /// INT64
     kLong,
+    /// FP64
+    kDouble,
     /// FP32
     kFloat,
     /// FP16

@@ -27,7 +27,7 @@ namespace pyapi {
     return static_cast<int64_t>(field_name);                                    \
   }
 
-enum class DataType : int8_t { kLong, kFloat, kHalf, kChar, kInt32, kBool, kUnknown };
+enum class DataType : int8_t { kLong, kDouble, kFloat, kHalf, kChar, kInt32, kBool, kUnknown };
 std::string to_str(DataType value);
 nvinfer1::DataType toTRTDataType(DataType value);
 at::ScalarType toAtenDataType(DataType value);

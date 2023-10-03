@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import collections.abc
 import logging
 from typing import Any, List, Optional, Sequence, Set, Tuple, Union
 
@@ -10,6 +9,7 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
     EngineCapability,
 )
+from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import CompilationSettings, partitioning
 from torch_tensorrt.dynamo._defaults import (
     DEBUG,
@@ -31,8 +31,9 @@ from torch_tensorrt.dynamo.conversion import (
     convert_module,
     repair_long_or_double_inputs,
 )
+from torch_tensorrt.dynamo.lowering import apply_lowering_passes
 from torch_tensorrt.dynamo.utils import (
-    prepare_inputs,
+    get_torch_inputs,
     set_log_level,
     to_torch_device,
     to_torch_tensorrt_device,
@@ -75,6 +76,10 @@ def compile(
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
 
+    # Apply lowering on the graph module
+    torch_inputs = get_torch_inputs(inputs, device)
+    gm = apply_lowering_passes(gm, torch_inputs)
+
     enabled_precisions = set(enabled_precisions)
 
     logger.warning(
@@ -87,12 +92,7 @@ def compile(
         "require_full_compilation}"
     )
 
-    if not isinstance(inputs, collections.abc.Sequence):
-        inputs = [inputs]
-
     device = to_torch_tensorrt_device(device)
-
-    _, torch_inputs = prepare_inputs(inputs, to_torch_device(device))
 
     if (
         torch.float16 in enabled_precisions
@@ -134,12 +134,12 @@ def compile(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-    return compile_module(gm, torch_inputs, settings)
+    return compile_module(gm, inputs, settings)
 
 
 def compile_module(
     gm: torch.fx.GraphModule,
-    sample_inputs: Sequence[torch.Tensor],
+    sample_inputs: Sequence[Input],
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
@@ -153,6 +153,7 @@ def compile_module(
     Returns:
         Compiled FX GraphModule
     """
+
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops = partitioning.get_graph_converter_support(
         gm, settings.debug, settings.torch_executed_ops
@@ -203,7 +204,6 @@ def compile_module(
 
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
-
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
     for name, _ in partitioned_module.named_children():
@@ -213,19 +213,30 @@ def compile_module(
 
         submodule = getattr(partitioned_module, name)
 
-        logger.debug(
-            "Submodule name: " + str(name) + " Graph: \n" + str(submodule.graph)
-        )
-        # Get submodule inputs
+        # Get the submodule inputs for min, opt, max shapes of the graph inputs
         submodule_inputs = partitioning.get_submod_inputs(
-            partitioned_module, submodule, sample_inputs
+            partitioned_module,
+            submodule,
+            sample_inputs,
+            to_torch_device(settings.device),
+        )
+
+        logger.debug(
+            "Submodule name: %s\n Input shapes: %s\n %s",
+            str(name),
+            [input.shape for input in submodule_inputs],
+            str(submodule.graph),
         )
 
         assert submodule_inputs is not None
         # Handle long/double inputs if requested by the user
         if settings.truncate_long_and_double:
             submodule_inputs = repair_long_or_double_inputs(
-                partitioned_module, submodule, submodule_inputs, name
+                partitioned_module,
+                submodule,
+                submodule_inputs,
+                to_torch_device(settings.device),
+                name,
             )
 
         # Create TRT Module from submodule
