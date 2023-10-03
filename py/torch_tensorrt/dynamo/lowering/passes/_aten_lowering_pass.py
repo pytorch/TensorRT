@@ -9,6 +9,7 @@ from .lower_efficient_attention import lower_efficient_attention
 from .pass_manager import DynamoPassManager
 from .remove_input_alias_fixing_clones import remove_input_alias_fixing_clones
 from .repair_input_as_output import repair_input_as_output
+from .replace_max_pool_with_indices import replace_max_pool_with_indices
 
 ATEN_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
     [
@@ -17,6 +18,7 @@ ATEN_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
         repair_input_as_output,
         lower_efficient_attention,
         fuse_prims_broadcast,
+        replace_max_pool_with_indices,
     ]
 )
 

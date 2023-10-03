@@ -2,18 +2,11 @@ import logging
 from typing import Any, Optional, Sequence, Set, Tuple
 
 import torch
-from torch.fx.node import _get_qualified_name
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import DEBUG
-from torch_tensorrt.dynamo.lowering import SUBSTITUTION_REGISTRY
 from torch_tensorrt.dynamo.utils import get_torch_inputs, input_is_dynamic
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_SINGLE_NODE_PARTITIONS: Set[str] = {
-    _get_qualified_name(to_replace.new_operator)
-    for to_replace in SUBSTITUTION_REGISTRY.values()
-}
 
 
 def get_submod_inputs(

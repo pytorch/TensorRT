@@ -15,7 +15,6 @@ from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     repair_input_aliasing,
 )
-from torch_tensorrt.dynamo.lowering._pre_aot_lowering import pre_aot_substitutions
 from torch_tensorrt.dynamo.utils import (
     parse_dynamo_kwargs,
     prepare_inputs,
@@ -67,9 +66,6 @@ def _pretraced_backend(
     """
     try:
         logger.debug("Pre-AOT Autograd graph:\n" + str(gm.graph))
-
-        # Perform Pre-AOT Lowering for Module-Level Replacement
-        gm = pre_aot_substitutions(gm)
 
         fake_mode = detect_fake_mode(sample_inputs)
 
