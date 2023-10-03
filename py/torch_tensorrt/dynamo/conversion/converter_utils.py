@@ -9,7 +9,6 @@ import torch
 from torch import SymBool, SymFloat, SymInt
 from torch.fx.node import Argument, Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
-from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_registry import (
     ConverterRegistry,
@@ -512,33 +511,3 @@ def to_numpy(
         raise AssertionError(
             f"to_numpy can only be called on None, bool, int, float, np.ndarray, or torch.Tensor, got: {value}"
         )
-
-
-def flatten_dims(
-    ctx: ConversionContext,
-    target: Union[Target, str],
-    source_ir: Optional[SourceIR],
-    name: str,
-    input: Sequence[Union[TRTTensor, torch.Tensor, np.ndarray]],
-    start_dim: int,
-    end_dim: int,
-) -> TRTTensor:
-    shape = input.shape
-    dim_size = len(shape)
-    start_dim = get_positive_dim(start_dim, dim_size)
-    end_dim = get_positive_dim(end_dim, dim_size)
-
-    if not isinstance(input, TRTTensor):
-        input = get_trt_tensor(ctx, input, f"{name}_flatten")
-
-    num_elements = 1
-    for i in range(start_dim, end_dim + 1):
-        num_elements *= shape[i]
-
-    new_shape = (
-        tuple(shape[:start_dim])
-        + (num_elements,)
-        + (tuple(shape[end_dim + 1 :]) if end_dim + 1 < dim_size else tuple())
-    )
-
-    return impl.shuffle.reshape(ctx, target, source_ir, name, input, new_shape)
