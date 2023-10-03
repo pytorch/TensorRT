@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import unittest.mock
 from typing import Any, List, Tuple
 
 import torch
@@ -77,12 +76,9 @@ def trace(
     experimental_decompositions = kwargs.get(
         "enable_experimental_decompositions", False
     )
-    with unittest.mock.patch(
-        "torch._export.DECOMP_TABLE", get_decompositions(experimental_decompositions)
-    ):
-        graph_module = export(
-            model, tuple(trace_inputs), constraints=constraints
-        ).module()
 
-    logger.debug("Post export graph: " + str(graph_module.graph))
-    return graph_module
+    exp_program = export(
+        model, tuple(trace_inputs), constraints=constraints
+    ).run_decompositions(get_decompositions(experimental_decompositions))
+
+    return exp_program
