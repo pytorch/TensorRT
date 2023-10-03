@@ -139,14 +139,14 @@ def aten_ops_sigmoid(
 
 @dynamo_tensorrt_converter(torch.ops.aten.index.Tensor)
 def aten_ops_index(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.select.index(
-        network,
+        ctx,
         target,
         SourceIR.ATEN,
         name,
