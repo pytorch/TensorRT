@@ -43,8 +43,8 @@ def sum(
     source_ir: Optional[SourceIR],
     name: str,
     input_val: TRTTensor,
-    dim: Optional[Union[int, Sequence[int]]] = None,
-    keepdim: bool = False,
+    dim: Optional[Union[int, Sequence[int]]],
+    keepdim: bool,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
@@ -70,8 +70,8 @@ def prod(
     source_ir: Optional[SourceIR],
     name: str,
     input_val: TRTTensor,
-    dim: Optional[Union[int, Sequence[int]]] = None,
-    keepdim: bool = False,
+    dim: int,
+    keepdim: bool,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
@@ -97,8 +97,8 @@ def prod(
 #     source_ir: Optional[SourceIR],
 #     name: str,
 #     input_val: TRTTensor,
-#     dim: Optional[Union[int, Sequence[int]]] = None,
-#     keepdim: bool = False,
+#     dim: Optional[int],
+#     keepdim: bool,
 # ) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
 #     if (isinstance(input_val, TRTTensor)) and (
 #         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
@@ -124,8 +124,8 @@ def prod(
 #     source_ir: Optional[SourceIR],
 #     name: str,
 #     input_val: TRTTensor,
-#     dim: Optional[Union[int, Sequence[int]]] = None,
-#     keepdim: bool = False,
+#     dim: Optional[int],
+#     keepdim: bool,
 # ) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
 #     if (isinstance(input_val, TRTTensor)) and (
 #         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
@@ -151,8 +151,8 @@ def mean(
     source_ir: Optional[SourceIR],
     name: str,
     input_val: TRTTensor,
-    dim: Optional[Union[int, Sequence[int]]] = None,
-    keepdim: bool = False,
+    dim: Optional[Union[int, Sequence[int]]],
+    keepdim: bool,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
