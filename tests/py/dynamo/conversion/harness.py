@@ -4,8 +4,6 @@ import unittest
 from typing import Callable, List, Optional, Set, Tuple
 
 import torch
-import torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer as aten_tracer
-from torch.fx.passes.infra.pass_base import PassResult
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt import Input
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -13,7 +11,6 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
-from torch_tensorrt.fx.passes.pass_utils import chain_passes
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
