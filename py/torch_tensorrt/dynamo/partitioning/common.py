@@ -1,19 +1,49 @@
 import logging
-from typing import Any, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Optional, Sequence, Set, Tuple
 
 import torch
-from torch.fx.node import _get_qualified_name
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import DEBUG
-from torch_tensorrt.dynamo.lowering import SUBSTITUTION_REGISTRY
 from torch_tensorrt.dynamo.utils import get_torch_inputs, input_is_dynamic
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SINGLE_NODE_PARTITIONS: Set[str] = {
-    _get_qualified_name(to_replace.new_operator)
-    for to_replace in SUBSTITUTION_REGISTRY.values()
-}
+
+def run_shape_analysis(
+    parent_module: torch.fx.GraphModule, inputs: Sequence[Input]
+) -> Tuple[Dict[Any, Sequence[Any]], Dict[Any, Sequence[Any]]]:
+    submod_inputs_shape_map: Dict[Any, Sequence[Any]] = {}
+    submod_outputs_shape_map: Dict[Any, Sequence[Any]] = {}
+    sub_inputs: Sequence[torch.Tensor] = []
+    sub_outputs: Sequence[torch.Tensor] = []
+
+    # Register a hook to capture IO shapes for submodules
+    def get_submodule_io(
+        self: Any, inputs: Sequence[torch.Tensor], outputs: Sequence[torch.Tensor]
+    ) -> None:
+        nonlocal sub_inputs, sub_outputs
+        sub_inputs = inputs
+        sub_outputs = outputs
+        return
+
+    # Iterate through submodules (both Torch and TRT) and store IO shapes
+    for name, _ in parent_module.named_children():
+        submodule = getattr(parent_module, name)
+        handle = submodule.register_forward_hook(get_submodule_io)
+        parent_module(*inputs)
+        handle.remove()
+        submod_inputs_shape_map[name] = (
+            [input.shape for input in sub_inputs]
+            if isinstance(sub_inputs, (tuple, list))
+            else [sub_inputs.shape]
+        )
+        submod_outputs_shape_map[name] = (
+            [output.shape for output in sub_outputs]
+            if isinstance(sub_outputs, (tuple, list))
+            else [sub_outputs.shape]
+        )
+
+    return submod_inputs_shape_map, submod_outputs_shape_map
 
 
 def get_submod_inputs(

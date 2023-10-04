@@ -12,7 +12,6 @@ from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     repair_input_aliasing,
 )
-from torch_tensorrt.dynamo.lowering._pre_aot_lowering import pre_aot_substitutions
 
 DECIMALS_OF_AGREEMENT = 4
 
@@ -34,8 +33,6 @@ def fx_dynamo_testing_backend(
         torch_executed_ops=torch_executed_ops,
         use_fast_partitioner=use_fast_partitioner,
     )
-
-    gm = pre_aot_substitutions(gm)
 
     fake_mode = detect_fake_mode(sample_inputs)
 

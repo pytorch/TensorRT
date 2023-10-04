@@ -137,6 +137,29 @@ def aten_ops_sigmoid(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.index.Tensor)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_index(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.select.index(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.tanh.default)  # type: ignore[misc]
 def aten_ops_tanh(
     ctx: ConversionContext,
