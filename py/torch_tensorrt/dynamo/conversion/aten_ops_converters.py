@@ -1,4 +1,5 @@
 import logging
+import operator
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -712,51 +713,93 @@ def aten_ops_prod(
     )
 
 
-# def one_user_validator(min_node: Node) -> bool:
-#     # Validate only one user, which is a getitem node that accesses the first element in the list
-#     return (len(min_node.users) == 1 and
-#             list(min_node.users)[0].target == operator.getitem and
-#             list(min_node.users)[0].args[1] == 0)
+def one_user_validator(node: Node) -> bool:
+    # Validate only one user, which is a getitem node that accesses the first element in the list
+    return (
+        len(node.users) == 1
+        and list(node.users)[0].target == operator.getitem
+        and list(node.users)[0].args[1] == 0
+    )
 
 
-# @dynamo_tensorrt_converter(torch.ops.aten.max.default)  # type: ignore[misc]
-# @dynamo_tensorrt_converter(torch.ops.aten.max.dim)  # type: ignore[misc]
-# def aten_ops_max(
-#     ctx: ConversionContext,
-#     target: Target,
-#     args: Tuple[Argument, ...],
-#     kwargs: Dict[str, Argument],
-#     name: str,
-# ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-#     return impl.reduce.max(
-#         ctx,
-#         target,
-#         SourceIR.ATEN,
-#         name,
-#         args[0],
-#         args_bounds_check(args, 1, replacement=None),
-#         args_bounds_check(args, 2, replacement=False),
-#     )
+@dynamo_tensorrt_converter(torch.ops.aten.max.default)  # type: ignore[misc]
+def aten_ops_max(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.max(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        dim=None,
+        keepdim=False,
+        return_indices=False,
+    )
 
 
-# @dynamo_tensorrt_converter(torch.ops.aten.min.default)  # type: ignore[misc]
-# @dynamo_tensorrt_converter(torch.ops.aten.min.dim)  # type: ignore[misc]
-# def aten_ops_min(
-#     ctx: ConversionContext,
-#     target: Target,
-#     args: Tuple[Argument, ...],
-#     kwargs: Dict[str, Argument],
-#     name: str,
-# ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-#     return impl.reduce.min(
-#         ctx,
-#         target,
-#         SourceIR.ATEN,
-#         name,
-#         args[0],
-#         args_bounds_check(args, 1, replacement=None),
-#         args_bounds_check(args, 2, replacement=False),
-#     )
+@dynamo_tensorrt_converter(torch.ops.aten.max.dim, capability_validator=one_user_validator)  # type: ignore[misc]
+def aten_ops_max_dim(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.max(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args_bounds_check(args, 2, replacement=False),
+        return_indices=True,
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.min.default)  # type: ignore[misc]
+def aten_ops_min(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.min(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        dim=None,
+        keepdim=False,
+        return_indices=False,
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.min.dim, capability_validator=one_user_validator)  # type: ignore[misc]
+def aten_ops_min_dim(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.min(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args_bounds_check(args, 2, replacement=False),
+        return_indices=True,
+    )
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.mean.default)  # type: ignore[misc]

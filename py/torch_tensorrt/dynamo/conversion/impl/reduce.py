@@ -1,4 +1,4 @@
-from typing import Optional, Sequence, Union
+from typing import Optional, Sequence, Tuple, Union
 
 import tensorrt as trt
 from torch.fx.node import Target
@@ -70,7 +70,7 @@ def prod(
     source_ir: Optional[SourceIR],
     name: str,
     input_val: TRTTensor,
-    dim: int,
+    dim: Optional[Union[int, Sequence[int]]],
     keepdim: bool,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
@@ -91,58 +91,68 @@ def prod(
     return layer.get_output(0)
 
 
-# def max(
-#     ctx: ConversionContext,
-#     target: Target,
-#     source_ir: Optional[SourceIR],
-#     name: str,
-#     input_val: TRTTensor,
-#     dim: Optional[int],
-#     keepdim: bool,
-# ) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
-#     if (isinstance(input_val, TRTTensor)) and (
-#         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
-#     ):
-#         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+def max(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+    dim: Optional[Union[int, Sequence[int]]],
+    keepdim: bool,
+    return_indices: bool,
+) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
+    if (isinstance(input_val, TRTTensor)) and (
+        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+    ):
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
-#     if dim is None:
-#         dim = tuple(range(len(input_val.shape)))
+    if dim is None:
+        dim = tuple(range(len(input_val.shape)))
 
-#     layer = ctx.net.add_reduce(
-#         input_val,
-#         trt.ReduceOperation.MAX,
-#         axes=get_axes_for_reduce_op(get_positive_dim(dim, len(input_val.shape))),
-#         keep_dims=keepdim,
-#     )
-#     set_layer_name(layer, target, name, source_ir)
-#     return layer.get_output(0), torch.tensor(0)
+    layer = ctx.net.add_reduce(
+        input_val,
+        trt.ReduceOperation.MAX,
+        axes=get_axes_for_reduce_op(get_positive_dim(dim, len(input_val.shape))),
+        keep_dims=keepdim,
+    )
+    set_layer_name(layer, target, name, source_ir)
+
+    if return_indices:
+        return layer.get_output(0), None
+
+    return layer.get_output(0)
 
 
-# def min(
-#     ctx: ConversionContext,
-#     target: Target,
-#     source_ir: Optional[SourceIR],
-#     name: str,
-#     input_val: TRTTensor,
-#     dim: Optional[int],
-#     keepdim: bool,
-# ) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
-#     if (isinstance(input_val, TRTTensor)) and (
-#         input_val.dtype == trt.int8 or input_val.dtype == trt.int32
-#     ):
-#         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+def min(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+    dim: Optional[Union[int, Sequence[int]]],
+    keepdim: bool,
+    return_indices: bool,
+) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
+    if (isinstance(input_val, TRTTensor)) and (
+        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+    ):
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
-#     if dim is None:
-#         dim = tuple(range(len(input_val.shape)))
+    if dim is None:
+        dim = tuple(range(len(input_val.shape)))
 
-#     layer = ctx.net.add_reduce(
-#         input_val,
-#         trt.ReduceOperation.MIN,
-#         axes=get_axes_for_reduce_op(get_positive_dim(dim, len(input_val.shape))),
-#         keep_dims=keepdim,
-#     )
-#     set_layer_name(layer, target, name, source_ir)
-#     return layer.get_output(0), torch.randint(0, 3, list(layer.get_output(0).shape))
+    layer = ctx.net.add_reduce(
+        input_val,
+        trt.ReduceOperation.MIN,
+        axes=get_axes_for_reduce_op(get_positive_dim(dim, len(input_val.shape))),
+        keep_dims=keepdim,
+    )
+    set_layer_name(layer, target, name, source_ir)
+
+    if return_indices:
+        return layer.get_output(0), None
+
+    return layer.get_output(0)
 
 
 def mean(

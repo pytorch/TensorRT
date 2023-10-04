@@ -197,18 +197,35 @@ class DispatchTestCase(TRTTestCase):
         use_dynamo_tracer: bool,
         enable_passes: bool,
     ):
-        if use_dynamo_tracer:
-            fx_module = torch._dynamo.export(
-                mod,
-                *original_inputs,
-                aten_graph=True,
-                assume_static_by_default=True,
-                tracing_mode="real",
-            ).graph_module
-        else:
-            fx_module = torch.fx.symbolic_trace(mod)
-        if enable_passes:
-            fx_module = apply_lowering_passes(fx_module, original_inputs)
+        # Torchdynamo+aot proxytensor tracer
+        # Below are common passes
+        passes_list = [
+            compose_bmm,
+            compose_chunk,
+            compose_getitem_slice,
+            replace_aten_reshape_alias_with_replace,
+            replace_aten_op_with_indices,
+            replace_transpose_mm_op_with_linear,  # after compose_bmm
+            replace_native_layernorm_with_layernorm,
+            remove_ops,
+            replace_builtin_ops,  # after replace_native_layernorm_with_layernorm
+        ]
+        # Combine with customized passes specific to any model
+        if customized_passes:
+            passes_list.extend(customized_passes)
+
+        if disable_passes:
+            passes_list = []
+
+        fx_module, _ = aten_tracer.trace(mod, original_inputs)
+        for passes in passes_list:
+            pr: PassResult = passes(fx_module)
+            fx_module = pr.graph_module
+        fx_module(*original_inputs)
+
+        fx_module = run_const_fold(fx_module)
+        fx_module.graph.eliminate_dead_code()
+
         _LOGGER.info(f"FX graph= {fx_module.graph}")
         return fx_module
 
