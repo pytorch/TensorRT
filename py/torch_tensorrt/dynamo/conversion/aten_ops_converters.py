@@ -712,44 +712,51 @@ def aten_ops_prod(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.max.default)  # type: ignore[misc]
-@dynamo_tensorrt_converter(torch.ops.aten.max.dim)  # type: ignore[misc]
-def aten_ops_max(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.reduce.max(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-        args_bounds_check(args, 1, replacement=None),
-        args_bounds_check(args, 2, replacement=False),
-    )
+# def one_user_validator(min_node: Node) -> bool:
+#     # Validate only one user, which is a getitem node that accesses the first element in the list
+#     return (len(min_node.users) == 1 and
+#             list(min_node.users)[0].target == operator.getitem and
+#             list(min_node.users)[0].args[1] == 0)
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.min.default)  # type: ignore[misc]
-@dynamo_tensorrt_converter(torch.ops.aten.min.dim)  # type: ignore[misc]
-def aten_ops_min(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.reduce.min(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-        args_bounds_check(args, 1, replacement=None),
-        args_bounds_check(args, 2, replacement=False),
-    )
+# @dynamo_tensorrt_converter(torch.ops.aten.max.default)  # type: ignore[misc]
+# @dynamo_tensorrt_converter(torch.ops.aten.max.dim)  # type: ignore[misc]
+# def aten_ops_max(
+#     ctx: ConversionContext,
+#     target: Target,
+#     args: Tuple[Argument, ...],
+#     kwargs: Dict[str, Argument],
+#     name: str,
+# ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+#     return impl.reduce.max(
+#         ctx,
+#         target,
+#         SourceIR.ATEN,
+#         name,
+#         args[0],
+#         args_bounds_check(args, 1, replacement=None),
+#         args_bounds_check(args, 2, replacement=False),
+#     )
+
+
+# @dynamo_tensorrt_converter(torch.ops.aten.min.default)  # type: ignore[misc]
+# @dynamo_tensorrt_converter(torch.ops.aten.min.dim)  # type: ignore[misc]
+# def aten_ops_min(
+#     ctx: ConversionContext,
+#     target: Target,
+#     args: Tuple[Argument, ...],
+#     kwargs: Dict[str, Argument],
+#     name: str,
+# ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+#     return impl.reduce.min(
+#         ctx,
+#         target,
+#         SourceIR.ATEN,
+#         name,
+#         args[0],
+#         args_bounds_check(args, 1, replacement=None),
+#         args_bounds_check(args, 2, replacement=False),
+#     )
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.mean.default)  # type: ignore[misc]
