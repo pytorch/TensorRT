@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.2.0.dev0+e432bf2 documentation</title>
+  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.2.0.dev0+7b21322 documentation</title>
   
 
   
@@ -222,7 +222,7 @@
               
               
                 <div class="version">
-                  v2.2.0.dev0+e432bf2
+                  v2.2.0.dev0+7b21322
                 </div>
               
             
@@ -266,6 +266,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/using_dla.html">DLA</a></li>
@@ -609,14 +610,14 @@
 
         <span class="c1"># Export the module</span>
         <span class="n">torchtrt_inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">input_list</span><span class="p">)</span>
-        <span class="n">module</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">torchtrt_inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="n">compiled_aten_module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span> <span class="o">=</span> <span class="n">dynamo_compile</span><span class="p">(</span>
-            <span class="n">module</span><span class="p">,</span>
+        <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">torchtrt_inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">trt_graph_module</span> <span class="o">=</span> <span class="n">dynamo_compile</span><span class="p">(</span>
+            <span class="n">exp_program</span><span class="p">,</span>
             <span class="n">inputs</span><span class="o">=</span><span class="n">torchtrt_inputs</span><span class="p">,</span>
             <span class="n">enabled_precisions</span><span class="o">=</span><span class="n">enabled_precisions_set</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="k">return</span> <span class="n">compiled_aten_module</span>
+        <span class="k">return</span> <span class="n">trt_graph_module</span>
     <span class="k">elif</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">torch_compile</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">torch_compile</span><span class="p">(</span>
             <span class="n">module</span><span class="p">,</span> <span class="n">enabled_precisions</span><span class="o">=</span><span class="n">enabled_precisions_set</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
