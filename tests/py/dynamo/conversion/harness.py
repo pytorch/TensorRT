@@ -193,8 +193,18 @@ class DispatchTestCase(TRTTestCase):
         self,
         mod: torch.nn.Module,
         original_inputs: List[torch.Tensor],
+        use_dynamo_tracer: bool,
     ):
-        fx_module = torch.fx.symbolic_trace(mod)
+        if use_dynamo_tracer:
+            fx_module = torch._dynamo.export(
+                mod,
+                *original_inputs,
+                aten_graph=True,
+                assume_static_by_default=True,
+                tracing_mode="real",
+            ).graph_module
+        else:
+            fx_module = torch.fx.symbolic_trace(mod)
         _LOGGER.info(f"FX graph= {fx_module.graph}")
         return fx_module
 
@@ -207,12 +217,10 @@ class DispatchTestCase(TRTTestCase):
         precision=torch.float,
         check_dtype=True,
         output_dtypes=None,
+        use_dynamo_tracer=False,
     ):
         mod.eval()
-        mod = self.generate_graph(
-            mod,
-            inputs,
-        )
+        mod = self.generate_graph(mod, inputs, use_dynamo_tracer=use_dynamo_tracer)
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
@@ -241,12 +249,14 @@ class DispatchTestCase(TRTTestCase):
         rtol=1e-03,
         atol=1e-03,
         output_dtypes=None,
+        use_dynamo_tracer=False,
     ):
         mod.eval()
         inputs = [spec.example_tensor("opt_shape") for spec in input_specs]
         mod = self.generate_graph(
             mod,
             inputs,
+            use_dynamo_tracer=False,
         )
 
         # Previous instance of the interpreter auto-casted 64-bit inputs

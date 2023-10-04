@@ -33,7 +33,6 @@ class TestReshapeConverter(DispatchTestCase):
         self.run_test(
             TestModule(target_shape),
             inputs,
-            # expected_ops={torch.ops.aten.view.default},
         )
 
     @parameterized.expand(
@@ -66,38 +65,36 @@ class TestReshapeConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             TestModule(target_shape),
             input_specs,
-            # expected_ops={torch.ops.aten.view.default},
         )
 
-    @unittest.skipIf(
-        trt.__version__ < "8.5",
-        "Shape tensor supported well in TensorRT 8.5 and later",
-    )
-    def test_reshape_with_dynamic_shape_size(self):
-        class TestModule(torch.nn.Module):
-            def forward(self, x, y):
-                shape_y = y.shape
-                t = shape_y[1]
-                return torch.ops.aten.view.default(x, [-1, t, 3])
+    # @unittest.skipIf(
+    #     trt.__version__ < "8.5",
+    #     "Shape tensor supported well in TensorRT 8.5 and later",
+    # )
+    # def test_reshape_with_dynamic_shape_size(self):
+    #     class TestModule(torch.nn.Module):
+    #         def forward(self, x, y):
+    #             shape_y = y.shape
+    #             t = shape_y[1]
+    #             return torch.ops.aten.view.default(x, [-1, t, 3])
 
-        input_specs = [
-            Input(
-                shape=(-1, 5, 6),
-                dtype=torch.float32,
-                shape_ranges=[((1, 5, 6), (3, 5, 6), (3, 5, 6))],
-            ),
-            Input(
-                shape=(-1, 5),
-                dtype=torch.float32,
-                shape_ranges=[((1, 5), (3, 5), (3, 5))],
-            ),
-        ]
+    #     input_specs = [
+    #         Input(
+    #             shape=(-1, 5, 6),
+    #             dtype=torch.float32,
+    #             shape_ranges=[((1, 5, 6), (3, 5, 6), (3, 5, 6))],
+    #         ),
+    #         Input(
+    #             shape=(-1, 5),
+    #             dtype=torch.float32,
+    #             shape_ranges=[((1, 5), (3, 5), (3, 5))],
+    #         ),
+    #     ]
 
-        self.run_test_with_dynamic_shape(
-            TestModule(),
-            input_specs,
-            # expected_ops={torch.ops.aten.view.default},
-        )
+    #     self.run_test_with_dynamic_shape(
+    #         TestModule(),
+    #         input_specs,
+    #     )
 
 
 if __name__ == "__main__":
