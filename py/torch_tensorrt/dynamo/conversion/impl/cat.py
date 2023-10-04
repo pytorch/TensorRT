@@ -4,22 +4,23 @@ import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 
 
 def cat(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTNetwork,
+    input: Union[TRTTensor, Sequence[TRTTensor]],
     dim: int,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    if any(not isinstance(t, TRTTensor) for t in input):  # type: ignore[union-attr]
-        raise RuntimeError(
-            f"cat received inputs {input} that is not part " "of the TensorRT region!"
-        )
-    concat_layer = network.add_concatenation(input)
+    for each_input in input:
+        if(not isinstance(each_input, TRTTensor)):
+            each_input = get_trt_tensor(each_input)
+    concat_layer = ctx.net.add_concatenation(input)
     if dim < 0:
         dim = len(input[0].shape) + dim
 

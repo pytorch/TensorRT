@@ -53,19 +53,19 @@ def aten_ops_batch_norm(
 
 @dynamo_tensorrt_converter(torch.ops.aten.cat.default)
 def aten_ops_cat(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.cat.cat(
-        network,
+        ctx,
         target,
         SourceIR.ATEN,
         name,
-        tensors=args[0],
-        dim=args_bounds_check(args, 2, 1),
+        input=args[0],
+        dim=args_bounds_check(args, 1, 0),
     )
 
 
