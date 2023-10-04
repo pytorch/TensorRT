@@ -24,10 +24,10 @@ class TestClampConverter(DispatchTestCase):
     ):
         class TestModule(torch.nn.Module):
             def forward(self, x):
-                return torch.clamp(x, min, max)
+                return torch.ops.aten.clamp.default(x, min, max)
 
         inputs = [torch.randn(3, 4)]
-        self.run_test(TestModule(), inputs, expected_ops={torch.ops.aten.clamp.default})
+        self.run_test(TestModule(), inputs)
 
     @parameterized.expand(
         [
@@ -45,12 +45,12 @@ class TestClampConverter(DispatchTestCase):
     ):
         class TestModule(torch.nn.Module):
             def forward(self, x):
-                return torch.clamp(x, min, max)
+                return torch.ops.aten.clamp.default(x, min, max)
 
         class TestScalarModule(torch.nn.Module):
             def forward(self, x):
                 y = torch.mean(x)
-                return torch.clamp(y, min, max)
+                return torch.ops.aten.clamp.default(y, min, max)
 
         input_specs = [
             Input(
@@ -60,12 +60,8 @@ class TestClampConverter(DispatchTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.clamp.default}
-        )
-        self.run_test_with_dynamic_shape(
-            TestScalarModule(), input_specs, expected_ops={torch.ops.aten.clamp.default}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs)
+        self.run_test_with_dynamic_shape(TestScalarModule(), input_specs)
 
 
 if __name__ == "__main__":

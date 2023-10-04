@@ -18,13 +18,12 @@ class TestCosConverter(DispatchTestCase):
     def test_cos_float(self, input_shape, dtype):
         class cos(nn.Module):
             def forward(self, input):
-                return torch.cos(input)
+                return torch.ops.aten.cos.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             cos(),
             inputs,
-            expected_ops={torch.ops.aten.cos.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestCosConverter(DispatchTestCase):
     def test_cos_int(self, input_shape, dtype, low, high):
         class cos(nn.Module):
             def forward(self, input):
-                return torch.cos(input)
+                return torch.ops.aten.cos.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             cos(),
             inputs,
-            expected_ops={torch.ops.aten.cos.default},
         )
 
 

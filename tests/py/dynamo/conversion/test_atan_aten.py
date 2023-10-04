@@ -18,13 +18,12 @@ class TestAtanConverter(DispatchTestCase):
     def test_atan_float(self, input_shape, dtype):
         class atan(nn.Module):
             def forward(self, input):
-                return torch.atan(input)
+                return torch.ops.aten.atan.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             atan(),
             inputs,
-            expected_ops={torch.ops.aten.atan.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestAtanConverter(DispatchTestCase):
     def test_atan_int(self, input_shape, dtype, low, high):
         class atan(nn.Module):
             def forward(self, input):
-                return torch.atan(input)
+                return torch.ops.aten.atan.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             atan(),
             inputs,
-            expected_ops={torch.ops.aten.atan.default},
         )
 
 

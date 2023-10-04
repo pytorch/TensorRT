@@ -1,8 +1,9 @@
 import torch
-from .harness import DispatchTestCase
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+
+from .harness import DispatchTestCase
 
 
 class TestClipConverter(DispatchTestCase):
@@ -18,10 +19,10 @@ class TestClipConverter(DispatchTestCase):
     def test_clip(self, test_name, min=None, max=None):
         class TestModule(torch.nn.Module):
             def forward(self, x):
-                return torch.clip(x, min, max)
+                return torch.ops.aten.clamp.default(x, min, max)
 
         inputs = [torch.randn(3, 4)]
-        self.run_test(TestModule(), inputs, expected_ops={torch.ops.aten.clamp.default})
+        self.run_test(TestModule(), inputs)
 
     @parameterized.expand(
         [
@@ -36,12 +37,12 @@ class TestClipConverter(DispatchTestCase):
     ):
         class TestModule(torch.nn.Module):
             def forward(self, x):
-                return torch.clip(x, min, max)
+                return torch.ops.aten.clamp.default(x, min, max)
 
         class TestScalarModule(torch.nn.Module):
             def forward(self, x):
                 y = torch.mean(x)
-                return torch.clip(y, min, max)
+                return torch.ops.aten.clamp.default(y, min, max)
 
         input_specs = [
             Input(
@@ -51,12 +52,8 @@ class TestClipConverter(DispatchTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.clamp.default}
-        )
-        self.run_test_with_dynamic_shape(
-            TestScalarModule(), input_specs, expected_ops={torch.ops.aten.clamp.default}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs)
+        self.run_test_with_dynamic_shape(TestScalarModule(), input_specs)
 
 
 if __name__ == "__main__":

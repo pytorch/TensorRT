@@ -17,13 +17,12 @@ class TestFloorDivConverter(DispatchTestCase):
     def test_floor_div_default(self, _, shape):
         class floor_div(nn.Module):
             def forward(self, lhs_val, rhs_val):
-                return torch.floor_divide(lhs_val, rhs_val)
+                return torch.ops.aten.floor_divide.default(lhs_val, rhs_val)
 
         inputs = [torch.randn(shape), torch.randn(shape)]
         self.run_test(
             floor_div(),
             inputs,
-            expected_ops={torch.ops.aten.floor_divide.default},
         )
 
     @parameterized.expand(
@@ -35,13 +34,14 @@ class TestFloorDivConverter(DispatchTestCase):
     def test_floor_div_tensor_scalar(self, _, shape, scalar):
         class floor_div(nn.Module):
             def forward(self, lhs_val):
-                return torch.floor_divide(lhs_val, torch.tensor(scalar))
+                return torch.ops.aten.floor_divide.default(
+                    lhs_val, torch.tensor(scalar)
+                )
 
         inputs = [torch.randn(shape)]
         self.run_test(
             floor_div(),
             inputs,
-            expected_ops={torch.ops.aten.floor_divide.default},
         )
 
     @parameterized.expand(
@@ -53,13 +53,12 @@ class TestFloorDivConverter(DispatchTestCase):
     def test_floor_div_scalar(self, _, shape, scalar):
         class floor_div(nn.Module):
             def forward(self, lhs_val):
-                return torch.floor_divide(lhs_val, scalar)
+                return torch.ops.aten.floor_divide.default(lhs_val, scalar)
 
         inputs = [torch.randn(shape)]
         self.run_test(
             floor_div(),
             inputs,
-            expected_ops={torch.ops.aten.floor_divide.default},
         )
 
 

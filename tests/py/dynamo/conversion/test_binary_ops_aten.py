@@ -74,7 +74,7 @@ class TestBinaryOpConverters(DispatchTestCase):
         m = TestModule(orig_op)
         # Avoid dividing by 0.
         inputs = [torch.rand(1, 1) + 1]
-        self.run_test(m, inputs, expected_ops={expected_op})
+        self.run_test(m, inputs)
 
     @parameterized.expand([(op[1].__name__, op[0], op[1]) for op in elementwise_ops])
     @unittest.skip("Pending reimplementation of all binary converters in Dynamo")
@@ -95,7 +95,7 @@ class TestBinaryOpConverters(DispatchTestCase):
             2 * torch.rand(1, 1, dtype=torch.float) + 1,
             torch.randint(1, 3, (1, 1), dtype=torch.int),
         ]
-        self.run_test(m, inputs, expected_ops={expected_op})
+        self.run_test(m, inputs)
 
     @parameterized.expand([(op[1].__name__, op[0], op[1]) for op in elementwise_ops])
     def test_elementwise_ops_with_one_constant(
@@ -113,7 +113,7 @@ class TestBinaryOpConverters(DispatchTestCase):
 
         m = TestModule(orig_op)
         inputs = [torch.randn(2, 2)]
-        self.run_test(m, inputs, expected_ops={expected_op})
+        self.run_test(m, inputs)
 
     @parameterized.expand(
         [(op[1].__name__, op[0], op[1]) for op in elementwise_ops if op[2]]
@@ -134,7 +134,7 @@ class TestBinaryOpConverters(DispatchTestCase):
 
         m = TestModule(orig_op)
         inputs = [torch.randn(2, 2)]
-        self.run_test(m, inputs, expected_ops={expected_op})
+        self.run_test(m, inputs)
 
     @parameterized.expand([((lambda x, y: x / y), torch.ops.aten.div.Tensor)])
     def test_elementwise_op_div_with_two_ints(self, orig_op: Callable, expected_op):
@@ -148,7 +148,7 @@ class TestBinaryOpConverters(DispatchTestCase):
 
         m = TestModule(orig_op)
         inputs = [torch.randint(1, 10, (5,), dtype=torch.int32)]
-        self.run_test(m, inputs, expected_ops={expected_op})
+        self.run_test(m, inputs)
 
     @parameterized.expand([((lambda x, y: x / y), torch.ops.aten.div.Tensor)])
     def test_elementwise_op_div_with_one_int_one_constant(
@@ -169,7 +169,7 @@ class TestBinaryOpConverters(DispatchTestCase):
 
         m = TestModule(orig_op)
         inputs = [torch.randint(1, 10, (5,), dtype=torch.int32)]
-        self.run_test(m, inputs, expected_ops={expected_op})
+        self.run_test(m, inputs)
 
     # Dynamic shape test
     @parameterized.expand(
@@ -217,7 +217,7 @@ class TestBinaryOpConverters(DispatchTestCase):
                 shape_ranges=[y_shape_ranges],
             ),
         ]
-        self.run_test_with_dynamic_shape(Op(), input_specs, expected_ops={expected_op})
+        self.run_test_with_dynamic_shape(Op(), input_specs)
 
     @parameterized.expand(
         [
@@ -256,7 +256,7 @@ class TestBinaryOpConverters(DispatchTestCase):
                 shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (5, 5, 5, 5))],
             ),
         ]
-        self.run_test_with_dynamic_shape(Op(), input_specs, expected_ops={expected_op})
+        self.run_test_with_dynamic_shape(Op(), input_specs)
 
 
 if __name__ == "__main__":
