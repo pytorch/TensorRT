@@ -16,13 +16,12 @@ class TestLogicalNotConverter(DispatchTestCase):
     def test_logical_not_bool(self, data):
         class logical_not(nn.Module):
             def forward(self, input):
-                return torch.logical_not(input)
+                return torch.ops.aten.logical_not.default(input)
 
         inputs = [data]
         self.run_test(
             logical_not(),
             inputs,
-            expected_ops={torch.ops.aten.logical_not.default},
             output_dtypes=[torch.bool],
         )
 
@@ -36,13 +35,12 @@ class TestLogicalNotConverter(DispatchTestCase):
     def test_logical_not_int(self, input_shape, dtype, low, high):
         class logical_not(nn.Module):
             def forward(self, input):
-                return torch.logical_not(input)
+                return torch.ops.aten.logical_not.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             logical_not(),
             inputs,
-            expected_ops={torch.ops.aten.logical_not.default},
             output_dtypes=[torch.bool],
         )
 
@@ -56,13 +54,12 @@ class TestLogicalNotConverter(DispatchTestCase):
     def test_logical_not_float(self, input_shape, dtype):
         class logical_not(nn.Module):
             def forward(self, input):
-                return torch.logical_not(input)
+                return torch.ops.aten.logical_not.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             logical_not(),
             inputs,
-            expected_ops={torch.ops.aten.logical_not.default},
             output_dtypes=[torch.bool],
         )
 

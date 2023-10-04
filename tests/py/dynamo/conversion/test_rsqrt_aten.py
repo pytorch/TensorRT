@@ -17,13 +17,12 @@ class TestRSqrtConverter(DispatchTestCase):
     def test_rsqrt(self, _, x, alpha):
         class rsqrt(nn.Module):
             def forward(self, input):
-                return torch.rsqrt(input)
+                return torch.ops.aten.rsqrt.default(input)
 
         inputs = [torch.randn(x) + 1]
         self.run_test(
             rsqrt(),
             inputs,
-            expected_ops={torch.ops.aten.rsqrt.default},
         )
 
 

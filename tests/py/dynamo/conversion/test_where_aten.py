@@ -19,7 +19,7 @@ class TestWhereConverter(DispatchTestCase):
     def test_(self, _, x_size, y_size):
         class Where(nn.Module):
             def forward(self, condition, x, y):
-                return torch.where(condition, x, y)
+                return torch.ops.aten.where.self(condition, x, y)
 
         inputX = torch.randn(*x_size)
         inputOther = torch.randn(*y_size)
@@ -27,13 +27,12 @@ class TestWhereConverter(DispatchTestCase):
         self.run_test(
             Where(),
             (condition, inputX, inputOther),
-            expected_ops={torch.ops.aten.where.self},
         )
 
     def test_0D_input(self):
         class Where(nn.Module):
             def forward(self, condition, x, y):
-                return torch.where(condition, x, y)
+                return torch.ops.aten.where.self(condition, x, y)
 
         inputX = torch.randn((5, 6, 7, 1, 3))
         inputOther = torch.tensor(8.0, dtype=torch.float)
@@ -41,7 +40,6 @@ class TestWhereConverter(DispatchTestCase):
         self.run_test(
             Where(),
             (condition, inputX, inputOther),
-            expected_ops={torch.ops.aten.where.self},
         )
 
 

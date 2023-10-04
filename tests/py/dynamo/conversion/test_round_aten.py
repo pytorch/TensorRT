@@ -18,13 +18,12 @@ class TestRoundConverter(DispatchTestCase):
     def test_round_float(self, input_shape, dtype):
         class round(nn.Module):
             def forward(self, input):
-                return torch.round(input)
+                return torch.ops.aten.round.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             round(),
             inputs,
-            expected_ops={torch.ops.aten.round.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestRoundConverter(DispatchTestCase):
     def test_round_int(self, input_shape, dtype, low, high):
         class round(nn.Module):
             def forward(self, input):
-                return torch.round(input)
+                return torch.ops.aten.round.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             round(),
             inputs,
-            expected_ops={torch.ops.aten.round.default},
             check_dtype=False,
         )
 

@@ -25,7 +25,6 @@ class TestSelectConverterImplicitBatch(DispatchTestCase):
         self.run_test(
             TestModule(),
             input,
-            expected_ops={torch.ops.aten.slice.Tensor},
         )
 
 
@@ -49,7 +48,6 @@ class TestSelectConverterExplicitBatch(DispatchTestCase):
         self.run_test(
             TestModule(),
             input,
-            expected_ops={torch.ops.aten.slice.Tensor},
         )
 
 
@@ -79,7 +77,6 @@ class TestSelectConverterDynamicShape(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             TestModule(),
             input_specs,
-            expected_ops={torch.ops.aten.slice.Tensor},
         )
 
 

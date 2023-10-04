@@ -197,10 +197,8 @@ class DispatchTestCase(TRTTestCase):
         mod: torch.nn.Module,
         original_inputs: List[torch.Tensor],
     ):
-        # fx_module, _ = aten_tracer.trace(mod, original_inputs)
         fx_module = torch.fx.symbolic_trace(mod)
         _LOGGER.info(f"FX graph= {fx_module.graph}")
-        # import pdb; pdb.set_trace()
         return fx_module
 
     def run_test(

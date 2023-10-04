@@ -17,13 +17,13 @@ class TestMaxConverter(DispatchTestCase):
     def test_max(self, _, shape):
         class max(nn.Module):
             def forward(self, lhs_val, rhs_val):
-                return torch.max(lhs_val, rhs_val)
+                return torch.ops.aten.maximum.default(lhs_val, rhs_val)
 
         inputs = [torch.randn(shape), torch.randn(shape)]
         self.run_test(
             max(),
             inputs,
-            expected_ops={torch.ops.aten.maximum.default},
+            # expected_ops={torch.ops.aten.maximum.default},
         )
 
 

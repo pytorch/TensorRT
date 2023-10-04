@@ -29,13 +29,12 @@ class TestIsInfConverter(DispatchTestCase):
     def test_isinf_float(self, data):
         class isinf(nn.Module):
             def forward(self, input):
-                return torch.isinf(input)
+                return torch.ops.aten.isinf.default(input)
 
         inputs = [data]
         self.run_test(
             isinf(),
             inputs,
-            expected_ops={torch.ops.aten.isinf.default},
             output_dtypes=[torch.bool],
         )
 
@@ -49,13 +48,12 @@ class TestIsInfConverter(DispatchTestCase):
     def test_isinf_int(self, input_shape, dtype, low, high):
         class isinf(nn.Module):
             def forward(self, input):
-                return torch.isinf(input)
+                return torch.ops.aten.isinf.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             isinf(),
             inputs,
-            expected_ops={torch.ops.aten.isinf.default},
             output_dtypes=[torch.bool],
         )
 

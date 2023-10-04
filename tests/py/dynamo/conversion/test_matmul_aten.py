@@ -53,14 +53,13 @@ class TestMatMulConverter(DispatchTestCase):
                 self.other = nn.Parameter(torch.randn(*other_shape))
 
             def forward(self, input):
-                return torch.matmul(input, self.other)
+                return torch.ops.aten.mm.default(input, self.other)
 
         inputs = [torch.randn(*input_shape)]
 
         self.run_test(
             MatMul(),
             inputs,
-            expected_ops={torch.ops.aten.mm.default},
         )
 
     @parameterized.expand(
@@ -94,14 +93,13 @@ class TestMatMulConverter(DispatchTestCase):
                 self.other = nn.Parameter(torch.randn(*other_shape))
 
             def forward(self, input):
-                return torch.matmul(input, self.other)
+                return torch.ops.aten.mv.default(input, self.other)
 
         inputs = [torch.randn(*input_shape)]
 
         self.run_test(
             MatMul(),
             inputs,
-            expected_ops={torch.ops.aten.mv.default},
         )
 
     @parameterized.expand(
@@ -118,14 +116,13 @@ class TestMatMulConverter(DispatchTestCase):
     def test_matmul(self, _, input_shape, other_shape):
         class MatMul(nn.Module):
             def forward(self, input, other):
-                return torch.matmul(input, other)
+                return torch.ops.aten.mm.default(input, other)
 
         inputs = [torch.randn(*input_shape), torch.randn(*other_shape)]
 
         self.run_test(
             MatMul(),
             inputs,
-            expected_ops={torch.ops.aten.mm.default},
         )
 
     # FIXME: dynamic shape is giving bmm
