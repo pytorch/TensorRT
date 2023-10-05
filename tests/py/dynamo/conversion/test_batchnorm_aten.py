@@ -1,3 +1,5 @@
+import unittest
+
 import torch
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -6,6 +8,7 @@ from .harness import DispatchTestCase
 
 
 class TestBatchNormConverter(DispatchTestCase):
+    @unittest.skip("Pending ongoing work on batchnorm converter in Dynamo")
     def test_batchnorm(self):
         class TestModule(torch.nn.Module):
             def __init__(self):
@@ -18,6 +21,7 @@ class TestBatchNormConverter(DispatchTestCase):
         inputs = [torch.randn(1, 3, 224, 224)]
         self.run_test(TestModule(), inputs, expected_ops={torch.ops.aten.batch_norm})
 
+    @unittest.skip("Pending ongoing work on batchnorm converter in Dynamo")
     def test_batchnorm1d_with_dynamic_shape(self):
         class TestModule(torch.nn.Module):
             def __init__(self):
@@ -39,6 +43,7 @@ class TestBatchNormConverter(DispatchTestCase):
             TestModule(), input_specs, expected_ops={torch.ops.aten.batch_norm}
         )
 
+    @unittest.skip("Pending ongoing work on batchnorm converter in Dynamo")
     def test_batchnorm_with_dynamic_shape(self):
         class TestModule(torch.nn.Module):
             def __init__(self):

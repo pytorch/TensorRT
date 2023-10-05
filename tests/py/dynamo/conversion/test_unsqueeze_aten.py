@@ -22,12 +22,10 @@ class TestUnsqueeze(DispatchTestCase):
                 self.dim = dim
 
             def forward(self, x):
-                return torch.unsqueeze(x, self.dim)
+                return torch.ops.aten.unsqueeze.default(x, self.dim)
 
         inputs = [torch.randn(1, 2, 3)]
-        self.run_test(
-            Unsqueeze(dim), inputs, expected_ops={torch.ops.aten.unsqueeze.default}
-        )
+        self.run_test(Unsqueeze(dim), inputs)
 
     # Testing with more than one dynamic dims results in following error:
     # AssertionError: Currently we don't support unsqueeze with more than one dynamic dims.
@@ -45,7 +43,7 @@ class TestUnsqueeze(DispatchTestCase):
                 self.dim = dim
 
             def forward(self, x):
-                return torch.unsqueeze(x, self.dim)
+                return torch.ops.aten.unsqueeze.default(x, self.dim)
 
         input_specs = [
             Input(
@@ -54,9 +52,7 @@ class TestUnsqueeze(DispatchTestCase):
                 shape_ranges=[((1, 2, 3), (2, 2, 3), (3, 2, 3))],
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            Unsqueeze(dim), input_specs, expected_ops={torch.ops.aten.unsqueeze.default}
-        )
+        self.run_test_with_dynamic_shape(Unsqueeze(dim), input_specs)
 
 
 if __name__ == "__main__":

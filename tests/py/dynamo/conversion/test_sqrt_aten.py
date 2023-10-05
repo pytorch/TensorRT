@@ -18,13 +18,12 @@ class TestSqrtConverter(DispatchTestCase):
     def test_sqrt_float(self, input_shape, dtype):
         class sqrt(nn.Module):
             def forward(self, input):
-                return torch.sqrt(input)
+                return torch.ops.aten.sqrt.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             sqrt(),
             inputs,
-            expected_ops={torch.ops.aten.sqrt.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestSqrtConverter(DispatchTestCase):
     def test_sqrt_int(self, input_shape, dtype, low, high):
         class sqrt(nn.Module):
             def forward(self, input):
-                return torch.sqrt(input)
+                return torch.ops.aten.sqrt.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             sqrt(),
             inputs,
-            expected_ops={torch.ops.aten.sqrt.default},
         )
 
 

@@ -18,13 +18,12 @@ class TestCeilConverter(DispatchTestCase):
     def test_ceil_float(self, input_shape, dtype):
         class ceil(nn.Module):
             def forward(self, input):
-                return torch.ceil(input)
+                return torch.ops.aten.ceil.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             ceil(),
             inputs,
-            expected_ops={torch.ops.aten.ceil.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestCeilConverter(DispatchTestCase):
     def test_ceil_int(self, input_shape, dtype, low, high):
         class ceil(nn.Module):
             def forward(self, input):
-                return torch.ceil(input)
+                return torch.ops.aten.ceil.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             ceil(),
             inputs,
-            expected_ops={torch.ops.aten.ceil.default},
             check_dtype=False,
         )
 

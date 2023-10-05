@@ -17,13 +17,12 @@ class TestLogicalOrConverter(DispatchTestCase):
     def test_logical_or(self, _, shape):
         class logical_or(nn.Module):
             def forward(self, lhs_val, rhs_val):
-                return torch.logical_or(lhs_val, rhs_val)
+                return torch.ops.aten.logical_or.default(lhs_val, rhs_val)
 
         inputs = [torch.randn(shape), torch.randn(shape)]
         self.run_test(
             logical_or(),
             inputs,
-            expected_ops={torch.ops.aten.logical_or.default},
         )
 
 

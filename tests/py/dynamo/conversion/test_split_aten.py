@@ -1,9 +1,10 @@
 import torch
-from .harness import DispatchTestCase
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 from torch_tensorrt.dynamo.conversion import UnsupportedOperatorException
+
+from .harness import DispatchTestCase
 
 
 # FIXME: check about implicit and explicit batch
@@ -19,15 +20,13 @@ class TestSplitConverterNoDim(DispatchTestCase):
                 super().__init__()
 
             def forward(self, input):
-                out = torch.split(input, split_size_or_tensor)
+                out = torch.ops.aten.split.Tensor(input, split_size_or_tensor)
                 return out
 
         input = [torch.randn(10).reshape(5, 2)]
         self.run_test(
             TestModule(),
             input,
-            expected_ops={torch.ops.aten.split.Tensor},
-            disable_passes=True,
         )
 
     @parameterized.expand(
@@ -41,15 +40,15 @@ class TestSplitConverterNoDim(DispatchTestCase):
                 super().__init__()
 
             def forward(self, input):
-                out = torch.split(input, split_size_or_tensor)
+                out = torch.ops.aten.split_with_sizes.default(
+                    input, split_size_or_tensor
+                )
                 return out
 
         input = [torch.randn(10).reshape(5, 2)]
         self.run_test(
             TestModule(),
             input,
-            expected_ops={torch.ops.aten.split_with_sizes.default},
-            disable_passes=True,
         )
 
     @parameterized.expand(
@@ -63,15 +62,13 @@ class TestSplitConverterNoDim(DispatchTestCase):
                 super().__init__()
 
             def forward(self, input):
-                out = torch.split(input, split_size_or_tensor, dim)
+                out = torch.ops.aten.split.Tensor(input, split_size_or_tensor, dim)
                 return out
 
         input = [torch.randn(10).reshape(5, 2)]
         self.run_test(
             TestModule(),
             input,
-            expected_ops={torch.ops.aten.split.Tensor},
-            disable_passes=True,
         )
 
     @parameterized.expand(
@@ -85,15 +82,15 @@ class TestSplitConverterNoDim(DispatchTestCase):
                 super().__init__()
 
             def forward(self, input):
-                out = torch.split(input, split_size_or_tensor, dim)
+                out = torch.ops.aten.split_with_sizes.default(
+                    input, split_size_or_tensor, dim
+                )
                 return out
 
         input = [torch.randn(10).reshape(5, 2)]
         self.run_test(
             TestModule(),
             input,
-            expected_ops={torch.ops.aten.split_with_sizes.default},
-            disable_passes=True,
         )
 
     @parameterized.expand(
@@ -107,7 +104,9 @@ class TestSplitConverterNoDim(DispatchTestCase):
                 super().__init__()
 
             def forward(self, input):
-                out = torch.split(input, split_size_or_tensor, dim)
+                out = torch.ops.aten.split_with_sizes.default(
+                    input, split_size_or_tensor, dim
+                )
                 return out
 
         input = [torch.randn(15).reshape(5, 3)]
@@ -115,8 +114,6 @@ class TestSplitConverterNoDim(DispatchTestCase):
             self.run_test(
                 TestModule(),
                 input,
-                expected_ops={torch.ops.aten.split_with_sizes.default},
-                disable_passes=True,
             )
 
     @parameterized.expand(
@@ -130,7 +127,7 @@ class TestSplitConverterNoDim(DispatchTestCase):
                 super().__init__()
 
             def forward(self, input):
-                out = torch.split(input, split_size_or_tensor, dim)
+                out = torch.ops.aten.split.Tensor(input, split_size_or_tensor, dim)
                 return out
 
         input_specs = [
@@ -143,8 +140,6 @@ class TestSplitConverterNoDim(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             TestModule(),
             input_specs,
-            expected_ops={torch.ops.aten.split.Tensor},
-            disable_passes=True,
         )
 
     @parameterized.expand(
@@ -166,8 +161,6 @@ class TestSplitConverterNoDim(DispatchTestCase):
             self.run_test(
                 TestModule(),
                 input,
-                expected_ops={torch.ops.aten.split.Tensor},
-                disable_passes=True,
             )
 
 

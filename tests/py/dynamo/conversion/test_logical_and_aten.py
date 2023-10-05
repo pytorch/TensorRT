@@ -17,13 +17,12 @@ class TestLogicalAndConverter(DispatchTestCase):
     def test_logical_and(self, _, shape):
         class logical_and(nn.Module):
             def forward(self, lhs_val, rhs_val):
-                return torch.logical_and(lhs_val, rhs_val)
+                return torch.ops.aten.logical_and.default(lhs_val, rhs_val)
 
         inputs = [torch.randn(shape), torch.randn(shape)]
         self.run_test(
             logical_and(),
             inputs,
-            expected_ops={torch.ops.aten.logical_and.default},
         )
 
 

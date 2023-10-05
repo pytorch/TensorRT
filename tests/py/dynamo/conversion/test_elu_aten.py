@@ -10,15 +10,15 @@ class TestELUConverter(DispatchTestCase):
     def test_elu(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.elu(x)
+                return torch.ops.aten.elu.default(x)
 
         inputs = [torch.randn(1, 10)]
-        self.run_test(TestModule(), inputs, expected_ops={torch.ops.aten.elu.default})
+        self.run_test(TestModule(), inputs)
 
     def test_elu_with_dynamic_shape(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.elu(x)
+                return torch.ops.aten.elu.default(x)
 
         input_specs = [
             Input(
@@ -27,14 +27,12 @@ class TestELUConverter(DispatchTestCase):
                 shape_ranges=[((1, 1, 1), (1, 2, 3), (3, 3, 3))],
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.elu.default}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs)
 
     def test_elu_with_dynamic_shape_four_dimensions(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.elu(x)
+                return torch.ops.aten.elu.default(x)
 
         input_specs = [
             Input(
@@ -44,9 +42,7 @@ class TestELUConverter(DispatchTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.elu.default}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs)
 
 
 if __name__ == "__main__":

@@ -17,13 +17,12 @@ class TestDivConverter(DispatchTestCase):
     def test_div_tensor(self, _, shape):
         class div(nn.Module):
             def forward(self, lhs_val, rhs_val):
-                return torch.div(lhs_val, rhs_val)
+                return torch.ops.aten.div.Tensor(lhs_val, rhs_val)
 
         inputs = [torch.randn(shape), torch.randn(shape)]
         self.run_test(
             div(),
             inputs,
-            expected_ops={torch.ops.aten.div.Tensor},
         )
 
     @parameterized.expand(
@@ -36,13 +35,14 @@ class TestDivConverter(DispatchTestCase):
     def test_div_tensor_rounding_mode(self, _, shape, rounding_mode):
         class div(nn.Module):
             def forward(self, lhs_val, rhs_val):
-                return torch.div(lhs_val, rhs_val, rounding_mode=rounding_mode)
+                return torch.ops.aten.div.Tensor_mode(
+                    lhs_val, rhs_val, rounding_mode=rounding_mode
+                )
 
         inputs = [torch.randn(shape), torch.randn(shape)]
         self.run_test(
             div(),
             inputs,
-            expected_ops={torch.ops.aten.div.Tensor_mode},
         )
 
     @parameterized.expand(
@@ -54,13 +54,12 @@ class TestDivConverter(DispatchTestCase):
     def test_div_tensor(self, _, shape, scalar):
         class div(nn.Module):
             def forward(self, lhs_val):
-                return torch.div(lhs_val, scalar)
+                return torch.ops.aten.div.Tensor(lhs_val, scalar)
 
         inputs = [torch.randn(shape)]
         self.run_test(
             div(),
             inputs,
-            expected_ops={torch.ops.aten.div.Tensor},
         )
 
     @parameterized.expand(
@@ -73,13 +72,14 @@ class TestDivConverter(DispatchTestCase):
     def test_div_tensor_rounding_mode(self, _, shape, scalar, rounding_mode):
         class div(nn.Module):
             def forward(self, lhs_val):
-                return torch.div(lhs_val, scalar, rounding_mode=rounding_mode)
+                return torch.ops.aten.div.Tensor_mode(
+                    lhs_val, scalar, rounding_mode=rounding_mode
+                )
 
         inputs = [torch.randn(shape)]
         self.run_test(
             div(),
             inputs,
-            expected_ops={torch.ops.aten.div.Tensor_mode},
         )
 
 

@@ -19,13 +19,12 @@ class TestExpandConverter(DispatchTestCase):
     def test_expand(self, _, sizes, init_size):
         class Expand(nn.Module):
             def forward(self, x):
-                return x.expand(*sizes)
+                return torch.ops.aten.expand.default(x, sizes)
 
         inputs = [torch.randn(*init_size)]
         self.run_test(
             Expand(),
             inputs,
-            expected_ops={torch.ops.aten.expand.default},
         )
 
 

@@ -18,13 +18,12 @@ class TestRecipConverter(DispatchTestCase):
     def test_recip_float(self, input_shape, dtype):
         class recip(nn.Module):
             def forward(self, input):
-                return torch.reciprocal(input)
+                return torch.ops.aten.reciprocal.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             recip(),
             inputs,
-            expected_ops={torch.ops.aten.reciprocal.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestRecipConverter(DispatchTestCase):
     def test_recip_int(self, input_shape, dtype, low, high):
         class recip(nn.Module):
             def forward(self, input):
-                return torch.reciprocal(input)
+                return torch.ops.aten.reciprocal.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             recip(),
             inputs,
-            expected_ops={torch.ops.aten.reciprocal.default},
         )
 
 

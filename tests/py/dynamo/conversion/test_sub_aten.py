@@ -17,13 +17,12 @@ class TestSubConverter(DispatchTestCase):
     def test_sub_tensor(self, _, shape):
         class sub(nn.Module):
             def forward(self, lhs_val, rhs_val):
-                return torch.sub(lhs_val, rhs_val)
+                return torch.ops.aten.sub.Tensor(lhs_val, rhs_val)
 
         inputs = [torch.randn(shape), torch.randn(shape)]
         self.run_test(
             sub(),
             inputs,
-            expected_ops={torch.ops.aten.sub.Tensor},
         )
 
     @parameterized.expand(
@@ -35,13 +34,12 @@ class TestSubConverter(DispatchTestCase):
     def test_sub_tensor_alpha(self, _, shape, alpha):
         class sub(nn.Module):
             def forward(self, lhs_val, rhs_val):
-                return torch.sub(lhs_val, rhs_val, alpha=alpha)
+                return torch.ops.aten.sub.Tensor(lhs_val, rhs_val, alpha=alpha)
 
         inputs = [torch.randn(shape), torch.randn(shape)]
         self.run_test(
             sub(),
             inputs,
-            expected_ops={torch.ops.aten.sub.Tensor},
         )
 
     @parameterized.expand(
@@ -53,13 +51,12 @@ class TestSubConverter(DispatchTestCase):
     def test_sub_scalar(self, _, shape, scalar):
         class sub(nn.Module):
             def forward(self, lhs_val):
-                return torch.sub(lhs_val, scalar)
+                return torch.ops.aten.sub.Tensor(lhs_val, scalar)
 
         inputs = [torch.randn(shape)]
         self.run_test(
             sub(),
             inputs,
-            expected_ops={torch.ops.aten.sub.Tensor},
         )
 
     @parameterized.expand(
@@ -71,13 +68,12 @@ class TestSubConverter(DispatchTestCase):
     def test_sub_scalar_alpha(self, _, shape, scalar, alpha):
         class sub(nn.Module):
             def forward(self, lhs_val):
-                return torch.sub(lhs_val, scalar, alpha=alpha)
+                return torch.ops.aten.sub.Tensor(lhs_val, scalar, alpha=alpha)
 
         inputs = [torch.randn(shape)]
         self.run_test(
             sub(),
             inputs,
-            expected_ops={torch.ops.aten.sub.Tensor},
         )
 
 

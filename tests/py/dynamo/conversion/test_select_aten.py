@@ -18,13 +18,12 @@ class TestSelectConverterOne(DispatchTestCase):
                 super().__init__()
 
             def forward(self, input):
-                return torch.select(input, dim, index)
+                return torch.ops.aten.select.int(input, dim, index)
 
         input = [torch.randn(1, 2)]
         self.run_test(
             TestModule(),
             input,
-            expected_ops={torch.ops.aten.select.int},
         )
 
 
@@ -40,13 +39,12 @@ class TestSelectConverterTwo(DispatchTestCase):
                 super().__init__()
 
             def forward(self, input):
-                return torch.select(input, dim, index)
+                return torch.ops.aten.select.int(input, dim, index)
 
         input = [torch.randn(4, 4, 4, 4)]
         self.run_test(
             TestModule(),
             input,
-            expected_ops={torch.ops.aten.select.int},
         )
 
 
@@ -62,7 +60,7 @@ class TestSelectConverterWithDynamicShape(DispatchTestCase):
                 super().__init__()
 
             def forward(self, input):
-                return torch.select(input, dim, index)
+                return torch.ops.aten.select.int(input, dim, index)
 
         input_spec = [
             Input(
@@ -71,9 +69,7 @@ class TestSelectConverterWithDynamicShape(DispatchTestCase):
                 shape_ranges=[((1, 3, 3), (3, 3, 3), (3, 3, 3))],
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_spec, expected_ops={torch.ops.aten.select.int}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_spec)
 
 
 if __name__ == "__main__":

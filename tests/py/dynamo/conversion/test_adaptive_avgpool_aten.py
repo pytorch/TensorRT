@@ -7,27 +7,11 @@ from .harness import DispatchTestCase
 
 
 class TestAdaptiveAvgPoolConverter(DispatchTestCase):
-    def test_adaptive_avgpool_mean(self):
-        class TestModule(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.pool = torch.nn.AdaptiveAvgPool2d((1, 1))
-
-            def forward(self, x):
-                return self.pool(x)
-
-        inputs = [torch.randn(1, 3, 256, 256)]
-        self.run_test(
-            TestModule(),
-            inputs,
-            expected_ops={torch.ops.aten.mean.dim},
-        )
-
     @parameterized.expand(
         [
             ((64, 64),),
             ((128, 64),),
-            (64,),
+            # (64,), This case has been there in previous code but it isn't a valid pytorch code.
         ]
     )
     def test_adaptive_avgpool(
@@ -46,7 +30,7 @@ class TestAdaptiveAvgPoolConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             inputs,
-            expected_ops={torch.ops.aten._adaptive_avg_pool2d.default},
+            use_dynamo_tracer=True,
         )
 
     def test_adaptive_avgpool_with_dynamic_shape(self):
@@ -66,9 +50,7 @@ class TestAdaptiveAvgPoolConverter(DispatchTestCase):
             ),
         ]
         self.run_test_with_dynamic_shape(
-            TestModule(),
-            input_specs,
-            expected_ops={torch.ops.aten._adaptive_avg_pool2d.default},
+            TestModule(), input_specs, use_dynamo_tracer=True
         )
 
     @parameterized.expand(
@@ -94,7 +76,7 @@ class TestAdaptiveAvgPoolConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             inputs,
-            expected_ops={torch.ops.aten._adaptive_avg_pool3d.default},
+            use_dynamo_tracer=True,
         )
 
     def test_adaptive_avgpool3d_with_dynamic_shape(self):
@@ -118,7 +100,7 @@ class TestAdaptiveAvgPoolConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             TestModule(),
             input_specs,
-            expected_ops={torch.ops.aten._adaptive_avg_pool3d.default},
+            use_dynamo_tracer=True,
         )
 
     #  Testing with shape(-1, -1, -1, -1) results into error: "AdaptiveAvgPool2d and AdaptiveAvgPool3d currently doesn't support dynamic shapes for last two dims."

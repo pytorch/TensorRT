@@ -25,7 +25,6 @@ class TestIndexConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             input,
-            expected_ops={torch.ops.aten.index.Tensor},
         )
 
     def test_index_zero_index_three_dim(self):
@@ -43,7 +42,6 @@ class TestIndexConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             input,
-            expected_ops={torch.ops.aten.index.Tensor},
         )
 
     def test_index_zero_index_one_index_two_three_dim(self):
@@ -62,7 +60,6 @@ class TestIndexConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             input,
-            expected_ops={torch.ops.aten.index.Tensor},
         )
 
     def test_index_zero_index_one_four_dim(self):
@@ -81,7 +78,6 @@ class TestIndexConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             input,
-            expected_ops={torch.ops.aten.index.Tensor},
         )
 
     def test_index_zero_index_one_four_dim_SD(self):
@@ -104,7 +100,6 @@ class TestIndexConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             input,
-            expected_ops={torch.ops.aten.index.Tensor},
         )
 
     def test_index_one_SD_unsqueeze_four_dim(self):
@@ -125,7 +120,6 @@ class TestIndexConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             input,
-            expected_ops={torch.ops.aten.index.Tensor},
         )
 
     def test_index_zero_index_one_index_two_SD_unsqueeze_four_dim_broadcast(self):
@@ -148,7 +142,6 @@ class TestIndexConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             input,
-            expected_ops={torch.ops.aten.index.Tensor},
         )
 
     def test_index_zero_index_one_index_four_dim_non_continuous(self):
@@ -167,7 +160,6 @@ class TestIndexConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             input,
-            expected_ops={torch.ops.aten.index.Tensor},
         )
 
 

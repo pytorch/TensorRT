@@ -17,13 +17,12 @@ class TestMinConverter(DispatchTestCase):
     def test_min(self, _, shape):
         class min(nn.Module):
             def forward(self, lhs_val, rhs_val):
-                return torch.min(lhs_val, rhs_val)
+                return torch.ops.aten.minimum.default(lhs_val, rhs_val)
 
         inputs = [torch.randn(shape), torch.randn(shape)]
         self.run_test(
             min(),
             inputs,
-            expected_ops={torch.ops.aten.minimum.default},
         )
 
 

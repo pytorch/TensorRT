@@ -19,14 +19,13 @@ class TestNegConverter(DispatchTestCase):
     def test_neg_float(self, _, x, type):
         class neg(nn.Module):
             def forward(self, input):
-                return torch.neg(input)
+                return torch.ops.aten.neg.default(input)
 
         inputs = [torch.randn(x, dtype=type)]
         self.run_test(
             neg(),
             inputs,
             precision=type,
-            expected_ops={torch.ops.aten.neg.default},
         )
 
     @parameterized.expand(
@@ -38,13 +37,12 @@ class TestNegConverter(DispatchTestCase):
     def test_neg_int(self, _, x, type, min, max):
         class neg(nn.Module):
             def forward(self, input):
-                return torch.neg(input)
+                return torch.ops.aten.neg.default(input)
 
         inputs = [torch.randint(min, max, x, dtype=type)]
         self.run_test(
             neg(),
             inputs,
-            expected_ops={torch.ops.aten.neg.default},
             check_dtype=False,
         )
 

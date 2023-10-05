@@ -18,13 +18,12 @@ class TestAsinConverter(DispatchTestCase):
     def test_asin_float(self, input_shape, dtype):
         class asin(nn.Module):
             def forward(self, input):
-                return torch.asin(input)
+                return torch.ops.aten.asin.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             asin(),
             inputs,
-            expected_ops={torch.ops.aten.asin.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestAsinConverter(DispatchTestCase):
     def test_asin_int(self, input_shape, dtype, low, high):
         class asin(nn.Module):
             def forward(self, input):
-                return torch.asin(input)
+                return torch.ops.aten.asin.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             asin(),
             inputs,
-            expected_ops={torch.ops.aten.asin.default},
         )
 
 
