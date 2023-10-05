@@ -12,57 +12,39 @@ from .harness import DispatchTestCase
 NEED_TEST_BOTH_CONSTANTS_CASE = True
 
 elementwise_ops = [
-    ((lambda x, y: x + y), torch.ops.aten.add.Tensor, NEED_TEST_BOTH_CONSTANTS_CASE),
+    ((lambda x, y: torch.ops.aten.add.Tensor(x, y)), NEED_TEST_BOTH_CONSTANTS_CASE),
+    ((lambda x, y: torch.ops.aten.sub.Tensor(x, y)), NEED_TEST_BOTH_CONSTANTS_CASE),
+    ((lambda x, y: torch.ops.aten.div.Tensor(x, y)), NEED_TEST_BOTH_CONSTANTS_CASE),
     (
-        (lambda x, y: torch.add(x, y)),
-        torch.ops.aten.add.Tensor,
-        NEED_TEST_BOTH_CONSTANTS_CASE,
-    ),
-    ((lambda x, y: x.add(y)), torch.ops.aten.add.Tensor, NEED_TEST_BOTH_CONSTANTS_CASE),
-    ((lambda x, y: x - y), torch.ops.aten.sub.Tensor, NEED_TEST_BOTH_CONSTANTS_CASE),
-    ((lambda x, y: torch.sub(x, y)), torch.ops.aten.sub.Tensor, False),
-    ((lambda x, y: x.sub(y)), torch.ops.aten.sub.Tensor, False),
-    ((lambda x, y: x / y), torch.ops.aten.div.Tensor, NEED_TEST_BOTH_CONSTANTS_CASE),
-    (
-        (lambda x, y: x // y),
-        torch.ops.aten.floor_divide.default,
+        (lambda x, y: torch.ops.aten.floor_divide.default(x, y)),
         NEED_TEST_BOTH_CONSTANTS_CASE,
     ),
     (
-        (lambda x, y: torch.div(x, y, rounding_mode="trunc")),
-        torch.ops.aten.div.Tensor_mode,
+        (lambda x, y: torch.ops.aten.div.Tensor_mode(x, y, rounding_mode="trunc")),
         not NEED_TEST_BOTH_CONSTANTS_CASE,
     ),
     (
-        (lambda x, y: torch.div(x, y, rounding_mode="floor")),
-        torch.ops.aten.div.Tensor_mode,
+        (lambda x, y: torch.ops.aten.div.Tensor_mode(x, y, rounding_mode="floor")),
         NEED_TEST_BOTH_CONSTANTS_CASE,
     ),
     (
-        (lambda x, y: torch.div(x, y)),
-        torch.ops.aten.div.Tensor,
-        NEED_TEST_BOTH_CONSTANTS_CASE,
-    ),
-    (
-        (lambda x, y: torch.fmod(x, y)),
         torch.ops.aten.fmod.Tensor,
         not NEED_TEST_BOTH_CONSTANTS_CASE,
     ),
     ## torch.floor_divide rounds result toward zero, rather than -Inf.
     ## https://github.com/pytorch/pytorch/issues/43874
     (
-        (lambda x, y: torch.floor_divide(x, y)),
-        torch.ops.aten.floor_divide.default,
+        (lambda x, y: torch.ops.aten.floor_divide.default(x, y)),
         not NEED_TEST_BOTH_CONSTANTS_CASE,
     ),
-    ((lambda x, y: x * y), torch.ops.aten.mul.Tensor, NEED_TEST_BOTH_CONSTANTS_CASE),
-    (torch.pow, torch.ops.aten.pow.Tensor_Tensor, not NEED_TEST_BOTH_CONSTANTS_CASE),
+    ((lambda x, y: torch.ops.aten.mul.Tensor(x, y)), NEED_TEST_BOTH_CONSTANTS_CASE),
+    (torch.ops.aten.pow.Tensor_Tensor, not NEED_TEST_BOTH_CONSTANTS_CASE),
 ]
 
 
 class TestBinaryOpConverters(DispatchTestCase):
-    @parameterized.expand([(op[1].__name__, op[0], op[1]) for op in elementwise_ops])
-    def test_elementwise_ops(self, name, orig_op: Callable, expected_op):
+    @parameterized.expand([(op[0].__name__, op[0]) for op in elementwise_ops])
+    def test_elementwise_ops(self, name, orig_op: Callable):
         class TestModule(nn.Module):
             def __init__(self, orig_op):
                 super().__init__()
@@ -76,11 +58,9 @@ class TestBinaryOpConverters(DispatchTestCase):
         inputs = [torch.rand(1, 1) + 1]
         self.run_test(m, inputs)
 
-    @parameterized.expand([(op[1].__name__, op[0], op[1]) for op in elementwise_ops])
+    @parameterized.expand([(op[0].__name__, op[0]) for op in elementwise_ops])
     @unittest.skip("Pending reimplementation of all binary converters in Dynamo")
-    def test_elementwise_ops_mismatched_dtypes(
-        self, name, orig_op: Callable, expected_op
-    ):
+    def test_elementwise_ops_mismatched_dtypes(self, name, orig_op: Callable):
         class TestModule(nn.Module):
             def __init__(self, orig_op):
                 super().__init__()
@@ -97,10 +77,14 @@ class TestBinaryOpConverters(DispatchTestCase):
         ]
         self.run_test(m, inputs)
 
-    @parameterized.expand([(op[1].__name__, op[0], op[1]) for op in elementwise_ops])
-    def test_elementwise_ops_with_one_constant(
-        self, name, orig_op: Callable, expected_op
-    ):
+    @parameterized.expand(
+        [
+            (op[0].__name__, op[0])
+            for op in elementwise_ops
+            if op[0].__name__ not in ["pow.Tensor_Tensor", "fmod.Tensor"]
+        ]
+    )
+    def test_elementwise_ops_with_one_constant(self, name, orig_op: Callable):
         class TestModule(nn.Module):
             def __init__(self, orig_op):
                 super().__init__()
@@ -115,12 +99,8 @@ class TestBinaryOpConverters(DispatchTestCase):
         inputs = [torch.randn(2, 2)]
         self.run_test(m, inputs)
 
-    @parameterized.expand(
-        [(op[1].__name__, op[0], op[1]) for op in elementwise_ops if op[2]]
-    )
-    def test_elementwise_op_with_both_constants(
-        self, name, orig_op: Callable, expected_op
-    ):
+    @parameterized.expand([(op[0].__name__, op[0]) for op in elementwise_ops if op[1]])
+    def test_elementwise_op_with_both_constants(self, name, orig_op: Callable):
         class TestModule(nn.Module):
             def __init__(self, orig_op):
                 super().__init__()
@@ -136,8 +116,8 @@ class TestBinaryOpConverters(DispatchTestCase):
         inputs = [torch.randn(2, 2)]
         self.run_test(m, inputs)
 
-    @parameterized.expand([((lambda x, y: x / y), torch.ops.aten.div.Tensor)])
-    def test_elementwise_op_div_with_two_ints(self, orig_op: Callable, expected_op):
+    @parameterized.expand([((lambda x, y: torch.ops.aten.div.Tensor(x, y)))])
+    def test_elementwise_op_div_with_two_ints(self, orig_op: Callable):
         class TestModule(nn.Module):
             def __init__(self, orig_op):
                 super().__init__()
@@ -150,10 +130,8 @@ class TestBinaryOpConverters(DispatchTestCase):
         inputs = [torch.randint(1, 10, (5,), dtype=torch.int32)]
         self.run_test(m, inputs)
 
-    @parameterized.expand([((lambda x, y: x / y), torch.ops.aten.div.Tensor)])
-    def test_elementwise_op_div_with_one_int_one_constant(
-        self, orig_op: Callable, expected_op
-    ):
+    @parameterized.expand([(lambda x, y: torch.ops.aten.div.Tensor(x, y))])
+    def test_elementwise_op_div_with_one_int_one_constant(self, orig_op: Callable):
         class TestModule(nn.Module):
             def __init__(self, orig_op):
                 super().__init__()
@@ -175,31 +153,29 @@ class TestBinaryOpConverters(DispatchTestCase):
     @parameterized.expand(
         [
             (
-                f"no_broadcast_{op[1].__name__}",
+                f"no_broadcast_{op[0].__name__}",
                 (-1, -1),
                 ((1, 1), (2, 2), (3, 3)),
                 (-1, -1),
                 ((1, 1), (2, 2), (3, 3)),
                 op[0],
-                op[1],
             )
             for op in elementwise_ops
         ]
         + [
             (
-                f"broadcast_{op[1].__name__}",
+                f"broadcast_{op[0].__name__}",
                 (-1, -1, -1),
                 ((1, 1, 1), (2, 2, 2), (3, 3, 3)),
                 (-1, -1),
                 ((1, 1), (2, 2), (3, 3)),
                 op[0],
-                op[1],
             )
             for op in elementwise_ops
         ]
     )
     def test_elementwise_op_with_dynamic_shape(
-        self, _, x_shape, x_shape_ranges, y_shape, y_shape_ranges, orig_op, expected_op
+        self, _, x_shape, x_shape_ranges, y_shape, y_shape_ranges, orig_op
     ):
         class Op(nn.Module):
             def forward(self, x, y):
@@ -222,24 +198,20 @@ class TestBinaryOpConverters(DispatchTestCase):
     @parameterized.expand(
         [
             (
-                f"no_broadcast_{op[1].__name__}",
+                f"no_broadcast_{op[0].__name__}",
                 op[0],
-                op[1],
             )
             for op in elementwise_ops
         ]
         + [
             (
-                f"broadcast_{op[1].__name__}",
+                f"broadcast_{op[0].__name__}",
                 op[0],
-                op[1],
             )
             for op in elementwise_ops
         ]
     )
-    def test_elementwise_op_with_dynamic_shape_four_dimensions(
-        self, _, orig_op, expected_op
-    ):
+    def test_elementwise_op_with_dynamic_shape_four_dimensions(self, _, orig_op):
         class Op(nn.Module):
             def forward(self, x, y):
                 return orig_op(x, y)

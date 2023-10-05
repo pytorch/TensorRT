@@ -39,7 +39,7 @@ class TestPoolConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             inputs,
-            expected_ops={torch.ops.aten.avg_pool2d.default},
+            use_dynamo_tracer=True,
         )
 
     @parameterized.expand(
@@ -77,9 +77,7 @@ class TestPoolConverter(DispatchTestCase):
                 return self.pool(x)
 
         inputs = [torch.randn(1, 3, 32, 32)]
-        self.run_test(
-            TestModule(), inputs, expected_ops={torch.ops.aten.avg_pool2d.default}
-        )
+        self.run_test(TestModule(), inputs, use_dynamo_tracer=True)
 
     @parameterized.expand(
         [
@@ -116,9 +114,7 @@ class TestPoolConverter(DispatchTestCase):
                 return self.pool(x)
 
         inputs = [torch.randn(1, 3, 32, 32, 32)]
-        self.run_test(
-            TestModule(), inputs, expected_ops={torch.ops.aten.avg_pool3d.default}
-        )
+        self.run_test(TestModule(), inputs, use_dynamo_tracer=True)
 
     @parameterized.expand(
         [
@@ -153,7 +149,7 @@ class TestPoolConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             inputs,
-            expected_ops={torch.ops.aten.max_pool2d},
+            use_dynamo_tracer=True,
         )
 
     @parameterized.expand(
@@ -191,7 +187,7 @@ class TestPoolConverter(DispatchTestCase):
                 return self.pool(x)
 
         inputs = [torch.randn(1, 3, 32, 32)]
-        self.run_test(TestModule(), inputs, expected_ops={torch.ops.aten.max_pool2d})
+        self.run_test(TestModule(), inputs, use_dynamo_tracer=True)
 
     @parameterized.expand(
         [
@@ -228,7 +224,7 @@ class TestPoolConverter(DispatchTestCase):
                 return self.pool(x)
 
         inputs = [torch.randn(1, 3, 32, 32, 32)]
-        self.run_test(TestModule(), inputs, expected_ops={torch.ops.aten.max_pool3d})
+        self.run_test(TestModule(), inputs, use_dynamo_tracer=True)
 
 
 if __name__ == "__main__":

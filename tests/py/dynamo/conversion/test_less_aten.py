@@ -44,6 +44,24 @@ class TestLessConverter(DispatchTestCase):
             output_dtypes=[torch.bool],
         )
 
+    @parameterized.expand(
+        [
+            ("2d", (2, 1), 1),
+            ("3d", (2, 1, 2), 2.0),
+        ]
+    )
+    def test_less_scalar(self, _, shape, scalar):
+        class less(nn.Module):
+            def forward(self, lhs_val):
+                return torch.ops.aten.lt.Scalar(lhs_val, scalar)
+
+        inputs = [torch.randn(shape)]
+        self.run_test(
+            less(),
+            inputs,
+            output_dtypes=[torch.bool],
+        )
+
 
 if __name__ == "__main__":
     run_tests()

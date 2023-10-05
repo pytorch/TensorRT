@@ -19,13 +19,12 @@ class TestAmaxConverter(DispatchTestCase):
     def test_amax_dim_int_default(self, input_shape, dim, keep_dims):
         class Amax(nn.Module):
             def forward(self, x):
-                return torch.ops.aten.amax.default(x, dim=dim, keepdim=keep_dims)
+                return torch.ops.aten.amax.default(x, dim, keep_dims)
 
         inputs = [torch.randn(*input_shape)]
         self.run_test(
             Amax(),
             inputs,
-            use_dynamo_tracer=True,
         )
 
     @parameterized.expand(
@@ -39,13 +38,12 @@ class TestAmaxConverter(DispatchTestCase):
     def test_amax_dim_tuple_default(self, input_shape, dim, keep_dims):
         class Amax(nn.Module):
             def forward(self, x):
-                return torch.ops.aten.amax.default(x, dim=dim, keepdim=keep_dims)
+                return torch.ops.aten.amax.default(x, dim, keep_dims)
 
         inputs = [torch.randn(*input_shape)]
         self.run_test(
             Amax(),
             inputs,
-            use_dynamo_tracer=True,
         )
 
     @parameterized.expand(
@@ -60,13 +58,12 @@ class TestAmaxConverter(DispatchTestCase):
     def test_amax_dim_int_int(self, input_shape, dim, keep_dims, dtype, low, high):
         class Amax(nn.Module):
             def forward(self, x):
-                return torch.ops.aten.amax.default(x, dim=dim, keepdim=keep_dims)
+                return torch.ops.aten.amax.default(x, dim, keep_dims)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             Amax(),
             inputs,
-            use_dynamo_tracer=True,
             check_dtype=False,
         )
 
@@ -82,13 +79,12 @@ class TestAmaxConverter(DispatchTestCase):
     def test_amax_dim_tuple_int(self, input_shape, dim, keep_dims, dtype, low, high):
         class Amax(nn.Module):
             def forward(self, x):
-                return torch.ops.aten.amax.default(x, dim=dim, keepdim=keep_dims)
+                return torch.ops.aten.amax.default(x, dim, keep_dims)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             Amax(),
             inputs,
-            use_dynamo_tracer=True,
             check_dtype=False,
         )
 

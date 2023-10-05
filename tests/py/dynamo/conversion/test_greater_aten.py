@@ -44,6 +44,24 @@ class TestGreaterConverter(DispatchTestCase):
             output_dtypes=[torch.bool],
         )
 
+    @parameterized.expand(
+        [
+            ("2d", (2, 1), 1),
+            ("3d", (2, 1, 2), 2.0),
+        ]
+    )
+    def test_greater_scalar(self, _, shape, scalar):
+        class greater(nn.Module):
+            def forward(self, lhs_val):
+                return torch.ops.aten.gt.Scalar(lhs_val, scalar)
+
+        inputs = [torch.randn(shape)]
+        self.run_test(
+            greater(),
+            inputs,
+            output_dtypes=[torch.bool],
+        )
+
 
 if __name__ == "__main__":
     run_tests()
