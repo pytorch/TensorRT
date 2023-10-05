@@ -1,3 +1,5 @@
+import unittest
+
 import torch
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
