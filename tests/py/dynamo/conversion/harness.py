@@ -5,14 +5,13 @@ from typing import Callable, List, Optional, Set, Tuple
 
 import torch
 from torch.testing._internal.common_utils import TestCase
+from torch_tensorrt import Input
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
 from torch_tensorrt.dynamo.lowering import apply_lowering_passes
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
-
-from torch_tensorrt import Input
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -196,6 +195,7 @@ class DispatchTestCase(TRTTestCase):
         mod: torch.nn.Module,
         original_inputs: List[torch.Tensor],
         use_dynamo_tracer: bool,
+        enable_passes: bool,
     ):
         if use_dynamo_tracer:
             fx_module = torch._dynamo.export(
@@ -207,6 +207,8 @@ class DispatchTestCase(TRTTestCase):
             ).graph_module
         else:
             fx_module = torch.fx.symbolic_trace(mod)
+        if enable_passes:
+            fx_module = apply_lowering_passes(fx_module, original_inputs)
         _LOGGER.info(f"FX graph= {fx_module.graph}")
         return fx_module
 
@@ -220,9 +222,15 @@ class DispatchTestCase(TRTTestCase):
         check_dtype=True,
         output_dtypes=None,
         use_dynamo_tracer=False,
+        enable_passes=False,
     ):
         mod.eval()
-        mod = self.generate_graph(mod, inputs, use_dynamo_tracer=use_dynamo_tracer)
+        mod = self.generate_graph(
+            mod,
+            inputs,
+            use_dynamo_tracer=use_dynamo_tracer,
+            enable_passes=enable_passes,
+        )
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
@@ -252,6 +260,7 @@ class DispatchTestCase(TRTTestCase):
         atol=1e-03,
         output_dtypes=None,
         use_dynamo_tracer=False,
+        enable_passes=False,
     ):
         mod.eval()
         inputs = [spec.example_tensor("opt_shape") for spec in input_specs]
@@ -259,6 +268,7 @@ class DispatchTestCase(TRTTestCase):
             mod,
             inputs,
             use_dynamo_tracer=use_dynamo_tracer,
+            enable_passes=enable_passes,
         )
 
         # Previous instance of the interpreter auto-casted 64-bit inputs

@@ -150,6 +150,7 @@ class TestPoolConverter(DispatchTestCase):
             TestModule(),
             inputs,
             use_dynamo_tracer=True,
+            enable_passes=True,
         )
 
     @parameterized.expand(
@@ -187,7 +188,7 @@ class TestPoolConverter(DispatchTestCase):
                 return self.pool(x)
 
         inputs = [torch.randn(1, 3, 32, 32)]
-        self.run_test(TestModule(), inputs, use_dynamo_tracer=True)
+        self.run_test(TestModule(), inputs, use_dynamo_tracer=True, enable_passes=True)
 
     @parameterized.expand(
         [
@@ -224,7 +225,7 @@ class TestPoolConverter(DispatchTestCase):
                 return self.pool(x)
 
         inputs = [torch.randn(1, 3, 32, 32, 32)]
-        self.run_test(TestModule(), inputs, use_dynamo_tracer=True)
+        self.run_test(TestModule(), inputs, use_dynamo_tracer=True, enable_passes=True)
 
 
 if __name__ == "__main__":
