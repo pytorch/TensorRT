@@ -41,7 +41,7 @@ class TestClipConverter(DispatchTestCase):
 
         class TestScalarModule(torch.nn.Module):
             def forward(self, x):
-                y = torch.mean(x)
+                y = torch.ops.aten.mean.default(x)
                 return torch.ops.aten.clamp.default(y, min, max)
 
         input_specs = [
