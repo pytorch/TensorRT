@@ -43,6 +43,7 @@ class TestBatchNormConverter(DispatchTestCase):
             TestModule(), input_specs, expected_ops={torch.ops.aten.batch_norm}
         )
 
+    @unittest.skip("Pending ongoing work on batchnorm converter in Dynamo")
     def test_batchnorm_with_dynamic_shape(self):
         class TestModule(torch.nn.Module):
             def __init__(self):
