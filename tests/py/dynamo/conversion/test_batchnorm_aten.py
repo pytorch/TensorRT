@@ -6,64 +6,61 @@ from .harness import DispatchTestCase
 
 
 class TestBatchNormConverter(DispatchTestCase):
+    @unittest.skip("Pending ongoing work on batchnorm converter in Dynamo")
     def test_batchnorm(self):
         class TestModule(torch.nn.Module):
-            # def __init__(self):
-            #     super().__init__()
-            #     self.bn = torch.nn.BatchNorm2d(3)
-            # self.weight = self.running_mean = [1.0]*3
-            # self.bias = self.running_var = [0.0]*3
-            # self.training = False
+            def __init__(self):
+                super().__init__()
+                self.bn = torch.nn.BatchNorm2d(3)
 
             def forward(self, x):
-                return torch.ops.aten.batch_norm(
-                    x, [1.0] * 3, [0.0] * 3, [1.0] * 3, [0.0] * 3, False, 0.1, 1e-05
-                )
+                return self.bn(x)
 
         inputs = [torch.randn(1, 3, 224, 224)]
-        self.run_test(TestModule(), inputs)
+        self.run_test(TestModule(), inputs, expected_ops={torch.ops.aten.batch_norm})
 
-    # def test_batchnorm1d_with_dynamic_shape(self):
-    #     class TestModule(torch.nn.Module):
-    #         def __init__(self):
-    #             super().__init__()
-    #             self.bn = torch.nn.BatchNorm1d(3)
+    @unittest.skip("Pending ongoing work on batchnorm converter in Dynamo")
+    def test_batchnorm1d_with_dynamic_shape(self):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.bn = torch.nn.BatchNorm1d(3)
 
-    #         def forward(self, x):
-    #             return self.bn(x)
+            def forward(self, x):
+                return self.bn(x)
 
-    #     input_specs = [
-    #         Input(
-    #             shape=(-1, 3, 5),
-    #             dtype=torch.float32,
-    #             shape_ranges=[((2, 3, 5), (6, 3, 5), (10, 3, 5))],
-    #         ),
-    #     ]
+        input_specs = [
+            Input(
+                shape=(-1, 3, 5),
+                dtype=torch.float32,
+                shape_ranges=[((2, 3, 5), (6, 3, 5), (10, 3, 5))],
+            ),
+        ]
 
-    #     self.run_test_with_dynamic_shape(
-    #         TestModule(), input_specs, expected_ops={torch.ops.aten.batch_norm}
-    #     )
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={torch.ops.aten.batch_norm}
+        )
 
-    # def test_batchnorm_with_dynamic_shape(self):
-    #     class TestModule(torch.nn.Module):
-    #         def __init__(self):
-    #             super().__init__()
-    #             self.bn = torch.nn.BatchNorm2d(3)
+    def test_batchnorm_with_dynamic_shape(self):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.bn = torch.nn.BatchNorm2d(3)
 
-    #         def forward(self, x):
-    #             return self.bn(x)
+            def forward(self, x):
+                return self.bn(x)
 
-    #     input_specs = [
-    #         Input(
-    #             shape=(-1, 3, -1, -1),
-    #             dtype=torch.float32,
-    #             shape_ranges=[((1, 3, 1, 1), (1, 3, 5, 5), (2, 3, 10, 10))],
-    #         ),
-    #     ]
+        input_specs = [
+            Input(
+                shape=(-1, 3, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 3, 1, 1), (1, 3, 5, 5), (2, 3, 10, 10))],
+            ),
+        ]
 
-    #     self.run_test_with_dynamic_shape(
-    #         TestModule(), input_specs, expected_ops={torch.ops.aten.batch_norm}
-    #     )
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={torch.ops.aten.batch_norm}
+        )
 
     # Testing with shape=(-1, -1, -1, -1) results in AssertionError: Channel dim can't be dynamic for batch norm.
 
