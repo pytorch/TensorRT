@@ -224,14 +224,14 @@ def compile(
 
         # Export the module
         torchtrt_inputs = prepare_inputs(input_list)
-        module = torch_tensorrt.dynamo.trace(module, torchtrt_inputs, **kwargs)
-        compiled_aten_module: torch.fx.GraphModule = dynamo_compile(
-            module,
+        exp_program = torch_tensorrt.dynamo.trace(module, torchtrt_inputs, **kwargs)
+        trt_graph_module = dynamo_compile(
+            exp_program,
             inputs=torchtrt_inputs,
             enabled_precisions=enabled_precisions_set,
             **kwargs,
         )
-        return compiled_aten_module
+        return trt_graph_module
     elif target_ir == _IRType.torch_compile:
         return torch_compile(
             module, enabled_precisions=enabled_precisions_set, **kwargs

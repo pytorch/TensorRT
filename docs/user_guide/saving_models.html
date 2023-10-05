@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Building Torch-TensorRT on Windows &mdash; Torch-TensorRT v2.2.0.dev0+7b21322 documentation</title>
+  <title>Saving models compiled with Torch-TensorRT &mdash; Torch-TensorRT v2.2.0.dev0+7b21322 documentation</title>
   
 
   
@@ -39,8 +39,8 @@
   <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Creating a TorchScript Module" href="../user_guide/creating_torchscript_module_in_python.html" />
-    <link rel="prev" title="Using Torch-TensorRT in C++" href="getting_started_with_cpp_api.html" />
+    <link rel="next" title="Dynamic shapes with Torch-TensorRT" href="dynamic_shapes.html" />
+    <link rel="prev" title="Deploying Torch-TensorRT Programs" href="runtime.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -254,25 +254,25 @@
             
             
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
-<li class="toctree-l1"><a class="reference internal" href="getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Building Torch-TensorRT on Windows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_windows.html#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/using_dla.html">DLA</a></li>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ptq.html">Post Training Quantization (PTQ)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="using_dla.html">DLA</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
@@ -352,13 +352,13 @@
       </li>
 
         
-      <li>Building Torch-TensorRT on Windows</li>
+      <li>Saving models compiled with Torch-TensorRT</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
         
             
-            <a href="../_sources/getting_started/getting_started_with_windows.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+            <a href="../_sources/user_guide/saving_models.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
           
         
       </li>
@@ -388,165 +388,74 @@
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
-  <section id="building-torch-tensorrt-on-windows">
-<span id="getting-started-windows"></span><h1>Building Torch-TensorRT on Windows<a class="headerlink" href="#building-torch-tensorrt-on-windows" title="Permalink to this headline">¶</a></h1>
-<p>Torch-TensorRT has community support for Windows platform using CMake</p>
-<p>Prerequisite:</p>
-<ul class="simple">
-<li><p>Microsoft Visual Studio</p></li>
-<li><p>LibTorch</p></li>
-<li><p>TensorRT</p></li>
-<li><p>CUDA</p></li>
-<li><p>cuDNN</p></li>
-</ul>
-<section id="build-configuration">
-<h2>Build configuration<a class="headerlink" href="#build-configuration" title="Permalink to this headline">¶</a></h2>
-<ul class="simple">
-<li><p>Open Microsoft Visual Studio</p></li>
-<li><p>Open Torch-TensorRT source code folder</p></li>
-<li><p>Open Manage configurations -&gt; Edit JSON to open CMakeSettings.json file.</p></li>
-<li><p>Configure the CMake build configurations. Following is an example configuration:</p></li>
-</ul>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>{
-  &quot;configurations&quot;: [
-    {
-      &quot;name&quot;: &quot;x64-Debug&quot;,
-      &quot;generator&quot;: &quot;Ninja&quot;,
-      &quot;configurationType&quot;: &quot;Debug&quot;,
-      &quot;inheritEnvironments&quot;: [ &quot;msvc_x64_x64&quot; ],
-      &quot;buildRoot&quot;: &quot;${projectDir}\\out\\build\\${name}&quot;,
-      &quot;installRoot&quot;: &quot;${projectDir}\\out\\install\\${name}&quot;,
-      &quot;cmakeCommandArgs&quot;: &quot;-S . -B out&quot;,
-      &quot;buildCommandArgs&quot;: &quot;cmake --build out&quot;,
-      &quot;ctestCommandArgs&quot;: &quot;&quot;,
-      &quot;variables&quot;: [
-        {
-          &quot;name&quot;: &quot;CMAKE_MODULE_PATH&quot;,
-          &quot;value&quot;: &quot;$PWD\cmake\Modules&quot;,
-          &quot;type&quot;: &quot;FILEPATH&quot;
-        },
-        {
-          &quot;name&quot;: &quot;Torch_DIR&quot;,
-          &quot;value&quot;: &quot;&lt;Path to libtorch&gt;\share\cmake\Torch&quot;,
-          &quot;type&quot;: &quot;FILEPATH&quot;
-        },
-        {
-          &quot;name&quot;: &quot;TensorRT_ROOT&quot;,
-          &quot;value&quot;: &quot;&lt;Path to TensorRT directory&gt;&quot;,
-          &quot;type&quot;: &quot;FILEPATH&quot;
-        },
-        {
-          &quot;name&quot;: &quot;CMAKE_BUILD_TYPE&quot;,
-          &quot;value&quot;: &quot;Release&quot;,
-          &quot;type&quot;: &quot; STRING&quot;
-        }
-      ]
-    }
-  ]
-}
-</pre></div>
-</div>
-</section>
-<section id="compilation">
-<h2>Compilation<a class="headerlink" href="#compilation" title="Permalink to this headline">¶</a></h2>
-<ul class="simple">
-<li><p>Click Build -&gt; Build All or directly press Ctrl + Shift + B</p></li>
-</ul>
-<p>Note: After successful compilation, the build artifacts will be present at buildRoot path configured.</p>
-</section>
-<section id="installation">
-<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
-<ul class="simple">
-<li><p>Build -&gt; Install Torch-TensorRT</p></li>
-</ul>
-<p>Note: After successful installation, the artifacts will be present at installRoot.</p>
-</section>
-</section>
-<section id="building-with-visual-studio-code">
-<h1>Building With Visual Studio Code<a class="headerlink" href="#building-with-visual-studio-code" title="Permalink to this headline">¶</a></h1>
-<ol class="arabic">
-<li><p>Install Visual Studio Code</p></li>
-<li><p>Install Build Tools for Visual Studio 2022</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>Select “Desktop Development with C++”
-&gt; Currently, this installs MSVC v143 - 2022. There are also options to install previous 2019/2017/2015 editions of MSVC
-&gt; License term “1b Build Tools additional use right” allows using Build Tools to compile Open Source Dependencies
-&gt; Also allows using Build Tools to develop and test Open Source Dependencies, to the minor extend of ensuring compatibility with Build Tools</p></li>
-</ul>
-</div></blockquote>
-</li>
-<li><p>Install CUDA (e.g. 11.7.1)</p></li>
-<li><p>Install cuDNN (e.g. 8.5.0.96)</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>Set <code class="docutils literal notranslate"><span class="pre">cuDNN_ROOT_DIR</span></code></p></li>
-</ul>
-</div></blockquote>
-</li>
-<li><p>Install <cite>TensorRT</cite> (e.g 8.5.1.7)</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>Set <code class="docutils literal notranslate"><span class="pre">TensorRT_ROOT</span></code></p></li>
-<li><p>Add <code class="docutils literal notranslate"><span class="pre">TensorRT_ROOT\lib</span></code> to <code class="docutils literal notranslate"><span class="pre">PATH</span></code></p></li>
-</ul>
-</div></blockquote>
-</li>
-<li><p>Install “libtorch-win-shared-with-deps-latest.zip”</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>Select build targeting the appropriate CUDA version</p></li>
-<li><p>Set <code class="docutils literal notranslate"><span class="pre">Torch_DIR</span></code></p></li>
-<li><p>Add <code class="docutils literal notranslate"><span class="pre">Torch_DIR\lib</span></code> to <code class="docutils literal notranslate"><span class="pre">PATH</span></code></p></li>
-</ul>
-</div></blockquote>
-</li>
-<li><p>Clone TensorRT repo</p></li>
-<li><p>Install C++ and CMake Tools extensions from MS</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>Change build to <code class="docutils literal notranslate"><span class="pre">RelWithDebInfo</span></code></p></li>
-</ul>
-</div></blockquote>
-</li>
-<li><p>Update <code class="docutils literal notranslate"><span class="pre">.vscode\settings.json</span></code></p>
-<blockquote>
-<div><ul class="simple">
-<li><p>Clean, configure, build</p></li>
-</ul>
-</div></blockquote>
-</li>
+  <section id="saving-models-compiled-with-torch-tensorrt">
+<span id="runtime"></span><h1>Saving models compiled with Torch-TensorRT<a class="headerlink" href="#saving-models-compiled-with-torch-tensorrt" title="Permalink to this headline">¶</a></h1>
+<p>Saving models compiled with Torch-TensorRT varies slightly with the <cite>ir</cite> that has been used for compilation.</p>
+<ol class="arabic simple">
+<li><p>Dynamo IR</p></li>
 </ol>
-<p>e.g. /.vscode/settings.json</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;cmake.generator&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Ninja&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;cmake.configureSettings&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;CMAKE_MODULE_PATH&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;FILEPATH&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;$PWD\\cmake\\Modules&quot;</span>
-<span class="w">        </span><span class="p">},</span>
-<span class="w">        </span><span class="nt">&quot;CMAKE_CXX_FLAGS&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;-D_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING&quot;</span>
-<span class="w">        </span><span class="p">},</span>
-<span class="w">        </span><span class="nt">&quot;Torch_DIR&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;FILEPATH&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;X:\\libtorch\\share\\cmake\\Torch&quot;</span>
-<span class="w">        </span><span class="p">},</span>
-<span class="w">        </span><span class="nt">&quot;TensorRT_ROOT&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;FILEPATH&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;X:\\path\\to\\tensorrt&quot;</span>
-<span class="w">        </span><span class="p">},</span>
-<span class="w">        </span><span class="nt">&quot;cuDNN_ROOT_DIR&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;FILEPATH&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;X:\\path\\to\\cudnn&quot;</span>
-<span class="w">        </span><span class="p">},</span>
-<span class="w">        </span><span class="nt">&quot;CMAKE_CUDA_FLAGS&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;-allow-unsupported-compiler&quot;</span>
-<span class="w">    </span><span class="p">},</span>
-<span class="w">    </span><span class="nt">&quot;cmake.buildDirectory&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;${workspaceFolder}/torch_tensorrt_build&quot;</span>
-<span class="p">}</span>
+<p>Starting with 2.1 release of Torch-TensorRT, we are switching the default compilation to be dynamo based.
+The output of <cite>ir=dynamo</cite> compilation is a <cite>torch.fx.GraphModule</cite> object. There are two ways to save these objects</p>
+<p>a) Converting to Torchscript
+<cite>torch.fx.GraphModule</cite> objects cannot be serialized directly. Hence we use <cite>torch.jit.trace</cite> to convert this into a <cite>ScriptModule</cite> object which can be saved to disk.
+The following code illustrates this approach.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">inputs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span> <span class="c1"># Output is a torch.fx.GraphModule</span>
+<span class="n">trt_script_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_script_model</span><span class="p">,</span> <span class="s2">&quot;trt_model.ts&quot;</span><span class="p">)</span>
+
+<span class="c1"># Later, you can load it and run inference</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt_model.ts&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">model</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
+<p>b) ExportedProgram
+<cite>torch.export.ExportedProgram</cite> is a new format introduced in Pytorch 2.1. After we compile a Pytorch module using Torch-TensorRT, the resultant
+<cite>torch.fx.GraphModule</cite> along with additional metadata can be used to create <cite>ExportedProgram</cite> which can be saved and loaded from disk.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.export</span> <span class="kn">import</span> <span class="n">transform</span><span class="p">,</span> <span class="n">create_exported_program</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">inputs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span> <span class="c1"># Output is a torch.fx.GraphModule</span>
+<span class="c1"># Transform and create an exported program</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
+<span class="n">trt_exp_program</span> <span class="o">=</span> <span class="n">create_exported_program</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="n">call_spec</span><span class="p">,</span> <span class="n">trt_gm</span><span class="o">.</span><span class="n">state_dict</span><span class="p">())</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">_export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_exp_program</span><span class="p">,</span> <span class="s2">&quot;trt_model.ep&quot;</span><span class="p">)</span>
+
+<span class="c1"># Later, you can load it and run inference</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">_export</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt_model.ep&quot;</span><span class="p">)</span>
+<span class="n">model</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><cite>torch_tensorrt.dynamo.export.transform</cite> inlines the submodules within a GraphModule to their corresponding nodes and stiches all the nodes together.
+This is needed as <cite>torch._export</cite> serialization cannot handle serializing and deserializing of submodules (<cite>call_module</cite> nodes).</p>
+<p>NOTE: This way of saving the models using <cite>ExportedProgram</cite> is experimental. Here is a known issue : <a class="reference external" href="https://github.com/pytorch/TensorRT/issues/2341">https://github.com/pytorch/TensorRT/issues/2341</a></p>
+<ol class="arabic simple" start="2">
+<li><p>Torchscript IR</p></li>
+</ol>
+<blockquote>
+<div><p>In Torch-TensorRT 1.X versions, the primary way to compile and run inference with Torch-TensorRT is using Torchscript IR.
+This behavior stays the same in 2.X versions as well.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">inputs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">trt_ts</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;ts&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span> <span class="c1"># Output is a ScriptModule object</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_ts</span><span class="p">,</span> <span class="s2">&quot;trt_model.ts&quot;</span><span class="p">)</span>
+
+<span class="c1"># Later, you can load it and run inference</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt_model.ts&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">model</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
 </section>
 
 
@@ -557,10 +466,10 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="../user_guide/creating_torchscript_module_in_python.html" class="btn btn-neutral float-right" title="Creating a TorchScript Module" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+        <a href="dynamic_shapes.html" class="btn btn-neutral float-right" title="Dynamic shapes with Torch-TensorRT" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
       
       
-        <a href="getting_started_with_cpp_api.html" class="btn btn-neutral" title="Using Torch-TensorRT in C++" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+        <a href="runtime.html" class="btn btn-neutral" title="Deploying Torch-TensorRT Programs" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
       
     </div>
   
@@ -592,13 +501,7 @@
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Building Torch-TensorRT on Windows</a><ul>
-<li><a class="reference internal" href="#build-configuration">Build configuration</a></li>
-<li><a class="reference internal" href="#compilation">Compilation</a></li>
-<li><a class="reference internal" href="#installation">Installation</a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
+<li><a class="reference internal" href="#">Saving models compiled with Torch-TensorRT</a></li>
 </ul>
 
             </div>
