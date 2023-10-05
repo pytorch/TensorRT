@@ -9,8 +9,8 @@ from .harness import DispatchTestCase
 class TestMaxConverter(DispatchTestCase):
     @parameterized.expand(
         [
+            ((1, 2),),
             ((3, 2, 4),),
-            ((2, 3, 4, 5),),
             ((2, 3, 4, 5),),
             ((6, 7, 5, 4, 5),),
         ]

@@ -27,6 +27,9 @@ def amax(
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
+    if dim is None or (isinstance(dim, (tuple, list)) and len(dim) == 0):
+        dim = tuple(range(len(input_val.shape)))
+
     layer = ctx.net.add_reduce(
         input_val,
         trt.ReduceOperation.MAX,
@@ -51,7 +54,7 @@ def sum(
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
-    if dim is None:
+    if dim is None or (isinstance(dim, (tuple, list)) and len(dim) == 0):
         dim = tuple(range(len(input_val.shape)))
 
     layer = ctx.net.add_reduce(
@@ -169,7 +172,7 @@ def mean(
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
-    if dim is None:
+    if dim is None or (isinstance(dim, (tuple, list)) and len(dim) == 0):
         dim = tuple(range(len(input_val.shape)))
 
     layer = ctx.net.add_reduce(

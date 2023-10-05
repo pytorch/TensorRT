@@ -668,7 +668,7 @@ def aten_ops_amax(
         SourceIR.ATEN,
         name,
         args[0],
-        args[1],
+        args_bounds_check(args, 1, replacement=[]),
         args_bounds_check(args, 2, replacement=False),
     )
 
