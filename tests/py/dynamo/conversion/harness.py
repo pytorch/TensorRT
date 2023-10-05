@@ -5,12 +5,13 @@ from typing import Callable, List, Optional, Set, Tuple
 
 import torch
 from torch.testing._internal.common_utils import TestCase
-from torch_tensorrt import Input
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
+
+from torch_tensorrt import Input
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -256,7 +257,7 @@ class DispatchTestCase(TRTTestCase):
         mod = self.generate_graph(
             mod,
             inputs,
-            use_dynamo_tracer=False,
+            use_dynamo_tracer=use_dynamo_tracer,
         )
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
