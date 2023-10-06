@@ -146,10 +146,19 @@ def opset_coverage(
             )
 
             if registry_data is not None:
-                if DYNAMO_REGISTRY_NAME in registry_data and registry_data[DYNAMO_REGISTRY_NAME] >= 1:
+                if (
+                        DYNAMO_REGISTRY_NAME in registry_data
+                        and registry_data[DYNAMO_REGISTRY_NAME] >= 1
+                ):
                     status = SupportStatus.CONVERTED
                     support_count += 1
-                elif (FX_REGISTRY_NAME in registry_data and registry_data[FX_REGISTRY_NAME] >= 1) or (FX_LEGACY_REGISTRY_NAME in registry_data and registry_data[FX_LEGACY_REGISTRY_NAME] >= 1):
+                elif (
+                        FX_REGISTRY_NAME in registry_data
+                        and registry_data[FX_REGISTRY_NAME] >= 1
+                ) or (
+                    FX_LEGACY_REGISTRY_NAME in registry_data
+                    and registry_data[FX_LEGACY_REGISTRY_NAME] >= 1
+                ):
                     status = SupportStatus.LEGACY_CONVERTED
                     legacy_count += 1
                 else:
