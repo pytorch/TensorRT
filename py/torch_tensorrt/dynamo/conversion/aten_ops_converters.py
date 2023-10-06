@@ -1722,3 +1722,22 @@ def aten_ops_reshape(
         input=args[0],
         shape=args[1],
     )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.argmax.default)  # type: ignore[misc]
+def aten_ops_argmax(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.argmax.argmax(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        dim=args_bounds_check(args, 1),
+        keep_dim=args_bounds_check(args, 2, False),
+    )

@@ -3,6 +3,7 @@ from torch_tensorrt.fx.converters.impl import convolution
 from . import (
     activation,
     attention,
+    argmax,
     cast,
     cat,
     condition,
