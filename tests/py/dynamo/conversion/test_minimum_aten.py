@@ -7,23 +7,23 @@ from torch_tensorrt import Input
 from .harness import DispatchTestCase
 
 
-class TestMinConverter(DispatchTestCase):
+class TestMinimumConverter(DispatchTestCase):
     @parameterized.expand(
         [
             ("2d", (2, 1)),
             ("3d", (2, 1, 2)),
         ]
     )
-    def test_min(self, _, shape):
-        class min(nn.Module):
+    def test_minimum(self, _, shape):
+        class Minimum(nn.Module):
             def forward(self, lhs_val, rhs_val):
-                return torch.min(lhs_val, rhs_val)
+                return torch.minimum(lhs_val, rhs_val)
 
         inputs = [torch.randn(shape), torch.randn(shape)]
         self.run_test(
-            min(),
+            Minimum(),
             inputs,
-            expected_ops={torch.ops.aten.minimum.default},
+            use_dynamo_tracer=True,
         )
 
 

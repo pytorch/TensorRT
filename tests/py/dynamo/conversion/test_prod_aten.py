@@ -20,11 +20,11 @@ class TestProdConverter(DispatchTestCase):
             def forward(self, x):
                 return torch.prod(x)
 
-        inputs = [torch.randn(*input_shape)]
+        inputs = [torch.randn(input_shape)]
         self.run_test(
             Prod(),
             inputs,
-            expected_ops={torch.ops.aten.prod.default},
+            use_dynamo_tracer=True,
         )
 
     @parameterized.expand(
@@ -39,13 +39,13 @@ class TestProdConverter(DispatchTestCase):
     def test_prod_dim_int(self, input_shape, dim, keep_dims):
         class Prod(nn.Module):
             def forward(self, x):
-                return torch.prod(x, dim=dim, keepdim=keep_dims)
+                return torch.prod(x, dim, keep_dims)
 
-        inputs = [torch.randn(*input_shape)]
+        inputs = [torch.randn(input_shape)]
         self.run_test(
             Prod(),
             inputs,
-            expected_ops={torch.ops.aten.prod.dim_int},
+            use_dynamo_tracer=True,
         )
 
     @parameterized.expand(
@@ -58,14 +58,14 @@ class TestProdConverter(DispatchTestCase):
     def test_prod_dim_int_int(self, input_shape, dim, keep_dims, dtype, low, high):
         class Prod(nn.Module):
             def forward(self, x):
-                return torch.prod(x, dim=dim, keepdim=keep_dims)
+                return torch.prod(x, dim, keep_dims)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             Prod(),
             inputs,
-            expected_ops={torch.ops.aten.prod.dim_int},
             check_dtype=False,
+            use_dynamo_tracer=True,
         )
 
 

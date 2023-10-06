@@ -7,23 +7,23 @@ from torch_tensorrt import Input
 from .harness import DispatchTestCase
 
 
-class TestMaxConverter(DispatchTestCase):
+class TestMaximumConverter(DispatchTestCase):
     @parameterized.expand(
         [
             ("2d", (2, 1)),
             ("3d", (2, 1, 2)),
         ]
     )
-    def test_max(self, _, shape):
-        class max(nn.Module):
+    def test_maximum(self, _, shape):
+        class Maximum(nn.Module):
             def forward(self, lhs_val, rhs_val):
-                return torch.max(lhs_val, rhs_val)
+                return torch.maximum(lhs_val, rhs_val)
 
         inputs = [torch.randn(shape), torch.randn(shape)]
         self.run_test(
-            max(),
+            Maximum(),
             inputs,
-            expected_ops={torch.ops.aten.maximum.default},
+            use_dynamo_tracer=True,
         )
 
 
