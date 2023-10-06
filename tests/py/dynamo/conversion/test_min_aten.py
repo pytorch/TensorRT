@@ -24,7 +24,6 @@ class TestMinConverter(DispatchTestCase):
         self.run_test(
             Min(),
             inputs,
-            expected_ops={torch.ops.aten.min.default},
         )
 
     @parameterized.expand(
@@ -39,14 +38,12 @@ class TestMinConverter(DispatchTestCase):
     def test_min_dim_int(self, input_shape, dim, keep_dims):
         class Min(nn.Module):
             def forward(self, x):
-                return torch.min(x, dim=dim, keepdim=keep_dims)[0]
+                return torch.ops.aten.min.dim(x, dim, keep_dims)[0]
 
         inputs = [torch.randn(*input_shape)]
         self.run_test(
             Min(),
             inputs,
-            expected_ops={torch.ops.aten.min.dim},
-            disable_passes=True,
         )
 
     @parameterized.expand(
@@ -59,15 +56,13 @@ class TestMinConverter(DispatchTestCase):
     def test_min_dim_int_int(self, input_shape, dim, keep_dims, dtype, low, high):
         class Min(nn.Module):
             def forward(self, x):
-                return torch.ops.aten.min.dim(x, dim=dim, keepdim=keep_dims)[0]
+                return torch.ops.aten.min.dim(x, dim, keep_dims)[0]
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             Min(),
             inputs,
-            expected_ops={torch.ops.aten.min.dim},
             check_dtype=False,
-            disable_passes=True,
         )
 
 

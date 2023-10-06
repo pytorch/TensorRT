@@ -138,12 +138,12 @@ def aten_ops_sigmoid(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.index.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.index.Tensor)  # type: ignore[misc]
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
     }
-)
+)  # type: ignore[misc]
 def aten_ops_index(
     ctx: ConversionContext,
     target: Target,
@@ -723,6 +723,7 @@ def one_user_validator(node: Node) -> bool:
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.max.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.max.dim, capability_validator=one_user_validator)  # type: ignore[misc]
 def aten_ops_max(
     ctx: ConversionContext,
     target: Target,
@@ -736,33 +737,14 @@ def aten_ops_max(
         SourceIR.ATEN,
         name,
         args[0],
-        dim=None,
-        keepdim=False,
-        return_indices=False,
-    )
-
-
-@dynamo_tensorrt_converter(torch.ops.aten.max.dim, capability_validator=one_user_validator)  # type: ignore[misc]
-def aten_ops_max_dim(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.reduce.max(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-        args[1],
-        args_bounds_check(args, 2, replacement=False),
-        return_indices=True,
+        dim=args_bounds_check(args, 1, replacement=None),
+        keepdim=args_bounds_check(args, 2, replacement=False),
+        return_indices=(target == torch.ops.aten.max.dim),
     )
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.min.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.min.dim, capability_validator=one_user_validator)  # type: ignore[misc]
 def aten_ops_min(
     ctx: ConversionContext,
     target: Target,
@@ -776,29 +758,9 @@ def aten_ops_min(
         SourceIR.ATEN,
         name,
         args[0],
-        dim=None,
-        keepdim=False,
-        return_indices=False,
-    )
-
-
-@dynamo_tensorrt_converter(torch.ops.aten.min.dim, capability_validator=one_user_validator)  # type: ignore[misc]
-def aten_ops_min_dim(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.reduce.min(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-        args[1],
-        args_bounds_check(args, 2, replacement=False),
-        return_indices=True,
+        dim=args_bounds_check(args, 1, replacement=None),
+        keepdim=args_bounds_check(args, 2, replacement=False),
+        return_indices=(target == torch.ops.aten.min.dim),
     )
 
 

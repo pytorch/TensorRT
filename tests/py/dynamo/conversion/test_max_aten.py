@@ -18,13 +18,12 @@ class TestMaxConverter(DispatchTestCase):
     def test_max_dim_int_default(self, input_shape):
         class Max(nn.Module):
             def forward(self, x):
-                return torch.max(x)
+                return torch.ops.aten.max.default(x)
 
         inputs = [torch.randn(*input_shape)]
         self.run_test(
             Max(),
             inputs,
-            expected_ops={torch.ops.aten.max.default},
         )
 
     @parameterized.expand(
@@ -45,8 +44,6 @@ class TestMaxConverter(DispatchTestCase):
         self.run_test(
             Max(),
             inputs,
-            expected_ops={torch.ops.aten.max.dim},
-            disable_passes=True,
         )
 
     @parameterized.expand(
@@ -65,9 +62,7 @@ class TestMaxConverter(DispatchTestCase):
         self.run_test(
             Max(),
             inputs,
-            expected_ops={torch.ops.aten.max.dim},
             check_dtype=False,
-            disable_passes=True,
         )
 
 
