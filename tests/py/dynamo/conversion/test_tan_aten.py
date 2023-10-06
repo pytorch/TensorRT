@@ -18,13 +18,12 @@ class TestTanConverter(DispatchTestCase):
     def test_tan_float(self, input_shape, dtype):
         class tan(nn.Module):
             def forward(self, input):
-                return torch.tan(input)
+                return torch.ops.aten.tan.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             tan(),
             inputs,
-            expected_ops={torch.ops.aten.tan.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestTanConverter(DispatchTestCase):
     def test_tan_int(self, input_shape, dtype, low, high):
         class tan(nn.Module):
             def forward(self, input):
-                return torch.tan(input)
+                return torch.ops.aten.tan.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             tan(),
             inputs,
-            expected_ops={torch.ops.aten.tan.default},
         )
 
 

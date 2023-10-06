@@ -17,13 +17,12 @@ class TestLogicalXorConverter(DispatchTestCase):
     def test_logical_xor(self, _, shape):
         class logical_xor(nn.Module):
             def forward(self, lhs_val, rhs_val):
-                return torch.logical_xor(lhs_val, rhs_val)
+                return torch.ops.aten.logical_xor.default(lhs_val, rhs_val)
 
         inputs = [torch.randn(shape), torch.randn(shape)]
         self.run_test(
             logical_xor(),
             inputs,
-            expected_ops={torch.ops.aten.logical_xor.default},
         )
 
 

@@ -18,13 +18,12 @@ class TestSinConverter(DispatchTestCase):
     def test_sin_float(self, input_shape, dtype):
         class sin(nn.Module):
             def forward(self, input):
-                return torch.sin(input)
+                return torch.ops.aten.sin.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             sin(),
             inputs,
-            expected_ops={torch.ops.aten.sin.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestSinConverter(DispatchTestCase):
     def test_sin_int(self, input_shape, dtype, low, high):
         class sin(nn.Module):
             def forward(self, input):
-                return torch.sin(input)
+                return torch.ops.aten.sin.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             sin(),
             inputs,
-            expected_ops={torch.ops.aten.sin.default},
         )
 
 

@@ -19,14 +19,13 @@ class TestErfConverter(DispatchTestCase):
     def test_erf_float(self, _, x, type):
         class erf(nn.Module):
             def forward(self, input):
-                return torch.erf(input)
+                return torch.ops.aten.erf.default(input)
 
         inputs = [torch.randn(x, dtype=type)]
         self.run_test(
             erf(),
             inputs,
             precision=type,
-            expected_ops={torch.ops.aten.erf.default},
         )
 
     @parameterized.expand(
@@ -38,13 +37,12 @@ class TestErfConverter(DispatchTestCase):
     def test_erf_int(self, _, x, type, min, max):
         class erf(nn.Module):
             def forward(self, input):
-                return torch.erf(input)
+                return torch.ops.aten.erf.default(input)
 
         inputs = [torch.randint(min, max, x, dtype=type)]
         self.run_test(
             erf(),
             inputs,
-            expected_ops={torch.ops.aten.erf.default},
         )
 
 

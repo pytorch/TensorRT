@@ -8,20 +8,20 @@ from .harness import DispatchTestCase
 class TestLinearConverter(DispatchTestCase):
     @parameterized.expand(
         [
-            ("default", [1, 512], True, torch.ops.aten.linear),
-            ("matrix", [5, 512], True, torch.ops.aten.linear),
-            ("no_bias", [1, 512], False, torch.ops.aten.linear),
+            ("default", [1, 512], True, torch.ops.aten.linear.default),
+            ("matrix", [5, 512], True, torch.ops.aten.linear.default),
+            ("no_bias", [1, 512], False, torch.ops.aten.linear.default),
             (
                 "multi_dim_matrix",
                 [4, 5, 512],
                 True,
-                torch.ops.aten.linear,
+                torch.ops.aten.linear.default,
             ),
             (
                 "multi_dim_matrix",
                 [4, 5, 512],
                 False,
-                torch.ops.aten.linear,
+                torch.ops.aten.linear.default,
             ),
         ]
     )
@@ -29,13 +29,17 @@ class TestLinearConverter(DispatchTestCase):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
-                self.linear = torch.nn.Linear(512, 256, bias)
+                self.weight = torch.randn((256, 512))
+                if bias:
+                    self.bias = torch.randn((256))
+                else:
+                    self.bias = None
 
             def forward(self, x):
-                return self.linear(x)
+                return torch.ops.aten.linear.default(x, self.weight, self.bias)
 
         inputs = [torch.randn(shape)]
-        self.run_test(TestModule(), inputs, expected_ops={op})
+        self.run_test(TestModule(), inputs)
 
         # linear will be decomposed to P531484488 and view(reshape) can not handle reshape pattern
         # like (2, 3, n)->(6, n) in implicit mode which is similar to dynamic shape test below.

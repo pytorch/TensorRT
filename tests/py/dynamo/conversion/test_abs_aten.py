@@ -18,13 +18,12 @@ class TestAbsConverter(DispatchTestCase):
     def test_abs_float(self, input_shape, dtype):
         class abs(nn.Module):
             def forward(self, input):
-                return torch.abs(input)
+                return torch.ops.aten.abs.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             abs(),
             inputs,
-            expected_ops={torch.ops.aten.abs.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestAbsConverter(DispatchTestCase):
     def test_abs_int(self, input_shape, dtype, low, high):
         class abs(nn.Module):
             def forward(self, input):
-                return torch.abs(input)
+                return torch.ops.aten.abs.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             abs(),
             inputs,
-            expected_ops={torch.ops.aten.abs.default},
             output_dtypes=[torch.int],
         )
 

@@ -27,6 +27,24 @@ def args_bounds_check(
     return args[i] if len(args) > i else replacement
 
 
+def get_ir(target: Target) -> SourceIR:
+    target_module = getattr(target, "__module__", "None")
+    if any(
+        target_module.startswith(prefix)
+        for prefix in ("torch.ops.prims", "torch._ops.prims")
+    ):
+        return SourceIR.ATEN
+    elif any(
+        target_module.startswith(prefix)
+        for prefix in ("torch.ops.prims", "torch._ops.prims")
+    ):
+        return SourceIR.PRIM
+    elif target_module.startswith("torch.nn"):
+        return SourceIR.NN
+
+    return SourceIR.UNKNOWN
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.batch_norm)  # type: ignore[misc]
 def aten_ops_batch_norm(
     ctx: ConversionContext,
@@ -674,6 +692,7 @@ def aten_ops_amax(
 
 @dynamo_tensorrt_converter(torch.ops.aten.sum.default)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.sum.dim_IntList)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.prims.sum.default)  # type: ignore[misc]
 def aten_ops_sum(
     ctx: ConversionContext,
     target: Target,
@@ -681,15 +700,28 @@ def aten_ops_sum(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.reduce.sum(
+    sum_ = impl.reduce.sum(
         ctx,
         target,
-        SourceIR.ATEN,
+        get_ir(target),
         name,
         args[0],
         args_bounds_check(args, 1, replacement=None),
         args_bounds_check(args, 2, replacement=False),
     )
+
+    if kwargs.get("output_dtype", None) is not None:
+        return impl.cast.to_copy(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            sum_,
+            kwargs["output_dtype"],
+            force_layer=False,
+        )
+    else:
+        return sum_
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.exp.default)  # type: ignore[misc]
@@ -1189,6 +1221,7 @@ def aten_ops_sub(
 @dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.div.Scalar)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.div.Scalar_mode)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.prims.div.default)  # type: ignore[misc]
 def aten_ops_div(
     ctx: ConversionContext,
     target: Target,
@@ -1202,7 +1235,7 @@ def aten_ops_div(
         return impl.elementwise.div(
             ctx,
             target,
-            SourceIR.ATEN,
+            get_ir(target),
             name,
             args[0],
             args[1],
@@ -1211,7 +1244,7 @@ def aten_ops_div(
         return impl.elementwise.floor_divide(
             ctx,
             target,
-            SourceIR.ATEN,
+            get_ir(target),
             name,
             args[0],
             args[1],
@@ -1220,7 +1253,7 @@ def aten_ops_div(
         return impl.elementwise.trunc_div(
             ctx,
             target,
-            SourceIR.ATEN,
+            get_ir(target),
             name,
             args[0],
             args[1],
@@ -1553,5 +1586,5 @@ def tensorrt_scaled_dot_product_attention(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.attention.scaled_dot_product_attention(
-        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2]
+        ctx, target, SourceIR.TORCHTRT_LOWERED, name, args[0], args[1], args[2]
     )

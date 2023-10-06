@@ -18,13 +18,12 @@ class TestLogConverter(DispatchTestCase):
     def test_log_float(self, input_shape, dtype):
         class log(nn.Module):
             def forward(self, input):
-                return torch.log(input)
+                return torch.ops.aten.log.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             log(),
             inputs,
-            expected_ops={torch.ops.aten.log.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestLogConverter(DispatchTestCase):
     def test_log_int(self, input_shape, dtype, low, high):
         class log(nn.Module):
             def forward(self, input):
-                return torch.log(input)
+                return torch.ops.aten.log.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             log(),
             inputs,
-            expected_ops={torch.ops.aten.log.default},
         )
 
 

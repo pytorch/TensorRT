@@ -17,13 +17,12 @@ class TestMulConverter(DispatchTestCase):
     def test_mul_tensor(self, _, shape):
         class mul(nn.Module):
             def forward(self, lhs_val, rhs_val):
-                return torch.mul(lhs_val, rhs_val)
+                return torch.ops.aten.mul.Tensor(lhs_val, rhs_val)
 
         inputs = [torch.randn(shape), torch.randn(shape)]
         self.run_test(
             mul(),
             inputs,
-            expected_ops={torch.ops.aten.mul.Tensor},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestMulConverter(DispatchTestCase):
     def test_mul_scalar(self, _, shape, scalar):
         class mul(nn.Module):
             def forward(self, lhs_val):
-                return torch.mul(lhs_val, scalar)
+                return torch.ops.aten.mul.Tensor(lhs_val, scalar)
 
         inputs = [torch.randn(shape)]
         self.run_test(
             mul(),
             inputs,
-            expected_ops={torch.ops.aten.mul.Tensor},
         )
 
 
