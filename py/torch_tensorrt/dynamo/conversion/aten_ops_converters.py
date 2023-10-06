@@ -32,7 +32,7 @@ def get_ir(target: Target) -> SourceIR:
     target_module = getattr(target, "__module__", "None")
     if any(
         target_module.startswith(prefix)
-        for prefix in ("torch.ops.prims", "torch._ops.prims")
+        for prefix in ("torch.ops.aten", "torch._ops.aten")
     ):
         return SourceIR.ATEN
     elif any(
