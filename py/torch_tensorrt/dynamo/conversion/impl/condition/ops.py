@@ -1,5 +1,6 @@
 from typing import Optional
 
+import numpy as np
 import tensorrt as trt
 import torch
 from torch.fx.node import Target
@@ -23,16 +24,6 @@ def where(
     other: TRTTensor,
     condition: TRTTensor,
 ) -> TRTTensor:
-    input_dim = len(tuple(input.shape))
-    other_dim = len(tuple(other.shape))
-    condition_dim = len(tuple(condition.shape))
-
-    if type(input) != TRTTensor:
-        assert type(input) is torch.Tensor, f"value {input} is not torch.Tensor!"
-
-    if type(other) != TRTTensor:
-        assert type(other) is torch.Tensor, f"value {other} is not torch.Tensor!"
-
     if not (broadcastable(input, other)):
         assert "The two torch tensors should be broadcastable"
 
@@ -49,33 +40,37 @@ def where(
     x_shape = list(input.shape)
     y_shape = list(other.shape)
     condition_shape = list(condition.shape)
+
     output_shape = list(torch.broadcast_shapes(condition_shape, x_shape, y_shape))
 
     # expand shape
-    if type(condition) != TRTTensor:
-        assert condition.dtype == torch.bool, "condition dtype is not bool"
+    if not isinstance(condition, TRTTensor):
+        assert condition.dtype in (torch.bool, np.bool_), "condition dtype is not bool"
         if condition_shape != output_shape:
-            condition.expand(output_shape)
-        condition = condition.to(torch.int32)
-        condition_const = get_trt_tensor(ctx, condition, f"{name}_condition")
-        condition_layer = ctx.net.add_identity(condition_const)
-        condition_layer.set_output_type(0, trt.bool)
-        set_layer_name(condition_layer, target, f"{name}_condition")
-        condition_val = condition_layer.get_output(0)
+            condition = (
+                condition.expand(output_shape)
+                if isinstance(condition, torch.Tensor)
+                else np.broadcast_to(condition, output_shape)
+            )
+        condition_val = get_trt_tensor(ctx, condition, f"{name}_condition")
     else:
         assert condition.dtype == trt.bool, "mask dtype is not bool!"
-        if len(condition_shape) != condition_dim:
+        if condition_shape != output_shape:
             condition_val = expand(
                 ctx, target, source_ir, f"{name}_expand", condition, output_shape
             )
         else:
             condition_val = condition
 
-    if type(input) != TRTTensor:
+    if not isinstance(input, TRTTensor):
         if x_shape != output_shape:
             # special case where 1 element in input
             if len(input.shape) == 0:
-                input = input.unsqueeze(0)
+                input = (
+                    input.unsqueeze(0)
+                    if isinstance(input, torch.Tensor)
+                    else np.expand_dims(input, axis=0)
+                )
             input = input.expand(output_shape)
         x_val = get_trt_tensor(ctx, input, f"{name}_x")
     else:
@@ -85,11 +80,15 @@ def where(
                 ctx, target, source_ir, f"{name}_x_expand", input, output_shape
             )
 
-    if type(other) != TRTTensor:
+    if not isinstance(other, TRTTensor):
         if y_shape != output_shape:
             # special case where 1 element in other
             if len(other.shape) == 0:
-                other = other.unsqueeze(0)
+                other = (
+                    other.unsqueeze(0)
+                    if isinstance(other, torch.Tensor)
+                    else np.expand_dims(other, axis=0)
+                )
             other = other.expand(output_shape)
         y_val = get_trt_tensor(ctx, other, f"{name}_y")
     else:
