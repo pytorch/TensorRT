@@ -6,7 +6,7 @@ from torch.testing._internal.common_utils import run_tests
 from .harness import DispatchTestCase
 
 
-class TestMinConverter(DispatchTestCase):
+class TestProdConverter(DispatchTestCase):
     @parameterized.expand(
         [
             ((1, 2),),
@@ -15,15 +15,16 @@ class TestMinConverter(DispatchTestCase):
             ((6, 7, 5, 4, 5),),
         ]
     )
-    def test_min_dim_int_default(self, input_shape):
-        class Min(nn.Module):
+    def test_prod_dim_int_default(self, input_shape):
+        class Prod(nn.Module):
             def forward(self, x):
-                return torch.ops.aten.min.default(x)
+                return torch.prod(x)
 
-        inputs = [torch.randn(*input_shape)]
+        inputs = [torch.randn(input_shape)]
         self.run_test(
-            Min(),
+            Prod(),
             inputs,
+            use_dynamo_tracer=True,
         )
 
     @parameterized.expand(
@@ -35,15 +36,16 @@ class TestMinConverter(DispatchTestCase):
             ((1, 5, 2, 3), -2, True),
         ]
     )
-    def test_min_dim_int(self, input_shape, dim, keep_dims):
-        class Min(nn.Module):
+    def test_prod_dim_int(self, input_shape, dim, keep_dims):
+        class Prod(nn.Module):
             def forward(self, x):
-                return torch.ops.aten.min.dim(x, dim, keep_dims)[0]
+                return torch.prod(x, dim, keep_dims)
 
-        inputs = [torch.randn(*input_shape)]
+        inputs = [torch.randn(input_shape)]
         self.run_test(
-            Min(),
+            Prod(),
             inputs,
+            use_dynamo_tracer=True,
         )
 
     @parameterized.expand(
@@ -53,16 +55,17 @@ class TestMinConverter(DispatchTestCase):
             ((6, 7, 5, 4, 5), 4, False, torch.int32, -5, 5),
         ]
     )
-    def test_min_dim_int_int(self, input_shape, dim, keep_dims, dtype, low, high):
-        class Min(nn.Module):
+    def test_prod_dim_int_int(self, input_shape, dim, keep_dims, dtype, low, high):
+        class Prod(nn.Module):
             def forward(self, x):
-                return torch.ops.aten.min.dim(x, dim, keep_dims)[0]
+                return torch.prod(x, dim, keep_dims)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
-            Min(),
+            Prod(),
             inputs,
             check_dtype=False,
+            use_dynamo_tracer=True,
         )
 
 

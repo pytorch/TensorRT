@@ -1,4 +1,5 @@
 import logging
+import operator
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -155,12 +156,12 @@ def aten_ops_sigmoid(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.index.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.index.Tensor)  # type: ignore[misc]
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
     }
-)
+)  # type: ignore[misc]
 def aten_ops_index(
     ctx: ConversionContext,
     target: Target,
@@ -685,7 +686,7 @@ def aten_ops_amax(
         SourceIR.ATEN,
         name,
         args[0],
-        args[1],
+        args_bounds_check(args, 1, replacement=[]),
         args_bounds_check(args, 2, replacement=False),
     )
 
@@ -722,6 +723,97 @@ def aten_ops_sum(
         )
     else:
         return sum_
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.prod.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.prod.dim_int)  # type: ignore[misc]
+def aten_ops_prod(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.prod(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, replacement=None),
+        args_bounds_check(args, 2, replacement=False),
+    )
+
+
+def one_user_validator(node: Node) -> bool:
+    # Validate only one user, which is a getitem node that accesses the first element in the list
+    return (
+        len(node.users) == 1
+        and list(node.users)[0].target == operator.getitem
+        and list(node.users)[0].args[1] == 0
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.max.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.max.dim, capability_validator=one_user_validator)  # type: ignore[misc]
+def aten_ops_max(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.max(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        dim=args_bounds_check(args, 1, replacement=None),
+        keepdim=args_bounds_check(args, 2, replacement=False),
+        return_indices=(target == torch.ops.aten.max.dim),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.min.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.min.dim, capability_validator=one_user_validator)  # type: ignore[misc]
+def aten_ops_min(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.min(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        dim=args_bounds_check(args, 1, replacement=None),
+        keepdim=args_bounds_check(args, 2, replacement=False),
+        return_indices=(target == torch.ops.aten.min.dim),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.mean.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.mean.dim)  # type: ignore[misc]
+def aten_ops_mean(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.mean(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, replacement=None),
+        args_bounds_check(args, 2, replacement=False),
+    )
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.exp.default)  # type: ignore[misc]
@@ -1150,7 +1242,7 @@ def aten_ops_mul(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.maximum.default)  # type: ignore[misc]
-def aten_ops_max(
+def aten_ops_maximum(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
@@ -1168,7 +1260,7 @@ def aten_ops_max(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.minimum.default)  # type: ignore[misc]
-def aten_ops_min(
+def aten_ops_minimum(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],

@@ -9,8 +9,8 @@ from .harness import DispatchTestCase
 class TestSumConverter(DispatchTestCase):
     @parameterized.expand(
         [
+            ((1, 2),),
             ((3, 2, 4),),
-            ((2, 3, 4, 5),),
             ((2, 3, 4, 5),),
             ((6, 7, 5, 4, 5),),
         ]
@@ -49,6 +49,7 @@ class TestSumConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
+            ((1, 2, 4), [], True),
             ((3, 2, 4), [1], True),
             ((2, 1, 4, 5), None, True),
             ((2, 3, 4, 5), [0, 1, 2, 3], False),
@@ -89,6 +90,7 @@ class TestSumConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
+            ((1, 2, 4), [], True, torch.int, 0, 5),
             ((3, 2, 4), [1], True, torch.int, 0, 5),
             ((2, 1, 4, 5), [0, 3], True, torch.int, -10, 10),
             ((2, 3, 4, 5), None, False, torch.int32, -5, 0),
