@@ -17,6 +17,7 @@ from . import (
     reduce,
     select,
     shape,
+    shuffle,
     slice,
     split,
     squeeze,
