@@ -152,6 +152,8 @@ def opset_coverage(
                 elif (FX_REGISTRY_NAME in registry_data and registry_data[FX_REGISTRY_NAME] >= 1) or (FX_LEGACY_REGISTRY_NAME in registry_data and registry_data[FX_LEGACY_REGISTRY_NAME] >= 1):
                     status = SupportStatus.LEGACY_CONVERTED
                     legacy_count += 1
+                else:
+                    raise Exception(f"Op belongs to unknown registry: {registry_data}")
 
                 support_status[target_str] = {
                     "schema": f"{target_str.split('.')[0]}.{opset_schemas[target_str]}",
