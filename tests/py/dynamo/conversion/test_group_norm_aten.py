@@ -6,46 +6,85 @@ from .harness import DispatchTestCase
 
 
 class TestGroupNormConverter(DispatchTestCase):
-    def test_groupnorm(self):
-        class TestModule(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.gn = torch.nn.GroupNorm(2, 6)
-
+    def test_groupnorm1d(self):
+        class GroupNorm(torch.nn.Module):
             def forward(self, x):
-                return self.gn(x)
+                return torch.ops.aten.group_norm.default(
+                    x,
+                    2,
+                    torch.ones((6,)),
+                    torch.zeros((6,)),
+                    1e-05,
+                    True,
+                )
 
-        inputs = [torch.randn(1, 6, 224, 224)]
+        inputs = [torch.randn(3, 6, 224)]
         self.run_test(
-            TestModule(),
+            GroupNorm(),
             inputs,
-            expected_ops={torch.ops.aten.native_group_norm.default},
-            disable_passes=True,
         )
 
-    def test_groupnorm_with_dynamic_shape(self):
-        class TestModule(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.gn = torch.nn.GroupNorm(2, 6)
-
+    def test_groupnorm2d(self):
+        class GroupNorm(torch.nn.Module):
             def forward(self, x):
-                return self.gn(x)
+                return torch.ops.aten.group_norm.default(
+                    x,
+                    2,
+                    torch.ones((6,)),
+                    torch.zeros((6,)),
+                    1e-05,
+                    True,
+                )
 
-        input_specs = [
-            Input(
-                shape=(-1, 6, 5),
-                dtype=torch.float32,
-                shape_ranges=[((2, 6, 5), (6, 6, 5), (10, 6, 5))],
-            ),
-        ]
+        inputs = [torch.randn(3, 6, 224, 224)]
+        with torch.no_grad():
+            self.run_test(
+                GroupNorm(),
+                inputs,
+            )
 
-        self.run_test_with_dynamic_shape(
-            TestModule(),
-            input_specs,
-            expected_ops={torch.ops.aten.native_group_norm.default},
-            disable_passes=True,
+
+class TestNativeGroupNormConverter(DispatchTestCase):
+    def test_groupnorm1d(self):
+        class GroupNorm(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.native_group_norm.default(
+                    x,
+                    torch.ones((6,)),
+                    torch.zeros((6,)),
+                    3,
+                    6,
+                    224,
+                    2,
+                    1e-05,
+                )[0]
+
+        inputs = [torch.randn(3, 6, 224)]
+        self.run_test(
+            GroupNorm(),
+            inputs,
         )
+
+    def test_groupnorm2d(self):
+        class GroupNorm(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.native_group_norm.default(
+                    x,
+                    torch.ones((6,)),
+                    torch.zeros((6,)),
+                    3,
+                    6,
+                    224 * 224,
+                    2,
+                    1e-05,
+                )[0]
+
+        inputs = [torch.randn(3, 6, 224, 224)]
+        with torch.no_grad():
+            self.run_test(
+                GroupNorm(),
+                inputs,
+            )
 
 
 if __name__ == "__main__":
