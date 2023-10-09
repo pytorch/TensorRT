@@ -57,6 +57,7 @@ def one_user_validator(node: Node) -> bool:
 
 @dynamo_tensorrt_converter(torch.ops.aten.native_batch_norm.default, capability_validator=one_user_validator)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.batch_norm.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.batch_norm)  # type: ignore[misc]
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -89,6 +90,7 @@ def aten_ops_batch_norm(
 
 @dynamo_tensorrt_converter(torch.ops.aten.native_layer_norm.default, capability_validator=one_user_validator)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.layer_norm.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.layer_norm)  # type: ignore[misc]
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -146,6 +148,7 @@ def aten_ops_native_group_norm(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.group_norm.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.group_norm)  # type: ignore[misc]
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
