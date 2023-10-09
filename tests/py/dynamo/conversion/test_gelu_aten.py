@@ -12,15 +12,15 @@ class TestGeLUConverter(DispatchTestCase):
     def test_gelu(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.gelu(x)
+                return torch.ops.aten.gelu.default(x)
 
         inputs = [torch.randn(1, 10)]
-        self.run_test(TestModule(), inputs, expected_ops={torch.ops.aten.gelu.default})
+        self.run_test(TestModule(), inputs)
 
     def test_gelu_with_dynamic_shape(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.gelu(x)
+                return torch.ops.aten.gelu.default(x)
 
         input_specs = [
             Input(
@@ -29,14 +29,12 @@ class TestGeLUConverter(DispatchTestCase):
                 shape_ranges=[((1, 1, 1), (1, 2, 3), (3, 3, 3))],
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.gelu.default}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs)
 
     def test_gelu_with_dynamic_shape_four_dimensions(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.gelu(x)
+                return torch.ops.aten.gelu.default(x)
 
         input_specs = [
             Input(
@@ -46,9 +44,7 @@ class TestGeLUConverter(DispatchTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.gelu.default}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs)
 
 
 if __name__ == "__main__":

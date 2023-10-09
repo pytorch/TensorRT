@@ -511,3 +511,35 @@ def to_numpy(
         raise AssertionError(
             f"to_numpy can only be called on None, bool, int, float, np.ndarray, or torch.Tensor, got: {value}"
         )
+
+
+def flatten_dims(
+    input: Sequence[Union[TRTTensor, torch.Tensor, np.ndarray]],
+    start_dim: int,
+    end_dim: int,
+) -> Tuple[int, ...]:
+    """
+    Given an input, start and end indices of dimension,
+    this function will return a flattened new shape.
+
+    Args:
+        input (Sequence[Union[TRTTensor, torch.Tensor, np.ndarray]]):
+            an input value waiting to be flattened
+        start_dim (int): the first dim to flatten
+        end_dim (int): the last dim to flatten (this dim is included)
+
+    Returns:
+        Tuple[int]: new_shape
+    """
+    shape = input.shape
+    dim_size = len(shape)
+    start_dim = get_positive_dim(start_dim, dim_size)
+    end_dim = get_positive_dim(end_dim, dim_size)
+
+    num_elements = 1
+    for i in range(start_dim, end_dim + 1):
+        num_elements *= shape[i]
+
+    new_shape = tuple(shape[:start_dim]) + (num_elements,) + tuple(shape[end_dim + 1 :])
+
+    return new_shape

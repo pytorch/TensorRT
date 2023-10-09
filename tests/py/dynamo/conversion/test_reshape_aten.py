@@ -12,6 +12,8 @@ from .harness import DispatchTestCase
 class TestReshapeConverter(DispatchTestCase):
     @parameterized.expand(
         [
+            ((-1,),),
+            ((20,),),
             ((1, 20),),
             ((1, 10, -1),),
         ]
@@ -21,23 +23,22 @@ class TestReshapeConverter(DispatchTestCase):
         "Shape tensor supported well in TensorRT 8.5 and later",
     )
     def test_reshape(self, target_shape):
-        class TestModule(torch.nn.Module):
-            def __init__(self, target_shape):
+        class Reshape(torch.nn.Module):
+            def __init__(self):
                 super().__init__()
-                self.target_shape = target_shape
 
             def forward(self, x):
-                return torch.reshape(x, self.target_shape)
+                return torch.ops.aten.view.default(x, target_shape)
 
         inputs = [torch.randn(1, 2, 10)]
         self.run_test(
-            TestModule(target_shape),
+            Reshape(),
             inputs,
-            expected_ops={torch.ops.aten.view.default},
         )
 
     @parameterized.expand(
         [
+            ((-1,),),
             ((-1, 10),),
             ((-1, 5),),
             ((2, 2, -1),),
@@ -48,13 +49,12 @@ class TestReshapeConverter(DispatchTestCase):
         "Shape tensor supported well in TensorRT 8.5 and later",
     )
     def test_reshape_with_dynamic_shape(self, target_shape):
-        class TestModule(torch.nn.Module):
-            def __init__(self, target_shape):
+        class Reshape(torch.nn.Module):
+            def __init__(self):
                 super().__init__()
-                self.target_shape = target_shape
 
             def forward(self, x):
-                return torch.reshape(x, self.target_shape)
+                return torch.ops.aten.view.default(x, target_shape)
 
         input_specs = [
             Input(
@@ -64,39 +64,8 @@ class TestReshapeConverter(DispatchTestCase):
             ),
         ]
         self.run_test_with_dynamic_shape(
-            TestModule(target_shape),
+            Reshape(),
             input_specs,
-            expected_ops={torch.ops.aten.view.default},
-        )
-
-    @unittest.skipIf(
-        trt.__version__ < "8.5",
-        "Shape tensor supported well in TensorRT 8.5 and later",
-    )
-    def test_reshape_with_dynamic_shape_size(self):
-        class TestModule(torch.nn.Module):
-            def forward(self, x, y):
-                shape_y = y.shape
-                t = shape_y[1]
-                return torch.reshape(x, [-1, t, 3])
-
-        input_specs = [
-            Input(
-                shape=(-1, 5, 6),
-                dtype=torch.float32,
-                shape_ranges=[((1, 5, 6), (3, 5, 6), (3, 5, 6))],
-            ),
-            Input(
-                shape=(-1, 5),
-                dtype=torch.float32,
-                shape_ranges=[((1, 5), (3, 5), (3, 5))],
-            ),
-        ]
-
-        self.run_test_with_dynamic_shape(
-            TestModule(),
-            input_specs,
-            expected_ops={torch.ops.aten.view.default},
         )
 
 

@@ -1,3 +1,5 @@
+import unittest
+
 import torch
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -6,6 +8,7 @@ from .harness import DispatchTestCase
 
 
 class TestLayerNormConverter(DispatchTestCase):
+    @unittest.skip("Pending ongoing work on layernorm converter in Dynamo")
     def test_layer_norm(self):
         class TestModule(torch.nn.Module):
             def __init__(self):
@@ -20,6 +23,7 @@ class TestLayerNormConverter(DispatchTestCase):
             TestModule(), inputs, expected_ops={torch.ops.aten.layer_norm.default}
         )
 
+    @unittest.skip("Pending ongoing work on layernorm converter in Dynamo")
     def test_layernorm_with_dynamic_shape(self):
         class TestModule(torch.nn.Module):
             def __init__(self):

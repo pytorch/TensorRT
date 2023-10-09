@@ -4,28 +4,14 @@ import unittest
 from typing import Callable, List, Optional, Set, Tuple
 
 import torch
-import torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer as aten_tracer
-from torch.fx.passes.infra.pass_base import PassResult
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt import Input
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
+from torch_tensorrt.dynamo.lowering import apply_lowering_passes
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
-from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
-    compose_bmm,
-    compose_chunk,
-    compose_getitem_slice,
-    remove_ops,
-    replace_aten_op_with_indices,
-    replace_aten_reshape_alias_with_replace,
-    replace_builtin_ops,
-    replace_native_layernorm_with_layernorm,
-    replace_transpose_mm_op_with_linear,
-    run_const_fold,
-)
-from torch_tensorrt.fx.passes.pass_utils import chain_passes
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -61,8 +47,6 @@ class TRTTestCase(TestCase):
         self,
         mod,
         inputs,
-        expected_ops,
-        unexpected_ops,
         interpreter,
         rtol,
         atol,
@@ -75,10 +59,6 @@ class TRTTestCase(TestCase):
                 cuda_inputs.append(i.cuda())
 
             mod.eval()
-            if len(expected_ops):
-                self.assert_has_op(mod, expected_ops)
-            if unexpected_ops:
-                self.assert_unexpected_op(mod, unexpected_ops)
             start = time.perf_counter()
             interpreter_result = interpreter.run(precision=precision)
             sec = time.perf_counter() - start
@@ -214,74 +194,43 @@ class DispatchTestCase(TRTTestCase):
         self,
         mod: torch.nn.Module,
         original_inputs: List[torch.Tensor],
-        expected_ops: Set[Callable],
-        unexpected_ops: Optional[Set[Callable]] = None,
-        customized_passes: List[Callable] = None,
-        disable_passes: bool = False,
+        use_dynamo_tracer: bool,
+        enable_passes: bool,
     ):
-        # Torchdynamo+aot proxytensor tracer
-        # Below are common passes
-        passes_list = [
-            compose_bmm,
-            compose_chunk,
-            compose_getitem_slice,
-            replace_aten_reshape_alias_with_replace,
-            replace_aten_op_with_indices,
-            replace_transpose_mm_op_with_linear,  # after compose_bmm
-            replace_native_layernorm_with_layernorm,
-            remove_ops,
-            replace_builtin_ops,  # after replace_native_layernorm_with_layernorm
-        ]
-        # Combine with customized passes specific to any model
-        if customized_passes:
-            passes_list.extend(customized_passes)
-
-        if disable_passes:
-            passes_list = []
-
-        fx_module, _ = aten_tracer.trace(mod, original_inputs)
-        for passes in passes_list:
-            pr: PassResult = passes(fx_module)
-            fx_module = pr.graph_module
-        fx_module(*original_inputs)
-
-        fx_module = run_const_fold(fx_module)
+        if use_dynamo_tracer:
+            fx_module = torch._dynamo.export(
+                mod,
+                *original_inputs,
+                aten_graph=True,
+                assume_static_by_default=True,
+                tracing_mode="real",
+            ).graph_module
+        else:
+            fx_module = torch.fx.symbolic_trace(mod)
+        if enable_passes:
+            fx_module = apply_lowering_passes(fx_module, original_inputs)
         _LOGGER.info(f"FX graph= {fx_module.graph}")
-
-        if len(expected_ops):
-            self.assert_has_op(fx_module, expected_ops)
-        if unexpected_ops:
-            self.assert_unexpected_op(fx_module, unexpected_ops)
-
         return fx_module
 
     def run_test(
         self,
         mod,
         inputs,
-        expected_ops,
-        unexpected_ops=None,
-        apply_passes=None,
         rtol=1e-03,
         atol=1e-03,
         precision=torch.float,
         check_dtype=True,
-        disable_passes=False,
         output_dtypes=None,
+        use_dynamo_tracer=False,
+        enable_passes=False,
     ):
         mod.eval()
         mod = self.generate_graph(
             mod,
             inputs,
-            expected_ops,
-            unexpected_ops,
-            None,
-            disable_passes=disable_passes,
+            use_dynamo_tracer=use_dynamo_tracer,
+            enable_passes=enable_passes,
         )
-
-        if apply_passes is not None:
-            pass_tracer = chain_passes(*apply_passes)
-            mod = pass_tracer(mod, inputs)
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
@@ -296,8 +245,6 @@ class DispatchTestCase(TRTTestCase):
         super().run_test(
             mod,
             inputs,
-            expected_ops,
-            unexpected_ops,
             interp,
             rtol,
             atol,
@@ -309,22 +256,19 @@ class DispatchTestCase(TRTTestCase):
         self,
         mod,
         input_specs,
-        expected_ops,
-        unexpected_ops=None,
         rtol=1e-03,
         atol=1e-03,
-        disable_passes=False,
         output_dtypes=None,
+        use_dynamo_tracer=False,
+        enable_passes=False,
     ):
         mod.eval()
         inputs = [spec.example_tensor("opt_shape") for spec in input_specs]
         mod = self.generate_graph(
             mod,
             inputs,
-            expected_ops,
-            unexpected_ops,
-            None,
-            disable_passes=disable_passes,
+            use_dynamo_tracer=use_dynamo_tracer,
+            enable_passes=enable_passes,
         )
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
@@ -340,6 +284,4 @@ class DispatchTestCase(TRTTestCase):
         # Since the lowering is based on optimal shape. We need to test with
         # different shape(for ex. max shape) for testing dynamic shape
         inputs_max = [spec.example_tensor("max_shape") for spec in input_specs]
-        super().run_test(
-            mod, inputs_max, expected_ops, unexpected_ops, interp, rtol, atol
-        )
+        super().run_test(mod, inputs_max, interp, rtol, atol)

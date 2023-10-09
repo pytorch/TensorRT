@@ -16,19 +16,14 @@ class TestBmmConverter(DispatchTestCase):
     )
     def test_bmm(self, _, input_shape, mat2_shape):
         class BMM(nn.Module):
-            def __init__(self):
-                super().__init__()
-
             def forward(self, input, mat2):
-                return torch.bmm(input, mat2)
+                return torch.ops.aten.bmm.default(input, mat2)
 
         inputs = [torch.randn(*input_shape), torch.randn(*mat2_shape)]
 
         self.run_test(
             BMM(),
             inputs,
-            disable_passes=True,
-            expected_ops={torch.ops.aten.bmm.default},
         )
 
 

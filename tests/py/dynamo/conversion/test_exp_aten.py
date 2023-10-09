@@ -18,13 +18,12 @@ class TestExpConverter(DispatchTestCase):
     def test_exp_float(self, input_shape, dtype):
         class exp(nn.Module):
             def forward(self, input):
-                return torch.exp(input)
+                return torch.ops.aten.exp.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             exp(),
             inputs,
-            expected_ops={torch.ops.aten.exp.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestExpConverter(DispatchTestCase):
     def test_exp_int(self, input_shape, dtype, low, high):
         class exp(nn.Module):
             def forward(self, input):
-                return torch.exp(input)
+                return torch.ops.aten.exp.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             exp(),
             inputs,
-            expected_ops={torch.ops.aten.exp.default},
         )
 
 

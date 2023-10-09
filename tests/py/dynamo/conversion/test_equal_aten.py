@@ -17,13 +17,12 @@ class TestEqualConverter(DispatchTestCase):
     def test_equal_tensor(self, _, shape):
         class equal(nn.Module):
             def forward(self, lhs_val, rhs_val):
-                return lhs_val == rhs_val
+                return torch.ops.aten.eq.Tensor(lhs_val, rhs_val)
 
         inputs = [torch.randn(shape), torch.randn(shape)]
         self.run_test(
             equal(),
             inputs,
-            expected_ops={torch.ops.aten.eq.Tensor},
             output_dtypes=[torch.bool],
         )
 
@@ -36,13 +35,12 @@ class TestEqualConverter(DispatchTestCase):
     def test_equal_tensor_scalar(self, _, shape, scalar):
         class equal(nn.Module):
             def forward(self, lhs_val):
-                return lhs_val == torch.tensor(scalar)
+                return torch.ops.aten.eq.Tensor(lhs_val, torch.tensor(scalar))
 
         inputs = [torch.randn(shape)]
         self.run_test(
             equal(),
             inputs,
-            expected_ops={torch.ops.aten.eq.Tensor},
             output_dtypes=[torch.bool],
         )
 
@@ -55,13 +53,13 @@ class TestEqualConverter(DispatchTestCase):
     def test_equal_scalar(self, _, shape, scalar):
         class equal(nn.Module):
             def forward(self, lhs_val):
-                return lhs_val == scalar
+                return torch.ops.aten.eq.Scalar(lhs_val, scalar)
 
         inputs = [torch.randn(shape)]
         self.run_test(
             equal(),
             inputs,
-            expected_ops={torch.ops.aten.eq.Scalar},
+            # expected_ops={torch.ops.aten.eq.Scalar},
             output_dtypes=[torch.bool],
         )
 

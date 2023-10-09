@@ -1,25 +1,24 @@
 import torch
 import torch.nn as nn
-from .harness import DispatchTestCase
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+
+from .harness import DispatchTestCase
 
 
 class TestSoftplusConverter(DispatchTestCase):
     def test_softplus(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.softplus(x)
+                return torch.ops.aten.softplus.default(x)
 
         inputs = [torch.randn(1, 10)]
-        self.run_test(
-            TestModule(), inputs, expected_ops={torch.ops.aten.softplus.default}
-        )
+        self.run_test(TestModule(), inputs)
 
     def test_softplus_with_dynamic_shape(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.softplus(x)
+                return torch.ops.aten.softplus.default(x)
 
         input_specs = [
             Input(
@@ -28,14 +27,12 @@ class TestSoftplusConverter(DispatchTestCase):
                 shape_ranges=[((1, 1, 1), (1, 2, 3), (3, 3, 3))],
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.softplus.default}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs)
 
     def test_softplus_with_dynamic_shape_four_dimensions(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.softplus(x)
+                return torch.ops.aten.softplus.default(x)
 
         input_specs = [
             Input(
@@ -45,9 +42,7 @@ class TestSoftplusConverter(DispatchTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.softplus.default}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs)
 
 
 if __name__ == "__main__":

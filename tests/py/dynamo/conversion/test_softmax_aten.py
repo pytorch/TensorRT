@@ -8,26 +8,16 @@ from .harness import DispatchTestCase
 class TestSoftMaxConverter(DispatchTestCase):
     def test_softmax(self):
         class TestModule(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.softmax = torch.nn.Softmax(1)
-
             def forward(self, x):
-                return self.softmax(x)
+                return torch.ops.aten._softmax.default(x, 1, False)
 
         inputs = [torch.randn(1, 3, 224, 224)]
-        self.run_test(
-            TestModule(), inputs, expected_ops={torch.ops.aten._softmax.default}
-        )
+        self.run_test(TestModule(), inputs)
 
     def test_softmax_with_dynamic_shape(self):
         class TestModule(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.softmax = torch.nn.Softmax(2)
-
             def forward(self, x):
-                return self.softmax(x)
+                return torch.ops.aten._softmax.default(x, 2, False)
 
         input_specs = [
             Input(
@@ -37,9 +27,7 @@ class TestSoftMaxConverter(DispatchTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten._softmax.default}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs)
 
 
 if __name__ == "__main__":
