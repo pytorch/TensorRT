@@ -158,7 +158,6 @@ def cast_trt_tensor(
             output = identity_layer.get_output(i)
             output.name = f"[{output.name}]"
 
-
         return identity_layer.get_output(0)
     else:
         return input_val
