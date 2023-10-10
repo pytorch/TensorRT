@@ -1,5 +1,5 @@
 import logging
-from typing import Sequence
+from typing import Any, Sequence
 
 import torch
 from torch_tensorrt._utils import sanitized_torch_version
@@ -32,7 +32,7 @@ def constant_fold(
 
     Modifies the graph in-place and replaces node with constants
     """
-    cf = ConstantFolder(gm, skip_constructors=False)
+    cf = _TorchTensorRTConstantFolder(gm, skip_constructors=False)
     cf.run()
 
     for node, constant in cf.node_replacements.items():
@@ -58,3 +58,14 @@ def constant_fold(
     logger.debug(f"Graph after constant folding:\n{gm.graph}")
 
     return gm
+
+
+# TODO: Delete this class when the following code is fixed in nightly:
+# https://github.com/pytorch/pytorch/blob/4b881b0da390c1290bb12850ef9daad6f6eb2cb6/torch/_inductor/constant_folding.py#L53-L63
+class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+    # TODO: Update this function when quantization is added
+    def is_impure(self, node: torch.fx.node.Node) -> bool:
+        return False
