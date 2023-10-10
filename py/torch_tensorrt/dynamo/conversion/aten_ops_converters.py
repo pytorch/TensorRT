@@ -175,7 +175,7 @@ def aten_ops_group_norm(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.cat.default)
+@dynamo_tensorrt_converter(torch.ops.aten.cat.default)  # type: ignore[misc]
 def aten_ops_cat(
     ctx: ConversionContext,
     target: Target,
@@ -1796,4 +1796,24 @@ def aten_ops_reshape(
         name,
         input=args[0],
         shape=args[1],
+    )
+
+
+@enforce_tensor_types({0: (TRTTensor,)})  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.argmax.default)  # type: ignore[misc]
+def aten_ops_argmax(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.argmax.argmax(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        dim=args_bounds_check(args, 1),
+        keep_dim=args_bounds_check(args, 2, False),
     )
