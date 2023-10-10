@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 import tensorrt as trt
@@ -11,7 +11,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
 )
 from torch_tensorrt.dynamo.conversion.impl.slice import expand
-from torch_tensorrt.fx.converters.converter_utils import broadcast, set_layer_name
+from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 from torch_tensorrt.fx.types import TRTTensor
 
 
@@ -20,22 +20,12 @@ def where(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
-    other: TRTTensor,
-    condition: TRTTensor,
+    input: Union[TRTTensor, np.ndarray, torch.Tensor],
+    other: Union[TRTTensor, np.ndarray, torch.Tensor],
+    condition: Union[TRTTensor, np.ndarray, torch.Tensor],
 ) -> TRTTensor:
     if not (broadcastable(input, other)):
         assert "The two torch tensors should be broadcastable"
-
-    # get output shape
-    # purpose of this is to bring input and other rank same as
-    # output_shape to input it to the add_expand operation
-    # condition will have dimension of either input or other
-    input, other = broadcast(ctx.net, input, other, f"{name}_x", f"{name}_y")
-    if len(tuple(condition.shape)) != len(tuple(input.shape)):
-        condition, input = broadcast(
-            ctx.net, condition, input, f"{name}_condition", f"{name}_x"
-        )
 
     x_shape = list(input.shape)
     y_shape = list(other.shape)
@@ -71,7 +61,11 @@ def where(
                     if isinstance(input, torch.Tensor)
                     else np.expand_dims(input, axis=0)
                 )
-            input = input.expand(output_shape)
+            input = (
+                input.expand(output_shape)
+                if isinstance(input, torch.Tensor)
+                else np.broadcast_to(input, output_shape)
+            )
         x_val = get_trt_tensor(ctx, input, f"{name}_x")
     else:
         x_val = input
@@ -89,7 +83,11 @@ def where(
                     if isinstance(other, torch.Tensor)
                     else np.expand_dims(other, axis=0)
                 )
-            other = other.expand(output_shape)
+            other = (
+                other.expand(output_shape)
+                if isinstance(other, torch.Tensor)
+                else np.broadcast_to(other, output_shape)
+            )
         y_val = get_trt_tensor(ctx, other, f"{name}_y")
     else:
         y_val = other

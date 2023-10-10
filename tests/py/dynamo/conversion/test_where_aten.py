@@ -59,6 +59,23 @@ class TestWhereConverter(DispatchTestCase):
             (condition,),
         )
 
+    def test_const_input_with_broadcast(self):
+        class Where(nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+                self.inputY = torch.randn((1,))
+                self.inputX = torch.randn((1,))
+
+            def forward(self, condition):
+                return torch.ops.aten.where.self(condition, self.inputX, self.inputY)
+
+        input1 = torch.randn((5, 6, 7))
+        condition = input1 < 0
+        self.run_test(
+            Where(),
+            (condition,),
+        )
+
 
 if __name__ == "__main__":
     run_tests()
