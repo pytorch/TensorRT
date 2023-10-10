@@ -18,13 +18,12 @@ class TestSinhConverter(DispatchTestCase):
     def test_sinh_float(self, input_shape, dtype):
         class sinh(nn.Module):
             def forward(self, input):
-                return torch.sinh(input)
+                return torch.ops.aten.sinh.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             sinh(),
             inputs,
-            expected_ops={torch.ops.aten.sinh.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestSinhConverter(DispatchTestCase):
     def test_sinh_int(self, input_shape, dtype, low, high):
         class sinh(nn.Module):
             def forward(self, input):
-                return torch.sinh(input)
+                return torch.ops.aten.sinh.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             sinh(),
             inputs,
-            expected_ops={torch.ops.aten.sinh.default},
         )
 
 

@@ -18,13 +18,12 @@ class TestAcosConverter(DispatchTestCase):
     def test_acos_float(self, input_shape, dtype):
         class acos(nn.Module):
             def forward(self, input):
-                return torch.acos(input)
+                return torch.ops.aten.acos.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             acos(),
             inputs,
-            expected_ops={torch.ops.aten.acos.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestAcosConverter(DispatchTestCase):
     def test_acos_int(self, input_shape, dtype, low, high):
         class acos(nn.Module):
             def forward(self, input):
-                return torch.acos(input)
+                return torch.ops.aten.acos.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             acos(),
             inputs,
-            expected_ops={torch.ops.aten.acos.default},
         )
 
 

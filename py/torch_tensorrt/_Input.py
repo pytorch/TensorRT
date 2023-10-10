@@ -46,6 +46,7 @@ class Input(object):
     low_tensor_domain_incl: float = 0.0
     high_tensor_domain_excl: float = low_tensor_domain_incl + DOMAIN_OFFSET
     torch_dtype: torch.dtype = torch.float32
+    torch_tensor: torch.Tensor = None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """__init__ Method for torch_tensorrt.Input
@@ -171,6 +172,14 @@ class Input(object):
 
         self.tensor_domain = Input._parse_tensor_domain(domain)
 
+        if "torch_tensor" in kwargs:
+            self.torch_tensor = kwargs["torch_tensor"]
+        else:
+            if self.shape_mode == Input._ShapeMode.DYNAMIC:
+                self.torch_tensor = self.example_tensor("opt_shape")
+            else:
+                self.torch_tensor = self.example_tensor()
+
     def __str__(self) -> str:
         if self.shape_mode == Input._ShapeMode.STATIC:
             return "Input(shape={}, dtype={}, format={}, domain=[{}, {}))".format(
@@ -220,6 +229,8 @@ class Input(object):
                 return _enums.dtype.half
             elif dtype == torch.float:
                 return _enums.dtype.float
+            elif dtype == torch.float64:
+                return _enums.dtype.double
             elif dtype == torch.bool:
                 return _enums.dtype.bool
             else:
@@ -249,6 +260,8 @@ class Input(object):
             return torch.float
         elif dtype == _enums.dtype.bool:
             return torch.bool
+        elif dtype == _enums.dtype.double:
+            return torch.float64
         else:
             # Default torch_dtype used in FX path
             return torch.float32
@@ -265,7 +278,7 @@ class Input(object):
                 return _enums.TensorFormat.channels_last
             else:
                 raise ValueError(
-                    "Provided an unsupported tensor format (support: NHCW/contiguous_format, NHWC/channel_last)"
+                    "Provided an unsupported tensor format (support: NCHW/contiguous_format, NHWC/channel_last)"
                 )
 
         elif isinstance(format, _enums.TensorFormat):
@@ -354,7 +367,7 @@ class Input(object):
             )
             else torch.channels_last
         )
-        return cls(shape=t.shape, dtype=t.dtype, format=frmt)
+        return cls(shape=t.shape, dtype=t.dtype, format=frmt, torch_tensor=t)
 
     @classmethod
     def from_tensors(

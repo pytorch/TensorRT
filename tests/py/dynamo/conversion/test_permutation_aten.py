@@ -17,10 +17,10 @@ class TestPermuteConverter(DispatchTestCase):
     def test_permute_list(self, _, permutation):
         class Permute(nn.Module):
             def forward(self, x):
-                return x.permute(permutation)
+                return torch.ops.aten.permute.default(x, permutation)
 
         inputs = [torch.randn(1, 3, 2)]
-        self.run_test(Permute(), inputs, expected_ops={torch.ops.aten.permute.default})
+        self.run_test(Permute(), inputs)
 
     @parameterized.expand(
         [
@@ -31,15 +31,15 @@ class TestPermuteConverter(DispatchTestCase):
     def test_permute(self, _, permutation):
         class Permute(nn.Module):
             def forward(self, x):
-                return x.permute(*permutation)
+                return torch.ops.aten.permute.default(x, permutation)
 
         inputs = [torch.randn(1, 3, 2)]
-        self.run_test(Permute(), inputs, expected_ops={torch.ops.aten.permute.default})
+        self.run_test(Permute(), inputs)
 
     def test_permute_with_dynamic_shape(self):
         class Permute(nn.Module):
             def forward(self, x):
-                return x.permute(1, 2, 0)
+                return torch.ops.aten.permute.default(x, (1, 2, 0))
 
         input_specs = [
             Input(
@@ -48,14 +48,12 @@ class TestPermuteConverter(DispatchTestCase):
                 shape_ranges=[((1, 1, 1), (1, 2, 3), (3, 3, 3))],
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            Permute(), input_specs, expected_ops={torch.ops.aten.permute.default}
-        )
+        self.run_test_with_dynamic_shape(Permute(), input_specs)
 
     def test_permute_with_dynamic_shape_four_dimensions(self):
         class Permute(nn.Module):
             def forward(self, x):
-                return x.permute(1, 2, 3, 0)
+                return torch.ops.aten.permute.default(x, (1, 2, 3, 0))
 
         input_specs = [
             Input(
@@ -65,9 +63,7 @@ class TestPermuteConverter(DispatchTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            Permute(), input_specs, expected_ops={torch.ops.aten.permute.default}
-        )
+        self.run_test_with_dynamic_shape(Permute(), input_specs)
 
 
 if __name__ == "__main__":

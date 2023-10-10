@@ -7,28 +7,31 @@ import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo.conversion import impl
-from torch_tensorrt.dynamo.conversion.converter_utils import extend_attr_to_tuple
-from torch_tensorrt.fx.converters.converter_utils import (
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.converter_utils import (
     SourceIR,
-    get_dyn_range,
+    extend_attr_to_tuple,
     get_trt_tensor,
+    to_numpy,
+)
+from torch_tensorrt.fx.converters.converter_utils import (
+    get_dyn_range,
     has_dynamic_shape,
     mark_as_int8_layer,
     set_layer_name,
-    to_numpy,
 )
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+from torch_tensorrt.fx.types import TRTTensor
 
 
 def convNd(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Union[Target, str],
     source_ir: Optional[SourceIR],
     name: str,
     is_conv1d: bool,
     input: TRTTensor,
-    weight: Union[TRTTensor, torch.Tensor],
-    bias: Optional[Union[TRTTensor, torch.Tensor]],
+    weight: Union[TRTTensor, torch.Tensor, np.ndarray],
+    bias: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
     stride: Optional[Union[int, Sequence[int]]],
     padding: Optional[Union[int, Sequence[int]]],
     dilation: Optional[Union[int, Sequence[int]]],
@@ -42,7 +45,7 @@ def convNd(
     if is_conv1d:
         # Apply an unsqueeze operation to transform the conv1d problem into conv2d
         input = impl.unsqueeze.unsqueeze(
-            network, target, source_ir, name + "_unsqueeze_conv1d", input, -1
+            ctx, target, source_ir, name + "_unsqueeze_conv1d", input, -1
         )
 
     # Process bias terms
@@ -51,7 +54,7 @@ def convNd(
         bias = to_numpy(bias)
 
     elif isinstance(bias, TRTTensor):
-        bias = get_trt_tensor(network, bias, f"{name}_bias")
+        bias = get_trt_tensor(ctx, bias, f"{name}_bias")
 
     elif bias is not None:
         raise RuntimeError(
@@ -59,12 +62,12 @@ def convNd(
         )
 
     # Process weight terms
-    if network.has_explicit_precision or isinstance(weight, TRTTensor):
-        weight = get_trt_tensor(network, weight, f"{name}_weight")
+    if ctx.net.has_explicit_precision or isinstance(weight, TRTTensor):
+        weight = get_trt_tensor(ctx, weight, f"{name}_weight")
         # Append new dimension (unsqueeze) if the convolution is 1d
         if is_conv1d:
             input = impl.unsqueeze.unsqueeze(
-                network, target, source_ir, name + "_unsqueeze_weight", weight, -1
+                ctx, target, source_ir, name + "_unsqueeze_weight", weight, -1
             )
 
     elif isinstance(weight, (torch.Tensor, np.ndarray)):
@@ -81,7 +84,7 @@ def convNd(
         )
 
     # add conv layer
-    conv_layer = network.add_convolution_nd(
+    conv_layer = ctx.net.add_convolution_nd(
         input=input,
         num_output_maps=weight.shape[0],
         kernel_shape=weight.shape[2:],
@@ -97,19 +100,28 @@ def convNd(
     if isinstance(bias, TRTTensor):
         conv_layer.set_input(2, bias)
 
+    # Cast certain fields to tuples, in accordance with TRT requirements
+    padding = (padding,) if isinstance(padding, int) else padding
+    stride = (stride,) if isinstance(stride, int) else stride
+    dilation = (dilation,) if isinstance(dilation, int) else dilation
+
     # Expand parameters manually for Conv1D computations
     if is_conv1d:
-        padding = tuple(padding) + (0,)
-        stride = extend_attr_to_tuple(stride, 2)
-        dilation = extend_attr_to_tuple(dilation, 2)
+        padding = (tuple(padding) + (0,)) if padding is not None else padding
+        stride = extend_attr_to_tuple(stride, 2) if stride is not None else stride
+        dilation = (
+            extend_attr_to_tuple(dilation, 2) if dilation is not None else dilation
+        )
 
     set_layer_name(conv_layer, target, name, source_ir)
 
     # Set relevant attributes of convolution layer
-    conv_layer.padding_nd = padding
-    conv_layer.stride_nd = stride
-    conv_layer.dilation_nd = dilation
-
+    if padding is not None:
+        conv_layer.padding_nd = padding
+    if stride is not None:
+        conv_layer.stride_nd = stride
+    if dilation is not None:
+        conv_layer.dilation_nd = dilation
     if groups is not None:
         conv_layer.num_groups = groups
 
@@ -123,7 +135,7 @@ def convNd(
     if is_conv1d:
         # Apply a squeeze operation to transform the conv2d problem back into conv1d
         result = impl.squeeze.squeeze(
-            network, target, source_ir, name + "_squeeze_conv1d", result, -1
+            ctx, target, source_ir, name + "_squeeze_conv1d", result, -1
         )
 
     return result

@@ -1,6 +1,7 @@
 import torch
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
+
 from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
@@ -41,7 +42,7 @@ class TestConvolutionConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             inputs,
-            expected_ops={torch.ops.aten.convolution.default},
+            use_dynamo_tracer=True,
         )
 
     def test_conv1d_with_dynamic_shape(
@@ -72,7 +73,9 @@ class TestConvolutionConverter(DispatchTestCase):
         ]
 
         self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.convolution.default}
+            TestModule(),
+            input_specs,
+            use_dynamo_tracer=True,
         )
 
     @parameterized.expand(
@@ -114,7 +117,9 @@ class TestConvolutionConverter(DispatchTestCase):
 
         inputs = [torch.randn(1, 3, 32, 32)]
         self.run_test(
-            TestModule(), inputs, expected_ops={torch.ops.aten.convolution.default}
+            TestModule(),
+            inputs,
+            use_dynamo_tracer=True,
         )
 
     # Testing with (-1, -1, -1, -1) results into Error:
@@ -137,7 +142,9 @@ class TestConvolutionConverter(DispatchTestCase):
             ),
         ]
         self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.convolution.default}
+            TestModule(),
+            input_specs,
+            use_dynamo_tracer=True,
         )
 
     @parameterized.expand(
@@ -173,7 +180,9 @@ class TestConvolutionConverter(DispatchTestCase):
 
         inputs = [torch.randn(1, 3, 32, 32, 32)]
         self.run_test(
-            TestModule(), inputs, expected_ops={torch.ops.aten.convolution.default}
+            TestModule(),
+            inputs,
+            use_dynamo_tracer=True,
         )
 
     # Testing with (-1, -1, -1, -1, -1) results into Error:
@@ -196,7 +205,9 @@ class TestConvolutionConverter(DispatchTestCase):
             ),
         ]
         self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.convolution.default}
+            TestModule(),
+            input_specs,
+            use_dynamo_tracer=True,
         )
 
 

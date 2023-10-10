@@ -214,23 +214,24 @@ def compile(
         )
         return compiled_fx_module
     elif target_ir == _IRType.dynamo:
+        # Prepare torch and torchtrt inputs
         import collections.abc
 
-        from torch_tensorrt import Device
-        from torch_tensorrt.dynamo.utils import prepare_inputs, to_torch_device
+        from torch_tensorrt.dynamo.utils import prepare_inputs
 
-        if not isinstance(inputs, collections.abc.Sequence):
-            inputs = [inputs]
-        device = kwargs.get("device", Device._current_device())
-        torchtrt_inputs, torch_inputs = prepare_inputs(inputs, to_torch_device(device))
-        module = torch_tensorrt.dynamo.trace(module, torch_inputs, **kwargs)
-        compiled_aten_module: torch.fx.GraphModule = dynamo_compile(
-            module,
-            inputs=input_list,
+        if not isinstance(input_list, collections.abc.Sequence):
+            input_list = [input_list]
+
+        # Export the module
+        torchtrt_inputs = prepare_inputs(input_list)
+        exp_program = torch_tensorrt.dynamo.trace(module, torchtrt_inputs, **kwargs)
+        trt_graph_module = dynamo_compile(
+            exp_program,
+            inputs=torchtrt_inputs,
             enabled_precisions=enabled_precisions_set,
             **kwargs,
         )
-        return compiled_aten_module
+        return trt_graph_module
     elif target_ir == _IRType.torch_compile:
         return torch_compile(
             module, enabled_precisions=enabled_precisions_set, **kwargs

@@ -10,17 +10,15 @@ class TestSigmoidConverter(DispatchTestCase):
     def test_sigmoid(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.sigmoid(x)
+                return torch.ops.aten.sigmoid.default(x)
 
         inputs = [torch.randn(1, 10)]
-        self.run_test(
-            TestModule(), inputs, expected_ops={torch.ops.aten.sigmoid.default}
-        )
+        self.run_test(TestModule(), inputs)
 
     def test_sigmoid_with_dynamic_shape(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.sigmoid(x)
+                return torch.ops.aten.sigmoid.default(x)
 
         input_specs = [
             Input(
@@ -29,14 +27,12 @@ class TestSigmoidConverter(DispatchTestCase):
                 shape_ranges=[((1, 1, 1), (1, 2, 3), (3, 3, 3))],
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.sigmoid.default}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs)
 
     def test_sigmoid_with_dynamic_shape_four_dimensions(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.sigmoid(x)
+                return torch.ops.aten.sigmoid.default(x)
 
         input_specs = [
             Input(
@@ -46,20 +42,17 @@ class TestSigmoidConverter(DispatchTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={torch.ops.aten.sigmoid.default}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs)
 
     def test_sigmoid_fp16(self):
         class TestModule(nn.Module):
             def forward(self, x):
-                return nn.functional.sigmoid(x)
+                return torch.ops.aten.sigmoid.default(x)
 
         inputs = [torch.randn(1, 10)]
         self.run_test(
             TestModule(),
             inputs,
-            expected_ops={torch.ops.aten.sigmoid.default},
             precision=torch.half,
             check_dtype=False,
         )

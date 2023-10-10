@@ -18,13 +18,12 @@ class TestFloorConverter(DispatchTestCase):
     def test_floor_float(self, input_shape, dtype):
         class floor(nn.Module):
             def forward(self, input):
-                return torch.floor(input)
+                return torch.ops.aten.floor.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             floor(),
             inputs,
-            expected_ops={torch.ops.aten.floor.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestFloorConverter(DispatchTestCase):
     def test_floor_int(self, input_shape, dtype, low, high):
         class floor(nn.Module):
             def forward(self, input):
-                return torch.floor(input)
+                return torch.ops.aten.floor.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             floor(),
             inputs,
-            expected_ops={torch.ops.aten.floor.default},
             check_dtype=False,
         )
 

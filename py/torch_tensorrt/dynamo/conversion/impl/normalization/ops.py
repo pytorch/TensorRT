@@ -2,30 +2,29 @@ import logging
 from typing import Any, List, Optional, Sequence, Union, cast
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim, to_numpy
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
 )
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
 from torch_tensorrt.fx.converters.converter_utils import (
-    get_positive_dim,
     get_trt_plugin,
     has_dynamic_shape,
     set_layer_name,
-    to_numpy,
 )
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+from torch_tensorrt.fx.types import TRTTensor
 from torch_tensorrt.fx.utils import get_dynamic_dims
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 def batch_norm(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -56,11 +55,11 @@ def batch_norm(
 
     # For BatchNorm1d, reshape 1d to 2d
     output_shape = input.shape
-    if not network.has_implicit_batch_dimension and len(input.shape) < 4:
+    if not ctx.net.has_implicit_batch_dimension and len(input.shape) < 4:
         assert (
             len(get_dynamic_dims(input.shape)) <= 1
         ), "BatchNorm1D with more than one dynamic dims is not currently supported."
-        reshape_layer = network.add_shuffle(input)
+        reshape_layer = ctx.net.add_shuffle(input)
         if len(input.shape) == 2:
             reshape_layer.reshape_dims = (input.shape[0], input.shape[1], 1, 1)
         else:  # len(input_val.shape) == 3
@@ -72,12 +71,12 @@ def batch_norm(
             )
         set_layer_name(reshape_layer, target, f"{name}_reshape_2d")
         input = reshape_layer.get_output(0)
-    layer = network.add_scale(input, trt.ScaleMode.CHANNEL, bias, scale, power)
+    layer = ctx.net.add_scale(input, trt.ScaleMode.CHANNEL, bias, scale, power)
     set_layer_name(layer, target, name)
 
     # For BatchNorm1d, reshape output back to 1d
-    if not network.has_implicit_batch_dimension and len(output_shape) < 4:
-        reshape_output_layer = network.add_shuffle(layer.get_output(0))
+    if not ctx.net.has_implicit_batch_dimension and len(output_shape) < 4:
+        reshape_output_layer = ctx.net.add_shuffle(layer.get_output(0))
         reshape_output_layer.reshape_dims = tuple(output_shape)
         set_layer_name(reshape_output_layer, target, f"{name}_reshape_1d")
         layer = reshape_output_layer
@@ -85,7 +84,7 @@ def batch_norm(
 
 
 def layer_norm(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -101,9 +100,15 @@ def layer_norm(
             "of the TensorRT region!"
         )
 
-    gamma = weight.detach().cpu().float().numpy()
+    gamma = (
+        weight.detach().cpu().float().numpy()
+        if isinstance(weight, torch.Tensor)
+        else weight
+    )
     gamma_field = trt.PluginField("gamma", gamma, trt.PluginFieldType.FLOAT32)
-    beta = bias.detach().cpu().float().numpy()
+    beta = (
+        bias.detach().cpu().float().numpy() if isinstance(bias, torch.Tensor) else bias
+    )
     beta_field = trt.PluginField("beta", beta, trt.PluginFieldType.FLOAT32)
     eps_field = trt.PluginField(
         "eps", np.array(eps, dtype=np.float32), trt.PluginFieldType.FLOAT32
@@ -122,7 +127,7 @@ def layer_norm(
     )
 
     try:
-        if network.has_implicit_batch_dimension:
+        if ctx.net.has_implicit_batch_dimension:
             plugin = get_trt_plugin("layer_norm", field_collection, "1", "fx2trt")
         else:
             plugin = get_trt_plugin("LayerNormDynamic", field_collection, "1", "fx2trt")
@@ -131,15 +136,15 @@ def layer_norm(
             "Unable to find layer norm plugin, fall back to TensorRT implementation."
         )
         return layer_norm_no_plugin(
-            network, target, source_ir, name, input, normalized_shape, weight, bias, eps
+            ctx, target, source_ir, name, input, normalized_shape, weight, bias, eps
         )
-    layer = network.add_plugin_v2([input], plugin)
+    layer = ctx.net.add_plugin_v2([input], plugin)
     layer.name = name
     return layer.get_output(0)
 
 
 def layer_norm_no_plugin(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -165,14 +170,14 @@ def layer_norm_no_plugin(
         axes |= 1 << (len(input.shape) - d - 1)
 
     # E[x]
-    mean_expected_layer = network.add_reduce(
+    mean_expected_layer = ctx.net.add_reduce(
         input, trt.ReduceOperation.AVG, axes, keep_dims=True
     )
     set_layer_name(mean_expected_layer, target, f"{name}_mean_expected")
 
     # X-E[x]
     sub_trt = convert_binary_elementwise(
-        network,
+        ctx,
         target,
         source_ir,
         f"{name}_sub",
@@ -181,13 +186,13 @@ def layer_norm_no_plugin(
         mean_expected_layer.get_output(0),
     )
     # Variance = mean(pow(x_sub_mean,2))
-    pow_tensor = network.add_constant(
+    pow_tensor = ctx.net.add_constant(
         (1,) * len(input.shape),
         trt.Weights(np.ascontiguousarray([2.0], dtype=np.float32)),
     )
     pow_tensor.name = f"{name}_power"
     pow_var = convert_binary_elementwise(
-        network,
+        ctx,
         target,
         source_ir,
         f"{name}_pow_var",
@@ -195,18 +200,18 @@ def layer_norm_no_plugin(
         sub_trt,
         pow_tensor.get_output(0),
     )
-    mean_trt_layer = network.add_reduce(
+    mean_trt_layer = ctx.net.add_reduce(
         pow_var, trt.ReduceOperation.AVG, axes, keep_dims=True
     )
     set_layer_name(mean_trt_layer, target, f"{name}_mean")
     # Variance + eps
-    eps_tensor = network.add_constant(
+    eps_tensor = ctx.net.add_constant(
         (1,) * len(input.shape),
         trt.Weights(np.ascontiguousarray([eps], dtype=np.float32)),
     )
     eps_tensor.name = f"{name}_eps"
     add_trt = convert_binary_elementwise(
-        network,
+        ctx,
         target,
         source_ir,
         f"{name}_add",
@@ -216,7 +221,7 @@ def layer_norm_no_plugin(
     )
     # SQRT((Var + eps))
     sqrt_trt = convert_unary(
-        network,
+        ctx,
         target,
         source_ir,
         f"{name}_sqrt",
@@ -225,7 +230,7 @@ def layer_norm_no_plugin(
     )
     # (x - E[x]) / sqrt((var + eps))
     div_trt = convert_binary_elementwise(
-        network,
+        ctx,
         target,
         source_ir,
         f"{name}_div_trt",
@@ -235,18 +240,18 @@ def layer_norm_no_plugin(
     )
 
     assert gamma is not None
-    gamma_tensor = network.add_constant(
+    gamma_tensor = ctx.net.add_constant(
         gamma.shape, trt.Weights(np.ascontiguousarray(gamma))
     )
     gamma_tensor.name = f"{name}_gamma"
     assert beta is not None
-    beta_tensor = network.add_constant(
+    beta_tensor = ctx.net.add_constant(
         gamma.shape, trt.Weights(np.ascontiguousarray(beta))
     )
     beta_tensor.name = f"{name}_beta"
     # y * gamma + beta
     scale_layer = convert_binary_elementwise(
-        network,
+        ctx,
         target,
         source_ir,
         f"{name}_scale",
@@ -255,7 +260,7 @@ def layer_norm_no_plugin(
         gamma_tensor.get_output(0),
     )
     return convert_binary_elementwise(
-        network,
+        ctx,
         target,
         source_ir,
         name,
@@ -266,14 +271,14 @@ def layer_norm_no_plugin(
 
 
 def softmax(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
     dim: Optional[Any] = None,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_ranks = len(input.shape) + (1 if network.has_implicit_batch_dimension else 0)
+    input_ranks = len(input.shape) + (1 if ctx.net.has_implicit_batch_dimension else 0)
 
     if not isinstance(input, TRTTensor):
         raise RuntimeError(
@@ -295,11 +300,11 @@ def softmax(
         dim = cast(int, dim)
 
     dim = get_positive_dim(dim, input_ranks)
-    if network.has_implicit_batch_dimension:
+    if ctx.net.has_implicit_batch_dimension:
         assert dim != 0, "Can't apply softmax on batch dimension when it's implicit."
         dim -= 1
 
-    layer = network.add_softmax(input)
+    layer = ctx.net.add_softmax(input)
     layer.axes = 1 << dim
     set_layer_name(layer, target, name)
     return layer.get_output(0)

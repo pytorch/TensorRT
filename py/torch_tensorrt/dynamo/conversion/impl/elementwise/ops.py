@@ -1,25 +1,27 @@
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 import tensorrt as trt
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_int_int_div_trt_tensor,
+    cast_int_or_float_to_bool,
+    get_trt_tensor,
+)
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
 )
 from torch_tensorrt.dynamo.conversion.impl.unary import sign
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
-from torch_tensorrt.fx.converters.converter_utils import (
-    get_trt_tensor,
-    set_layer_name,
-    squeeze_left,
-)
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+from torch_tensorrt.fx.converters.converter_utils import set_layer_name, squeeze_left
+from torch_tensorrt.fx.types import TRTTensor
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
 
 def trunc_div(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -32,7 +34,7 @@ def trunc_div(
     it will be ceil round. Example: [2.1, 0.8, -3.2] -> [2, 0, -3].
 
     Args:
-        network: INetworkDefinition.
+        ctx: ConversionContext.
         target: node target
         source_ir (SourceIR): Source IR calling the function.
         name: namespace for the op
@@ -43,7 +45,7 @@ def trunc_div(
         A TensorRT tensor represent the result of trunc divide.
     """
     prod_output = convert_binary_elementwise(
-        network,
+        ctx,
         target,
         source_ir,
         f"{name}_prod",
@@ -53,7 +55,7 @@ def trunc_div(
     )
 
     sign_output = sign(
-        network,
+        ctx,
         target,
         source_ir,
         name,
@@ -62,17 +64,17 @@ def trunc_div(
 
     # Convert constant input into ITensor for UnaryOperation
     if not isinstance(input, trt.tensorrt.ITensor):
-        input = get_trt_tensor(network, input, f"{name}_input")
+        input = get_trt_tensor(ctx, input, f"{name}_input")
     if not isinstance(other, trt.tensorrt.ITensor):
         other = get_trt_tensor(
-            network,
+            ctx,
             other,
             f"{name}_other",
             dtype=unified_dtype_converter(input.dtype, Frameworks.TORCH),
         )
 
     abs_input_output = convert_unary(
-        network,
+        ctx,
         target,
         source_ir,
         f"{name}_abs_input",
@@ -80,7 +82,7 @@ def trunc_div(
         input,
     )
     abs_other_output = convert_unary(
-        network,
+        ctx,
         target,
         source_ir,
         f"{name}_abs_other",
@@ -88,7 +90,7 @@ def trunc_div(
         other,
     )
     abs_floor_output = convert_binary_elementwise(
-        network,
+        ctx,
         target,
         source_ir,
         f"{name}_floor_div",
@@ -97,7 +99,7 @@ def trunc_div(
         abs_other_output,
     )
     output = convert_binary_elementwise(
-        network,
+        ctx,
         target,
         source_ir,
         f"{name}_output",
@@ -110,14 +112,14 @@ def trunc_div(
 
 
 def rsqrt(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
 ) -> TRTTensor:
     sqrt_trt_output = convert_unary(
-        network,
+        ctx,
         target,
         source_ir,
         f"{name}_sqrt",
@@ -126,7 +128,7 @@ def rsqrt(
     )
 
     output = convert_binary_elementwise(
-        network,
+        ctx,
         target,
         source_ir,
         f"{name}_output",
@@ -139,7 +141,7 @@ def rsqrt(
 
 
 def fmod(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -148,7 +150,7 @@ def fmod(
 ) -> TRTTensor:
     # NOTE: TRT doesnt currently implement fmod so we need multiple operations to perform it
     trunc_div_value = trunc_div(
-        network,
+        ctx,
         target,
         source_ir,
         name + "_trunc_div",
@@ -156,7 +158,7 @@ def fmod(
         other,
     )
     prod_value = convert_binary_elementwise(
-        network,
+        ctx,
         target,
         source_ir,
         name + "_prod",
@@ -165,7 +167,7 @@ def fmod(
         other,
     )
     sub_value = convert_binary_elementwise(
-        network,
+        ctx,
         target,
         SourceIR.ACC,
         name + "_sub",
@@ -177,7 +179,7 @@ def fmod(
 
 
 def clamp(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -192,7 +194,7 @@ def clamp(
         )
 
     def _add_layer(
-        network: TRTNetwork,
+        ctx: ConversionContext,
         input: TRTTensor,
         val: float,
         op: trt.ElementWiseOperation,
@@ -203,7 +205,7 @@ def clamp(
         if not len(input.shape):
             # clamping scalar
             acc_ops_clamp_trt = get_trt_tensor(
-                network,
+                ctx,
                 squeeze_left(
                     np.array(
                         [val],
@@ -219,23 +221,259 @@ def clamp(
                 val,
                 dtype=unified_dtype_converter(input.dtype, Frameworks.NUMPY),
             )
-            acc_ops_clamp_trt = network.add_constant(
+            acc_ops_clamp_trt = ctx.net.add_constant(
                 acc_ops_clamp_shape, acc_ops_clamp_tensor
             ).get_output(0)
-        layer = network.add_elementwise(input, acc_ops_clamp_trt, op)
+        layer = ctx.net.add_elementwise(input, acc_ops_clamp_trt, op)
         return layer
 
     if min_val is not None:
         clamp_min_layer = _add_layer(
-            network, input_val, min_val, trt.ElementWiseOperation.MAX, name
+            ctx, input_val, min_val, trt.ElementWiseOperation.MAX, name
         )
         set_layer_name(clamp_min_layer, target, f"{name}_clamp_min")
         input_val = clamp_min_layer.get_output(0)
     if max_val is not None:
         clamp_max_layer = _add_layer(
-            network, input_val, max_val, trt.ElementWiseOperation.MIN, name
+            ctx, input_val, max_val, trt.ElementWiseOperation.MIN, name
         )
         set_layer_name(clamp_max_layer, target, f"{name}_clamp_max")
         input_val = clamp_max_layer.get_output(0)
 
     return input_val
+
+
+def add(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    return convert_binary_elementwise(
+        ctx, target, source_ir, name, trt.ElementWiseOperation.SUM, lhs_val, rhs_val
+    )
+
+
+def mul(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    return convert_binary_elementwise(
+        ctx,
+        target,
+        source_ir,
+        name,
+        trt.ElementWiseOperation.PROD,
+        lhs_val,
+        rhs_val,
+    )
+
+
+def max(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    return convert_binary_elementwise(
+        ctx, target, source_ir, name, trt.ElementWiseOperation.MAX, lhs_val, rhs_val
+    )
+
+
+def min(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    return convert_binary_elementwise(
+        ctx, target, source_ir, name, trt.ElementWiseOperation.MIN, lhs_val, rhs_val
+    )
+
+
+def sub(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    return convert_binary_elementwise(
+        ctx, target, source_ir, name, trt.ElementWiseOperation.SUB, lhs_val, rhs_val
+    )
+
+
+def div(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    if isinstance(lhs_val, TRTTensor) and isinstance(rhs_val, TRTTensor):
+        lhs_val, rhs_val = cast_int_int_div_trt_tensor(ctx, lhs_val, rhs_val, name)
+
+    return convert_binary_elementwise(
+        ctx, target, source_ir, name, trt.ElementWiseOperation.DIV, lhs_val, rhs_val
+    )
+
+
+def pow(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    if isinstance(lhs_val, TRTTensor) and isinstance(rhs_val, TRTTensor):
+        lhs_val, rhs_val = cast_int_int_div_trt_tensor(ctx, lhs_val, rhs_val, name)
+
+    return convert_binary_elementwise(
+        ctx, target, source_ir, name, trt.ElementWiseOperation.POW, lhs_val, rhs_val
+    )
+
+
+def floor_divide(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    return convert_binary_elementwise(
+        ctx,
+        target,
+        source_ir,
+        name,
+        trt.ElementWiseOperation.FLOOR_DIV,
+        lhs_val,
+        rhs_val,
+    )
+
+
+def logical_and(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    if isinstance(lhs_val, TRTTensor):
+        lhs_val = cast_int_or_float_to_bool(ctx, name, lhs_val)
+
+    if isinstance(rhs_val, TRTTensor):
+        rhs_val = cast_int_or_float_to_bool(ctx, name, rhs_val)
+
+    return convert_binary_elementwise(
+        ctx, target, source_ir, name, trt.ElementWiseOperation.AND, lhs_val, rhs_val
+    )
+
+
+def logical_or(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    if isinstance(lhs_val, TRTTensor):
+        lhs_val = cast_int_or_float_to_bool(ctx, name, lhs_val)
+
+    if isinstance(rhs_val, TRTTensor):
+        rhs_val = cast_int_or_float_to_bool(ctx, name, rhs_val)
+
+    return convert_binary_elementwise(
+        ctx, target, source_ir, name, trt.ElementWiseOperation.OR, lhs_val, rhs_val
+    )
+
+
+def logical_xor(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    if isinstance(lhs_val, TRTTensor):
+        lhs_val = cast_int_or_float_to_bool(ctx, name, lhs_val)
+
+    if isinstance(rhs_val, TRTTensor):
+        rhs_val = cast_int_or_float_to_bool(ctx, name, rhs_val)
+
+    return convert_binary_elementwise(
+        ctx, target, source_ir, name, trt.ElementWiseOperation.XOR, lhs_val, rhs_val
+    )
+
+
+def eq(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    return convert_binary_elementwise(
+        ctx,
+        target,
+        source_ir,
+        name,
+        trt.ElementWiseOperation.EQUAL,
+        lhs_val,
+        rhs_val,
+    )
+
+
+def gt(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    return convert_binary_elementwise(
+        ctx,
+        target,
+        source_ir,
+        name,
+        trt.ElementWiseOperation.GREATER,
+        lhs_val,
+        rhs_val,
+    )
+
+
+def lt(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    return convert_binary_elementwise(
+        ctx,
+        target,
+        source_ir,
+        name,
+        trt.ElementWiseOperation.LESS,
+        lhs_val,
+        rhs_val,
+    )

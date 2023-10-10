@@ -1,160 +1,88 @@
 from __future__ import annotations
 
-import copy
 import logging
-import sys
-from contextlib import contextmanager
-from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
+import unittest.mock
+from typing import Any, List, Tuple
 
 import torch
-import torch._dynamo as torchdynamo
-from torch.fx.passes.infra.pass_base import PassResult
-from torch_tensorrt.dynamo.utils import req_torch_version
-from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
-    compose_bmm,
-    compose_chunk,
-    compose_getitem_slice,
-    remove_ops,
-    replace_aten_op_with_indices,
-    replace_aten_reshape_alias_with_replace,
-    replace_builtin_ops,
-    replace_inplace_ops,
-    replace_native_layernorm_with_layernorm,
-    replace_transpose_mm_op_with_linear,
-    run_const_fold,
+from torch._export import dynamic_dim, export
+from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo._defaults import (
+    ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    default_device,
 )
-from typing_extensions import TypeAlias
-
-Value: TypeAlias = Union[Tuple["Value", ...], List["Value"], Dict[str, "Value"]]
+from torch_tensorrt.dynamo.lowering import get_decompositions
+from torch_tensorrt.dynamo.utils import get_torch_inputs, set_log_level, to_torch_device
 
 logger = logging.getLogger(__name__)
 
 
-class DynamoConfig:
-    """
-    Manage Exir-specific configurations of Dynamo.
-    """
-
-    def __init__(
-        self,
-        capture_scalar_outputs: bool = True,
-        guard_nn_modules: bool = True,
-        dynamic_shapes: bool = True,
-        specialize_int: bool = True,
-        verbose: bool = True,
-    ) -> None:
-        self.capture_scalar_outputs = capture_scalar_outputs
-        self.guard_nn_modules = guard_nn_modules
-        self.dynamic_shapes = dynamic_shapes
-        self.specialize_int = specialize_int
-        self.verbose = verbose
-
-    def activate(self) -> None:
-        torchdynamo.config.capture_scalar_outputs = self.capture_scalar_outputs
-        torchdynamo.config.guard_nn_modules = self.guard_nn_modules
-        torchdynamo.config.dynamic_shapes = self.dynamic_shapes
-        torchdynamo.config.specialize_int = self.specialize_int
-        torchdynamo.config.verbose = self.verbose
-
-    def deactivate(self) -> None:
-        torchdynamo.config.capture_scalar_outputs = True
-        torchdynamo.config.guard_nn_modules = True
-        torchdynamo.config.dynamic_shapes = True
-        torchdynamo.config.specialize_int = True
-        torchdynamo.config.verbose = True
+def get_random_tensor(
+    shape: List[Any], dtype: torch.dtype, device: torch.device
+) -> torch.Tensor:
+    if dtype == torch.int32 or dtype == torch.int64:
+        return torch.randint(2, 10, shape, dtype=dtype, device=device)
+    elif dtype in (torch.float64, torch.float32, torch.float16):
+        return torch.randn(shape, dtype=dtype, device=device)
+    else:
+        logger.critical(
+            "Invalid dtype detected in creating input tensors for tracing the graph."
+        )
+        raise
 
 
-@contextmanager
-def using_config(config: DynamoConfig) -> Generator[DynamoConfig, None, None]:
-    config.activate()
-    try:
-        yield config
-    finally:
-        config.deactivate()
-
-
-@contextmanager
-def setting_python_recursive_limit(limit: int = 10000) -> Generator[None, None, None]:
-    """
-    Temporarily increase the python interpreter stack recursion limit.
-    This is mostly used for pickling large scale modules.
-    """
-    default = sys.getrecursionlimit()
-    if limit > default:
-        sys.setrecursionlimit(limit)
-    try:
-        yield
-    finally:
-        sys.setrecursionlimit(default)
-
-
-@req_torch_version("2.dev")
-def dynamo_trace(
-    f: Callable[..., Value],
-    # pyre-ignore
-    args: Tuple[Any, ...],
-    aten_graph: bool,
-    tracing_mode: str = "real",
-    dynamo_config: Optional[DynamoConfig] = None,
-) -> Any:  # Tuple[torch.fx.GraphModule, Set[_guards.Guard]]:
-    """
-    TODO: Once we fully migrate to torchdynamo frontend, we will remove
-    this config option alltogether.  For now, it helps with quick
-    experiments with playing around with TorchDynamo
-    """
-    if dynamo_config is None:
-        dynamo_config = DynamoConfig()
-    with using_config(dynamo_config), setting_python_recursive_limit(2000):
-        torchdynamo.reset()
-        try:
-            return torchdynamo.export(
-                f,
-                *copy.deepcopy(args),
-                aten_graph=aten_graph,
-                tracing_mode=tracing_mode,
-            )
-        except torchdynamo.exc.Unsupported as exc:
-            raise RuntimeError(
-                "The user code is using a feature we don't support. "
-                "Please try torchdynamo.explain() to get possible the reasons",
-            ) from exc
-        except Exception as exc:
-            raise RuntimeError(
-                "torchdynamo internal error occured. Please see above stacktrace"
-            ) from exc
-
-
-@req_torch_version("2.dev")
 def trace(
     model: torch.nn.Module | torch.fx.GraphModule,
     inputs: Tuple[Any, ...],
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
-    """
-    Optimized trace with necessary passes which re-compose some ops or replace some ops
-    These passes should be general and functional purpose
-    """
-    passes_list = [
-        compose_bmm,
-        compose_chunk,
-        compose_getitem_slice,
-        replace_aten_reshape_alias_with_replace,
-        replace_aten_op_with_indices,
-        replace_transpose_mm_op_with_linear,  # after compose_bmm
-        replace_native_layernorm_with_layernorm,
-        remove_ops,
-        replace_builtin_ops,  # after replace_native_layernorm_with_layernorm
-        replace_inplace_ops,  # remove it once functionalization is enabled
-    ]
+    # Set log level at the top of compilation (torch_tensorrt.dynamo)
+    if "debug" in kwargs and kwargs["debug"]:
+        set_log_level(logger.parent, logging.DEBUG)
 
-    fx_module, __package__ = dynamo_trace(model, inputs, True, "symbolic")
+    # Determine the dynamic dimension and setup constraints to input dimensions as dictated by TensorRT
+    # Torch dynamo does not allow 0/1 value for dynamic dimensions
+    # for inputs during tracing. Hence we create new inputs for export
+    device = to_torch_device(kwargs.get("device", default_device()))
+    torch_inputs = get_torch_inputs(inputs, device)
+    trace_inputs = []
+    constraints = []
+    for idx, input in enumerate(inputs):
+        if input.shape_mode == Input._ShapeMode.DYNAMIC:
+            min_shape = input.shape["min_shape"]
+            opt_shape = input.shape["opt_shape"]
+            max_shape = input.shape["max_shape"]
+            assert len(min_shape) == len(opt_shape) == len(max_shape)
 
-    for passes in passes_list:
-        pr: PassResult = passes(fx_module)
-        fx_module = pr.graph_module
+            constraint_dims = []
+            new_shape = []
+            for dim in range(len(min_shape)):
+                if min_shape[dim] == opt_shape[dim] == max_shape[dim]:
+                    new_shape.append(torch_inputs[idx].shape[dim])
+                else:
+                    constraint_dims.append(dim)
+                    if torch_inputs[idx].shape[dim] == 1:
+                        new_shape.append(torch_inputs[idx].shape[dim] + 1)
+                    else:
+                        new_shape.append(torch_inputs[idx].shape[dim])
 
-    fx_module(*inputs)
+            trace_input = get_random_tensor(new_shape, torch_inputs[idx].dtype, device)
 
-    fx_module = run_const_fold(fx_module)
-    logger.info("Post export graph : %s\n", fx_module.graph)
-    return fx_module
+            for dim in constraint_dims:
+                if min_shape[dim] > 1:
+                    constraints.append(min_shape[dim] <= dynamic_dim(trace_input, dim))
+                if max_shape[dim] > 1:
+                    constraints.append(dynamic_dim(trace_input, dim) <= max_shape[dim])
+            trace_inputs.append(trace_input)
+        else:
+            trace_inputs.append(torch_inputs[idx])
+
+    experimental_decompositions = kwargs.get(
+        "enable_experimental_decompositions", ENABLE_EXPERIMENTAL_DECOMPOSITIONS
+    )
+    with unittest.mock.patch(
+        "torch._export.DECOMP_TABLE", get_decompositions(experimental_decompositions)
+    ):
+        exp_program = export(model, tuple(trace_inputs), constraints=constraints)
+
+    return exp_program

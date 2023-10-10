@@ -18,13 +18,12 @@ class TestAcoshConverter(DispatchTestCase):
     def test_acosh_float(self, input_shape, dtype):
         class acosh(nn.Module):
             def forward(self, input):
-                return torch.acosh(input)
+                return torch.ops.aten.acosh.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             acosh(),
             inputs,
-            expected_ops={torch.ops.aten.acosh.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestAcoshConverter(DispatchTestCase):
     def test_acosh_int(self, input_shape, dtype, low, high):
         class acosh(nn.Module):
             def forward(self, input):
-                return torch.acosh(input)
+                return torch.ops.aten.acosh.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             acosh(),
             inputs,
-            expected_ops={torch.ops.aten.acosh.default},
         )
 
 

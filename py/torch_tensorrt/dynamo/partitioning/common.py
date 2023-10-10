@@ -1,20 +1,56 @@
-from typing import Any, Optional, Sequence, Set, Tuple
+import logging
+from typing import Any, Dict, Optional, Sequence, Set, Tuple
 
 import torch
-from torch.fx.node import _get_qualified_name
+from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import DEBUG
-from torch_tensorrt.dynamo.lowering import SUBSTITUTION_REGISTRY
+from torch_tensorrt.dynamo.utils import get_torch_inputs, input_is_dynamic
 
-DEFAULT_SINGLE_NODE_PARTITIONS: Set[str] = {
-    _get_qualified_name(to_replace.new_operator)
-    for to_replace in SUBSTITUTION_REGISTRY.values()
-}
+logger = logging.getLogger(__name__)
+
+
+def run_shape_analysis(
+    parent_module: torch.fx.GraphModule, inputs: Sequence[Input]
+) -> Tuple[Dict[Any, Sequence[Any]], Dict[Any, Sequence[Any]]]:
+    submod_inputs_shape_map: Dict[Any, Sequence[Any]] = {}
+    submod_outputs_shape_map: Dict[Any, Sequence[Any]] = {}
+    sub_inputs: Sequence[torch.Tensor] = []
+    sub_outputs: Sequence[torch.Tensor] = []
+
+    # Register a hook to capture IO shapes for submodules
+    def get_submodule_io(
+        self: Any, inputs: Sequence[torch.Tensor], outputs: Sequence[torch.Tensor]
+    ) -> None:
+        nonlocal sub_inputs, sub_outputs
+        sub_inputs = inputs
+        sub_outputs = outputs
+        return
+
+    # Iterate through submodules (both Torch and TRT) and store IO shapes
+    for name, _ in parent_module.named_children():
+        submodule = getattr(parent_module, name)
+        handle = submodule.register_forward_hook(get_submodule_io)
+        parent_module(*inputs)
+        handle.remove()
+        submod_inputs_shape_map[name] = (
+            [input.shape for input in sub_inputs]
+            if isinstance(sub_inputs, (tuple, list))
+            else [sub_inputs.shape]
+        )
+        submod_outputs_shape_map[name] = (
+            [output.shape for output in sub_outputs]
+            if isinstance(sub_outputs, (tuple, list))
+            else [sub_outputs.shape]
+        )
+
+    return submod_inputs_shape_map, submod_outputs_shape_map
 
 
 def get_submod_inputs(
     mod: torch.fx.GraphModule,
     submod: torch.fx.GraphModule,
-    inputs: Sequence[torch.Tensor],
+    inputs: Sequence[Input],
+    device: torch.device,
 ) -> Optional[Sequence[torch.Tensor]]:
     """Helper function to get inputs to a Torch submodule
 
@@ -25,17 +61,63 @@ def get_submod_inputs(
     Returns:
         Sequence of Tensors representing inputs to child module
     """
-    acc_inputs = None
+    acc_inputs: Any = None
 
     def get_input(self: Any, inputs: Sequence[torch.Tensor]) -> None:
         nonlocal acc_inputs
         acc_inputs = inputs
         return
 
+    # Register a hook to capture submodule input
     handle = submod.register_forward_pre_hook(get_input)
-    mod(*inputs)
-    handle.remove()
-    return acc_inputs
+    # Iterate over min, opt, max shapes for dynamic inputs
+    inputs_map = {}
+
+    if input_is_dynamic(inputs):
+        for mode in ["min_shape", "opt_shape", "max_shape"]:
+            torch_inputs = get_torch_inputs(inputs, device, mode)
+            mod(*torch_inputs)
+            inputs_map[mode] = acc_inputs
+        handle.remove()
+    else:
+        torch_inputs = get_torch_inputs(inputs, device)
+        mod(*torch_inputs)
+        handle.remove()
+        assert isinstance(acc_inputs, tuple)
+        return [
+            Input(shape=acc_input.shape, dtype=acc_input.dtype)
+            for acc_input in acc_inputs
+        ]
+
+    num_submodule_inputs = (
+        len(inputs_map["min_shape"]) if inputs_map["min_shape"] else 0
+    )
+    submodule_inputs = []
+    for idx in range(num_submodule_inputs):
+        if not isinstance(inputs_map["min_shape"][idx], torch.Tensor):
+            input_val = torch.tensor(inputs_map["opt_shape"][idx], dtype=torch.int32)
+            logger.warning(
+                "Detected a zero-dimensional input. This might be a shape tensor input which is not currently supported. This might result in undefined behavior"
+            )
+            submodule_inputs.append(
+                Input(
+                    shape=[1],
+                    torch_tensor=input_val,
+                    dtype=input_val.dtype,
+                )
+            )
+        else:
+            submodule_inputs.append(
+                Input(
+                    min_shape=inputs_map["min_shape"][idx].shape,
+                    opt_shape=inputs_map["opt_shape"][idx].shape,
+                    max_shape=inputs_map["max_shape"][idx].shape,
+                    torch_tensor=inputs_map["opt_shape"][idx],
+                    dtype=inputs_map["opt_shape"][idx].dtype,
+                )
+            )
+
+    return submodule_inputs
 
 
 def get_graph_converter_support(

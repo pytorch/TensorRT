@@ -1,18 +1,21 @@
+import unittest
 from copy import deepcopy
 from functools import partial
 from typing import Any, List, Sequence, Set
 
 import torch
-from torch._dynamo.backends.common import fake_tensor_unsupported
-from torch._functorch.aot_autograd import aot_module_simplified, make_boxed_compiler
+from torch._dynamo.utils import detect_fake_mode
+from torch._functorch.aot_autograd import aot_export_joint_simple
 from torch_tensorrt.dynamo import partitioning
-from torch_tensorrt.dynamo.lowering._decompositions import get_decompositions
-from torch_tensorrt.dynamo.lowering._pre_aot_lowering import pre_aot_substitutions
+from torch_tensorrt.dynamo.lowering import (
+    apply_lowering_passes,
+    get_decompositions,
+    repair_input_aliasing,
+)
 
 DECIMALS_OF_AGREEMENT = 4
 
 
-@fake_tensor_unsupported
 def fx_dynamo_testing_backend(
     gm: torch.fx.GraphModule,
     sample_inputs: Sequence[torch.Tensor],
@@ -31,15 +34,29 @@ def fx_dynamo_testing_backend(
         use_fast_partitioner=use_fast_partitioner,
     )
 
-    gm = pre_aot_substitutions(gm)
+    fake_mode = detect_fake_mode(sample_inputs)
 
-    # Invoke AOTAutograd to translate operators to aten
-    return aot_module_simplified(
-        gm,
-        sample_inputs,
-        fw_compiler=make_boxed_compiler(custom_backend),
-        decompositions=get_decompositions(),
-    )
+    # Place backend tracing within FakeTensor context allowing nonfake Tensors
+    with unittest.mock.patch.object(
+        fake_mode, "allow_non_fake_inputs", True
+    ), fake_mode:
+        repair_input_aliasing(gm)
+
+        # Invoke AOTAutograd to translate operators to aten
+        gm = aot_export_joint_simple(
+            gm,
+            sample_inputs,
+            trace_joint=False,
+            decompositions=get_decompositions(),
+        )
+
+        gm = apply_lowering_passes(gm, sample_inputs)
+
+        trt_compiled = custom_backend(
+            gm,
+            sample_inputs,
+        )
+        return trt_compiled
 
 
 def compile_module_testing(

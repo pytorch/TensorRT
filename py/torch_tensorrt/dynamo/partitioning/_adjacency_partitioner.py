@@ -22,8 +22,6 @@ from torch_tensorrt.dynamo.conversion.converter_registry import (
 )
 from torch_tensorrt.dynamo.conversion.converter_registry import ConverterRegistry
 
-from .common import DEFAULT_SINGLE_NODE_PARTITIONS
-
 logger = logging.getLogger(__name__)
 
 
@@ -43,7 +41,9 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
     ) -> bool:
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
 
-        if node in CONVERTERS and node_name not in self.torch_executed_ops:
+        if (
+            node in CONVERTERS or (node.op == "get_attr" and "constant" in node_name)
+        ) and node_name not in self.torch_executed_ops:
             # If node is a proper, supported computational node, store the operator
             if not node.is_impure():
                 if node_name not in self.supported_operators:
@@ -105,9 +105,7 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         self,
         module: torch.fx.GraphModule,
         operator_support: ops.OperatorSupportBase,
-        allowed_single_node_partition_ops: Optional[
-            Collection[str]
-        ] = DEFAULT_SINGLE_NODE_PARTITIONS,
+        allowed_single_node_partition_ops: Optional[Collection[str]] = None,
         min_block_size: int = MIN_BLOCK_SIZE,
         require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
     ):

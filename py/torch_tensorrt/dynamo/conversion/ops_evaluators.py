@@ -3,7 +3,8 @@ import operator
 from typing import Dict, Sequence, Tuple, Union
 
 from torch.fx.node import Argument, Node, Target
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.fx.types import TRTTensor
 
 from .converter_registry import ConverterRegistry, dynamo_tensorrt_converter
 
@@ -18,9 +19,9 @@ def getitem_validator(getitem_node: Node) -> bool:
 
 
 # TODO: Subsequent evaluators should be registered here with their own validators
-@dynamo_tensorrt_converter(operator.getitem, capability_validator=getitem_validator)
+@dynamo_tensorrt_converter(operator.getitem, capability_validator=getitem_validator)  # type: ignore[misc]
 def generic_evaluator(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
     kwargs: Dict[str, Argument],

@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._Input &mdash; Torch-TensorRT v2.0.0.dev0+1fec519 documentation</title>
+  <title>torch_tensorrt._Input &mdash; Torch-TensorRT v2.2.0.dev0+50ab2c1 documentation</title>
   
 
   
@@ -222,7 +222,7 @@
               
               
                 <div class="version">
-                  v2.0.0.dev0+1fec519
+                  v2.2.0.dev0+50ab2c1
                 </div>
               
             
@@ -266,6 +266,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/using_dla.html">DLA</a></li>
 </ul>
@@ -301,6 +303,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../contributors/system_overview.html">System Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../contributors/writing_converters.html">Writing Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../contributors/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Indices</span></p>
@@ -429,6 +432,7 @@
     <span class="n">low_tensor_domain_incl</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
     <span class="n">high_tensor_domain_excl</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">low_tensor_domain_incl</span> <span class="o">+</span> <span class="n">DOMAIN_OFFSET</span>
     <span class="n">torch_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span>
+    <span class="n">torch_tensor</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span>
 
 <div class="viewcode-block" id="Input.__init__"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Input.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;__init__ Method for torch_tensorrt.Input</span>
@@ -552,7 +556,15 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="n">domain</span> <span class="o">=</span> <span class="kc">None</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">tensor_domain</span> <span class="o">=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_parse_tensor_domain</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tensor_domain</span> <span class="o">=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_parse_tensor_domain</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s2">&quot;torch_tensor&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">torch_tensor</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;torch_tensor&quot;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">torch_tensor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">example_tensor</span><span class="p">(</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">torch_tensor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">example_tensor</span><span class="p">()</span></div>
 
     <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">STATIC</span><span class="p">:</span>
@@ -603,6 +615,8 @@
                 <span class="k">return</span> <span class="n">_enums</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">half</span>
             <span class="k">elif</span> <span class="n">dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">_enums</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">float</span>
+            <span class="k">elif</span> <span class="n">dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">_enums</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">double</span>
             <span class="k">elif</span> <span class="n">dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">bool</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">_enums</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">bool</span>
             <span class="k">else</span><span class="p">:</span>
@@ -632,6 +646,8 @@
             <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">float</span>
         <span class="k">elif</span> <span class="n">dtype</span> <span class="o">==</span> <span class="n">_enums</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">bool</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">bool</span>
+        <span class="k">elif</span> <span class="n">dtype</span> <span class="o">==</span> <span class="n">_enums</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">double</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">float64</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Default torch_dtype used in FX path</span>
             <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span>
@@ -648,7 +664,7 @@
                 <span class="k">return</span> <span class="n">_enums</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">channels_last</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;Provided an unsupported tensor format (support: NHCW/contiguous_format, NHWC/channel_last)&quot;</span>
+                    <span class="s2">&quot;Provided an unsupported tensor format (support: NCHW/contiguous_format, NHWC/channel_last)&quot;</span>
                 <span class="p">)</span>
 
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="nb">format</span><span class="p">,</span> <span class="n">_enums</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">):</span>
@@ -737,7 +753,7 @@
             <span class="p">)</span>
             <span class="k">else</span> <span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span>
         <span class="p">)</span>
-        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="n">t</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">t</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="n">frmt</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="n">t</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">t</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="n">frmt</span><span class="p">,</span> <span class="n">torch_tensor</span><span class="o">=</span><span class="n">t</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="Input.from_tensors"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Input.from_tensors">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">from_tensors</span><span class="p">(</span>

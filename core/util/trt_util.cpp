@@ -216,7 +216,7 @@ nvinfer1::Dims squeezeDims(const nvinfer1::Dims& d, int pos, bool use_zeros, boo
       // Replace all instances of -1, indicating dynamic dimension
       // with 0, indicating copy the dimension from another tensor
       // (Generally used for reshape operations)
-      if (use_zeros && d.d[i] == -1) {
+      if (use_zeros && d.d[i] == -1 && i < pos) {
         dims.d[j] = 0;
         // If zeros already exist in the dimensions (empty tensor),
         // Replace all instances of 0, indicating empty dimension

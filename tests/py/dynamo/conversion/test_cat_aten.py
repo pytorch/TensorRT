@@ -17,13 +17,12 @@ class TestCatConverter(DispatchTestCase):
     def test_cat(self, _, dim):
         class Cat(nn.Module):
             def forward(self, x, y, z):
-                return torch.cat((x, y, z), dim)
+                return torch.ops.aten.cat.default((x, y, z), dim)
 
         inputs = [torch.randn(1, 2, 3), torch.randn(1, 1, 3), torch.randn(1, 3, 3)]
         self.run_test(
             Cat(),
             inputs,
-            expected_ops={torch.ops.aten.cat.default},
         )
 
     @parameterized.expand(
@@ -35,7 +34,7 @@ class TestCatConverter(DispatchTestCase):
     def test_cat_dynamic_shape(self, _, dim):
         class Cat(nn.Module):
             def forward(self, x, y):
-                return torch.cat((x, y), dim)
+                return torch.ops.aten.cat.default((x, y), dim)
 
         input_specs = [
             Input(
@@ -52,25 +51,23 @@ class TestCatConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             Cat(),
             input_specs,
-            expected_ops={torch.ops.aten.cat.default},
         )
 
     def test_cat_no_dim(self):
         class Cat(nn.Module):
             def forward(self, x, y, z):
-                return torch.cat((x, y, z))
+                return torch.ops.aten.cat.default((x, y, z))
 
         inputs = [torch.randn(2, 1, 3), torch.randn(1, 1, 3), torch.randn(3, 1, 3)]
         self.run_test(
             Cat(),
             inputs,
-            expected_ops={torch.ops.aten.cat.default},
         )
 
     def test_cat_dynamic_shape_no_dim(self):
         class Cat(nn.Module):
             def forward(self, x, y):
-                return torch.cat((x, y))
+                return torch.ops.aten.cat.default((x, y))
 
         input_specs = [
             Input(
@@ -87,7 +84,6 @@ class TestCatConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             Cat(),
             input_specs,
-            expected_ops={torch.ops.aten.cat.default},
         )
 
 

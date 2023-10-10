@@ -6,10 +6,12 @@ from typing import Any, List, Optional, Sequence, Set, Tuple, Union
 
 import torch
 import torch_tensorrt
+from torch.export import ExportedProgram
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
     EngineCapability,
 )
+from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import CompilationSettings, partitioning
 from torch_tensorrt.dynamo._defaults import (
     DEBUG,
@@ -31,8 +33,11 @@ from torch_tensorrt.dynamo.conversion import (
     convert_module,
     repair_long_or_double_inputs,
 )
+from torch_tensorrt.dynamo.lowering import apply_lowering_passes
 from torch_tensorrt.dynamo.utils import (
+    get_torch_inputs,
     prepare_inputs,
+    set_log_level,
     to_torch_device,
     to_torch_tensorrt_device,
 )
@@ -41,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 
 def compile(
-    gm: Any,
+    exported_program: ExportedProgram,
     inputs: Any,
     *,
     device: Optional[Union[Device, torch.device, str]] = DEVICE,
@@ -72,27 +77,24 @@ def compile(
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     if debug:
-        if logger.parent:
-            logger.parent.setLevel(logging.DEBUG)
-
-    enabled_precisions = set(enabled_precisions)
-
-    logger.warning(
-        "The Dynamo backend is an experimental feature, for which only the "
-        "following arguments are supported: "
-        "{enabled_precisions, debug, workspace_size, min_block_size, "
-        "max_aux_streams, version_compatible, optimization_level, "
-        "torch_executed_ops, pass_through_build_failures, "
-        "use_fast_partitioner, enable_experimental_decompositions, "
-        "require_full_compilation}"
-    )
+        set_log_level(logger.parent, logging.DEBUG)
 
     if not isinstance(inputs, collections.abc.Sequence):
         inputs = [inputs]
 
+    # Prepare torch_trt inputs
+    inputs = prepare_inputs(inputs)
     device = to_torch_tensorrt_device(device)
 
-    _, torch_inputs = prepare_inputs(inputs, to_torch_device(device))
+    gm = exported_program.module()
+    logger.debug("Input graph: " + str(gm.graph))
+
+    # Apply lowering on the graph module
+    torch_inputs = get_torch_inputs(inputs, device)
+    gm = apply_lowering_passes(gm, torch_inputs)
+    logger.debug("Lowered Input graph: " + str(gm.graph))
+
+    enabled_precisions = set(enabled_precisions)
 
     if (
         torch.float16 in enabled_precisions
@@ -134,12 +136,12 @@ def compile(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-    return compile_module(gm, torch_inputs, settings)
+    return compile_module(gm, inputs, settings)
 
 
 def compile_module(
     gm: torch.fx.GraphModule,
-    sample_inputs: Sequence[torch.Tensor],
+    sample_inputs: Sequence[Input],
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
@@ -153,6 +155,7 @@ def compile_module(
     Returns:
         Compiled FX GraphModule
     """
+
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops = partitioning.get_graph_converter_support(
         gm, settings.debug, settings.torch_executed_ops
@@ -203,44 +206,53 @@ def compile_module(
 
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
-
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
     for name, _ in partitioned_module.named_children():
+        submodule = getattr(partitioned_module, name)
         # Criteria for a module to be convertible to TRT
         if settings.use_fast_partitioner and "_run_on_acc" not in name:
             continue
 
-        submodule = getattr(partitioned_module, name)
+        # Get the submodule inputs for min, opt, max shapes of the graph inputs
+        submodule_inputs = partitioning.get_submod_inputs(
+            partitioned_module,
+            submodule,
+            sample_inputs,
+            to_torch_device(settings.device),
+        )
 
         logger.debug(
-            "Submodule name: " + str(name) + " Graph: \n" + str(submodule.graph)
-        )
-        # Get submodule inputs
-        submodule_inputs = partitioning.get_submod_inputs(
-            partitioned_module, submodule, sample_inputs
+            "Submodule name: %s\n Input shapes: %s\n %s",
+            str(name),
+            [input.shape for input in submodule_inputs],
+            str(submodule.graph),
         )
 
         assert submodule_inputs is not None
         # Handle long/double inputs if requested by the user
         if settings.truncate_long_and_double:
             submodule_inputs = repair_long_or_double_inputs(
-                partitioned_module, submodule, submodule_inputs, name
+                partitioned_module,
+                submodule,
+                submodule_inputs,
+                to_torch_device(settings.device),
+                name,
             )
 
-        # Create TRT Module from submodule
-        trt_mod = convert_module(
+        # Create TRT engines from submodule
+        trt_module = convert_module(
             submodule,
             submodule_inputs,
             settings=settings,
             name=name,
         )
 
-        trt_modules[name] = trt_mod
+        trt_modules[name] = trt_module
 
     # Replace all FX Modules with TRT Modules
-    for name, trt_mod in trt_modules.items():
-        setattr(partitioned_module, name, trt_mod)
+    for name, trt_module in trt_modules.items():
+        setattr(partitioned_module, name, trt_module)
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:

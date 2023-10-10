@@ -16,13 +16,15 @@ from typing import (
     cast,
 )
 
+from torch._ops import OpOverloadPacket
 from torch.fx.node import Argument, Node, Target, _get_qualified_name
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.fx.converter_registry import CONVERTERS
 from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
 
 logger = logging.getLogger(__name__)
 
-ConverterImplSignature = Callable[
+LegacyConverterImplSignature = Callable[
     [
         TRTNetwork,
         Target,
@@ -33,12 +35,34 @@ ConverterImplSignature = Callable[
     Union[TRTTensor, Sequence[TRTTensor]],
 ]
 
+DynamoConverterImplSignature = Callable[
+    [
+        ConversionContext,
+        Target,
+        Tuple[Argument, ...],
+        Dict[str, Argument],
+        str,
+    ],
+    Union[TRTTensor, Sequence[TRTTensor]],
+]
+
+ConverterImplSignature = Union[
+    LegacyConverterImplSignature, DynamoConverterImplSignature
+]
+
 
 class ConverterPriority(Enum):
     """Enum to set a converter's priority in the registry"""
 
     STANDARD = auto()
     HIGH = auto()
+
+
+class CallingConvention(Enum):
+    """Enum representing a converter's calling convention"""
+
+    LEGACY = auto()  # Legacy FX converters
+    CTX = auto()  # New Dynamo converters
 
 
 @dataclass(frozen=True)
@@ -66,7 +90,7 @@ def dynamo_tensorrt_converter(
     enabled: bool = True,
     capability_validator: Optional[Callable[[Node], bool]] = None,
     priority: ConverterPriority = ConverterPriority.STANDARD,
-) -> Callable[[Any], Union[TRTTensor, Sequence[TRTTensor]]]:
+) -> Callable[[ConverterImplSignature], ConverterImplSignature]:
     """Decorator for Dynamo TensorRT Converter
 
     Registers the decorated function in the DYNAMO_ATEN_CONVERTERS registry
@@ -99,6 +123,19 @@ def dynamo_tensorrt_converter(
             converter_support = ConverterSupport(
                 converter_implementation=converter,
                 capability_validator=capability_validator,
+            )
+
+        # OpOverloadPackets are only valid if they have a single overload, or
+        # only the ["default", "out"] overloads, due to PyTorch conventions
+        if isinstance(key, OpOverloadPacket) and (
+            len(key.overloads()) >= 3
+            or (len(key.overloads()) == 2 and "out" not in key.overloads())
+        ):
+            raise AssertionError(
+                f"Detected converter for OpOverloadPacket {key}. "
+                "We do not support OpOverloadPacket-keyed converters with multiple overloads. "
+                "Make sure to explicitly specify each converter overload. For instance "
+                "aten.mean is not a valid key, but aten.mean.default is."
             )
 
         # If a converter for this operator already exists, append the new converter to the list
@@ -142,7 +179,10 @@ class ConverterRegistry:
         registries: List of dictionaries representing converter registries.
             The order of the provided dictionaries is the order in which they
             will be traversed. This is only significant when using non-validated
-            methods.
+            methods
+        registry_names: Optional list of names for each registry
+        registry_calling_conventions: Optional list of calling conventions
+            for each registry
     """
 
     def __init__(
@@ -151,6 +191,7 @@ class ConverterRegistry:
             Dict[Target, Union[Callable[..., Any], Sequence[ConverterSupport]]]
         ],
         registry_names: Optional[Sequence[str]] = None,
+        registry_calling_conventions: Optional[Sequence[CallingConvention]] = None,
     ):
         # Copy reference to each dictionary object into attribute list
         self.registries = list(registries)
@@ -161,6 +202,14 @@ class ConverterRegistry:
         else:
             self.registry_names = [
                 f"Registry {i + 1}" for i in range(len(self.registries))
+            ]
+
+        if registry_calling_conventions is not None:
+            assert len(self.registries) == len(registry_calling_conventions)
+            self.registry_calling_conventions = list(registry_calling_conventions)
+        else:
+            self.registry_calling_conventions = [
+                CallingConvention.CTX for _ in range(len(self.registries))
             ]
 
         self.validate_invariants()
@@ -188,12 +237,13 @@ class ConverterRegistry:
 
     def __getitem_without_validation__(
         self, key: Target
-    ) -> (
-        Any
-    ):  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
+    ) -> Tuple[
+        Any, CallingConvention
+    ]:  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
         """Get the first-found converter in any registry
 
-        Searches all registries in order and returns the first converter encountered
+        Searches all registries in order and returns the first converter encountered,
+        along with the calling convention of the registry the converter was sourced from
         """
         if isinstance(key, Node):
             raise KeyError(
@@ -204,26 +254,29 @@ class ConverterRegistry:
         self.validate_invariants()
 
         # Iterate over all registries and return the first converter found
-        for registry in self.registries:
+        for registry, calling_convention in zip(
+            self.registries, self.registry_calling_conventions
+        ):
             if key in registry:
                 converters = registry[key]
 
                 if isinstance(converters, (list, tuple)):
-                    return converters[0].converter_implementation
+                    return converters[0].converter_implementation, calling_convention
                 else:
-                    return converters
+                    return converters, calling_convention
 
         raise KeyError(f"None of the converter registries have an entry for {key}")
 
     def __getitem__(
         self, node: Node
-    ) -> (
-        Any
-    ):  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
+    ) -> Tuple[
+        Any, CallingConvention
+    ]:  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
         """Get the first-found validated converter in any registry
 
-        Searches all registries in order and returns the first converter
-        which passes validation on the input node
+        Searches all registries in order and returns the first converter which passes
+        validation on the input node, along with the calling convention of the
+        registry the converter was sourced from
         """
         if not isinstance(node, Node):
             raise KeyError(
@@ -237,16 +290,21 @@ class ConverterRegistry:
 
         # Iterate over all registries, validating the converter on the input node
         # If no capability_validator function is found, assume full coverage
-        for registry in self.registries:
+        for registry, calling_convention in zip(
+            self.registries, self.registry_calling_conventions
+        ):
             if key in registry:
                 converters = registry[key]
 
                 if isinstance(converters, (list, tuple)):
                     for candidate in converters:
                         if candidate.capability_validator(node):
-                            return candidate.converter_implementation
+                            return (
+                                candidate.converter_implementation,
+                                calling_convention,
+                            )
                 else:
-                    return converters
+                    return converters, calling_convention
 
         raise KeyError(
             f"None of the converter registries have a validated entry for {key}, with node {node}"
@@ -258,9 +316,9 @@ class ConverterRegistry:
 
     def get_unvalidated(
         self, key: Target, value: Optional[ConverterImplSignature] = None
-    ) -> (
-        Any
-    ):  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
+    ) -> Union[
+        Any, Tuple[Any, CallingConvention]
+    ]:  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
         """Get unvalidated converter for input target with a default return"""
         try:
             return self.__getitem_without_validation__(key)
@@ -269,9 +327,9 @@ class ConverterRegistry:
 
     def get(
         self, node: Node, value: Optional[ConverterImplSignature] = None
-    ) -> (
-        Any
-    ):  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
+    ) -> Union[
+        Any, Tuple[Any, CallingConvention]
+    ]:  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
         """Get validated converter for input node with a default return"""
         try:
             return self.__getitem__(node)
@@ -384,5 +442,6 @@ class ConverterRegistry:
 # Note the Dynamo registry is listed first, for precedence
 DYNAMO_CONVERTERS: ConverterRegistry = ConverterRegistry(
     [DYNAMO_ATEN_CONVERTERS, CONVERTERS],  # type: ignore[list-item]
-    ["Dynamo ATen Converters Registry", "FX ATen Converters Registry"],
+    ["Dynamo ATen Converters Registry", "FX Legacy ATen Converters Registry"],
+    [CallingConvention.CTX, CallingConvention.LEGACY],
 )

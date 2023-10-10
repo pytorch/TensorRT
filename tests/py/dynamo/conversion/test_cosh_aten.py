@@ -18,13 +18,12 @@ class TestCoshConverter(DispatchTestCase):
     def test_cosh_float(self, input_shape, dtype):
         class cosh(nn.Module):
             def forward(self, input):
-                return torch.cosh(input)
+                return torch.ops.aten.cosh.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             cosh(),
             inputs,
-            expected_ops={torch.ops.aten.cosh.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestCoshConverter(DispatchTestCase):
     def test_cosh_int(self, input_shape, dtype, low, high):
         class cosh(nn.Module):
             def forward(self, input):
-                return torch.cosh(input)
+                return torch.ops.aten.cosh.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             cosh(),
             inputs,
-            expected_ops={torch.ops.aten.cosh.default},
         )
 
 

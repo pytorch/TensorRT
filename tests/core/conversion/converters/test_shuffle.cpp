@@ -4,7 +4,6 @@
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
 
-// TODO: IR Parser doesnt work well with neg numbers
 TEST(Converters, ATenFlattenConvertsCorrectly) {
   const auto graph = R"IR(
     graph(%0 : Tensor):
@@ -23,12 +22,32 @@ TEST(Converters, ATenFlattenConvertsCorrectly) {
   in = at::clone(in);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
-// TODO: IR Parser doesnt work well with neg numbers
+TEST(Converters, ATenFlattenNegDimsConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=-3]()
+      %2 : int = prim::Constant[value=-2]()
+      %3 : Tensor = aten::flatten(%0, %1, %2)
+      return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(0, 5, {2, 3, 3}, {at::kCUDA});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
+
+  in = at::clone(in);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
 TEST(Converters, ATenFlattenOtherDimsConvertsCorrectly) {
   const auto graph = R"IR(
     graph(%0 : Tensor):
@@ -47,9 +66,8 @@ TEST(Converters, ATenFlattenOtherDimsConvertsCorrectly) {
   in = at::clone(in);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenReshapeConvertsCorrectly) {
@@ -204,6 +222,29 @@ TEST(Converters, ATenFlattenConvertsCorrectlyWithDynamicBatch) {
   torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {2, 3}, {at::kCUDA});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
+
+  in = at::clone(in);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in}, true);
+  auto trt = trt_results[0].reshape_as(jit_results[0]);
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+}
+
+TEST(Converters, ATenFlattenNegDimsConvertsCorrectlyWithDynamicBatch) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=-3]()
+      %2 : int = prim::Constant[value=-2]()
+      %3 : Tensor = aten::flatten(%0, %1, %2)
+      return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(0, 5, {2, 3, 4}, {at::kCUDA});
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 

@@ -15,8 +15,6 @@ from torch_tensorrt.dynamo.conversion.converter_registry import (
 )
 from torch_tensorrt.dynamo.conversion.converter_registry import ConverterRegistry
 
-from .common import DEFAULT_SINGLE_NODE_PARTITIONS
-
 logger = logging.getLogger(__name__)
 
 
@@ -41,9 +39,7 @@ class TRTPartitioner(CapabilityBasedPartitioner):  # type: ignore[misc]
         operator_support: OperatorSupport,
         *,
         non_compute_ops: Optional[Sequence[str]] = None,
-        allowed_single_node_partition_ops: Optional[
-            Collection[str]
-        ] = DEFAULT_SINGLE_NODE_PARTITIONS,
+        allowed_single_node_partition_ops: Optional[Collection[str]] = None,
         min_block_size: int = MIN_BLOCK_SIZE,
         require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
     ) -> None:
@@ -95,8 +91,8 @@ class TRTPartitioner(CapabilityBasedPartitioner):  # type: ignore[misc]
             compute_node_count = 0
             for node in partition.nodes:
                 # Partitions are exempted from min_block_size if they contain an allowed single-node op
-                if (
-                    node.op == "call_function"
+                if node.op == "call_function" and (
+                    self.allowed_single_node_partition_ops is not None
                     and ConverterRegistry.qualified_name_or_str(node.target)
                     in self.allowed_single_node_partition_ops
                 ):
@@ -153,7 +149,9 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
     ) -> bool:
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
 
-        if node in CONVERTERS and node_name not in self.torch_executed_ops:
+        if (
+            node in CONVERTERS or (node.op == "get_attr" and "constant" in node_name)
+        ) and node_name not in self.torch_executed_ops:
             # If node is a proper, supported computational node, store the operator
             if not node.is_impure():
                 if node_name not in self.supported_operators:

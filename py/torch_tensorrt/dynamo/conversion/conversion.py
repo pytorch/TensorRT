@@ -9,11 +9,12 @@ from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
+from torch_tensorrt.dynamo.utils import get_torch_inputs
 
 
 def convert_module(
     module: torch.fx.GraphModule,
-    inputs: Sequence[torch.Tensor],
+    inputs: Sequence[Input],
     settings: CompilationSettings = CompilationSettings(),
     name: str = "",
 ) -> PythonTorchTensorRTModule | TorchTensorRTModule:
@@ -28,17 +29,20 @@ def convert_module(
     """
     # Specify module output data types to ensure TRT output types agree with
     # that of the equivalent Torch module
-    module_outputs = module(*inputs)
+    torch_inputs = get_torch_inputs(inputs, settings.device)
+    module_outputs = module(*torch_inputs)
 
     if not isinstance(module_outputs, (list, tuple)):
         module_outputs = [module_outputs]
 
     output_dtypes = [output.dtype for output in module_outputs]
+
     interpreter = TRTInterpreter(
         module,
-        Input.from_tensors(inputs, disable_memory_format_check=True),
+        inputs,
         logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
         output_dtypes=output_dtypes,
+        compilation_settings=settings,
     )
     interpreter_result = interpreter.run(
         workspace_size=settings.workspace_size,

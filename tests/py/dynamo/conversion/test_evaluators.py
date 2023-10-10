@@ -29,8 +29,6 @@ class TestGetItemConverter(DispatchTestCase):
         self.run_test(
             GetItem(),
             inputs,
-            expected_ops={operator.getitem},
-            disable_passes=True,
         )
 
 

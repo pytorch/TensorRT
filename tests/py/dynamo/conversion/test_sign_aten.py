@@ -18,13 +18,12 @@ class TestSignConverter(DispatchTestCase):
     def test_sign_float(self, input_shape, dtype):
         class sign(nn.Module):
             def forward(self, input):
-                return torch.sign(input)
+                return torch.ops.aten.sign.default(input)
 
         inputs = [torch.randn(input_shape, dtype=dtype)]
         self.run_test(
             sign(),
             inputs,
-            expected_ops={torch.ops.aten.sign.default},
         )
 
     @parameterized.expand(
@@ -37,13 +36,12 @@ class TestSignConverter(DispatchTestCase):
     def test_sign_int(self, input_shape, dtype, low, high):
         class sign(nn.Module):
             def forward(self, input):
-                return torch.sign(input)
+                return torch.ops.aten.sign.default(input)
 
         inputs = [torch.randint(low, high, input_shape, dtype=dtype)]
         self.run_test(
             sign(),
             inputs,
-            expected_ops={torch.ops.aten.sign.default},
             check_dtype=False,
         )
 

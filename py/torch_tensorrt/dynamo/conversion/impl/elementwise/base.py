@@ -2,18 +2,18 @@ import operator
 import warnings
 from typing import Any, Callable, Optional, Union
 
+import numpy as np
 import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
-from torch_tensorrt.dynamo.conversion.converter_utils import cast_trt_tensor
-from torch_tensorrt.fx.converters.converter_utils import (
-    broadcast,
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_trt_tensor,
     get_trt_tensor,
-    set_layer_name,
-    squeeze_left,
 )
-from torch_tensorrt.fx.types import TRTElementWiseOp, TRTNetwork, TRTTensor
+from torch_tensorrt.fx.converters.converter_utils import broadcast, set_layer_name
+from torch_tensorrt.fx.types import TRTElementWiseOp, TRTTensor
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
 
@@ -24,18 +24,36 @@ def get_python_op_from_trt_elementwise_op(
         return operator.add
     elif trt_op == trt.ElementWiseOperation.PROD:
         return operator.mul
+    elif trt_op == trt.ElementWiseOperation.MAX:
+        return lambda a, b: max(a, b)
+    elif trt_op == trt.ElementWiseOperation.MIN:
+        return lambda a, b: min(a, b)
     elif trt_op == trt.ElementWiseOperation.SUB:
         return operator.sub
     elif trt_op == trt.ElementWiseOperation.DIV:
         return operator.truediv
+    elif trt_op == trt.ElementWiseOperation.POW:
+        return operator.pow
     elif trt_op == trt.ElementWiseOperation.FLOOR_DIV:
         return operator.floordiv
+    elif trt_op == trt.ElementWiseOperation.AND:
+        return lambda a, b: a and b
+    elif trt_op == trt.ElementWiseOperation.OR:
+        return lambda a, b: a or b
+    elif trt_op == trt.ElementWiseOperation.XOR:
+        return lambda a, b: (a or b) and not (a and b)
+    elif trt_op == trt.ElementWiseOperation.EQUAL:
+        return operator.eq
+    elif trt_op == trt.ElementWiseOperation.GREATER:
+        return operator.gt
+    elif trt_op == trt.ElementWiseOperation.LESS:
+        return operator.lt
     else:
         raise RuntimeError(f"{trt_op} is not supported yet!")
 
 
 def convert_binary_elementwise(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
@@ -56,7 +74,7 @@ def convert_binary_elementwise(
     tensor are not allowed to have larger ranks than the trt tensor operand.
 
     Args:
-        network (TRTNetwork): TensorRT network object.
+        ctx (ConversionContext): TensorRT ConversionContext object.
         target (Target): Target of fx node.
         source_ir (SourceIR): The IR that is calling the function.
         name (str): The name we want to assign to the created TensorRT layer.
@@ -75,10 +93,10 @@ def convert_binary_elementwise(
     is_rhs_trt_tensor = False
 
     if isinstance(lhs_val, TRTTensor):
-        lhs_dtype = unified_dtype_converter(lhs_val.dtype, Frameworks.TORCH)
+        lhs_dtype = lhs_val.dtype
         is_lhs_trt_tensor = True
     if isinstance(rhs_val, TRTTensor):
-        rhs_dtype = unified_dtype_converter(rhs_val.dtype, Frameworks.TORCH)
+        rhs_dtype = rhs_val.dtype
         is_rhs_trt_tensor = True
 
     if not is_lhs_trt_tensor and not is_rhs_trt_tensor:
@@ -103,26 +121,16 @@ def convert_binary_elementwise(
     # dtype but we don't have a way to detect whether it makes sense for the
     # scalar to be float or half. Hence we go with the lhs dtype.
     if is_lhs_trt_tensor and isinstance(rhs_val, (float, int)):
-        rhs_val = torch.tensor([rhs_val], dtype=lhs_dtype)
+        rhs_val = np.array(
+            [rhs_val], dtype=unified_dtype_converter(lhs_dtype, Frameworks.NUMPY)
+        )
     if is_rhs_trt_tensor and isinstance(lhs_val, (float, int)):
-        lhs_val = torch.tensor([lhs_val], dtype=rhs_dtype)
+        lhs_val = np.array(
+            [lhs_val], dtype=unified_dtype_converter(rhs_dtype, Frameworks.NUMPY)
+        )
 
-    # When lhs is scalar, and rhs has shape [1,], then currently the assert
-    # will fail because lhs shape has fewer dimensions than rhs shape.  This
-    # happens when using implicit batch dimension, when we removed the 1st
-    # dimension from input tensor, causing it to have shape [] - a scalar.  We
-    # fix it by reducing the rhs constant with a squeeze_left, so it becomes a
-    # scalar too. More generally, we squeeze_left on input if it's a constant
-    # tensor. This is safe because broadcast will pad dimensions on the left
-    # (prepend) to make lhs and rhs shape compatible.
-    if network.has_implicit_batch_dimension:
-        if isinstance(lhs_val, torch.Tensor):
-            lhs_val = squeeze_left(lhs_val)
-        if isinstance(rhs_val, torch.Tensor):
-            rhs_val = squeeze_left(rhs_val)
-
-    lhs_val = get_trt_tensor(network, lhs_val, f"{name}_lhs", lhs_dtype)
-    rhs_val = get_trt_tensor(network, rhs_val, f"{name}_rhs", rhs_dtype)
+    lhs_val = get_trt_tensor(ctx, lhs_val, f"{name}_lhs", lhs_dtype)
+    rhs_val = get_trt_tensor(ctx, rhs_val, f"{name}_rhs", rhs_dtype)
 
     promoted_type = torch.promote_types(
         unified_dtype_converter(lhs_val.dtype, Frameworks.TORCH),
@@ -132,15 +140,15 @@ def convert_binary_elementwise(
 
     if trt_promoted_type != lhs_val.dtype:
         lhs_val = cast_trt_tensor(
-            network, lhs_val, trt_promoted_type, name, target, source_ir
+            ctx, lhs_val, trt_promoted_type, name, target, source_ir
         )
     if trt_promoted_type != rhs_val.dtype:
         rhs_val = cast_trt_tensor(
-            network, rhs_val, trt_promoted_type, name, target, source_ir
+            ctx, rhs_val, trt_promoted_type, name, target, source_ir
         )
 
     # Check the limitation in the doc string.
-    if network.has_implicit_batch_dimension:
+    if ctx.net.has_implicit_batch_dimension:
         if is_lhs_trt_tensor and not is_rhs_trt_tensor:
             assert len(lhs_val.shape) >= len(
                 rhs_val.shape
@@ -151,9 +159,9 @@ def convert_binary_elementwise(
             ), f"{rhs_val.shape} >= {lhs_val.shape}"
 
     lhs_val, rhs_val = broadcast(
-        network, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
+        ctx.net, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
     )
-    layer = network.add_elementwise(lhs_val, rhs_val, op_type)
+    layer = ctx.net.add_elementwise(lhs_val, rhs_val, op_type)
     set_layer_name(layer, target, name, source_ir)
     output = layer.get_output(0)
     kind: str = str(target.__name__) if callable(target) else target
