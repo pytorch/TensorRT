@@ -21,6 +21,7 @@ class TestArgmaxConverter(DispatchTestCase):
             ("dim_1_keep_dim_false", (3, 3), 1, False),
             ("dim_0_keep_dim_true", (4, 4, 4), 0, True),
             ("dim_0_keep_dim_false", (4, 4, 4), 0, False),
+            ("dim_negative_keep_dim_true", (1, 2, 3), -1, True),
         ]
     )
     def test_argmax(self, _, input_shape, dim, keep_dim):
