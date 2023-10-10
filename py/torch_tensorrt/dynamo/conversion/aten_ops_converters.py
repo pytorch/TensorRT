@@ -46,7 +46,23 @@ def get_ir(target: Target) -> SourceIR:
     return SourceIR.UNKNOWN
 
 
+def one_user_validator(node: Node) -> bool:
+    # Validate only one user, which is a getitem node that accesses the first element in the list
+    return (
+        len(node.users) == 1
+        and list(node.users)[0].target == operator.getitem
+        and list(node.users)[0].args[1] == 0
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.native_batch_norm.default, capability_validator=one_user_validator)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.batch_norm.default)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.batch_norm)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)  # type: ignore[misc]
 def aten_ops_batch_norm(
     ctx: ConversionContext,
     target: Target,
@@ -59,14 +75,103 @@ def aten_ops_batch_norm(
         target,
         SourceIR.ATEN,
         name,
-        args[0],
-        args[1],
-        args[2],
-        args[3],
-        args[4],
-        args[5],
-        args[6],
-        args[7],
+        input=args[0],
+        weight=args[1],
+        bias=args[2],
+        running_mean=args[3],
+        running_var=args[4],
+        training=args[5],
+        momentum=args[6],
+        eps=args[7],
+        cudnn_enabled=args_bounds_check(args, 8, True),
+        return_mean_rstd=(target == torch.ops.aten.native_batch_norm.default),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.native_layer_norm.default, capability_validator=one_user_validator)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.layer_norm.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.layer_norm)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)  # type: ignore[misc]
+def aten_ops_layer_norm(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.normalization.layer_norm(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        normalized_shape=args[1],
+        weight=args_bounds_check(args, 2),
+        bias=args_bounds_check(args, 3),
+        eps=args_bounds_check(args, 4, 1e-05),
+        cudnn_enable=args_bounds_check(args, 5, True),
+        return_mean_rstd=(target == torch.ops.aten.native_layer_norm.default),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.native_group_norm.default, capability_validator=one_user_validator)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)  # type: ignore[misc]
+def aten_ops_native_group_norm(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.normalization.native_group_norm(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        weight=args[1],
+        bias=args[2],
+        N=args[3],
+        C=args[4],
+        HxW=args[5],
+        group=args[6],
+        eps=args[7],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.group_norm.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.group_norm)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)  # type: ignore[misc]
+def aten_ops_group_norm(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.normalization.group_norm(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        num_groups=args[1],
+        weight=args_bounds_check(args, 2, None),
+        bias=args_bounds_check(args, 3, None),
+        eps=args_bounds_check(args, 4, 1e-05),
+        cudnn_enabled=args_bounds_check(args, 5, True),
     )
 
 
@@ -325,27 +430,6 @@ def aten_ops_matmul(
         name,
         args[0],
         args[1],
-    )
-
-
-@dynamo_tensorrt_converter(torch.ops.aten.layer_norm.default)  # type: ignore[misc]
-def aten_ops_layernorm(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.normalization.layer_norm(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-        args[1],
-        args[2],
-        args[3],
-        args[4],
     )
 
 
@@ -760,15 +844,6 @@ def aten_ops_prod(
         args[0],
         args_bounds_check(args, 1, replacement=None),
         args_bounds_check(args, 2, replacement=False),
-    )
-
-
-def one_user_validator(node: Node) -> bool:
-    # Validate only one user, which is a getitem node that accesses the first element in the list
-    return (
-        len(node.users) == 1
-        and list(node.users)[0].target == operator.getitem
-        and list(node.users)[0].args[1] == 0
     )
 
 
