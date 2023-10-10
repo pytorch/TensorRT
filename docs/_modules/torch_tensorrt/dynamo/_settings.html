@@ -6,11 +6,10 @@
 <!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Function torch_tensorrt::dump_build_info &mdash; Torch-TensorRT v2.2.0.dev0+4a920a1 documentation</title>
+  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.2.0.dev0+4a920a1 documentation</title>
   
 
   
@@ -26,21 +25,19 @@
 
   
 
-  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-  <!-- <link rel="stylesheet" href="../_static/pygments.css" type="text/css" /> -->
-  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/sg_gallery.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/sg_gallery-binder.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/sg_gallery-dataframe.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/sg_gallery-rendered-html.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/collapsible-lists/css/tree_view.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!-- <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" /> -->
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/sg_gallery.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/sg_gallery-binder.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/sg_gallery-dataframe.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/sg_gallery-rendered-html.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/collapsible-lists/css/tree_view.css" type="text/css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
-    <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Function torch_tensorrt::get_build_info" href="function_namespacetorch__tensorrt_1ac4ab8313ae72c2c899ea31548b528528.html" />
-    <link rel="prev" title="Enum Level" href="enum_namespacetorch__tensorrt_1_1logging_1a130f65408ad8cbaee060f05e8db69558.html" />
+  <link rel="stylesheet" href="../../../_static/css/custom.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -51,16 +48,16 @@
   
 
   
-  <script src="../_static/js/modernizr.min.js"></script>
+  <script src="../../../_static/js/modernizr.min.js"></script>
 
   <!-- Preload the theme fonts -->
 
-<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-book.woff2" as="font" type="font/woff2" crossorigin="anonymous">
-<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
-<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-Medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
-<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
-<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium-italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
-<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-SemiBold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/FreightSans/freight-sans-book.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/FreightSans/freight-sans-medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/IBMPlexMono/IBMPlexMono-Medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/FreightSans/freight-sans-bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/FreightSans/freight-sans-medium-italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/IBMPlexMono/IBMPlexMono-SemiBold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
 
 <!-- Preload the katex fonts -->
 
@@ -237,7 +234,7 @@
 
 
 <div role="search">
-  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
     <input type="text" name="q" placeholder="Search Docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
@@ -255,64 +252,64 @@
             
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_windows.html#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/getting_started_with_windows.html#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/torch_compile.html">Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/torch_compile.html">Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/using_dla.html">DLA</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Example notebooks</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/notebooks.html">Example notebooks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../py_api/logging.html">torch_tensorrt.logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../py_api/ptq.html">torch_tensorrt.ptq</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../py_api/ts.html">torch_tensorrt.ts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../py_api/fx.html">torch_tensorrt.fx</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/logging.html">torch_tensorrt.logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/ptq.html">torch_tensorrt.ptq</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/fx.html">torch_tensorrt.fx</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
-<ul class="current">
-<li class="toctree-l1 current"><a class="reference internal" href="torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
-<li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
-<li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">CLI Documenation</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../cli/torchtrtc.html">torchtrtc</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../contributors/system_overview.html">System Overview</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../contributors/writing_converters.html">Writing Converters</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../contributors/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/system_overview.html">System Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/writing_converters.html">Writing Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Indices</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../indices/supported_ops.html">Operators Supported</a></li>
 </ul>
 
             
@@ -345,7 +342,7 @@
   <ul class="pytorch-breadcrumbs">
     
       <li>
-        <a href="../index.html">
+        <a href="../../../index.html">
           
             Docs
           
@@ -353,16 +350,12 @@
       </li>
 
         
-          <li><a href="torch_tensort_cpp.html">Torch-TensorRT C++ API</a> &gt;</li>
+          <li><a href="../../index.html">Module code</a> &gt;</li>
         
-      <li>Function torch_tensorrt::dump_build_info</li>
+      <li>torch_tensorrt.dynamo._settings</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
-        
-            
-            <a href="../_sources/_cpp_api/function_namespacetorch__tensorrt_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
-          
         
       </li>
     
@@ -391,33 +384,78 @@
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
-  <section id="function-torch-tensorrt-dump-build-info">
-<span id="exhale-function-namespacetorch-tensorrt-1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1"></span><h1>Function torch_tensorrt::dump_build_info<a class="headerlink" href="#function-torch-tensorrt-dump-build-info" title="Permalink to this headline">¶</a></h1>
-<section id="function-documentation">
-<h2>Function Documentation<a class="headerlink" href="#function-documentation" title="Permalink to this headline">¶</a></h2>
-<dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt15dump_build_infoEv">
-<span class="target" id="namespacetorch__tensorrt_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1"></span><span class="pre">TORCHTRT_API</span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">torch_tensorrt</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">dump_build_info</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt15dump_build_infoEv" title="Permalink to this definition">¶</a><br /></dt>
-<dd><p>Dump the version information for Torch-TensorRT including base libtorch and TensorRT versions to stdout. </p>
-</dd></dl>
+  <h1>Source code for torch_tensorrt.dynamo._settings</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span>
 
-</section>
-</section>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt._Device</span> <span class="kn">import</span> <span class="n">Device</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._defaults</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DEBUG</span><span class="p">,</span>
+    <span class="n">ENABLE_EXPERIMENTAL_DECOMPOSITIONS</span><span class="p">,</span>
+    <span class="n">MAX_AUX_STREAMS</span><span class="p">,</span>
+    <span class="n">MIN_BLOCK_SIZE</span><span class="p">,</span>
+    <span class="n">OPTIMIZATION_LEVEL</span><span class="p">,</span>
+    <span class="n">PASS_THROUGH_BUILD_FAILURES</span><span class="p">,</span>
+    <span class="n">PRECISION</span><span class="p">,</span>
+    <span class="n">REQUIRE_FULL_COMPILATION</span><span class="p">,</span>
+    <span class="n">TRUNCATE_LONG_AND_DOUBLE</span><span class="p">,</span>
+    <span class="n">USE_FAST_PARTITIONER</span><span class="p">,</span>
+    <span class="n">USE_PYTHON_RUNTIME</span><span class="p">,</span>
+    <span class="n">VERSION_COMPATIBLE</span><span class="p">,</span>
+    <span class="n">WORKSPACE_SIZE</span><span class="p">,</span>
+    <span class="n">default_device</span><span class="p">,</span>
+<span class="p">)</span>
 
+
+<div class="viewcode-block" id="CompilationSettings"><a class="viewcode-back" href="../../../user_guide/torch_compile.html#torch_tensorrt.dynamo.CompilationSettings">[docs]</a><span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">CompilationSettings</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compilation settings for Torch-TensorRT Dynamo Paths</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        precision (torch.dtype): Model Layer precision</span>
+<span class="sd">        debug (bool): Whether to print out verbose debugging information</span>
+<span class="sd">        workspace_size (int): Workspace TRT is allowed to use for the module (0 is default)</span>
+<span class="sd">        min_block_size (int): Minimum number of operators per TRT-Engine Block</span>
+<span class="sd">        torch_executed_ops (Sequence[str]): Sequence of operations to run in Torch, regardless of converter coverage</span>
+<span class="sd">        pass_through_build_failures (bool): Whether to fail on TRT engine build errors (True) or not (False)</span>
+<span class="sd">        max_aux_streams (Optional[int]): Maximum number of allowed auxiliary TRT streams for each engine</span>
+<span class="sd">        version_compatible (bool): Provide version forward-compatibility for engine plan files</span>
+<span class="sd">        optimization_level (Optional[int]): Builder optimization 0-5, higher levels imply longer build time,</span>
+<span class="sd">            searching for more optimization options. TRT defaults to 3</span>
+<span class="sd">        use_python_runtime (Optional[bool]): Whether to strictly use Python runtime or C++ runtime. To auto-select a runtime</span>
+<span class="sd">            based on C++ dependency presence (preferentially choosing C++ runtime if available), leave the</span>
+<span class="sd">            argument as None</span>
+<span class="sd">        truncate_long_and_double (bool): Whether to truncate int64/float64 TRT engine inputs or weights to int32/float32</span>
+<span class="sd">        use_fast_partitioner (bool): Whether to use the fast or global graph partitioning system</span>
+<span class="sd">        enable_experimental_decompositions (bool): Whether to enable all core aten decompositions</span>
+<span class="sd">            or only a selected subset of them</span>
+<span class="sd">        device (Device): GPU to compile the model on</span>
+<span class="sd">        require_full_compilation (bool): Whether to require the graph is fully compiled in TensorRT.</span>
+<span class="sd">            Only applicable for `ir=&quot;dynamo&quot;`; has no effect for `torch.compile` path</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">precision</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">PRECISION</span>
+    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DEBUG</span>
+    <span class="n">workspace_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">WORKSPACE_SIZE</span>
+    <span class="n">min_block_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">MIN_BLOCK_SIZE</span>
+    <span class="n">torch_executed_ops</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">set</span><span class="p">)</span>
+    <span class="n">pass_through_build_failures</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">PASS_THROUGH_BUILD_FAILURES</span>
+    <span class="n">max_aux_streams</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">MAX_AUX_STREAMS</span>
+    <span class="n">version_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">VERSION_COMPATIBLE</span>
+    <span class="n">optimization_level</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">OPTIMIZATION_LEVEL</span>
+    <span class="n">use_python_runtime</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="n">USE_PYTHON_RUNTIME</span>
+    <span class="n">truncate_long_and_double</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">TRUNCATE_LONG_AND_DOUBLE</span>
+    <span class="n">use_fast_partitioner</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">USE_FAST_PARTITIONER</span>
+    <span class="n">enable_experimental_decompositions</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ENABLE_EXPERIMENTAL_DECOMPOSITIONS</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">Device</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">default_device</span><span class="p">)</span>
+    <span class="n">require_full_compilation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">REQUIRE_FULL_COMPILATION</span></div>
+</pre></div>
 
              </article>
              
             </div>
             <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="function_namespacetorch__tensorrt_1ac4ab8313ae72c2c899ea31548b528528.html" class="btn btn-neutral float-right" title="Function torch_tensorrt::get_build_info" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
-      
-      
-        <a href="enum_namespacetorch__tensorrt_1_1logging_1a130f65408ad8cbaee060f05e8db69558.html" class="btn btn-neutral" title="Enum Level" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
-      
-    </div>
   
 
   
@@ -446,13 +484,7 @@
         <div class="pytorch-content-right" id="pytorch-content-right">
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
-              <ul>
-<li><a class="reference internal" href="#">Function torch_tensorrt::dump_build_info</a><ul>
-<li><a class="reference internal" href="#function-documentation">Function Documentation</a></li>
-</ul>
-</li>
-</ul>
-
+              
             </div>
           </div>
         </div>
@@ -465,22 +497,22 @@
   
 
      
-       <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
-         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
-         <script src="../_static/jquery.js"></script>
-         <script src="../_static/underscore.js"></script>
-         <script src="../_static/doctools.js"></script>
-         <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
-         <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
+       <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+         <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+         <script src="../../../_static/jquery.js"></script>
+         <script src="../../../_static/underscore.js"></script>
+         <script src="../../../_static/doctools.js"></script>
+         <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
+         <script src="../../../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
          <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
      
 
   
 
-  <script type="text/javascript" src="../_static/js/vendor/popper.min.js"></script>
-  <script type="text/javascript" src="../_static/js/vendor/bootstrap.min.js"></script>
+  <script type="text/javascript" src="../../../_static/js/vendor/popper.min.js"></script>
+  <script type="text/javascript" src="../../../_static/js/vendor/bootstrap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/1.5.0/list.min.js"></script>
-  <script type="text/javascript" src="../_static/js/theme.js"></script>
+  <script type="text/javascript" src="../../../_static/js/theme.js"></script>
 
   <script type="text/javascript">
       jQuery(function () {
@@ -585,7 +617,7 @@
   <div class="cookie-banner-wrapper">
   <div class="container">
     <p class="gdpr-notice">To analyze traffic and optimize your experience, we serve cookies on this site. By clicking or navigating, you agree to allow our usage of cookies. As the current maintainers of this site, Facebook’s Cookies Policy applies. Learn more, including about available controls: <a href="https://www.facebook.com/policies/cookies/">Cookies Policy</a>.</p>
-    <img class="close-button" src="../_static/images/pytorch-x.svg">
+    <img class="close-button" src="../../../_static/images/pytorch-x.svg">
   </div>
 </div>
 
@@ -721,7 +753,7 @@
 
   <!-- End Mobile Menu -->
 
-  <script type="text/javascript" src="../_static/js/vendor/anchor.min.js"></script>
+  <script type="text/javascript" src="../../../_static/js/vendor/anchor.min.js"></script>
 
   <script type="text/javascript">
     $(document).ready(function() {
