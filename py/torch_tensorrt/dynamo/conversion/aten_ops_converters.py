@@ -70,7 +70,7 @@ def aten_ops_batch_norm(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.cat.default)
+@dynamo_tensorrt_converter(torch.ops.aten.cat.default)  # type: ignore[misc]
 def aten_ops_cat(
     ctx: ConversionContext,
     target: Target,
@@ -1724,6 +1724,7 @@ def aten_ops_reshape(
     )
 
 
+@enforce_tensor_types({0: (TRTTensor,)})  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.argmax.default)  # type: ignore[misc]
 def aten_ops_argmax(
     ctx: ConversionContext,

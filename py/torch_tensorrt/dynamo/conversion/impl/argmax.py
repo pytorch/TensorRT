@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Optional
 
 import tensorrt as trt
 from torch.fx.node import Target
@@ -24,14 +24,9 @@ def argmax(
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    dim: Union[int, None],
+    dim: Optional[int],
     keep_dim: bool = False,
 ) -> TRTTensor:
-    if not isinstance(input, TRTTensor):
-        raise RuntimeError(
-            f"argmax received input {input} that is not part " "of the TensorRT region!"
-        )
-
     if input.dtype == trt.int32:
         input = cast_trt_tensor(ctx, input, trt.float32, name)
 
@@ -51,8 +46,6 @@ def argmax(
         shuffle_layer.reshape_dims = (*input.shape, 1)
         set_layer_name(shuffle_layer, target, name + "_broadcast")
         out = shuffle_layer.get_output(0)
-    elif dim < 0:
-        dim = len(tuple(input.shape)) + dim
 
     reduce_mask = get_axes_for_reduce_op(0)
     if dim is not None:
