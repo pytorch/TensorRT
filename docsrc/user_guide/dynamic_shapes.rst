@@ -1,4 +1,4 @@
-.. _runtime:
+.. _dynamic_shapes:
 
 Dynamic shapes with Torch-TensorRT
 ====================================
@@ -206,13 +206,3 @@ In the future, we plan to explore the option of compiling with dynamic shapes in
     # Recompilation happens with modified batch size
     inputs_bs2 = torch.randn((2, 3, 224, 224), dtype=torch.float32)
     trt_gm = torch_tensorrt.compile(model, ir="torch_compile", inputs_bs2)
-
-
-
-
-
-
-
-
-
-
