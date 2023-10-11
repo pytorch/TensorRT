@@ -40,6 +40,7 @@ User Guide
 ------------
 * :ref:`creating_a_ts_mod`
 * :ref:`getting_started_with_fx`
+* :ref:`torch_compile`
 * :ref:`ptq`
 * :ref:`runtime`
 * :ref:`saving_models`
@@ -54,6 +55,7 @@ User Guide
 
    user_guide/creating_torchscript_module_in_python
    user_guide/getting_started_with_fx_path
+   user_guide/torch_compile
    user_guide/ptq
    user_guide/runtime
    user_guide/saving_models

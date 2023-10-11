@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Index &mdash; Torch-TensorRT v2.2.0.dev0+d375d10 documentation</title>
+  <title>Index &mdash; Torch-TensorRT v2.2.0.dev0+4a920a1 documentation</title>
   
 
   
@@ -222,7 +222,7 @@
               
               
                 <div class="version">
-                  v2.2.0.dev0+d375d10
+                  v2.2.0.dev0+4a920a1
                 </div>
               
             
@@ -264,6 +264,7 @@
 <li class="toctree-l1"><a class="reference internal" href="user_guide/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/torch_compile.html">Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
@@ -438,6 +439,10 @@
 </li>
       <li><a href="py_api/ts.html#torch_tensorrt.ts.check_method_op_support">check_method_op_support() (in module torch_tensorrt.ts)</a>
 </li>
+      <li><a href="user_guide/torch_compile.html#torch_tensorrt.dynamo.CompilationSettings">CompilationSettings (class in torch_tensorrt.dynamo)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.compile">compile() (in module torch_tensorrt)</a>
 
       <ul>
@@ -446,8 +451,6 @@
         <li><a href="py_api/ts.html#torch_tensorrt.ts.compile">(in module torch_tensorrt.ts)</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.convert_method_to_trt_engine">convert_method_to_trt_engine() (in module torch_tensorrt)</a>
 
       <ul>
@@ -598,6 +601,8 @@
       <ul>
         <li><a href="py_api/torch_tensorrt.html#module-torch_tensorrt">torch_tensorrt</a>
 </li>
+        <li><a href="user_guide/torch_compile.html#module-torch_tensorrt.dynamo">torch_tensorrt.dynamo</a>
+</li>
         <li><a href="py_api/fx.html#module-torch_tensorrt.fx">torch_tensorrt.fx</a>
 </li>
         <li><a href="py_api/logging.html#module-torch_tensorrt.logging">torch_tensorrt.logging</a>
@@ -676,6 +681,13 @@
 
       <ul>
         <li><a href="py_api/torch_tensorrt.html#module-torch_tensorrt">module</a>
+</li>
+      </ul></li>
+      <li>
+    torch_tensorrt.dynamo
+
+      <ul>
+        <li><a href="user_guide/torch_compile.html#module-torch_tensorrt.dynamo">module</a>
 </li>
       </ul></li>
       <li>
@@ -808,10 +820,10 @@
 </li>
       <li><a href="_cpp_api/function_namespacetorch__tensorrt_1_1logging_1a0c012cb374addd90eb1f42eaec570650.html#_CPPv4N14torch_tensorrt7logging24get_reportable_log_levelEv">torch_tensorrt::logging::get_reportable_log_level (C++ function)</a>
 </li>
-      <li><a href="_cpp_api/enum_namespacetorch__tensorrt_1_1logging_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5LevelE">torch_tensorrt::logging::Level (C++ enum)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_cpp_api/enum_namespacetorch__tensorrt_1_1logging_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5LevelE">torch_tensorrt::logging::Level (C++ enum)</a>
+</li>
       <li><a href="_cpp_api/enum_namespacetorch__tensorrt_1_1logging_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5Level6kDEBUGE">torch_tensorrt::logging::Level::kDEBUG (C++ enumerator)</a>
 </li>
       <li><a href="_cpp_api/enum_namespacetorch__tensorrt_1_1logging_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5Level6kERRORE">torch_tensorrt::logging::Level::kERROR (C++ enumerator)</a>
