@@ -39,9 +39,13 @@ class CompilationSettings:
         use_python_runtime (Optional[bool]): Whether to strictly use Python runtime or C++ runtime. To auto-select a runtime
             based on C++ dependency presence (preferentially choosing C++ runtime if available), leave the
             argument as None
-        truncate_long_and_double (bool): Truncate int64/float64 TRT engine inputs or weights to int32/float32
+        truncate_long_and_double (bool): Whether to truncate int64/float64 TRT engine inputs or weights to int32/float32
+        use_fast_partitioner (bool): Whether to use the fast or global graph partitioning system
         enable_experimental_decompositions (bool): Whether to enable all core aten decompositions
             or only a selected subset of them
+        device (Device): GPU to compile the model on
+        require_full_compilation (bool): Whether to require the graph is fully compiled in TensorRT.
+            Only applicable for `ir="dynamo"`; has no effect for `torch.compile` path
     """
 
     precision: torch.dtype = PRECISION
