@@ -6,33 +6,52 @@ Installation
 Precompiled Binaries
 *********************
 
+Torch-TensorRT 2.x is centered primarily around Python. As such, precompiled releases can be found on pypi.org
+
 Dependencies
 ---------------
 
-You need to have either PyTorch or LibTorch installed based on if you are using Python or C++
-and you must have CUDA, cuDNN and TensorRT installed.
+You need to have CUDA, PyTorch, and TensorRT (python package is sufficient) installed to use Torch-TensorRT
 
-    * https://www.pytorch.org
     * https://developer.nvidia.com/cuda
-    * https://developer.nvidia.com/cudnn
-    * https://developer.nvidia.com/tensorrt
+    * https://pytorch.org
 
 
-Python Package
----------------
+Installing Torch-TensorRT
+---------------------------
 
 You can install the python package using
 
 .. code-block:: sh
 
-    pip3 install nvidia-pyindex
-    pip3 install nvidia-tensorrt
-    pip3 install torch-tensorrt==<VERSION> -f https://github.com/pytorch/TensorRT/releases/expanded_assets/<VERSION>
+    python -m pip install torch torch-tensorrt tensorrt
+
+Installing Torch-TensorRT for a specific CUDA version
+--------------------------------------------------------
+
+Similar to PyTorch, Torch-TensorRT has builds compiled for different versions of CUDA. These are distributed on PyTorch's package index
+
+For example CUDA 11.8
+
+.. code-block:: sh
+
+    python -m pip install torch torch-tensorrt tensorrt --extra-index-url https://download.pytorch.org/whl/cu118
+
+Installing Nightly Builds
+---------------------------
+
+Torch-TensorRT distributed nightlies targeting the PyTorch nightly. These can be installed from the PyTorch nightly package index (separated by CUDA version)
+
+.. code-block:: sh
+
+    python -m pip install --pre torch torch-tensorrt tensorrt --extra-index-url https://download.pytorch.org/whl/nightly/cu121
+
+
 
 .. _bin-dist:
 
-C++ Binary Distribution
-------------------------
+C++ Precompiled Binaries (TorchScript Only)
+--------------------------------------------------
 
 Precompiled tarballs for releases are provided here: https://github.com/pytorch/TensorRT/releases
 
@@ -46,7 +65,7 @@ Compiling From Source
 Dependencies for Compilation
 -------------------------------
 
-Torch-TensorRT is built with Bazel, so begin by installing it.
+* Torch-TensorRT is built with **Bazel**, so begin by installing it.
 
     * The easiest way is to install bazelisk using the method of your choosing https://github.com/bazelbuild/bazelisk
     * Otherwise you can use the following instructions to install binaries https://docs.bazel.build/versions/master/install.html
@@ -63,14 +82,104 @@ Torch-TensorRT is built with Bazel, so begin by installing it.
         cp output/bazel /usr/local/bin/
 
 
-You will also need to have CUDA installed on the system (or if running in a container, the system must have
+* You will also need to have **CUDA** installed on the system (or if running in a container, the system must have
 the CUDA driver installed and the container must have CUDA)
 
-The correct LibTorch version will be pulled down for you by bazel.
+    * Specify your CUDA version here if not the version used in the branch being built: https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L46
 
-    NOTE: For best compatability with official PyTorch, use torch==1.10.0+cuda113, TensorRT 8.0 and cuDNN 8.2 for CUDA 11.3 however Torch-TensorRT itself supports
-    TensorRT and cuDNN for other CUDA versions for usecases such as using NVIDIA compiled distributions of PyTorch that use other versions of CUDA
-    e.g. aarch64 or custom compiled version of PyTorch.
+
+* The correct **LibTorch** version will be pulled down for you by bazel.
+
+    NOTE: By default bazel will pull the latest nightly from pytorch.org. For building main, this is usually sufficient however if there is a specific PyTorch you are targeting,
+    edit these locations with updated URLs/paths:
+
+    * https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L53C1-L53C1
+
+
+* **cuDNN and TensorRT** are not required to be installed on the system to build Torch-TensorRT, in fact this is preferable to ensure reproducable builds. Download the tarballs
+for cuDNN and TensorRT from https://developer.nvidia.com and update the paths in the WORKSPACE file here https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L71
+
+    For example:
+
+    .. code-block:: python
+
+        http_archive(
+            name = "cudnn",
+            build_file = "@//third_party/cudnn/archive:BUILD",
+            sha256 = "79d77a769c7e7175abc7b5c2ed5c494148c0618a864138722c887f95c623777c",
+            strip_prefix = "cudnn-linux-x86_64-8.8.1.3_cuda12-archive",
+            urls = [
+                #"https://developer.nvidia.com/downloads/compute/cudnn/secure/8.8.1/local_installers/12.0/cudnn-linux-x86_64-8.8.1.3_cuda12-archive.tar.xz",
+                "file:///<ABSOLUTE PATH TO FILE>/cudnn-linux-x86_64-8.8.1.3_cuda12-archive.tar.xz"
+            ],
+        )
+
+        http_archive(
+            name = "tensorrt",
+            build_file = "@//third_party/tensorrt/archive:BUILD",
+            sha256 = "0f8157a5fc5329943b338b893591373350afa90ca81239cdadd7580cd1eba254",
+            strip_prefix = "TensorRT-8.6.1.6",
+            urls = [
+                #"https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/secure/8.6.1/tars/TensorRT-8.6.1.6.Linux.x86_64-gnu.cuda-12.0.tar.gz",
+                "file:///<ABSOLUTE PATH TO FILE>/TensorRT-8.6.1.6.Linux.x86_64-gnu.cuda-12.0.tar.gz"
+            ],
+        )
+
+If you have a local version of cuDNN and TensorRT installed, this can be used as well by commenting out the above lines and uncommenting the following lines https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L114C1-L124C3
+
+
+Building the Package
+---------------------
+
+Once the WORKSPACE has been configured properly, all that is required to build torch-tensorrt is the following command
+
+    .. code-block:: sh
+
+        python -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu121
+
+To build the wheel file
+
+    .. code-bloc:: sh
+
+        python -m pip wheel --no-deps --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu121 -w dist
+
+
+Building the C++ Library (TorchScript Only)
+------------------------------
+
+Release Build
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: shell
+
+    bazel build //:libtorchtrt -c opt
+
+A tarball with the include files and library can then be found in ``bazel-bin``
+
+.. _build-from-archive-debug:
+
+Debug Build
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+To build with debug symbols use the following command
+
+.. code-block:: shell
+
+    bazel build //:libtorchtrt -c dbg
+
+A tarball with the include files and library can then be found in ``bazel-bin``
+
+Pre CXX11 ABI Build
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+To build using the pre-CXX11 ABI use the ``pre_cxx11_abi`` config
+
+.. code-block:: shell
+
+    bazel build //:libtorchtrt --config pre_cxx11_abi -c [dbg/opt]
+
+A tarball with the include files and library can then be found in ``bazel-bin``
+
 
 .. _abis:
 
@@ -86,160 +195,25 @@ using the correct ABI to function properly. Below is a table with general pairin
 recommended commands:
 
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
-| PyTorch Source                                              | Recommended C++ Compilation Command                      | Recommended Python Compilation Command                             |
+| PyTorch Source                                              | Recommended Python Compilation Command                   | Recommended C++ Compilation Command                                |
 +=============================================================+==========================================================+====================================================================+
-| PyTorch whl file from PyTorch.org                           | bazel build //:libtorchtrt -c opt --config pre_cxx11_abi | python3 setup.py bdist_wheel                                       |
+| PyTorch whl file from PyTorch.org                           | python -m pip install .                                  | bazel build //:libtorchtrt -c opt --config pre_cxx11_abi           |
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
-| libtorch-shared-with-deps-*.zip from PyTorch.org            | bazel build //:libtorchtrt -c opt --config pre_cxx11_abi | python3 setup.py bdist_wheel                                       |
+| libtorch-shared-with-deps-*.zip from PyTorch.org            | python -m pip install .                                  | bazel build //:libtorchtrt -c opt --config pre_cxx11_abi           |
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
-| libtorch-cxx11-abi-shared-with-deps-*.zip from PyTorch.org  | bazel build //:libtorchtrt -c opt                        | python3 setup.py bdist_wheel --use-cxx11-abi                       |
+| libtorch-cxx11-abi-shared-with-deps-*.zip from PyTorch.org  | python setup.py bdist_wheel --use-cxx11-abi              | bazel build //:libtorchtrt -c opt                                  |
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
-| PyTorch preinstalled in an NGC container                    | bazel build //:libtorchtrt -c opt                        | python3 setup.py bdist_wheel --use-cxx11-abi                       |
+| PyTorch preinstalled in an NGC container                    | python setup.py bdist_wheel --use-cxx11-abi              | bazel build //:libtorchtrt -c opt                                  |
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
-| PyTorch from the NVIDIA Forums for Jetson                   | bazel build //:libtorchtrt -c opt                        | python3 setup.py bdist_wheel --jetpack-version 4.6 --use-cxx11-abi |
+| PyTorch from the NVIDIA Forums for Jetson                   | python setup.py bdist_wheel --use-cxx11-abi              | bazel build //:libtorchtrt -c opt                                  |
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
-| PyTorch built from Source                                   | bazel build //:libtorchtrt -c opt                        | python3 setup.py bdist_wheel --use-cxx11-abi                       |
+| PyTorch built from Source                                   | python setup.py bdist_wheel --use-cxx11-abi              | bazel build //:libtorchtrt -c opt                                  |
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
 
     NOTE: For all of the above cases you must correctly declare the source of PyTorch you intend to use in your WORKSPACE file for both Python and C++ builds. See below for more information
 
-You then have two compilation options:
-
-.. _build-from-archive:
-
-**Building using cuDNN & TensorRT tarball distributions**
---------------------------------------------------------------
-
-    This is recommended so as to build Torch-TensorRT hermetically and insures any compilation errors are not caused by version issues
-
-    Make sure when running Torch-TensorRT that these versions of the libraries are prioritized in your ``$LD_LIBRARY_PATH``
-
-You need to download the tarball distributions of TensorRT and cuDNN from the NVIDIA website.
-    * https://developer.nvidia.com/cudnn
-    * https://developer.nvidia.com/tensorrt
-
-Place these files in a directory (the directories ``third_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]`` exist for this purpose)
-
-Then compile referencing the directory with the tarballs
-
-    If you get errors regarding the packages, check their sha256 hashes and make sure they match the ones listed in ``WORKSPACE``
-
-Release Build
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: shell
-
-    bazel build //:libtorchtrt -c opt --distdir third_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
-
-A tarball with the include files and library can then be found in ``bazel-bin``
-
-.. _build-from-archive-debug:
-
-Debug Build
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-To build with debug symbols use the following command
-
-.. code-block:: shell
-
-    bazel build //:libtorchtrt -c dbg --distdir third_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
-
-A tarball with the include files and library can then be found in ``bazel-bin``
-
-Pre CXX11 ABI Build
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-To build using the pre-CXX11 ABI use the ``pre_cxx11_abi`` config
-
-.. code-block:: shell
-
-    bazel build //:libtorchtrt --config pre_cxx11_abi -c [dbg/opt] --distdir third_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
-
-A tarball with the include files and library can then be found in ``bazel-bin``
-
-.. _build-from-local:
-
-**Building using locally installed cuDNN & TensorRT**
---------------------------------------------------------------
-
-    If you encounter bugs and you compiled using this method please disclose that you used local sources in the issue (an ldd dump would be nice too)
-
-Install TensorRT, CUDA and cuDNN on the system before starting to compile.
-
-In WORKSPACE comment out:
-
-.. code-block:: python
-
-    # Downloaded distributions to use with --distdir
-    http_archive(
-        name="cudnn",
-        urls=[
-            "<URL>",
-        ],
-        build_file="@//third_party/cudnn/archive:BUILD",
-        sha256="<TAR SHA256>",
-        strip_prefix="cuda",
-    )
-
-    http_archive(
-        name="tensorrt",
-        urls=[
-            "<URL>",
-        ],
-        build_file="@//third_party/tensorrt/archive:BUILD",
-        sha256="<TAR SHA256>",
-        strip_prefix="TensorRT-<VERSION>",
-    )
-
-and uncomment
-
-.. code-block:: python
-
-    # Locally installed dependencies
-    new_local_repository(
-        name="cudnn", path="/usr/", build_file="@//third_party/cudnn/local:BUILD"
-    )
-
-    new_local_repository(
-        name="tensorrt", path="/usr/", build_file="@//third_party/tensorrt/local:BUILD"
-    )
-
-Release Build
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-Compile using:
-
-.. code-block:: shell
-
-    bazel build //:libtorchtrt -c opt
-
-A tarball with the include files and library can then be found in ``bazel-bin``
-
-.. _build-from-local-debug:
-
-Debug Build
-^^^^^^^^^^^^
-
-To build with debug symbols use the following command
-
-.. code-block:: shell
-
-    bazel build //:libtorchtrt -c dbg
-
-
-A tarball with the include files and library can then be found in ``bazel-bin``
-
-Pre CXX11 ABI Build
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-To build using the pre-CXX11 ABI use the ``pre_cxx11_abi`` config
-
-.. code-block:: shell
-
-    bazel build //:libtorchtrt --config pre_cxx11_abi -c [dbg/opt]
-
-**Building with CMake**
------------------------
+**Building with CMake** (TorchScript Only)
+-------------------------------------------
 
 It is possible to build the API libraries (in cpp/) and the torchtrtc executable using CMake instead of Bazel.
 Currently, the python API and the tests cannot be built with CMake.
@@ -266,26 +240,6 @@ A few useful CMake options include:
             [-DTensorRT_ROOT=<path to TensorRT>] \
             [-DCMAKE_BUILD_TYPE=Debug|Release]
         cmake --build <build directory>
-
-**Building the Python package**
---------------------------------
-
-Begin by installing ``ninja``
-
-You can build the Python package using ``setup.py`` (this will also build the correct version of ``libtorchtrt.so``)
-
-.. code-block:: shell
-
-    python3 setup.py [install/bdist_wheel]
-
-Debug Build
-^^^^^^^^^^^^
-
-.. code-block:: shell
-
-    python3 setup.py develop [--user]
-
-This also compiles a debug build of ``libtorchtrt.so``
 
 **Building Natively on aarch64 (Jetson)**
 -------------------------------------------
