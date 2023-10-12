@@ -233,6 +233,39 @@ def aten_ops_embedding(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.embedding_bag.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten._embedding_bag.default)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        1: (TRTTensor,),
+    }
+)  # type: ignore[misc]
+def aten_ops_embedding_bag(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.embedding.embedding_bag(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        weight=args[0],
+        indices=args[1],
+        offsets=args[2],
+        scale_grad_by_freq=args_bounds_check(args, 3, False),
+        mode=args_bounds_check(args, 4, 0),
+        sparse=args_bounds_check(args, 5, False),
+        per_sample_weights=args_bounds_check(args, 6, None),
+        include_last_offset=args_bounds_check(args, 7, False),
+        # padding index is useful for training only
+        padding_idx=args_bounds_check(args, 8, -1),
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.fmod.Tensor)  # type: ignore[misc]
 def aten_ops_fmod(
