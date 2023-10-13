@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 
 def compile(
-    exported_program: ExportedProgram,
+    exported_program: Union[torch.fx.GraphModule, ExportedProgram],
     inputs: Any,
     *,
     device: Optional[Union[Device, torch.device, str]] = DEVICE,
