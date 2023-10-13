@@ -16,3 +16,4 @@ if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
         DYNAMO_CONVERTERS,
         dynamo_tensorrt_converter,
     )
+    from .export import transform

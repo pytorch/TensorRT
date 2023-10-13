@@ -1,6 +1,6 @@
 import copy
 import operator
-from typing import Any, Dict, Sequence, Tuple, Union, cast
+from typing import Any, Dict, Sequence, Tuple, cast
 
 import torch
 from torch._export.exported_program import CallSpec
@@ -11,8 +11,8 @@ from torch_tensorrt.dynamo import partitioning
 
 
 def transform(
-    gm: torch.fx.GraphModule, inputs: Sequence[torch.Tensor]
-) -> torch.fx.GraphModule:
+    gm: torch.fx.GraphModule, inputs: Sequence[torch.Tensor], call_spec: CallSpec
+) -> ExportedProgram:
     # Run shape analysis
     _, outputs_map = partitioning.run_shape_analysis(gm, inputs)
 
@@ -31,7 +31,10 @@ def transform(
     gm.graph.eliminate_dead_code()
     gm.graph.lint()
 
-    return gm
+    # Create an exported program with the TRT GraphModule
+    exp_program = create_trt_exp_program(gm, call_spec)
+
+    return exp_program
 
 
 def lift_constant_pass(trt_gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
@@ -115,7 +118,6 @@ def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
 
                 # Copy all nodes in the submodule into gm and
                 # store the output node of this submodule which is now present in gm
-
                 submodule_output = gm.graph.graph_copy(submodule.graph, val_map)
 
                 # Get their references (since we copied) in the parent graph (gm)
@@ -174,9 +176,7 @@ def copy_submodule_attributes(
 
 
 def create_trt_exp_program(
-    gm: torch.fx.GraphModule,
-    call_spec: CallSpec,
-    state_dict: Dict[str, Union[torch.Tensor, torch.nn.Parameter]],
+    gm: torch.fx.GraphModule, call_spec: CallSpec
 ) -> ExportedProgram:
     """Creates a new Exported Program. This function takes an torch.fx.GraphModule which has TRT engines
     and constructs an Exported Program object with the new IO node names, call_spec and state_dict
@@ -208,7 +208,7 @@ def create_trt_exp_program(
     )
 
     trt_exp_program = ExportedProgram(
-        gm, gm.graph, trt_graph_signature, call_spec, state_dict, {}, [], []
+        gm, gm.graph, trt_graph_signature, call_spec, gm.state_dict(), {}, [], []
     )
 
     return trt_exp_program

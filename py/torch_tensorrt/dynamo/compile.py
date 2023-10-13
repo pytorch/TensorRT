@@ -86,7 +86,15 @@ def compile(
     inputs = prepare_inputs(inputs)
     device = to_torch_tensorrt_device(device)
 
-    gm = exported_program.module()
+    if isinstance(exported_program, torch.fx.GraphModule):
+        gm = exported_program
+    elif isinstance(exported_program, ExportedProgram):
+        gm = exported_program.module()
+    else:
+        raise AssertionError(
+            f"Input graph should either be an ExportedProgram or a GraphModule but got type {type(exported_program)}"
+        )
+
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module
