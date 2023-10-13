@@ -3,6 +3,7 @@ from typing import Optional, Sequence, Union, cast
 
 import numpy as np
 import tensorrt as trt
+import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -87,6 +88,8 @@ def index(
     # _LOGGER.debug(f"The index shape is {index.shape}")
     # check if the input is dynamic
     dynamic_shape = has_dynamic_shape(input.shape)
+    #is_numpy is a flag to specify if input isa numpy
+    is_numpy = False
 
     # here we need to check if all the index are broadcastable
     # if no, then we need to broadcast
@@ -95,8 +98,14 @@ def index(
         if ind is not None:
             _LOGGER.debug(f"Shape of {i} index is {ind.shape}")
             adv_indx_indices.append(i)
-            # torch.nn.parameter.Parameter=> torch.Tensor
-            ind = get_trt_tensor(ctx, ind, name + f"_parameter_to_fp32_tensor_{i}")
+            # torch.nn.parameter.Parameter=> numpy array
+            # numpy array is kept as numpy
+            # other cases are kept as TRTTensor
+            if (isinstance(ind, torch.Tensor) or (ind, np.ndarray)):
+                ind = to_numpy(ind)
+                is_numpy = True
+            else:
+                ind = get_trt_tensor(ctx, ind, name + f"_parameter_to_fp32_tensor_{i}")
             if last_index is not None:
                 assert broadcastable(
                     ind, last_index
@@ -131,8 +140,11 @@ def index(
         for i in range(rank):
             dim = input_shape[i]
             dim_tensor = get_trt_tensor(ctx, dim, name + f"_individual_dim_{i}")
-            # dim_tensor_list is a list of tensors
-            dim_tensor_list.append(dim_tensor)
+            # dim_tensor_list is a list of tensors or numpy
+            if(is_numpy):
+                dim_tensor_list.append(dim)
+            else:
+                dim_tensor_list.append(dim_tensor)
 
         # for cases like
         # t: [x_1, y_1, y_2, ..., x_m, ..., y_n] -> t: [x_1, x_2, ..., x_m, y_1, y_2, ..., y_n],
@@ -150,9 +162,14 @@ def index(
             if i not in adv_indx_indices:
                 new_order.append(i)
         _LOGGER.debug(f"The new transpose order is {new_order}")
-        transpose_layer.second_transpose = tuple(new_order)
-        set_layer_name(transpose_layer, target, name + "_index_transpose", source_ir)
-        transpose_tensor = transpose_layer.get_output(0)
+
+        transpose_tensor = None
+        if(is_numpy):
+            transpose_tensor = input[new_order]
+        else:
+            transpose_layer.second_transpose = tuple(new_order)
+            set_layer_name(transpose_layer, target, name + "_index_transpose", source_ir)
+            transpose_tensor = transpose_layer.get_output(0)
 
         # Flatten [x_1, x_2,.......x_m, y_1, y_2,.....y_n]
         # transpose_tensor_shape = ctx.net.add_shape(transpose_tensor)
@@ -165,57 +182,70 @@ def index(
         for i in range(adv_indx_count, rank):
             mult_d1 = mult_d1 * transpose_tensor_shape[i]
 
-        concat_tensor_layer = ctx.net.add_concatenation(
-            [
-                get_trt_tensor(ctx, mult_d0, name + "_d0_shape"),
-                get_trt_tensor(ctx, mult_d1, name + "_d1_shape"),
-            ]
-        )
-        set_layer_name(concat_tensor_layer, target, name + "_index_Concat", source_ir)
-        concat_tensor = concat_tensor_layer.get_output(0)
+        flatten_tensor = None
+        if(is_numpy):
+            flatten_tensor = transpose_tensor.reshape(mult_d0, mult_d1)
+        else:
+            concat_tensor_layer = ctx.net.add_concatenation(
+                [
+                    get_trt_tensor(ctx, mult_d0, name + "_d0_shape"),
+                    get_trt_tensor(ctx, mult_d1, name + "_d1_shape"),
+                ]
+            )
+            set_layer_name(concat_tensor_layer, target, name + "_index_Concat", source_ir)
+            concat_tensor = concat_tensor_layer.get_output(0)
 
-        reshape_layer = ctx.net.add_shuffle(transpose_tensor)
-        # check this
-        reshape_layer.set_input(1, concat_tensor)
-        flatten_tensor = reshape_layer.get_output(0)
+            reshape_layer = ctx.net.add_shuffle(transpose_tensor)
+            reshape_layer.set_input(1, concat_tensor)
+            flatten_tensor = reshape_layer.get_output(0)
+
         _LOGGER.debug(f"The flatten tensor shape is {flatten_tensor.shape}")
 
         # tensor index = \sum_{i=1}^m (ind_i * \prod_{j=i+1}^m (x_j)),  ind_i is input indices[i], x_j is the
         # // j dimension of input x.
-        multiplier = get_trt_tensor(
-            ctx,
-            dim_tensor_list[adv_indx_indices[adv_indx_count - 1]],
-            name + "_dim_last",
-        )
-        cum_adv_index = tensor_indices[adv_indx_count - 1]
-        for i in range(adv_indx_count - 2, -1, -1):
-            adv_index = convert_binary_elementwise(
+        if(is_numpy):
+            multiplier = dim_tensor_list[adv_indx_indices[adv_indx_count - 1]]
+            cum_adv_index = tensor_indices[adv_indx_count - 1]
+            for i in range(adv_indx_count - 2, -1, -1):
+                adv_index = multiplier * tensor_indices[i]
+                cum_adv_index = cum_adv_index + adv_index
+                multiplier = multiplier * dim_tensor_list[adv_indx_indices[i]]
+        else:
+
+            multiplier = get_trt_tensor(
                 ctx,
-                target,
-                source_ir,
-                name + f"_index_intermediate_{i}",
-                trt.ElementWiseOperation.PROD,
-                multiplier,
-                tensor_indices[i],
+                dim_tensor_list[adv_indx_indices[adv_indx_count - 1]],
+                name + "_dim_last",
             )
-            cum_adv_index = convert_binary_elementwise(
-                ctx,
-                target,
-                source_ir,
-                name + f"_index_sum_intermediate_{i}",
-                trt.ElementWiseOperation.SUM,
-                cum_adv_index,
-                adv_index,
-            )
-            multiplier = convert_binary_elementwise(
-                ctx,
-                target,
-                source_ir,
-                name + f"_index_intermediate_xj_{i}",
-                trt.ElementWiseOperation.PROD,
-                multiplier,
-                dim_tensor_list[adv_indx_indices[i]],
-            )
+            cum_adv_index = tensor_indices[adv_indx_count - 1]
+            for i in range(adv_indx_count - 2, -1, -1):
+                adv_index = convert_binary_elementwise(
+                    ctx,
+                    target,
+                    source_ir,
+                    name + f"_index_intermediate_{i}",
+                    trt.ElementWiseOperation.PROD,
+                    multiplier,
+                    tensor_indices[i],
+                )
+                cum_adv_index = convert_binary_elementwise(
+                    ctx,
+                    target,
+                    source_ir,
+                    name + f"_index_sum_intermediate_{i}",
+                    trt.ElementWiseOperation.SUM,
+                    cum_adv_index,
+                    adv_index,
+                )
+                multiplier = convert_binary_elementwise(
+                    ctx,
+                    target,
+                    source_ir,
+                    name + f"_index_intermediate_xj_{i}",
+                    trt.ElementWiseOperation.PROD,
+                    multiplier,
+                    dim_tensor_list[adv_indx_indices[i]],
+                )
 
         gather_layer_element = ctx.net.add_gather(flatten_tensor, cum_adv_index, 0)
         set_layer_name(
@@ -239,29 +269,36 @@ def index(
             == adv_indx_indices[adv_indx_count - 1] - adv_indx_indices[0] + 1
         ):
             _LOGGER.debug(f"The indices are continuous in this case")
-            concat_tensor_reshape.append(
-                get_trt_tensor(ctx, -1, name + "_dynamic_concat")
-            )
+            if(is_numpy):
+                concat_tensor_reshape.append(-1)
+            else:
+                concat_tensor_reshape.append(
+                    get_trt_tensor(ctx, -1, name + "_dynamic_concat")
+                )
             for i in range(0, rank):
                 if i not in adv_indx_indices:
                     curr_dim = dim_tensor_list[i]
                     concat_tensor_reshape.append(curr_dim)
 
-            concat_tensor_layer = ctx.net.add_concatenation(concat_tensor_reshape)
-            set_layer_name(
-                concat_tensor_layer, target, name + "_index_Concat_reshape", source_ir
-            )
-            concat_tensor = concat_tensor_layer.get_output(0)
+            unfold_tensor = None
+            if(is_numpy):
+                unfold_tensor = gather_out.reshape(concat_tensor)
+            else:
+                concat_tensor_layer = ctx.net.add_concatenation(concat_tensor_reshape)
+                set_layer_name(
+                    concat_tensor_layer, target, name + "_index_Concat_reshape", source_ir
+                )
+                concat_tensor = concat_tensor_layer.get_output(0)
 
-            regular_index_shuffle_layer = ctx.net.add_shuffle(gather_out)
-            regular_index_shuffle_layer.set_input(1, concat_tensor)
-            set_layer_name(
-                regular_index_shuffle_layer,
-                target,
-                name + "_index_regular_index",
-                source_ir,
-            )
-            unfold_tensor = regular_index_shuffle_layer.get_output(0)
+                regular_index_shuffle_layer = ctx.net.add_shuffle(gather_out)
+                regular_index_shuffle_layer.set_input(1, concat_tensor)
+                set_layer_name(
+                    regular_index_shuffle_layer,
+                    target,
+                    name + "_index_regular_index",
+                    source_ir,
+                )
+                unfold_tensor = regular_index_shuffle_layer.get_output(0)
             _LOGGER.debug(f"The tensor is unfolded now")
             _LOGGER.debug(f"The unfolded tensor shape is {unfold_tensor.shape}")
 
@@ -275,14 +312,18 @@ def index(
                 new_order.append(i)
             _LOGGER.debug(f"Transposing the indices to correct position {new_order}")
 
-            transpose_advanced_shuffle_layer.second_transpose = tuple(new_order)
-            set_layer_name(
-                transpose_advanced_shuffle_layer,
-                target,
-                name + "_index_advanced_shuffle_transpose",
-                source_ir,
-            )
-            transpose_tensor = transpose_advanced_shuffle_layer.get_output(0)
+            transpose_tensor = None
+            if(is_numpy):
+                transpose_tensor = unfold_tensor[new_order]
+            else:
+                transpose_advanced_shuffle_layer.second_transpose = tuple(new_order)
+                set_layer_name(
+                    transpose_advanced_shuffle_layer,
+                    target,
+                    name + "_index_advanced_shuffle_transpose",
+                    source_ir,
+                )
+                transpose_tensor = transpose_advanced_shuffle_layer.get_output(0)
 
             # unfold advanced layer
             concat_final_tensor = []
@@ -296,25 +337,29 @@ def index(
                     current_dim = dim_tensor_list[i]
                     concat_final_tensor.append(current_dim)
 
-            concat_final_shape_layer = ctx.net.add_concatenation(concat_final_tensor)
-            set_layer_name(
-                concat_final_shape_layer,
-                target,
-                name + "_index_continuous_concat_final_shape_layer",
-                source_ir,
-            )
-            concat_final_tensor = concat_final_shape_layer.get_output(0)
+            reshape_output = []
+            if(is_numpy):
+                reshape_output = transpose_tensor.reshape(concat_final_tensor)
+            else:
+                concat_final_shape_layer = ctx.net.add_concatenation(concat_final_tensor)
+                set_layer_name(
+                    concat_final_shape_layer,
+                    target,
+                    name + "_index_continuous_concat_final_shape_layer",
+                    source_ir,
+                )
+                concat_final_tensor = concat_final_shape_layer.get_output(0)
 
-            unfold_advanced_shuffle_layer = ctx.net.add_shuffle(transpose_tensor)
-            # check this
-            unfold_advanced_shuffle_layer.set_input(1, concat_final_tensor)
-            set_layer_name(
-                unfold_advanced_shuffle_layer,
-                target,
-                name + "_unfold_advanced_index",
-                source_ir,
-            )
-            reshape_output = unfold_advanced_shuffle_layer.get_output(0)
+                unfold_advanced_shuffle_layer = ctx.net.add_shuffle(transpose_tensor)
+                # check this
+                unfold_advanced_shuffle_layer.set_input(1, concat_final_tensor)
+                    set_layer_name(
+                    unfold_advanced_shuffle_layer,
+                    target,
+                    name + "_unfold_advanced_index",
+                    source_ir,
+                )
+                reshape_output = unfold_advanced_shuffle_layer.get_output(0)
 
         else:
             _LOGGER.debug(f"The indices are not continuous in this case")
@@ -325,23 +370,27 @@ def index(
                     curr_dim = dim_tensor_list[i]
                     concat_final_tensor.append(curr_dim)
 
-            concat_final_shape_layer = ctx.net.add_concatenation(concat_final_tensor)
-            set_layer_name(
-                concat_final_shape_layer,
-                target,
-                name + "_index_non_continuous_concat_final_shape_layer",
-                source_ir,
-            )
-            concat_final_tensor = concat_final_shape_layer.get_output(0)
+            reshape_output = None
+            if(is_numpy):
+                reshape_output = gather_out.reshape(concat_final_tensor)
+            else:
+                concat_final_shape_layer = ctx.net.add_concatenation(concat_final_tensor)
+                set_layer_name(
+                    concat_final_shape_layer,
+                    target,
+                    name + "_index_non_continuous_concat_final_shape_layer",
+                    source_ir,
+                )
+                concat_final_tensor = concat_final_shape_layer.get_output(0)
 
-            reshape_layer = ctx.net.add_shuffle(gather_out)
-            reshape_layer.set_input(1, concat_final_tensor)
-            set_layer_name(
-                reshape_layer,
-                target,
-                name + "_index_non_continuous_shuffle_final_shape_layer",
-                source_ir,
-            )
-            reshape_output = reshape_layer.get_output(0)
+                reshape_layer = ctx.net.add_shuffle(gather_out)
+                reshape_layer.set_input(1, concat_final_tensor)
+                set_layer_name(
+                    reshape_layer,
+                    target,
+                    name + "_index_non_continuous_shuffle_final_shape_layer",
+                    source_ir,
+                )
+                reshape_output = reshape_layer.get_output(0)
 
     return reshape_output

@@ -180,8 +180,7 @@ def cast_int_int_div_trt_tensor(
 
 
 def broadcastable(
-    a: TRTTensor,
-    b: TRTTensor,
+    a: Union[TRTTensor, np.ndarray], b: Union[TRTTensor, np.ndarray]
 ) -> bool:
     "Check if two tensors are broadcastable according to torch rules"
     a_shape = tuple(a.shape)
