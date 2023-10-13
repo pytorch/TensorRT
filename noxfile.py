@@ -203,11 +203,11 @@ def run_base_tests(session):
             session.run_always("pytest", test)
 
 
-def run_fx_core_tests(session):
-    print("Running FX core tests")
-    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
+def run_dynamo_backend_tests(session):
+    print("Running Dynamo core tests")
+    session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/"))
     tests = [
-        "core",
+        "backend",
     ]
     for test in tests:
         if USE_HOST_DEPS:
@@ -217,31 +217,10 @@ def run_fx_core_tests(session):
 
 
 def run_fx_converter_tests(session):
-    print("Running FX converter tests")
-    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
+    print("Running Dynamo converter tests")
+    session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/"))
     tests = [
-        "converters",
-    ]
-    # Skipping this test as it fails inside NGC container with the following error.
-    # Error Code 4: Internal Error (Could not find any implementation for node conv due to insufficient workspace. See verbose log for requested sizes.)
-    skip_tests = "-k not conv3d"
-    for test in tests:
-        if USE_HOST_DEPS:
-            session.run_always("pytest", test, skip_tests, env={"PYTHONPATH": PYT_PATH})
-        else:
-            session.run_always("pytest", test, skip_tests)
-
-
-def run_fx_lower_tests(session):
-    print("Running FX passes and trt_lower tests")
-    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
-    tests = [
-        "passes/test_multi_fuse_trt.py",
-        # "passes/test_fuse_permute_linear_trt.py",
-        "passes/test_remove_duplicate_output_args.py",
-        "passes/test_fuse_permute_matmul_trt.py",
-        # "passes/test_graph_opts.py"
-        "trt_lower",
+        "conversion",
     ]
     for test in tests:
         if USE_HOST_DEPS:
@@ -250,31 +229,11 @@ def run_fx_lower_tests(session):
             session.run_always("pytest", test)
 
 
-def run_fx_quant_tests(session):
-    print("Running FX Quant tests")
-    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
+def run_dynamo_lower_tests(session):
+    print("Running Dynamo lowering passes")
+    session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/"))
     tests = [
-        "quant",
-    ]
-    # Skipping this test as it fails inside NGC container with the following error.
-    # ImportError: cannot import name 'ObservationType' from 'torch.ao.quantization.backend_config.observation_type'
-    skip_tests = "-k not conv_add_standalone_module"
-    for test in tests:
-        if USE_HOST_DEPS:
-            session.run_always("pytest", test, skip_tests, env={"PYTHONPATH": PYT_PATH})
-        else:
-            session.run_always("pytest", test, skip_tests)
-
-
-def run_fx_tracer_tests(session):
-    print("Running FX Tracer tests")
-    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
-    # skipping a test since it depends on torchdynamo
-    # Enable this test once NGC moves to latest pytorch which has dynamo integrated.
-    tests = [
-        "tracer/test_acc_shape_prop.py",
-        "tracer/test_acc_tracer.py",
-        # "tracer/test_dispatch_tracer.py"
+        "lowering"
     ]
     for test in tests:
         if USE_HOST_DEPS:
@@ -283,11 +242,37 @@ def run_fx_tracer_tests(session):
             session.run_always("pytest", test)
 
 
-def run_fx_tools_tests(session):
-    print("Running FX tools tests")
-    session.chdir(os.path.join(TOP_DIR, "py/torch_tensorrt/fx/test"))
+def run_dynamo_model_tests(session):
+    print("Running Dynamo model tests")
+    session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/"))
     tests = [
-        "tools",
+        "models",
+    ]
+    for test in tests:
+        if USE_HOST_DEPS:
+            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+        else:
+            session.run_always("pytest", test)
+
+
+def run_dynamo_partitioning_tests(session):
+    print("Running Dynamo Partitioning tests")
+    session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/"))
+    tests = [
+        "partitioning"
+    ]
+    for test in tests:
+        if USE_HOST_DEPS:
+            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+        else:
+            session.run_always("pytest", test)
+
+
+def run_dynamo_runtime_tests(session):
+    print("Running Dynamo Runtime tests")
+    session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/"))
+    tests = [
+        "runtime",
     ]
     for test in tests:
         if USE_HOST_DEPS:
