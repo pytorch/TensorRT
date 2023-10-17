@@ -61,7 +61,6 @@ def embedding_bag(
     sparse: bool,
     per_sample_weights: Optional[TRTTensor],
     include_last_offset: bool,
-    padding_idx: int,
 ) -> Tuple[TRTTensor, TRTTensor, TRTTensor, TRTTensor]:
     """
     This function is for calculating embedding bags.

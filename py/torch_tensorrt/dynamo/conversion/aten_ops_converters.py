@@ -233,12 +233,17 @@ def aten_ops_embedding(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.embedding_bag.default)  # type: ignore[misc]
-@dynamo_tensorrt_converter(torch.ops.aten._embedding_bag.default)  # type: ignore[misc]
+def embedding_bag_validator(node: Node) -> bool:
+    return bool(node.args[2].op == "get_attr")
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.embedding_bag.default, capability_validator=embedding_bag_validator)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten._embedding_bag.default, capability_validator=embedding_bag_validator)  # type: ignore[misc]
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
         1: (TRTTensor,),
+        2: (np.ndarray, torch.Tensor),
     }
 )  # type: ignore[misc]
 def aten_ops_embedding_bag(
@@ -262,7 +267,6 @@ def aten_ops_embedding_bag(
         per_sample_weights=args_bounds_check(args, 6, None),
         include_last_offset=args_bounds_check(args, 7, False),
         # padding index is useful for training only
-        padding_idx=args_bounds_check(args, 8, -1),
     )
 
 
