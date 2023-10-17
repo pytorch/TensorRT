@@ -1,7 +1,6 @@
 import math
-from typing import Optional
+from typing import Optional, Sequence
 
-import numpy as np
 import tensorrt as trt
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -203,3 +202,31 @@ def cumsum(
     set_layer_name(loop_output, target, f"{name}_loop_output", source_ir)
     loop_output.set_input(1, trip_limit)
     return loop_output.get_output(0)
+
+
+def tile(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    dims: Sequence[int],
+) -> TRTTensor:
+    diff = len(dims) - len(input.shape)
+    if diff > 0:
+        # prepend 1 to input.shape
+        new_shape = (1,) * diff + tuple(input.shape)
+        input = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_prepend_input_shape", input, new_shape
+        )
+    elif diff < 0:
+        # prepend 1 to dims
+        dims = (1,) * -diff + tuple(dims)
+
+    shapes = [i * j for i, j in zip(input.shape, dims)]
+    starts = [0] * len(dims)
+    strides = [1] * len(dims)
+    layer = ctx.net.add_slice(input, tuple(starts), tuple(shapes), tuple(strides))
+    layer.mode = trt.SampleMode.WRAP
+    set_layer_name(layer, target, name)
+    return layer.get_output(0)
