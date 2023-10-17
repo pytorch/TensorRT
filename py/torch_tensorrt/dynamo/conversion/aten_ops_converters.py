@@ -623,6 +623,11 @@ def aten_ops_slice(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.chunk.default)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)  # type: ignore[misc]
 def aten_ops_chunk(
     ctx: ConversionContext,
     target: Target,
