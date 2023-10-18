@@ -143,26 +143,25 @@ def chunk(
     chunk_size = int(np.ceil(size_dim / chunks))
     result = []
     start = 0
-    for i in range(chunks):
-        end = start + chunk_size
-        if end > size_dim:
-            end = size_dim
-        if start < end:
-            result.append(
-                slice_op(
-                    ctx,
-                    target,
-                    source_ir,
-                    f"{name}_slice{i}",
-                    input,
-                    dim,
-                    start,
-                    end,
-                    1,
-                )
+    end = min(start + chunk_size, size_dim)
+    cnt = 0
+
+    while start < end:
+        result.append(
+            slice_op(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_slice_{cnt}",
+                input,
+                dim,
+                start,
+                end,
+                1,
             )
-            start = end
-        else:
-            break
+        )
+        start = end
+        end = min(start + chunk_size, size_dim)
+        cnt += 1
 
     return result
