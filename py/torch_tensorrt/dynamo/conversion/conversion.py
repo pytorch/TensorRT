@@ -35,7 +35,16 @@ def convert_module(
     if not isinstance(module_outputs, (list, tuple)):
         module_outputs = [module_outputs]
 
-    output_dtypes = [output.dtype for output in module_outputs]
+    # Int64 outputs can sometimes be generated from within other operators
+    # such as aten.sum - such outputs can be truncated
+    output_dtypes = []
+    for output in module_outputs:
+        if settings.truncate_long_and_double and output.dtype == torch.float64:
+            output_dtypes.append(torch.float32)
+        elif settings.truncate_long_and_double and output.dtype == torch.int64:
+            output_dtypes.append(torch.int32)
+        else:
+            output_dtypes.append(output.dtype)
 
     interpreter = TRTInterpreter(
         module,
