@@ -1,7 +1,6 @@
 import math
 from typing import Optional
 
-import numpy as np
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -140,7 +139,7 @@ def chunk(
         assert input.shape[dim] != -1, "Can't chunk on dynamic shape dimension!"
 
     size_dim = shape[dim]
-    chunk_size = int(np.ceil(size_dim / chunks))
+    chunk_size = math.ceil(size_dim / chunks)
     result = []
     start = 0
     end = min(start + chunk_size, size_dim)
