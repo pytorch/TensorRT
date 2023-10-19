@@ -1,6 +1,5 @@
-import copy
 import functools
-from typing import Optional, Tuple, Union
+from typing import Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
@@ -55,7 +54,7 @@ def embedding_bag(
     name: str,
     weight: TRTTensor,
     indices: TRTTensor,
-    offsets: Optional[Union[torch.Tensor, np.ndarray]],
+    offsets: Union[torch.Tensor, np.ndarray, Sequence[int]],
     scale_grad_by_freq: bool,
     mode: int,
     sparse: bool,
@@ -64,12 +63,18 @@ def embedding_bag(
 ) -> Tuple[TRTTensor, TRTTensor, TRTTensor, TRTTensor]:
     """
     This function is for calculating embedding bags.
-    In PyTorch, `offsets` is only used when input is 1D. If input is 2D of shape (B, N), it will be treated as B bags (sequences) each of fixed length N, and this will return B values aggregated in a way depending on the mode. `offsets` is ignored and required to be None in this case.
-    However, according to the schema, `offsets` is required for input with any dimensions. Accordingly, this function flattens N-D input to 1D and then to calculate embedding bags.
+
+    In PyTorch, `offsets` is only used when input is 1D. If input is 2D of shape (B, N),
+    it will be treated as B bags (sequences) each of fixed length N, and this will return
+    B values aggregated in a way depending on the mode. `offsets` is ignored and required
+    to be None in this case.
+
+    However, according to the schema, `offsets` is required for input with any dimensions.
+    Accordingly, this function flattens N-D input to 1D and then to calculate embedding bags.
     """
-    if len(indices.shape) != 1:
-        raise RuntimeError("Currently we only support 1D input.")
-        # indices = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_reshape_indices", indices, (-1,))
+
+    # TODO: support 2D inputs
+    # indices = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_reshape_indices", indices, (-1,))
 
     if mode == 0:  # sum
         reduce_op = functools.partial(
@@ -90,8 +95,6 @@ def embedding_bag(
             return_indices=False,
         )
         reduce_name = "max"
-    else:
-        raise RuntimeError(f"Currently we don't support mode={mode}.")
 
     # calculate embedding
     embed = embedding(
@@ -130,19 +133,24 @@ def embedding_bag(
             per_sample_weights,
         )
 
+    offsets = to_numpy(offsets)
+
     if include_last_offset is False:
         # add the end index to offsets
-        _offsets = np.append(to_numpy(offsets), indices.shape[0])
+        offsets = np.append(offsets, indices.shape[0])
     else:
         # modify the last index of offsets to the end index
-        _offsets = copy.deepcopy(offsets)
-        _offsets[-1] = indices.shape[0]
+        # however, pytorch doc says if `include_last_offset` is True, the size of offsets
+        # is equal to the number of bags + 1. The last element is the size of the input,
+        # or the ending index position of the last bag (sequence).
+
+        offsets[-1] = indices.shape[0]
 
     # separately reduce embeddings for different bags
     reduced_embed = []
-    len_offsets = len(_offsets)
+    len_offsets = len(offsets)
     for i in range(len_offsets - 1):
-        if _offsets[i] < _offsets[i + 1]:
+        if offsets[i] < offsets[i + 1]:
             sliced_embed = impl.slice.slice_op(
                 ctx,
                 target,
@@ -150,8 +158,8 @@ def embedding_bag(
                 f"{name}_slice_embed_{i}",
                 embed,
                 0,
-                _offsets[i],
-                _offsets[i + 1],
+                offsets[i],
+                offsets[i + 1],
                 1,
             )
             reduced_sliced_embed = reduce_op(

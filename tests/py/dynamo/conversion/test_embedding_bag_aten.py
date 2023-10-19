@@ -18,7 +18,7 @@ class TestEmbeddingBagConverter(DispatchTestCase):
                 mode=1,
                 sparse=False,
                 per_sample_weights=None,
-                include_last_offset=False,
+                include_last_offset=True,
                 padding_idx=-1,
             ),
             param(
@@ -133,6 +133,7 @@ class TestEmbeddingBagConverter(DispatchTestCase):
         self.run_test(
             TestEmbeddingBag(),
             inputs=[weight, indices],
+            enable_passes=True,
         )
 
 

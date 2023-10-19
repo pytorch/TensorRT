@@ -234,7 +234,15 @@ def aten_ops_embedding(
 
 
 def embedding_bag_validator(node: Node) -> bool:
-    return bool(node.args[2].op == "get_attr")
+    mode = args_bounds_check(node.args, 4, 0)
+    indices = node.args[1].meta.get("tensor_meta")
+    if indices is None:
+        return False
+    return (
+        bool(node.args[2].op == "get_attr")
+        and (mode == 0 or mode == 1 or mode == 2)
+        and len(indices.shape) == 1
+    )
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.embedding_bag.default, capability_validator=embedding_bag_validator)  # type: ignore[misc]
