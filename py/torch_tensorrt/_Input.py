@@ -47,6 +47,7 @@ class Input(object):
     high_tensor_domain_excl: float = low_tensor_domain_incl + DOMAIN_OFFSET
     torch_dtype: torch.dtype = torch.float32
     torch_tensor: torch.Tensor = None
+    name: str = ""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """__init__ Method for torch_tensorrt.Input
@@ -68,7 +69,8 @@ class Input(object):
             format (torch.memory_format or torch_tensorrt.TensorFormat): The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)
             tensor_domain (Tuple(float, float), optional): The domain of allowed values for the tensor, as interval notation: [tensor_domain[0], tensor_domain[1]).
                 Note: Entering "None" (or not specifying) will set the bound to [0, 2)
-
+            torch_tensor (torch.Tensor): Holds a corresponding torch tensor with this Input.
+            name (str, optional): Name of this input in the pytorch graph. Used to specify dynamic shapes in dynamo tracer.
         Examples:
             - Input([1,3,32,32], dtype=torch.float32, format=torch.channel_last)
             - Input(shape=(1,3,32,32), dtype=torch_tensorrt.dtype.int32, format=torch_tensorrt.TensorFormat.NCHW)
@@ -179,6 +181,9 @@ class Input(object):
                 self.torch_tensor = self.example_tensor("opt_shape")
             else:
                 self.torch_tensor = self.example_tensor()
+
+        if "name" in kwargs:
+            self.name = kwargs["name"]
 
     def __str__(self) -> str:
         if self.shape_mode == Input._ShapeMode.STATIC:
