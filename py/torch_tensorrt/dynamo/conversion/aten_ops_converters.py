@@ -330,11 +330,7 @@ def aten_ops_fmod(
     return impl.elementwise.fmod(ctx, target, SourceIR.ATEN, name, args[0], args[1])
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler)
-@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_2d.out)
-@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_2d_backward.out)
-@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_3d.out)
-@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_3d_backward.out)
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler)  # type: ignore[misc]
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -349,21 +345,19 @@ def aten_ops_grid(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.grid.grid(
-        ctx, 
-        target, 
-        SourceIR.ATEN, 
-        name, 
-        input=args[0], 
-        grid=args[1], 
-        interpolation_mode=args[2], 
-        padding_mode=args[3], 
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        grid=args[1],
+        interpolation_mode=args[2],
+        padding_mode=args[3],
         align_corners=args_bounds_check(args, 4, True),
-        output_mask=args_bounds_check(args, 5, None),
-
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.relu.default)
+@dynamo_tensorrt_converter(torch.ops.aten.relu.default)  # type: ignore[misc]
 def aten_ops_relu(
     ctx: ConversionContext,
     target: Target,

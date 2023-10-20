@@ -34,7 +34,6 @@ def grid(
     interpolation_mode: int,
     padding_mode: int,
     align_corners: bool,
-    output_mask: Optional[Sequence[bool]] = None,
 ) -> TRTTensor:
     grid_layer = ctx.net.add_grid_sample(input, grid)
     assert interpolation_mode in GridSamplerInterpolationMode
@@ -45,11 +44,4 @@ def grid(
     grid_layer.sample_mode = GridSamplerSampling.get(padding_mode, None)
     grid_layer.align_corners = align_corners
     set_layer_name(grid_layer, target, name + "_grid_layer", source_ir)
-    if output_mask is None:
-        return grid_layer.get_output(0)
-    elif output_mask[0] and output_mask[1]:
-        return (grid_layer.get_output(0), None)
-    elif output_mask[0]:
-        return grid_layer.get_output(0)
-    else:
-        return None
+    return grid_layer.get_output(0)
