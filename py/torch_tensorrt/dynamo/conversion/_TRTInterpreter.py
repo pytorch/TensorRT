@@ -361,6 +361,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         n.kwargs = kwargs
 
         # run the node
+        _LOGGER.debug(
+            f"Running node {self._cur_node_name}, a {self._cur_node.op} node "
+            f"with target {self._cur_node.target} in the TensorRT Interpreter"
+        )
         trt_node: torch.fx.Node = super().run_node(n)
 
         # remove "_itensor_to_tensor_meta"

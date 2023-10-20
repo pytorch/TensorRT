@@ -5,6 +5,7 @@ from dataclasses import fields, replace
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import torch
+import torch_tensorrt
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
@@ -189,9 +190,16 @@ def parse_complex_tensor_structs(
 
         return torchtrt_inputs_dict
 
+    elif isinstance(inputs, (torch.SymBool, torch.SymFloat, torch.SymInt)):
+        raise ValueError(
+            f"Detected Torch symbolic input type {type(inputs)} during input parsing. "
+            "Symbolic inputs are not currently allowed; please specify dynamic=False "
+            "if using torch.compile with the Torch-TensorRT backend."
+        )
+
     else:
         raise ValueError(
-            f"Invalid input type {type(inputs)} encountered in parse_complex_tensor_structs parsing. "
+            f"Invalid input type {type(inputs)} encountered during Dynamo input parsing. "
             + "Allowed input types: {torch_tensorrt.Input, torch.Tensor, list, tuple, dict}"
         )
 
