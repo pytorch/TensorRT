@@ -140,7 +140,6 @@ def index(
         rank = len(input_shape)
         adv_indx_count = len(adv_indx_indices)
         dim_tensor_list = []
-        dim_list = []
 
         for i in range(rank):
             dim = input_shape[i]
