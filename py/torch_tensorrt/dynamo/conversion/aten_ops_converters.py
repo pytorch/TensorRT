@@ -355,7 +355,7 @@ def aten_ops_grid(
         grid=args[1],
         interpolation_mode=args[2],
         padding_mode=args[3],
-        align_corners=args_bounds_check(args, 4, True),
+        align_corners=args[4],
     )
 
 
