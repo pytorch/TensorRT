@@ -279,6 +279,24 @@ def aten_ops_sigmoid(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.sym_size.int)  # type: ignore[misc]
+def aten_ops_symsize_int(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.shape.shape(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, None),
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.index.Tensor)  # type: ignore[misc]
 @enforce_tensor_types(
     {
