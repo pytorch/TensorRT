@@ -44,7 +44,9 @@ def test_base_full_compile(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    trt_exp_program = torchtrt.dynamo.transform(trt_gm, [input], exp_program.call_spec)
+    trt_exp_program = torchtrt.dynamo.serialize(
+        trt_gm, [input], call_spec=exp_program.call_spec, ir="exported_program"
+    )
     serialized_prog = serialize(trt_exp_program)
     deserialized_prog = deserialize(*serialized_prog)
 
@@ -96,7 +98,9 @@ def test_base_full_compile_multiple_outputs(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    trt_exp_program = torchtrt.dynamo.transform(trt_gm, [input], exp_program.call_spec)
+    trt_exp_program = torchtrt.dynamo.serialize(
+        trt_gm, [input], call_spec=exp_program.call_spec, ir="exported_program"
+    )
     serialized_prog = serialize(trt_exp_program)
     deserialized_prog = deserialize(*serialized_prog)
     # Check Pyt and TRT exported program outputs
@@ -153,7 +157,9 @@ def test_base_full_compile_save_load(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    trt_exp_program = torchtrt.dynamo.transform(trt_gm, [input], exp_program.call_spec)
+    trt_exp_program = torchtrt.dynamo.serialize(
+        trt_gm, [input], call_spec=exp_program.call_spec, ir="exported_program"
+    )
     torch._export.save(trt_exp_program, "/tmp/trt.ep")
     deser_trt_exp_program = torch._export.load("/tmp/trt.ep")
 
@@ -212,7 +218,9 @@ def test_hybrid_relu_fallback(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    trt_exp_program = torchtrt.dynamo.transform(trt_gm, [input], exp_program.call_spec)
+    trt_exp_program = torchtrt.dynamo.serialize(
+        trt_gm, [input], call_spec=exp_program.call_spec, ir="exported_program"
+    )
     torch._export.save(trt_exp_program, "/tmp/trt.ep")
     deser_trt_exp_program = torch._export.load("/tmp/trt.ep")
 
@@ -254,7 +262,9 @@ def test_resnet18_save_load(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    trt_exp_program = torchtrt.dynamo.transform(trt_gm, [input], exp_program.call_spec)
+    trt_exp_program = torchtrt.dynamo.serialize(
+        trt_gm, [input], call_spec=exp_program.call_spec, ir="exported_program"
+    )
     torch._export.save(trt_exp_program, "/tmp/trt.ep")
     deser_trt_exp_program = torch._export.load("/tmp/trt.ep")
 

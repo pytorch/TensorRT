@@ -22,8 +22,8 @@ The following code illustrates this approach.
     model = MyModel().eval().cuda()
     inputs = torch.randn((1, 3, 224, 224)).cuda()
     trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs) # Output is a torch.fx.GraphModule
-    trt_script_model = torch.jit.trace(trt_gm, inputs)
-    torch.jit.save(trt_script_model, "trt_model.ts")
+    trt_traced_model = torchtrt.dynamo.serialize(trt_gm, inputs)
+    torch.jit.save(trt_traced_model, "trt_model.ts")
 
     # Later, you can load it and run inference
     model = torch.jit.load("trt_model.ts").cuda()
@@ -42,7 +42,7 @@ b) ExportedProgram
     inputs = torch.randn((1, 3, 224, 224)).cuda()
     trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs) # Output is a torch.fx.GraphModule
     # Transform and create an exported program
-    trt_exp_program = torch_tensorrt.dynamo.transform(trt_gm, inputs, call_spec)
+    trt_exp_program = torch_tensorrt.dynamo.serialize(trt_gm, inputs, call_spec, ir="exported_program")
     torch.export.save(trt_exp_program, "trt_model.ep")
 
     # Later, you can load it and run inference 

@@ -10,31 +10,42 @@ from torch.export import ExportedProgram, ExportGraphSignature
 from torch_tensorrt.dynamo import partitioning
 
 
-def transform(
-    gm: torch.fx.GraphModule, inputs: Sequence[torch.Tensor], call_spec: CallSpec
+def serialize(
+    gm: torch.fx.GraphModule,
+    inputs: Sequence[torch.Tensor],
+    call_spec: CallSpec = None,
+    ir: str = "torchscript",
 ) -> ExportedProgram:
-    # Run shape analysis
-    _, outputs_map = partitioning.run_shape_analysis(gm, inputs)
+    if ir == "torchscript":
+        return torch.jit.trace(gm, inputs)
+    elif ir == "exported_program":
+        assert call_spec
+        # Run shape analysis
+        _, outputs_map = partitioning.run_shape_analysis(gm, inputs)
 
-    # Inline TensorRT submodules
-    inline_trt_modules(gm, outputs_map)
+        # Inline TensorRT submodules
+        inline_trt_modules(gm, outputs_map)
 
-    # Inline pytorch submodules
-    inline_torch_modules(gm)
+        # Inline pytorch submodules
+        inline_torch_modules(gm)
 
-    # Lift constant buffers and parameters in the graph
-    # torch.export serialization expects them to be lifted
-    lift_constant_pass(gm)
+        # Lift constant buffers and parameters in the graph
+        # torch.export serialization expects them to be lifted
+        lift_constant_pass(gm)
 
-    # Clean the graph
-    gm.delete_all_unused_submodules()
-    gm.graph.eliminate_dead_code()
-    gm.graph.lint()
+        # Clean the graph
+        gm.delete_all_unused_submodules()
+        gm.graph.eliminate_dead_code()
+        gm.graph.lint()
 
-    # Create an exported program with the TRT GraphModule
-    exp_program = create_trt_exp_program(gm, call_spec)
+        # Create an exported program with the TRT GraphModule
+        exp_program = create_trt_exp_program(gm, call_spec)
 
-    return exp_program
+        return exp_program
+    else:
+        raise ValueError(
+            "Invalid ir provided for serialization. Select among torchscript | exported_program"
+        )
 
 
 def lift_constant_pass(trt_gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
