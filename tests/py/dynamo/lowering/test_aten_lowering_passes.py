@@ -282,7 +282,10 @@ class TestLowerLinear(TestCase):
 
         fx_graph = torch.fx.symbolic_trace(Linear())
         expected_ops = {torch.ops.aten.linear.default}
-        unexpected_ops = {}
+        unexpected_ops = {
+            torch.ops.aten.permute.default,
+            torch.ops.aten.addmm.default,
+        }
 
         unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
             fx_graph,
@@ -338,7 +341,7 @@ class TestLowerLinear(TestCase):
                 return out
 
         inputs = [
-            torch.rand((3, 2, 32)).cuda(),
+            torch.rand((2, 2, 32)).cuda(),
             torch.rand((64, 32)).cuda(),
             torch.rand((64,)).cuda(),
         ]
