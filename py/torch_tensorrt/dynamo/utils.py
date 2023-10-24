@@ -5,12 +5,12 @@ from dataclasses import fields, replace
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import torch
-import torch_tensorrt
 from torch_tensorrt._Device import Device
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo._defaults import PRECISION
 
+import torch_tensorrt
 from packaging import version
 
 logger = logging.getLogger(__name__)
@@ -104,17 +104,22 @@ def set_log_level(parent_logger: Any, level: Any) -> None:
 
 def prepare_inputs(
     inputs: Input | torch.Tensor | Sequence[Any] | Dict[Any, Any],
+    disable_memory_format_check: bool = False,
 ) -> Any:
     if isinstance(inputs, Input):
         return inputs
 
     elif isinstance(inputs, torch.Tensor):
-        return Input.from_tensor(inputs)
+        return Input.from_tensor(
+            inputs, disable_memory_format_check=disable_memory_format_check
+        )
 
     elif isinstance(inputs, list):
         torchtrt_input_list = []
         for input_obj in inputs:
-            torchtrt_input = prepare_inputs(input_obj)
+            torchtrt_input = prepare_inputs(
+                input_obj, disable_memory_format_check=disable_memory_format_check
+            )
             torchtrt_input_list.append(torchtrt_input)
 
         return torchtrt_input_list
@@ -122,7 +127,9 @@ def prepare_inputs(
     elif isinstance(inputs, tuple):
         torchtrt_inputs_tup = []
         for input_obj in inputs:
-            torchtrt_input = prepare_inputs(input_obj)
+            torchtrt_input = prepare_inputs(
+                input_obj, disable_memory_format_check=disable_memory_format_check
+            )
             torchtrt_inputs_tup.append(torchtrt_input)
 
         return tuple(torchtrt_inputs_tup)
@@ -131,7 +138,9 @@ def prepare_inputs(
         torchtrt_inputs_dict: Dict[Any, Any] = dict()
 
         for key, input_obj in inputs.items():
-            torchtrt_input = prepare_inputs(input_obj)
+            torchtrt_input = prepare_inputs(
+                input_obj, disable_memory_format_check=disable_memory_format_check
+            )
             torchtrt_inputs_dict[key] = torchtrt_input
 
         return torchtrt_inputs_dict

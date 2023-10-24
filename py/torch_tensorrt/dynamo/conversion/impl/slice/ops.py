@@ -31,30 +31,23 @@ def slice_op(  # TODO: This should be slice not whatever is in base
             "of the TensorRT region!"
         )
 
-    ranks = len(input.shape) + (1 if ctx.net.has_implicit_batch_dimension else 0)
-    dim = get_positive_dim(dim, ranks)
-    dynamic_shape = has_dynamic_shape(input.shape)
-    if ctx.net.has_implicit_batch_dimension:
-        if dim == 0:
-            raise RuntimeError(
-                f"We do not support slice_tensor at batch dim when it's implicit, got {dim}!"
-            )
-        dim = dim - 1
-    else:
-        if dynamic_shape:
-            # Check whether slice target dim is dynamic shape dim
-            assert input.shape[dim] != -1, "Can't chunk on dynamic shape dimension!"
-    start_int = start
-    stop_int = stop
-    if stop_int == 2**63 - 1:
-        stop_int = input.shape[dim]
-    step_int = step
+    dim = get_positive_dim(dim, len(input.shape))
+    start = get_positive_dim(start, input.shape[dim])
+    stop = get_positive_dim(stop, input.shape[dim])
+
+    if has_dynamic_shape(input.shape):
+        # Check whether slice target dim is dynamic shape dim
+        assert input.shape[dim] != -1, "Can't slice on dynamic shape dimension!"
+
+    if stop == 2**63 - 1:
+        stop = input.shape[dim]
+
     start_slice = [0] * len(input.shape)
-    start_slice[dim] = start_int
-    stride_slice = [1] * len(start_slice)
-    stride_slice[dim] = step_int
+    start_slice[dim] = start
+    stride_slice = [1] * len(input.shape)
+    stride_slice[dim] = step
     output_shape = list(input.shape)
-    output_shape[dim] = math.ceil((stop_int - start_int) / step_int)
+    output_shape[dim] = math.ceil((stop - start) / step)
 
     return slice(
         ctx, target, source_ir, name, input, start_slice, output_shape, stride_slice
