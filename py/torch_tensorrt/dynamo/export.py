@@ -44,7 +44,7 @@ def serialize(
         return exp_program
     else:
         raise ValueError(
-            "Invalid ir provided for serialization. Select among torchscript | exported_program"
+            "Invalid ir : {ir} provided for serialization. Options include torchscript | exported_program"
         )
 
 
