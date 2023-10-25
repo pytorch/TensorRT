@@ -1,8 +1,8 @@
 import math
 from typing import Optional
 
+import numpy as np
 import tensorrt as trt
-import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -13,11 +13,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 from torch_tensorrt.dynamo.conversion.impl.slice.base import slice
 from torch_tensorrt.fx.converters.converter_utils import (
-    Frameworks,
     has_dynamic_shape,
     prepend_ones,
     set_layer_name,
-    unified_dtype_converter,
 )
 from torch_tensorrt.fx.types import Shape, TRTTensor
 
