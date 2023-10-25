@@ -15,9 +15,9 @@ using TensorRT in an Ahead-Of-Time fashion.
 Using the Dynamo backend 
 ----------------------------------------
 Pytorch 2.1 introduced ``torch.export`` APIs which 
-can export graphs from Pytorch programs into ``ExportedProgram``s. Torch-TensorRT dynamo 
-backend compiles these ``ExportedProgram``s and optimizes them using TensorRT. Here's a simple 
-usage of the dynamo backend  
+can export graphs from Pytorch programs into ``ExportedProgram`` objects. Torch-TensorRT dynamo 
+backend compiles these ``ExportedProgram`` objects and optimizes them using TensorRT. Here's a simple 
+usage of the dynamo backend
 
 .. code-block:: python
 
@@ -38,7 +38,6 @@ Customizeable Settings
 There are lot of options for users to customize their settings for optimizing with TensorRT. 
 Some of the frequently used options are as follows: 
 
-
 * ``inputs`` - For static shapes, this can be a list of torch tensors or `torch_tensorrt.Input` objects. For dynamic shapes, this should be a list of ``torch_tensorrt.Input`` objects.
 * ``enabled_precisions`` - Set of precisions that TensorRT builder can use during optimization.
 * ``truncate_long_and_double`` - Truncates long and double values to int and floats respectively.
@@ -46,7 +45,8 @@ Some of the frequently used options are as follows:
 * ``min_block_size`` - Minimum number of consecutive operators required to be executed as a TensorRT segment.
 
 The complete list of options can be found `here <https://github.com/pytorch/TensorRT/blob/123a486d6644a5bbeeec33e2f32257349acc0b8f/py/torch_tensorrt/dynamo/compile.py#L51-L77>`_
-Note: We do not support INT precision currently in Dynamo. Support for this currently exists in 
+
+.. note:: We do not support INT precision currently in Dynamo. Support for this currently exists in 
 our Torchscript IR. We plan to implement similar support for dynamo in our next release.
 
 Under the hood
