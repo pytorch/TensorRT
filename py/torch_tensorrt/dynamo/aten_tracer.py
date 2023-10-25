@@ -28,7 +28,7 @@ def trace(
     device = to_torch_device(kwargs.get("device", default_device()))
     torch_inputs = get_torch_inputs(inputs, device)
     dynamic_shapes = {}
-    for idx, input in enumerate(inputs):
+    for input in inputs:
         if input.shape_mode == Input._ShapeMode.DYNAMIC:
             min_shape = input.shape["min_shape"]
             opt_shape = input.shape["opt_shape"]
