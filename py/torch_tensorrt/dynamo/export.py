@@ -1,18 +1,17 @@
 import copy
 import operator
-from typing import Any, Dict, Sequence, Tuple, Union
+from typing import Any, Dict, Sequence, Tuple, Union, cast
 
 import torch
-import torch.utils._pytree as pytree
 from torch._guards import detect_fake_mode
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.export import ExportedProgram, ExportGraphSignature
 from torch.export.exported_program import (
-    ArgumentSpec,
-    ConstantArgument,
-    SymIntArgument,
+    InputKind,
+    InputSpec,
+    OutputKind,
+    OutputSpec,
     TensorArgument,
-    _sig_to_specs,
 )
 from torch_tensorrt.dynamo import partitioning
 
@@ -169,13 +168,13 @@ def copy_submodule_attributes(
     Copy the getattr attriibutes from submodule to parent module gm.
     The graph_copy call doesn't do this for us unfortunately.
     """
-    for idx, param in enumerate(gm.named_parameters()):
-        if submod_name in param[0]:
+    for param in gm.named_parameters():
+        if param[0].startswith(submod_name + "."):
             attr_name = param[0].replace(submod_name + ".", "")
             gm.register_parameter(attr_name, param[1])
 
-    for idx, buffer in enumerate(gm.named_buffers()):
-        if submod_name in buffer[0]:
+    for buffer in gm.named_buffers():
+        if buffer[0].startswith(submod_name + "."):
             attr_name = buffer[0].replace(submod_name + ".", "")
             gm.register_buffer(attr_name, buffer[1])
 
@@ -187,50 +186,29 @@ def create_trt_exp_program(
     """Creates a new Exported Program. This function takes an torch.fx.GraphModule which has TRT engines
     and constructs an Exported Program object with the new IO node names, call_spec and state_dict
     """
-    input_node_names = [
-        node.name for node in gm.graph.nodes if node.op == "placeholder"
-    ]
-    output_node_names = [node.name for node in gm.graph.nodes if node.op == "output"]
-    param_names = [param[0] for param in gm.named_parameters()]
-    buffer_names = [buffer[0] for buffer in gm.named_buffers()]
-    inputs_to_parameters = {}
-    inputs_to_buffers = {}
-    for node in gm.graph.nodes:
-        if node.target in param_names:
-            inputs_to_parameters[node.name] = node.target
-        if node.target in buffer_names:
-            inputs_to_buffers[node.name] = node.target
+    input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]
+    output_nodes = [node for node in gm.graph.nodes if node.op == "output"]
 
-    def make_argument_spec(node: torch.fx.Node) -> ArgumentSpec:
-        # import pdb; pdb.set_trace()
-        val = node.meta["val"]
-        if isinstance(val, FakeTensor):
-            return TensorArgument(name=node.name)
-        elif isinstance(val, torch.SymInt):
-            return SymIntArgument(name=node.name)
-        else:
-            return ConstantArgument(value=val)
-
-    # import pdb; pdb.set_trace()
-    input_args = [
-        make_argument_spec(node) for node in gm.graph.nodes if node.op == "placeholder"
+    input_specs = [
+        InputSpec(InputKind.USER_INPUT, TensorArgument(name=node.name), node.target)
+        for node in input_nodes
     ]
-    output_args = [
-        make_argument_spec(node)
-        for node in pytree.tree_flatten(next(iter(reversed(gm.graph.nodes))).args)[0]
+    output_specs = [
+        OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name=node.name), node.target)
+        for node in output_nodes
     ]
-    input_specs, output_specs = _sig_to_specs(
-        user_inputs=set(input_node_names),
-        inputs_to_parameters=inputs_to_parameters,
-        inputs_to_buffers=inputs_to_buffers,
-        user_outputs=set(output_node_names),
-        buffer_mutations={},
-        grad_params={},
-        grad_user_inputs={},
-        loss_output=None,
-        inputs=input_args,
-        outputs=output_args,
-    )
+    # input_specs, output_specs = _sig_to_specs(
+    #     user_inputs=set(input_node_names),
+    #     inputs_to_parameters=inputs_to_parameters,
+    #     inputs_to_buffers=inputs_to_buffers,
+    #     user_outputs=set(output_node_names),
+    #     buffer_mutations={},
+    #     grad_params={},
+    #     grad_user_inputs={},
+    #     loss_output=None,
+    #     inputs=input_args,
+    #     outputs=output_args,
+    # )
 
     trt_graph_signature = ExportGraphSignature(
         input_specs=input_specs, output_specs=output_specs
@@ -271,16 +249,15 @@ def inline_trt_modules(
             trt_node.meta["val"] = []
             # Generate meta data for TRT node (a FakeTensor with corresponding output shape)
             for idx in range(num_outputs):
-                with torch._subclasses.fake_tensor.FakeTensorMode.push():
-                    trt_node.meta["val"].append(
-                        # cast(
-                        # FakeTensor,
+                trt_node.meta["val"].append(
+                    cast(
+                        FakeTensor,
                         torch.empty_strided(
                             tuple(outputs_map[trt_module_node.name][idx]),
                             tuple([1] * len(outputs_map[trt_module_node.name][idx])),
                         ),
-                        # )
                     )
+                )
 
         if num_outputs == 1:
             # Insert getitem nodes as outputs (for export serialization to work)
