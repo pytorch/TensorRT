@@ -22,8 +22,8 @@ The following code illustrates this approach.
     model = MyModel().eval().cuda()
     inputs = torch.randn((1, 3, 224, 224)).cuda()
     trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs) # Output is a torch.fx.GraphModule
-    trt_script_model = torch.jit.trace(trt_gm, inputs)
-    torch.jit.save(trt_script_model, "trt_model.ts")
+    trt_traced_model = torchtrt.dynamo.serialize(trt_gm, inputs)
+    torch.jit.save(trt_traced_model, "trt_model.ts")
 
     # Later, you can load it and run inference
     model = torch.jit.load("trt_model.ts").cuda()
@@ -37,21 +37,19 @@ b) ExportedProgram
 
     import torch
     import torch_tensorrt
-    from torch_tensorrt.dynamo.export import transform, create_exported_program
 
     model = MyModel().eval().cuda()
     inputs = torch.randn((1, 3, 224, 224)).cuda()
     trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs) # Output is a torch.fx.GraphModule
     # Transform and create an exported program
-    trt_gm = transform(trt_gm, inputs)
-    trt_exp_program = create_exported_program(trt_gm, call_spec, trt_gm.state_dict())
-    torch._export.save(trt_exp_program, "trt_model.ep")
+    trt_exp_program = torch_tensorrt.dynamo.serialize(trt_gm, inputs, call_spec, ir="exported_program")
+    torch.export.save(trt_exp_program, "trt_model.ep")
 
     # Later, you can load it and run inference 
-    model = torch._export.load("trt_model.ep")
+    model = torch.export.load("trt_model.ep")
     model(inputs)
 
-`torch_tensorrt.dynamo.export.transform` inlines the submodules within a GraphModule to their corresponding nodes and stiches all the nodes together. 
+`torch_tensorrt.dynamo.transform` inlines the submodules within a GraphModule to their corresponding nodes, stiches all the nodes together and creates an ExportedProgram. 
 This is needed as `torch._export` serialization cannot handle serializing and deserializing of submodules (`call_module` nodes). 
 
 NOTE: This way of saving the models using `ExportedProgram` is experimental. Here is a known issue : https://github.com/pytorch/TensorRT/issues/2341
