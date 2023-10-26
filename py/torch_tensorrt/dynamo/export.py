@@ -197,18 +197,6 @@ def create_trt_exp_program(
         OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name=node.name), node.target)
         for node in output_nodes
     ]
-    # input_specs, output_specs = _sig_to_specs(
-    #     user_inputs=set(input_node_names),
-    #     inputs_to_parameters=inputs_to_parameters,
-    #     inputs_to_buffers=inputs_to_buffers,
-    #     user_outputs=set(output_node_names),
-    #     buffer_mutations={},
-    #     grad_params={},
-    #     grad_user_inputs={},
-    #     loss_output=None,
-    #     inputs=input_args,
-    #     outputs=output_args,
-    # )
 
     trt_graph_signature = ExportGraphSignature(
         input_specs=input_specs, output_specs=output_specs

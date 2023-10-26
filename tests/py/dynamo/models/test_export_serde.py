@@ -249,7 +249,10 @@ def test_resnet18_save_load(ir):
     """
     model = models.resnet18().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
+    print(torch.export.export(model, (input,)))
+    import pdb
 
+    pdb.set_trace()
     compile_spec = {
         "inputs": [
             torchtrt.Input(
@@ -263,6 +266,9 @@ def test_resnet18_save_load(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
     trt_gm = transform(trt_gm, [input])
+    import pdb
+
+    pdb.set_trace()
     trt_exp_program = create_trt_exp_program(trt_gm, trt_gm.state_dict())
 
     torch._export.save(trt_exp_program, "/tmp/trt.ep")
