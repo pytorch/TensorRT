@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Saving models compiled with Torch-TensorRT &mdash; Torch-TensorRT v2.2.0.dev0+533215c documentation</title>
+  <title>Saving models compiled with Torch-TensorRT &mdash; Torch-TensorRT v2.2.0.dev0+9d87f82 documentation</title>
   
 
   
@@ -237,7 +237,7 @@
               
               
                 <div class="version">
-                  v2.2.0.dev0+533215c
+                  v2.2.0.dev0+9d87f82
                 </div>
               
             
@@ -280,6 +280,7 @@
 <li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
 <li class="toctree-l1"><a class="reference internal" href="getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile.html">Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamo_export.html">Torch-TensorRT Dynamo Backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ptq.html">Post Training Quantization (PTQ)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Saving models compiled with Torch-TensorRT</a></li>
@@ -402,15 +403,15 @@
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
   <section id="saving-models-compiled-with-torch-tensorrt">
-<span id="runtime"></span><h1>Saving models compiled with Torch-TensorRT<a class="headerlink" href="#saving-models-compiled-with-torch-tensorrt" title="Permalink to this headline">¶</a></h1>
-<p>Saving models compiled with Torch-TensorRT varies slightly with the <cite>ir</cite> that has been used for compilation.</p>
-<ol class="arabic simple">
-<li><p>Dynamo IR</p></li>
-</ol>
+<span id="saving-models"></span><h1>Saving models compiled with Torch-TensorRT<a class="headerlink" href="#saving-models-compiled-with-torch-tensorrt" title="Permalink to this headline">¶</a></h1>
+<span class="target" id="module-torch_tensorrt.dynamo"></span><p>Saving models compiled with Torch-TensorRT varies slightly with the <cite>ir</cite> that has been used for compilation.</p>
+<section id="dynamo-ir">
+<h2>Dynamo IR<a class="headerlink" href="#dynamo-ir" title="Permalink to this headline">¶</a></h2>
 <p>Starting with 2.1 release of Torch-TensorRT, we are switching the default compilation to be dynamo based.
 The output of <cite>ir=dynamo</cite> compilation is a <cite>torch.fx.GraphModule</cite> object. There are two ways to save these objects</p>
-<p>a) Converting to Torchscript
-<cite>torch.fx.GraphModule</cite> objects cannot be serialized directly. Hence we use <cite>torch.jit.trace</cite> to convert this into a <cite>ScriptModule</cite> object which can be saved to disk.
+<section id="a-converting-to-torchscript">
+<h3>a) Converting to Torchscript<a class="headerlink" href="#a-converting-to-torchscript" title="Permalink to this headline">¶</a></h3>
+<p><cite>torch.fx.GraphModule</cite> objects cannot be serialized directly. Hence we use <cite>torch.jit.trace</cite> to convert this into a <cite>ScriptModule</cite> object which can be saved to disk.
 The following code illustrates this approach.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torch_tensorrt</span>
@@ -426,8 +427,10 @@ The following code illustrates this approach.</p>
 <span class="n">model</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>b) ExportedProgram
-<cite>torch.export.ExportedProgram</cite> is a new format introduced in Pytorch 2.1. After we compile a Pytorch module using Torch-TensorRT, the resultant
+</section>
+<section id="b-exportedprogram">
+<h3>b) ExportedProgram<a class="headerlink" href="#b-exportedprogram" title="Permalink to this headline">¶</a></h3>
+<p><cite>torch.export.ExportedProgram</cite> is a new format introduced in Pytorch 2.1. After we compile a Pytorch module using Torch-TensorRT, the resultant
 <cite>torch.fx.GraphModule</cite> along with additional metadata can be used to create <cite>ExportedProgram</cite> which can be saved and loaded from disk.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torch_tensorrt</span>
@@ -449,9 +452,10 @@ The following code illustrates this approach.</p>
 <p><cite>torch_tensorrt.dynamo.export.transform</cite> inlines the submodules within a GraphModule to their corresponding nodes and stiches all the nodes together.
 This is needed as <cite>torch._export</cite> serialization cannot handle serializing and deserializing of submodules (<cite>call_module</cite> nodes).</p>
 <p>NOTE: This way of saving the models using <cite>ExportedProgram</cite> is experimental. Here is a known issue : <a class="reference external" href="https://github.com/pytorch/TensorRT/issues/2341">https://github.com/pytorch/TensorRT/issues/2341</a></p>
-<ol class="arabic simple" start="2">
-<li><p>Torchscript IR</p></li>
-</ol>
+</section>
+</section>
+<section id="torchscript-ir">
+<h2>Torchscript IR<a class="headerlink" href="#torchscript-ir" title="Permalink to this headline">¶</a></h2>
 <blockquote>
 <div><p>In Torch-TensorRT 1.X versions, the primary way to compile and run inference with Torch-TensorRT is using Torchscript IR.
 This behavior stays the same in 2.X versions as well.</p>
@@ -469,6 +473,7 @@ This behavior stays the same in 2.X versions as well.</p>
 </pre></div>
 </div>
 </div></blockquote>
+</section>
 </section>
 
 
@@ -514,7 +519,15 @@ This behavior stays the same in 2.X versions as well.</p>
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Saving models compiled with Torch-TensorRT</a></li>
+<li><a class="reference internal" href="#">Saving models compiled with Torch-TensorRT</a><ul>
+<li><a class="reference internal" href="#dynamo-ir">Dynamo IR</a><ul>
+<li><a class="reference internal" href="#a-converting-to-torchscript">a) Converting to Torchscript</a></li>
+<li><a class="reference internal" href="#b-exportedprogram">b) ExportedProgram</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#torchscript-ir">Torchscript IR</a></li>
+</ul>
+</li>
 </ul>
 
             </div>

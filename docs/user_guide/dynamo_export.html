@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Lowering Phase &mdash; Torch-TensorRT v2.2.0.dev0+9d87f82 documentation</title>
+  <title>Torch-TensorRT Dynamo Backend &mdash; Torch-TensorRT v2.2.0.dev0+9d87f82 documentation</title>
   
 
   
@@ -39,8 +39,8 @@
   <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Partitioning Phase" href="partitioning.html" />
-    <link rel="prev" title="System Overview" href="system_overview.html" />
+    <link rel="next" title="Post Training Quantization (PTQ)" href="ptq.html" />
+    <link rel="prev" title="Torch-TensorRT torch.compile Backend" href="torch_compile.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -274,19 +274,19 @@
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_windows.html#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/torch_compile.html">Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/dynamo_export.html">Torch-TensorRT Dynamo Backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/using_dla.html">DLA</a></li>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_compile.html">Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Torch-TensorRT Dynamo Backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ptq.html">Post Training Quantization (PTQ)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="using_dla.html">DLA</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
@@ -317,11 +317,11 @@
 <li class="toctree-l1"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
-<ul class="current">
-<li class="toctree-l1 current"><a class="reference internal" href="system_overview.html">System Overview</a></li>
-<li class="toctree-l1"><a class="reference internal" href="writing_converters.html">Writing Converters</a></li>
-<li class="toctree-l1"><a class="reference internal" href="writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/system_overview.html">System Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/writing_converters.html">Writing Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Indices</span></p>
 <ul>
@@ -366,15 +366,13 @@
       </li>
 
         
-          <li><a href="system_overview.html">System Overview</a> &gt;</li>
-        
-      <li>Lowering Phase</li>
+      <li>Torch-TensorRT Dynamo Backend</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
         
             
-            <a href="../_sources/contributors/lowering.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+            <a href="../_sources/user_guide/dynamo_export.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
           
         
       </li>
@@ -404,210 +402,77 @@
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
-  <section id="lowering-phase">
-<span id="lowering"></span><h1>Lowering Phase<a class="headerlink" href="#lowering-phase" title="Permalink to this headline">¶</a></h1>
-<p>The lowering phase is made up out of passes which are operations which map a graph from a high level representation
-to a lower level one. Each pass does something specific for instance inlining method calls. The idea is to
-significantly reduce what the conversion phase needs to be able to handle when actually mapping to TensorRT.
-We aim for closer to 1-&gt;1 op conversion vs looking for applicable subgraphs, limiting the number of converters and
-reduce the scope of each converter.</p>
-<p>You can see the effects of each pass by setting the log level to <code class="docutils literal notranslate"><span class="pre">Level::kGraph</span></code></p>
-<section id="passes-used">
-<h2>Passes Used<a class="headerlink" href="#passes-used" title="Permalink to this headline">¶</a></h2>
-<section id="eliminatecommonsubexpression">
-<h3>EliminateCommonSubexpression<a class="headerlink" href="#eliminatecommonsubexpression" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/common_subexpression_elimination.h">torch/csrc/jit/passes/common_subexpression_elimination.h</a></p>
-</div></blockquote>
-<p>Removes common subexpressions in the graph</p>
-</section>
-<section id="eliminate-dead-code">
-<h3>Eliminate Dead Code<a class="headerlink" href="#eliminate-dead-code" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/dead_code_elimination.h">torch/csrc/jit/passes/dead_code_elimination.h</a></p>
-</div></blockquote>
-<p>Dead code elimination will check if a node has side effects and not delete it if it does.</p>
-</section>
-<section id="eliminate-exeception-or-pass-pattern">
-<h3>Eliminate Exeception Or Pass Pattern<a class="headerlink" href="#eliminate-exeception-or-pass-pattern" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/exception_elimination.cpp">Torch-TensorRT/core/lowering/passes/exception_elimination.cpp</a></p>
-</div></blockquote>
-<p>A common pattern in scripted modules are dimension gaurds which will throw execptions if
-the input dimension is not what was expected.</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>%1013 : bool = aten::ne(%1012, %24) # ~/.local/lib/python3.6/site-packages/torch/nn/modules/batchnorm.py:248:11
-    = prim::If(%1013) # ~/.local/lib/python3.6/site-packages/torch/nn/modules/batchnorm.py:248:8
-    block0():
-        = prim::RaiseException(%23) # ~/.local/lib/python3.6/site-packages/torch/nn/modules/batchnorm.py:249:12
-    -&gt; ()
-    block1():
-    -&gt; ()
+  <section id="torch-tensorrt-dynamo-backend">
+<span id="dynamo-export"></span><h1>Torch-TensorRT Dynamo Backend<a class="headerlink" href="#torch-tensorrt-dynamo-backend" title="Permalink to this headline">¶</a></h1>
+<span class="target" id="module-torch_tensorrt.dynamo"></span><p>This guide presents Torch-TensorRT dynamo backend which optimizes Pytorch models
+using TensorRT in an Ahead-Of-Time fashion.</p>
+<section id="using-the-dynamo-backend">
+<h2>Using the Dynamo backend<a class="headerlink" href="#using-the-dynamo-backend" title="Permalink to this headline">¶</a></h2>
+<p>Pytorch 2.1 introduced <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> APIs which
+can export graphs from Pytorch programs into <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> objects. Torch-TensorRT dynamo
+backend compiles these <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> objects and optimizes them using TensorRT. Here’s a simple
+usage of the dynamo backend</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
+<span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">))</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span> <span class="c1"># Output is a torch.fx.GraphModule</span>
+<span class="n">trt_gm</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Since we are resolving all of this at compile time and there are no execptions in the TensorRT graph, we just remove it.</p>
-</section>
-<section id="eliminate-redundant-gaurds">
-<h3>Eliminate Redundant Gaurds<a class="headerlink" href="#eliminate-redundant-gaurds" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/guard_elimination.h">torch/csrc/jit/passes/guard_elimination.h</a></p>
-</div></blockquote>
-<p>Eliminate redundant guards for ops whose outputs are fully determined by their inputs i.e. if inputs to such ops are
-guarded we are allowed to remove a guard on ops’ outputs</p>
-</section>
-<section id="freeze-module">
-<h3>Freeze Module<a class="headerlink" href="#freeze-module" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/freeze_module.h">torch/csrc/jit/passes/freeze_module.h</a></p>
-</div></blockquote>
-<p>Freeze attributes and inline constants and modules. Propogates constants in the graph.</p>
-</section>
-<section id="fuse-addmm-branches">
-<h3>Fuse AddMM Branches<a class="headerlink" href="#fuse-addmm-branches" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/fuse_addmm_branches.cpp">Torch-TensorRT/core/lowering/passes/fuse_addmm_branches.cpp</a></p>
-</div></blockquote>
-<p>A common pattern in scripted modules is tensors of different dimensions use different constructions for implementing linear layers. We fuse these
-different varients into a single one that will get caught by the Unpack AddMM pass.</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>%ret : Tensor = prim::If(%622)
-block0():
-  %ret.1 : Tensor = aten::addmm(%self.fc.bias, %x9.1, %3677, %3, %3)
-  -&gt; (%ret.1)
-block1():
-  %output.1 : Tensor = aten::matmul(%x9.1, %3677)
-  %output0.1 : Tensor = aten::add_(%output.1, %self.fc.bias, %3)
-  -&gt; (%output0.1)
-</pre></div>
-</div>
-<p>We fuse this set of blocks into a graph like this:</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>%ret : Tensor = aten::addmm(%self.fc.bias, %x9.1, %3677, %3, %3)
-</pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile</span></code> is the main API for users to interact with Torch-TensorRT dynamo backend. The input type of the model should be <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> (ideally the output of <code class="docutils literal notranslate"><span class="pre">torch.export.export</span></code> or <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace</span></code> (discussed in the section below)) and output type is a <code class="docutils literal notranslate"><span class="pre">torch.fx.GraphModule</span></code> object.</p>
 </div>
 </section>
-<section id="fuse-linear">
-<h3>Fuse Linear<a class="headerlink" href="#fuse-linear" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/fuse_linear.h">torch/csrc/jit/passes/fuse_linear.h</a></p>
-</div></blockquote>
-<p>Match the <code class="docutils literal notranslate"><span class="pre">aten::linear</span></code> pattern and fuse it into a single <code class="docutils literal notranslate"><span class="pre">aten::linear</span></code>
-This pass fuse the addmm or matmul + add generated by JIT back to linear</p>
-</section>
-<section id="fuse-flatten-linear">
-<h3>Fuse Flatten Linear<a class="headerlink" href="#fuse-flatten-linear" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/fuse_flatten_linear.cpp">Torch-TensorRT/core/lowering/passes/fuse_flatten_linear.cpp</a></p>
-</div></blockquote>
-<p>TensorRT implicity flattens input layers into fully connected layers when they are higher than 1D. So when there is a
-<code class="docutils literal notranslate"><span class="pre">aten::flatten</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">aten::linear</span></code> pattern we remove the <code class="docutils literal notranslate"><span class="pre">aten::flatten</span></code>.</p>
-</section>
-<section id="lower-graph">
-<h3>Lower Graph<a class="headerlink" href="#lower-graph" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/lower_graph.h">torch/csrc/jit/passes/lower_graph.h</a></p>
-</div></blockquote>
-<p>Given a graph with of a method which first argument is %self, lower it to a graph where
-all attributes accesses are replaced with explicit inputs of the graph
-(rather than results of prim::GetAttr executed on %self). Returns a tuple
-(graph, parameters) where the last module.parameters.size() inputs to the
-graph are the trainable parameters used in this method. The remaining inputs
-are the true inputs to the function.</p>
-</section>
-<section id="lower-tuples">
-<h3>Lower Tuples<a class="headerlink" href="#lower-tuples" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/lower_tuples.h">torch/csrc/jit/passes/lower_tuples.h</a></p>
-</div></blockquote>
+<section id="customizeable-settings">
+<h2>Customizeable Settings<a class="headerlink" href="#customizeable-settings" title="Permalink to this headline">¶</a></h2>
+<p>There are lot of options for users to customize their settings for optimizing with TensorRT.
+Some of the frequently used options are as follows:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">LowerSimpleTuples</span></code>:</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">inputs</span></code> - For static shapes, this can be a list of torch tensors or <cite>torch_tensorrt.Input</cite> objects. For dynamic shapes, this should be a list of <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.Input</span></code> objects.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">enabled_precisions</span></code> - Set of precisions that TensorRT builder can use during optimization.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">truncate_long_and_double</span></code> - Truncates long and double values to int and floats respectively.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">torch_executed_ops</span></code> - Operators which are forced to be executed by Torch.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">min_block_size</span></code> - Minimum number of consecutive operators required to be executed as a TensorRT segment.</p></li>
 </ul>
-<p>Removes tuples where TupleConstruct and TupleUnpack are matched but leaves tuples in place across if statements, loops, and as inputs/outputs</p>
+<p>The complete list of options can be found <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/123a486d6644a5bbeeec33e2f32257349acc0b8f/py/torch_tensorrt/dynamo/compile.py#L51-L77">here</a></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>We do not support INT precision currently in Dynamo. Support for this currently exists in</p>
+</div>
+<p>our Torchscript IR. We plan to implement similar support for dynamo in our next release.</p>
+</section>
+<section id="under-the-hood">
+<h2>Under the hood<a class="headerlink" href="#under-the-hood" title="Permalink to this headline">¶</a></h2>
+<p>Under the hood, <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile</span></code> performs the following on the graph.</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">LowerAllTuples</span></code>:</p></li>
+<li><p>Lowering - Applies lowering passes to add/remove operators for optimal conversion.</p></li>
+<li><p>Partitioning - Partitions the graph into Pytorch and TensorRT segments based on the <code class="docutils literal notranslate"><span class="pre">min_block_size</span></code> and <code class="docutils literal notranslate"><span class="pre">torch_executed_ops</span></code> field.</p></li>
+<li><p>Conversion - Pytorch ops get converted into TensorRT ops in this phase.</p></li>
+<li><p>Optimization - Post conversion, we build the TensorRT engine and embed this inside the pytorch graph.</p></li>
 </ul>
-<p>Removes _all_ tuples and raises an error if some cannot be removed, this is used by ONNX to ensure there are not tuples before conversion, but will not work on graphs whose inputs contain tuples.</p>
 </section>
-<section id="module-fallback">
-<h3>Module Fallback<a class="headerlink" href="#module-fallback" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/module_fallback.cpp">Torch-TensorRT/core/lowering/passes/module_fallback.cpp</a></p>
-</div></blockquote>
-<p>Module fallback consists of two lowering passes that must be run as a pair. The first pass is run before freezing to place delimiters in the graph around modules
-that should run in PyTorch. The second pass marks nodes between these delimiters after freezing to signify they should run in PyTorch.</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">NotateModuleForFallback</span></code></p></li>
-</ul>
-<p>Places delimiting nodes around module calls pre freezing to signify where in the graph nodes should run in PyTorch</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">MarkNodesForFallback</span></code></p></li>
-</ul>
-<p>Looks for delimiters then marks all nodes between the delimiters to tell partitioning to run them in PyTorch</p>
-</section>
-<section id="peephole-optimze">
-<h3>Peephole Optimze<a class="headerlink" href="#peephole-optimze" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/ppeephole_optimze.h">torch/csrc/jit/passes/peephole_optimze.h</a></p>
-</div></blockquote>
-<p>The intent for this optimization pass is to catch all of the small, easy to catch peephole optimizations you might be interested in doing.</p>
-<dl class="simple">
-<dt>Right now, it does:</dt><dd><ul class="simple">
-<li><p>Eliminate no-op ‘expand’ nodes</p></li>
-<li><p>Simply x.t().t() to x</p></li>
-</ul>
-</dd>
-</dl>
-</section>
-<section id="remove-contiguous">
-<h3>Remove Contiguous<a class="headerlink" href="#remove-contiguous" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/remove_contiguous.cpp">Torch-TensorRT/core/lowering/passes/remove_contiguous.cpp</a></p>
-</div></blockquote>
-<p>Removes contiguous operators since we are doing TensorRT memory is already contiguous.</p>
-</section>
-<section id="remove-dropout">
-<h3>Remove Dropout<a class="headerlink" href="#remove-dropout" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/remove_dropout.cpp">Torch-TensorRT/core/lowering/passes/remove_dropout.cpp</a></p>
-</div></blockquote>
-<p>Removes dropout operators since we are doing inference.</p>
-</section>
-<section id="remove-to">
-<h3>Remove To<a class="headerlink" href="#remove-to" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/remove_to.cpp">Torch-TensorRT/core/lowering/passes/remove_to.cpp</a></p>
-</div></blockquote>
-<p>Removes <code class="docutils literal notranslate"><span class="pre">aten::to</span></code> operators that do casting, since TensorRT mangages it itself. It is important that this is one of the last passes run so that
-other passes have a change to move required cast operators out of the main namespace.</p>
-</section>
-<section id="unpack-addmm">
-<h3>Unpack AddMM<a class="headerlink" href="#unpack-addmm" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/unpack_addmm.cpp">Torch-TensorRT/core/lowering/passes/unpack_addmm.cpp</a></p>
-</div></blockquote>
-<p>Unpacks <code class="docutils literal notranslate"><span class="pre">aten::addmm</span></code> into <code class="docutils literal notranslate"><span class="pre">aten::matmul</span></code> and <code class="docutils literal notranslate"><span class="pre">aten::add_</span></code> (with an additional <code class="docutils literal notranslate"><span class="pre">trt::const</span></code>
-op to freeze the bias in the TensorRT graph). This lets us reuse the <code class="docutils literal notranslate"><span class="pre">aten::matmul</span></code> and <code class="docutils literal notranslate"><span class="pre">aten::add_</span></code>
-converters instead of needing a dedicated converter.</p>
-</section>
-<section id="unpack-logsoftmax">
-<h3>Unpack LogSoftmax<a class="headerlink" href="#unpack-logsoftmax" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/unpack_log_softmax.cpp">Torch-TensorRT/core/lowering/passes/unpack_log_softmax.cpp</a></p>
-</div></blockquote>
-<p>Unpacks <code class="docutils literal notranslate"><span class="pre">aten::logsoftmax</span></code> into <code class="docutils literal notranslate"><span class="pre">aten::softmax</span></code> and <code class="docutils literal notranslate"><span class="pre">aten::log</span></code>. This lets us reuse the
-<code class="docutils literal notranslate"><span class="pre">aten::softmax</span></code> and <code class="docutils literal notranslate"><span class="pre">aten::log</span></code> converters instead of needing a dedicated converter.</p>
-</section>
-<section id="unroll-loops">
-<h3>Unroll Loops<a class="headerlink" href="#unroll-loops" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/loop_unrolling.h">torch/csrc/jit/passes/loop_unrolling.h</a></p>
-</div></blockquote>
-<p>Unrolls the operations of compatable loops (e.g. sufficently short) so that you only have to go through the loop once.</p>
-</section>
-<section id="replace-tile-with-repeat">
-<h3>Replace Tile with Repeat<a class="headerlink" href="#replace-tile-with-repeat" title="Permalink to this headline">¶</a></h3>
-<blockquote>
-<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/tile_to_repeat.cpp">Torch-TensorRT/core/lowering/passes/tile_to_repeat.cpp</a></p>
-</div></blockquote>
-<p>Removes dropout operators since we are doing inference.</p>
-</section>
+<section id="tracing">
+<h2>Tracing<a class="headerlink" href="#tracing" title="Permalink to this headline">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace</span></code> can be used to trace a Pytorch graphs and produce <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code>.
+This internally performs some decompositions of operators for downstream optimization.
+The <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> can then be used with <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile</span></code> API.
+If you have dynamic input shapes in your model, you can use this <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace</span></code> to export
+the model with dynamic shapes. Alternatively, you can use <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> <a class="reference external" href="https://pytorch.org/docs/stable/export.html#expressing-dynamism">with constraints</a> directly as well.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+
+<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="n">min_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+                              <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+                              <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+                              <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)]</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
+</pre></div>
+</div>
 </section>
 </section>
 
@@ -619,10 +484,10 @@ converters instead of needing a dedicated converter.</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="partitioning.html" class="btn btn-neutral float-right" title="Partitioning Phase" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+        <a href="ptq.html" class="btn btn-neutral float-right" title="Post Training Quantization (PTQ)" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
       
       
-        <a href="system_overview.html" class="btn btn-neutral" title="System Overview" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+        <a href="torch_compile.html" class="btn btn-neutral" title="Torch-TensorRT torch.compile Backend" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
       
     </div>
   
@@ -654,29 +519,11 @@ converters instead of needing a dedicated converter.</p>
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Lowering Phase</a><ul>
-<li><a class="reference internal" href="#passes-used">Passes Used</a><ul>
-<li><a class="reference internal" href="#eliminatecommonsubexpression">EliminateCommonSubexpression</a></li>
-<li><a class="reference internal" href="#eliminate-dead-code">Eliminate Dead Code</a></li>
-<li><a class="reference internal" href="#eliminate-exeception-or-pass-pattern">Eliminate Exeception Or Pass Pattern</a></li>
-<li><a class="reference internal" href="#eliminate-redundant-gaurds">Eliminate Redundant Gaurds</a></li>
-<li><a class="reference internal" href="#freeze-module">Freeze Module</a></li>
-<li><a class="reference internal" href="#fuse-addmm-branches">Fuse AddMM Branches</a></li>
-<li><a class="reference internal" href="#fuse-linear">Fuse Linear</a></li>
-<li><a class="reference internal" href="#fuse-flatten-linear">Fuse Flatten Linear</a></li>
-<li><a class="reference internal" href="#lower-graph">Lower Graph</a></li>
-<li><a class="reference internal" href="#lower-tuples">Lower Tuples</a></li>
-<li><a class="reference internal" href="#module-fallback">Module Fallback</a></li>
-<li><a class="reference internal" href="#peephole-optimze">Peephole Optimze</a></li>
-<li><a class="reference internal" href="#remove-contiguous">Remove Contiguous</a></li>
-<li><a class="reference internal" href="#remove-dropout">Remove Dropout</a></li>
-<li><a class="reference internal" href="#remove-to">Remove To</a></li>
-<li><a class="reference internal" href="#unpack-addmm">Unpack AddMM</a></li>
-<li><a class="reference internal" href="#unpack-logsoftmax">Unpack LogSoftmax</a></li>
-<li><a class="reference internal" href="#unroll-loops">Unroll Loops</a></li>
-<li><a class="reference internal" href="#replace-tile-with-repeat">Replace Tile with Repeat</a></li>
-</ul>
-</li>
+<li><a class="reference internal" href="#">Torch-TensorRT Dynamo Backend</a><ul>
+<li><a class="reference internal" href="#using-the-dynamo-backend">Using the Dynamo backend</a></li>
+<li><a class="reference internal" href="#customizeable-settings">Customizeable Settings</a></li>
+<li><a class="reference internal" href="#under-the-hood">Under the hood</a></li>
+<li><a class="reference internal" href="#tracing">Tracing</a></li>
 </ul>
 </li>
 </ul>
