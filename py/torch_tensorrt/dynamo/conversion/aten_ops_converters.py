@@ -233,6 +233,51 @@ def aten_ops_embedding(
     )
 
 
+def embedding_bag_validator(node: Node) -> bool:
+    mode = args_bounds_check(node.args, 4, 0)
+    indices = node.args[1].meta.get("tensor_meta")
+    if indices is None:
+        return False
+    return (
+        bool(node.args[2].op == "get_attr")
+        and (mode == 0 or mode == 1 or mode == 2)
+        and len(indices.shape) == 1
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.embedding_bag.default, capability_validator=embedding_bag_validator)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten._embedding_bag.default, capability_validator=embedding_bag_validator)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        1: (TRTTensor,),
+        2: (np.ndarray, torch.Tensor),
+    }
+)  # type: ignore[misc]
+def aten_ops_embedding_bag(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.embedding.embedding_bag(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        weight=args[0],
+        indices=args[1],
+        offsets=args[2],
+        scale_grad_by_freq=args_bounds_check(args, 3, False),
+        mode=args_bounds_check(args, 4, 0),
+        sparse=args_bounds_check(args, 5, False),
+        per_sample_weights=args_bounds_check(args, 6, None),
+        include_last_offset=args_bounds_check(args, 7, False),
+        # padding index is useful for training only
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.fmod.Tensor)  # type: ignore[misc]
 def aten_ops_fmod(
@@ -619,6 +664,30 @@ def aten_ops_slice(
         args[2],
         args[3],
         args_bounds_check(args, 4, replacement=1),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.chunk.default)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)  # type: ignore[misc]
+def aten_ops_chunk(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.slice.chunk(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args_bounds_check(args, 2, 0),
     )
 
 
