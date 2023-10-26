@@ -2,11 +2,21 @@ import logging
 from typing import Any, Dict, Optional, Sequence, Set, Tuple
 
 import torch
+from torch.fx.passes.fake_tensor_prop import FakeTensorProp
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import DEBUG
 from torch_tensorrt.dynamo.utils import get_torch_inputs, input_is_dynamic
 
 logger = logging.getLogger(__name__)
+
+
+def fake_tensor_prop(
+    gm: torch.fx.GraphModule, inputs: Sequence[Input], device: torch.device
+) -> None:
+    torch_inputs = get_torch_inputs(inputs, device)
+    # Propagate fake tensors and generates metadata (shape, dtype) for the nodes in the graph
+    fake_mode = torch._subclasses.FakeTensorMode(allow_non_fake_inputs=True)
+    FakeTensorProp(gm, mode=fake_mode).propagate(*torch_inputs)
 
 
 def run_shape_analysis(

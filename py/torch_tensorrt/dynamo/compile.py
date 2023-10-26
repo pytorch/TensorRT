@@ -203,6 +203,10 @@ def compile_module(
             min_block_size=settings.min_block_size,
             torch_executed_ops=settings.torch_executed_ops,
         )
+    # Run symbolic shape analysis
+    partitioning.fake_tensor_prop(
+        partitioned_module, sample_inputs, to_torch_device(settings.device)
+    )
 
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
