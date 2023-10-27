@@ -75,7 +75,7 @@ def embedding_bag(
 
     # TODO: support 2D inputs
     # indices = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_reshape_indices", indices, (-1,))
-
+    reduce_name = ""
     if mode == 0:  # sum
         reduce_op = functools.partial(
             impl.reduce.sum, ctx=ctx, target=target, source_ir=source_ir
@@ -143,7 +143,6 @@ def embedding_bag(
         # however, pytorch doc says if `include_last_offset` is True, the size of offsets
         # is equal to the number of bags + 1. The last element is the size of the input,
         # or the ending index position of the last bag (sequence).
-
         offsets[-1] = indices.shape[0]
 
     # separately reduce embeddings for different bags
@@ -158,8 +157,8 @@ def embedding_bag(
                 f"{name}_slice_embed_{i}",
                 embed,
                 0,
-                offsets[i],
-                offsets[i + 1],
+                int(offsets[i]),
+                int(offsets[i + 1]),
                 1,
             )
             reduced_sliced_embed = reduce_op(
