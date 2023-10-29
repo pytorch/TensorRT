@@ -395,9 +395,6 @@ def run_l0_dynamo_tests(session):
     run_dynamo_backend_tests(session)
     run_dynamo_converter_tests(session)
     run_dynamo_lower_tests(session)
-    run_dynamo_model_tests(session)
-    run_dynamo_partitioning_tests(session)
-    run_dynamo_runtime_tests(session)
     cleanup(session)
 
 
@@ -477,13 +474,13 @@ def run_l1_int8_accuracy_tests(session):
     cleanup(session)
 
 
-def run_l1_fx_tests(session):
+def run_l1_dynamo_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
         install_torch_trt(session)
-    run_fx_quant_tests(session)
-    run_fx_tracer_tests(session)
-    run_fx_tools_tests(session)
+    run_dynamo_model_tests(session)
+    run_dynamo_partitioning_tests(session)
+    run_dynamo_runtime_tests(session)
     cleanup(session)
 
 
@@ -513,25 +510,25 @@ def l0_api_tests(session):
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l0_dynamo_tests(session):
     """When a developer needs to check correctness for a PR or something"""
-    run_l0_fx_tests(session)
+    run_l0_dynamo_tests(session)
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
-def l0_dynamo_core_tests(session):
+def l0_dynamo_backend_tests(session):
     """When a developer needs to check correctness for a PR or something"""
-    run_l0_fx_core_tests(session)
+    run_l0_dynamo_backend_tests(session)
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l0_dynamo_converter_tests(session):
     """When a developer needs to check correctness for a PR or something"""
-    run_l0_fx_converter_tests(session)
+    run_l0_dynamo_converter_tests(session)
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l0_dynamo_lower_tests(session):
     """When a developer needs to check correctness for a PR or something"""
-    run_l0_fx_lower_tests(session)
+    run_l0_dynamo_lower_tests(session)
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
@@ -547,9 +544,9 @@ def l1_model_tests(session):
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
-def l1_fx_tests(session):
+def l1_dynamo_tests(session):
     """When a user needs to test the functionality of standard models compilation and results"""
-    run_l1_fx_tests(session)
+    run_l1_dynamo_tests(session)
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
