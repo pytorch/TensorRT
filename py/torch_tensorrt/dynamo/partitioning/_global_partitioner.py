@@ -10,10 +10,10 @@ from torch_tensorrt.dynamo._defaults import (
     MIN_BLOCK_SIZE,
     REQUIRE_FULL_COMPILATION,
 )
-from torch_tensorrt.dynamo.conversion.converter_registry import (
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
-from torch_tensorrt.dynamo.conversion.converter_registry import ConverterRegistry
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterRegistry
 
 logger = logging.getLogger(__name__)
 

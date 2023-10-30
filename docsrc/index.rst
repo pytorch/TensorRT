@@ -19,8 +19,6 @@ More Information / System Architecture:
 Getting Started
 ----------------
 * :ref:`installation`
-* :ref:`getting_started_with_python_api`
-* :ref:`getting_started_cpp`
 
 .. toctree::
    :caption: Getting Started
@@ -28,22 +26,60 @@ Getting Started
    :hidden:
 
    getting_started/installation
-   getting_started/getting_started_with_python_api
-   getting_started/getting_started_with_cpp_api
    getting_started/getting_started_with_windows
+
+
+Dynamo Frontend
+----------------
+
+* :ref:`torch_compile`
+* :ref:`dynamo_export`
+
+.. toctree::
+   :caption: Dynamo Frontend
+   :maxdepth: 1
+   :hidden:
+
+   dynamo/torch_compile
+   dynamo/dynamo_export
+
+TorchScript Frontend
+-----------------------
+* :ref:`creating_a_ts_mod`
+* :ref:`getting_started_with_python_api`
+* :ref:`getting_started_cpp`
+* :ref:`use_from_pytorch`
+
+.. toctree::
+   :caption: TorchScript Frontend
+   :maxdepth: 1
+   :hidden:
+
+   ts/creating_torchscript_module_in_python
+   ts/getting_started_with_python_api
+   ts/getting_started_with_cpp_api
+   ts/use_from_pytorch
+
+FX Frontend
+------------
+
+* :ref:`getting_started_with_fx`
+
+.. toctree::
+   :caption: FX Frontend
+   :maxdepth: 1
+   :hidden:
+
+   fx/getting_started_with_fx_path
 
 
 User Guide
 ------------
-* :ref:`creating_a_ts_mod`
-* :ref:`getting_started_with_fx`
-* :ref:`torch_compile`
-* :ref:`dynamo_export`
-* :ref:`ptq`
-* :ref:`runtime`
-* :ref:`saving_models`
+
 * :ref:`dynamic_shapes`
-* :ref:`use_from_pytorch`
+* :ref:`ptq`
+* :ref:`saving_models`
+* :ref:`runtime`
 * :ref:`using_dla`
 
 .. toctree::
@@ -51,15 +87,11 @@ User Guide
    :maxdepth: 1
    :hidden:
 
-   user_guide/creating_torchscript_module_in_python
-   user_guide/getting_started_with_fx_path
-   user_guide/torch_compile
-   user_guide/dynamo_export
-   user_guide/ptq
-   user_guide/runtime
-   user_guide/saving_models
+
    user_guide/dynamic_shapes
-   user_guide/use_from_pytorch
+   user_guide/ptq
+   user_guide/saving_models
+   user_guide/runtime
    user_guide/using_dla
 
 Tutorials
@@ -84,6 +116,7 @@ Python API Documenation
 * :ref:`torch_tensorrt_py`
 * :ref:`torch_tensorrt_logging_py`
 * :ref:`torch_tensorrt_ptq_py`
+* :ref:`torch_tensorrt_dynamo_py`
 * :ref:`torch_tensorrt_ts_py`
 * :ref:`torch_tensorrt_fx_py`
 
@@ -95,6 +128,7 @@ Python API Documenation
    py_api/torch_tensorrt
    py_api/logging
    py_api/ptq
+   py_api/dynamo
    py_api/ts
    py_api/fx
 
@@ -132,8 +166,9 @@ CLI Documentation
 Contributor Documentation
 --------------------------------
 * :ref:`system_overview`
-* :ref:`writing_converters`
+* :ref:`_dynamo_converters`
 * :ref:`writing_dynamo_aten_lowering_passes`
+* :ref:`_ts_converters`
 * :ref:`useful_links`
 
 .. toctree::
@@ -142,8 +177,9 @@ Contributor Documentation
    :hidden:
 
    contributors/system_overview
-   contributors/writing_converters
+   contributors/dynamo_converters
    contributors/writing_dynamo_aten_lowering_passes
+   contributors/ts_converters
    contributors/useful_links
 
 Indices

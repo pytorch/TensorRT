@@ -15,12 +15,12 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__name__), "../py"))
 
-import torch
 import pytorch_sphinx_theme
+import torch
 import torch_tensorrt
+from docutils import nodes
 from docutils.parsers.rst import Directive, directives
 from docutils.statemachine import StringList
-from docutils import nodes
 
 # -- Project information -----------------------------------------------------
 
@@ -175,12 +175,21 @@ cpp_id_attributes = ["TORCHTRT_API"]
 # Tell sphinx what the pygments highlight language should be.
 highlight_language = "cpp"
 
+autodoc_typehints_format = 'short'
+python_use_unqualified_type_names = True
+
+autodoc_type_aliases = {
+    'LegacyConverterImplSignature': 'LegacyConverterImplSignature',
+    'DynamoConverterImplSignature': 'DynamoConverterImplSignature',
+    'ConverterImplSignature': 'ConverterImplSignature',
+}
+
 # -- A patch that prevents Sphinx from cross-referencing ivar tags -------
 # See http://stackoverflow.com/a/41184353/3343043
 
 from docutils import nodes
-from sphinx.util.docfields import TypedField
 from sphinx import addnodes
+from sphinx.util.docfields import TypedField
 
 
 def patched_make_field(self, types, domain, items, **kw):

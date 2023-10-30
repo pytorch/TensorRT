@@ -8,7 +8,9 @@ If you haven't already, acquire a tarball of the library by following the instru
 Using Torch-TensorRT in C++
 ***************************
 Torch-TensorRT C++ API accepts TorchScript modules (generated either from ``torch.jit.script`` or ``torch.jit.trace``) as an input and returns
-a Torchscript module (optimized using TensorRT). This requires users to use Pytorch (in python) to generate torchscript modules beforehand.
+a Torchscript module (optimized using TensorRT), Dynamo compilation workflows will not be supported in the C++ API however, execution of
+torch.jit.trace'd compiled FX GraphModules is supported for FX and Dyanmo workflows.
+
 Please refer to `Creating TorchScript modules in Python <https://nvidia.github.io/Torch-TensorRT/tutorials/creating_torchscript_module_in_python.html>`_ section to generate torchscript graphs.
 
 

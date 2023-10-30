@@ -82,8 +82,7 @@ Dependencies for Compilation
         cp output/bazel /usr/local/bin/
 
 
-* You will also need to have **CUDA** installed on the system (or if running in a container, the system must have
-the CUDA driver installed and the container must have CUDA)
+* You will also need to have **CUDA** installed on the system (or if running in a container, the system must have the CUDA driver installed and the container must have CUDA)
 
     * Specify your CUDA version here if not the version used in the branch being built: https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L46
 
@@ -96,8 +95,7 @@ the CUDA driver installed and the container must have CUDA)
     * https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L53C1-L53C1
 
 
-* **cuDNN and TensorRT** are not required to be installed on the system to build Torch-TensorRT, in fact this is preferable to ensure reproducable builds. Download the tarballs
-for cuDNN and TensorRT from https://developer.nvidia.com and update the paths in the WORKSPACE file here https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L71
+* **cuDNN and TensorRT** are not required to be installed on the system to build Torch-TensorRT, in fact this is preferable to ensure reproducable builds. Download the tarballs for cuDNN and TensorRT from https://developer.nvidia.com and update the paths in the WORKSPACE file here https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L71
 
     For example:
 
@@ -137,9 +135,10 @@ Once the WORKSPACE has been configured properly, all that is required to build t
 
         python -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu121
 
+
 To build the wheel file
 
-    .. code-bloc:: sh
+    .. code-block:: sh
 
         python -m pip wheel --no-deps --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu121 -w dist
 
