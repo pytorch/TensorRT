@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
-from .harness import DispatchTestCase
+from harness import DispatchTestCase
 
 
 class TestIndexConverter(DispatchTestCase):
@@ -26,6 +26,21 @@ class TestIndexConverter(DispatchTestCase):
             TestModule(),
             input,
         )
+    
+    def test_index_zero_two_dim_ITensor(self):
+        class TestModule(nn.Module):
+            def forward(self, x, index0):
+                indices = [None, index0]
+                out = torch.ops.aten.index.Tensor(x, indices)
+                return out
+
+        input = torch.randn(2, 2)
+        index0 = torch.randint(0, 1, (1, 1))
+        index0 = index0.to(torch.int32)
+        self.run_test(
+            TestModule(),
+            [input, index0],
+        )
 
     def test_index_zero_index_three_dim(self):
         class TestModule(nn.Module):
@@ -42,6 +57,21 @@ class TestIndexConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             input,
+        )
+    
+    def test_index_zero_index_three_dim_ITensor(self):
+        class TestModule(nn.Module):
+            def forward(self, x, index0):
+                indices = [None, index0, None]
+                out = torch.ops.aten.index.Tensor(x, indices)
+                return out
+
+        input = torch.randn(2, 2, 2)
+        index0 = torch.randint(0, 1, (1, 1))
+        index0 = index0.to(torch.int32)
+        self.run_test(
+            TestModule(),
+            [input, index0]
         )
 
     def test_index_zero_index_one_index_two_three_dim(self):
