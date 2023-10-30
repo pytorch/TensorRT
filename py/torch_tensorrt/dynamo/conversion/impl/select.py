@@ -75,6 +75,20 @@ def select(
     return layer.get_output(0)
 
 
+def gather(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    dim: int,
+    index: Sequence[Union[TRTTensor, np.ndarray, torch.Tensor]],
+) -> TRTTensor:
+    gather_layer = ctx.net.add_gather(input, index, index)
+    set_layer_name(gather_layer, target, name + "_gather", source_ir)
+    return gather_layer.get_output(0)
+
+
 def index(
     ctx: ConversionContext,
     target: Target,
@@ -127,9 +141,8 @@ def index(
         )
         index = adv_indx_indices[0]
         _LOGGER.debug(f"The advanced index indices is {adv_indx_indices}")
-        gather_layer = ctx.net.add_gather(input, indices_tensor, index)
-        set_layer_name(gather_layer, target, name + "_index_gather", source_ir)
-        return gather_layer.get_output(0)
+        return gather(input, index, indices_tensor)
+    
     else:
         input_shape = input.shape
         _LOGGER.debug(f"The input shape is {input.shape}")
@@ -242,11 +255,7 @@ def index(
                     dim_tensor_list[adv_indx_indices[i]],
                 )
 
-        gather_layer_element = ctx.net.add_gather(flatten_tensor, cum_adv_index, 0)
-        set_layer_name(
-            gather_layer_element, target, name + "_index_gather_element", source_ir
-        )
-        gather_out = gather_layer_element.get_output(0)
+        gather_out = gather(flatten_tensor, 0, cum_adv_index)
         _LOGGER.debug(f"The shape after cumultative gather is {gather_out.shape}")
         _LOGGER.debug(f"The shape for cumulative adv index is {cum_adv_index}")
 
