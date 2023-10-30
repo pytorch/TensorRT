@@ -1,20 +1,26 @@
 import copy
 import operator
-from typing import Any, Dict, Sequence, Tuple, Union, cast
+from typing import Any, Dict, Sequence, Tuple, cast
 
 import torch
-from torch._export.exported_program import CallSpec
 from torch._guards import detect_fake_mode
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.export import ExportedProgram, ExportGraphSignature
+from torch.export.exported_program import (
+    InputKind,
+    InputSpec,
+    OutputKind,
+    OutputSpec,
+    TensorArgument,
+)
 from torch_tensorrt.dynamo import partitioning
 
 
-# TODO: @peri044: Correct this implementation
 def export(
-    src_gm: torch.fx.GraphModule,
-    trt_gm: torch.fx.GraphModule,
+    gm: torch.fx.GraphModule,
     inputs: Sequence[torch.Tensor],
+    *,
+    ir: str = "torchscript",
 ) -> ExportedProgram:
     """Export a program (``torch.fx.GraphModule``) for serialization with the TensorRT engines embedded.
 
@@ -39,12 +45,19 @@ def export(
                         format=torch.channel_last
                     ), # Dynamic input shape for input #2
                     torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
-
+        ir (str): torchscript | exported_program. Based on the provided ir, the output type would be a torchscript or exported program.
     """
+    if ir == "torchscript":
+        return torch.jit.trace(gm, inputs)
+    elif ir == "exported_program":
+        patched_module = transform(gm, inputs)
+        exp_program = create_trt_exp_program(patched_module)
 
-    patched_module = transform(torch.fx.GraphModule, inputs)
-
-    return create_trt_exp_program(patched_module, src_gm.call_spec, src_gm.state_dict)
+        return exp_program
+    else:
+        raise ValueError(
+            "Invalid ir : {ir} provided for serialization. Options include torchscript | exported_program"
+        )
 
 
 def transform(
@@ -184,7 +197,7 @@ def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
                 gm_node.replace_all_uses_with(submodule_output)
 
                 # copy the attributes of the submodule into gm (graph_copy doesn't do this)
-                copy_submodule_attributes(submodule, gm, gm_node.name)
+                copy_submodule_attributes(gm, gm_node.name)
 
             # Erase the pytorch submodule (call_module) node
             gm.graph.erase_node(gm_node)
@@ -192,60 +205,46 @@ def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     return gm
 
 
-def copy_submodule_attributes(
-    submodule: torch.fx.GraphModule, gm: torch.fx.GraphModule, submod_name: str
-) -> None:
+def copy_submodule_attributes(gm: torch.fx.GraphModule, submod_name: str) -> None:
     """
     Copy the getattr attriibutes from submodule to parent module gm.
     The graph_copy call doesn't do this for us unfortunately.
     """
-    for idx, param in enumerate(gm.named_parameters()):
-        if submod_name in param[0]:
+    for param in gm.named_parameters():
+        if param[0].startswith(submod_name + "."):
             attr_name = param[0].replace(submod_name + ".", "")
             gm.register_parameter(attr_name, param[1])
 
-    for idx, buffer in enumerate(gm.named_buffers()):
-        if submod_name in buffer[0]:
+    for buffer in gm.named_buffers():
+        if buffer[0].startswith(submod_name + "."):
             attr_name = buffer[0].replace(submod_name + ".", "")
             gm.register_buffer(attr_name, buffer[1])
 
 
 def create_trt_exp_program(
     gm: torch.fx.GraphModule,
-    call_spec: CallSpec,
-    state_dict: Dict[str, Union[torch.Tensor, torch.nn.Parameter]],
 ) -> ExportedProgram:
     """Creates a new Exported Program. This function takes an torch.fx.GraphModule which has TRT engines
-    and constructs an Exported Program object with the new IO node names, call_spec and state_dict
+    and constructs an Exported Program object with the new IO node names and state_dict
     """
-    input_node_names = [
-        node.name for node in gm.graph.nodes if node.op == "placeholder"
+    input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]
+    output_nodes = [node for node in gm.graph.nodes if node.op == "output"]
+
+    input_specs = [
+        InputSpec(InputKind.USER_INPUT, TensorArgument(name=node.name), node.target)
+        for node in input_nodes
     ]
-    output_node_names = [node.name for node in gm.graph.nodes if node.op == "output"]
-    param_names = [param[0] for param in gm.named_parameters()]
-    buffer_names = [buffer[0] for buffer in gm.named_buffers()]
-    inputs_to_parameters = {}
-    inputs_to_buffers = {}
-    for node in gm.graph.nodes:
-        if node.target in param_names:
-            inputs_to_parameters[node.name] = node.target
-        if node.target in buffer_names:
-            inputs_to_buffers[node.name] = node.target
+    output_specs = [
+        OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name=node.name), node.target)
+        for node in output_nodes
+    ]
 
     trt_graph_signature = ExportGraphSignature(
-        parameters=param_names,
-        buffers=buffer_names,
-        user_inputs=input_node_names,
-        user_outputs=output_node_names,
-        inputs_to_parameters=inputs_to_parameters,
-        inputs_to_buffers=inputs_to_buffers,
-        buffers_to_mutate={},
-        backward_signature=None,
-        assertion_dep_token=None,
+        input_specs=input_specs, output_specs=output_specs
     )
 
     trt_exp_program = ExportedProgram(
-        gm, gm.graph, trt_graph_signature, call_spec, state_dict, {}, [], []
+        gm, gm.graph, trt_graph_signature, gm.state_dict(), {}, [], [], []
     )
 
     return trt_exp_program
