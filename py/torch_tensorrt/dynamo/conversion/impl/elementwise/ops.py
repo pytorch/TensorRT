@@ -2,6 +2,7 @@ from typing import Optional, Union
 
 import numpy as np
 import tensorrt as trt
+import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -441,6 +442,23 @@ def eq(
     )
 
 
+def ne(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    return impl.unary.logical_not(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_logical_not",
+        eq(ctx, target, source_ir, f"{name}_eq", lhs_val, rhs_val),
+    )
+
+
 def gt(
     ctx: ConversionContext,
     target: Target,
@@ -460,6 +478,24 @@ def gt(
     )
 
 
+def ge(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    return logical_or(
+        ctx,
+        target,
+        source_ir,
+        name,
+        gt(ctx, target, source_ir, f"{name}_gt", lhs_val, rhs_val),
+        eq(ctx, target, source_ir, f"{name}_eq", lhs_val, rhs_val),
+    )
+
+
 def lt(
     ctx: ConversionContext,
     target: Target,
@@ -476,4 +512,22 @@ def lt(
         trt.ElementWiseOperation.LESS,
         lhs_val,
         rhs_val,
+    )
+
+
+def le(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    return logical_or(
+        ctx,
+        target,
+        source_ir,
+        name,
+        lt(ctx, target, source_ir, f"{name}_lt", lhs_val, rhs_val),
+        eq(ctx, target, source_ir, f"{name}_eq", lhs_val, rhs_val),
     )

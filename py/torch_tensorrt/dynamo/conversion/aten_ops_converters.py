@@ -1701,9 +1701,9 @@ def aten_ops_logical_xor(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.eq.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.eq.Scalar)
-def aten_ops_equal(
+@dynamo_tensorrt_converter(torch.ops.aten.eq.Tensor)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.eq.Scalar)  # type: ignore[misc]
+def aten_ops_eq(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
@@ -1720,9 +1720,28 @@ def aten_ops_equal(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.gt.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.gt.Scalar)
-def aten_ops_greater(
+@dynamo_tensorrt_converter(torch.ops.aten.ne.Tensor)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.ne.Scalar)  # type: ignore[misc]
+def aten_ops_ne(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.ne(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.gt.Tensor)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.gt.Scalar)  # type: ignore[misc]
+def aten_ops_gt(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
@@ -1739,9 +1758,28 @@ def aten_ops_greater(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.lt.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.lt.Scalar)
-def aten_ops_less(
+@dynamo_tensorrt_converter(torch.ops.aten.ge.Tensor)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.ge.Scalar)  # type: ignore[misc]
+def aten_ops_ge(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.ge(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.lt.Tensor)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.lt.Scalar)  # type: ignore[misc]
+def aten_ops_lt(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
@@ -1749,6 +1787,25 @@ def aten_ops_less(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.elementwise.lt(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.le.Tensor)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.le.Scalar)  # type: ignore[misc]
+def aten_ops_le(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.le(
         ctx,
         target,
         SourceIR.ATEN,
