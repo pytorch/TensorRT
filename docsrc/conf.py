@@ -175,13 +175,13 @@ cpp_id_attributes = ["TORCHTRT_API"]
 # Tell sphinx what the pygments highlight language should be.
 highlight_language = "cpp"
 
-autodoc_typehints_format = 'short'
+autodoc_typehints_format = "short"
 python_use_unqualified_type_names = True
 
 autodoc_type_aliases = {
-    'LegacyConverterImplSignature': 'LegacyConverterImplSignature',
-    'DynamoConverterImplSignature': 'DynamoConverterImplSignature',
-    'ConverterImplSignature': 'ConverterImplSignature',
+    "LegacyConverterImplSignature": "LegacyConverterImplSignature",
+    "DynamoConverterImplSignature": "DynamoConverterImplSignature",
+    "ConverterImplSignature": "ConverterImplSignature",
 }
 
 # -- A patch that prevents Sphinx from cross-referencing ivar tags -------
