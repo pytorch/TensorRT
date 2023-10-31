@@ -1,6 +1,7 @@
 import math
 from typing import Optional, Sequence
 
+import numpy as np
 import tensorrt as trt
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
