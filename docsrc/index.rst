@@ -5,25 +5,20 @@
 
 Torch-TensorRT
 ==============
-Ahead-of-time compilation of TorchScript / PyTorch JIT for NVIDIA GPUs
------------------------------------------------------------------------
-Torch-TensorRT is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime.
-Unlike PyTorch's Just-In-Time (JIT) compiler, Torch-TensorRT is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your
-TorchScript code, you go through an explicit compile step to convert a standard TorchScript program into an module targeting
-a TensorRT engine. Torch-TensorRT operates as a PyTorch extention and compiles modules that integrate into the JIT runtime seamlessly.
-After compilation using the optimized graph should feel no different than running a TorchScript module.
-You also have access to TensorRT's suite of configurations at compile time, so you are able to specify
-operating precision (FP32/FP16/INT8) and other settings for your module.
+
+In-framework compilation of PyTorch inference code for NVIDIA GPUs
+--------------------------------------------------------------------------
+Torch-TensorRT is a inference compiler for PyTorch, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime.
+It supports both just-in-time (JIT) compilation workflows via the ``torch.compile`` interface as well as ahead-of-time (AOT) workflows.
+Torch-TensorRT integrates seamlessly into the PyTorch ecosystem supporting hybrid execution of optimized TensorRT code with standard PyTorch code.
 
 More Information / System Architecture:
 
-* `GTC 2020 Talk <https://developer.nvidia.com/gtc/2020/video/s21671>`_
+* `Torch-TensorRT 2.0 <https://www.nvidia.com/en-us/on-demand/session/gtcspring23-s51714/>`_
 
 Getting Started
 ----------------
 * :ref:`installation`
-* :ref:`getting_started_with_python_api`
-* :ref:`getting_started_cpp`
 
 .. toctree::
    :caption: Getting Started
@@ -31,21 +26,60 @@ Getting Started
    :hidden:
 
    getting_started/installation
-   getting_started/getting_started_with_python_api
-   getting_started/getting_started_with_cpp_api
    getting_started/getting_started_with_windows
+
+
+Dynamo Frontend
+----------------
+
+* :ref:`torch_compile`
+* :ref:`dynamo_export`
+
+.. toctree::
+   :caption: Dynamo Frontend
+   :maxdepth: 1
+   :hidden:
+
+   dynamo/torch_compile
+   dynamo/dynamo_export
+
+TorchScript Frontend
+-----------------------
+* :ref:`creating_a_ts_mod`
+* :ref:`getting_started_with_python_api`
+* :ref:`getting_started_cpp`
+* :ref:`use_from_pytorch`
+
+.. toctree::
+   :caption: TorchScript Frontend
+   :maxdepth: 1
+   :hidden:
+
+   ts/creating_torchscript_module_in_python
+   ts/getting_started_with_python_api
+   ts/getting_started_with_cpp_api
+   ts/use_from_pytorch
+
+FX Frontend
+------------
+
+* :ref:`getting_started_with_fx`
+
+.. toctree::
+   :caption: FX Frontend
+   :maxdepth: 1
+   :hidden:
+
+   fx/getting_started_with_fx_path
 
 
 User Guide
 ------------
-* :ref:`creating_a_ts_mod`
-* :ref:`getting_started_with_fx`
-* :ref:`torch_compile`
-* :ref:`ptq`
-* :ref:`runtime`
-* :ref:`saving_models`
+
 * :ref:`dynamic_shapes`
-* :ref:`use_from_pytorch`
+* :ref:`ptq`
+* :ref:`saving_models`
+* :ref:`runtime`
 * :ref:`using_dla`
 
 .. toctree::
@@ -53,14 +87,10 @@ User Guide
    :maxdepth: 1
    :hidden:
 
-   user_guide/creating_torchscript_module_in_python
-   user_guide/getting_started_with_fx_path
-   user_guide/torch_compile
-   user_guide/ptq
-   user_guide/runtime
-   user_guide/saving_models
    user_guide/dynamic_shapes
-   user_guide/use_from_pytorch
+   user_guide/ptq
+   user_guide/saving_models
+   user_guide/runtime
    user_guide/using_dla
 
 Tutorials
@@ -85,6 +115,7 @@ Python API Documenation
 * :ref:`torch_tensorrt_py`
 * :ref:`torch_tensorrt_logging_py`
 * :ref:`torch_tensorrt_ptq_py`
+* :ref:`torch_tensorrt_dynamo_py`
 * :ref:`torch_tensorrt_ts_py`
 * :ref:`torch_tensorrt_fx_py`
 
@@ -96,6 +127,7 @@ Python API Documenation
    py_api/torch_tensorrt
    py_api/logging
    py_api/ptq
+   py_api/dynamo
    py_api/ts
    py_api/fx
 
@@ -133,8 +165,9 @@ CLI Documentation
 Contributor Documentation
 --------------------------------
 * :ref:`system_overview`
-* :ref:`writing_converters`
+* :ref:`_dynamo_converters`
 * :ref:`writing_dynamo_aten_lowering_passes`
+* :ref:`_ts_converters`
 * :ref:`useful_links`
 
 .. toctree::
@@ -143,8 +176,9 @@ Contributor Documentation
    :hidden:
 
    contributors/system_overview
-   contributors/writing_converters
+   contributors/dynamo_converters
    contributors/writing_dynamo_aten_lowering_passes
+   contributors/ts_converters
    contributors/useful_links
 
 Indices
@@ -159,3 +193,16 @@ Indices
    :hidden:
 
    indices/supported_ops
+
+
+Legacy Further Information (TorchScript)
+-------------------------------------------
+
+* `Introductory Blog Post <https://developer.nvidia.com/blog/accelerating-inference-up-to-6x-faster-in-pytorch-with-torch-tensorrt/>`_
+* `GTC 2020 Talk <https://www.nvidia.com/en-us/on-demand/session/gtcsj20-s21671/>`_
+* `GTC 2020 Fall Talk <https://www.nvidia.com/en-us/on-demand/session/gtcfall20-a21864/>`_
+* `GTC 2021 Talk <https://www.nvidia.com/en-us/on-demand/session/gtcspring21-s31864/>`_
+* `GTC 2021 Fall Talk <https://www.nvidia.com/en-us/on-demand/session/gtcfall21-a31107/>`_
+* `PyTorch Ecosystem Day 2021 <https://assets.pytorch.org/pted2021/posters/I6.png>`_
+* `PyTorch Developer Conference 2021 <https://s3.amazonaws.com/assets.pytorch.org/ptdd2021/posters/D2.png>`_
+* `PyTorch Developer Conference 2022 <https://pytorch.s3.amazonaws.com/posters/ptc2022/C04.pdf>`_

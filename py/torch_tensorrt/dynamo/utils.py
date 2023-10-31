@@ -8,8 +8,8 @@ import torch
 import torch_tensorrt
 from torch_tensorrt._Device import Device
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo._defaults import PRECISION
+from torch_tensorrt.dynamo._settings import CompilationSettings
 
 from packaging import version
 

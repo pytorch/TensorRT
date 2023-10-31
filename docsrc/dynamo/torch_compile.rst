@@ -1,6 +1,6 @@
 .. _torch_compile:
 
-Torch-TensorRT `torch.compile` Backend
+TensorRT Backend for ``torch.compile``
 ======================================================
 .. currentmodule:: torch_tensorrt.dynamo
 
