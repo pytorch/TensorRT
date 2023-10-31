@@ -4,9 +4,6 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set
 
 import numpy as np
-
-# @manual=//deeplearning/trt/python:py_tensorrt
-import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
@@ -15,7 +12,10 @@ from torch.utils._python_dispatch import _disable_current_modes
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.converter_registry import CallingConvention
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    DYNAMO_CONVERTERS as CONVERTERS,
+)
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import CallingConvention
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_node_name,
     get_trt_tensor,
@@ -23,9 +23,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
+# @manual=//deeplearning/trt/python:py_tensorrt
+import tensorrt as trt
 from packaging import version
-
-from .converter_registry import DYNAMO_CONVERTERS as CONVERTERS
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -49,9 +49,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     def __init__(
         self,
         module: torch.fx.GraphModule,
-        input_specs: List[Input],
+        input_specs: Sequence[Input],
         logger_level: trt.ILogger.Severity = trt.ILogger.Severity.WARNING,
-        output_dtypes: Optional[List[torch.dtype]] = None,
+        output_dtypes: Optional[Sequence[torch.dtype]] = None,
         compilation_settings: CompilationSettings = CompilationSettings(),
     ):
         super().__init__(module)

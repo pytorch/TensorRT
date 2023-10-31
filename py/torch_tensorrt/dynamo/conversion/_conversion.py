@@ -3,13 +3,14 @@ from __future__ import annotations
 import io
 from typing import Sequence
 
-import tensorrt as trt
 import torch
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo import CompilationSettings
-from torch_tensorrt.dynamo.conversion import TRTInterpreter
+from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.conversion._TRTInterpreter import TRTInterpreter
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import get_torch_inputs
+
+import tensorrt as trt
 
 
 def convert_module(
