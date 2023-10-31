@@ -691,6 +691,29 @@ def aten_ops_chunk(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.cumsum.default)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)  # type: ignore[misc]
+def aten_ops_cumsum(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.slice.cumsum(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.permute.default)  # type: ignore[misc]
 @enforce_tensor_types(
     {
