@@ -8,11 +8,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data as data
-import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-
+import torchvision.models as models
+import torchvision.transforms as transforms
 from torch.utils.tensorboard import SummaryWriter
-
 from vgg16 import vgg16
 
 PARSER = argparse.ArgumentParser(
@@ -125,7 +124,8 @@ def main():
 
     num_classes = len(classes)
 
-    model = vgg16(num_classes=num_classes, init_weights=False)
+    # model = vgg16(num_classes=num_classes, init_weights=False)
+    model = models.vgg16(weights=None)
     model = model.cuda()
 
     data = iter(training_dataloader)

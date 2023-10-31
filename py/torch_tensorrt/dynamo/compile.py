@@ -132,6 +132,7 @@ def compile(
         "use_fast_partitioner": use_fast_partitioner,
         "enable_experimental_decompositions": enable_experimental_decompositions,
         "require_full_compilation": require_full_compilation,
+        "calibrator": calibrator,
     }
 
     settings = CompilationSettings(**compilation_options)

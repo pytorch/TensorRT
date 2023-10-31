@@ -64,6 +64,7 @@ def convert_module(
         max_aux_streams=settings.max_aux_streams,
         version_compatible=settings.version_compatible,
         optimization_level=settings.optimization_level,
+        calibrator=settings.calibrator,
     )
 
     if settings.use_python_runtime:

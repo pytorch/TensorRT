@@ -8,17 +8,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data as data
-import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-
-from torch.utils.tensorboard import SummaryWriter
-
+import torchvision.models as models
+import torchvision.transforms as transforms
+from pytorch_quantization import calib
 from pytorch_quantization import nn as quant_nn
 from pytorch_quantization import quant_modules
 from pytorch_quantization.tensor_quant import QuantDescriptor
-from pytorch_quantization import calib
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-
 from vgg16 import vgg16
 
 PARSER = argparse.ArgumentParser(
@@ -231,7 +229,8 @@ def main():
 
     quant_modules.initialize()
 
-    model = vgg16(num_classes=num_classes, init_weights=False)
+    # model = vgg16(num_classes=num_classes, init_weights=False)
+    model = models.vgg16(weights=None)
     model = model.cuda()
 
     crit = nn.CrossEntropyLoss()
