@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Optional, Sequence, Union
 
 import numpy as np
 import tensorrt as trt
@@ -428,8 +428,8 @@ def eq(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, bool, Sequence[Union[int, float, bool]]],
 ) -> TRTTensor:
     return convert_binary_elementwise(
         ctx,
@@ -447,8 +447,8 @@ def ne(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, bool, Sequence[Union[int, float, bool]]],
 ) -> TRTTensor:
     return impl.unary.logical_not(
         ctx,
@@ -464,8 +464,8 @@ def gt(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, Sequence[Union[int, float]]],
 ) -> TRTTensor:
     return convert_binary_elementwise(
         ctx,
@@ -483,8 +483,8 @@ def ge(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, Sequence[Union[int, float]]],
 ) -> TRTTensor:
     return logical_or(
         ctx,
@@ -501,8 +501,8 @@ def lt(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, Sequence[Union[int, float]]],
 ) -> TRTTensor:
     return convert_binary_elementwise(
         ctx,
@@ -520,8 +520,8 @@ def le(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, Sequence[Union[int, float]]],
 ) -> TRTTensor:
     return logical_or(
         ctx,

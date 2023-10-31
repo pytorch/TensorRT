@@ -1703,6 +1703,11 @@ def aten_ops_logical_xor(
 
 @dynamo_tensorrt_converter(torch.ops.aten.eq.Tensor)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.eq.Scalar)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)  # type: ignore[misc]
 def aten_ops_eq(
     ctx: ConversionContext,
     target: Target,
@@ -1722,6 +1727,11 @@ def aten_ops_eq(
 
 @dynamo_tensorrt_converter(torch.ops.aten.ne.Tensor)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.ne.Scalar)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)  # type: ignore[misc]
 def aten_ops_ne(
     ctx: ConversionContext,
     target: Target,
@@ -1741,6 +1751,11 @@ def aten_ops_ne(
 
 @dynamo_tensorrt_converter(torch.ops.aten.gt.Tensor)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.gt.Scalar)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)  # type: ignore[misc]
 def aten_ops_gt(
     ctx: ConversionContext,
     target: Target,
@@ -1760,6 +1775,11 @@ def aten_ops_gt(
 
 @dynamo_tensorrt_converter(torch.ops.aten.ge.Tensor)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.ge.Scalar)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)  # type: ignore[misc]
 def aten_ops_ge(
     ctx: ConversionContext,
     target: Target,
@@ -1779,6 +1799,11 @@ def aten_ops_ge(
 
 @dynamo_tensorrt_converter(torch.ops.aten.lt.Tensor)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.lt.Scalar)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)  # type: ignore[misc]
 def aten_ops_lt(
     ctx: ConversionContext,
     target: Target,
@@ -1798,6 +1823,11 @@ def aten_ops_lt(
 
 @dynamo_tensorrt_converter(torch.ops.aten.le.Tensor)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.le.Scalar)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)  # type: ignore[misc]
 def aten_ops_le(
     ctx: ConversionContext,
     target: Target,
