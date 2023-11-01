@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import logging
 import unittest.mock
-from typing import Any, List, Tuple
+from typing import Any, List, Optional, Tuple, Union
 
 import torch
 from torch._export import dynamic_dim, export
+from torch_tensorrt._Device import Device
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import (
+    DEBUG,
+    DEVICE,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     default_device,
 )
@@ -32,18 +35,55 @@ def get_random_tensor(
 
 
 def trace(
-    model: torch.nn.Module | torch.fx.GraphModule,
+    mod: torch.nn.Module | torch.fx.GraphModule,
     inputs: Tuple[Any, ...],
+    device: Optional[Union[Device, torch.device, str]] = DEVICE,
+    debug: bool = DEBUG,
+    enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     **kwargs: Any,
-) -> torch.fx.GraphModule:
+) -> torch.export.ExportedProgram:
+    """Exports a ``torch.export.ExportedProgram`` from a ``torch.nn.Module`` or ``torch.fx.GraphModule`` specifically targeting being compiled with Torch-TensorRT
+
+    Exports a ``torch.export.ExportedProgram`` from either a ``torch.nn.Module`` or torch.fx.GraphModule``. Runs specific operator decompositions geared towards
+    compilation by Torch-TensorRT's dynamo frontend.
+
+    Arguments:
+        mod (torch.nn.Module | torch.fx.GraphModule): Source module to later be compiled by Torch-TensorRT's dynamo fronted
+        inputs (Tuple[Any, ...]): List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
+            to select device type. ::
+
+                input=[
+                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                    torch_tensorrt.Input(
+                        min_shape=(1, 224, 224, 3),
+                        opt_shape=(1, 512, 512, 3),
+                        max_shape=(1, 1024, 1024, 3),
+                        dtype=torch.int32
+                        format=torch.channel_last
+                    ), # Dynamic input shape for input #2
+                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+                ]
+    Keyword Arguments:
+        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
+
+            device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
+
+        debug (bool): Enable debuggable engine
+        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the grap easier to covert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
+        **kwargs: Any,
+    Returns:
+        torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
+    """
+
     # Set log level at the top of compilation (torch_tensorrt.dynamo)
-    if "debug" in kwargs and kwargs["debug"]:
+    if debug:
         set_log_level(logger.parent, logging.DEBUG)
+    device = to_torch_device(device if device else default_device())
 
     # Determine the dynamic dimension and setup constraints to input dimensions as dictated by TensorRT
     # Torch dynamo does not allow 0/1 value for dynamic dimensions
     # for inputs during tracing. Hence we create new inputs for export
-    device = to_torch_device(kwargs.get("device", default_device()))
     torch_inputs = get_torch_inputs(inputs, device)
     trace_inputs = []
     constraints = []
@@ -77,12 +117,10 @@ def trace(
         else:
             trace_inputs.append(torch_inputs[idx])
 
-    experimental_decompositions = kwargs.get(
-        "enable_experimental_decompositions", ENABLE_EXPERIMENTAL_DECOMPOSITIONS
-    )
     with unittest.mock.patch(
-        "torch._export.DECOMP_TABLE", get_decompositions(experimental_decompositions)
+        "torch._export.DECOMP_TABLE",
+        get_decompositions(enable_experimental_decompositions),
     ):
-        exp_program = export(model, tuple(trace_inputs), constraints=constraints)
+        exp_program = export(mod, tuple(trace_inputs), constraints=constraints)
 
     return exp_program

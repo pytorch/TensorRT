@@ -6,9 +6,10 @@ from torch.fx.node import Argument, Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    dynamo_tensorrt_converter,
+)
 from torch_tensorrt.fx.types import TRTTensor
-
-from .converter_registry import dynamo_tensorrt_converter
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -25,8 +26,8 @@ def broadcast_checker(broadcast_node: torch.fx.Node) -> bool:
 
 @dynamo_tensorrt_converter(
     torch.ops.prims.broadcast_in_dim.default, capability_validator=broadcast_checker
-)  # type: ignore[misc]
-def aten_ops_broadcast_in_dim(
+)
+def prim_ops_broadcast_in_dim(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
