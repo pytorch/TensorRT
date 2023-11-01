@@ -89,7 +89,9 @@ def _pretraced_backend(
 
             gm = apply_lowering_passes(gm, sample_inputs)
 
-            torchtrt_inputs = prepare_inputs(sample_inputs)
+            torchtrt_inputs = prepare_inputs(
+                sample_inputs, disable_memory_format_check=True
+            )
             trt_compiled = compile_module(
                 gm,
                 torchtrt_inputs,

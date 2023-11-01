@@ -2,15 +2,16 @@
 
 Saving models compiled with Torch-TensorRT
 ====================================
+.. currentmodule:: torch_tensorrt.dynamo
 
 .. automodule:: torch_tensorrt.dynamo
    :members:
    :undoc-members:
    :show-inheritance:
-
+   
 Saving models compiled with Torch-TensorRT varies slightly with the `ir` that has been used for compilation.
 
-Dynamo IR
+Dynamo IR 
 -------------
 
 Starting with 2.1 release of Torch-TensorRT, we are switching the default compilation to be dynamo based.
@@ -40,7 +41,7 @@ The following code illustrates this approach.
 b) ExportedProgram
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-`torch.export.ExportedProgram` is a new format introduced in Pytorch 2.1. After we compile a Pytorch module using Torch-TensorRT, the resultant
+`torch.export.ExportedProgram` is a new format introduced in Pytorch 2.1. After we compile a Pytorch module using Torch-TensorRT, the resultant 
 `torch.fx.GraphModule` along with additional metadata can be used to create `ExportedProgram` which can be saved and loaded from disk.
 
 .. code-block:: python
@@ -64,7 +65,9 @@ This is needed as `torch.export` serialization cannot handle serializing and des
 
 NOTE: This way of saving the models using `ExportedProgram` is experimental. Here is a known issue : https://github.com/pytorch/TensorRT/issues/2341
 
-2) Torchscript IR
+
+Torchscript IR
+-------------
 
   In Torch-TensorRT 1.X versions, the primary way to compile and run inference with Torch-TensorRT is using Torchscript IR.
   This behavior stays the same in 2.X versions as well.
