@@ -549,7 +549,6 @@ if __name__ == "__main__":
         print("Loading user provided torch model: ", model_name_torch)
         model_torch = torch.load(model_name_torch).eval().cuda()
     elif model_name_torch in BENCHMARK_MODELS:
-        model_torch = None
         model_torch = BENCHMARK_MODELS[model_name_torch]["model"].eval().cuda()
         if model_name_torch == "bert_base_uncased":
             from transformers.utils.fx import symbolic_trace as transformers_trace
