@@ -1,12 +1,17 @@
-import torch
-import torch_tensorrt
 import custom_models as cm
-import torchvision.models as models
 import timm
+import torch
+import torchvision.models as models
+
+import torch_tensorrt
 
 BENCHMARK_MODELS = {
     "vgg16": {
         "model": models.vgg16(weights=models.VGG16_Weights.DEFAULT),
+        "path": ["script", "pytorch"],
+    },
+    "alexnet": {
+        "model": models.alexnet(weights=models.AlexNet_Weights.DEFAULT),
         "path": ["script", "pytorch"],
     },
     "resnet50": {
@@ -19,9 +24,21 @@ BENCHMARK_MODELS = {
     },
     "vit": {
         "model": timm.create_model("vit_base_patch16_224", pretrained=True),
-        "path": "script",
+        "path": ["script", "pytorch"],
     },
-    "bert_base_uncased": {"model": cm.BertModule(), "path": "trace"},
+    # "vit_large": {
+    #     "model": timm.create_model("vit_giant_patch14_224", pretrained=False),
+    #     "path": ["script", "pytorch"],
+    # },
+    "bert_base_uncased": {
+        "model": cm.BertModule(),
+        "inputs": cm.BertInputs(),
+        "path": ["trace", "pytorch"],
+    },
+    "sd_unet": {
+        "model": cm.StableDiffusionUnet(),
+        "path": "pytorch",
+    },
 }
 
 
@@ -51,7 +68,11 @@ def parse_inputs(user_inputs, dtype):
         )
         for input_dim in input_shape_and_dtype[0][1:-1].split(","):
             input_shape.append(int(input_dim))
-        torchtrt_inputs.append(torch.randint(0, 5, input_shape, dtype=dtype).cuda())
+
+        if input_shape != [1]:
+            torchtrt_inputs.append(torch.randn(input_shape, dtype=dtype).cuda())
+        else:
+            torchtrt_inputs.append(torch.Tensor([1.0]).cuda())
 
     return torchtrt_inputs
 

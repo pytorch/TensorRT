@@ -2,6 +2,7 @@ from __future__ import absolute_import, division, print_function
 
 # Config parsers and report generations
 import argparse
+import logging
 import os
 import time
 import timeit
@@ -14,7 +15,6 @@ import tensorrt as trt
 # Importing supported Backends
 import torch
 import torch.backends.cudnn as cudnn
-import torch_tensorrt as torchtrt
 from utils import (
     BENCHMARK_MODELS,
     parse_backends,
@@ -23,11 +23,26 @@ from utils import (
     precision_to_dtype,
 )
 
+import torch_tensorrt as torchtrt
+
 WARMUP_ITER = 10
 results = []
 
 
+def run_with_try_except(func):
+    def wrapper_func(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except KeyboardInterrupt:
+            raise
+        except:
+            logging.warning(f"Running {func} failed", exc_info=True)
+
+    return wrapper_func
+
+
 # Runs inference using Torch backend
+@run_with_try_except
 def run_torch(model, input_tensors, params, precision, batch_size):
     print("Running Torch for precision: ", precision, " batch_size : ", batch_size)
     iters = params.get("iterations", 20)
@@ -53,6 +68,7 @@ def run_torch(model, input_tensors, params, precision, batch_size):
 
 
 # Runs inference using Torch-TensorRT backend
+@run_with_try_except
 def run_ts_trt(model, input_tensors, params, precision, batch_size):
     print(
         "Running Torch-TensorRT for precision: ",
@@ -71,9 +87,9 @@ def run_ts_trt(model, input_tensors, params, precision, batch_size):
         compile_settings.update({"calib": params.get("calibration_cache")})
 
     start_compile = time.time_ns()
-    model = torchtrt.compile(model, **compile_settings)
+    model = torchtrt.compile(model, ir="ts", **compile_settings)
     end_compile = time.time_ns()
-    compile_time_ms = (end_compile - start_compile) / 1e6
+    compile_time_s = (end_compile - start_compile) / 1e9
 
     iters = params.get("iterations", 20)
     # Warm up
@@ -94,10 +110,11 @@ def run_ts_trt(model, input_tensors, params, precision, batch_size):
             timings.append(meas_time)
 
     recordStats(
-        "Torch-TensorRT [Torchscript]", timings, precision, batch_size, compile_time_ms
+        "Torch-TensorRT [Torchscript]", timings, precision, batch_size, compile_time_s
     )
 
 
+@run_with_try_except
 def run_dynamo(model, input_tensors, params, precision, batch_size):
     """
     Compile the given model using Torch-TensorRT dynamo frontend and record performance stats
@@ -119,7 +136,7 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
         truncate_long_and_double=params.get("truncate", False),
     )
     end_compile = time.time_ns()
-    compile_time_ms = (end_compile - start_compile) / 1e6
+    compile_time_s = (end_compile - start_compile) / 1e9
     iters = params.get("iterations", 20)
     # Warm up
     with torch.no_grad():
@@ -139,14 +156,17 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
             timings.append(meas_time)
 
     recordStats(
-        "Torch-TensorRT [Dynamo]", timings, precision, batch_size, compile_time_ms
+        "Torch-TensorRT [Dynamo]", timings, precision, batch_size, compile_time_s
     )
 
 
+@run_with_try_except
 def run_torch_compile(model, input_tensors, params, precision, batch_size):
     """
     Compile the given model using Torch-TensorRT torch.compile frontend and record performance stats
     """
+    torch._dynamo.reset()
+
     print(
         "Running Torch-TensorRT [torch_compile] for precision: ",
         precision,
@@ -165,7 +185,7 @@ def run_torch_compile(model, input_tensors, params, precision, batch_size):
     )
     model(*input_tensors)
     end_compile = time.time_ns()
-    compile_time_ms = (end_compile - start_compile) / 1e6
+    compile_time_s = (end_compile - start_compile) / 1e9
     iters = params.get("iterations", 20)
     # Warm up
     with torch.no_grad():
@@ -191,16 +211,19 @@ def run_torch_compile(model, input_tensors, params, precision, batch_size):
         timings,
         precision,
         batch_size,
-        compile_time_ms,
+        compile_time_s,
     )
 
 
+@run_with_try_except
 def run_inductor(model, input_tensors, params, precision, batch_size):
     """
     Compile the given model using torch inductor and record performance stats
     """
+    torch._dynamo.reset()
+
     print(
-        "Running Torch-TensorRT [inductor] for precision: ",
+        "Running Torch [inductor] for precision: ",
         precision,
         " batch_size : ",
         batch_size,
@@ -210,7 +233,7 @@ def run_inductor(model, input_tensors, params, precision, batch_size):
     model = torch.compile(model, backend="inductor", dynamic=False, mode="max-autotune")
     model(*input_tensors)
     end_compile = time.time_ns()
-    compile_time_ms = (end_compile - start_compile) / 1e6
+    compile_time_s = (end_compile - start_compile) / 1e9
     iters = params.get("iterations", 20)
     # Warm up
     with torch.no_grad():
@@ -232,11 +255,11 @@ def run_inductor(model, input_tensors, params, precision, batch_size):
     torch._dynamo.reset()
 
     recordStats(
-        "Torch-TensorRT [inductor]",
+        "Torch [inductor]",
         timings,
         precision,
         batch_size,
-        compile_time_ms,
+        compile_time_s,
     )
 
 
@@ -264,6 +287,7 @@ def torch_device_from_trt(device):
         return TypeError("%s is not supported by torch" % device)
 
 
+@run_with_try_except
 def run_tensorrt(
     model,
     input_tensors,
@@ -356,7 +380,7 @@ def run(
                 print("int8 precision expects calibration cache file for inference")
                 return False
 
-        if (model is None) and (backend != "fx2trt"):
+        if (model is None) and (backend in ("tensorrt", "ts_trt", "all")):
             warnings.warn(
                 f"Requested backend {backend} without specifying a TorchScript Model, "
                 + "skipping this backend"
@@ -423,7 +447,7 @@ def run(
 
 
 # Generate report
-def recordStats(backend, timings, precision, batch_size=1, compile_time_ms=None):
+def recordStats(backend, timings, precision, batch_size=1, compile_time_s=None):
     times = np.array(timings)
     steps = len(times)
     speeds = batch_size / times
@@ -442,7 +466,7 @@ def recordStats(backend, timings, precision, batch_size=1, compile_time_ms=None)
         "Mean(FPS)": speed_mean,
         "Median-Latency(ms)": time_med * 1000,
         "Mean-Latency(ms)": time_mean * 1000,
-        "Compile Time(ms)": compile_time_ms,
+        "Compile Time(s)": compile_time_s,
     }
     results.append(stats)
 
@@ -488,7 +512,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--truncate",
         action="store_true",
-        help="Truncate long and double weights in the network  in Torch-TensorRT",
+        help="Truncate long and double weights in the network in Torch-TensorRT",
     )
     arg_parser.add_argument(
         "--is_trt_engine",
@@ -563,8 +587,10 @@ if __name__ == "__main__":
 
         if not is_trt_engine and (precision == "fp16" or precision == "half"):
             # If model is TensorRT serialized engine then model.half will report failure
-            model = model.half()
-            model_torch = model_torch.half()
+            if model is not None:
+                model = model.half()
+            if model_torch is not None:
+                model_torch = model_torch.half()
 
         status = run(
             model,
