@@ -23,10 +23,6 @@ from utils import (
     precision_to_dtype,
 )
 
-# from torch_tensorrt.fx.lower import compile
-# from torch_tensorrt.fx.utils import LowerPrecision
-
-
 WARMUP_ITER = 10
 results = []
 
@@ -199,6 +195,51 @@ def run_torch_compile(model, input_tensors, params, precision, batch_size):
     )
 
 
+def run_inductor(model, input_tensors, params, precision, batch_size):
+    """
+    Compile the given model using torch inductor and record performance stats
+    """
+    print(
+        "Running Torch-TensorRT [inductor] for precision: ",
+        precision,
+        " batch_size : ",
+        batch_size,
+    )
+
+    start_compile = time.time_ns()
+    model = torch.compile(model, backend="inductor", dynamic=False, mode="max-autotune")
+    model(*input_tensors)
+    end_compile = time.time_ns()
+    compile_time_ms = (end_compile - start_compile) / 1e6
+    iters = params.get("iterations", 20)
+    # Warm up
+    with torch.no_grad():
+        for _ in range(WARMUP_ITER):
+            features = model(*input_tensors)
+
+    torch.cuda.synchronize()
+
+    timings = []
+    with torch.no_grad():
+        for i in range(iters):
+            start_time = timeit.default_timer()
+            features = model(*input_tensors)
+            torch.cuda.synchronize()
+            end_time = timeit.default_timer()
+            meas_time = end_time - start_time
+            timings.append(meas_time)
+    # Reset torch dynamo cache
+    torch._dynamo.reset()
+
+    recordStats(
+        "Torch-TensorRT [inductor]",
+        timings,
+        precision,
+        batch_size,
+        compile_time_ms,
+    )
+
+
 def torch_dtype_from_trt(dtype):
     if dtype == trt.int8:
         return torch.int8
@@ -349,7 +390,7 @@ def run(
             run_dynamo(model_torch, input_tensors, params, precision, batch_size)
 
         elif backend == "torch":
-            run_torch(model, input_tensors, params, precision, batch_size)
+            run_torch(model_torch, input_tensors, params, precision, batch_size)
 
         elif backend == "ts_trt":
             run_ts_trt(
@@ -377,6 +418,9 @@ def run(
         elif backend == "torch_compile":
             run_torch_compile(model_torch, input_tensors, params, precision, batch_size)
 
+        elif backend == "inductor":
+            run_inductor(model_torch, input_tensors, params, precision, batch_size)
+
 
 # Generate report
 def recordStats(backend, timings, precision, batch_size=1, compile_time_ms=None):
@@ -401,53 +445,6 @@ def recordStats(backend, timings, precision, batch_size=1, compile_time_ms=None)
         "Compile Time(ms)": compile_time_ms,
     }
     results.append(stats)
-
-
-def load_ts_model(params):
-    model = None
-    is_trt_engine = False
-
-    # No TorchScript Model Specified
-    if len(params.get("model", "")) == 0:
-        return None, None, is_trt_engine
-
-    # Load torch model traced/scripted
-    model_file = params.get("model").get("filename")
-    try:
-        model_name = params.get("model").get("name")
-    except:
-        model_name = model_file
-
-    print("Loading model: ", model_file)
-    if model_file.endswith(".plan"):
-        is_trt_engine = True
-        # Read the TensorRT engine file
-        with open(model_file, "rb") as fin:
-            model = fin.read()
-    else:
-        model = torch.jit.load(model_file).cuda()
-
-    return model, model_name, is_trt_engine
-
-
-def load_torch_model(params):
-    model = None
-
-    # No Torch Model Specified
-    if len(params.get("model_torch", "")) == 0:
-        return None, None
-
-    # Load torch model
-    model_file = params.get("model_torch").get("filename")
-    try:
-        model_name = params.get("model_torch").get("name")
-    except:
-        model_name = model_file
-
-    print("Loading Torch model: ", model_file)
-    model = torch.load(model_file).cuda()
-
-    return model, model_name
 
 
 if __name__ == "__main__":
@@ -528,6 +525,20 @@ if __name__ == "__main__":
     if len(model_name_torch) > 0 and os.path.exists(model_name_torch):
         print("Loading user provided torch model: ", model_name_torch)
         model_torch = torch.load(model_name_torch).eval().cuda()
+    elif model_name_torch in BENCHMARK_MODELS:
+        model_torch = None
+        if model_name_torch == "bert_base_uncased":
+            from transformers import BertModel
+            from transformers.utils.fx import symbolic_trace as transformers_trace
+
+            model_torch = BertModel.from_pretrained("bert-base-uncased").cuda().eval()
+            model_torch = (
+                transformers_trace(
+                    model_torch, input_names=["input_ids", "attention_mask"]
+                )
+                .eval()
+                .cuda()
+            )
 
     # If neither model type was provided
     if (model is None) and (model_torch is None):
@@ -553,6 +564,7 @@ if __name__ == "__main__":
         if not is_trt_engine and (precision == "fp16" or precision == "half"):
             # If model is TensorRT serialized engine then model.half will report failure
             model = model.half()
+            model_torch = model_torch.half()
 
         status = run(
             model,
