@@ -15,7 +15,6 @@ import tensorrt as trt
 # Importing supported Backends
 import torch
 import torch.backends.cudnn as cudnn
-import torch_tensorrt as torchtrt
 from utils import (
     BENCHMARK_MODELS,
     parse_backends,
@@ -23,6 +22,8 @@ from utils import (
     parse_precisions,
     precision_to_dtype,
 )
+
+import torch_tensorrt as torchtrt
 
 WARMUP_ITER = 10
 results = []
@@ -465,6 +466,7 @@ def recordStats(backend, timings, precision, batch_size=1, compile_time_s=None):
         "Mean(FPS)": speed_mean,
         "Median-Latency(ms)": time_med * 1000,
         "Mean-Latency(ms)": time_mean * 1000,
+        "Latency-StdDev(ms)": time_std * 1000,
         "Compile Time(s)": compile_time_s,
     }
     results.append(stats)
@@ -550,16 +552,6 @@ if __name__ == "__main__":
         model_torch = torch.load(model_name_torch).eval().cuda()
     elif model_name_torch in BENCHMARK_MODELS:
         model_torch = BENCHMARK_MODELS[model_name_torch]["model"].eval().cuda()
-        if model_name_torch == "bert_base_uncased":
-            from transformers.utils.fx import symbolic_trace as transformers_trace
-
-            model_torch = (
-                transformers_trace(
-                    model_torch, input_names=["input_ids", "attention_mask"]
-                )
-                .eval()
-                .cuda()
-            )
 
     # If neither model type was provided
     if (model is None) and (model_torch is None):

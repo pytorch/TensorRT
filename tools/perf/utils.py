@@ -1,44 +1,81 @@
+from typing import Optional, Sequence, Union
+
 import custom_models as cm
 import timm
 import torch
-import torch_tensorrt
 import torchvision.models as models
 
-BENCHMARK_MODELS = {
-    "vgg16": {
-        "model": models.vgg16(weights=models.VGG16_Weights.DEFAULT),
-        "path": ["script", "pytorch"],
-    },
-    "alexnet": {
-        "model": models.alexnet(weights=models.AlexNet_Weights.DEFAULT),
-        "path": ["script", "pytorch"],
-    },
-    "resnet50": {
-        "model": models.resnet50(weights=None),
-        "path": ["script", "pytorch"],
-    },
-    "efficientnet_b0": {
-        "model": timm.create_model("efficientnet_b0", pretrained=True),
-        "path": ["script", "pytorch"],
-    },
-    "vit": {
-        "model": timm.create_model("vit_base_patch16_224", pretrained=True),
-        "path": ["script", "pytorch"],
-    },
-    "vit_large": {
-        "model": timm.create_model("vit_giant_patch14_224", pretrained=False),
-        "path": ["script", "pytorch"],
-    },
-    "bert_base_uncased": {
-        "model": cm.BertModule(),
-        "inputs": cm.BertInputs(),
-        "path": ["trace", "pytorch"],
-    },
-    "sd_unet": {
-        "model": cm.StableDiffusionUnet(),
-        "path": "pytorch",
-    },
+import torch_tensorrt
+
+BENCHMARK_MODEL_NAMES = {
+    "vgg16",
+    "alexnet",
+    "resnet50",
+    "efficientnet_b0",
+    "vit",
+    "vit_large",
+    "bert_base_uncased",
+    "sd_unet",
 }
+
+
+class ModelStorage:
+    def __contains__(self, name: str):
+        return name in BENCHMARK_MODEL_NAMES
+
+    def __getitem__(self, name: str):
+        assert name in BENCHMARK_MODEL_NAMES
+
+        if name == "vgg16":
+            return {
+                "model": models.vgg16(weights=models.VGG16_Weights.DEFAULT),
+                "path": ["script", "pytorch"],
+            }
+        elif name == "alexnet":
+            return {
+                "model": models.alexnet(weights=models.AlexNet_Weights.DEFAULT),
+                "path": ["script", "pytorch"],
+            }
+        elif name == "resnet50":
+            return {
+                "model": models.resnet50(weights=None),
+                "path": ["script", "pytorch"],
+            }
+        elif name == "efficientnet_b0":
+            return {
+                "model": timm.create_model("efficientnet_b0", pretrained=True),
+                "path": ["script", "pytorch"],
+            }
+        elif name == "vit":
+            return {
+                "model": timm.create_model("vit_base_patch16_224", pretrained=True),
+                "path": ["script", "pytorch"],
+            }
+        elif name == "vit_large":
+            return {
+                "model": timm.create_model("vit_giant_patch14_224", pretrained=False),
+                "path": ["script", "pytorch"],
+            }
+        elif name == "bert_base_uncased":
+            return {
+                "model": cm.BertModule(),
+                "inputs": cm.BertInputs(),
+                "path": ["trace", "pytorch"],
+            }
+        elif name == "sd_unet":
+            return {
+                "model": cm.StableDiffusionUnet(),
+                "path": "pytorch",
+            }
+        else:
+            raise AssertionError(f"Invalid model name {name}")
+
+    def items(self):
+        for name in BENCHMARK_MODEL_NAMES:
+            yield name, self.__getitem__(name)
+
+
+BENCHMARK_MODELS = ModelStorage()
 
 
 def precision_to_dtype(pr):

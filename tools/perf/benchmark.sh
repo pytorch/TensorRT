@@ -14,7 +14,7 @@ echo "Benchmarking VGG16 model"
 for bs in ${batch_sizes[@]}
 do
   python perf_run.py --model ${MODELS_DIR}/vgg16_scripted.jit.pt \
-                     --model_torch ${MODELS_DIR}/vgg16_pytorch.pt \
+                     --model_torch vgg16 \
                      --precision fp32,fp16 --inputs="(${bs}, 3, 224, 224)" \
                      --batch_size ${bs} \
                      --truncate \
@@ -27,7 +27,7 @@ echo "Benchmarking AlexNet model"
 for bs in ${batch_sizes[@]}
 do
   python perf_run.py --model ${MODELS_DIR}/alexnet_scripted.jit.pt \
-                     --model_torch ${MODELS_DIR}/alexnet_pytorch.pt \
+                     --model_torch alexnet \
                      --precision fp32,fp16 --inputs="(${bs}, 3, 227, 227)" \
                      --batch_size ${bs} \
                      --truncate \
@@ -40,7 +40,7 @@ echo "Benchmarking Resnet50 model"
 for bs in ${batch_sizes[@]}
 do
   python perf_run.py --model ${MODELS_DIR}/resnet50_scripted.jit.pt \
-                     --model_torch ${MODELS_DIR}/resnet50_pytorch.pt \
+                     --model_torch resnet50 \
                      --precision fp32,fp16 --inputs="(${bs}, 3, 224, 224)" \
                      --batch_size ${bs} \
                      --truncate \
@@ -53,7 +53,7 @@ echo "Benchmarking VIT model"
 for bs in ${batch_sizes[@]}
 do
   python perf_run.py --model ${MODELS_DIR}/vit_scripted.jit.pt \
-                     --model_torch ${MODELS_DIR}/vit_pytorch.pt \
+                     --model_torch vit \
                      --precision fp32,fp16 --inputs="(${bs}, 3, 224, 224)" \
                      --batch_size ${bs} \
                      --truncate \
@@ -66,19 +66,20 @@ echo "Benchmarking VIT Large model"
 for bs in ${large_model_batch_sizes[@]}
 do
   python perf_run.py --model ${MODELS_DIR}/vit_large_scripted.jit.pt \
-                     --model_torch ${MODELS_DIR}/vit_large_pytorch.pt \
+                     --model_torch vit_large \
                      --precision fp32,fp16 --inputs="(${bs}, 3, 224, 224)" \
                      --truncate \
                      --batch_size ${bs} \
                      --backends torch,ts_trt,dynamo,torch_compile,inductor \
                      --report "vit_large_perf_bs${bs}.txt"
+done
 
 # Benchmark EfficientNet-B0 model
 echo "Benchmarking EfficientNet-B0 model"
 for bs in ${batch_sizes[@]}
 do
   python perf_run.py --model ${MODELS_DIR}/efficientnet_b0_scripted.jit.pt \
-                     --model_torch ${MODELS_DIR}/efficientnet_b0_pytorch.pt \
+                     --model_torch efficientnet_b0 \
                      --precision fp32,fp16 --inputs="(${bs}, 3, 224, 224)" \
                      --batch_size ${bs} \
                      --truncate \
@@ -90,7 +91,7 @@ done
 echo "Benchmarking SD UNet model"
 for bs in ${large_model_batch_sizes[@]}
 do
-  python perf_run.py --model_torch ${MODELS_DIR}/sd_unet_pytorch.pt \
+  python perf_run.py --model_torch sd_unet \
                      --precision fp32,fp16 --inputs="(${bs}, 4, 128, 128)@fp16;(${bs})@fp16;(${bs}, 1, 768)@fp16" \
                      --batch_size ${bs} \
                      --backends torch,dynamo,torch_compile,inductor \

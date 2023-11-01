@@ -67,9 +67,25 @@ def download_models(version_matches, manifest):
     # Download all models if torch version is different than model version
     if not version_matches:
         for n, m in BENCHMARK_MODELS.items():
+            # Ensure all specified desired model formats exist and are valid
+            assert all(
+                (path in VALID_PATHS)
+                for path in (
+                    m["path"] if isinstance(m["path"], (list, tuple)) else [m["path"]]
+                )
+            ), "Not all 'path' attributes in BENCHMARK_MODELS are valid"
+
             manifest = get(n, m, manifest)
     else:
         for n, m in BENCHMARK_MODELS.items():
+            # Ensure all specified desired model formats exist and are valid
+            assert all(
+                (path in VALID_PATHS)
+                for path in (
+                    m["path"] if isinstance(m["path"], (list, tuple)) else [m["path"]]
+                )
+            ), "Not all 'path' attributes in BENCHMARK_MODELS are valid"
+
             scripted_filename = "models/" + n + "_scripted.jit.pt"
             traced_filename = "models/" + n + "_traced.jit.pt"
             pytorch_filename = "models/" + n + "_pytorch.pt"
@@ -147,12 +163,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # Ensure all specified desired model formats exist and are valid
-    paths = [
-        [m["path"]] if isinstance(m["path"], str) else m["path"]
-        for m in BENCHMARK_MODELS.values()
-    ]
-    assert all(
-        (path in VALID_PATHS) for path_list in paths for path in path_list
-    ), "Not all 'path' attributes in BENCHMARK_MODELS are valid"
     main()
