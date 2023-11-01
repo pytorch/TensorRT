@@ -1,12 +1,13 @@
+import json
+import os
+
+import custom_models as cm
+import timm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
-import timm
-from transformers import BertModel, BertTokenizer, BertConfig
-import os
-import json
-import custom_models as cm
+from transformers import BertConfig, BertModel, BertTokenizer
 
 torch.hub._validate_not_a_forked_repo = lambda a, b, c: True
 
@@ -40,7 +41,7 @@ BENCHMARK_MODELS = {
     },
     "vit": {
         "model": timm.create_model("vit_base_patch16_224", pretrained=True),
-        "path": "script",
+        "path": ["script", "pytorch"],
     },
     "bert_base_uncased": {"model": cm.BertModule(), "path": "trace"},
 }

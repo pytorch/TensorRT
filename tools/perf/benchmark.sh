@@ -5,7 +5,7 @@ MODELS_DIR="models"
 # Download the Torchscript models
 python hub.py
 
-batch_sizes=(1 2 4 8 16 32 64 128 256)
+batch_sizes=(1) # 2 4 8 16 32 64 128 256
 
 #Benchmark VGG16 model
 echo "Benchmarking VGG16 model"
@@ -15,56 +15,56 @@ do
                      --model_torch ${MODELS_DIR}/vgg16_pytorch.pt \
                      --precision fp32,fp16 --inputs="(${bs}, 3, 224, 224)" \
                      --batch_size ${bs} \
-                     --backends torch,torch_tensorrt,tensorrt,fx2trt \
+                     --backends torch,ts_trt,tensorrt,dynamo,torch_compile \
                      --report "vgg_perf_bs${bs}.txt"
 done
 
-# Benchmark Resnet50 model
-echo "Benchmarking Resnet50 model"
-for bs in ${batch_sizes[@]}
-do
-  python perf_run.py --model ${MODELS_DIR}/resnet50_scripted.jit.pt \
-                     --model_torch ${MODELS_DIR}/resnet50_pytorch.pt \
-                     --precision fp32,fp16 --inputs="(${bs}, 3, 224, 224)" \
-                     --batch_size ${bs} \
-                     --backends torch,torch_tensorrt,tensorrt,fx2trt \
-                     --report "rn50_perf_bs${bs}.txt"
-done
+# # Benchmark Resnet50 model
+# echo "Benchmarking Resnet50 model"
+# for bs in ${batch_sizes[@]}
+# do
+#   python perf_run.py --model ${MODELS_DIR}/resnet50_scripted.jit.pt \
+#                      --model_torch ${MODELS_DIR}/resnet50_pytorch.pt \
+#                      --precision fp32,fp16 --inputs="(${bs}, 3, 224, 224)" \
+#                      --batch_size ${bs} \
+#                      --backends torch,ts_trt,tensorrt,dynamo,torch_compile \
+#                      --report "rn50_perf_bs${bs}.txt"
+# done
 
-# Benchmark VIT model
-echo "Benchmarking VIT model"
-for bs in ${batch_sizes[@]}
-do
-  python perf_run.py --model ${MODELS_DIR}/vit_scripted.jit.pt \
-                     --precision fp32,fp16 --inputs="(${bs}, 3, 224, 224)" \
-                     --batch_size ${bs} \
-                     --backends torch,torch_tensorrt,tensorrt \
-                     --report "vit_perf_bs${bs}.txt"
-done
+# # Benchmark VIT model
+# echo "Benchmarking VIT model"
+# for bs in ${batch_sizes[@]}
+# do
+#   python perf_run.py --model ${MODELS_DIR}/vit_scripted.jit.pt \
+#                      --precision fp32,fp16 --inputs="(${bs}, 3, 224, 224)" \
+#                      --batch_size ${bs} \
+#                      --backends torch,ts_trt,tensorrt,dynamo,torch_compile \
+#                      --report "vit_perf_bs${bs}.txt"
+# done
 
-# Benchmark EfficientNet-B0 model
-echo "Benchmarking EfficientNet-B0 model"
-for bs in ${batch_sizes[@]}
-do
-  python perf_run.py --model ${MODELS_DIR}/efficientnet_b0_scripted.jit.pt \
-                     --model_torch ${MODELS_DIR}/efficientnet_b0_pytorch.pt \
-                     --precision fp32,fp16 --inputs="(${bs}, 3, 224, 224)" \
-                     --batch_size ${bs} \
-                     --backends torch,torch_tensorrt,tensorrt,fx2trt \
-                     --report "eff_b0_perf_bs${bs}.txt"
-done
+# # Benchmark EfficientNet-B0 model
+# echo "Benchmarking EfficientNet-B0 model"
+# for bs in ${batch_sizes[@]}
+# do
+#   python perf_run.py --model ${MODELS_DIR}/efficientnet_b0_scripted.jit.pt \
+#                      --model_torch ${MODELS_DIR}/efficientnet_b0_pytorch.pt \
+#                      --precision fp32,fp16 --inputs="(${bs}, 3, 224, 224)" \
+#                      --batch_size ${bs} \
+#                      --backends torch,ts_trt,tensorrt,dynamo,torch_compile \
+#                      --report "eff_b0_perf_bs${bs}.txt"
+# done
 
 # Benchmark BERT model
-echo "Benchmarking Huggingface BERT base model"
-for bs in ${batch_sizes[@]}
-do
-  python perf_run.py --model ${MODELS_DIR}/bert_base_uncased_traced.jit.pt \
-                     --precision fp32 --inputs="(${bs}, 128)@int32;(${bs}, 128)@int32" \
-                     --batch_size ${bs} \
-                     --backends torch,torch_tensorrt \
-                     --truncate \
-                     --report "bert_base_perf_bs${bs}.txt"
-done
+# echo "Benchmarking Huggingface BERT base model"
+# for bs in ${batch_sizes[@]}
+# do
+#   python perf_run.py --model ${MODELS_DIR}/bert_base_uncased_traced.jit.pt \
+#                      --precision fp32 --inputs="(${bs}, 128)@int32;(${bs}, 128)@int32" \
+#                      --batch_size ${bs} \
+#                      --backends torch,torch_tensorrt \
+#                      --truncate \
+#                      --report "bert_base_perf_bs${bs}.txt"
+# done
 
 # Collect and concatenate all results
 echo "Concatenating all results"
