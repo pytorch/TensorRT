@@ -1,9 +1,8 @@
 import custom_models as cm
 import timm
 import torch
-import torchvision.models as models
-
 import torch_tensorrt
+import torchvision.models as models
 
 BENCHMARK_MODELS = {
     "vgg16": {
@@ -26,10 +25,10 @@ BENCHMARK_MODELS = {
         "model": timm.create_model("vit_base_patch16_224", pretrained=True),
         "path": ["script", "pytorch"],
     },
-    # "vit_large": {
-    #     "model": timm.create_model("vit_giant_patch14_224", pretrained=False),
-    #     "path": ["script", "pytorch"],
-    # },
+    "vit_large": {
+        "model": timm.create_model("vit_giant_patch14_224", pretrained=False),
+        "path": ["script", "pytorch"],
+    },
     "bert_base_uncased": {
         "model": cm.BertModule(),
         "inputs": cm.BertInputs(),
@@ -70,7 +69,12 @@ def parse_inputs(user_inputs, dtype):
             input_shape.append(int(input_dim))
 
         if input_shape != [1]:
-            torchtrt_inputs.append(torch.randn(input_shape, dtype=dtype).cuda())
+            if dtype == torch.int32:
+                torchtrt_inputs.append(
+                    torch.randint(0, 5, input_shape, dtype=dtype).cuda()
+                )
+            else:
+                torchtrt_inputs.append(torch.randn(input_shape, dtype=dtype).cuda())
         else:
             torchtrt_inputs.append(torch.Tensor([1.0]).cuda())
 

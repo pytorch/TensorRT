@@ -15,6 +15,7 @@ import tensorrt as trt
 # Importing supported Backends
 import torch
 import torch.backends.cudnn as cudnn
+import torch_tensorrt as torchtrt
 from utils import (
     BENCHMARK_MODELS,
     parse_backends,
@@ -22,8 +23,6 @@ from utils import (
     parse_precisions,
     precision_to_dtype,
 )
-
-import torch_tensorrt as torchtrt
 
 WARMUP_ITER = 10
 results = []
@@ -551,11 +550,10 @@ if __name__ == "__main__":
         model_torch = torch.load(model_name_torch).eval().cuda()
     elif model_name_torch in BENCHMARK_MODELS:
         model_torch = None
+        model_torch = BENCHMARK_MODELS[model_name_torch]["model"].eval().cuda()
         if model_name_torch == "bert_base_uncased":
-            from transformers import BertModel
             from transformers.utils.fx import symbolic_trace as transformers_trace
 
-            model_torch = BertModel.from_pretrained("bert-base-uncased").cuda().eval()
             model_torch = (
                 transformers_trace(
                     model_torch, input_names=["input_ids", "attention_mask"]
