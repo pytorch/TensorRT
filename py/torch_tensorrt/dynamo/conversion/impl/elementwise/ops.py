@@ -423,6 +423,39 @@ def logical_xor(
     )
 
 
+def bitwise_and(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, bool, Sequence[Union[int, bool]]],
+    rhs_val: Union[TRTTensor, int, bool, Sequence[Union[int, bool]]],
+) -> TRTTensor:
+    return logical_and(ctx, target, source_ir, f"{name}_logical_and", lhs_val, rhs_val)
+
+
+def bitwise_or(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, bool, Sequence[Union[int, bool]]],
+    rhs_val: Union[TRTTensor, int, bool, Sequence[Union[int, bool]]],
+) -> TRTTensor:
+    return logical_or(ctx, target, source_ir, f"{name}_logical_or", lhs_val, rhs_val)
+
+
+def bitwise_xor(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, bool, Sequence[Union[int, bool]]],
+    rhs_val: Union[TRTTensor, int, bool, Sequence[Union[int, bool]]],
+) -> TRTTensor:
+    return logical_xor(ctx, target, source_ir, f"{name}_logical_xor", lhs_val, rhs_val)
+
+
 def eq(
     ctx: ConversionContext,
     target: Target,

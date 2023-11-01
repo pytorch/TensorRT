@@ -1701,6 +1701,120 @@ def aten_ops_logical_xor(
     )
 
 
+def bitwise_type_validator(node: Node) -> bool:
+    targets = [
+        torch.ops.aten.bitwise_and.Tensor,
+        torch.ops.aten.bitwise_or.Tensor,
+        torch.ops.aten.bitwise_xor.Tensor,
+    ]
+    if node.target not in targets:
+        return False
+
+    lhs_val = node.args[0]
+    rhs_val = node.args[1]
+    lhs_meta = lhs_val.meta.get("tensor_meta")
+    rhs_meta = rhs_val.meta.get("tensor_meta")
+
+    if lhs_meta is None or rhs_meta is None:
+        return False
+
+    supported_type = [torch.bool, bool]
+    return lhs_meta.dtype in supported_type and rhs_meta.dtype in supported_type
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.bitwise_and.Tensor, capability_validator=bitwise_type_validator)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.bitwise_and.Scalar)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.bitwise_and.Scalar_Tensor)  # type: ignore[misc]
+def aten_ops_bitwise_and(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.bitwise_and(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.bitwise_or.Tensor, capability_validator=bitwise_type_validator)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.bitwise_or.Scalar)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.bitwise_or.Scalar_Tensor)  # type: ignore[misc]
+def aten_ops_bitwise_or(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.bitwise_or(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.bitwise_xor.Tensor, capability_validator=bitwise_type_validator)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.bitwise_xor.Scalar)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.bitwise_xor.Scalar_Tensor)  # type: ignore[misc]
+def aten_ops_bitwise_xor(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.bitwise_xor(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+def bitwise_not_type_validator(node: Node) -> bool:
+    val = node.args[0]
+    val_meta = val.meta.get("tensor_meta")
+
+    if val_meta is None:
+        return False
+
+    supported_type = [torch.bool, bool]
+    return val_meta.dtype in supported_type
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.bitwise_not.default, capability_validator=bitwise_not_type_validator)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)  # type: ignore[misc]
+def aten_ops_bitwise_not(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.bitwise_not(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.eq.Tensor)  # type: ignore[misc]
 @dynamo_tensorrt_converter(torch.ops.aten.eq.Scalar)  # type: ignore[misc]
 @enforce_tensor_types(
