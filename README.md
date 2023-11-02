@@ -118,7 +118,7 @@ These are the following dependencies used to verify the testcases. Torch-TensorR
 - Bazel 6.2.1
 - Libtorch 2.1.0
 - CUDA 12.1
-- cuDNN 8.8.1
+- cuDNN 8.9.5
 - TensorRT 8.6.1
 
 ## Prebuilt Binaries and Wheel files
