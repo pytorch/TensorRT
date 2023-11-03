@@ -7,6 +7,7 @@ import os
 import time
 import timeit
 import warnings
+from functools import wraps
 
 import numpy as np
 import pandas as pd
@@ -14,7 +15,6 @@ import tensorrt as trt
 
 # Importing supported Backends
 import torch
-import torch.backends.cudnn as cudnn
 from utils import (
     BENCHMARK_MODELS,
     parse_backends,
@@ -30,6 +30,7 @@ results = []
 
 
 def run_with_try_except(func):
+    @wraps(func)
     def wrapper_func(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -527,7 +528,6 @@ if __name__ == "__main__":
     )
     args = arg_parser.parse_args()
 
-    cudnn.benchmark = True
     # Create random input tensor of certain size
     torch.manual_seed(12345)
     model_name = "Model"
@@ -542,9 +542,6 @@ if __name__ == "__main__":
     if os.path.exists(model_name):
         print("Loading user provided torchscript model: ", model_name)
         model = torch.jit.load(model_name).cuda().eval()
-    elif model_name in BENCHMARK_MODELS:
-        print("Loading torchscript model from BENCHMARK_MODELS for: ", model_name)
-        model = BENCHMARK_MODELS[model_name]["model"].eval().cuda()
 
     # Load PyTorch Model, if provided
     if len(model_name_torch) > 0 and os.path.exists(model_name_torch):
