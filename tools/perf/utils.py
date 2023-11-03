@@ -1,11 +1,7 @@
-from typing import Optional, Sequence, Union
-
 import custom_models as cm
 import timm
 import torch
 import torchvision.models as models
-
-import torch_tensorrt
 
 BENCHMARK_MODEL_NAMES = {
     "vgg16",
