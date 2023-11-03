@@ -269,10 +269,10 @@ commands:
         default: "0.16.0.dev20230703+cu121"
       torch-build-index:
         type: string
-        default: "https://download.pytorch.org/whl/nightly/cu121"
+        default: "https://download.pytorch.org/whl/cu121"
       torchvision-build-index:
         type: string
-        default: "https://download.pytorch.org/whl/nightly/cu121"
+        default: "https://download.pytorch.org/whl/cu121"
     steps:
       - run:
           name: Install Torch
@@ -1457,7 +1457,7 @@ parameters:
     default: "0.16.0.dev20230703+cu121"
   torch-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/nightly/cu121"
+    default: "https://download.pytorch.org/whl/cu121"
   cudnn-version:
     type: string
     default: "8.9.5.30"

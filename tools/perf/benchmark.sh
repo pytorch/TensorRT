@@ -105,7 +105,7 @@ for bs in ${batch_sizes[@]}
 do
   python perf_run.py --model ${MODELS_DIR}/bert_base_uncased_traced.jit.pt \
                      --model_torch "bert_base_uncased" \
-                     --precision fp32 --inputs="(${bs}, 128)@int32;(${bs}, 128)@int32" \
+                     --precision fp32,fp16 --inputs="(${bs}, 128)@int32;(${bs}, 128)@int32" \
                      --batch_size ${bs} \
                      --backends torch,ts_trt,dynamo,torch_compile,inductor \
                      --truncate \

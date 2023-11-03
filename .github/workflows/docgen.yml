@@ -30,14 +30,14 @@ jobs:
       - name: Install base deps
         run: |
           python3 -m pip install pip --upgrade
-          python3 -m pip install pyyaml numpy torch --pre --extra-index-url https://download.pytorch.org/whl/nightly/cu121
+          python3 -m pip install pyyaml numpy torch --pre --extra-index-url https://download.pytorch.org/whl/cu121
           ./packaging/pre_build_script.sh
       - name: Get HEAD SHA
         id: vars
         run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
       - name: Build Python Package
         run: |
-          python3 -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu121
+          python3 -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/cu121
       - name: Generate New Docs
         run: |
           cd docsrc
