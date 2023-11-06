@@ -2,7 +2,7 @@ import operator
 
 import torch
 import torch.nn as nn
-from harness import DispatchTestCase
+from .harness import DispatchTestCase
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
