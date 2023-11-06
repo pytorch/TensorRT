@@ -1,6 +1,6 @@
 .. _use_from_pytorch:
 
-Using Torch-TensorRT Directly From PyTorch
+Using Torch-TensorRT TorchScript Frontend Directly From PyTorch
 ============================================
 
 You will now be able to directly access TensorRT from PyTorch APIs. The process to use this feature

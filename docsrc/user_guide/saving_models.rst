@@ -20,8 +20,8 @@ The output of `ir=dynamo` compilation is a `torch.fx.GraphModule` object. There 
 a) Converting to Torchscript
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-`torch.fx.GraphModule` objects cannot be serialized directly. Hence we use `torch.jit.trace` to convert this into a `ScriptModule` object which can be saved to disk. 
-The following code illustrates this approach. 
+`torch.fx.GraphModule` objects cannot be serialized directly. Hence we use `torch.jit.trace` to convert this into a `ScriptModule` object which can be saved to disk.
+The following code illustrates this approach.
 
 .. code-block:: python
 
@@ -53,15 +53,15 @@ b) ExportedProgram
     inputs = torch.randn((1, 3, 224, 224)).cuda()
     trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs) # Output is a torch.fx.GraphModule
     # Transform and create an exported program
-    trt_exp_program = torch_tensorrt.dynamo.serialize(trt_gm, inputs, call_spec, ir="exported_program")
+    trt_exp_program = torch_tensorrt.dynamo.export(trt_gm, inputs, call_spec, ir="exported_program")
     torch.export.save(trt_exp_program, "trt_model.ep")
 
     # Later, you can load it and run inference 
     model = torch.export.load("trt_model.ep")
     model(inputs)
 
-`torch_tensorrt.dynamo.transform` inlines the submodules within a GraphModule to their corresponding nodes, stiches all the nodes together and creates an ExportedProgram. 
-This is needed as `torch._export` serialization cannot handle serializing and deserializing of submodules (`call_module` nodes). 
+`torch_tensorrt.dynamo.export` inlines the submodules within a GraphModule to their corresponding nodes, stiches all the nodes together and creates an ExportedProgram. 
+This is needed as `torch.export` serialization cannot handle serializing and deserializing of submodules (`call_module` nodes). 
 
 NOTE: This way of saving the models using `ExportedProgram` is experimental. Here is a known issue : https://github.com/pytorch/TensorRT/issues/2341
 
@@ -70,7 +70,7 @@ Torchscript IR
 -------------
 
   In Torch-TensorRT 1.X versions, the primary way to compile and run inference with Torch-TensorRT is using Torchscript IR.
-  This behavior stays the same in 2.X versions as well. 
+  This behavior stays the same in 2.X versions as well.
 
   .. code-block:: python
 
@@ -85,4 +85,4 @@ Torchscript IR
     # Later, you can load it and run inference
     model = torch.jit.load("trt_model.ts").cuda()
     model(inputs)
-  
+

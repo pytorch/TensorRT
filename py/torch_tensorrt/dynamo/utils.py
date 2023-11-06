@@ -5,12 +5,12 @@ from dataclasses import fields, replace
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import torch
+import torch_tensorrt
 from torch_tensorrt._Device import Device
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo._defaults import PRECISION
+from torch_tensorrt.dynamo._settings import CompilationSettings
 
-import torch_tensorrt
 from packaging import version
 
 logger = logging.getLogger(__name__)

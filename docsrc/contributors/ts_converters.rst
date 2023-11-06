@@ -1,7 +1,7 @@
-.. _writing_converters:
+.. _ts_converters:
 
-Writing Converters
-===================
+Writing TorchScript Converters
+=================================
 
 Background
 ------------

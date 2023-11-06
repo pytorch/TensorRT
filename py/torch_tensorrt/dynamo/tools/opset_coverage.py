@@ -13,10 +13,7 @@ import torch._prims as prims
 import torchgen
 from torch._dynamo.variables import BuiltinVariable
 from torch._ops import OpOverload
-from torch_tensorrt.dynamo.conversion.converter_registry import (
-    DYNAMO_CONVERTERS,
-    ConverterRegistry,
-)
+from torch_tensorrt.dynamo.conversion import DYNAMO_CONVERTERS, ConverterRegistry
 from torch_tensorrt.dynamo.lowering import get_decompositions
 from torchgen.gen import parse_native_yaml
 
