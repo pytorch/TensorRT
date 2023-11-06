@@ -2,21 +2,10 @@ import logging
 from typing import Any, Sequence
 
 import torch
-from torch_tensorrt._utils import sanitized_torch_version
+from torch._inductor.freezing import ConstantFolder, replace_node_with_constant
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
-
-from packaging import version
-
-# Modify import location of utilities based on Torch version
-if version.parse(sanitized_torch_version()) < version.parse("2.1.1"):
-    from torch._inductor.freezing import ConstantFolder, replace_node_with_constant
-else:
-    from torch._inductor.constant_folding import (
-        ConstantFolder,
-        replace_node_with_constant,
-    )
 
 logger = logging.getLogger(__name__)
 

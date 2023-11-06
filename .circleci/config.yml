@@ -109,7 +109,7 @@ commands:
             sudo docker run --rm --runtime=nvidia --gpus all nvidia/cuda:11.6.2-base-ubuntu20.04 nvidia-smi
 
   install-cudnn:
-    description: "Install CUDNN 8.8.1"
+    description: "Install CUDNN 8.9.5"
     parameters:
       os:
         type: string
@@ -119,7 +119,7 @@ commands:
         default: "x86_64"
       cudnn-version:
         type: string
-        default: "8.8.1.3"
+        default: "8.9.5.30"
       cuda-version:
         type: string
         default: "cuda12.0"
@@ -198,7 +198,7 @@ commands:
         default: "cuda12.0"
       cudnn-version:
         type: string
-        default: "8.8.1.3"
+        default: "8.9.5.30"
       trt-version-short:
         type: string
         default: "8.6.1"
@@ -246,7 +246,7 @@ commands:
           default: "8.6.1"
         cudnn-version-long:
           type: string
-          default: "8.8.1.3"
+          default: "8.9.5.30"
       steps:
         - run:
             name: Set up python environment
@@ -269,10 +269,10 @@ commands:
         default: "0.16.0.dev20230703+cu121"
       torch-build-index:
         type: string
-        default: "https://download.pytorch.org/whl/nightly/cu121"
+        default: "https://download.pytorch.org/whl/cu121"
       torchvision-build-index:
         type: string
-        default: "https://download.pytorch.org/whl/nightly/cu121"
+        default: "https://download.pytorch.org/whl/cu121"
     steps:
       - run:
           name: Install Torch
@@ -1457,10 +1457,10 @@ parameters:
     default: "0.16.0.dev20230703+cu121"
   torch-build-index:
     type: string
-    default: "https://download.pytorch.org/whl/nightly/cu121"
+    default: "https://download.pytorch.org/whl/cu121"
   cudnn-version:
     type: string
-    default: "8.8.1.3"
+    default: "8.9.5.30"
   trt-version-short:
     type: string
     default: "8.6.1"
@@ -1483,7 +1483,7 @@ parameters:
     default: "https://download.pytorch.org/whl/cu117"
   cudnn-version-legacy:
     type: string
-    default: "8.8.1.3"
+    default: "8.9.5.30"
   trt-version-short-legacy:
     type: string
     default: "8.6.1"
