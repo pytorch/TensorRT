@@ -12,7 +12,7 @@ from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT Engine
     EngineCapability,
 )
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo import CompilationSettings, partitioning
+from torch_tensorrt.dynamo import partitioning
 from torch_tensorrt.dynamo._defaults import (
     DEBUG,
     DEVICE,
@@ -30,6 +30,7 @@ from torch_tensorrt.dynamo._defaults import (
     WORKSPACE_SIZE,
 )
 from torch_tensorrt.dynamo.conversion import (
+    CompilationSettings,
     convert_module,
     repair_long_or_double_inputs,
 )
@@ -47,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 def compile(
     exported_program: ExportedProgram,
-    inputs: Any,
+    inputs: Tuple[Any, ...],
     *,
     device: Optional[Union[Device, torch.device, str]] = DEVICE,
     disable_tf32: bool = False,
@@ -76,6 +77,65 @@ def compile(
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
+    """Compile a TorchScript module for NVIDIA GPUs using TensorRT
+
+    Takes a existing TorchScript module and a set of settings to configure the compiler
+    and will convert methods to JIT Graphs which call equivalent TensorRT engines
+
+    Converts specifically the forward method of a TorchScript Module
+
+    Arguments:
+        exported_program (torch.export.ExportedProgram): Source module, running torch.export on a ``torch.nn.Module``
+        inputs (Tuple[Any, ...]): List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
+            to select device type. ::
+
+                input=[
+                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                    torch_tensorrt.Input(
+                        min_shape=(1, 224, 224, 3),
+                        opt_shape=(1, 512, 512, 3),
+                        max_shape=(1, 1024, 1024, 3),
+                        dtype=torch.int32
+                        format=torch.channel_last
+                    ), # Dynamic input shape for input #2
+                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+                ]
+
+    Keyword Arguments:
+        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
+
+            device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
+
+        disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+        sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
+        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
+        refit (bool): Enable refitting
+        debug (bool): Enable debuggable engine
+        capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
+        num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
+        workspace_size (int): Maximum size of workspace given to TensorRT
+        dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
+        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
+        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
+        truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
+        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
+        require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
+        min_block_size (int): The minimum number of contiguous TensorRT convertable operations in order to run a set of operations in TensorRT
+        torch_executed_ops (List[str]): List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+        torch_executed_modules (List[str]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+        pass_through_build_failures (bool): Error out if there are issues during compilation (only applicable to torch.compile workflows)
+        max_aux_stream (Optional[int]): Maximum streams in the engine
+        version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
+        optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
+        use_python_runtime: (bool): Return a graph using a pure Python runtime, reduces options for serialization
+        use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optiminal. Use the global paritioner (``False``) if looking for best performance
+        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the grap easier to covert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
+        **kwargs: Any,
+    Returns:
+        torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
+    """
+
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
 
