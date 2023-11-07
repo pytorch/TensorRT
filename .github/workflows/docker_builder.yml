@@ -28,6 +28,12 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
+    - name: Fix Slashes Repo Name
+      id: fix_slashes
+      run: |
+        export container_name=$(echo ${{ env.CONTAINER_NAME }} |  sed 's|/|_|g')
+        echo "container_name=$container_name" >> $GITHUB_OUTPUT
+
     - name: Log in to the Container registry
       uses: docker/login-action@v2
       with:
@@ -38,7 +44,7 @@ jobs:
     # Automatically detect TensorRT and cuDNN default versions for Torch-TRT build
     - name: Build Docker image
       env:
-        DOCKER_TAG: ${{ env.DOCKER_REGISTRY }}/${{ env.CONTAINER_NAME }}
+        DOCKER_TAG: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
       run: |
         python3 -m pip install pyyaml
         TRT_VERSION=$(python3 -c "import versions; versions.tensorrt_version()")
@@ -50,7 +56,7 @@ jobs:
 
     - name: Push Docker image
       env:
-        DOCKER_URL: ${{ env.DOCKER_REGISTRY }}/${{ env.CONTAINER_NAME }}
+        DOCKER_URL: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
       run: docker push $DOCKER_URL
 
     # Clean up all untagged containers in registry
