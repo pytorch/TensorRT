@@ -15,7 +15,7 @@ namespace core {
 namespace runtime {
 
 using EngineID = int64_t;
-const std::string ABI_VERSION = "4";
+const std::string ABI_VERSION = "5";
 extern bool MULTI_DEVICE_SAFE_MODE;
 typedef enum {
   ABI_TARGET_IDX = 0,
@@ -24,13 +24,15 @@ typedef enum {
   ENGINE_IDX,
   INPUT_BINDING_NAMES_IDX,
   OUTPUT_BINDING_NAMES_IDX,
+  HW_COMPATIBLE_IDX,
   SERIALIZATION_LEN, // NEVER USED FOR DATA, USED TO DETERMINE LENGTH OF SERIALIZED INFO
 } SerializedInfoIndex;
 
 c10::optional<RTDevice> get_most_compatible_device(
     const RTDevice& target_device,
-    const RTDevice& curr_device = RTDevice());
-std::vector<RTDevice> find_compatible_devices(const RTDevice& target_device);
+    const RTDevice& curr_device = RTDevice(),
+    bool hardware_compatible = false);
+std::vector<RTDevice> find_compatible_devices(const RTDevice& target_device, bool hardware_compatible);
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine);
 

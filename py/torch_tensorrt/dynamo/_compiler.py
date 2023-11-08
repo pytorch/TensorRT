@@ -22,6 +22,7 @@ from torch_tensorrt.dynamo._defaults import (
     DRYRUN,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     ENGINE_CAPABILITY,
+    HARDWARE_COMPATIBLE,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
@@ -94,6 +95,7 @@ def compile(
     use_fast_partitioner: bool = USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = DRYRUN,
+    hardware_compatible: bool = HARDWARE_COMPATIBLE,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile a TorchScript module for NVIDIA GPUs using TensorRT
@@ -151,6 +153,7 @@ def compile(
         use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optiminal. Use the global paritioner (``False``) if looking for best performance
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the grap easier to covert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
+        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -227,6 +230,7 @@ def compile(
         "dla_local_dram_size": dla_local_dram_size,
         "dla_global_dram_size": dla_global_dram_size,
         "dryrun": dryrun,
+        "hardware_compatible": hardware_compatible,
     }
 
     settings = CompilationSettings(**compilation_options)

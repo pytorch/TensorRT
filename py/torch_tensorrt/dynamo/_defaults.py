@@ -25,6 +25,7 @@ ENABLE_EXPERIMENTAL_DECOMPOSITIONS = False
 REFIT = False
 REQUIRE_FULL_COMPILATION = False
 DRYRUN = False
+HARDWARE_COMPATIBLE = False
 
 
 def default_device() -> Device:

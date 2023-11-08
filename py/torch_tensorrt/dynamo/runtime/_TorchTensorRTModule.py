@@ -9,10 +9,10 @@ from torch_tensorrt._Device import Device
 logger = logging.getLogger(__name__)
 
 SerializedTensorRTEngineFmt = Tuple[
-    str, str, bytes, str, str
+    str, str, str, bytes, str, str, str
 ]  # Defined in //core/runtime/register_jit_hooks.cpp
 SerializedTorchTensorRTModuleFmt = Tuple[
-    str, SerializedTensorRTEngineFmt, List[str], List[str]
+    str, Optional[SerializedTensorRTEngineFmt], List[str], List[str]
 ]
 
 
@@ -43,6 +43,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         input_binding_names: Optional[List[str]] = None,
         output_binding_names: Optional[List[str]] = None,
         target_device: Device = Device._current_device(),
+        hardware_compatible: bool = False,
     ):
         """__init__ method for torch_tensorrt.dynamo.runtime._TorchTensorRTModule.TorchTensorRTModule
 
@@ -89,6 +90,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             output_binding_names if output_binding_names is not None else []
         )
         self.name = name
+        self.hardware_compatible = hardware_compatible
 
         if serialized_engine is not None:
             self.engine = torch.classes.tensorrt.Engine(
@@ -99,6 +101,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     serialized_engine,
                     TorchTensorRTModule._pack_binding_names(self.input_binding_names),
                     TorchTensorRTModule._pack_binding_names(self.output_binding_names),
+                    str(int(hardware_compatible)),
                 ]
             )
         else:
@@ -115,7 +118,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def set_extra_state(self, state: SerializedTorchTensorRTModuleFmt) -> None:
         self.name = state[0]
         if state[1] is not None:
-            serialized_engine_info = state[1][0]
+            serialized_engine_info: SerializedTensorRTEngineFmt = state[1]
             import base64
 
             serialized_engine = base64.b64decode(serialized_engine_info[3])
@@ -127,6 +130,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     serialized_engine,
                     serialized_engine_info[4],
                     serialized_engine_info[5],
+                    serialized_engine_info[6],
                 ]
             )
         else:
@@ -134,6 +138,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
         self.input_binding_names = state[2]
         self.output_binding_names = state[3]
+        self.hardware_compatible = (
+            bool(int(state[1][6])) if state[1] is not None else False
+        )
 
     def forward(self, *inputs: Any) -> torch.Tensor | Tuple[torch.Tensor, ...]:
         """Implementation of the forward pass for a TensorRT engine
