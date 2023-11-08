@@ -3,6 +3,7 @@ from typing import Optional, Sequence, Union, cast
 
 import numpy as np
 import tensorrt as trt
+import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -80,14 +81,20 @@ def index(
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    index: Union[TRTTensor, Sequence[TRTTensor]],
+    index: Sequence[Union[TRTTensor, np.ndarray, torch.Tensor]],
 ) -> TRTTensor:
     adv_indx_indices = []
     tensor_indices = []
-    # _LOGGER.debug(f"The index shape is {index.shape}")
     # check if the input is dynamic
     dynamic_shape = has_dynamic_shape(input.shape)
-
+    # is_numpy is a flag to specify if all the indices are numpy or torchTensor.
+    # If any is not this flag will be set to False
+    _LOGGER.debug(
+        f"Determining whether aten.index constant-index optimization can be invoked"
+    )
+    is_numpy = all(
+        isinstance(ind, (torch.Tensor, np.ndarray)) for ind in index if ind is not None
+    )
     # here we need to check if all the index are broadcastable
     # if no, then we need to broadcast
     last_index = None
@@ -95,8 +102,13 @@ def index(
         if ind is not None:
             _LOGGER.debug(f"Shape of {i} index is {ind.shape}")
             adv_indx_indices.append(i)
-            # torch.nn.parameter.Parameter=> torch.Tensor
-            ind = get_trt_tensor(ctx, ind, name + f"_parameter_to_fp32_tensor_{i}")
+            # torch.nn.parameter.Parameter=> numpy array
+            # numpy array is kept as numpy
+            # other cases are kept as TRTTensor
+            if is_numpy:
+                ind = to_numpy(ind)
+            else:
+                ind = get_trt_tensor(ctx, ind, name + f"_parameter_to_fp32_tensor_{i}")
             if last_index is not None:
                 assert broadcastable(
                     ind, last_index
@@ -110,8 +122,9 @@ def index(
         set_layer_name(identity_layer, target, name + "_index_identity", source_ir)
         return identity_layer.get_output(0)
     elif len(tensor_indices) == 1:
-        # This case works
-        indices_tensor = tensor_indices[0]
+        indices_tensor = get_trt_tensor(
+            ctx, tensor_indices[0], name + f"_parameter_to_fp32_tensor"
+        )
         index = adv_indx_indices[0]
         _LOGGER.debug(f"The advanced index indices is {adv_indx_indices}")
         gather_layer = ctx.net.add_gather(input, indices_tensor, index)
@@ -150,6 +163,7 @@ def index(
             if i not in adv_indx_indices:
                 new_order.append(i)
         _LOGGER.debug(f"The new transpose order is {new_order}")
+
         transpose_layer.second_transpose = tuple(new_order)
         set_layer_name(transpose_layer, target, name + "_index_transpose", source_ir)
         transpose_tensor = transpose_layer.get_output(0)
@@ -175,47 +189,58 @@ def index(
         concat_tensor = concat_tensor_layer.get_output(0)
 
         reshape_layer = ctx.net.add_shuffle(transpose_tensor)
-        # check this
         reshape_layer.set_input(1, concat_tensor)
         flatten_tensor = reshape_layer.get_output(0)
+
         _LOGGER.debug(f"The flatten tensor shape is {flatten_tensor.shape}")
 
         # tensor index = \sum_{i=1}^m (ind_i * \prod_{j=i+1}^m (x_j)),  ind_i is input indices[i], x_j is the
         # // j dimension of input x.
-        multiplier = get_trt_tensor(
-            ctx,
-            dim_tensor_list[adv_indx_indices[adv_indx_count - 1]],
-            name + "_dim_last",
-        )
-        cum_adv_index = tensor_indices[adv_indx_count - 1]
-        for i in range(adv_indx_count - 2, -1, -1):
-            adv_index = convert_binary_elementwise(
-                ctx,
-                target,
-                source_ir,
-                name + f"_index_intermediate_{i}",
-                trt.ElementWiseOperation.PROD,
-                multiplier,
-                tensor_indices[i],
+        if is_numpy:
+            multiplier = input_shape[adv_indx_indices[adv_indx_count - 1]]
+            cum_adv_index = tensor_indices[adv_indx_count - 1]
+            for i in range(adv_indx_count - 2, -1, -1):
+                adv_index = multiplier * tensor_indices[i]
+                cum_adv_index = cum_adv_index + adv_index
+                multiplier = multiplier * input_shape[adv_indx_indices[i]]
+            cum_adv_index = get_trt_tensor(
+                ctx, cum_adv_index, name + f"_index_sum_intermediate"
             )
-            cum_adv_index = convert_binary_elementwise(
+        else:
+            multiplier = get_trt_tensor(
                 ctx,
-                target,
-                source_ir,
-                name + f"_index_sum_intermediate_{i}",
-                trt.ElementWiseOperation.SUM,
-                cum_adv_index,
-                adv_index,
+                dim_tensor_list[adv_indx_indices[adv_indx_count - 1]],
+                name + "_dim_last",
             )
-            multiplier = convert_binary_elementwise(
-                ctx,
-                target,
-                source_ir,
-                name + f"_index_intermediate_xj_{i}",
-                trt.ElementWiseOperation.PROD,
-                multiplier,
-                dim_tensor_list[adv_indx_indices[i]],
-            )
+            cum_adv_index = tensor_indices[adv_indx_count - 1]
+            for i in range(adv_indx_count - 2, -1, -1):
+                adv_index = convert_binary_elementwise(
+                    ctx,
+                    target,
+                    source_ir,
+                    name + f"_index_intermediate_{i}",
+                    trt.ElementWiseOperation.PROD,
+                    multiplier,
+                    tensor_indices[i],
+                )
+                cum_adv_index = convert_binary_elementwise(
+                    ctx,
+                    target,
+                    source_ir,
+                    name + f"_index_sum_intermediate_{i}",
+                    trt.ElementWiseOperation.SUM,
+                    cum_adv_index,
+                    adv_index,
+                )
+                multiplier = convert_binary_elementwise(
+                    ctx,
+                    target,
+                    source_ir,
+                    name + f"_index_intermediate_xj_{i}",
+                    trt.ElementWiseOperation.PROD,
+                    multiplier,
+                    dim_tensor_list[adv_indx_indices[i]],
+                )
 
         gather_layer_element = ctx.net.add_gather(flatten_tensor, cum_adv_index, 0)
         set_layer_name(
