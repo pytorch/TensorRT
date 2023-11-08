@@ -29,14 +29,14 @@ The following code illustrates this approach.
     import torch_tensorrt
 
     model = MyModel().eval().cuda()
-    inputs = torch.randn((1, 3, 224, 224)).cuda()
+    inputs = [torch.randn((1, 3, 224, 224)).cuda()]
     trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs) # Output is a torch.fx.GraphModule
-    trt_script_model = torch.jit.trace(trt_gm, inputs)
-    torch.jit.save(trt_script_model, "trt_model.ts")
+    trt_traced_model = torch.jit.trace(trt_gm, inputs)
+    torch.jit.save(trt_traced_model, "trt_model.ts")
 
     # Later, you can load it and run inference
     model = torch.jit.load("trt_model.ts").cuda()
-    model(inputs)
+    model(*inputs)
 
 b) ExportedProgram
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -50,40 +50,39 @@ b) ExportedProgram
     import torch_tensorrt
 
     model = MyModel().eval().cuda()
-    inputs = torch.randn((1, 3, 224, 224)).cuda()
+    inputs = [torch.randn((1, 3, 224, 224)).cuda()]
     trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs) # Output is a torch.fx.GraphModule
     # Transform and create an exported program
-    trt_gm = torch_tensorrt.dynamo.export(trt_gm, inputs)
-    trt_exp_program = create_exported_program(trt_gm, call_spec, trt_gm.state_dict())
-    torch._export.save(trt_exp_program, "trt_model.ep")
+    trt_exp_program = torch_tensorrt.dynamo.export(trt_gm, inputs)
+    torch.export.save(trt_exp_program, "trt_model.ep")
 
     # Later, you can load it and run inference
-    model = torch._export.load("trt_model.ep")
-    model(inputs)
+    model = torch.export.load("trt_model.ep")
+    model(*inputs)
 
 `torch_tensorrt.dynamo.export` inlines the submodules within a GraphModule to their corresponding nodes and stiches all the nodes together.
 This is needed as `torch._export` serialization cannot handle serializing and deserializing of submodules (`call_module` nodes).
 
-NOTE: This way of saving the models using `ExportedProgram` is experimental. Here is a known issue : https://github.com/pytorch/TensorRT/issues/2341
+.. note:: This way of saving the models using `ExportedProgram` is experimental. Here is a known issue : https://github.com/pytorch/TensorRT/issues/2341
 
 
 Torchscript IR
 -------------
 
-  In Torch-TensorRT 1.X versions, the primary way to compile and run inference with Torch-TensorRT is using Torchscript IR.
-  This behavior stays the same in 2.X versions as well.
+In Torch-TensorRT 1.X versions, the primary way to compile and run inference with Torch-TensorRT is using Torchscript IR.
+This behavior stays the same in 2.X versions as well.
 
-  .. code-block:: python
+.. code-block:: python
 
-    import torch
-    import torch_tensorrt
+  import torch
+  import torch_tensorrt
 
-    model = MyModel().eval().cuda()
-    inputs = torch.randn((1, 3, 224, 224)).cuda()
-    trt_ts = torch_tensorrt.compile(model, ir="ts", inputs) # Output is a ScriptModule object
-    torch.jit.save(trt_ts, "trt_model.ts")
+  model = MyModel().eval().cuda()
+  inputs = [torch.randn((1, 3, 224, 224)).cuda()]
+  trt_ts = torch_tensorrt.compile(model, ir="ts", inputs) # Output is a ScriptModule object
+  torch.jit.save(trt_ts, "trt_model.ts")
 
-    # Later, you can load it and run inference
-    model = torch.jit.load("trt_model.ts").cuda()
-    model(inputs)
+  # Later, you can load it and run inference
+  model = torch.jit.load("trt_model.ts").cuda()
+  model(*inputs)
 
