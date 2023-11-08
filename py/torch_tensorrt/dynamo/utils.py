@@ -220,8 +220,12 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
     # TODO: Remove once Dynamo precisions refactoring is complete
     if "enabled_precisions" in kwargs:
         enabled_precisions = kwargs["enabled_precisions"]
-
         if (
+            torch.int8 in enabled_precisions
+            or torch_tensorrt.dtype.int8 in enabled_precisions
+        ):
+            settings.precision = torch.int8
+        elif (
             torch.float16 in enabled_precisions
             or torch_tensorrt.dtype.half in enabled_precisions
         ):

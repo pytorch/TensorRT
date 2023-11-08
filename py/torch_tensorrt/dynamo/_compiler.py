@@ -155,8 +155,12 @@ def compile(
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     enabled_precisions = set(enabled_precisions)
-
     if (
+        torch.int8 in enabled_precisions
+        or torch_tensorrt.dtype.int8 in enabled_precisions
+    ):
+        precision = torch.int8
+    elif (
         torch.float16 in enabled_precisions
         or torch_tensorrt.dtype.half in enabled_precisions
     ):
