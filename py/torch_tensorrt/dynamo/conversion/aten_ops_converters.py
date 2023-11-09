@@ -90,6 +90,37 @@ def aten_ops_batch_norm(
 
 
 @dynamo_tensorrt_converter(
+    torch.ops.aten._native_batch_norm_legit_no_training.default,
+    capability_validator=one_user_validator,
+)
+def aten_ops_batch_norm_legit_no_training(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.normalization.batch_norm(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        weight=args[1],
+        bias=args[2],
+        running_mean=args[3],
+        running_var=args[4],
+        training=False,
+        momentum=args[5],
+        eps=args[6],
+        cudnn_enabled=False,
+        return_mean_rstd=(
+            target == torch.ops.aten._native_batch_norm_legit_no_training.default
+        ),
+    )
+
+
+@dynamo_tensorrt_converter(
     torch.ops.aten.native_layer_norm.default, capability_validator=one_user_validator
 )
 @dynamo_tensorrt_converter(torch.ops.aten.layer_norm.default)
@@ -1956,4 +1987,32 @@ def aten_ops_argmax(
         input=args[0],
         dim=args_bounds_check(args, 1),
         keep_dim=args_bounds_check(args, 2, False),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.addmm.default)  # type: ignore[misc]
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        1: (np.ndarray, torch.Tensor, TRTTensor),
+        2: (np.ndarray, torch.Tensor, TRTTensor),
+    }
+)  # type: ignore[misc]
+def aten_ops_addmm(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.addmm.addmm(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args[2],
+        beta=kwargs.get("beta", 1),
+        alpha=kwargs.get("alpha", 1),
     )

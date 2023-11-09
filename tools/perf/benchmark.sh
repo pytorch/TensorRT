@@ -92,7 +92,7 @@ echo "Benchmarking SD UNet model"
 for bs in ${large_model_batch_sizes[@]}
 do
   python perf_run.py --model_torch sd_unet \
-                     --precision fp32,fp16 --inputs="(${bs}, 4, 128, 128)@fp16;(${bs})@fp16;(${bs}, 1, 768)@fp16" \
+                     --precision fp32,fp16 --inputs="(${bs}, 4, 64, 64)@fp16;(${bs})@fp16;(${bs}, 1, 768)@fp16" \
                      --batch_size ${bs} \
                      --backends torch,dynamo,torch_compile,inductor \
                      --truncate \

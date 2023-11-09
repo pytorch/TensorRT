@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Saving models compiled with Torch-TensorRT &mdash; Torch-TensorRT v2.2.0.dev0+53a0802 documentation</title>
+  <title>Saving models compiled with Torch-TensorRT &mdash; Torch-TensorRT v2.2.0.dev0+7f748cd documentation</title>
   
 
   
@@ -237,7 +237,7 @@
               
               
                 <div class="version">
-                  v2.2.0.dev0+53a0802
+                  v2.2.0.dev0+7f748cd
                 </div>
               
             
@@ -274,7 +274,7 @@
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../dynamo/torch_compile.html">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
-<li class="toctree-l1"><a class="reference internal" href="../dynamo/dynamo_export.html">Compiling <code class="docutils literal notranslate"><span class="pre">ExportedPrograms</span></code> with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">TorchScript Frontend</span></p>
 <ul>
@@ -428,14 +428,14 @@ The following code illustrates this approach.</p>
 <span class="kn">import</span> <span class="nn">torch_tensorrt</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-<span class="n">inputs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
 <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span> <span class="c1"># Output is a torch.fx.GraphModule</span>
-<span class="n">trt_script_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
-<span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_script_model</span><span class="p">,</span> <span class="s2">&quot;trt_model.ts&quot;</span><span class="p">)</span>
+<span class="n">trt_traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_traced_model</span><span class="p">,</span> <span class="s2">&quot;trt_model.ts&quot;</span><span class="p">)</span>
 
 <span class="c1"># Later, you can load it and run inference</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt_model.ts&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-<span class="n">model</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -447,42 +447,42 @@ The following code illustrates this approach.</p>
 <span class="kn">import</span> <span class="nn">torch_tensorrt</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-<span class="n">inputs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
 <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span> <span class="c1"># Output is a torch.fx.GraphModule</span>
 <span class="c1"># Transform and create an exported program</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
-<span class="n">trt_exp_program</span> <span class="o">=</span> <span class="n">create_exported_program</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="n">call_spec</span><span class="p">,</span> <span class="n">trt_gm</span><span class="o">.</span><span class="n">state_dict</span><span class="p">())</span>
-<span class="n">torch</span><span class="o">.</span><span class="n">_export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_exp_program</span><span class="p">,</span> <span class="s2">&quot;trt_model.ep&quot;</span><span class="p">)</span>
+<span class="n">trt_exp_program</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_exp_program</span><span class="p">,</span> <span class="s2">&quot;trt_model.ep&quot;</span><span class="p">)</span>
 
 <span class="c1"># Later, you can load it and run inference</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">_export</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt_model.ep&quot;</span><span class="p">)</span>
-<span class="n">model</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt_model.ep&quot;</span><span class="p">)</span>
+<span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
 <p><cite>torch_tensorrt.dynamo.export</cite> inlines the submodules within a GraphModule to their corresponding nodes and stiches all the nodes together.
 This is needed as <cite>torch._export</cite> serialization cannot handle serializing and deserializing of submodules (<cite>call_module</cite> nodes).</p>
-<p>NOTE: This way of saving the models using <cite>ExportedProgram</cite> is experimental. Here is a known issue : <a class="reference external" href="https://github.com/pytorch/TensorRT/issues/2341">https://github.com/pytorch/TensorRT/issues/2341</a></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This way of saving the models using <cite>ExportedProgram</cite> is experimental. Here is a known issue : <a class="reference external" href="https://github.com/pytorch/TensorRT/issues/2341">https://github.com/pytorch/TensorRT/issues/2341</a></p>
+</div>
 </section>
 </section>
 <section id="torchscript-ir">
 <h2>Torchscript IR<a class="headerlink" href="#torchscript-ir" title="Permalink to this headline">¶</a></h2>
-<blockquote>
-<div><p>In Torch-TensorRT 1.X versions, the primary way to compile and run inference with Torch-TensorRT is using Torchscript IR.
+<p>In Torch-TensorRT 1.X versions, the primary way to compile and run inference with Torch-TensorRT is using Torchscript IR.
 This behavior stays the same in 2.X versions as well.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torch_tensorrt</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-<span class="n">inputs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
 <span class="n">trt_ts</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;ts&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span> <span class="c1"># Output is a ScriptModule object</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_ts</span><span class="p">,</span> <span class="s2">&quot;trt_model.ts&quot;</span><span class="p">)</span>
 
 <span class="c1"># Later, you can load it and run inference</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt_model.ts&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-<span class="n">model</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
-</div></blockquote>
 </section>
 </section>
 

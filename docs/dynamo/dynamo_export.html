@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compiling ExportedPrograms with Torch-TensorRT &mdash; Torch-TensorRT v2.2.0.dev0+53a0802 documentation</title>
+  <title>Compiling Exported Programs with Torch-TensorRT &mdash; Torch-TensorRT v2.2.0.dev0+7f748cd documentation</title>
   
 
   
@@ -237,7 +237,7 @@
               
               
                 <div class="version">
-                  v2.2.0.dev0+53a0802
+                  v2.2.0.dev0+7f748cd
                 </div>
               
             
@@ -274,7 +274,7 @@
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="torch_compile.html">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Compiling <code class="docutils literal notranslate"><span class="pre">ExportedPrograms</span></code> with Torch-TensorRT</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Compiling Exported Programs with Torch-TensorRT</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">TorchScript Frontend</span></p>
 <ul>
@@ -377,7 +377,7 @@
       </li>
 
         
-      <li>Compiling <code class="docutils literal notranslate"><span class="pre">ExportedPrograms</span></code> with Torch-TensorRT</li>
+      <li>Compiling Exported Programs with Torch-TensorRT</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
@@ -413,11 +413,9 @@
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
-  <section id="compiling-exportedprograms-with-torch-tensorrt">
-<span id="dynamo-export"></span><h1>Compiling <code class="docutils literal notranslate"><span class="pre">ExportedPrograms</span></code> with Torch-TensorRT<a class="headerlink" href="#compiling-exportedprograms-with-torch-tensorrt" title="Permalink to this headline">¶</a></h1>
-<span class="target" id="module-torch_tensorrt.dynamo"></span><section id="using-the-torch-tensorrt-frontend-for-torch-export-exportedprograms">
-<h2>Using the Torch-TensorRT Frontend for <code class="docutils literal notranslate"><span class="pre">torch.export.ExportedPrograms</span></code><a class="headerlink" href="#using-the-torch-tensorrt-frontend-for-torch-export-exportedprograms" title="Permalink to this headline">¶</a></h2>
-<p>Pytorch 2.1 introduced <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> APIs which
+  <section id="compiling-exported-programs-with-torch-tensorrt">
+<span id="dynamo-export"></span><h1>Compiling Exported Programs with Torch-TensorRT<a class="headerlink" href="#compiling-exported-programs-with-torch-tensorrt" title="Permalink to this headline">¶</a></h1>
+<span class="target" id="module-torch_tensorrt.dynamo"></span><p>Pytorch 2.1 introduced <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> APIs which
 can export graphs from Pytorch programs into <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> objects. Torch-TensorRT dynamo
 frontend compiles these <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> objects and optimizes them using TensorRT. Here’s a simple
 usage of the dynamo frontend</p>
@@ -435,7 +433,6 @@ usage of the dynamo frontend</p>
 <p class="admonition-title">Note</p>
 <p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile</span></code> is the main API for users to interact with Torch-TensorRT dynamo frontend. The input type of the model should be <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> (ideally the output of <code class="docutils literal notranslate"><span class="pre">torch.export.export</span></code> or <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace</span></code> (discussed in the section below)) and output type is a <code class="docutils literal notranslate"><span class="pre">torch.fx.GraphModule</span></code> object.</p>
 </div>
-</section>
 <section id="customizeable-settings">
 <h2>Customizeable Settings<a class="headerlink" href="#customizeable-settings" title="Permalink to this headline">¶</a></h2>
 <p>There are lot of options for users to customize their settings for optimizing with TensorRT.
@@ -450,9 +447,8 @@ Some of the frequently used options are as follows:</p>
 <p>The complete list of options can be found <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/123a486d6644a5bbeeec33e2f32257349acc0b8f/py/torch_tensorrt/dynamo/compile.py#L51-L77">here</a></p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>We do not support INT precision currently in Dynamo. Support for this currently exists in</p>
+<p>We do not support INT precision currently in Dynamo. Support for this currently exists in our Torchscript IR. We plan to implement similar support for dynamo in our next release.</p>
 </div>
-<p>our Torchscript IR. We plan to implement similar support for dynamo in our next release.</p>
 </section>
 <section id="under-the-hood">
 <h2>Under the hood<a class="headerlink" href="#under-the-hood" title="Permalink to this headline">¶</a></h2>
@@ -528,8 +524,7 @@ the model with dynamic shapes. Alternatively, you can use <code class="docutils 
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Compiling <code class="docutils literal notranslate"><span class="pre">ExportedPrograms</span></code> with Torch-TensorRT</a><ul>
-<li><a class="reference internal" href="#using-the-torch-tensorrt-frontend-for-torch-export-exportedprograms">Using the Torch-TensorRT Frontend for <code class="docutils literal notranslate"><span class="pre">torch.export.ExportedPrograms</span></code></a></li>
+<li><a class="reference internal" href="#">Compiling Exported Programs with Torch-TensorRT</a><ul>
 <li><a class="reference internal" href="#customizeable-settings">Customizeable Settings</a></li>
 <li><a class="reference internal" href="#under-the-hood">Under the hood</a></li>
 <li><a class="reference internal" href="#tracing">Tracing</a></li>

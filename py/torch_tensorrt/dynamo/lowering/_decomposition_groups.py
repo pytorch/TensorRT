@@ -100,7 +100,6 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.native_batch_norm_backward,
     aten._native_batch_norm_legit,
     aten._native_batch_norm_legit_functional,
-    aten._native_batch_norm_legit_no_training,
     aten.native_dropout_backward,
     aten.native_group_norm_backward,
     aten.native_layer_norm_backward,
