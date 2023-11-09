@@ -1,6 +1,6 @@
 .. _dynamo_export:
 
-Compiling ``ExportedPrograms`` with Torch-TensorRT
+Compiling Exported Programs with Torch-TensorRT
 =============================================
 .. currentmodule:: torch_tensorrt.dynamo
 
@@ -9,8 +9,6 @@ Compiling ``ExportedPrograms`` with Torch-TensorRT
    :undoc-members:
    :show-inheritance:
 
-Using the Torch-TensorRT Frontend for ``torch.export.ExportedPrograms``
---------------------------------------------------------
 Pytorch 2.1 introduced ``torch.export`` APIs which
 can export graphs from Pytorch programs into ``ExportedProgram`` objects. Torch-TensorRT dynamo
 frontend compiles these ``ExportedProgram`` objects and optimizes them using TensorRT. Here's a simple
@@ -43,8 +41,7 @@ Some of the frequently used options are as follows:
 
 The complete list of options can be found `here <https://github.com/pytorch/TensorRT/blob/123a486d6644a5bbeeec33e2f32257349acc0b8f/py/torch_tensorrt/dynamo/compile.py#L51-L77>`_
 
-.. note:: We do not support INT precision currently in Dynamo. Support for this currently exists in
-our Torchscript IR. We plan to implement similar support for dynamo in our next release.
+.. note:: We do not support INT precision currently in Dynamo. Support for this currently exists in our Torchscript IR. We plan to implement similar support for dynamo in our next release.
 
 Under the hood
 --------------
