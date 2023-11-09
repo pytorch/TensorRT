@@ -1,7 +1,8 @@
-from typing import Optional, Sequence, Union
+from typing import Optional, Union
 
 import numpy as np
 import tensorrt as trt
+import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -371,8 +372,8 @@ def logical_and(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: Union[TRTTensor, int, float, bool],
+    rhs_val: Union[TRTTensor, int, float, bool],
 ) -> TRTTensor:
     if isinstance(lhs_val, TRTTensor):
         lhs_val = cast_int_or_float_to_bool(ctx, name, lhs_val)
@@ -390,8 +391,8 @@ def logical_or(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: Union[TRTTensor, int, float, bool],
+    rhs_val: Union[TRTTensor, int, float, bool],
 ) -> TRTTensor:
     if isinstance(lhs_val, TRTTensor):
         lhs_val = cast_int_or_float_to_bool(ctx, name, lhs_val)
@@ -409,8 +410,8 @@ def logical_xor(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: Union[TRTTensor, int, float, bool],
+    rhs_val: Union[TRTTensor, int, float, bool],
 ) -> TRTTensor:
     if isinstance(lhs_val, TRTTensor):
         lhs_val = cast_int_or_float_to_bool(ctx, name, lhs_val)
@@ -428,8 +429,8 @@ def bitwise_and(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, bool, Sequence[Union[int, bool]]],
-    rhs_val: Union[TRTTensor, int, bool, Sequence[Union[int, bool]]],
+    lhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
 ) -> TRTTensor:
     return logical_and(ctx, target, source_ir, f"{name}_logical_and", lhs_val, rhs_val)
 
@@ -439,8 +440,8 @@ def bitwise_or(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, bool, Sequence[Union[int, bool]]],
-    rhs_val: Union[TRTTensor, int, bool, Sequence[Union[int, bool]]],
+    lhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
 ) -> TRTTensor:
     return logical_or(ctx, target, source_ir, f"{name}_logical_or", lhs_val, rhs_val)
 
@@ -450,8 +451,8 @@ def bitwise_xor(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, bool, Sequence[Union[int, bool]]],
-    rhs_val: Union[TRTTensor, int, bool, Sequence[Union[int, bool]]],
+    lhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
 ) -> TRTTensor:
     return logical_xor(ctx, target, source_ir, f"{name}_logical_xor", lhs_val, rhs_val)
 
@@ -462,7 +463,7 @@ def eq(
     source_ir: Optional[SourceIR],
     name: str,
     lhs_val: TRTTensor,
-    rhs_val: Union[TRTTensor, int, float, bool, Sequence[Union[int, float, bool]]],
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
 ) -> TRTTensor:
     return convert_binary_elementwise(
         ctx,
@@ -481,7 +482,7 @@ def ne(
     source_ir: Optional[SourceIR],
     name: str,
     lhs_val: TRTTensor,
-    rhs_val: Union[TRTTensor, int, float, bool, Sequence[Union[int, float, bool]]],
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
 ) -> TRTTensor:
     return impl.unary.logical_not(
         ctx,
@@ -498,7 +499,7 @@ def gt(
     source_ir: Optional[SourceIR],
     name: str,
     lhs_val: TRTTensor,
-    rhs_val: Union[TRTTensor, int, float, Sequence[Union[int, float]]],
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
 ) -> TRTTensor:
     return convert_binary_elementwise(
         ctx,
@@ -517,7 +518,7 @@ def ge(
     source_ir: Optional[SourceIR],
     name: str,
     lhs_val: TRTTensor,
-    rhs_val: Union[TRTTensor, int, float, Sequence[Union[int, float]]],
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
 ) -> TRTTensor:
     return logical_or(
         ctx,
@@ -535,7 +536,7 @@ def lt(
     source_ir: Optional[SourceIR],
     name: str,
     lhs_val: TRTTensor,
-    rhs_val: Union[TRTTensor, int, float, Sequence[Union[int, float]]],
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
 ) -> TRTTensor:
     return convert_binary_elementwise(
         ctx,
@@ -554,7 +555,7 @@ def le(
     source_ir: Optional[SourceIR],
     name: str,
     lhs_val: TRTTensor,
-    rhs_val: Union[TRTTensor, int, float, Sequence[Union[int, float]]],
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
 ) -> TRTTensor:
     return logical_or(
         ctx,
