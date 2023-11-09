@@ -16,12 +16,28 @@ auto mm_registrations TORCHTRT_UNUSED =
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto self = args[0].ITensorOrFreeze(ctx);
                auto other = args[1].ITensorOrFreeze(ctx);
+
+               auto selfDims = self->getDimensions().nbDims;
+               auto otherDims = other->getDimensions().nbDims;
+
+               bool squeezeFront = false;
+               bool squeezeBack = false;
+
+               if (selfDims == 1 && selfDims < otherDims) {
+                 squeezeFront = true;
+               } else if (otherDims == 1 && otherDims < selfDims) {
+                 // Append a 1 to the end of the shape before padding front to match self
+                 other = addPadding(ctx, n, other, 2, true, false);
+                 otherDims = other->getDimensions().nbDims;
+                 squeezeBack = true;
+               }
+
                // Ensure self and other tensors have same nbDims by expanding the dimensions (from 0 axis) if
                // necessary.
-               if (self->getDimensions().nbDims < other->getDimensions().nbDims) {
-                 self = addPadding(ctx, n, self, other->getDimensions().nbDims, false, false);
-               } else {
-                 other = addPadding(ctx, n, other, self->getDimensions().nbDims, false, false);
+               if (selfDims < otherDims) {
+                 self = addPadding(ctx, n, self, otherDims, false, false);
+               } else if (otherDims < selfDims) {
+                 other = addPadding(ctx, n, other, selfDims, false, false);
                }
 
                auto mm_layer = ctx->net->addMatrixMultiply(
@@ -29,7 +45,20 @@ auto mm_registrations TORCHTRT_UNUSED =
 
                TORCHTRT_CHECK(mm_layer, "Unable to create matrix multiplication node: " << *n);
                mm_layer->setName(util::node_info(n).c_str());
-               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mm_layer->getOutput(0));
+               auto out = mm_layer->getOutput(0);
+
+               if (squeezeFront || squeezeBack) {
+                 auto squeezeDimOffset = squeezeFront ? 2 : 1;
+                 auto reshapeDims =
+                     util::squeezeDims(out->getDimensions(), out->getDimensions().nbDims - squeezeDimOffset);
+                 auto shuffle_layer = ctx->net->addShuffle(*out);
+                 LOG_DEBUG("Squeezing matmul output for 1d correction: " << reshapeDims);
+                 TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
+                 shuffle_layer->setReshapeDimensions(reshapeDims);
+                 shuffle_layer->setName((util::node_info(n) + "_squeeze").c_str());
+                 out = shuffle_layer->getOutput(0);
+               }
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out);
 
                LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
                return true;
