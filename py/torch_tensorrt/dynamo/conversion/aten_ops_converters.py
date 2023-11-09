@@ -782,12 +782,12 @@ def aten_ops_cumsum(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.tile.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.tile.default)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
     }
-)  # type: ignore[misc]
+)
 def aten_ops_tile(
     ctx: ConversionContext,
     target: Target,
@@ -805,7 +805,7 @@ def aten_ops_tile(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.permute.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.permute.default)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2018,14 +2018,14 @@ def aten_ops_argmax(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.addmm.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.addmm.default)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
         1: (np.ndarray, torch.Tensor, TRTTensor),
         2: (np.ndarray, torch.Tensor, TRTTensor),
     }
-)  # type: ignore[misc]
+)
 def aten_ops_addmm(
     ctx: ConversionContext,
     target: Target,
