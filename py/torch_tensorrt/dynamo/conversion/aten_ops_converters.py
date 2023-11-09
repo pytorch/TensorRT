@@ -330,16 +330,14 @@ def aten_ops_fmod(
     return impl.elementwise.fmod(ctx, target, SourceIR.ATEN, name, args[0], args[1])
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler)  # type: ignore[misc]
-@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_2d)  # type: ignore[misc]
-# commented this for now, see py/dynamo/conversion/tests/test_grid_aten. Should this be removed altogether?
-# @dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_3d)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler)
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_2d)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
         1: (TRTTensor,),
     }
-)  # type: ignore[misc]
+)
 def aten_ops_grid(
     ctx: ConversionContext,
     target: Target,
@@ -360,7 +358,7 @@ def aten_ops_grid(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.relu.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.relu.default)
 def aten_ops_relu(
     ctx: ConversionContext,
     target: Target,

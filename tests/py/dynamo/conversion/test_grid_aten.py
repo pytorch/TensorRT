@@ -115,17 +115,6 @@ grid_sampler_ops = [
         [1, 1, 5, 5],
         [1, 5, 2, 2],
     ),
-    # The 3d cases with 4d input gives the error that it requires 5d input for both input and grid
-    # The 5d input fails in the generation of the Grid Layer since the TensorRT layer requires 4d input
-    # ("input_grid_interpolation_nearest_sample_fill_3d", (lambda x, grid: torch.ops.aten.grid_sampler_3d(x, grid, 0, 0, True)), [1, 1, 5, 5, 5],  [1, 5, 5, 2, 2]),
-    # ("input_grid_interpolation_nearest_sample_clamp_3d", (lambda x, grid: torch.ops.aten.grid_sampler_3d(x, grid, 0, 1, True)), [1, 1, 5, 5, 5],  [1, 5, 5, 2, 2]),
-    # ("input_grid_interpolation_nearest_sample_reflect_3d", (lambda x, grid: torch.ops.aten.grid_sampler_3d(x, grid, 0, 2, True)), [1, 1, 5, 5, 5],  [1, 5, 5, 2, 2]),
-    # ("input_grid_interpolation_linear_sample_fill_3d", (lambda x, grid: torch.ops.aten.grid_sampler_3d(x, grid, 0, 0, True)), [1, 1, 5, 5, 5],  [1, 5, 5, 2, 2]),
-    # ("input_grid_interpolation_linear_sample_clamp_3d", (lambda x, grid: torch.ops.aten.grid_sampler_3d(x, grid, 0, 1, True)), [1, 1, 5, 5, 5],  [1, 5, 5, 2, 2]),
-    # ("input_grid_interpolation_linear_sample_reflect_3d", (lambda x, grid: torch.ops.aten.grid_sampler_3d(x, grid, 0, 2, True)), [1, 1, 5, 5, 5],  [1, 5, 5, 2, 2]),
-    # ("input_grid_interpolation_cubic_sample_fill_3d", (lambda x, grid: torch.ops.aten.grid_sampler_3d(x, grid, 0, 0, True)), [1, 1, 5, 5, 5],  [1, 5, 5, 2, 2]),
-    # ("input_grid_interpolation_cubic_sample_clamp_3d", (lambda x, grid: torch.ops.aten.grid_sampler_3d(x, grid, 0, 1, True)), [1, 1, 5, 5, 5],  [1, 5, 5, 2, 2]),
-    # ("input_grid_interpolation_cubic_sample_reflect_3d", (lambda x, grid: torch.ops.aten.grid_sampler_3d(x, grid, 0, 2, True)), [1, 1, 5, 5, 5],  [1, 5, 5, 2, 2]),
 ]
 
 
