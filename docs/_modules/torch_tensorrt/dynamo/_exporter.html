@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._exporter &mdash; Torch-TensorRT v2.2.0.dev0+53a0802 documentation</title>
+  <title>torch_tensorrt.dynamo._exporter &mdash; Torch-TensorRT v2.2.0.dev0+504b39d documentation</title>
   
 
   
@@ -234,7 +234,7 @@
               
               
                 <div class="version">
-                  v2.2.0.dev0+53a0802
+                  v2.2.0.dev0+504b39d
                 </div>
               
             
@@ -271,7 +271,7 @@
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../dynamo/torch_compile.html">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../dynamo/dynamo_export.html">Compiling <code class="docutils literal notranslate"><span class="pre">ExportedPrograms</span></code> with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../dynamo/dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">TorchScript Frontend</span></p>
 <ul>
@@ -467,7 +467,7 @@
         <span class="k">return</span> <span class="n">exp_program</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="s2">&quot;Invalid ir : </span><span class="si">{ir}</span><span class="s2"> provided for serialization. Options include torchscript | exported_program&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Invalid ir : </span><span class="si">{</span><span class="n">ir</span><span class="si">}</span><span class="s2"> provided for serialization. Options include torchscript | exported_program&quot;</span>
         <span class="p">)</span></div>
 
 
