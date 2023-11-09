@@ -106,22 +106,6 @@ def alias_replacement(x: torch.Tensor) -> torch.Tensor:
 
 
 @register_torch_trt_decomposition(
-    torch.ops.aten.addmm, registry=TORCH_TRT_DECOMPOSITIONS
-)
-def addmm_replacement(
-    input_: torch.Tensor,
-    mat1: torch.Tensor,
-    mat2: torch.Tensor,
-    *,
-    beta: int = 1,
-    alpha: int = 1,
-) -> torch.Tensor:
-    return torch.add(
-        torch.mul(input_, beta), torch.mul(torch.matmul(mat1, mat2), alpha)
-    )
-
-
-@register_torch_trt_decomposition(
     torch.ops.aten.reciprocal.default, registry=TORCH_TRT_DECOMPOSITIONS
 )
 def reciprocal_replacement(
