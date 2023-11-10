@@ -8,8 +8,8 @@ import torchvision
 import torchvision.models as models
 import torchvision.transforms as transforms
 from torch.nn import functional as F
-from torch_tensorrt.dynamo import CalibrationAlgo, DataLoaderCalibrator
 from torch_tensorrt.logging import *
+from torch_tensorrt.ptq import CalibrationAlgo, DataLoaderCalibrator
 from vgg16 import vgg16
 
 
@@ -25,6 +25,7 @@ def compute_accuracy(testing_dataloader, model):
         for data, labels in testing_dataloader:
             data, labels = data.to(device), labels.to(device)
             out = model(data)
+            out = out[0] if isinstance(out, tuple) else out
             preds = torch.max(out, 1)[1]
             class_probs.append([F.softmax(i, dim=0) for i in out])
             class_preds.append(preds)
@@ -41,6 +42,9 @@ class TestAccuracy(unittest.TestCase):
     def test_compile_script(self):
         # self.model = models.vgg16(weights=None).eval().cuda()
         self.model = vgg16(num_classes=10, init_weights=False).eval().cuda()
+        ckpt = torch.load("./ckpt_epoch15.pth")
+        weights = ckpt["model_state_dict"]
+        self.model.load_state_dict(weights)
         self.testing_dataset = torchvision.datasets.CIFAR10(
             root="./data",
             train=False,
@@ -56,7 +60,7 @@ class TestAccuracy(unittest.TestCase):
         )
 
         self.testing_dataloader = torch.utils.data.DataLoader(
-            self.testing_dataset, batch_size=1, shuffle=False, num_workers=1
+            self.testing_dataset, batch_size=100, shuffle=False, num_workers=1
         )
         self.calibrator = DataLoaderCalibrator(
             self.testing_dataloader,
@@ -67,7 +71,7 @@ class TestAccuracy(unittest.TestCase):
         )
 
         compile_spec = {
-            "inputs": [torchtrt.Input([1, 3, 32, 32])],
+            "inputs": [torchtrt.Input([100, 3, 32, 32])],
             "enabled_precisions": {torch.int8},
             "calibrator": self.calibrator,
             "truncate_long_and_double": True,

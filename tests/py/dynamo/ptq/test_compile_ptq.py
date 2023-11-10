@@ -39,8 +39,8 @@ def compute_accuracy(testing_dataloader, model):
 
 class TestAccuracy(unittest.TestCase):
     def test_compile_script(self):
-        self.model = models.vgg16(weights=None).eval()
-        # self.model = vgg16(num_classes=10, init_weights=False).eval().cuda()
+        # self.model = models.vgg16(weights=None).eval()
+        self.model = vgg16(num_classes=10, init_weights=False).eval().cuda()
         # ckpt = torch.load("./ckpt_epoch25.pth")
         # weights = ckpt["model_state_dict"]
         # self.model.load_state_dict(weights)
@@ -60,7 +60,7 @@ class TestAccuracy(unittest.TestCase):
         )
 
         self.testing_dataloader = torch.utils.data.DataLoader(
-            self.testing_dataset, batch_size=1, shuffle=False, num_workers=1
+            self.testing_dataset, batch_size=100, shuffle=False, num_workers=1
         )
         self.calibrator = DataLoaderCalibrator(
             self.testing_dataloader,
@@ -71,7 +71,7 @@ class TestAccuracy(unittest.TestCase):
         )
 
         compile_spec = {
-            "inputs": [torchtrt.Input([1, 3, 32, 32])],
+            "inputs": [torchtrt.Input([100, 3, 32, 32])],
             "enabled_precisions": {torch.int8},
             "calibrator": self.calibrator,
             "truncate_long_and_double": True,

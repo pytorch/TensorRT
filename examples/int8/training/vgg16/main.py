@@ -124,8 +124,8 @@ def main():
 
     num_classes = len(classes)
 
-    # model = vgg16(num_classes=num_classes, init_weights=False)
-    model = models.vgg16(weights=None)
+    model = vgg16(num_classes=num_classes, init_weights=False)
+    # model = models.vgg16(weights=None)
     model = model.cuda()
 
     data = iter(training_dataloader)

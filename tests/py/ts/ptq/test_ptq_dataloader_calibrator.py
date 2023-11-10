@@ -1,13 +1,13 @@
+import os
 import unittest
-import torch_tensorrt as torchtrt
-from torch_tensorrt.logging import *
+
 import torch
 import torch.nn as nn
-from torch.nn import functional as F
+import torch_tensorrt as torchtrt
 import torchvision
 import torchvision.transforms as transforms
-
-import os
+from torch.nn import functional as F
+from torch_tensorrt.logging import *
 
 
 def find_repo_root(max_depth=10):
@@ -72,11 +72,11 @@ class TestAccuracy(unittest.TestCase):
         self.testing_dataloader = torch.utils.data.DataLoader(
             self.testing_dataset, batch_size=1, shuffle=False, num_workers=1
         )
-        self.calibrator = torchtrt.ptq.DataLoaderCalibrator(
+        self.calibrator = torchtrt.DataLoaderCalibrator(
             self.testing_dataloader,
             cache_file="./calibration.cache",
             use_cache=False,
-            algo_type=torchtrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2,
+            algo_type=torchtrt.CalibrationAlgo.ENTROPY_CALIBRATION_2,
             device=torch.device("cuda:0"),
         )
 

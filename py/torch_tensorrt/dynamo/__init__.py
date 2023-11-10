@@ -12,4 +12,3 @@ if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
     from ._settings import CompilationSettings
     from ._SourceIR import SourceIR
     from ._tracer import trace
-    from .ptq import CacheCalibrator, CalibrationAlgo, DataLoaderCalibrator

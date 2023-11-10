@@ -36,6 +36,7 @@ from torch_tensorrt.dynamo.conversion import (
 )
 from torch_tensorrt.dynamo.lowering import apply_lowering_passes
 from torch_tensorrt.dynamo.utils import (
+    build_calibrator,
     get_torch_inputs,
     prepare_inputs,
     set_log_level,
@@ -62,7 +63,7 @@ def compile(
     dla_sram_size: int = 1048576,
     dla_local_dram_size: int = 1073741824,
     dla_global_dram_size: int = 536870912,
-    calibrator: object = None,
+    calibrator: Any = None,
     truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE,
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
     min_block_size: int = MIN_BLOCK_SIZE,
@@ -196,7 +197,7 @@ def compile(
         "use_fast_partitioner": use_fast_partitioner,
         "enable_experimental_decompositions": enable_experimental_decompositions,
         "require_full_compilation": require_full_compilation,
-        "calibrator": calibrator,
+        "calibrator": build_calibrator(calibrator),
     }
 
     settings = CompilationSettings(**compilation_options)
