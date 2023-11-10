@@ -1,17 +1,18 @@
 from __future__ import annotations
 
+import os
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Set
 
+import tensorrt as trt
 import torch
 import torch_tensorrt._C.ts as _ts_C
 from torch_tensorrt import _C, _enums
 from torch_tensorrt._Device import Device
 from torch_tensorrt._Input import Input
 from torch_tensorrt.logging import Level, log
+from torch_tensorrt.ptq import *
 from torch_tensorrt.ts._Input import TorchScriptInput
-
-import tensorrt as trt
 
 
 def _internal_input_to_torch_class_input(i: _C.Input) -> torch.classes.tensorrt._Input:
@@ -73,6 +74,111 @@ def _parse_enabled_precisions(precisions: Any) -> Set[_enums.dtype]:
     else:
         parsed_precisions.add(_parse_op_precision(precisions))
     return parsed_precisions
+
+
+# deepcopy (which involves pickling) is performed on the compile_spec internally during compilation.
+# We register this __reduce__ function for pickler to identity the calibrator object returned by DataLoaderCalibrator during deepcopy.
+# This should be the object's local name relative to the module https://docs.python.org/3/library/pickle.html#object.__reduce__
+def __reduce__(self: object) -> str:
+    return self.__class__.__name__
+
+
+def _build_calibrator(calibrator: Any) -> Any:
+    if not calibrator:
+        return None
+    if not isinstance(calibrator, DataLoaderCalibrator) or isinstance(
+        calibrator, CacheCalibrator
+    ):
+        raise AssertionError(
+            f"Invalid calibrator of type {type(calibrator)} provided. Only calibrator of type DataLoaderCalibrator or CacheCalibrator is supported"
+        )
+    algo_type = calibrator.algo_type
+    cache_file = calibrator.cache_file
+    attribute_mapping = {}
+    if isinstance(calibrator, DataLoaderCalibrator):
+        dataloader = calibrator.dataloader
+        use_cache = calibrator.use_cache
+        device = calibrator.device
+        if not isinstance(dataloader, torch.utils.data.DataLoader):
+            log(
+                Level.Error,
+                "Dataloader : {} is not a valid instance of torch.utils.data.DataLoader".format(
+                    dataloader
+                ),
+            )
+        if not cache_file:
+            if use_cache:
+                log(
+                    Level.Debug,
+                    "Using existing cache_file {} for calibration".format(cache_file),
+                )
+            else:
+                log(Level.Debug, "Overwriting existing calibration cache file.")
+        else:
+            if use_cache:
+                log(
+                    Level.Error,
+                    "Input cache file is None but use_cache is set to True in INT8 mode.",
+                )
+
+        # Define attributes and member functions for the calibrator class
+        attribute_mapping = {
+            "data_loader": dataloader,
+            "current_batch_idx": 0,
+            "batch_size": dataloader.batch_size,
+            "cache_file": cache_file,
+            "device": device,
+            "use_cache": use_cache,
+            "get_batch_size": get_batch_size,
+            "get_batch": get_cache_mode_batch if use_cache else get_batch,
+            "read_calibration_cache": read_calibration_cache,
+            "write_calibration_cache": write_calibration_cache,
+            "__reduce__": __reduce__,  # used when you deepcopy the DataLoaderCalibrator object
+        }
+    elif isinstance(calibrator, CacheCalibrator):
+        if os.path.isfile(cache_file):
+            log(
+                Level.Debug,
+                "Using existing cache_file {} for calibration".format(cache_file),
+            )
+        else:
+            log(Level.Error, "Invalid calibration cache file.")
+        attribute_mapping = {
+            "use_cache": True,
+            "cache_file": cache_file,
+            "get_batch_size": get_batch_size,
+            "get_batch": get_cache_mode_batch,
+            "read_calibration_cache": read_calibration_cache,
+            "write_calibration_cache": write_calibration_cache,
+        }
+
+    # Using type metaclass to construct calibrator class based on algorithm type
+    if algo_type == CalibrationAlgo.ENTROPY_CALIBRATION:
+        calib_ec = type(
+            "Int8EntropyCalibrator", (_C.IInt8EntropyCalibrator,), attribute_mapping
+        )()
+        return calib_ec
+    elif algo_type == CalibrationAlgo.ENTROPY_CALIBRATION_2:
+        calib_ec2 = type(
+            "Int8EntropyCalibrator2",
+            (_C.IInt8EntropyCalibrator2,),
+            attribute_mapping,
+        )()
+        return calib_ec2
+    elif algo_type == CalibrationAlgo.LEGACY_CALIBRATION:
+        calib_lc = type(
+            "Int8LegacyCalibrator", (_C.IInt8LegacyCalibrator,), attribute_mapping
+        )()
+        return calib_lc
+    elif algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
+        calib_mmc = type(
+            "Int8MinMaxCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping
+        )()
+        return calib_mmc
+    else:
+        raise ValueError(
+            "Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION"
+        )
 
 
 def _parse_device_type(device: Any) -> _enums.DeviceType:
@@ -281,7 +387,11 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
         )
 
     if "calibrator" in compile_spec and compile_spec["calibrator"]:
-        info.ptq_calibrator = compile_spec["calibrator"]
+        import pdb
+
+        pdb.set_trace()
+        info.ptq_calibrator = _build_calibrator(compile_spec["calibrator"])
+        # info.ptq_calibrator = compile_spec["calibrator"]
 
     if "sparse_weights" in compile_spec:
         assert isinstance(compile_spec["sparse_weights"], bool)
