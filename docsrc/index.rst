@@ -166,9 +166,9 @@ CLI Documentation
 Contributor Documentation
 --------------------------------
 * :ref:`system_overview`
-* :ref:`_dynamo_converters`
+* :ref:`dynamo_converters`
 * :ref:`writing_dynamo_aten_lowering_passes`
-* :ref:`_ts_converters`
+* :ref:`ts_converters`
 * :ref:`useful_links`
 
 .. toctree::

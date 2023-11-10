@@ -32,7 +32,7 @@ jobs:
       id: fix_slashes
       run: |
         export container_name=$(echo ${{ env.CONTAINER_NAME }} |  sed 's|/|_|g')
-        echo ::set-output name=container_name::$container_name
+        echo "container_name=$container_name" >> $GITHUB_OUTPUT
 
     - name: Log in to the Container registry
       uses: docker/login-action@v2
