@@ -5,12 +5,12 @@ from dataclasses import fields, replace
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import torch
-import torch_tensorrt
 from torch_tensorrt._Device import Device
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import PRECISION
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
+import torch_tensorrt
 from packaging import version
 
 logger = logging.getLogger(__name__)
@@ -114,7 +114,7 @@ def prepare_inputs(
             inputs, disable_memory_format_check=disable_memory_format_check
         )
 
-    elif isinstance(inputs, list):
+    elif isinstance(inputs, (list, tuple)):
         torchtrt_input_list = []
         for input_obj in inputs:
             torchtrt_input = prepare_inputs(
@@ -122,17 +122,11 @@ def prepare_inputs(
             )
             torchtrt_input_list.append(torchtrt_input)
 
-        return torchtrt_input_list
-
-    elif isinstance(inputs, tuple):
-        torchtrt_inputs_tup = []
-        for input_obj in inputs:
-            torchtrt_input = prepare_inputs(
-                input_obj, disable_memory_format_check=disable_memory_format_check
-            )
-            torchtrt_inputs_tup.append(torchtrt_input)
-
-        return tuple(torchtrt_inputs_tup)
+        return (
+            torchtrt_input_list
+            if isinstance(inputs, list)
+            else tuple(torchtrt_input_list)
+        )
 
     elif isinstance(inputs, dict):
         torchtrt_inputs_dict: Dict[Any, Any] = dict()
@@ -148,6 +142,50 @@ def prepare_inputs(
     else:
         raise ValueError(
             f"Invalid input type {type(inputs)} encountered in the dynamo_compile input parsing. "
+            + "Allowed input types: {torch_tensorrt.Input, torch.Tensor, list, tuple, dict}"
+        )
+
+
+def parse_complex_tensor_structs(
+    inputs: Input | torch.Tensor | Sequence[Any] | Dict[Any, Any],
+    attribute_to_extract: str,
+    apply_fn: Callable[[Any], Any] = lambda x: x,
+) -> Any:
+    """Parses complex structures of Tensors and returns a mirrored structure
+    Extracts key attributes of each singular element, while reconstructing the struct
+    Optionally applies a function to each attribute before returning
+    """
+    if isinstance(inputs, (torch.Tensor, Input)):
+        return apply_fn(getattr(inputs, attribute_to_extract, None))
+
+    elif isinstance(inputs, (list, tuple)):
+        torchtrt_input_list = []
+        for input_obj in inputs:
+            torchtrt_input = parse_complex_tensor_structs(
+                input_obj, attribute_to_extract, apply_fn
+            )
+            torchtrt_input_list.append(torchtrt_input)
+
+        return (
+            torchtrt_input_list
+            if isinstance(inputs, list)
+            else tuple(torchtrt_input_list)
+        )
+
+    elif isinstance(inputs, dict):
+        torchtrt_inputs_dict: Dict[Any, Any] = dict()
+
+        for key, input_obj in inputs.items():
+            torchtrt_input = parse_complex_tensor_structs(
+                input_obj, attribute_to_extract, apply_fn
+            )
+            torchtrt_inputs_dict[key] = torchtrt_input
+
+        return torchtrt_inputs_dict
+
+    else:
+        raise ValueError(
+            f"Invalid input type {type(inputs)} encountered in parse_complex_tensor_structs parsing. "
             + "Allowed input types: {torch_tensorrt.Input, torch.Tensor, list, tuple, dict}"
         )
 

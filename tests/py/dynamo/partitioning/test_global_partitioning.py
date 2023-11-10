@@ -18,7 +18,7 @@ class TestGlobalPartitioning(TestCase):
                 return torch.ops.aten.add.Tensor(x, y)
 
         fx_graph = torch.fx.symbolic_trace(FullySupportedOneOp())
-        partitioned_graph = partitioning.global_partition(deepcopy(fx_graph))
+        partitioned_graph, _ = partitioning.global_partition(deepcopy(fx_graph))
         self.assertEquals(
             len(list(partitioned_graph.named_children())),
             0,
@@ -34,7 +34,7 @@ class TestGlobalPartitioning(TestCase):
                 return torch.ops.aten.add.Tensor(x, y)
 
         fx_graph = torch.fx.symbolic_trace(FullySupportedOneOp())
-        partitioned_graph = partitioning.global_partition(
+        partitioned_graph, _ = partitioning.global_partition(
             deepcopy(fx_graph), require_full_compilation=True
         )
         self.assertEquals(
@@ -56,7 +56,7 @@ class TestGlobalPartitioning(TestCase):
                 return pow_
 
         fx_graph = torch.fx.symbolic_trace(FullySupportedMultiOp())
-        partitioned_graph = partitioning.global_partition(
+        partitioned_graph, _ = partitioning.global_partition(
             deepcopy(fx_graph), min_block_size=2
         )
         self.assertEquals(
@@ -79,7 +79,7 @@ class TestGlobalPartitioning(TestCase):
                 return pow_
 
         fx_graph = torch.fx.symbolic_trace(PartiallySupportedMultiOp())
-        partitioned_graph = partitioning.global_partition(
+        partitioned_graph, _ = partitioning.global_partition(
             deepcopy(fx_graph), min_block_size=2
         )
         self.assertEquals(

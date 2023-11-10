@@ -50,6 +50,7 @@ from torch_tensorrt.dynamo.conversion import (
 from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decompositions
 from torch_tensorrt.dynamo.utils import (
     get_torch_inputs,
+    parse_complex_tensor_structs,
     prepare_inputs,
     set_log_level,
     to_torch_device,
@@ -257,11 +258,13 @@ def compile_module(
 
     dryrun_tracker.total_ops_in_graph = total_ops
     dryrun_tracker.supported_ops_in_graph = num_supported_ops
-    dryrun_tracker.graph_input_shapes = [
-        tuple(input_.shape) for input_ in sample_inputs
-    ]
-    dryrun_tracker.graph_input_dtypes = [input_.torch_dtype for input_ in sample_inputs]
-    dryrun_tracker.truncated_long_and_double = settings.truncate_long_and_double
+    dryrun_tracker.graph_input_shapes = parse_complex_tensor_structs(
+        sample_inputs, "shape", tuple
+    )
+    dryrun_tracker.graph_input_dtypes = parse_complex_tensor_structs(
+        sample_inputs, "torch_dtype"
+    )
+    dryrun_tracker.compilation_settings = settings
 
     if settings.dryrun and settings.min_block_size > 1:
         logger.info(
@@ -290,7 +293,7 @@ def compile_module(
     # If specified, try using the fast partitioner and fall back to the global one on failure
     if settings.use_fast_partitioner:
         try:
-            partitioned_module = partitioning.fast_partition(
+            partitioned_module, supported_ops = partitioning.fast_partition(
                 gm,
                 verbose=settings.debug,
                 min_block_size=settings.min_block_size,
@@ -307,12 +310,14 @@ def compile_module(
             settings.use_fast_partitioner = False
 
     if not settings.use_fast_partitioner:
-        partitioned_module = partitioning.global_partition(
+        partitioned_module, supported_ops = partitioning.global_partition(
             gm,
             verbose=settings.debug,
             min_block_size=settings.min_block_size,
             torch_executed_ops=settings.torch_executed_ops,
         )
+
+    dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
 
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
@@ -360,25 +365,23 @@ def compile_module(
                 name,
             )
 
-        subgraph_data.subgraph_input_dtypes = [
-            submodule_input.torch_dtype for submodule_input in submodule_inputs
-        ]
-        subgraph_data.subgraph_input_shapes = [
-            tuple(submodule_input.shape) for submodule_input in submodule_inputs
-        ]
+        subgraph_data.subgraph_input_shapes = parse_complex_tensor_structs(
+            submodule_inputs, "shape", tuple
+        )
+        subgraph_data.subgraph_input_dtypes = parse_complex_tensor_structs(
+            submodule_inputs, "torch_dtype"
+        )
 
         submodule_outputs = submodule(
             *get_torch_inputs(submodule_inputs, to_torch_device(settings.device))
         )
-        if not isinstance(submodule_outputs, (list, tuple)):
-            submodule_outputs = [submodule_outputs]
 
-        subgraph_data.subgraph_output_dtypes = [
-            submodule_output.dtype for submodule_output in submodule_outputs
-        ]
-        subgraph_data.subgraph_output_shapes = [
-            tuple(submodule_output.shape) for submodule_output in submodule_outputs
-        ]
+        subgraph_data.subgraph_output_shapes = parse_complex_tensor_structs(
+            submodule_outputs, "shape", tuple
+        )
+        subgraph_data.subgraph_output_dtypes = parse_complex_tensor_structs(
+            submodule_outputs, "dtype"
+        )
 
         dryrun_tracker.tensorrt_graph_count += 1
         dryrun_tracker.per_subgraph_data.append(subgraph_data)
@@ -401,10 +404,12 @@ def compile_module(
     if not isinstance(sample_outputs, (list, tuple)):
         sample_outputs = [sample_outputs]
 
-    dryrun_tracker.graph_output_shapes = [
-        tuple(output_.shape) for output_ in sample_outputs
-    ]
-    dryrun_tracker.graph_output_dtypes = [output_.dtype for output_ in sample_outputs]
+    dryrun_tracker.graph_output_shapes = parse_complex_tensor_structs(
+        sample_outputs, "shape", tuple
+    )
+    dryrun_tracker.graph_output_dtypes = parse_complex_tensor_structs(
+        sample_outputs, "dtype"
+    )
 
     # Replace all FX Modules with TRT Modules
     for name, trt_module in trt_modules.items():
