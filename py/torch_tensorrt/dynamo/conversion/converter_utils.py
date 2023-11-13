@@ -4,6 +4,7 @@ import re
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch import SymBool, SymFloat, SymInt
 from torch.fx.node import Argument, Target
@@ -19,8 +20,6 @@ from torch_tensorrt.fx.converters.converter_utils import (
     unified_dtype_converter,
 )
 from torch_tensorrt.fx.types import TRTDataType, TRTTensor
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -339,8 +338,8 @@ def get_positive_dim(
 ) -> Union[int, Tuple[int, ...]]:
     """
     Given an integer number or tuple that represents dimension(s) in the array,
-    transform it to a positive integer dim if it's negative. Otherwise, do
-    nothing.
+    transform it to a positive integer dim if it's negative.
+    Otherwise, truncate it to the dimension size
 
     Args:
         dim (Union[int, Sequence[int]]): A integer or Sequence of integers that represent dimension(s) in an array.
@@ -353,7 +352,8 @@ def get_positive_dim(
     def positive_dim(d: int) -> int:
         if d < 0:
             return d % dim_size
-        return d
+        else:
+            return min(d, dim_size)
 
     return (
         positive_dim(dim)

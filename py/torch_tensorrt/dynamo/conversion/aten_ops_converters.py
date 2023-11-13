@@ -700,9 +700,9 @@ def aten_ops_slice(
         SourceIR.ATEN,
         name,
         args[0],
-        args[1],
-        args[2],
-        args[3],
+        args_bounds_check(args, 1, replacement=0),
+        args_bounds_check(args, 2, replacement=None),
+        args_bounds_check(args, 3, replacement=None),
         args_bounds_check(args, 4, replacement=1),
     )
 

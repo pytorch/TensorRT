@@ -27,8 +27,8 @@ def slice_op(  # TODO: This should be slice not whatever is in base
     name: str,
     input: TRTTensor,
     dim: int,
-    start: int,
-    stop: int,
+    start: Optional[int],
+    stop: Optional[int],
     step: int,
 ) -> TRTTensor:
     if not isinstance(input, TRTTensor):
@@ -37,6 +37,14 @@ def slice_op(  # TODO: This should be slice not whatever is in base
             "of the TensorRT region!"
         )
 
+    # Special case for start being None
+    if start is None:
+        start = 0
+
+    # Special case for stop being None
+    if stop is None:
+        stop = input.shape[dim]
+
     dim = get_positive_dim(dim, len(input.shape))
     start = get_positive_dim(start, input.shape[dim])
     stop = get_positive_dim(stop, input.shape[dim])
@@ -44,9 +52,6 @@ def slice_op(  # TODO: This should be slice not whatever is in base
     if has_dynamic_shape(input.shape):
         # Check whether slice target dim is dynamic shape dim
         assert input.shape[dim] != -1, "Can't slice on dynamic shape dimension!"
-
-    if stop == 2**63 - 1:
-        stop = input.shape[dim]
 
     start_slice = [0] * len(input.shape)
     start_slice[dim] = start
