@@ -216,7 +216,7 @@ def run_dynamo_backend_tests(session):
             session.run_always("pytest", test)
 
 
-def run_fx_converter_tests(session):
+def run_dynamo_converter_tests(session):
     print("Running Dynamo converter tests")
     session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/"))
     tests = [
@@ -234,19 +234,6 @@ def run_dynamo_lower_tests(session):
     session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/"))
     tests = [
         "lowering"
-    ]
-    for test in tests:
-        if USE_HOST_DEPS:
-            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
-        else:
-            session.run_always("pytest", test)
-
-
-def run_dynamo_model_tests(session):
-    print("Running Dynamo model tests")
-    session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/"))
-    tests = [
-        "models",
     ]
     for test in tests:
         if USE_HOST_DEPS:
@@ -281,17 +268,31 @@ def run_dynamo_runtime_tests(session):
             session.run_always("pytest", test)
 
 
-def run_model_tests(session):
-    print("Running model tests")
-    session.chdir(os.path.join(TOP_DIR, "tests/py/ts"))
+def run_dynamo_model_compile_tests(session):
+    print("Running model torch-compile tests")
+    session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/models"))
     tests = [
-        "models",
+        "test_models.py",
     ]
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+            session.run_always("python", test, "--ir", str("torch_compile"), env={"PYTHONPATH": PYT_PATH})
         else:
-            session.run_always("pytest", test)
+            session.run_always("python", test, "--ir", str("torch_compile"))
+
+
+def run_dynamo_model_export_tests(session):
+    print("Running model torch-export tests")
+    session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/models"))
+    tests = [
+        "test_models_export.py",
+        "test_export_serde.py"
+    ]
+    for test in tests:
+        if USE_HOST_DEPS:
+            session.run_always("python", test, "--ir", str("dynamo"), env={"PYTHONPATH": PYT_PATH})
+        else:
+            session.run_always("python", test, "--ir", str("dynamo"))
 
 
 def run_accuracy_tests(session):
@@ -388,37 +389,61 @@ def run_l0_api_tests(session):
     cleanup(session)
 
 
-def run_l0_fx_tests(session):
+def run_l0_dynamo_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
         install_torch_trt(session)
-    run_fx_core_tests(session)
-    run_fx_converter_tests(session)
-    run_fx_lower_tests(session)
+    run_dynamo_backend_tests(session)
+    run_dynamo_converter_tests(session)
+    run_dynamo_lower_tests(session)
     cleanup(session)
 
 
-def run_l0_fx_core_tests(session):
+def run_l0_dynamo_backend_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
         install_torch_trt(session)
-    run_fx_core_tests(session)
+    run_dynamo_backend_tests(session)
     cleanup(session)
 
 
-def run_l0_fx_converter_tests(session):
+def run_l0_dynamo_converter_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
         install_torch_trt(session)
-    run_fx_converter_tests(session)
+    run_dynamo_converter_tests(session)
     cleanup(session)
 
 
-def run_l0_fx_lower_tests(session):
+def run_l0_dynamo_lower_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
         install_torch_trt(session)
-    run_fx_lower_tests(session)
+    run_dynamo_lower_tests(session)
+    cleanup(session)
+
+
+def run_l0_dynamo_model_tests(session):
+    if not USE_HOST_DEPS:
+        install_deps(session)
+        install_torch_trt(session)
+    run_dynamo_model_tests(session)
+    cleanup(session)
+
+
+def run_l0_dynamo_partitioning_tests(session):
+    if not USE_HOST_DEPS:
+        install_deps(session)
+        install_torch_trt(session)
+    run_dynamo_partitioning_tests(session)
+    cleanup(session)
+
+
+def run_l0_dynamo_runtime_tests(session):
+    if not USE_HOST_DEPS:
+        install_deps(session)
+        install_torch_trt(session)
+    run_dynamo_runtime_tests(session)
     cleanup(session)
 
 
@@ -431,12 +456,13 @@ def run_l0_dla_tests(session):
     cleanup(session)
 
 
-def run_l1_model_tests(session):
+def run_dynamo_model_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
         install_torch_trt(session)
     download_models(session)
-    run_model_tests(session)
+    run_dynamo_model_compile_tests(session)
+    run_dynamo_model_export_tests(session)
     cleanup(session)
 
 
@@ -450,13 +476,13 @@ def run_l1_int8_accuracy_tests(session):
     cleanup(session)
 
 
-def run_l1_fx_tests(session):
+def run_l1_dynamo_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
         install_torch_trt(session)
-    run_fx_quant_tests(session)
-    run_fx_tracer_tests(session)
-    run_fx_tools_tests(session)
+    run_dynamo_model_tests(session)
+    run_dynamo_partitioning_tests(session)
+    run_dynamo_runtime_tests(session)
     cleanup(session)
 
 
@@ -484,27 +510,27 @@ def l0_api_tests(session):
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
-def l0_fx_tests(session):
+def l0_dynamo_tests(session):
     """When a developer needs to check correctness for a PR or something"""
-    run_l0_fx_tests(session)
+    run_l0_dynamo_tests(session)
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
-def l0_fx_core_tests(session):
+def l0_dynamo_backend_tests(session):
     """When a developer needs to check correctness for a PR or something"""
-    run_l0_fx_core_tests(session)
+    run_l0_dynamo_backend_tests(session)
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
-def l0_fx_converter_tests(session):
+def l0_dynamo_converter_tests(session):
     """When a developer needs to check correctness for a PR or something"""
-    run_l0_fx_converter_tests(session)
+    run_l0_dynamo_converter_tests(session)
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
-def l0_fx_lower_tests(session):
+def l0_dynamo_lower_tests(session):
     """When a developer needs to check correctness for a PR or something"""
-    run_l0_fx_lower_tests(session)
+    run_l0_dynamo_lower_tests(session)
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
@@ -516,13 +542,13 @@ def l0_dla_tests(session):
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l1_model_tests(session):
     """When a user needs to test the functionality of standard models compilation and results"""
-    run_l1_model_tests(session)
+    run_dynamo_model_tests(session)
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
-def l1_fx_tests(session):
+def l1_dynamo_tests(session):
     """When a user needs to test the functionality of standard models compilation and results"""
-    run_l1_fx_tests(session)
+    run_l1_dynamo_tests(session)
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
