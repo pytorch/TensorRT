@@ -506,7 +506,7 @@ def TensorRTCompileSpec(
       Returns:
         torch.classes.tensorrt.CompileSpec: List of methods and formated spec objects to be provided to ``torch._C._jit_to_tensorrt``
     """
-
+    ptq_calibrator = _build_calibrator(calibrator)
     compile_spec = {
         "inputs": inputs if inputs is not None else [],
         # "input_signature": input_signature,
@@ -524,7 +524,7 @@ def TensorRTCompileSpec(
         "dla_sram_size": dla_sram_size,  # Fast software managed RAM used by DLA to communicate within a layer.
         "dla_local_dram_size": dla_local_dram_size,  # Host RAM used by DLA to share intermediate tensor data across operations
         "dla_global_dram_size": dla_global_dram_size,  # Host RAM used by DLA to store weights and metadata for execution
-        "calibrator": calibrator,
+        "calibrator": ptq_calibrator,
         "truncate_long_and_double": truncate_long_and_double,
         "allow_shape_tensors": allow_shape_tensors,
     }

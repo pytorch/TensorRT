@@ -8,8 +8,8 @@ import torchvision
 import torchvision.models as models
 import torchvision.transforms as transforms
 from torch.nn import functional as F
-from torch_tensorrt.dynamo import CalibrationAlgo, DataLoaderCalibrator
 from torch_tensorrt.logging import *
+from torch_tensorrt.ptq import CalibrationAlgo, DataLoaderCalibrator
 from vgg16 import vgg16
 
 
@@ -39,12 +39,7 @@ def compute_accuracy(testing_dataloader, model):
 
 class TestAccuracy(unittest.TestCase):
     def test_compile_script(self):
-        # self.model = models.vgg16(weights=None).eval()
         self.model = vgg16(num_classes=10, init_weights=False).eval().cuda()
-        # ckpt = torch.load("./ckpt_epoch25.pth")
-        # weights = ckpt["model_state_dict"]
-        # self.model.load_state_dict(weights)
-        self.model = self.model.cuda()
         self.testing_dataset = torchvision.datasets.CIFAR10(
             root="./data",
             train=False,

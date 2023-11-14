@@ -11,7 +11,7 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import PRECISION
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.ptq import *
+from torch_tensorrt.ptq import *  # noqa: F403
 
 from packaging import version
 
@@ -258,6 +258,9 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
             "If this is incorrect, please specify an input device, via the device keyword."
         )
 
+    if "calibrator" in kwargs:
+        settings.calibrator = build_calibrator(kwargs["calibrator"])
+
     # Ignore and warn about require_full_compilation flag
     if settings.require_full_compilation:
         logger.warning(
@@ -309,6 +312,7 @@ def build_calibrator(calibrator: Union[DataLoaderCalibrator | CacheCalibrator]) 
             "current_batch_idx": 0,
             "batch_size": dataloader.batch_size,
             "cache_file": cache_file,
+            "dataset_iterator": iter(dataloader),
             "device": device,
             "use_cache": use_cache,
             "get_batch_size": get_batch_size,

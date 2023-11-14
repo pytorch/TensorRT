@@ -124,9 +124,7 @@ def main():
 
     num_classes = len(classes)
 
-    model = vgg16(num_classes=num_classes, init_weights=False)
-    # model = models.vgg16(weights=None)
-    model = model.cuda()
+    model = vgg16(num_classes=num_classes, init_weights=False).cuda()
 
     data = iter(training_dataloader)
     images, _ = next(data)
@@ -233,7 +231,7 @@ def test(model, dataloader, crit, epoch):
     test_preds = torch.cat(class_preds)
     for i in range(len(classes)):
         add_pr_curve_tensorboard(i, test_probs, test_preds, epoch)
-    # print(loss, total, correct, total)
+
     return loss / total, correct / total
 
 

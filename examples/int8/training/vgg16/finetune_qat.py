@@ -229,8 +229,7 @@ def main():
 
     quant_modules.initialize()
 
-    # model = vgg16(num_classes=num_classes, init_weights=False)
-    model = models.vgg16(weights=None)
+    model = vgg16(num_classes=num_classes, init_weights=False).cuda()
     model = model.cuda()
 
     crit = nn.CrossEntropyLoss()

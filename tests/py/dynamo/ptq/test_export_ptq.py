@@ -40,11 +40,7 @@ def compute_accuracy(testing_dataloader, model):
 
 class TestAccuracy(unittest.TestCase):
     def test_compile_script(self):
-        # self.model = models.vgg16(weights=None).eval().cuda()
         self.model = vgg16(num_classes=10, init_weights=False).eval().cuda()
-        ckpt = torch.load("./ckpt_epoch15.pth")
-        weights = ckpt["model_state_dict"]
-        self.model.load_state_dict(weights)
         self.testing_dataset = torchvision.datasets.CIFAR10(
             root="./data",
             train=False,

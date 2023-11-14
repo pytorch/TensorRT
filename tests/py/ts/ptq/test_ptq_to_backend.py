@@ -1,12 +1,13 @@
+import os
 import unittest
-import torch_tensorrt as torchtrt
-from torch_tensorrt.logging import *
+
 import torch
 import torch.nn as nn
-from torch.nn import functional as F
+import torch_tensorrt as torchtrt
 import torchvision
 import torchvision.transforms as transforms
-import os
+from torch.nn import functional as F
+from torch_tensorrt.logging import *
 
 
 def find_repo_root(max_depth=10):
@@ -69,7 +70,7 @@ class TestAccuracy(unittest.TestCase):
         )
 
         self.testing_dataloader = torch.utils.data.DataLoader(
-            self.testing_dataset, batch_size=1, shuffle=False, num_workers=1
+            self.testing_dataset, batch_size=100, shuffle=False, num_workers=1
         )
         self.calibrator = torchtrt.ptq.DataLoaderCalibrator(
             self.testing_dataloader,
@@ -82,8 +83,8 @@ class TestAccuracy(unittest.TestCase):
         self.spec = {
             "forward": torchtrt.ts.TensorRTCompileSpec(
                 **{
-                    "inputs": [torchtrt.Input([1, 3, 32, 32])],
-                    "enabled_precisions": {torch.float, torch.half, torch.int8},
+                    "inputs": [torchtrt.Input([100, 3, 32, 32])],
+                    "enabled_precisions": {torch.float, torch.int8},
                     "calibrator": self.calibrator,
                     "truncate_long_and_double": True,
                     "device": {
