@@ -27,13 +27,10 @@ def get_batch_size(self: object) -> int:
 
 
 def get_batch(self: object, _: Any) -> Optional[List[int]]:
-    import pdb
-
-    pdb.set_trace()
     if self.current_batch_idx + self.batch_size > len(self.data_loader.dataset):
         return None
 
-    batch = next(iter(self.data_loader))
+    batch = next(self.dataset_iterator)
     self.current_batch_idx += self.batch_size
     inputs_gpu = []
     if isinstance(batch, list):

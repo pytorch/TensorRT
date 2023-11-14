@@ -11,7 +11,7 @@ from torch_tensorrt import _C, _enums
 from torch_tensorrt._Device import Device
 from torch_tensorrt._Input import Input
 from torch_tensorrt.logging import Level, log
-from torch_tensorrt.ptq import *
+from torch_tensorrt.ptq import *  # noqa: F403
 from torch_tensorrt.ts._Input import TorchScriptInput
 
 
@@ -126,6 +126,7 @@ def _build_calibrator(calibrator: Any) -> Any:
             "data_loader": dataloader,
             "current_batch_idx": 0,
             "batch_size": dataloader.batch_size,
+            "dataset_iterator": iter(dataloader),
             "cache_file": cache_file,
             "device": device,
             "use_cache": use_cache,
@@ -387,11 +388,7 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
         )
 
     if "calibrator" in compile_spec and compile_spec["calibrator"]:
-        import pdb
-
-        pdb.set_trace()
-        info.ptq_calibrator = _build_calibrator(compile_spec["calibrator"])
-        # info.ptq_calibrator = compile_spec["calibrator"]
+        info.ptq_calibrator = compile_spec["calibrator"]
 
     if "sparse_weights" in compile_spec:
         assert isinstance(compile_spec["sparse_weights"], bool)

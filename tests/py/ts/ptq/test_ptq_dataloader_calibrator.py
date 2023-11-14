@@ -70,18 +70,18 @@ class TestAccuracy(unittest.TestCase):
         )
 
         self.testing_dataloader = torch.utils.data.DataLoader(
-            self.testing_dataset, batch_size=1, shuffle=False, num_workers=1
+            self.testing_dataset, batch_size=100, shuffle=False, num_workers=0
         )
-        self.calibrator = torchtrt.DataLoaderCalibrator(
+        self.calibrator = torchtrt.ptq.DataLoaderCalibrator(
             self.testing_dataloader,
             cache_file="./calibration.cache",
             use_cache=False,
-            algo_type=torchtrt.CalibrationAlgo.ENTROPY_CALIBRATION_2,
+            algo_type=torchtrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2,
             device=torch.device("cuda:0"),
         )
 
         compile_spec = {
-            "inputs": [torchtrt.Input([1, 3, 32, 32])],
+            "inputs": [torchtrt.Input([100, 3, 32, 32])],
             "enabled_precisions": {torch.float, torch.int8},
             "calibrator": self.calibrator,
             "truncate_long_and_double": True,
@@ -92,7 +92,8 @@ class TestAccuracy(unittest.TestCase):
                 "allow_gpu_fallback": False,
             },
         }
-        trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
+        with torchtrt.logging.debug():
+            trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
 
         fp32_test_acc = compute_accuracy(self.testing_dataloader, self.model)
         log(Level.Info, "[Pyt FP32] Test Acc: {:.2f}%".format(100 * fp32_test_acc))

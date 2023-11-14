@@ -7,7 +7,11 @@ import torch_tensorrt._C.ts as _C
 from torch_tensorrt import _enums
 from torch_tensorrt._Device import Device
 from torch_tensorrt._Input import Input
-from torch_tensorrt.ts._compile_spec import _parse_compile_spec, _parse_device
+from torch_tensorrt.ts._compile_spec import (
+    _build_calibrator,
+    _parse_compile_spec,
+    _parse_device,
+)
 
 
 def compile(
@@ -125,6 +129,7 @@ def compile(
             f"require_full_compilation is enabled however the list of modules and ops to run in torch is not empty. Found: torch_executed_ops: {torch_executed_ops}, torch_executed_modules: {torch_executed_modules}"
         )
 
+    ptq_calibrator = _build_calibrator(calibrator)
     spec = {
         "inputs": input_list,
         "input_signature": input_signature,
@@ -137,7 +142,7 @@ def compile(
         "capability": capability,  # Restrict kernel selection to safe gpu kernels or safe dla kernels
         "num_avg_timing_iters": num_avg_timing_iters,  # Number of averaging timing iterations used to select kernels
         "workspace_size": workspace_size,  # Maximum size of workspace given to TensorRT
-        "calibrator": calibrator,
+        "calibrator": ptq_calibrator,
         "truncate_long_and_double": truncate_long_and_double,
         "torch_fallback": {
             "enabled": not require_full_compilation,
