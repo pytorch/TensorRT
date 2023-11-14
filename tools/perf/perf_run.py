@@ -593,9 +593,9 @@ if __name__ == "__main__":
     # Generate report
     print("Model Summary: ", model_name)
     summary = pd.DataFrame(results)
+    summary["model_name"] = (
+        model_name_torch if model_name_torch is not None else model_name
+    )
     print(summary)
     if args.report:
-        with open(args.report, "w") as file:
-            file.write("Model Summary: " + model_name + "\n")
-            file.write(summary.to_string())
-        file.close()
+        summary.to_csv(args.report)
