@@ -1,6 +1,7 @@
 import torch
-import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
+
+import torch_tensorrt
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
@@ -371,6 +372,71 @@ class TestLowerLinear(TestCase):
             0,
             DECIMALS_OF_AGREEMENT,
             msg=f"Linear TRT outputs don't match with the original model.",
+        )
+        torch._dynamo.reset()
+
+
+class TestLowerViewToReshape(TestCase):
+    def test_view_to_reshape(self):
+        class ViewToReshape(torch.nn.Module):
+            def forward(self, input):
+                out = torch.ops.aten.view.default(input, (1, 1, -1))
+                return out
+
+        inputs = [
+            torch.rand((3, 4, 5, 32)).cuda(),
+        ]
+
+        fx_graph = torch.fx.symbolic_trace(ViewToReshape())
+        expected_ops = {torch.ops.aten.reshape.default}
+        unexpected_ops = {
+            torch.ops.aten.view.default,
+        }
+
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEquals(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEquals(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = torch.cat(
+            [tensor.detach().cpu() for tensor in optimized_model(*inputs)]
+        )
+        torch_model_results = torch.cat(
+            [tensor.detach().cpu() for tensor in fx_graph(*inputs)]
+        )
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            msg=f"ViewToReshape TRT outputs don't match with the original model.",
         )
         torch._dynamo.reset()
 
