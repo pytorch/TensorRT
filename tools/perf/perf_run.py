@@ -578,16 +578,17 @@ if __name__ == "__main__":
             if model_torch is not None:
                 model_torch = model_torch.half()
 
-        status = run(
-            model,
-            backends,
-            input_tensors,
-            params,
-            precision,
-            batch_size,
-            is_trt_engine,
-            model_torch=model_torch,
-        )
+        with torch.no_grad():
+            status = run(
+                model,
+                backends,
+                input_tensors,
+                params,
+                precision,
+                batch_size,
+                is_trt_engine,
+                model_torch=model_torch,
+            )
 
     # Generate report
     print("Model Summary: ", model_name)
