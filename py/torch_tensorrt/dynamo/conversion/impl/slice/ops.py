@@ -31,12 +31,6 @@ def slice_op(  # TODO: This should be slice not whatever is in base
     stop: Optional[int],
     step: int,
 ) -> TRTTensor:
-    if not isinstance(input, TRTTensor):
-        raise RuntimeError(
-            f"slice_tensor received input {input} that is not part "
-            "of the TensorRT region!"
-        )
-
     # Special case for start being None
     if start is None:
         start = 0
@@ -73,11 +67,6 @@ def expand(
     input_t: TRTTensor,
     shape: Shape,
 ) -> TRTTensor:
-    if not isinstance(input_t, TRTTensor):
-        raise RuntimeError(
-            f"expand received input {input_t} that is not a TensorRT ITensor"
-        )
-
     shape_rank = len(shape)
     initial_tensor_rank = len(input_t.shape)
 

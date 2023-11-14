@@ -7,7 +7,7 @@ from torch_tensorrt import Input
 from .harness import DispatchTestCase
 
 
-class TestSelectConverter(DispatchTestCase):
+class TestSliceConverter(DispatchTestCase):
     @parameterized.expand(
         [
             ("slice_dim_start_stop_step", 0, 0, 7, 2),
@@ -50,11 +50,11 @@ class TestSelectConverter(DispatchTestCase):
         )
 
 
-class TestSelectConverterDynamicShape(DispatchTestCase):
+class TestSliceConverterDynamicShape(DispatchTestCase):
     @parameterized.expand(
         [
-            ("select_dim_start_stop_step", 1, 0, 7, 2),
-            ("select_dim_start_stop_step", 1, 0, 10, 2),
+            ("slice_dim_start_stop_step", 1, 0, 7, 2),
+            ("slice_dim_start_stop_step", 1, 0, 10, 2),
         ]
     )
     def test_slice(self, _, dim, start, stop, step):
