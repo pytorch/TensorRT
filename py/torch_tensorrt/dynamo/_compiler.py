@@ -4,9 +4,11 @@ import collections.abc
 import logging
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
 
+import tensorrt as trt
 import torch
 from torch.export import ExportedProgram
 from torch.fx.node import Target
+from torch_tensorrt import _enums
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
     EngineCapability,
@@ -443,3 +445,122 @@ def compile_module(
     dryrun_stats_display(dryrun_tracker, settings.dryrun)
 
     return partitioned_module
+
+
+def interpreter(
+    module: torch.fx.GraphModule,
+    inputs: Sequence[Input],
+    settings: CompilationSettings = CompilationSettings(),
+    name: str = "",
+) -> TRTInterpreterResult:
+    torch_inputs = get_torch_inputs(inputs, settings.device)
+    module_outputs = module(*torch_inputs)
+
+    if not isinstance(module_outputs, (list, tuple)):
+        module_outputs = [module_outputs]
+
+    # Int64 outputs can sometimes be generated from within other operators
+    # such as aten.sum - such outputs can be truncated
+    output_dtypes = []
+    for output in module_outputs:
+        if settings.truncate_long_and_double and output.dtype == torch.float64:
+            output_dtypes.append(torch.float32)
+        elif settings.truncate_long_and_double and output.dtype == torch.int64:
+            output_dtypes.append(torch.int32)
+        else:
+            output_dtypes.append(output.dtype)
+
+    interpreter = TRTInterpreter(
+        module,
+        inputs,
+        logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
+        output_dtypes=output_dtypes,
+        compilation_settings=settings,
+    )
+    interpreter_result = interpreter.run(
+        workspace_size=settings.workspace_size,
+        precision=settings.precision,
+        profiling_verbosity=(
+            trt.ProfilingVerbosity.VERBOSE
+            if settings.debug
+            else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
+        ),
+        max_aux_streams=settings.max_aux_streams,
+        version_compatible=settings.version_compatible,
+        optimization_level=settings.optimization_level,
+    )
+    return interpreter_result
+
+
+def convert_method_to_trt_engine(
+    module: torch.fx.GraphModule,
+    method_name: str = "forward",
+    inputs: Optional[Sequence[Input | torch.Tensor]] = None,
+    device: Device = Device._current_device(),
+    disable_tf32: bool = False,
+    sparse_weights: bool = False,
+    enabled_precisions: Optional[Set[torch.dtype | _enums.dtype]] = None,
+    refit: bool = False,
+    debug: bool = False,
+    capability: _enums.EngineCapability = _enums.EngineCapability.default,
+    num_avg_timing_iters: int = 1,
+    workspace_size: int = 0,
+    dla_sram_size: int = 1048576,
+    dla_local_dram_size: int = 1073741824,
+    dla_global_dram_size: int = 536870912,
+    truncate_long_and_double: int = False,
+    calibrator: object = None,
+    allow_shape_tensors: bool = False,
+) -> bytes:
+    if debug:
+        set_log_level(logger.parent, logging.DEBUG)
+
+    input_list = list(inputs) if inputs is not None else []
+    # Prepare torch_trt inputs
+    input_list = prepare_inputs(input_list)
+    device = to_torch_tensorrt_device(device)
+
+    enabled_precisions = (
+        enabled_precisions if enabled_precisions is not None else {torch.float}
+    )
+
+    if (
+        torch.float16 in enabled_precisions
+        or torch_tensorrt.dtype.half in enabled_precisions
+    ):
+        precision = torch.float16
+    elif (
+        torch.float32 in enabled_precisions
+        or torch_tensorrt.dtype.float in enabled_precisions
+    ):
+        precision = torch.float32
+    elif len(enabled_precisions) == 0:
+        logger.info(f"No precision specified, defaulting to {PRECISION}")
+        precision = PRECISION
+    else:
+        raise ValueError(
+            f"Precision {enabled_precisions} not supported in the Dynamo Path"
+        )
+
+    compilation_options = {
+        "precision": precision,
+        "debug": debug,
+        "device": device,
+        "workspace_size": workspace_size,
+        "truncate_long_and_double": truncate_long_and_double,
+        "max_aux_streams": MAX_AUX_STREAMS,
+        "version_compatible": VERSION_COMPATIBLE,
+        "optimization_level": OPTIMIZATION_LEVEL,
+    }
+
+    settings = CompilationSettings(**compilation_options)
+    logger.info("Compilation Settings: %s\n", settings)
+    interpreter_result = interpreter(module, input_list, settings, method_name)
+
+    import io
+
+    with io.BytesIO() as engine_bytes:
+        engine_bytes.write(interpreter_result.engine.serialize())
+        engine_bytearray = engine_bytes.getvalue()
+
+    return engine_bytearray
