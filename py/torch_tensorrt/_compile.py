@@ -22,7 +22,7 @@ DYNAMO_ENABLED = version.parse(sanitized_torch_version()) >= version.parse("2.1.
 
 if DYNAMO_ENABLED:
     from torch._export import ExportedProgram
-    from torch_tensorrt.dynamo.compile import compile as dynamo_compile
+    from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 
 logger = logging.getLogger(__name__)
 

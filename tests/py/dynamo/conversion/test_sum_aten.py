@@ -70,8 +70,8 @@ class TestSumConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
-            ((3, 2, 4), 1, True, torch.int, 0, 5),
-            ((2, 3, 4, 5), None, True, torch.int, -10, 10),
+            ((3, 2, 4), 1, True, torch.int32, 0, 5),
+            ((2, 3, 4, 5), None, True, torch.int32, -10, 10),
             ((2, 3, 4, 5), 2, False, torch.int32, -5, 0),
             ((6, 7, 5, 4, 5), 4, False, torch.int32, -5, 5),
         ]
@@ -85,16 +85,18 @@ class TestSumConverter(DispatchTestCase):
         self.run_test(
             Sum(),
             inputs,
-            check_dtype=False,
+            output_dtypes=[torch.int32],
         )
 
     @parameterized.expand(
         [
-            ((1, 2, 4), [], True, torch.int, 0, 5),
-            ((3, 2, 4), [1], True, torch.int, 0, 5),
-            ((2, 1, 4, 5), [0, 3], True, torch.int, -10, 10),
+            ((1, 2, 4), [], True, torch.int32, 0, 5),
+            ((3, 2, 4), [1], True, torch.int32, 0, 5),
+            ((2, 1, 4, 5), [0, 3], True, torch.int32, -10, 10),
             ((2, 3, 4, 5), None, False, torch.int32, -5, 0),
             ((6, 7, 5, 4, 5), [1, 3, 4], False, torch.int32, -5, 5),
+            ((6, 7, 5, 4, 5), [1, 3, 4], False, torch.bool, 0, 2),
+            ((4, 7, 1, 5), None, True, torch.bool, 0, 2),
         ]
     )
     def test_sum_dim_tuple_int(self, input_shape, dim, keep_dims, dtype, low, high):
@@ -106,7 +108,7 @@ class TestSumConverter(DispatchTestCase):
         self.run_test(
             Sum(),
             inputs,
-            check_dtype=False,
+            output_dtypes=[torch.int32],
         )
 
 

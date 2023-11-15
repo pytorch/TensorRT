@@ -4,7 +4,7 @@ from typing import Optional
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.converter_registry import ConverterRegistry
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterRegistry
 from torch_tensorrt.dynamo.conversion.converter_utils import cast_trt_tensor
 from torch_tensorrt.fx.converters.converter_utils import (
     Frameworks,

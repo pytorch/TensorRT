@@ -9,7 +9,7 @@ import torch._dynamo as td
 from torch._dynamo.utils import detect_fake_mode
 from torch._functorch.aot_autograd import aot_export_joint_simple
 from torch_tensorrt.dynamo import CompilationSettings
-from torch_tensorrt.dynamo.compile import compile_module
+from torch_tensorrt.dynamo._compiler import compile_module
 from torch_tensorrt.dynamo.lowering import (
     apply_lowering_passes,
     get_decompositions,
@@ -89,7 +89,9 @@ def _pretraced_backend(
 
             gm = apply_lowering_passes(gm, sample_inputs)
 
-            torchtrt_inputs = prepare_inputs(sample_inputs)
+            torchtrt_inputs = prepare_inputs(
+                sample_inputs, disable_memory_format_check=True
+            )
             trt_compiled = compile_module(
                 gm,
                 torchtrt_inputs,
