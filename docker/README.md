@@ -17,14 +17,14 @@ Note: By default the container uses the `pre-cxx11-abi` version of Torch + Torch
 
 ### Instructions
 
-- The example below uses CUDNN 8.8 and TensorRT 8.6
+- The example below uses CUDNN 8.9 and TensorRT 8.6
 - See <a href="https://github.com/pytorch/TensorRT#dependencies">dependencies</a> for a list of current default dependencies.
 
 > From root of Torch-TensorRT repo
 
 Build:
 ```
-DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=8.6 --build-arg CUDNN_VERSION=8.8 -f docker/Dockerfile -t torch_tensorrt:latest .
+DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=8.6 --build-arg CUDNN_VERSION=8.9 -f docker/Dockerfile -t torch_tensorrt:latest .
 ```
 
 Run:

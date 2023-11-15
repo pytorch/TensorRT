@@ -4,13 +4,12 @@ import re
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
-import tensorrt as trt
 import torch
 from torch import SymBool, SymFloat, SymInt
 from torch.fx.node import Argument, Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.converter_registry import (
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
     DynamoConverterImplSignature,
 )
@@ -20,6 +19,8 @@ from torch_tensorrt.fx.converters.converter_utils import (
     unified_dtype_converter,
 )
 from torch_tensorrt.fx.types import TRTDataType, TRTTensor
+
+import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -180,8 +181,7 @@ def cast_int_int_div_trt_tensor(
 
 
 def broadcastable(
-    a: TRTTensor,
-    b: TRTTensor,
+    a: Union[TRTTensor, np.ndarray], b: Union[TRTTensor, np.ndarray]
 ) -> bool:
     "Check if two tensors are broadcastable according to torch rules"
     a_shape = tuple(a.shape)

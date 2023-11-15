@@ -13,10 +13,7 @@ import torch._prims as prims
 import torchgen
 from torch._dynamo.variables import BuiltinVariable
 from torch._ops import OpOverload
-from torch_tensorrt.dynamo.conversion.converter_registry import (
-    DYNAMO_CONVERTERS,
-    ConverterRegistry,
-)
+from torch_tensorrt.dynamo.conversion import DYNAMO_CONVERTERS, ConverterRegistry
 from torch_tensorrt.dynamo.lowering import get_decompositions
 from torchgen.gen import parse_native_yaml
 
@@ -47,6 +44,10 @@ NATIVE_FUNCTION_YAML_PATH = (
 TAGS_YAML_PATH = (
     Path(os.path.dirname(torchgen.__file__)) / "packaged/ATen/native/tags.yaml"
 )
+
+DYNAMO_REGISTRY_NAME = "Dynamo ATen Converters Registry"
+FX_REGISTRY_NAME = "FX ATen Converters Registry"
+FX_LEGACY_REGISTRY_NAME = "FX Legacy ATen Converters Registry"
 
 
 def get_aten_ops() -> List[Tuple[str, str]]:
@@ -140,13 +141,25 @@ def opset_coverage(
             _, registry_data = c_registry.get_all_converters_with_target(
                 target, return_registry_info=True
             )
+
             if registry_data is not None:
-                if registry_data["Dynamo ATen Converters Registry"] >= 1:
+                if (
+                    DYNAMO_REGISTRY_NAME in registry_data
+                    and registry_data[DYNAMO_REGISTRY_NAME] >= 1
+                ):
                     status = SupportStatus.CONVERTED
                     support_count += 1
-                elif registry_data["FX ATen Converters Registry"] >= 1:
+                elif (
+                    FX_REGISTRY_NAME in registry_data
+                    and registry_data[FX_REGISTRY_NAME] >= 1
+                ) or (
+                    FX_LEGACY_REGISTRY_NAME in registry_data
+                    and registry_data[FX_LEGACY_REGISTRY_NAME] >= 1
+                ):
                     status = SupportStatus.LEGACY_CONVERTED
                     legacy_count += 1
+                else:
+                    raise Exception(f"Op belongs to unknown registry: {registry_data}")
 
                 support_status[target_str] = {
                     "schema": f"{target_str.split('.')[0]}.{opset_schemas[target_str]}",

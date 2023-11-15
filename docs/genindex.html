@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Index &mdash; Torch-TensorRT v2.2.0.dev0+4a920a1 documentation</title>
+  <title>Index &mdash; Torch-TensorRT v2.2.0.dev0+4da330d documentation</title>
   
 
   
@@ -88,7 +88,19 @@
           </li>
 
           <li>
-            <a href="https://pytorch.org/mobile">Mobile</a>
+          <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="resource-option with-down-arrow">
+                PyTorch Edge
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/edge">
+                  <span class="dropdown-title">About PyTorch Edge</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch">
+                  <span class="dropdown-title">ExecuTorch</span>
+                </a>
+              </div>
+            </div>  
           </li>
 
           <li>
@@ -222,7 +234,7 @@
               
               
                 <div class="version">
-                  v2.2.0.dev0+4a920a1
+                  v2.2.0.dev0+4da330d
                 </div>
               
             
@@ -253,23 +265,32 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="getting_started/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
-<li class="toctree-l1"><a class="reference internal" href="getting_started/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
 <li class="toctree-l1"><a class="reference internal" href="getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
 <li class="toctree-l1"><a class="reference internal" href="getting_started/getting_started_with_windows.html#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
 </ul>
+<p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="dynamo/torch_compile.html">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamo/dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">TorchScript Frontend</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="ts/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">FX Frontend</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="fx/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
+</ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/torch_compile.html">Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/using_dla.html">DLA</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
@@ -279,12 +300,14 @@
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="py_api/torch_tensorrt.html">torch_tensorrt</a></li>
 <li class="toctree-l1"><a class="reference internal" href="py_api/logging.html">torch_tensorrt.logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="py_api/ptq.html">torch_tensorrt.ptq</a></li>
+<li class="toctree-l1"><a class="reference internal" href="py_api/dynamo.html">torch_tensorrt.dynamo</a></li>
 <li class="toctree-l1"><a class="reference internal" href="py_api/ts.html">torch_tensorrt.ts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="py_api/fx.html">torch_tensorrt.fx</a></li>
 </ul>
@@ -303,8 +326,9 @@
 <p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="contributors/system_overview.html">System Overview</a></li>
-<li class="toctree-l1"><a class="reference internal" href="contributors/writing_converters.html">Writing Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributors/dynamo_converters.html">Writing Dynamo Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="contributors/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributors/ts_converters.html">Writing TorchScript Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Indices</span></p>
@@ -439,18 +463,20 @@
 </li>
       <li><a href="py_api/ts.html#torch_tensorrt.ts.check_method_op_support">check_method_op_support() (in module torch_tensorrt.ts)</a>
 </li>
-      <li><a href="user_guide/torch_compile.html#torch_tensorrt.dynamo.CompilationSettings">CompilationSettings (class in torch_tensorrt.dynamo)</a>
+      <li><a href="dynamo/torch_compile.html#torch_tensorrt.dynamo.CompilationSettings">CompilationSettings (class in torch_tensorrt.dynamo)</a>, <a href="py_api/dynamo.html#torch_tensorrt.dynamo.CompilationSettings">[1]</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.compile">compile() (in module torch_tensorrt)</a>
 
       <ul>
+        <li><a href="py_api/dynamo.html#torch_tensorrt.dynamo.compile">(in module torch_tensorrt.dynamo)</a>
+</li>
         <li><a href="py_api/fx.html#torch_tensorrt.fx.compile">(in module torch_tensorrt.fx)</a>
 </li>
         <li><a href="py_api/ts.html#torch_tensorrt.ts.compile">(in module torch_tensorrt.ts)</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.convert_method_to_trt_engine">convert_method_to_trt_engine() (in module torch_tensorrt)</a>
 
       <ul>
@@ -501,15 +527,17 @@
 </li>
       <li><a href="py_api/ptq.html#torch_tensorrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION">ENTROPY_CALIBRATION (torch_tensorrt.ptq.CalibrationAlgo attribute)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/ptq.html#torch_tensorrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2">ENTROPY_CALIBRATION_2 (torch_tensorrt.ptq.CalibrationAlgo attribute)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/logging.html#torch_tensorrt.logging.Level.Error">Error (torch_tensorrt.logging.Level attribute)</a>
 </li>
       <li><a href="py_api/logging.html#torch_tensorrt.logging.errors">errors (class in torch_tensorrt.logging)</a>
 </li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input.example_tensor">example_tensor() (torch_tensorrt.Input method)</a>
+</li>
+      <li><a href="py_api/dynamo.html#torch_tensorrt.dynamo.export">export() (in module torch_tensorrt.dynamo)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -601,7 +629,7 @@
       <ul>
         <li><a href="py_api/torch_tensorrt.html#module-torch_tensorrt">torch_tensorrt</a>
 </li>
-        <li><a href="user_guide/torch_compile.html#module-torch_tensorrt.dynamo">torch_tensorrt.dynamo</a>
+        <li><a href="dynamo/dynamo_export.html#module-torch_tensorrt.dynamo">torch_tensorrt.dynamo</a>, <a href="dynamo/torch_compile.html#module-torch_tensorrt.dynamo">[1]</a>, <a href="py_api/dynamo.html#module-torch_tensorrt.dynamo">[2]</a>, <a href="user_guide/saving_models.html#module-torch_tensorrt.dynamo">[3]</a>
 </li>
         <li><a href="py_api/fx.html#module-torch_tensorrt.fx">torch_tensorrt.fx</a>
 </li>
@@ -656,13 +684,15 @@
 </li>
       <li><a href="py_api/logging.html#torch_tensorrt.logging.set_logging_prefix">set_logging_prefix() (in module torch_tensorrt.logging)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/logging.html#torch_tensorrt.logging.set_reportable_log_level">set_reportable_log_level() (in module torch_tensorrt.logging)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input.shape">shape (torch_tensorrt.Input attribute)</a>
 </li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input.shape_mode">shape_mode (torch_tensorrt.Input attribute)</a>
+</li>
+      <li><a href="py_api/dynamo.html#torch_tensorrt.dynamo.SourceIR">SourceIR (class in torch_tensorrt.dynamo)</a>
 </li>
       <li><a href="_cpp_api/define_macros_8h_1a18d295a837ac71add5578860b55e5502.html#c.STR">STR (C macro)</a>
 </li>
@@ -687,7 +717,7 @@
     torch_tensorrt.dynamo
 
       <ul>
-        <li><a href="user_guide/torch_compile.html#module-torch_tensorrt.dynamo">module</a>
+        <li><a href="dynamo/dynamo_export.html#module-torch_tensorrt.dynamo">module</a>, <a href="dynamo/torch_compile.html#module-torch_tensorrt.dynamo">[1]</a>, <a href="py_api/dynamo.html#module-torch_tensorrt.dynamo">[2]</a>, <a href="user_guide/saving_models.html#module-torch_tensorrt.dynamo">[3]</a>
 </li>
       </ul></li>
       <li>
@@ -946,6 +976,8 @@
 </li>
       <li><a href="_cpp_api/define_macros_8h_1ad19939408f7be171a74a89928b36eb59.html#c.TORCHTRT_HIDDEN">TORCHTRT_HIDDEN (C macro)</a>
 </li>
+      <li><a href="py_api/dynamo.html#torch_tensorrt.dynamo.trace">trace() (in module torch_tensorrt.dynamo)</a>
+</li>
       <li><a href="py_api/fx.html#torch_tensorrt.fx.TRTInterpreter">TRTInterpreter (class in torch_tensorrt.fx)</a>
 </li>
       <li><a href="py_api/fx.html#torch_tensorrt.fx.TRTInterpreterResult">TRTInterpreterResult (class in torch_tensorrt.fx)</a>
@@ -1135,9 +1167,9 @@
         <div class="copyright">
         <p>© Copyright The Linux Foundation. The PyTorch Foundation is a project of The Linux Foundation.
           For web site terms of use, trademark policy and other policies applicable to The PyTorch Foundation please see
-          <a href="www.linuxfoundation.org/policies/">www.linuxfoundation.org/policies/</a>. The PyTorch Foundation supports the PyTorch open source
+          <a href="https://www.linuxfoundation.org/policies/">www.linuxfoundation.org/policies/</a>. The PyTorch Foundation supports the PyTorch open source
           project, which has been established as PyTorch Project a Series of LF Projects, LLC. For policies applicable to the PyTorch Project a Series of LF Projects, LLC,
-          please see <a href="www.lfprojects.org/policies/">www.lfprojects.org/policies/</a>.</p>
+          please see <a href="https://www.lfprojects.org/policies/">www.lfprojects.org/policies/</a>.</p>
       </div>
      </div>
 
@@ -1176,7 +1208,7 @@
           </li>
             
           <li>
-            <a href="https://pytorch.org/mobile">Mobile</a>
+            <a href="">Mobile</a>
           </li>
 
           <li>
