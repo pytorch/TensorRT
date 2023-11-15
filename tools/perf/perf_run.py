@@ -593,8 +593,10 @@ if __name__ == "__main__":
     # Generate report
     print("Model Summary: ", model_name)
     summary = pd.DataFrame(results)
-    summary["model_name"] = (
-        model_name_torch if model_name_torch is not None else model_name
+    summary.insert(
+        loc=0,
+        column="model_name",
+        value=(model_name_torch if model_name_torch is not None else model_name),
     )
     print(summary)
     if args.report:

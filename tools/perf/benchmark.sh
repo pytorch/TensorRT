@@ -134,7 +134,7 @@ do
                        --batch_size ${bs} \
                        --truncate \
                        --backends ${backend} \
-                       --report "bert_base_perf_bs${bs}_backend_${backend}.csv.csv"
+                       --report "bert_base_perf_bs${bs}_backend_${backend}.csv"
   done
 done
 
