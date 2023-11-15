@@ -578,23 +578,26 @@ if __name__ == "__main__":
             if model_torch is not None:
                 model_torch = model_torch.half()
 
-        status = run(
-            model,
-            backends,
-            input_tensors,
-            params,
-            precision,
-            batch_size,
-            is_trt_engine,
-            model_torch=model_torch,
-        )
+        with torch.no_grad():
+            status = run(
+                model,
+                backends,
+                input_tensors,
+                params,
+                precision,
+                batch_size,
+                is_trt_engine,
+                model_torch=model_torch,
+            )
 
     # Generate report
     print("Model Summary: ", model_name)
     summary = pd.DataFrame(results)
+    summary.insert(
+        loc=0,
+        column="model_name",
+        value=(model_name_torch if model_name_torch is not None else model_name),
+    )
     print(summary)
     if args.report:
-        with open(args.report, "w") as file:
-            file.write("Model Summary: " + model_name + "\n")
-            file.write(summary.to_string())
-        file.close()
+        summary.to_csv(args.report)
