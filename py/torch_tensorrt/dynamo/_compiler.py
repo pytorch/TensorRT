@@ -41,6 +41,7 @@ from torch_tensorrt.dynamo._DryRunTracker import (
     DryRunTracker,
     PerSubgraphData,
     dryrun_stats_display,
+    parse_non_trt_nodes,
 )
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
@@ -319,6 +320,10 @@ def compile_module(
 
     dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
 
+    # The global partitioner leaves non-TRT nodes as-is
+    if not settings.use_fast_partitioner:
+        dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(partitioned_module))
+
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
     # Iterate over all components that can be accelerated
@@ -327,6 +332,7 @@ def compile_module(
         submodule = getattr(partitioned_module, name)
         # Criteria for a module to be convertible to TRT
         if settings.use_fast_partitioner and "_run_on_acc" not in name:
+            dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(submodule))
             continue
 
         subgraph_data = PerSubgraphData()

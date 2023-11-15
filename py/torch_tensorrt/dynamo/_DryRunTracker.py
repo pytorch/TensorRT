@@ -1,9 +1,14 @@
 import logging
 import math
+import operator
+import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
+import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterRegistry
+from torch_tensorrt.dynamo.conversion.converter_utils import get_node_name
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +49,7 @@ class DryRunTracker:
         tensorrt_graph_count (int): Number of TensorRT engines to be generated
         compilation_settings (CompilationSettings): User Compilation Settings
         unsupported_ops (Dict[str, int]): Set of operators not supported in TRT
+        to_run_in_torch (List[str]): Set of nodes to run in Torch
     """
 
     total_ops_in_graph: int = 0
@@ -58,9 +64,12 @@ class DryRunTracker:
         default_factory=CompilationSettings
     )
     unsupported_ops: Dict[str, int] = field(default_factory=dict)
+    to_run_in_torch: List[str] = field(default_factory=list)
 
 
-def dryrun_stats_display(dryrun_tracker: DryRunTracker, dryrun_enabled: bool) -> None:
+def dryrun_stats_display(
+    dryrun_tracker: DryRunTracker, dryrun_enabled: Union[bool, str]
+) -> None:
     """Displays statistics about the dryrun either to debug logs or stdout"""
     formatted_stats = "\n"
 
@@ -71,7 +80,19 @@ def dryrun_stats_display(dryrun_tracker: DryRunTracker, dryrun_enabled: bool) ->
         f"of which {dryrun_tracker.supported_ops_in_graph} operators are supported, "
         f"{round(dryrun_tracker.supported_ops_in_graph*100/dryrun_tracker.total_ops_in_graph, 2)}% coverage\n\n"
     )
-    formatted_stats += f"The following ops are currently unsupported and set to run in Torch: {dryrun_tracker.unsupported_ops}\n\n"
+    if dryrun_tracker.unsupported_ops:
+        parsed_ops = "\n".join(
+            [f"{str(k)}: {str(v)}" for k, v in dryrun_tracker.unsupported_ops.items()]
+        )
+        formatted_stats += f"The following ops are currently unsupported or excluded from conversion, and are listed with their op-count in the graph:\n {parsed_ops}\n\n"
+
+    if dryrun_tracker.to_run_in_torch:
+        formatted_nodes = "\n".join(dryrun_tracker.to_run_in_torch)
+        formatted_stats += (
+            f"The following nodes are currently set to run in Torch:\n{formatted_nodes}\n"
+            "Note: Some of the above nodes may be supported, but were not included in a TRT graph by the partitioner\n\n"
+        )
+
     formatted_stats += f"Compiled with: {dryrun_tracker.compilation_settings}\n\n"
 
     assert len(dryrun_tracker.per_subgraph_data) == dryrun_tracker.tensorrt_graph_count
@@ -184,8 +205,17 @@ def dryrun_stats_display(dryrun_tracker: DryRunTracker, dryrun_enabled: bool) ->
         )
 
     # If user specified "dryrun=True", print to stdout, else debug
+    # If user specified a filepath, save the output to the path as well
     if dryrun_enabled:
         print(formatted_stats)
+        if isinstance(dryrun_enabled, str):
+            if os.path.exists(dryrun_enabled):
+                logger.warning(
+                    f"File already exists at path {dryrun_enabled}, not saving dryrun output"
+                )
+            else:
+                with open(dryrun_enabled, "w+") as f:
+                    f.write(formatted_stats)
     else:
         logger.debug(formatted_stats)
 
@@ -225,3 +255,23 @@ def input_formatter(shapes: Any, dtypes: Any) -> str:
             )
 
     return input_formatter_helper(shapes, dtypes)[:-2]
+
+
+def parse_non_trt_nodes(graph_module: torch.fx.GraphModule) -> List[str]:
+    """Parses call_function and call_method nodes from a GraphModule
+    Excludes getitem nodes
+
+    Returns a string representation of the nodes
+    """
+    to_run_in_torch = []
+    for node in graph_module.graph.nodes:
+        # getitem nodes are excluded since they are a Tensor-collection op
+        if (
+            node.op in ("call_function", "call_method")
+            and node.target != operator.getitem
+        ):
+            to_run_in_torch.append(
+                f"Node: {ConverterRegistry.qualified_name_or_str(node.target)}, "
+                f"with layer location: {get_node_name(node)}"
+            )
+    return to_run_in_torch
