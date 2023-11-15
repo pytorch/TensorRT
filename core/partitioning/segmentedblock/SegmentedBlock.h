@@ -94,8 +94,15 @@ struct SegmentedBlock {
   void register_intypes(std::vector<at::ScalarType>& in_types) {
     in_types_ = in_types;
   }
+  void register_outtypes(std::vector<at::ScalarType>& out_types) {
+    out_types_ = out_types;
+  }
+
   const std::vector<at::ScalarType>& in_types() const {
     return in_types_;
+  }
+  std::vector<at::ScalarType> out_types() const {
+    return out_types_;
   }
 
   BlockID get_id() {
@@ -128,6 +135,7 @@ struct SegmentedBlock {
   std::vector<std::vector<int64_t>> opt_shapes_;
   std::vector<std::vector<int64_t>> max_shapes_;
   std::vector<at::ScalarType> in_types_;
+  std::vector<at::ScalarType> out_types_;
   std::vector<torch::jit::Value*> inputs_;
   std::vector<torch::jit::Value*> outputs_;
   std::vector<torch::jit::Node*> nodes_;

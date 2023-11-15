@@ -211,7 +211,11 @@ void AddInputs(ConversionCtx* ctx, c10::ArrayRef<const torch::jit::Value*> input
 #endif
 }
 
-void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outputs) {
+void MarkOutputs(
+    ConversionCtx* ctx,
+    at::ArrayRef<const torch::jit::Value*> outputs,
+    const std::vector<at::ScalarType>& out_types) {
+  size_t out_idx = 0;
   for (auto out : outputs) {
     auto it = ctx->value_tensor_map.find(out);
     if (it == ctx->value_tensor_map.end()) {
@@ -265,6 +269,7 @@ void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outp
       }
 
       if (!setOutput) {
+        out_tensor->setType(util::ScalarTypeToTRTDataType(out_types[out_idx++]));
         out_tensor->setName(name.c_str());
         ctx->net->markOutput(*out_tensor);
       }
@@ -487,7 +492,7 @@ void ConvertBlockToNetDef(
   }
 
   auto outputs = b->outputs();
-  MarkOutputs(ctx, outputs);
+  MarkOutputs(ctx, outputs, build_info.out_types);
 }
 
 // Converts a already lowered block (blocks with no sub blocks) to

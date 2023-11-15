@@ -167,6 +167,7 @@ partitioning::GraphAndMapping BuildHybridGraph(
         auto inputs = seg_block.construct_inputs_spec();
         // update the input ranges for each segments
         convert_info.inputs = ir::associate_specs_with_inputs(seg_block.g(), inputs, static_params);
+        convert_info.out_types = seg_block.out_types();
 
         // TODO mapping Inputs Ivalue to flatten one here
         auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_info, static_params);
