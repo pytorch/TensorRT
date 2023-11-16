@@ -7,28 +7,20 @@ import tensorrt as trt
 import torch
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.conversion._TRTInterpreter import TRTInterpreter
+from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
+    TRTInterpreter,
+    TRTInterpreterResult,
+)
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import get_torch_inputs
 
 
-def convert_module(
+def interpret_module(
     module: torch.fx.GraphModule,
     inputs: Sequence[Input],
     settings: CompilationSettings = CompilationSettings(),
     name: str = "",
-) -> PythonTorchTensorRTModule | TorchTensorRTModule:
-    """Convert an FX module to a TRT module
-    Args:
-        module: FX GraphModule to convert
-        inputs: Sequence of Tensors representing inputs to the module
-        settings: Compilation settings
-        name: TRT engine name
-    Returns:
-        _PythonTorchTensorRTModule or TorchTensorRTModule
-    """
-    # Specify module output data types to ensure TRT output types agree with
-    # that of the equivalent Torch module
+) -> TRTInterpreterResult:
     torch_inputs = get_torch_inputs(inputs, settings.device)
     module_outputs = module(*torch_inputs)
 

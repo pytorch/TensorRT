@@ -4,7 +4,6 @@ import collections.abc
 import logging
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
 
-import tensorrt as trt
 import torch
 from torch.export import ExportedProgram
 from torch.fx.node import Target
@@ -49,7 +48,9 @@ from torch_tensorrt.dynamo._DryRunTracker import (
 )
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
+    UnsupportedOperatorException,
     convert_module,
+    interpret_module,
     repair_long_or_double_inputs,
 )
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -447,51 +448,6 @@ def compile_module(
     return partitioned_module
 
 
-def interpreter(
-    module: torch.fx.GraphModule,
-    inputs: Sequence[Input],
-    settings: CompilationSettings = CompilationSettings(),
-    name: str = "",
-) -> TRTInterpreterResult:
-    torch_inputs = get_torch_inputs(inputs, settings.device)
-    module_outputs = module(*torch_inputs)
-
-    if not isinstance(module_outputs, (list, tuple)):
-        module_outputs = [module_outputs]
-
-    # Int64 outputs can sometimes be generated from within other operators
-    # such as aten.sum - such outputs can be truncated
-    output_dtypes = []
-    for output in module_outputs:
-        if settings.truncate_long_and_double and output.dtype == torch.float64:
-            output_dtypes.append(torch.float32)
-        elif settings.truncate_long_and_double and output.dtype == torch.int64:
-            output_dtypes.append(torch.int32)
-        else:
-            output_dtypes.append(output.dtype)
-
-    interpreter = TRTInterpreter(
-        module,
-        inputs,
-        logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
-        output_dtypes=output_dtypes,
-        compilation_settings=settings,
-    )
-    interpreter_result = interpreter.run(
-        workspace_size=settings.workspace_size,
-        precision=settings.precision,
-        profiling_verbosity=(
-            trt.ProfilingVerbosity.VERBOSE
-            if settings.debug
-            else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
-        ),
-        max_aux_streams=settings.max_aux_streams,
-        version_compatible=settings.version_compatible,
-        optimization_level=settings.optimization_level,
-    )
-    return interpreter_result
-
-
 def convert_method_to_trt_engine(
     module: torch.fx.GraphModule,
     method_name: str = "forward",
@@ -511,6 +467,9 @@ def convert_method_to_trt_engine(
     truncate_long_and_double: int = False,
     calibrator: object = None,
     allow_shape_tensors: bool = False,
+    max_aux_streams: Optional[int] = MAX_AUX_STREAMS,
+    version_compatible: bool = VERSION_COMPATIBLE,
+    optimization_level: Optional[int] = OPTIMIZATION_LEVEL,
 ) -> bytes:
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
@@ -548,15 +507,20 @@ def convert_method_to_trt_engine(
         "device": device,
         "workspace_size": workspace_size,
         "truncate_long_and_double": truncate_long_and_double,
-        "max_aux_streams": MAX_AUX_STREAMS,
-        "version_compatible": VERSION_COMPATIBLE,
-        "optimization_level": OPTIMIZATION_LEVEL,
+        "max_aux_streams": max_aux_streams,
+        "version_compatible": version_compatible,
+        "optimization_level": optimization_level,
     }
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-    interpreter_result = interpreter(module, input_list, settings, method_name)
-
+    try:
+        interpreter_result = interpret_module(module, input_list, settings, method_name)
+    except UnsupportedOperatorException:
+        logger.error(
+            f"Conversion of module {module} not currently fully supported or convertible!",
+            exc_info=True,
+        )
     import io
 
     with io.BytesIO() as engine_bytes:
