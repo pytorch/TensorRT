@@ -70,6 +70,10 @@ def trace(
     dynamic_shapes = {}
     for input in inputs:
         if input.shape_mode == Input._ShapeMode.DYNAMIC:
+            if not input.name:
+                raise AssertionError(
+                    f"Expected a name for a dynamic input with shape {input.shape} but found none"
+                )
             min_shape = input.shape["min_shape"]
             opt_shape = input.shape["opt_shape"]
             max_shape = input.shape["max_shape"]
