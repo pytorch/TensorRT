@@ -58,8 +58,8 @@ def convert_binary_elementwise(
     source_ir: Optional[SourceIR],
     name: str,
     op_type: trt.ElementWiseOperation,
-    lhs_val: Union[int, float, TRTTensor, torch.Tensor],
-    rhs_val: Union[int, float, TRTTensor, torch.Tensor],
+    lhs_val: Union[int, float, bool, TRTTensor, torch.Tensor],
+    rhs_val: Union[int, float, bool, TRTTensor, torch.Tensor],
 ) -> TRTTensor:
     """
     This function adds a TensorRT elementwise layer. We allow both operands to be
