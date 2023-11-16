@@ -2,7 +2,6 @@ import logging
 from typing import Any, Dict, Optional, Sequence, Set, Tuple
 
 import torch
-from torch.fx.passes.fake_tensor_prop import FakeTensorProp
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import DEBUG
 from torch_tensorrt.dynamo.utils import get_torch_inputs, input_is_dynamic
@@ -10,13 +9,78 @@ from torch_tensorrt.dynamo.utils import get_torch_inputs, input_is_dynamic
 logger = logging.getLogger(__name__)
 
 
-def fake_tensor_prop(
-    gm: torch.fx.GraphModule, inputs: Sequence[Input], device: torch.device
-) -> None:
-    torch_inputs = get_torch_inputs(inputs, device)
-    # Propagate fake tensors and generates metadata (shape, dtype) for the nodes in the graph
-    fake_mode = torch._subclasses.FakeTensorMode(allow_non_fake_inputs=True)
-    FakeTensorProp(gm, mode=fake_mode).propagate(*torch_inputs)
+def contains_sym_int(tensor: torch.Tensor) -> bool:
+    """
+    Returns true if the given tensor has symbolic shape.
+    """
+    for dim in tensor:
+        if isinstance(dim, torch.SymInt):
+            return True
+    return False
+
+
+def construct_dynamic_input(input: Any) -> Input:
+    """
+    Constructs a torch_tensorrt.Input based on a symbolic input
+    Args:
+        input: A symbolic shape tensor (which can have a  mix of SymInt nodes and static values)
+    Returns:
+        A dynamic shaped torch_tensorrt.Input which has the properties of the symbolic shaped input.
+    """
+    input_sym_shape = input.size()
+    min_shape = []
+    opt_shape = []
+    max_shape = []
+    for dim in input_sym_shape:
+        if isinstance(dim, torch.SymInt):
+            node = dim.node
+            expr = node.expr
+            shape_env = node.shape_env
+            var_range = shape_env.var_to_range.get(expr, None)
+            var_val = shape_env.var_to_val.get(expr, None)
+            assert var_range, var_val
+            # Torchdynamo 0/1 specialization outlier
+            if var_range.lower == 2:
+                min_shape.append(1)
+            else:
+                min_shape.append(var_range.lower)
+            opt_shape.append(var_val)
+            max_shape.append(var_range.upper)
+        else:
+            min_shape.append(dim)
+            opt_shape.append(dim)
+            max_shape.append(dim)
+
+    return Input(
+        min_shape=min_shape, opt_shape=opt_shape, max_shape=max_shape, dtype=input.dtype
+    )
+
+
+def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
+    """
+    Construct torch_tensorrt Inputs based on the module inputs.
+    The module inputs will have meta data which has the shape and dtype info
+    Args:
+        module: Input FX GraphModule
+    Returns:
+        Sequence of torch_tensorrt.Input's representing inputs to given module
+    """
+    torchtrt_inputs = []
+    module_inputs = [node for node in module.graph.nodes if node.op == "placeholder"]
+    for input in module_inputs:
+        if input.meta and "val" in input.meta:
+            input_meta = input.meta["val"]
+            input_shape = input_meta.size()
+            if contains_sym_int(input_shape):
+                torchtrt_inputs.append(construct_dynamic_input(input_meta))
+            else:
+                torchtrt_inputs.append(Input(shape=input_shape, dtype=input_meta.dtype))
+        else:
+            raise AssertionError(
+                f"Input {input.name} does not contain metadata. Please ensure you have exported the graph correctly"
+            )
+
+    return torchtrt_inputs
 
 
 def run_shape_analysis(

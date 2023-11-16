@@ -69,7 +69,7 @@ def trace(
     torch_inputs = get_torch_inputs(inputs, device)
     dynamic_shapes = {}
     for input in inputs:
-        if input.shape_mode == Input._ShapeMode.DYNAMIC:
+        if isinstance(input, Input) and input.shape_mode == Input._ShapeMode.DYNAMIC:
             min_shape = input.shape["min_shape"]
             opt_shape = input.shape["opt_shape"]
             max_shape = input.shape["max_shape"]

@@ -3,14 +3,13 @@ from __future__ import annotations
 import io
 from typing import Sequence
 
+import tensorrt as trt
 import torch
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._TRTInterpreter import TRTInterpreter
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import get_torch_inputs
-
-import tensorrt as trt
 
 
 def convert_module(
@@ -40,6 +39,12 @@ def convert_module(
     # such as aten.sum - such outputs can be truncated
     output_dtypes = []
     for output in module_outputs:
+        if not isinstance(output, torch.Tensor):
+            output = torch.tensor(output)
+            if isinstance(output, int):
+                output = output.to(torch.int32)
+            elif isinstance(output, float):
+                output = output.to(torch.float32)
         if settings.truncate_long_and_double and output.dtype == torch.float64:
             output_dtypes.append(torch.float32)
         elif settings.truncate_long_and_double and output.dtype == torch.int64:

@@ -28,9 +28,10 @@ def reshape(
             else:
                 a = get_trt_tensor(ctx, s, f"{name}_{i}")
                 trt_shape.append(a)
-    shape_layer = ctx.net.add_concatenation(inputs=trt_shape)
-    shape_layer.axis = 0
-    shape_layer.name = f"{name}_output_shape"
-    layer.set_input(1, shape_layer.get_output(0))
+        shape_layer = ctx.net.add_concatenation(inputs=trt_shape)
+        shape_layer.axis = 0
+        shape_layer.name = f"{name}_output_shape"
+        layer.set_input(1, shape_layer.get_output(0))
+
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)

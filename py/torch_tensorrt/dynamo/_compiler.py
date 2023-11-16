@@ -148,10 +148,10 @@ def compile(
 
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
-
     # Apply lowering on the graph module
     torch_inputs = get_torch_inputs(inputs, device)
     gm = apply_lowering_passes(gm, torch_inputs)
+
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     enabled_precisions = set(enabled_precisions)
@@ -263,10 +263,6 @@ def compile_module(
             min_block_size=settings.min_block_size,
             torch_executed_ops=settings.torch_executed_ops,
         )
-    # Run symbolic shape analysis
-    partitioning.fake_tensor_prop(
-        partitioned_module, sample_inputs, to_torch_device(settings.device)
-    )
 
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
@@ -279,12 +275,7 @@ def compile_module(
             continue
 
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
-        submodule_inputs = partitioning.get_submod_inputs(
-            partitioned_module,
-            submodule,
-            sample_inputs,
-            to_torch_device(settings.device),
-        )
+        submodule_inputs = partitioning.construct_submodule_inputs(submodule)
 
         logger.debug(
             "Submodule name: %s\n Input shapes: %s\n %s",
