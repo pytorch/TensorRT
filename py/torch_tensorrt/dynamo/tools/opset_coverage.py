@@ -141,7 +141,7 @@ def opset_coverage(
                 if registry_data["Dynamo ATen Converters Registry"] >= 1:
                     status = SupportStatus.CONVERTED
                     support_count += 1
-                elif registry_data["FX ATen Converters Registry"] >= 1:
+                elif registry_data["FX Legacy ATen Converters Registry"] >= 1:
                     status = SupportStatus.LEGACY_CONVERTED
                     legacy_count += 1
 
