@@ -12,7 +12,7 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreterResult,
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
-from torch_tensorrt.dynamo.utils import get_torch_inputs
+from torch_tensorrt.dynamo.utils import get_torch_inputs, to_torch_device
 
 
 def interpret_module(
@@ -22,6 +22,7 @@ def interpret_module(
     name: str = "",
 ) -> TRTInterpreterResult:
     torch_inputs = get_torch_inputs(inputs, settings.device)
+    module.to(to_torch_device(settings.device))
     module_outputs = module(*torch_inputs)
 
     if not isinstance(module_outputs, (list, tuple)):

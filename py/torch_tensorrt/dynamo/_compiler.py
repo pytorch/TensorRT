@@ -521,6 +521,12 @@ def convert_method_to_trt_engine(
             f"Conversion of module {module} not currently fully supported or convertible!",
             exc_info=True,
         )
+    except Exception as e:
+        logger.error(
+            f"While interpreting the module got an error: {e}",
+            exc_info=True,
+        )
+
     import io
 
     with io.BytesIO() as engine_bytes:
