@@ -183,7 +183,7 @@ def aten_ops_native_group_norm(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.gather)
+@dynamo_tensorrt_converter(torch.ops.aten.gather.default)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
