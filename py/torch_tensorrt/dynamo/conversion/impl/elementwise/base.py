@@ -120,11 +120,11 @@ def convert_binary_elementwise(
     # Note that the dtype here is supposed to be the same as the scalar
     # dtype but we don't have a way to detect whether it makes sense for the
     # scalar to be float or half. Hence we go with the lhs dtype.
-    if is_lhs_trt_tensor and isinstance(rhs_val, (float, int)):
+    if is_lhs_trt_tensor and isinstance(rhs_val, (float, int, bool)):
         rhs_val = np.array(
             [rhs_val], dtype=unified_dtype_converter(lhs_dtype, Frameworks.NUMPY)
         )
-    if is_rhs_trt_tensor and isinstance(lhs_val, (float, int)):
+    if is_rhs_trt_tensor and isinstance(lhs_val, (float, int, bool)):
         lhs_val = np.array(
             [lhs_val], dtype=unified_dtype_converter(rhs_dtype, Frameworks.NUMPY)
         )
