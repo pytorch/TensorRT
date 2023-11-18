@@ -228,7 +228,10 @@ def create_trt_exp_program(
     and constructs an Exported Program object with the new IO node names and state_dict
     """
     input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]
-    output_nodes = [node for node in gm.graph.nodes if node.op == "output"]
+    # output_nodes = [node for node in gm.graph.nodes if node.op == "output"]
+    # graph = [placeholder, conv1, relu, trt_node, getitem, output]
+    # output_nodes[0].args[0]
+    output_nodes = list(gm.graph.nodes)[-1].args[0]
 
     input_specs = [
         InputSpec(InputKind.USER_INPUT, TensorArgument(name=node.name), node.target)
@@ -292,6 +295,13 @@ def inline_trt_modules(
             # Insert getitem nodes as outputs (for export serialization to work)
             with gm.graph.inserting_after(trt_node):
                 getitem_output = gm.graph.call_function(operator.getitem, (trt_node, 0))
+                getitem_output.meta["val"] = cast(
+                    FakeTensor,
+                    torch.empty_strided(
+                        tuple(outputs_map[trt_module_node.name][idx]),
+                        tuple([1] * len(outputs_map[trt_module_node.name][idx])),
+                    ),
+                )
             trt_module_node.replace_all_uses_with(getitem_output)
         else:
             # Multiple outputs case:
