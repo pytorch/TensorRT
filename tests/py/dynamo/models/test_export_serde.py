@@ -234,7 +234,6 @@ def test_hybrid_relu_fallback(ir):
         )
 
 
-# TODO (peri044) : Enable this test once the _frozen_param0 attribute resulting in sym_int ops issue is fixed.
 @pytest.mark.unit
 def test_resnet18_save_load(ir):
     """
