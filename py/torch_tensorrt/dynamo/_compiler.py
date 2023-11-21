@@ -40,7 +40,6 @@ from torch_tensorrt.dynamo.utils import (
     prepare_inputs,
     set_log_level,
     to_torch_device,
-    to_torch_tensorrt_device,
 )
 
 logger = logging.getLogger(__name__)
@@ -144,7 +143,7 @@ def compile(
 
     # Prepare torch_trt inputs
     inputs = prepare_inputs(inputs)
-    device = to_torch_tensorrt_device(device)
+    device = to_torch_device(device)
 
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
@@ -233,6 +232,21 @@ def compile_module(
         logger.debug(
             f"Detected support for {num_supported_ops} operators out of {total_ops} in subgraph."
         )
+
+    def contains_metadata(gm: torch.fx.GraphModule) -> bool:
+        for node in gm.graph.nodes:
+            if (not node.meta) or "val" not in node.meta and node.op != "output":
+                return False
+        return True
+
+    # Check if the module has metadata (shape, dtype). If not, run symbolic shape propagation.
+    if not contains_metadata(gm):
+        from torch._inductor.compile_fx import fake_tensor_prop
+
+        torch_inputs = get_torch_inputs(sample_inputs, settings.device)
+        with torch.no_grad():
+            # This fails if the module has data-dependent shape operators.
+            fake_tensor_prop(gm, torch_inputs)
 
     # Partition module into components that can be TRT-accelerated
     fast_partitioner_failed = False
