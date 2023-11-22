@@ -74,3 +74,62 @@ def constant_padNd(
             input = output
 
         return output
+
+
+def reflection_padNd(
+    ctx: ConversionContext,
+    target: Union[Target, str],
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    padding: Sequence[int],
+) -> TRTTensor:
+    if has_dynamic_shape(input.shape):
+        assert input.shape[1] != -1, "Channel dim can't be dynamic for padding."
+
+    padding_dims = len(padding) // 2
+
+    if padding_dims == 1 or padding_dims == 2 or padding_dims == 3:
+        for i in range(padding_dims):
+            dim = -1 - i
+            pre_pad, post_pad = padding[2 * i], padding[2 * i + 1]
+            pre_pad_tensor = impl.slice.slice_op(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_slice_pre{i}",
+                input,
+                dim=dim,
+                start=pre_pad,
+                stop=0,
+                step=-1,
+            )
+
+            post_pad_tensor = impl.slice.slice_op(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_slice_post{i}",
+                input,
+                dim=dim,
+                start=input.shape[dim] - 2,
+                stop=input.shape[dim] - post_pad - 2,
+                step=-1,
+            )
+
+            output = impl.cat.cat(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_concat_dim{dim}",
+                input=(pre_pad_tensor, input, post_pad_tensor),
+                dim=dim,
+            )
+            input = output
+
+        return output
+
+    else:
+        raise RuntimeError(
+            f"We currently only support for padding 1D, 2D, and 3D, but got {padding_dims}D"
+        )

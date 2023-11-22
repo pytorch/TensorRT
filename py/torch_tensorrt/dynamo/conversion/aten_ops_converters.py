@@ -2078,3 +2078,28 @@ def aten_ops_constant_pad(
         args[1],
         args_bounds_check(args, 2, 0),
     )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.reflection_pad1d.default)
+@dynamo_tensorrt_converter(torch.ops.aten.reflection_pad2d.default)
+@dynamo_tensorrt_converter(torch.ops.aten.reflection_pad3d.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_reflection_pad(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.pad.reflection_padNd(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
