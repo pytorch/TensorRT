@@ -2103,3 +2103,28 @@ def aten_ops_reflection_pad(
         args[0],
         args[1],
     )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.replication_pad1d.default)
+@dynamo_tensorrt_converter(torch.ops.aten.replication_pad2d.default)
+@dynamo_tensorrt_converter(torch.ops.aten.replication_pad3d.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_replication_pad(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.pad.replication_padNd(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )

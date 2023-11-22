@@ -133,3 +133,80 @@ def reflection_padNd(
         raise RuntimeError(
             f"We currently only support for padding 1D, 2D, and 3D, but got {padding_dims}D"
         )
+
+
+def replication_padNd(
+    ctx: ConversionContext,
+    target: Union[Target, str],
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    padding: Sequence[int],
+) -> TRTTensor:
+    if has_dynamic_shape(input.shape):
+        assert input.shape[1] != -1, "Channel dim can't be dynamic for padding."
+
+    padding_dims = len(padding) // 2
+
+    if padding_dims == 1 or padding_dims == 2 or padding_dims == 3:
+        for i in range(padding_dims):
+            dim = -1 - i
+            pre_pad, post_pad = padding[2 * i], padding[2 * i + 1]
+            pre_pad_tensor = impl.slice.slice_op(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_slice_pre{i}",
+                input,
+                dim=dim,
+                start=0,
+                stop=1,
+                step=1,
+            )
+            new_shape = input.shape
+            new_shape[dim] = pre_pad
+            pre_pad_tensor = impl.slice.expand(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_expand_pre{i}",
+                pre_pad_tensor,
+                new_shape,
+            )
+
+            post_pad_tensor = impl.slice.slice_op(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_slice_post{i}",
+                input,
+                dim=dim,
+                start=input.shape[dim] - 1,
+                stop=input.shape[dim],
+                step=1,
+            )
+            new_shape[dim] = post_pad
+            post_pad_tensor = impl.slice.expand(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_expand_post{i}",
+                post_pad_tensor,
+                new_shape,
+            )
+            output = impl.cat.cat(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_concat_dim{dim}",
+                input=(pre_pad_tensor, input, post_pad_tensor),
+                dim=dim,
+            )
+            input = output
+
+        return output
+
+    else:
+        raise RuntimeError(
+            f"We currently only support for padding 1D, 2D, and 3D, but got {padding_dims}D"
+        )
