@@ -154,5 +154,67 @@ class TestReplicationPadConverter(DispatchTestCase):
         )
 
 
+class TestCircularPadConverter(DispatchTestCase):
+    @parameterized.expand(
+        [
+            # Per pytorch doc, the input should be 2D or 3D
+            ((3, 3), (1, 1)),
+            ((3, 3), (2, 2)),
+            ((2, 2, 2), (1, 1)),
+            ((2, 2, 4), (2, 3)),
+        ]
+    )
+    def test_circular_pad1d(self, shape, pad):
+        class TestModule(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten._pad_circular.default(input, pad)
+
+        input = [torch.randn(shape)]
+        self.run_test(
+            TestModule(),
+            input,
+        )
+
+    @parameterized.expand(
+        [
+            # Per pytorch doc, the input should be 3D or 4D
+            ((2, 2, 2), (1, 1, 1, 1)),
+            ((1, 2, 4), (2, 2, 1, 1)),
+            ((2, 2, 3, 3), (1, 1, 2, 2)),
+            ((2, 3, 4, 5), (4, 3, 0, 1)),
+        ]
+    )
+    def test_circular_pad2d(self, shape, pad):
+        class TestModule(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten._pad_circular.default(input, pad)
+
+        input = [torch.randn(shape)]
+        self.run_test(
+            TestModule(),
+            input,
+        )
+
+    @parameterized.expand(
+        [
+            # Per pytorch doc, the input should be 4D or 5D
+            ((2, 2, 2, 2), (1, 1, 1, 1, 1, 1)),
+            ((1, 2, 3, 4), (3, 2, 2, 1, 1, 1)),
+            ((2, 2, 3, 3, 4), (3, 3, 2, 1, 1, 2)),
+            ((2, 3, 4, 5, 6), (4, 3, 2, 1, 1, 0)),
+        ]
+    )
+    def test_circular_pad3d(self, shape, pad):
+        class TestModule(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten._pad_circular.default(input, pad)
+
+        input = [torch.randn(shape)]
+        self.run_test(
+            TestModule(),
+            input,
+        )
+
+
 if __name__ == "__main__":
     run_tests()
