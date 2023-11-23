@@ -20,7 +20,7 @@ def constant_padNd(
     name: str,
     input: TRTTensor,
     pad: Sequence[int],
-    value: int = 0,
+    value: Union[int, float] = 0,
 ) -> TRTTensor:
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for padding."
@@ -268,4 +268,36 @@ def circular_padNd(
     else:
         raise RuntimeError(
             f"We currently only support for padding 1D, 2D, and 3D, but got {padding_dims}D"
+        )
+
+
+def pad(
+    ctx: ConversionContext,
+    target: Union[Target, str],
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    pad: Sequence[int],
+    mode: str = "constant",
+    value: Optional[float] = None,
+) -> TRTTensor:
+    if mode == "constant":
+        return constant_padNd(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_{mode}",
+            input,
+            pad,
+            value if value is not None else 0,
+        )
+    elif mode == "reflect":
+        return reflection_padNd(ctx, target, source_ir, f"{name}_{mode}", input, pad)
+    elif mode == "replicate":
+        return replication_padNd(ctx, target, source_ir, f"{name}_{mode}", input, pad)
+    elif mode == "circular":
+        return circular_padNd(ctx, target, source_ir, f"{name}_{mode}", input, pad)
+    else:
+        raise RuntimeError(
+            f'We currently only support for `mode` in ["constant", "reflect", "replicate", "circular"], but got {mode}'
         )

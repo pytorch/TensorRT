@@ -2151,3 +2151,28 @@ def aten_ops_circular_pad(
         args[0],
         args[1],
     )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.pad.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_pad(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.pad.pad(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        pad=args[1],
+        mode=args_bounds_check(args, 2, "constant"),
+        value=args_bounds_check(args, 3, None),
+    )

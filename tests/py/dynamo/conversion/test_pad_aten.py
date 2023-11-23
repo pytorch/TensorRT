@@ -216,5 +216,26 @@ class TestCircularPadConverter(DispatchTestCase):
         )
 
 
+class TestPadConverter(DispatchTestCase):
+    @parameterized.expand(
+        [
+            ((3, 3), (2, 2), "constant"),
+            ((2, 2, 4), (2, 3, 1, 0), "reflect"),
+            ((1, 2, 3, 4), (3, 2, 2, 1, 1, 1), "replicate"),
+            ((2, 3, 4, 5), (3, 2, 1, 0), "circular"),
+        ]
+    )
+    def test_pad(self, shape, pad, mode, value=None):
+        class TestModule(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.pad.default(input, pad, mode, value)
+
+        input = [torch.randn(shape)]
+        self.run_test(
+            TestModule(),
+            input,
+        )
+
+
 if __name__ == "__main__":
     run_tests()
