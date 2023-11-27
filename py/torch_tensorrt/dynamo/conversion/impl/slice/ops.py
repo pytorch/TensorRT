@@ -39,6 +39,10 @@ def slice_op(  # TODO: This should be slice not whatever is in base
     if stop is None:
         stop = input.shape[dim]
 
+    dim = get_positive_dim(dim, len(input.shape))
+    start = get_positive_dim(start, input.shape[dim])
+    stop = get_positive_dim(stop, input.shape[dim])
+
     if has_dynamic_shape(input.shape):
         # Check whether slice target dim is dynamic shape dim
         assert input.shape[dim] != -1, "Can't slice on dynamic shape dimension!"

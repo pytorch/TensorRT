@@ -1,13 +1,21 @@
-import copy
 from typing import Optional, Sequence, Union
 
-import torch
-import torch_tensorrt.dynamo.conversion.impl as impl
+import tensorrt as trt
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.fx.converters.converter_utils import has_dynamic_shape
+from torch_tensorrt.fx.converters.converter_utils import (
+    get_trt_tensor,
+    has_dynamic_shape,
+    set_layer_name,
+)
 from torch_tensorrt.fx.types import TRTTensor
+
+"""
+Note: IPaddingLayer is deprecated in TensorRT 8.2 and will be removed in TensorRT 10.0.
+Use ISliceLayer to pad the tensor, which supports new non-constant, reflects padding
+mode and clamp, and supports padding output with dynamic shape.
+"""
 
 
 def constant_padNd(
@@ -19,43 +27,36 @@ def constant_padNd(
     pad: Sequence[int],
     value: Union[int, float] = 0,
 ) -> TRTTensor:
-    """
-    Note: IPaddingLayer is deprecated in TensorRT 8.2 and will be removed in TensorRT 10.0.
-    Use ISliceLayer to pad the tensor, which supports new non-constant, reflects padding
-    mode and clamp, and supports padding output with dynamic shape.
-    """
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for padding."
 
-    # Implement constant padding via concat
-    curr_dim = len(input.shape) - 1
+    rank = len(input.shape)
 
-    for i in range(0, len(pad), 2):
-        input_shape = list(input.shape)
-
-        pre_pad = pad[i]
-        post_pad = pad[i + 1]
-        pre_pad_shape = copy.deepcopy(input_shape)
-        pre_pad_shape[curr_dim] = pre_pad
-        pre_pad_tensor = torch.full(pre_pad_shape, float(value))
-        if pre_pad == post_pad:
-            post_pad_tensor = pre_pad_tensor
-        else:
-            post_pad_shape = copy.deepcopy(input_shape)
-            post_pad_shape[curr_dim] = post_pad
-            post_pad_tensor = torch.full(post_pad_shape, float(value))
-        output = impl.cat.cat(
-            ctx,
-            target,
-            source_ir,
-            f"{name}_concat{curr_dim}",
-            input=(pre_pad_tensor, input, post_pad_tensor),
-            dim=curr_dim,
+    if len(pad) / 2 > rank:
+        raise RuntimeError(
+            f"Trying to pad last {len(pad) / 2} dimension but the input only has {rank} dimension."
         )
-        curr_dim -= 1
-        input = output
 
-    return output
+    start_list = [0] * len(input.shape)
+    new_shape = input.shape
+
+    for i in range(0, len(pad) // 2):
+        start_list[-i - 1] = -pad[i * 2]
+        new_shape[-i - 1] += pad[i * 2] + pad[i * 2 + 1]
+
+    stride_list = [1] * len(new_shape)
+    layer = ctx.net.add_slice(
+        input,
+        start=tuple(start_list),
+        shape=tuple(new_shape),
+        stride=tuple(stride_list),
+    )
+    value_const = get_trt_tensor(ctx.net, value, f"{name}_value", input.dtype)
+    layer.set_input(4, value_const)
+    layer.mode = trt.SliceMode.FILL
+
+    set_layer_name(layer, target, name, source_ir)
+    return layer.get_output(0)
 
 
 def reflection_padNd(
@@ -69,52 +70,31 @@ def reflection_padNd(
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for padding."
 
-    padding_dims = len(padding) // 2
+    rank = len(input.shape)
 
-    if padding_dims == 1 or padding_dims == 2 or padding_dims == 3:
-        for i in range(padding_dims):
-            dim = -1 - i
-            pre_pad, post_pad = padding[2 * i], padding[2 * i + 1]
-            pre_pad_tensor = impl.slice.slice_op(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_slice_pre{i}",
-                input,
-                dim=dim,
-                start=pre_pad,
-                stop=0,
-                step=-1,
-            )
-
-            post_pad_tensor = impl.slice.slice_op(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_slice_post{i}",
-                input,
-                dim=dim,
-                start=input.shape[dim] - 2,
-                stop=input.shape[dim] - post_pad - 2,
-                step=-1,
-            )
-
-            output = impl.cat.cat(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_concat_dim{dim}",
-                input=(pre_pad_tensor, input, post_pad_tensor),
-                dim=dim,
-            )
-            input = output
-
-        return output
-
-    else:
+    if len(padding) / 2 > rank:
         raise RuntimeError(
-            f"We currently only support for padding 1D, 2D, and 3D, but got {padding_dims}D"
+            f"Trying to pad last {len(padding) / 2} dimension but the input only has {rank} dimension."
         )
+
+    start_list = [0] * len(input.shape)
+    new_shape = input.shape
+
+    for i in range(0, len(padding) // 2):
+        start_list[-i - 1] = -padding[i * 2]
+        new_shape[-i - 1] += padding[i * 2] + padding[i * 2 + 1]
+
+    stride_list = [1] * len(new_shape)
+    layer = ctx.net.add_slice(
+        input,
+        start=tuple(start_list),
+        shape=tuple(new_shape),
+        stride=tuple(stride_list),
+    )
+    layer.mode = trt.SliceMode.REFLECT
+
+    set_layer_name(layer, target, name, source_ir)
+    return layer.get_output(0)
 
 
 def replication_padNd(
@@ -128,70 +108,31 @@ def replication_padNd(
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for padding."
 
-    padding_dims = len(padding) // 2
+    rank = len(input.shape)
 
-    if padding_dims == 1 or padding_dims == 2 or padding_dims == 3:
-        for i in range(padding_dims):
-            dim = -1 - i
-            pre_pad, post_pad = padding[2 * i], padding[2 * i + 1]
-            pre_pad_tensor = impl.slice.slice_op(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_slice_pre{i}",
-                input,
-                dim=dim,
-                start=0,
-                stop=1,
-                step=1,
-            )
-            new_shape = input.shape
-            new_shape[dim] = pre_pad
-            pre_pad_tensor = impl.slice.expand(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_expand_pre{i}",
-                pre_pad_tensor,
-                new_shape,
-            )
-
-            post_pad_tensor = impl.slice.slice_op(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_slice_post{i}",
-                input,
-                dim=dim,
-                start=input.shape[dim] - 1,
-                stop=input.shape[dim],
-                step=1,
-            )
-            new_shape[dim] = post_pad
-            post_pad_tensor = impl.slice.expand(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_expand_post{i}",
-                post_pad_tensor,
-                new_shape,
-            )
-            output = impl.cat.cat(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_concat_dim{dim}",
-                input=(pre_pad_tensor, input, post_pad_tensor),
-                dim=dim,
-            )
-            input = output
-
-        return output
-
-    else:
+    if len(padding) / 2 > rank:
         raise RuntimeError(
-            f"We currently only support for padding 1D, 2D, and 3D, but got {padding_dims}D"
+            f"Trying to pad last {len(padding) / 2} dimension but the input only has {rank} dimension."
         )
+
+    start_list = [0] * len(input.shape)
+    new_shape = input.shape
+
+    for i in range(0, len(padding) // 2):
+        start_list[-i - 1] = -padding[i * 2]
+        new_shape[-i - 1] += padding[i * 2] + padding[i * 2 + 1]
+
+    stride_list = [1] * len(new_shape)
+    layer = ctx.net.add_slice(
+        input,
+        start=tuple(start_list),
+        shape=tuple(new_shape),
+        stride=tuple(stride_list),
+    )
+    layer.mode = trt.SliceMode.CLAMP
+
+    set_layer_name(layer, target, name, source_ir)
+    return layer.get_output(0)
 
 
 def circular_padNd(
@@ -205,52 +146,31 @@ def circular_padNd(
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for padding."
 
-    padding_dims = len(pad) // 2
+    rank = len(input.shape)
 
-    if padding_dims == 1 or padding_dims == 2 or padding_dims == 3:
-        for i in range(padding_dims):
-            dim = -1 - i
-            pre_pad, post_pad = pad[2 * i], pad[2 * i + 1]
-            pre_pad_tensor = impl.slice.slice_op(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_slice_pre{i}",
-                input,
-                dim=dim,
-                start=input.shape[dim] - pre_pad,
-                stop=input.shape[dim],
-                step=1,
-            )
-
-            post_pad_tensor = impl.slice.slice_op(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_slice_post{i}",
-                input,
-                dim=dim,
-                start=0,
-                stop=post_pad,
-                step=1,
-            )
-
-            output = impl.cat.cat(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_concat_dim{dim}",
-                input=(pre_pad_tensor, input, post_pad_tensor),
-                dim=dim,
-            )
-            input = output
-
-        return output
-
-    else:
+    if len(pad) / 2 > rank:
         raise RuntimeError(
-            f"We currently only support for padding 1D, 2D, and 3D, but got {padding_dims}D"
+            f"Trying to pad last {len(pad) / 2} dimension but the input only has {rank} dimension."
         )
+
+    start_list = [0] * len(input.shape)
+    new_shape = input.shape
+
+    for i in range(0, len(pad) // 2):
+        start_list[-i - 1] = -pad[i * 2]
+        new_shape[-i - 1] += pad[i * 2] + pad[i * 2 + 1]
+
+    stride_list = [1] * len(new_shape)
+    layer = ctx.net.add_slice(
+        input,
+        start=tuple(start_list),
+        shape=tuple(new_shape),
+        stride=tuple(stride_list),
+    )
+    layer.mode = trt.SliceMode.WRAP
+
+    set_layer_name(layer, target, name, source_ir)
+    return layer.get_output(0)
 
 
 def pad(
