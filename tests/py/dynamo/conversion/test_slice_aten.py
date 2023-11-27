@@ -7,14 +7,16 @@ from torch_tensorrt import Input
 from .harness import DispatchTestCase
 
 
-class TestSelectConverter(DispatchTestCase):
+class TestSliceConverter(DispatchTestCase):
     @parameterized.expand(
         [
-            ("select_dim_start_stop_step", 0, 0, 7, 2),
-            ("select_dim_start_stop_step_offset", 1, 0, 7, 2),
-            ("select_dim_start_stop_step_exact", 1, 0, 10, 2),
-            ("select_dim_start_stop_step_negatives", -3, -2, -1, 1),
-            ("select_dim_start_stop_step_max_int", 2, 0, 2**63 - 1, 1),
+            ("slice_dim_start_stop_step", 0, 0, 7, 2),
+            ("slice_dim_start_stop_step_offset", 1, 0, 7, 2),
+            ("slice_dim_start_stop_step_exact", 1, 0, 10, 2),
+            ("slice_dim_start_stop_step_negatives", -3, -2, -1, 1),
+            ("slice_dim_start_stop_step_max_int", 2, 0, 2**63 - 1, 1),
+            ("slice_dim_start_stop_step_past_end", 2, 0, 2048, 1),
+            ("slice_dim_start_stop_step_none", 2, None, None, 1),
         ]
     )
     def test_slice(self, _, dim, start, stop, step):
@@ -32,12 +34,27 @@ class TestSelectConverter(DispatchTestCase):
             input,
         )
 
+    def test_slice_empty(self):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
 
-class TestSelectConverterDynamicShape(DispatchTestCase):
+            def forward(self, input):
+                out = torch.ops.aten.slice.Tensor(input)
+                return out
+
+        input = [torch.randn(10, 10, 3, 1)]
+        self.run_test(
+            TestModule(),
+            input,
+        )
+
+
+class TestSliceConverterDynamicShape(DispatchTestCase):
     @parameterized.expand(
         [
-            ("select_dim_start_stop_step", 1, 0, 7, 2),
-            ("select_dim_start_stop_step", 1, 0, 10, 2),
+            ("slice_dim_start_stop_step", 1, 0, 7, 2),
+            ("slice_dim_start_stop_step", 1, 0, 10, 2),
         ]
     )
     def test_slice(self, _, dim, start, stop, step):
