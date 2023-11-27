@@ -195,12 +195,12 @@ def compile(
 
     if (
         torch.float16 in enabled_precisions
-        or torch_tensorrt.dtype.half in enabled_precisions
+        or torch_tensorrt.dtype.float16 in enabled_precisions
     ):
         precision = torch.float16
     elif (
         torch.float32 in enabled_precisions
-        or torch_tensorrt.dtype.float in enabled_precisions
+        or torch_tensorrt.dtype.float32 in enabled_precisions
     ):
         precision = torch.float32
     elif len(enabled_precisions) == 0:

@@ -227,15 +227,15 @@ class Input(object):
     def _parse_dtype(dtype: Any) -> _enums.dtype:
         if isinstance(dtype, torch.dtype):
             if dtype == torch.long:
-                return _enums.dtype.long
+                return _enums.dtype.int64
             elif dtype == torch.int32:
                 return _enums.dtype.int32
             elif dtype == torch.half:
-                return _enums.dtype.half
+                return _enums.dtype.float16
             elif dtype == torch.float:
-                return _enums.dtype.float
+                return _enums.dtype.float32
             elif dtype == torch.float64:
-                return _enums.dtype.double
+                return _enums.dtype.float64
             elif dtype == torch.bool:
                 return _enums.dtype.bool
             else:
@@ -255,24 +255,24 @@ class Input(object):
 
     @staticmethod
     def _to_torch_dtype(dtype: _enums.dtype) -> torch.dtype:
-        if dtype == _enums.dtype.long:
+        if dtype == _enums.dtype.int64:
             return torch.long
         elif dtype == _enums.dtype.int32:
             return torch.int32
-        elif dtype == _enums.dtype.half:
+        elif dtype == _enums.dtype.float16:
             return torch.half
-        elif dtype == _enums.dtype.float:
+        elif dtype == _enums.dtype.float32:
             return torch.float
         elif dtype == _enums.dtype.bool:
             return torch.bool
-        elif dtype == _enums.dtype.double:
+        elif dtype == _enums.dtype.float64:
             return torch.float64
         else:
             # Default torch_dtype used in FX path
             return torch.float32
 
     def is_trt_dtype(self) -> bool:
-        return bool(self.dtype != _enums.dtype.long)
+        return bool(self.dtype != _enums.dtype.int64)
 
     @staticmethod
     def _parse_format(format: Any) -> _enums.TensorFormat:

@@ -1,7 +1,6 @@
 from typing import Any
 
 import torch
-from torch_tensorrt import _C
 from torch_tensorrt._version import __version__
 
 
@@ -16,7 +15,14 @@ def get_build_info() -> str:
     Returns:
         str: String containing the build information for torch_tensorrt distribution
     """
-    core_build_info = _C.get_build_info()
+    try:
+        from torch_tensorrt import _C
+
+        core_build_info = _C.get_build_info()
+    except:
+        core_build_info = ""
+        print("Unable to get _C build info, _C extensions unavailable")
+
     build_info = str(
         "Torch-TensorRT Version: "
         + str(__version__)
@@ -30,7 +36,12 @@ def get_build_info() -> str:
 
 
 def set_device(gpu_id: int) -> None:
-    _C.set_device(gpu_id)
+    try:
+        from torch_tensorrt import _C
+
+        _C.set_device(gpu_id)
+    except:
+        print("Unable to set_device, _C extensions unavailable")
 
 
 def sanitized_torch_version() -> Any:

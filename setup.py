@@ -46,6 +46,10 @@ def get_git_revision_short_hash() -> str:
     )
 
 
+def linux_path_to_windows(path: str) -> str:
+    return os.path.join(*path.split("/"))
+
+
 def get_base_version() -> str:
     root = get_root_dir()
     try:
@@ -76,7 +80,7 @@ def load_dep_info():
 
 load_dep_info()
 
-dir_path = str(get_root_dir()) + "/py"
+dir_path = linux_path_to_windows(str(get_root_dir()) + "/py")
 
 CXX11_ABI = False
 JETPACK_VERSION = None
@@ -213,10 +217,11 @@ def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=F
 
 
 def gen_version_file():
-    if not os.path.exists(dir_path + "/torch_tensorrt/_version.py"):
-        os.mknod(dir_path + "/torch_tensorrt/_version.py")
+    version_path = os.path.join(dir_path, "torch_tensorrt", "_version.py")
+    # if not os.path.exists(version_path):
+    #     os.mknod(version_path)
 
-    with open(dir_path + "/torch_tensorrt/_version.py", "w") as f:
+    with open(version_path, "w+") as f:
         print("creating version file")
         f.write('__version__ = "' + __version__ + '"\n')
         f.write('__cuda_version__ = "' + __cuda_version__ + '"\n')
@@ -328,22 +333,22 @@ class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
 
     PY_CLEAN_DIRS = [
-        "./build",
-        "./dist",
-        "./torch_tensorrt/__pycache__",
-        "./torch_tensorrt/lib",
-        "./torch_tensorrt/include",
-        "./torch_tensorrt/bin",
-        "./*.pyc",
-        "./*.tgz",
-        "./*.egg-info",
+        linux_path_to_windows("./build"),
+        linux_path_to_windows("./dist"),
+        linux_path_to_windows("./torch_tensorrt/__pycache__"),
+        linux_path_to_windows("./torch_tensorrt/lib"),
+        linux_path_to_windows("./torch_tensorrt/include"),
+        linux_path_to_windows("./torch_tensorrt/bin"),
+        linux_path_to_windows("./*.pyc"),
+        linux_path_to_windows("./*.tgz"),
+        linux_path_to_windows("./*.egg-info"),
     ]
     PY_CLEAN_FILES = [
-        "./torch_tensorrt/*.so",
-        "./torch_tensorrt/_version.py",
-        "./torch_tensorrt/BUILD",
-        "./torch_tensorrt/WORKSPACE",
-        "./torch_tensorrt/LICENSE",
+        linux_path_to_windows("./torch_tensorrt/*.so"),
+        linux_path_to_windows("./torch_tensorrt/_version.py"),
+        linux_path_to_windows("./torch_tensorrt/BUILD"),
+        linux_path_to_windows("./torch_tensorrt/WORKSPACE"),
+        linux_path_to_windows("./torch_tensorrt/LICENSE"),
     ]
     description = "Command to tidy up the project root"
     user_options = []
@@ -407,31 +412,67 @@ packages = [
 ]
 
 package_dir = {
-    "torch_tensorrt": "py/torch_tensorrt",
-    "torch_tensorrt.dynamo": "py/torch_tensorrt/dynamo",
-    "torch_tensorrt.dynamo.backend": "py/torch_tensorrt/dynamo/backend",
-    "torch_tensorrt.dynamo.conversion": "py/torch_tensorrt/dynamo/conversion",
-    "torch_tensorrt.dynamo.conversion.impl": "py/torch_tensorrt/dynamo/conversion/impl",
-    "torch_tensorrt.dynamo.conversion.impl.activation": "py/torch_tensorrt/dynamo/conversion/impl/activation",
-    "torch_tensorrt.dynamo.conversion.impl.condition": "py/torch_tensorrt/dynamo/conversion/impl/condition",
-    "torch_tensorrt.dynamo.conversion.impl.elementwise": "py/torch_tensorrt/dynamo/conversion/impl/elementwise",
-    "torch_tensorrt.dynamo.conversion.impl.normalization": "py/torch_tensorrt/dynamo/conversion/impl/normalization",
-    "torch_tensorrt.dynamo.conversion.impl.slice": "py/torch_tensorrt/dynamo/conversion/impl/slice",
-    "torch_tensorrt.dynamo.conversion.impl.unary": "py/torch_tensorrt/dynamo/conversion/impl/unary",
-    "torch_tensorrt.dynamo.lowering": "py/torch_tensorrt/dynamo/lowering",
-    "torch_tensorrt.dynamo.lowering.passes": "py/torch_tensorrt/dynamo/lowering/passes",
-    "torch_tensorrt.dynamo.partitioning": "py/torch_tensorrt/dynamo/partitioning",
-    "torch_tensorrt.dynamo.runtime": "py/torch_tensorrt/dynamo/runtime",
-    "torch_tensorrt.dynamo.tools": "py/torch_tensorrt/dynamo/tools",
-    "torch_tensorrt.fx": "py/torch_tensorrt/fx",
-    "torch_tensorrt.fx.converters": "py/torch_tensorrt/fx/converters",
-    "torch_tensorrt.fx.converters.impl": "py/torch_tensorrt/fx/converters/impl",
-    "torch_tensorrt.fx.passes": "py/torch_tensorrt/fx/passes",
-    "torch_tensorrt.fx.tools": "py/torch_tensorrt/fx/tools",
-    "torch_tensorrt.fx.tracer": "py/torch_tensorrt/fx/tracer",
-    "torch_tensorrt.fx.tracer.acc_tracer": "py/torch_tensorrt/fx/tracer/acc_tracer",
-    "torch_tensorrt.fx.tracer.dispatch_tracer": "py/torch_tensorrt/fx/tracer/dispatch_tracer",
-    "torch_tensorrt.runtime": "py/torch_tensorrt/runtime",
+    "torch_tensorrt": linux_path_to_windows("py/torch_tensorrt"),
+    "torch_tensorrt.dynamo": linux_path_to_windows("py/torch_tensorrt/dynamo"),
+    "torch_tensorrt.dynamo.backend": linux_path_to_windows(
+        "py/torch_tensorrt/dynamo/backend"
+    ),
+    "torch_tensorrt.dynamo.conversion": linux_path_to_windows(
+        "py/torch_tensorrt/dynamo/conversion"
+    ),
+    "torch_tensorrt.dynamo.conversion.impl": linux_path_to_windows(
+        "py/torch_tensorrt/dynamo/conversion/impl"
+    ),
+    "torch_tensorrt.dynamo.conversion.impl.activation": linux_path_to_windows(
+        "py/torch_tensorrt/dynamo/conversion/impl/activation"
+    ),
+    "torch_tensorrt.dynamo.conversion.impl.condition": linux_path_to_windows(
+        "py/torch_tensorrt/dynamo/conversion/impl/condition"
+    ),
+    "torch_tensorrt.dynamo.conversion.impl.elementwise": linux_path_to_windows(
+        "py/torch_tensorrt/dynamo/conversion/impl/elementwise"
+    ),
+    "torch_tensorrt.dynamo.conversion.impl.normalization": linux_path_to_windows(
+        "py/torch_tensorrt/dynamo/conversion/impl/normalization"
+    ),
+    "torch_tensorrt.dynamo.conversion.impl.slice": linux_path_to_windows(
+        "py/torch_tensorrt/dynamo/conversion/impl/slice"
+    ),
+    "torch_tensorrt.dynamo.conversion.impl.unary": linux_path_to_windows(
+        "py/torch_tensorrt/dynamo/conversion/impl/unary"
+    ),
+    "torch_tensorrt.dynamo.lowering": linux_path_to_windows(
+        "py/torch_tensorrt/dynamo/lowering"
+    ),
+    "torch_tensorrt.dynamo.lowering.passes": linux_path_to_windows(
+        "py/torch_tensorrt/dynamo/lowering/passes"
+    ),
+    "torch_tensorrt.dynamo.partitioning": linux_path_to_windows(
+        "py/torch_tensorrt/dynamo/partitioning"
+    ),
+    "torch_tensorrt.dynamo.runtime": linux_path_to_windows(
+        "py/torch_tensorrt/dynamo/runtime"
+    ),
+    "torch_tensorrt.dynamo.tools": linux_path_to_windows(
+        "py/torch_tensorrt/dynamo/tools"
+    ),
+    "torch_tensorrt.fx": linux_path_to_windows("py/torch_tensorrt/fx"),
+    "torch_tensorrt.fx.converters": linux_path_to_windows(
+        "py/torch_tensorrt/fx/converters"
+    ),
+    "torch_tensorrt.fx.converters.impl": linux_path_to_windows(
+        "py/torch_tensorrt/fx/converters/impl"
+    ),
+    "torch_tensorrt.fx.passes": linux_path_to_windows("py/torch_tensorrt/fx/passes"),
+    "torch_tensorrt.fx.tools": linux_path_to_windows("py/torch_tensorrt/fx/tools"),
+    "torch_tensorrt.fx.tracer": linux_path_to_windows("py/torch_tensorrt/fx/tracer"),
+    "torch_tensorrt.fx.tracer.acc_tracer": linux_path_to_windows(
+        "py/torch_tensorrt/fx/tracer/acc_tracer"
+    ),
+    "torch_tensorrt.fx.tracer.dispatch_tracer": linux_path_to_windows(
+        "py/torch_tensorrt/fx/tracer/dispatch_tracer"
+    ),
+    "torch_tensorrt.runtime": linux_path_to_windows("py/torch_tensorrt/runtime"),
 }
 
 package_data = {}
@@ -559,22 +600,22 @@ setup(
     package_data=package_data,
     exclude_package_data={
         "": [
-            "py/torch_tensorrt/csrc/*.cpp",
-            "py/torch_tensorrt/fx/test*",
-            "torch_tensorrt/csrc/*.cpp",
-            "torch_tensorrt/fx/test*",
-            "test*",
-            "*.cpp",
+            linux_path_to_windows("py/torch_tensorrt/csrc/*.cpp"),
+            linux_path_to_windows("py/torch_tensorrt/fx/test*"),
+            linux_path_to_windows("torch_tensorrt/csrc/*.cpp"),
+            linux_path_to_windows("torch_tensorrt/fx/test*"),
+            linux_path_to_windows("test*"),
+            linux_path_to_windows("*.cpp"),
         ],
         "torch_tensorrt": [
-            "py/torch_tensorrt/csrc/*.cpp",
-            "py/torch_tensorrt/fx/test*",
-            "torch_tensorrt/csrc/*.cpp",
-            "torch_tensorrt/fx/test*",
-            "test*",
-            "*.cpp",
+            linux_path_to_windows("py/torch_tensorrt/csrc/*.cpp"),
+            linux_path_to_windows("py/torch_tensorrt/fx/test*"),
+            linux_path_to_windows("torch_tensorrt/csrc/*.cpp"),
+            linux_path_to_windows("torch_tensorrt/fx/test*"),
+            linux_path_to_windows("test*"),
+            linux_path_to_windows("*.cpp"),
         ],
-        "torch_tensorrt.dynamo": ["test/*.py"],
-        "torch_tensorrt.fx": ["test/*.py"],
+        "torch_tensorrt.dynamo": [linux_path_to_windows("test/*.py")],
+        "torch_tensorrt.fx": [linux_path_to_windows("test/*.py")],
     },
 )

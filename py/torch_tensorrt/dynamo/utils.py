@@ -34,6 +34,7 @@ def use_python_runtime_parser(use_python_runtime: Optional[bool] = None) -> bool
     # Runtime was not manually specified by the user, automatically detect runtime
     else:
         try:
+            from torch_tensorrt import _C
             from torch_tensorrt.dynamo.runtime import TorchTensorRTModule  # noqa: F401
 
             using_python_runtime = False

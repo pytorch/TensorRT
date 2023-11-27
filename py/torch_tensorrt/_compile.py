@@ -6,14 +6,13 @@ from typing import Any, Callable, List, Optional, Sequence, Set
 
 import torch
 import torch.fx
-import torch_tensorrt.ts
+import torch_tensorrt
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt._utils import sanitized_torch_version
 from torch_tensorrt.fx import InputTensorSpec
 from torch_tensorrt.fx.lower import compile as fx_compile
 from torch_tensorrt.fx.utils import LowerPrecision
-from torch_tensorrt.ts._compiler import compile as torchscript_compile
 from typing_extensions import TypeGuard
 
 from packaging import version
@@ -192,12 +191,12 @@ def compile(
     elif target_ir == _IRType.fx:
         if (
             torch.float16 in enabled_precisions_set
-            or torch_tensorrt.dtype.half in enabled_precisions_set
+            or torch_tensorrt.dtype.float16 in enabled_precisions_set
         ):
             lower_precision = LowerPrecision.FP16
         elif (
             torch.float32 in enabled_precisions_set
-            or torch_tensorrt.dtype.float in enabled_precisions_set
+            or torch_tensorrt.dtype.float32 in enabled_precisions_set
         ):
             lower_precision = LowerPrecision.FP32
         else:

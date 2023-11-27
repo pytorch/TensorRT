@@ -1,3 +1,4 @@
+import logging
 import sys
 from typing import Any, Optional, Tuple
 
@@ -11,7 +12,6 @@ import warnings
 # from torch_tensorrt import _enums
 import tensorrt as trt
 import torch
-from torch_tensorrt import logging
 
 try:
     from torch_tensorrt import _C
@@ -19,6 +19,9 @@ except ImportError:
     warnings.warn(
         "Unable to import torchscript frontend core and torch-tensorrt runtime. Some dependent features may be unavailable."
     )
+
+
+logger = logging.getLogger(__name__)
 
 
 class Device(object):
@@ -72,8 +75,7 @@ class Device(object):
                 else:
                     self.dla_core = id
                     self.gpu_id = 0
-                    logging.log(
-                        logging.Level.Warning,
+                    logger.info(
                         "Setting GPU id to 0 for device because device 0 manages DLA on Xavier",
                     )
 
@@ -86,8 +88,7 @@ class Device(object):
                         self.gpu_id = kwargs["gpu_id"]
                     else:
                         self.gpu_id = 0
-                        logging.log(
-                            logging.Level.Warning,
+                        logger.info(
                             "Setting GPU id to 0 for device because device 0 manages DLA on Xavier",
                         )
                 else:
@@ -122,7 +123,7 @@ class Device(object):
     def __repr__(self) -> str:
         return self.__str__()
 
-    def _to_internal(self) -> _C.Device:
+    def _to_internal(self) -> "_C.Device":
         internal_dev = _C.Device()
         if self.device_type == trt.DeviceType.GPU:
             internal_dev.device_type = _C.DeviceType.GPU
@@ -152,8 +153,8 @@ class Device(object):
 
     @classmethod
     def _current_device(cls) -> Self:
-        dev = _C._get_current_device()
-        return cls(gpu_id=dev.gpu_id)
+        # dev = _C._get_current_device()
+        return cls(gpu_id=torch.cuda.current_device())
 
     @staticmethod
     def _parse_device_str(s: str) -> Tuple[trt.DeviceType, int]:
