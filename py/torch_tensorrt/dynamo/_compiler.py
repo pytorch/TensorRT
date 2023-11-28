@@ -40,6 +40,7 @@ from torch_tensorrt.dynamo.utils import (
     prepare_inputs,
     set_log_level,
     to_torch_device,
+    to_torch_tensorrt_device,
 )
 
 logger = logging.getLogger(__name__)
@@ -143,7 +144,7 @@ def compile(
 
     # Prepare torch_trt inputs
     inputs = prepare_inputs(inputs)
-    device = to_torch_device(device)
+    device = to_torch_tensorrt_device(device)
 
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
