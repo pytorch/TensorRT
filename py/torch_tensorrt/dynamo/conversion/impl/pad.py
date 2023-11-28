@@ -32,9 +32,9 @@ def constant_padNd(
 
     rank = len(input.shape)
 
-    if len(pad) / 2 > rank:
+    if len(pad) // 2 > rank:
         raise RuntimeError(
-            f"Trying to pad last {len(pad) / 2} dimension but the input only has {rank} dimension."
+            f"Trying to pad last {len(pad) // 2} dimension but the input only has {rank} dimension."
         )
 
     start_list = [0] * len(input.shape)
@@ -51,7 +51,7 @@ def constant_padNd(
         shape=tuple(new_shape),
         stride=tuple(stride_list),
     )
-    value_const = get_trt_tensor(ctx.net, value, f"{name}_value", input.dtype)
+    value_const = get_trt_tensor(ctx, value, f"{name}_value", input.dtype)
     layer.set_input(4, value_const)
     layer.mode = trt.SliceMode.FILL
 
@@ -72,9 +72,9 @@ def reflection_padNd(
 
     rank = len(input.shape)
 
-    if len(padding) / 2 > rank:
+    if len(padding) // 2 > rank:
         raise RuntimeError(
-            f"Trying to pad last {len(padding) / 2} dimension but the input only has {rank} dimension."
+            f"Trying to pad last {len(padding) // 2} dimension but the input only has {rank} dimension."
         )
 
     start_list = [0] * len(input.shape)
@@ -110,9 +110,9 @@ def replication_padNd(
 
     rank = len(input.shape)
 
-    if len(padding) / 2 > rank:
+    if len(padding) // 2 > rank:
         raise RuntimeError(
-            f"Trying to pad last {len(padding) / 2} dimension but the input only has {rank} dimension."
+            f"Trying to pad last {len(padding) // 2} dimension but the input only has {rank} dimension."
         )
 
     start_list = [0] * len(input.shape)
@@ -148,9 +148,9 @@ def circular_padNd(
 
     rank = len(input.shape)
 
-    if len(pad) / 2 > rank:
+    if len(pad) // 2 > rank:
         raise RuntimeError(
-            f"Trying to pad last {len(pad) / 2} dimension but the input only has {rank} dimension."
+            f"Trying to pad last {len(pad) // 2} dimension but the input only has {rank} dimension."
         )
 
     start_list = [0] * len(input.shape)
