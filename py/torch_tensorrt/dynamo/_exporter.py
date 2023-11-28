@@ -228,10 +228,9 @@ def create_trt_exp_program(
     and constructs an Exported Program object with the new IO node names and state_dict
     """
     input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]
-    # output_nodes = [node for node in gm.graph.nodes if node.op == "output"]
-    # graph = [placeholder, conv1, relu, trt_node, getitem, output]
-    # output_nodes[0].args[0]
-    output_nodes = list(gm.graph.nodes)[-1].args[0]
+    output_nodes = [node for node in gm.graph.nodes if node.op == "output"]
+    assert output_nodes
+    output_nodes = output_nodes[0].args[0]
 
     input_specs = [
         InputSpec(InputKind.USER_INPUT, TensorArgument(name=node.name), node.target)
