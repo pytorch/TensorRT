@@ -253,7 +253,9 @@ def index(
                     dim_tensor_list[adv_indx_indices[i]],
                 )
 
-        gather_out = gather(ctx, target, source_ir, name, flatten_tensor, 0, cum_adv_index)
+        gather_out = gather(
+            ctx, target, source_ir, name, flatten_tensor, 0, cum_adv_index
+        )
         _LOGGER.debug(f"The shape after cumultative gather is {gather_out.shape}")
         _LOGGER.debug(f"The shape for cumulative adv index is {cum_adv_index}")
 
