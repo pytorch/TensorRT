@@ -330,6 +330,34 @@ def aten_ops_fmod(
     return impl.elementwise.fmod(ctx, target, SourceIR.ATEN, name, args[0], args[1])
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler)
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_2d)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        1: (TRTTensor,),
+    }
+)
+def aten_ops_grid(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.grid.grid(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        grid=args[1],
+        interpolation_mode=args[2],
+        padding_mode=args[3],
+        align_corners=args[4],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.relu.default)
 def aten_ops_relu(
     ctx: ConversionContext,
@@ -759,12 +787,12 @@ def aten_ops_cumsum(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.tile.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.tile.default)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
     }
-)  # type: ignore[misc]
+)
 def aten_ops_tile(
     ctx: ConversionContext,
     target: Target,
@@ -782,7 +810,7 @@ def aten_ops_tile(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.permute.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.permute.default)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2000,14 +2028,14 @@ def aten_ops_argmax(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.addmm.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.addmm.default)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
         1: (np.ndarray, torch.Tensor, TRTTensor),
         2: (np.ndarray, torch.Tensor, TRTTensor),
     }
-)  # type: ignore[misc]
+)
 def aten_ops_addmm(
     ctx: ConversionContext,
     target: Target,
