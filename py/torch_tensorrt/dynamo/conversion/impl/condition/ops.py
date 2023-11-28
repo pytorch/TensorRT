@@ -96,8 +96,18 @@ def where(
                 ctx, target, source_ir, f"{name}_y_expand", y_val, output_shape
             )
 
-    select_layer = ctx.net.add_select(condition_val, x_val, y_val)
+    return select(ctx, target, source_ir, name, x_val, y_val, condition)
 
-    set_layer_name(select_layer, target, f"{name}_select")
 
+def select(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: Union[TRTTensor, np.ndarray, torch.Tensor],
+    other: Union[TRTTensor, np.ndarray, torch.Tensor],
+    condition: Union[TRTTensor, np.ndarray, torch.Tensor],
+) -> TRTTensor:
+    select_layer = ctx.net.add_select(condition, input, other)
+    set_layer_name(select_layer, target, name + "_select", source_ir)
     return select_layer.get_output(0)
