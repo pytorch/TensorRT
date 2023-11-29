@@ -687,6 +687,11 @@ def aten_ops_select(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.slice.Tensor)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
 def aten_ops_slice(
     ctx: ConversionContext,
     target: Target,
@@ -700,9 +705,9 @@ def aten_ops_slice(
         SourceIR.ATEN,
         name,
         args[0],
-        args[1],
-        args[2],
-        args[3],
+        args_bounds_check(args, 1, replacement=0),
+        args_bounds_check(args, 2, replacement=None),
+        args_bounds_check(args, 3, replacement=None),
         args_bounds_check(args, 4, replacement=1),
     )
 
@@ -877,6 +882,11 @@ def aten_ops_clone_copy_placeholder(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.expand.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
 def aten_ops_expand(
     ctx: ConversionContext,
     target: Target,

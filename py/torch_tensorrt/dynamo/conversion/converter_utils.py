@@ -339,8 +339,8 @@ def get_positive_dim(
 ) -> Union[int, Tuple[int, ...]]:
     """
     Given an integer number or tuple that represents dimension(s) in the array,
-    transform it to a positive integer dim if it's negative. Otherwise, do
-    nothing.
+    transform it to a positive integer dim if it's negative.
+    Otherwise, truncate it to the dimension size
 
     Args:
         dim (Union[int, Sequence[int]]): A integer or Sequence of integers that represent dimension(s) in an array.
@@ -353,7 +353,8 @@ def get_positive_dim(
     def positive_dim(d: int) -> int:
         if d < 0:
             return d % dim_size
-        return d
+        else:
+            return min(d, dim_size)
 
     return (
         positive_dim(dim)
