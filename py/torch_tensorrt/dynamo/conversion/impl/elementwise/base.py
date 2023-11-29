@@ -58,8 +58,8 @@ def convert_binary_elementwise(
     source_ir: Optional[SourceIR],
     name: str,
     op_type: trt.ElementWiseOperation,
-    lhs_val: Union[int, float, TRTTensor, torch.Tensor],
-    rhs_val: Union[int, float, TRTTensor, torch.Tensor],
+    lhs_val: Union[int, float, bool, TRTTensor, torch.Tensor],
+    rhs_val: Union[int, float, bool, TRTTensor, torch.Tensor],
 ) -> TRTTensor:
     """
     This function adds a TensorRT elementwise layer. We allow both operands to be
@@ -120,11 +120,11 @@ def convert_binary_elementwise(
     # Note that the dtype here is supposed to be the same as the scalar
     # dtype but we don't have a way to detect whether it makes sense for the
     # scalar to be float or half. Hence we go with the lhs dtype.
-    if is_lhs_trt_tensor and isinstance(rhs_val, (float, int)):
+    if is_lhs_trt_tensor and isinstance(rhs_val, (float, int, bool)):
         rhs_val = np.array(
             [rhs_val], dtype=unified_dtype_converter(lhs_dtype, Frameworks.NUMPY)
         )
-    if is_rhs_trt_tensor and isinstance(lhs_val, (float, int)):
+    if is_rhs_trt_tensor and isinstance(lhs_val, (float, int, bool)):
         lhs_val = np.array(
             [lhs_val], dtype=unified_dtype_converter(rhs_dtype, Frameworks.NUMPY)
         )

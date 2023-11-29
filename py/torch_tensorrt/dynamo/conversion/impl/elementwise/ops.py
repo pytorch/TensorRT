@@ -2,6 +2,8 @@ from typing import Optional, Union
 
 import numpy as np
 import tensorrt as trt
+import torch
+import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -370,8 +372,8 @@ def logical_and(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: Union[TRTTensor, int, float, bool],
+    rhs_val: Union[TRTTensor, int, float, bool],
 ) -> TRTTensor:
     if isinstance(lhs_val, TRTTensor):
         lhs_val = cast_int_or_float_to_bool(ctx, name, lhs_val)
@@ -389,8 +391,8 @@ def logical_or(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: Union[TRTTensor, int, float, bool],
+    rhs_val: Union[TRTTensor, int, float, bool],
 ) -> TRTTensor:
     if isinstance(lhs_val, TRTTensor):
         lhs_val = cast_int_or_float_to_bool(ctx, name, lhs_val)
@@ -408,8 +410,8 @@ def logical_xor(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: Union[TRTTensor, int, float, bool],
+    rhs_val: Union[TRTTensor, int, float, bool],
 ) -> TRTTensor:
     if isinstance(lhs_val, TRTTensor):
         lhs_val = cast_int_or_float_to_bool(ctx, name, lhs_val)
@@ -422,13 +424,46 @@ def logical_xor(
     )
 
 
+def bitwise_and(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
+) -> TRTTensor:
+    return logical_and(ctx, target, source_ir, f"{name}_logical_and", lhs_val, rhs_val)
+
+
+def bitwise_or(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
+) -> TRTTensor:
+    return logical_or(ctx, target, source_ir, f"{name}_logical_or", lhs_val, rhs_val)
+
+
+def bitwise_xor(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
+) -> TRTTensor:
+    return logical_xor(ctx, target, source_ir, f"{name}_logical_xor", lhs_val, rhs_val)
+
+
 def eq(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
 ) -> TRTTensor:
     return convert_binary_elementwise(
         ctx,
@@ -441,13 +476,30 @@ def eq(
     )
 
 
+def ne(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
+) -> TRTTensor:
+    return impl.unary.logical_not(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_logical_not",
+        eq(ctx, target, source_ir, f"{name}_eq", lhs_val, rhs_val),
+    )
+
+
 def gt(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
 ) -> TRTTensor:
     return convert_binary_elementwise(
         ctx,
@@ -460,13 +512,31 @@ def gt(
     )
 
 
+def ge(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
+) -> TRTTensor:
+    return logical_or(
+        ctx,
+        target,
+        source_ir,
+        name,
+        gt(ctx, target, source_ir, f"{name}_gt", lhs_val, rhs_val),
+        eq(ctx, target, source_ir, f"{name}_eq", lhs_val, rhs_val),
+    )
+
+
 def lt(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
 ) -> TRTTensor:
     return convert_binary_elementwise(
         ctx,
@@ -476,4 +546,22 @@ def lt(
         trt.ElementWiseOperation.LESS,
         lhs_val,
         rhs_val,
+    )
+
+
+def le(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
+) -> TRTTensor:
+    return logical_or(
+        ctx,
+        target,
+        source_ir,
+        name,
+        lt(ctx, target, source_ir, f"{name}_lt", lhs_val, rhs_val),
+        eq(ctx, target, source_ir, f"{name}_eq", lhs_val, rhs_val),
     )
