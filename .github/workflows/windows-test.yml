@@ -1,0 +1,191 @@
+name: Run a Windows job
+
+on:
+  workflow_call:
+    inputs:
+      script:
+        description: 'Script to utilize'
+        default: "python setup.py bdist_wheel"
+        type: string
+      timeout:
+        description: 'Timeout for the job (in minutes)'
+        default: 30
+        type: number
+      runner:
+        description: 'Runner type to utilize'
+        default: "windows.8xlarge.nvidia.gpu"
+        type: string
+      upload-artifact:
+        description: 'Name to give artifacts uploaded from ${RUNNER_ARTIFACT_DIR}'
+        default: ''
+        type: string
+      download-artifact:
+        description: 'Name to download artifacts to ${RUNNER_ARTIFACT_DIR}'
+        default: ''
+        type: string
+      repository:
+        description: 'Repository to checkout, defaults to ""'
+        default: ""
+        type: string
+      fetch-depth:
+        description: 'Number of commits to fetch, defaults to 1 similar to actions/checkout'
+        default: 1
+        type: number
+      submodules:
+        description:
+          Same as actions/checkout, set to `true` to checkout submodules or `recursive` to
+          recursively checkout everything
+        default: ""
+        type: string
+      ref:
+        description: 'Reference to checkout, defaults to "nightly"'
+        default: ""
+        type: string
+      test-infra-repository:
+        description: "Test infra repository to use"
+        default: "pytorch/test-infra"
+        type: string
+      test-infra-ref:
+        description: "Test infra reference to use"
+        default: ""
+        type: string
+      job-name:
+        description: "Name for the job, which is displayed in the GitHub UI"
+        default: "windows-job"
+        type: string
+      continue-on-error:
+        description: "Prevents a job from failing when a step fails. Set to true to allow a job to pass when exec script step fails."
+        default: false
+        type: boolean
+      binary-matrix:
+        description: "If we are calling this workflow with binary build matrix entry, will initialize matrix entries and env vars"
+        required: false
+        default: ''
+        type: string
+      build-matrix:
+        description: "Build matrix to utilize"
+        default: ""
+        type: string
+
+jobs:
+  job:
+    name: ${{ inputs.job-name }}
+    env:
+      REPOSITORY: ${{ inputs.repository || github.repository }}
+      SCRIPT: ${{ inputs.script }}
+      matrix: ${{ fromJSON(inputs.build-matrix) }}
+      RUNNER_TEST_RESULTS_DIR: /tmp/test_results
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout }}
+    steps:
+      - name: Clean workspace
+        shell: bash -l {0}
+        run: |
+          echo "::group::Cleanup debug output"
+          rm -rfv "${GITHUB_WORKSPACE}"
+          mkdir -p "${GITHUB_WORKSPACE}"
+          echo "::endgroup::"
+
+      - name: Checkout repository (${{ inputs.test-infra-repository }}@${{ inputs.test-infra-ref }})
+        uses: actions/checkout@v3
+        with:
+          # Support the use case where we need to checkout someone's fork
+          repository: ${{ inputs.test-infra-repository }}
+          ref: ${{ inputs.test-infra-ref }}
+          path: test-infra
+
+      - name: Setup Windows
+        uses: ./test-infra/.github/actions/setup-windows
+
+      - name: Setup SSH
+        uses: ./test-infra/.github/actions/setup-ssh
+        with:
+          github-secret: ${{ github.token }}
+
+      - name: Checkout repository (${{ inputs.repository || github.repository }}@${{ inputs.ref }})
+        uses: actions/checkout@v3
+        with:
+          # Support the use case where we need to checkout someone's fork
+          repository: ${{ inputs.repository || github.repository }}
+          ref: ${{ inputs.ref || github.ref }}
+          path: ${{ inputs.repository || github.repository }}
+          fetch-depth: ${{ inputs.fetch-depth }}
+          submodules: ${{ inputs.submodules }}
+
+      - name: Download artifacts (if any)
+        uses: actions/download-artifact@v3
+        if: ${{ inputs.download-artifact != '' }}
+        with:
+          name: ${{ inputs.download-artifact }}
+          path: ${{ runner.temp }}/artifacts/
+
+      - name: Export matrix variables (if any)
+        uses: ./test-infra/.github/actions/export-matrix-variables
+        if: ${{ inputs.binary-matrix != '' }}
+        with:
+          binary-matrix: ${{ inputs.binary-matrix }}
+          target-os: "windows"
+
+      - name: Run script
+        shell: bash -l {0}
+        continue-on-error: ${{ inputs.continue-on-error }}
+        working-directory: ${{ inputs.repository }}
+        run: |
+          EXEC_SCRIPT="${RUNNER_TEMP}/exec_script"
+          {
+            echo "#!/usr/bin/env bash";
+            echo "set -eou pipefail";
+            # Without this specific version of pywin32 conda the default conda installation does not work
+            # See https://github.com/conda/conda/issues/11503
+            echo "/c/Jenkins/Miniconda3/python.exe -m pip install --upgrade pywin32==300"
+            # Source conda so it's available to the script environment
+            echo "source /c/Jenkins/Miniconda3/etc/profile.d/conda.sh";
+            echo 'export PATH="/c/Jenkins/Miniconda3/Scripts:${PATH}"'
+          } > "${EXEC_SCRIPT}"
+          if [[ ${{ matrix.gpu-arch-type }} == cuda ]]; then
+            {
+              echo 'export CUDA_HOME="/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${{ matrix.gpu-arch-version }}"'
+              echo 'export CUDA_PATH="${CUDA_HOME}"'
+              echo 'export PATH="${CUDA_PATH}/bin:${PATH}"'
+            } >> "${EXEC_SCRIPT}"
+          fi
+          echo "${SCRIPT}" >> "${EXEC_SCRIPT}"
+          while read line; do
+            eval "export ${line}"
+          done < "${RUNNER_TEMP}/github_env_${GITHUB_RUN_ID}"
+          bash "${EXEC_SCRIPT}"
+
+      - name: Surface failing tests
+        if: always()
+        uses: pmeier/pytest-results-action@v0.3.0
+        with:
+          path: ${{ env.RUNNER_TEST_RESULTS_DIR }}
+          fail-on-empty: false
+
+      - name: Check if there are potential artifacts and move them to the correct artifact location
+        shell: bash -l {0}
+        working-directory: ${{ inputs.repository }}
+        id: check-artifacts
+        if: ${{ inputs.upload-artifact != '' }}
+        env:
+          UPLOAD_ARTIFACT_NAME: ${{ inputs.upload-artifact }}
+        run: |
+          # If the default execution path is followed then we should get a wheel in the dist/ folder
+          # attempt to just grab whatever is in there and scoop it all up
+          if find "dist/" -name "*.whl" >/dev/null 2>/dev/null; then
+            mv -v dist/*.whl "${RUNNER_ARTIFACT_DIR}/"
+          fi
+          # Set to fail upload step if there are no files for upload and expected files for upload
+          echo 'if-no-files-found=error' >> "${GITHUB_OUTPUT}"
+
+      - name: Upload artifacts to GitHub (if any)
+        uses: actions/upload-artifact@v3
+        if: ${{ inputs.upload-artifact != '' }}
+        with:
+          name: ${{ inputs.upload-artifact }}
+          path: ${{ runner.temp }}/artifacts/
+          if-no-files-found: ${{ steps.check-artifacts.outputs.if-no-files-found }}
+
+      - name: Teardown Windows
+        if: ${{ always() }}
+        uses: ./test-infra/.github/actions/teardown-windows

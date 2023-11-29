@@ -8,7 +8,6 @@ requires = [
     "cffi>=1.15.1",
     "typing-extensions>=4.7.0",
     "future>=0.18.3",
-    "tensorrt>=8.6,<8.7",
     "torch >=2.3.0.dev,<2.4.0",
     "pybind11==2.6.2",
     "numpy",
@@ -41,10 +40,15 @@ readme = {file = "py/README.md", content-type = "text/markdown"}
 requires-python = ">=3.8"
 keywords = ["pytorch", "torch", "tensorrt", "trt", "ai", "artificial intelligence", "ml", "machine learning", "dl", "deep learning", "compiler", "dynamo", "torchscript", "inference"]
 dependencies = [
+<<<<<<< HEAD
     "torch >=2.3.0.dev,<2.4.0",
     "tensorrt>=8.6,<8.7",
+=======
+    "torch >=2.2.0.dev,<2.3.0",
+>>>>>>> c16475de7... feat: First pass at Windows CI
     "packaging>=23",
     "numpy",
+    "pyyaml",
     "typing-extensions>=4.7.0",
 ]
 dynamic = ["version"]

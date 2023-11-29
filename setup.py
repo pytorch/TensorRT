@@ -12,8 +12,8 @@ from pathlib import Path
 from shutil import copyfile, rmtree
 from typing import List
 
-import setuptools
-import yaml
+# import setuptools
+# import yaml
 from setuptools import Extension, find_namespace_packages, setup
 from setuptools.command.build_ext import build_ext
 from setuptools.command.develop import develop
@@ -62,40 +62,29 @@ def get_base_version() -> str:
     return re.sub(LEGACY_BASE_VERSION_SUFFIX_PATTERN, "", dirty_version)
 
 
-def load_dep_info():
-    global __cuda_version__
-    global __cudnn_version__
-    global __tensorrt_version__
-    with open("dev_dep_versions.yml", "r") as stream:
-        versions = yaml.safe_load(stream)
-        if (gpu_arch_version := os.environ.get("CU_VERSION")) is not None:
-            __cuda_version__ = (
-                (gpu_arch_version[2:])[:-1] + "." + (gpu_arch_version[2:])[-1:]
-            )
-        else:
-            __cuda_version__ = versions["__cuda_version__"]
-        __cudnn_version__ = versions["__cudnn_version__"]
-        __tensorrt_version__ = versions["__tensorrt_version__"]
+# def load_dep_info():
+#     global __cuda_version__
+#     global __cudnn_version__
+#     global __tensorrt_version__
+#     with open("dev_dep_versions.yml", "r") as stream:
+#         versions = yaml.safe_load(stream)
+#         if (gpu_arch_version := os.environ.get("CU_VERSION")) is not None:
+#             __cuda_version__ = (
+#                 (gpu_arch_version[2:])[:-1] + "." + (gpu_arch_version[2:])[-1:]
+#             )
+#         else:
+#             __cuda_version__ = versions["__cuda_version__"]
+#         __cudnn_version__ = versions["__cudnn_version__"]
+#         __tensorrt_version__ = versions["__tensorrt_version__"]
 
 
-load_dep_info()
+# load_dep_info()
 
 dir_path = linux_path_to_windows(str(get_root_dir()) + "/py")
 
-CXX11_ABI = False
-JETPACK_VERSION = None
-FX_ONLY = False
-LEGACY = False
 RELEASE = False
 CI_BUILD = False
 
-if "--fx-only" in sys.argv:
-    FX_ONLY = True
-    sys.argv.remove("--fx-only")
-
-if "--legacy" in sys.argv:
-    LEGACY = True
-    sys.argv.remove("--legacy")
 
 if "--release" in sys.argv:
     RELEASE = True
@@ -123,34 +112,6 @@ if (ci_env_var := os.environ.get("CI_BUILD")) is not None:
     if ci_env_var == "1":
         CI_BUILD = True
 
-if "--use-cxx11-abi" in sys.argv:
-    sys.argv.remove("--use-cxx11-abi")
-    CXX11_ABI = True
-
-if platform.uname().processor == "aarch64":
-    if "--jetpack-version" in sys.argv:
-        version_idx = sys.argv.index("--jetpack-version") + 1
-        version = sys.argv[version_idx]
-        sys.argv.remove(version)
-        sys.argv.remove("--jetpack-version")
-        if version == "4.5":
-            JETPACK_VERSION = "4.5"
-        elif version == "4.6":
-            JETPACK_VERSION = "4.6"
-        elif version == "5.0":
-            JETPACK_VERSION = "5.0"
-
-    if not JETPACK_VERSION:
-        warnings.warn(
-            "Assuming jetpack version to be 5.0, if not use the --jetpack-version option"
-        )
-        JETPACK_VERSION = "5.0"
-
-    if not CXX11_ABI:
-        warnings.warn(
-            "Jetson platform detected but did not see --use-cxx11-abi option, if using a pytorch distribution provided by NVIDIA include this flag"
-        )
-
 
 def which(program):
     import os
@@ -171,55 +132,8 @@ def which(program):
     return None
 
 
-BAZEL_EXE = None
-if not FX_ONLY:
-    BAZEL_EXE = which("bazelisk")
-
-    if BAZEL_EXE is None:
-        BAZEL_EXE = which("bazel")
-        if BAZEL_EXE is None:
-            sys.exit("Could not find bazel in PATH")
-
-
-def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
-    cmd = [BAZEL_EXE, "build"]
-    cmd.append("//:libtorchtrt")
-    if develop:
-        cmd.append("--compilation_mode=dbg")
-    else:
-        cmd.append("--compilation_mode=opt")
-    if use_dist_dir:
-        cmd.append("--distdir=third_party/dist_dir/x86_64-linux-gnu")
-    if not cxx11_abi:
-        cmd.append("--config=python")
-    else:
-        print("using CXX11 ABI build")
-
-    if JETPACK_VERSION == "4.5":
-        cmd.append("--platforms=//toolchains:jetpack_4.5")
-        print("Jetpack version: 4.5")
-    elif JETPACK_VERSION == "4.6":
-        cmd.append("--platforms=//toolchains:jetpack_4.6")
-        print("Jetpack version: 4.6")
-    elif JETPACK_VERSION == "5.0":
-        cmd.append("--platforms=//toolchains:jetpack_5.0")
-        print("Jetpack version: 5.0")
-
-    if CI_BUILD:
-        cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
-        print("CI based build")
-
-    print("building libtorchtrt")
-    status_code = subprocess.run(cmd).returncode
-
-    if status_code != 0:
-        sys.exit(status_code)
-
-
 def gen_version_file():
     version_path = os.path.join(dir_path, "torch_tensorrt", "_version.py")
-    # if not os.path.exists(version_path):
-    #     os.mknod(version_path)
 
     with open(version_path, "w+") as f:
         print("creating version file")
@@ -227,26 +141,6 @@ def gen_version_file():
         f.write('__cuda_version__ = "' + __cuda_version__ + '"\n')
         f.write('__cudnn_version__ = "' + __cudnn_version__ + '"\n')
         f.write('__tensorrt_version__ = "' + __tensorrt_version__ + '"\n')
-
-
-def copy_libtorchtrt(multilinux=False):
-    if not os.path.exists(dir_path + "/torch_tensorrt/lib"):
-        os.makedirs(dir_path + "/torch_tensorrt/lib")
-
-    print("copying library into module")
-    if multilinux:
-        copyfile(
-            dir_path + "/build/libtrtorch_build/libtrtorch.so",
-            dir_path + "/trtorch/lib/libtrtorch.so",
-        )
-    else:
-        os.system(
-            "tar -xzf "
-            + dir_path
-            + "/../bazel-bin/libtorchtrt.tar.gz --strip-components=1 -C "
-            + dir_path
-            + "/torch_tensorrt"
-        )
 
 
 class DevelopCommand(develop):
@@ -259,15 +153,8 @@ class DevelopCommand(develop):
         develop.finalize_options(self)
 
     def run(self):
-        if FX_ONLY:
-            gen_version_file()
-            develop.run(self)
-        else:
-            global CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(develop=True, cxx11_abi=CXX11_ABI)
-            gen_version_file()
-            copy_libtorchtrt()
-            develop.run(self)
+        gen_version_file()
+        develop.run(self)
 
 
 class InstallCommand(install):
@@ -280,15 +167,8 @@ class InstallCommand(install):
         install.finalize_options(self)
 
     def run(self):
-        if FX_ONLY:
-            gen_version_file()
-            install.run(self)
-        else:
-            global CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI)
-            gen_version_file()
-            copy_libtorchtrt()
-            install.run(self)
+        gen_version_file()
+        install.run(self)
 
 
 class BdistCommand(bdist_wheel):
@@ -301,10 +181,7 @@ class BdistCommand(bdist_wheel):
         bdist_wheel.finalize_options(self)
 
     def run(self):
-        global CXX11_ABI
-        build_libtorchtrt_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI)
         gen_version_file()
-        copy_libtorchtrt()
         bdist_wheel.run(self)
 
 
@@ -318,15 +195,8 @@ class EditableWheelCommand(editable_wheel):
         editable_wheel.finalize_options(self)
 
     def run(self):
-        if FX_ONLY:
-            gen_version_file()
-            editable_wheel.run(self)
-        else:
-            global CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(develop=True, cxx11_abi=CXX11_ABI)
-            gen_version_file()
-            copy_libtorchtrt()
-            editable_wheel.run(self)
+        gen_version_file()
+        editable_wheel.run(self)
 
 
 class CleanCommand(Command):
@@ -476,107 +346,6 @@ package_dir = {
 }
 
 package_data = {}
-
-if not FX_ONLY:
-    ext_modules += [
-        cpp_extension.CUDAExtension(
-            "torch_tensorrt._C",
-            [
-                "py/" + f
-                for f in [
-                    "torch_tensorrt/csrc/torch_tensorrt_py.cpp",
-                    "torch_tensorrt/csrc/tensorrt_backend.cpp",
-                    "torch_tensorrt/csrc/tensorrt_classes.cpp",
-                    "torch_tensorrt/csrc/register_tensorrt_classes.cpp",
-                ]
-            ],
-            library_dirs=[
-                (dir_path + "/torch_tensorrt/lib/"),
-                "/opt/conda/lib/python3.6/config-3.6m-x86_64-linux-gnu",
-            ],
-            libraries=["torchtrt"],
-            include_dirs=[
-                dir_path + "torch_tensorrt/csrc",
-                dir_path + "torch_tensorrt/include",
-                dir_path + "/../bazel-TRTorch/external/tensorrt/include",
-                dir_path + "/../bazel-Torch-TensorRT/external/tensorrt/include",
-                dir_path + "/../bazel-TensorRT/external/tensorrt/include",
-                dir_path + "/../bazel-tensorrt/external/tensorrt/include",
-                dir_path + "/../",
-                "/usr/local/cuda",
-            ],
-            extra_compile_args=[
-                "-Wno-deprecated",
-                "-Wno-deprecated-declarations",
-            ]
-            + (
-                ["-D_GLIBCXX_USE_CXX11_ABI=1"]
-                if CXX11_ABI
-                else ["-D_GLIBCXX_USE_CXX11_ABI=0"]
-            ),
-            extra_link_args=[
-                "-Wno-deprecated",
-                "-Wno-deprecated-declarations",
-                "-Wl,--no-as-needed",
-                "-ltorchtrt",
-                "-Wl,-rpath,$ORIGIN/lib",
-                "-lpthread",
-                "-ldl",
-                "-lutil",
-                "-lrt",
-                "-lm",
-                "-Xlinker",
-                "-export-dynamic",
-            ]
-            + (
-                ["-D_GLIBCXX_USE_CXX11_ABI=1"]
-                if CXX11_ABI
-                else ["-D_GLIBCXX_USE_CXX11_ABI=0"]
-            ),
-            undef_macros=["NDEBUG"],
-        )
-    ]
-
-    packages += [
-        "torch_tensorrt.ts",
-    ]
-
-    package_dir.update(
-        {
-            "torch_tensorrt.ts": "py/torch_tensorrt/ts",
-        }
-    )
-
-    package_data.update(
-        {
-            "torch_tensorrt": [
-                "BUILD",
-                "WORKSPACE",
-                "include/torch_tensorrt/*.h",
-                "include/torch_tensorrt/core/*.h",
-                "include/torch_tensorrt/core/conversion/*.h",
-                "include/torch_tensorrt/core/conversion/conversionctx/*.h",
-                "include/torch_tensorrt/core/conversion/converters/*.h",
-                "include/torch_tensorrt/core/conversion/evaluators/*.h",
-                "include/torch_tensorrt/core/conversion/tensorcontainer/*.h",
-                "include/torch_tensorrt/core/conversion/var/*.h",
-                "include/torch_tensorrt/core/ir/*.h",
-                "include/torch_tensorrt/core/lowering/*.h",
-                "include/torch_tensorrt/core/lowering/passes/*.h",
-                "include/torch_tensorrt/core/partitioning/*.h",
-                "include/torch_tensorrt/core/partitioning/segmentedblock/*.h",
-                "include/torch_tensorrt/core/partitioning/partitioninginfo/*.h",
-                "include/torch_tensorrt/core/partitioning/partitioningctx/*.h",
-                "include/torch_tensorrt/core/plugins/*.h",
-                "include/torch_tensorrt/core/plugins/impl/*.h",
-                "include/torch_tensorrt/core/runtime/*.h",
-                "include/torch_tensorrt/core/util/*.h",
-                "include/torch_tensorrt/core/util/logging/*.h",
-                "bin/*",
-                "lib/*",
-            ]
-        }
-    )
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
