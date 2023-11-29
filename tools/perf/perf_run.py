@@ -15,6 +15,7 @@ import tensorrt as trt
 
 # Importing supported Backends
 import torch
+import torch_tensorrt as torchtrt
 from utils import (
     BENCHMARK_MODELS,
     parse_backends,
@@ -22,8 +23,6 @@ from utils import (
     parse_precisions,
     precision_to_dtype,
 )
-
-import torch_tensorrt as torchtrt
 
 WARMUP_ITER = 10
 results = []
@@ -294,29 +293,27 @@ def run_tensorrt(
     input_tensors,
     params,
     precision,
-    is_trt_engine=False,
     batch_size=1,
 ):
-    engine = None
+    # Export an ONNX model and convert to TRT
+    torch.onnx.export(model.eval().cuda(), tuple(input_tensors), "./tmp.onnx")
+    logger = trt.Logger(trt.Logger.WARNING)
+    builder = trt.Builder(logger)
+    network = builder.create_network(
+        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+    )
+    parser = trt.OnnxParser(network, logger)
+    success = parser.parse_from_file("./tmp.onnx")
+    if not success:
+        raise ValueError("ONNX conversion failed")
 
-    # If the model file is a TensorRT engine then directly deserialize and run inference
-    # else convert the torch module to a TensorRT engine first and then run inference
-    if not is_trt_engine:
-        compile_settings = {
-            "inputs": input_tensors,
-            "enabled_precisions": {precision_to_dtype(precision)},
-            "truncate_long_and_double": params.get("truncate", False),
-        }
-
-        print("Converting method to TensorRT engine...")
-        with torch.no_grad(), torchtrt.logging.errors():
-            model = torchtrt.ts.convert_method_to_trt_engine(
-                model, "forward", **compile_settings
-            )
-
+    config = builder.create_builder_config()
+    if precision == "fp16":
+        config.set_flag(trt.BuilderFlag.FP16)
+    serialized_engine = builder.build_serialized_network(network, config)
     # Deserialize the TensorRT engine
-    with trt.Logger() as logger, trt.Runtime(logger) as runtime:
-        engine = runtime.deserialize_cuda_engine(model)
+    with trt.Runtime(logger) as runtime:
+        engine = runtime.deserialize_cuda_engine(serialized_engine)
 
     print("Running TensorRT for precision: ", precision, " batch_size : ", batch_size)
     iters = params.get("iterations", 20)
@@ -427,18 +424,14 @@ def run(
             )
         elif backend == "tensorrt":
             run_tensorrt(
-                model,
+                model_torch,
                 input_tensors,
                 params,
                 precision,
-                is_trt_engine,
                 batch_size,
             )
         elif backend == "dynamo":
             run_dynamo(model_torch, input_tensors, params, precision, batch_size)
-
-        elif backend == "torch_compile":
-            run_torch_compile(model_torch, input_tensors, params, precision, batch_size)
 
         elif backend == "torch_compile":
             run_torch_compile(model_torch, input_tensors, params, precision, batch_size)
