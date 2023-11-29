@@ -37,14 +37,14 @@ def constant_padNd(
             f"Trying to pad last {len(pad) // 2} dimension but the input only has {rank} dimension."
         )
 
-    start_list = [0] * len(input.shape)
-    new_shape = input.shape
+    start_list = [0] * rank
+    new_shape = list(input.shape)
 
     for i in range(0, len(pad) // 2):
         start_list[-i - 1] = -pad[i * 2]
         new_shape[-i - 1] += pad[i * 2] + pad[i * 2 + 1]
 
-    stride_list = [1] * len(new_shape)
+    stride_list = [1] * rank
     layer = ctx.net.add_slice(
         input,
         start=tuple(start_list),
@@ -77,14 +77,14 @@ def reflection_padNd(
             f"Trying to pad last {len(padding) // 2} dimension but the input only has {rank} dimension."
         )
 
-    start_list = [0] * len(input.shape)
-    new_shape = input.shape
+    start_list = [0] * rank
+    new_shape = list(input.shape)
 
     for i in range(0, len(padding) // 2):
         start_list[-i - 1] = -padding[i * 2]
         new_shape[-i - 1] += padding[i * 2] + padding[i * 2 + 1]
 
-    stride_list = [1] * len(new_shape)
+    stride_list = [1] * rank
     layer = ctx.net.add_slice(
         input,
         start=tuple(start_list),
@@ -115,14 +115,14 @@ def replication_padNd(
             f"Trying to pad last {len(padding) // 2} dimension but the input only has {rank} dimension."
         )
 
-    start_list = [0] * len(input.shape)
-    new_shape = input.shape
+    start_list = [0] * rank
+    new_shape = list(input.shape)
 
     for i in range(0, len(padding) // 2):
         start_list[-i - 1] = -padding[i * 2]
         new_shape[-i - 1] += padding[i * 2] + padding[i * 2 + 1]
 
-    stride_list = [1] * len(new_shape)
+    stride_list = [1] * rank
     layer = ctx.net.add_slice(
         input,
         start=tuple(start_list),
@@ -153,14 +153,14 @@ def circular_padNd(
             f"Trying to pad last {len(pad) // 2} dimension but the input only has {rank} dimension."
         )
 
-    start_list = [0] * len(input.shape)
-    new_shape = input.shape
+    start_list = [0] * rank
+    new_shape = list(input.shape)
 
     for i in range(0, len(pad) // 2):
         start_list[-i - 1] = -pad[i * 2]
         new_shape[-i - 1] += pad[i * 2] + pad[i * 2 + 1]
 
-    stride_list = [1] * len(new_shape)
+    stride_list = [1] * rank
     layer = ctx.net.add_slice(
         input,
         start=tuple(start_list),
