@@ -956,6 +956,11 @@ def aten_ops_expand(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.amax.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
 def aten_ops_amax(
     ctx: ConversionContext,
     target: Target,
@@ -975,6 +980,11 @@ def aten_ops_amax(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.amin.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
 def aten_ops_amin(
     ctx: ConversionContext,
     target: Target,
