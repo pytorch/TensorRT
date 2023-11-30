@@ -70,7 +70,7 @@ class Input(object):
             tensor_domain (Tuple(float, float), optional): The domain of allowed values for the tensor, as interval notation: [tensor_domain[0], tensor_domain[1]).
                 Note: Entering "None" (or not specifying) will set the bound to [0, 2)
             torch_tensor (torch.Tensor): Holds a corresponding torch tensor with this Input.
-            name (str, optional): Name of this input in the pytorch graph. Used to specify dynamic shapes in dynamo tracer.
+            name (str, optional): Name of this input in the input nn.Module's forward function. Used to specify dynamic shapes for the corresponding input in dynamo tracer.
         Examples:
             - Input([1,3,32,32], dtype=torch.float32, format=torch.channel_last)
             - Input(shape=(1,3,32,32), dtype=torch_tensorrt.dtype.int32, format=torch_tensorrt.TensorFormat.NCHW)
