@@ -310,7 +310,10 @@ def run_tensorrt(
     config = builder.create_builder_config()
     if precision == "fp16":
         config.set_flag(trt.BuilderFlag.FP16)
+    start_compile = time.time_ns()
     serialized_engine = builder.build_serialized_network(network, config)
+    end_compile = time.time_ns()
+    compile_time_s = (end_compile - start_compile) / 1e9
     # Deserialize the TensorRT engine
     with trt.Runtime(logger) as runtime:
         engine = runtime.deserialize_cuda_engine(serialized_engine)
@@ -348,7 +351,7 @@ def run_tensorrt(
             meas_time = end_time - start_time
             timings.append(meas_time)
 
-    recordStats("TensorRT", timings, precision, batch_size)
+    recordStats("TensorRT", timings, precision, batch_size, compile_time_s)
 
 
 # Deploys inference run for different backend configurations
