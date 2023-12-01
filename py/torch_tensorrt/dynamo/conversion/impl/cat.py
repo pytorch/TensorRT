@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Sequence, Union
+from typing import Optional, Sequence, Union
 
 import numpy as np
 import torch
@@ -6,12 +6,11 @@ from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
-    SourceIR,
     get_positive_dim,
     get_trt_tensor,
 )
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+from torch_tensorrt.fx.types import TRTTensor
 
 
 def cat(
@@ -23,12 +22,12 @@ def cat(
     dim: int,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     trt_inputs = []
-    for each_input in input:
+    for i, each_input in enumerate(input):
         if not isinstance(each_input, TRTTensor):
-            each_input = get_trt_tensor(ctx, each_input, name + "_tensor_{i}")
+            each_input = get_trt_tensor(ctx, each_input, f"{name}_tensor_{i}")
         trt_inputs.append(each_input)
     concat_layer = ctx.net.add_concatenation(trt_inputs)
     dim = get_positive_dim(dim, len(input[0].shape))
     concat_layer.axis = dim
-    set_layer_name(concat_layer, target, name + "_gather", source_ir)
+    set_layer_name(concat_layer, target, f"{name}_gather", source_ir)
     return concat_layer.get_output(0)
