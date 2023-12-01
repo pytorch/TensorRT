@@ -54,6 +54,38 @@ jobs:
       AWS_PYTORCH_UPLOADER_ACCESS_KEY_ID: ${{ secrets.AWS_PYTORCH_UPLOADER_ACCESS_KEY_ID }}
       AWS_PYTORCH_UPLOADER_SECRET_ACCESS_KEY: ${{ secrets.AWS_PYTORCH_UPLOADER_SECRET_ACCESS_KEY }}
 
+  tests-py-torchscript-core:
+    name: Test torchscript core [c++]
+    needs: [generate-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+    with:
+      job-name: tests-py-torchscript-core
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      script: |
+        export USE_HOST_DEPS=1
+        export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
+        pushd .
+        cd tests/modules
+        ${CONDA_RUN} python -m pip install --pre -r requirements.txt --use-deprecated=legacy-resolver
+        ${CONDA_RUN} python hub.py
+        popd
+        export TORCHTRT_PATH=$(python -c "import os, torch_tensorrt; print(os.path.dirname(torch_tensorrt.__file__))")
+        cat toolchains/ci_workspaces/WORKSPACE.x86_64.release.rhel.tmpl | envsubst > WORKSPACE
+        export LD_LIBRARY_PATH=$(pwd)/bazel-tensorrt/external/cudnn/lib/:$(pwd)/bazel-tensorrt/external/tensorrt/lib/:$(pwd)/bazel-tensorrt/external/libtorch_pre_cxx11_abi/lib:${CUDA_HOME}/lib64/:$LD_LIBRARY_PATH
+        bazel test //tests --jobs=4 --platforms=//toolchains:ci_rhel_x86_64_linux --test_arg=--gtest_output=xml:${RUNNER_TEST_RESULTS_DIR} --config ci_testing --config pre_cxx11_abi --noshow_progress --test_timeout=20000
+
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
     needs: [generate-matrix, build]
