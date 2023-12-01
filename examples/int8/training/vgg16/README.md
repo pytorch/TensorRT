@@ -53,10 +53,12 @@ Use the exporter script to create a torchscript module you can compile with Torc
 
 ### For PTQ
 ```
-python3 export_ckpt.py <path-to-checkpoint>
+python3 export.py --ckpt <path-to-checkpoint> --ir torchscript --output vgg.ts
 ```
 
-The checkpoint file should be from the original training and not quatization aware fine tuning. THe script should produce a file called `trained_vgg16.jit.pt`
+* `--ckpt` : The checkpoint file should be from the original training and not quatization aware fine tuning.
+* `--ir` : Options include `torchscript` or `exported_program`. The saved module type is determined by this `ir` flag.
+* `--output` : Output file name
 
 ### For QAT
 To export a QAT  model, you can run

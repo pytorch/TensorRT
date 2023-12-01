@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
-from typing import Optional, Set
+from typing import Any, Optional, Set
 
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt.dynamo._defaults import (
+    CALIBRATOR,
     DEBUG,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     MAX_AUX_STREAMS,
@@ -46,6 +47,7 @@ class CompilationSettings:
         device (Device): GPU to compile the model on
         require_full_compilation (bool): Whether to require the graph is fully compiled in TensorRT.
             Only applicable for `ir="dynamo"`; has no effect for `torch.compile` path
+        calibrator (ptq.DataLoaderCalibrator | ptq.CacheCalibrator): Calibrator used for INT8 calibration of the model
     """
 
     precision: torch.dtype = PRECISION
@@ -63,3 +65,4 @@ class CompilationSettings:
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS
     device: Device = field(default_factory=default_device)
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION
+    calibrator: Optional[Any] = CALIBRATOR

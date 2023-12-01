@@ -4,12 +4,14 @@ import logging
 from dataclasses import fields, replace
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 
+import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch_tensorrt._Device import Device
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import PRECISION
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.ptq import *  # noqa: F403
 
 from packaging import version
 
@@ -220,8 +222,12 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
     # TODO: Remove once Dynamo precisions refactoring is complete
     if "enabled_precisions" in kwargs:
         enabled_precisions = kwargs["enabled_precisions"]
-
         if (
+            torch.int8 in enabled_precisions
+            or torch_tensorrt.dtype.int8 in enabled_precisions
+        ):
+            settings.precision = torch.int8
+        elif (
             torch.float16 in enabled_precisions
             or torch_tensorrt.dtype.half in enabled_precisions
         ):
@@ -252,6 +258,9 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
             "If this is incorrect, please specify an input device, via the device keyword."
         )
 
+    if "calibrator" in kwargs:
+        settings.calibrator = build_calibrator(kwargs["calibrator"])
+
     # Ignore and warn about require_full_compilation flag
     if settings.require_full_compilation:
         logger.warning(
@@ -263,6 +272,91 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
     logger.info("Compilation Settings: %s\n", settings)
 
     return settings
+
+
+def build_calibrator(calibrator: Union[DataLoaderCalibrator | CacheCalibrator]) -> Any:
+    if not calibrator:
+        return None
+    if not isinstance(calibrator, DataLoaderCalibrator) or isinstance(
+        calibrator, CacheCalibrator
+    ):
+        raise AssertionError(
+            f"Invalid calibrator of type {type(calibrator)} provided. Only calibrator of type DataLoaderCalibrator or CacheCalibrator is supported"
+        )
+    algo_type = calibrator.algo_type
+    cache_file = calibrator.cache_file
+    attribute_mapping = {}
+    if isinstance(calibrator, DataLoaderCalibrator):
+        dataloader = calibrator.dataloader
+        use_cache = calibrator.use_cache
+        device = calibrator.device
+        if not isinstance(dataloader, torch.utils.data.DataLoader):
+            logger.error(
+                f"Dataloader type: {type(dataloader)} is not a valid instance of torch.utils.data.DataLoader"
+            )
+
+        if not cache_file:
+            if use_cache:
+                logger.info(f"Using existing cache_file {cache_file} for calibration")
+            else:
+                logger.info("Overwriting existing calibration cache file.")
+        else:
+            if use_cache:
+                logger.error(
+                    "Input cache file is None but use_cache is set to True in INT8 mode."
+                )
+
+        # Define attributes and member functions for the calibrator class
+        attribute_mapping = {
+            "data_loader": dataloader,
+            "current_batch_idx": 0,
+            "batch_size": dataloader.batch_size,
+            "cache_file": cache_file,
+            "dataset_iterator": iter(dataloader),
+            "device": device,
+            "use_cache": use_cache,
+            "get_batch_size": get_batch_size,
+            "get_batch": get_cache_mode_batch if use_cache else get_batch,
+            "read_calibration_cache": read_calibration_cache,
+            "write_calibration_cache": write_calibration_cache,
+        }
+    elif isinstance(calibrator, CacheCalibrator):
+        attribute_mapping = {
+            "use_cache": True,
+            "cache_file": cache_file,
+            "get_batch_size": get_batch_size,
+            "get_batch": get_cache_mode_batch,
+            "read_calibration_cache": read_calibration_cache,
+            "write_calibration_cache": write_calibration_cache,
+        }
+
+    # Using type metaclass to construct calibrator class based on algorithm type
+    if algo_type == CalibrationAlgo.ENTROPY_CALIBRATION:
+        calib_ec = type(
+            "Int8EntropyCalibrator", (trt.IInt8EntropyCalibrator,), attribute_mapping
+        )()
+        return calib_ec
+    elif algo_type == CalibrationAlgo.ENTROPY_CALIBRATION_2:
+        calib_ec2 = type(
+            "Int8EntropyCalibrator2",
+            (trt.IInt8EntropyCalibrator2,),
+            attribute_mapping,
+        )()
+        return calib_ec2
+    elif algo_type == CalibrationAlgo.LEGACY_CALIBRATION:
+        calib_lc = type(
+            "Int8LegacyCalibrator", (trt.IInt8LegacyCalibrator,), attribute_mapping
+        )()
+        return calib_lc
+    elif algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
+        calib_mmc = type(
+            "Int8MinMaxCalibrator", (trt.IInt8MinMaxCalibrator,), attribute_mapping
+        )()
+        return calib_mmc
+    else:
+        raise ValueError(
+            "Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION"
+        )
 
 
 def req_torch_version(min_torch_version: str = "2.dev") -> Callable[..., Any]:

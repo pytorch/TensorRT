@@ -92,6 +92,7 @@ def _pretraced_backend(
             torchtrt_inputs = prepare_inputs(
                 sample_inputs, disable_memory_format_check=True
             )
+
             trt_compiled = compile_module(
                 gm,
                 torchtrt_inputs,

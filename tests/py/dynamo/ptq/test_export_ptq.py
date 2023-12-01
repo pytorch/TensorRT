@@ -5,24 +5,12 @@ import torch
 import torch.nn as nn
 import torch_tensorrt as torchtrt
 import torchvision
+import torchvision.models as models
 import torchvision.transforms as transforms
 from torch.nn import functional as F
 from torch_tensorrt.logging import *
-
-
-def find_repo_root(max_depth=10):
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    for i in range(max_depth):
-        files = os.listdir(dir_path)
-        if "WORKSPACE" in files:
-            return dir_path
-        else:
-            dir_path = os.path.dirname(dir_path)
-
-    raise RuntimeError("Could not find repo root")
-
-
-MODULE_DIR = find_repo_root() + "/tests/modules"
+from torch_tensorrt.ptq import CalibrationAlgo, DataLoaderCalibrator
+from vgg16 import vgg16
 
 
 def compute_accuracy(testing_dataloader, model):
@@ -37,6 +25,7 @@ def compute_accuracy(testing_dataloader, model):
         for data, labels in testing_dataloader:
             data, labels = data.to(device), labels.to(device)
             out = model(data)
+            out = out[0] if isinstance(out, tuple) else out
             preds = torch.max(out, 1)[1]
             class_probs.append([F.softmax(i, dim=0) for i in out])
             class_preds.append(preds)
@@ -51,10 +40,7 @@ def compute_accuracy(testing_dataloader, model):
 
 class TestAccuracy(unittest.TestCase):
     def test_compile_script(self):
-        self.model = (
-            torch.jit.load(MODULE_DIR + "/trained_vgg16.jit.pt").eval().to("cuda")
-        )
-        self.input = torch.randn((1, 3, 32, 32)).to("cuda")
+        self.model = vgg16(num_classes=10, init_weights=False).eval().cuda()
         self.testing_dataset = torchvision.datasets.CIFAR10(
             root="./data",
             train=False,
@@ -70,30 +56,26 @@ class TestAccuracy(unittest.TestCase):
         )
 
         self.testing_dataloader = torch.utils.data.DataLoader(
-            self.testing_dataset, batch_size=100, shuffle=False, num_workers=0
+            self.testing_dataset, batch_size=100, shuffle=False, num_workers=1
         )
-        self.calibrator = torchtrt.ptq.DataLoaderCalibrator(
+        self.calibrator = DataLoaderCalibrator(
             self.testing_dataloader,
             cache_file="./calibration.cache",
             use_cache=False,
-            algo_type=torchtrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2,
+            algo_type=CalibrationAlgo.ENTROPY_CALIBRATION_2,
             device=torch.device("cuda:0"),
         )
 
         compile_spec = {
             "inputs": [torchtrt.Input([100, 3, 32, 32])],
-            "enabled_precisions": {torch.float, torch.int8},
+            "enabled_precisions": {torch.int8},
             "calibrator": self.calibrator,
             "truncate_long_and_double": True,
-            "device": {
-                "device_type": torchtrt.DeviceType.GPU,
-                "gpu_id": 0,
-                "dla_core": 0,
-                "allow_gpu_fallback": False,
-            },
+            "debug": True,
+            "min_block_size": 1,
+            "enable_experimental_decompositions": True,
         }
-        with torchtrt.logging.debug():
-            trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
+        trt_mod = torchtrt.compile(self.model, **compile_spec)
 
         fp32_test_acc = compute_accuracy(self.testing_dataloader, self.model)
         log(Level.Info, "[Pyt FP32] Test Acc: {:.2f}%".format(100 * fp32_test_acc))

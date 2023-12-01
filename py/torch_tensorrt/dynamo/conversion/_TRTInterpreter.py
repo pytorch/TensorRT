@@ -131,6 +131,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         max_aux_streams: Optional[int] = None,
         version_compatible: bool = False,
         optimization_level: Optional[int] = None,
+        calibrator: Optional[Any] = None,
     ) -> TRTInterpreterResult:
         """
         Build TensorRT engine with some configs.
@@ -171,6 +172,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         build_engine_start_time = datetime.now()
 
         builder_config = self.builder.create_builder_config()
+        if calibrator:
+            builder_config.int8_calibrator = calibrator
 
         if workspace_size != 0:
             builder_config.set_memory_pool_limit(
