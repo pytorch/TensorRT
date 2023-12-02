@@ -1,3 +1,4 @@
+import builtins
 import logging
 import operator
 from typing import Dict, Sequence, Tuple, Union
@@ -23,7 +24,9 @@ def getitem_validator(getitem_node: Node) -> bool:
 
 # TODO: Subsequent evaluators should be registered here with their own validators
 @dynamo_tensorrt_converter(operator.getitem, capability_validator=getitem_validator)
+@dynamo_tensorrt_converter(builtins.getattr)
 @dynamo_tensorrt_converter(torch.ops.aten.detach.default)
+@dynamo_tensorrt_converter(torch.ops.aten.arange.start_step)
 def generic_evaluator(
     ctx: ConversionContext,
     target: Target,
