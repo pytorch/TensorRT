@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
@@ -23,8 +24,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
-# @manual=//deeplearning/trt/python:py_tensorrt
-import tensorrt as trt
 from packaging import version
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -96,6 +95,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._itensor_to_tensor_meta: Dict[
             trt.tensorrt.ITensor, TensorMetadata
         ] = dict()
+        self.compilation_settings = compilation_settings
 
         # Data types for TRT Module output Tensors
         self.output_dtypes = output_dtypes
@@ -118,40 +118,25 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
     def run(
         self,
-        workspace_size: int = 0,
-        precision: torch.dtype = torch.float32,  # TODO: @peri044 Needs to be expanded to set
-        sparse_weights: bool = False,
-        disable_tf32: bool = False,
         force_fp32_output: bool = False,
         strict_type_constraints: bool = False,
         algorithm_selector: Optional[trt.IAlgorithmSelector] = None,
         timing_cache: Optional[trt.ITimingCache] = None,
-        profiling_verbosity: Optional[trt.ProfilingVerbosity] = None,
         tactic_sources: Optional[int] = None,
-        max_aux_streams: Optional[int] = None,
-        version_compatible: bool = False,
-        optimization_level: Optional[int] = None,
     ) -> TRTInterpreterResult:
         """
         Build TensorRT engine with some configs.
         Args:
-            workspace_size: Amount of memory used by TensorRT to store intermediate buffers within an operation.
-            precision: the precision model layers are running on (TensorRT will choose the best perforamnce precision).
-            sparse_weights: allow the builder to examine weights and use optimized functions when weights have suitable sparsity
             force_fp32_output: force output to be fp32
             strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric reasons.
             algorithm_selector: set up algorithm selection for certain layer
             timing_cache: enable timing cache for TensorRT
-            profiling_verbosity: TensorRT logging level
-            max_aux_streams: Maximum number of allowed auxiliary TRT streams for each engine
-            version_compatible: Provide version forward-compatibility for engine plan files
-            optimization_level: Builder optimization 0-5, higher levels imply longer build time,
-                searching for more optimization options. TRT defaults to 3
         Return:
             TRTInterpreterResult
         """
         TRT_INTERPRETER_CALL_PRE_OBSERVER.observe(self.module)
 
+        precision = self.compilation_settings.precision
         # For float outputs, we set their dtype to fp16 only if precision == torch.float16 and
         # force_fp32_output=False. Overriden by specifying output_dtypes
         self.output_fp16 = not force_fp32_output and precision == torch.float16
@@ -172,9 +157,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         builder_config = self.builder.create_builder_config()
 
-        if workspace_size != 0:
+        if self.compilation_settings.workspace_size != 0:
             builder_config.set_memory_pool_limit(
-                trt.MemoryPoolType.WORKSPACE, workspace_size
+                trt.MemoryPoolType.WORKSPACE, self.compilation_settings.workspace_size
             )
 
         cache = None
@@ -187,21 +172,50 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         if version.parse(trt.__version__) >= version.parse("8.2"):
             builder_config.profiling_verbosity = (
-                profiling_verbosity
-                if profiling_verbosity
+                trt.ProfilingVerbosity.VERBOSE
+                if self.compilation_settings.debug
                 else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
             )
 
         if version.parse(trt.__version__) >= version.parse("8.6"):
-            if max_aux_streams is not None:
-                _LOGGER.info(f"Setting max aux streams to {max_aux_streams}")
-                builder_config.max_aux_streams = max_aux_streams
-            if version_compatible:
+            if self.compilation_settings.max_aux_streams is not None:
+                _LOGGER.info(
+                    f"Setting max aux streams to {self.compilation_settings.max_aux_streams}"
+                )
+                builder_config.max_aux_streams = (
+                    self.compilation_settings.max_aux_streams
+                )
+            if self.compilation_settings.version_compatible:
                 _LOGGER.info("Using version compatible")
                 builder_config.set_flag(trt.BuilderFlag.VERSION_COMPATIBLE)
-            if optimization_level is not None:
-                _LOGGER.info(f"Using optimization level {optimization_level}")
-                builder_config.builder_optimization_level = optimization_level
+            if self.compilation_settings.optimization_level is not None:
+                _LOGGER.info(
+                    f"Using optimization level {self.compilation_settings.optimization_level}"
+                )
+                builder_config.builder_optimization_level = (
+                    self.compilation_settings.optimization_level
+                )
+
+        builder_config.engine_capability = self.compilation_settings.engine_capability
+        builder_config.avg_timing_iterations = (
+            self.compilation_settings.num_avg_timing_iters
+        )
+
+        if self.compilation_settings.device.device_type == trt.DeviceType.DLA:
+            builder_config.DLA_core = self.compilation_settings.device.dla_core
+            _LOGGER.info(f"Using DLA core {self.compilation_settings.device.dla_core}")
+            builder_config.set_memory_pool_limit(
+                trt.MemoryPoolType.DLA_MANAGED_SRAM,
+                self.compilation_settings.dla_sram_size,
+            )
+            builder_config.set_memory_pool_limit(
+                trt.MemoryPoolType.DLA_LOCAL_DRAM,
+                self.compilation_settings.dla_local_dram_size,
+            )
+            builder_config.set_memory_pool_limit(
+                trt.MemoryPoolType.DLA_GLOBAL_DRAM,
+                self.compilation_settings.dla_global_dram_size,
+            )
 
         if precision == torch.float16:
             builder_config.set_flag(trt.BuilderFlag.FP16)
@@ -209,11 +223,14 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if precision == torch.int8:
             builder_config.set_flag(trt.BuilderFlag.INT8)
 
-        if sparse_weights:
+        if self.compilation_settings.sparse_weights:
             builder_config.set_flag(trt.BuilderFlag.SPARSE_WEIGHTS)
 
-        if disable_tf32:
+        if self.compilation_settings.disable_tf32:
             builder_config.clear_flag(trt.BuilderFlag.TF32)
+
+        if self.compilation_settings.refit:
+            builder_config.set_flag(trt.BuilderFlag.REFIT)
 
         if strict_type_constraints:
             builder_config.set_flag(trt.BuilderFlag.STRICT_TYPES)
