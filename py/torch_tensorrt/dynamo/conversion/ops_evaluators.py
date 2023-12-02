@@ -3,6 +3,7 @@ import logging
 import operator
 from typing import Dict, Sequence, Tuple, Union
 
+import numpy as np
 import torch
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -26,7 +27,6 @@ def getitem_validator(getitem_node: Node) -> bool:
 @dynamo_tensorrt_converter(operator.getitem, capability_validator=getitem_validator)
 @dynamo_tensorrt_converter(builtins.getattr)
 @dynamo_tensorrt_converter(torch.ops.aten.detach.default)
-@dynamo_tensorrt_converter(torch.ops.aten.arange.start_step)
 def generic_evaluator(
     ctx: ConversionContext,
     target: Target,
@@ -38,3 +38,14 @@ def generic_evaluator(
         f"Evaluating {ConverterRegistry.qualified_name_or_str(target)} on object with name: {name}"
     )
     return target(*args)
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.arange.start_step)
+def aten_ops_arange_start_step(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return np.arange(*args)
