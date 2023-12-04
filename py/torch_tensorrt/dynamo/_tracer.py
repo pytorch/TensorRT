@@ -60,7 +60,7 @@ def trace(
     torch_inputs = get_torch_inputs(inputs, device)
     dynamic_shapes = {}
     for input in inputs:
-        if input.shape_mode == Input._ShapeMode.DYNAMIC:
+        if isinstance(input, Input) and input.shape_mode == Input._ShapeMode.DYNAMIC:
             if not input.name:
                 raise AssertionError(
                     f"Expected a name for a dynamic input with shape {input.shape} but found none"
