@@ -12,7 +12,6 @@ from torch_tensorrt.dynamo._defaults import (
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     default_device,
 )
-from torch_tensorrt.dynamo.lowering import get_decompositions
 from torch_tensorrt.dynamo.utils import get_torch_inputs, set_log_level, to_torch_device
 
 logger = logging.getLogger(__name__)
@@ -95,8 +94,6 @@ def trace(
         "enable_experimental_decompositions", ENABLE_EXPERIMENTAL_DECOMPOSITIONS
     )
 
-    exp_program = export(
-        mod, tuple(torch_inputs), dynamic_shapes=dynamic_shapes
-    ).run_decompositions(get_decompositions(experimental_decompositions))
+    exp_program = export(mod, tuple(torch_inputs), dynamic_shapes=dynamic_shapes)
 
     return exp_program

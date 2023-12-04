@@ -278,7 +278,7 @@ def inline_trt_modules(
                 (trt_module_node.args, trt_module.engine),
             )
             trt_node.meta["val"] = []
-            assert num_outputs
+            assert num_outputs > 0
             # Generate meta data for TRT node (a FakeTensor with corresponding output shape)
             for idx in range(num_outputs):
                 trt_node.meta["val"].append(
