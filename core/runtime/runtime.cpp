@@ -7,6 +7,8 @@ namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
+bool SAFE_MODE = true;
+
 c10::optional<RTDevice> get_most_compatible_device(const RTDevice& target_device, const RTDevice& curr_device) {
   LOG_DEBUG("Target Device: " << target_device);
   auto device_options = find_compatible_devices(target_device);

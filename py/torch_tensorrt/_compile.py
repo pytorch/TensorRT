@@ -256,6 +256,22 @@ def torch_compile(module: torch.nn.Module, **kwargs: Any) -> Any:
     return boxed_fn
 
 
+def enable_unsafe_inference_mode():
+    """
+    Enables unsafe inference mode for Torch-TensorRT
+    """
+    torch.ops.tensorrt.set_safe_mode(False)
+    logger.info("Enabled unsafe inference mode")
+
+
+def enable_safe_inference_mode():
+    """
+    Enables safe inference mode for Torch-TensorRT
+    """
+    torch.ops.tensorrt.set_safe_mode(True)
+    logger.info("Enabled safe inference mode")
+
+
 def convert_method_to_trt_engine(
     module: Any,
     method_name: str = "forward",

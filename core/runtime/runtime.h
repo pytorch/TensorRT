@@ -16,6 +16,7 @@ namespace runtime {
 
 using EngineID = int64_t;
 const std::string ABI_VERSION = "4";
+extern bool SAFE_MODE;
 typedef enum {
   ABI_TARGET_IDX = 0,
   NAME_IDX,
