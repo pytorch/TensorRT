@@ -213,6 +213,19 @@ def slice_scatter_decomposition(
     return output_tensor
 
 
+@register_torch_trt_decomposition(
+    torch.ops.aten.select_scatter.default, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def select_scatter_decomposition(
+    input_tensor: torch.Tensor,
+    src_tensor: torch.Tensor,
+    dim: int,
+    index: int,
+) -> torch.Tensor:
+    src_tensor = torch.unsqueeze(src_tensor, dim)
+    return torch.slice_scatter(input_tensor, src_tensor, dim, index, index + 1, 1)
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
