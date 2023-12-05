@@ -104,9 +104,9 @@ def select(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: Union[TRTTensor],
-    other: Union[TRTTensor],
-    condition: Union[TRTTensor],
+    input: TRTTensor,
+    other: TRTTensor,
+    condition: TRTTensor,
 ) -> TRTTensor:
     select_layer = ctx.net.add_select(condition, input, other)
     set_layer_name(select_layer, target, name + "_select", source_ir)
