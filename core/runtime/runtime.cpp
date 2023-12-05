@@ -33,13 +33,13 @@ c10::optional<RTDevice> get_most_compatible_device(const RTDevice& target_device
     if (device.device_name == target_device.device_name) {
       // First priority is selecting a candidate which agrees with the current device ID
       // If such a device is found, we can select it and break out of the loop
-      if (device.id == current_device.id && best_match.id != current_device.id) {
+      if (device.id == current_device.id) {
         best_match = device;
         break;
       }
       // Second priority is selecting a candidate which agrees with the target device ID
       // At deserialization time, the current device and target device may not agree
-      else if (device.id == target_device.id && best_match.id != target_device.id) {
+      else if (device.id == target_device.id) {
         best_match = device;
       }
       // If no such GPU ID is found, select the first available candidate GPU
