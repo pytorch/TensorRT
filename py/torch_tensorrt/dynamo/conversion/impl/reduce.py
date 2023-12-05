@@ -19,7 +19,7 @@ def amax(
     source_ir: Optional[SourceIR],
     name: str,
     input_val: TRTTensor,
-    dim: Union[int, Sequence[int]],
+    dim: Sequence[int] = [],
     keepdim: bool = False,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
@@ -27,12 +27,39 @@ def amax(
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
-    if dim is None or (isinstance(dim, (tuple, list)) and len(dim) == 0):
+    if isinstance(dim, (tuple, list)) and len(dim) == 0:
         dim = tuple(range(len(input_val.shape)))
 
     layer = ctx.net.add_reduce(
         input_val,
         trt.ReduceOperation.MAX,
+        axes=get_axes_for_reduce_op(get_positive_dim(dim, len(input_val.shape))),
+        keep_dims=keepdim,
+    )
+    set_layer_name(layer, target, name, source_ir)
+    return layer.get_output(0)
+
+
+def amin(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+    dim: Sequence[int] = [],
+    keepdim: bool = False,
+) -> TRTTensor:
+    if (isinstance(input_val, TRTTensor)) and (
+        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+    ):
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+
+    if isinstance(dim, (tuple, list)) and len(dim) == 0:
+        dim = tuple(range(len(input_val.shape)))
+
+    layer = ctx.net.add_reduce(
+        input_val,
+        trt.ReduceOperation.MIN,
         axes=get_axes_for_reduce_op(get_positive_dim(dim, len(input_val.shape))),
         keep_dims=keepdim,
     )
