@@ -162,6 +162,21 @@ def var_decomposition(
     return variance
 
 
+@register_torch_trt_decomposition(
+    torch.ops.select_scatter, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def select_scatter_decomposition(
+    input_tensor: torch.Tensor,
+    src_tensor: torch.Tensor,
+    dim: int,
+    index: int,
+) -> torch.Tensor:
+    input_tensor.shape[dim] = torch.le(index, input_tensor.shape[dim])
+    src_tensor = torch.expand(torch.unsqueeze(src_tensor, dim), input_tensor.shape)
+    input_tensor_shape = input_tensor.shape
+    return torch.where(torch.eq((input_tensor_shape[dim]), index)), src_tensor, input_tensor)
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
