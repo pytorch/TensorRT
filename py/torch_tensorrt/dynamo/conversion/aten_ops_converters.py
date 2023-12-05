@@ -366,7 +366,12 @@ def aten_ops_sigmoid(
 
 def index_dtype_validator(node: Node) -> bool:
     index = node.args[1]
-    return all(ind.meta["val"].dtype == torch.int32 for ind in index if ind is not None)
+    for ind in index:
+        if ind is not None:
+            val = ind.meta.get("val")
+            if val is not None and val.dtype != torch.int32:
+                return False
+    return True
 
 
 @dynamo_tensorrt_converter(
