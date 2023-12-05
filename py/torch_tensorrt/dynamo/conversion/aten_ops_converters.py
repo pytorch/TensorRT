@@ -2505,3 +2505,27 @@ def upsample_bilinear2d(
         resize_mode="bilinear",
         align_corners=args_bounds_check(args, 2),
     )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.sort.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_sort(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.topk.sort(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        dim=args_bounds_check(args, 1, -1),
+        descending=args_bounds_check(args, 2, False),
+    )
