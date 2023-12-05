@@ -236,7 +236,10 @@ def compile_module(
 
     def contains_metadata(gm: torch.fx.GraphModule) -> bool:
         for node in gm.graph.nodes:
-            if (not node.meta) or "val" not in node.meta and node.op != "output":
+            if node.op != "output" and (not node.meta) and "val" not in node.meta:
+                logger.debug(
+                    f"Node {node.name} of op type {node.op} does not have metadata"
+                )
                 return False
         return True
 
