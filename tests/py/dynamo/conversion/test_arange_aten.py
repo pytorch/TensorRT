@@ -26,6 +26,7 @@ class TestArangeConverter(DispatchTestCase):
         self.run_test(
             Arange(),
             inputs,
+            use_dynamo_tracer=True,
         )
 
 
