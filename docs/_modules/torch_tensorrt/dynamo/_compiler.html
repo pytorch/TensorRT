@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.2.0.dev0+e3608a5 documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.2.0.dev0+bc6e1fa documentation</title>
   
 
   
@@ -234,7 +234,7 @@
               
               
                 <div class="version">
-                  v2.2.0.dev0+e3608a5
+                  v2.2.0.dev0+bc6e1fa
                 </div>
               
             
@@ -445,7 +445,7 @@
     <span class="n">convert_module</span><span class="p">,</span>
     <span class="n">repair_long_or_double_inputs</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.lowering</span> <span class="kn">import</span> <span class="n">apply_lowering_passes</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.lowering</span> <span class="kn">import</span> <span class="n">apply_lowering_passes</span><span class="p">,</span> <span class="n">get_decompositions</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">get_torch_inputs</span><span class="p">,</span>
     <span class="n">prepare_inputs</span><span class="p">,</span>
@@ -557,6 +557,13 @@
     <span class="n">inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
     <span class="n">device</span> <span class="o">=</span> <span class="n">to_torch_tensorrt_device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">ExportedProgram</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Input graph should be an ExportedProgram but got type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
+        <span class="n">get_decompositions</span><span class="p">(</span><span class="n">enable_experimental_decompositions</span><span class="p">)</span>
+    <span class="p">)</span>
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
