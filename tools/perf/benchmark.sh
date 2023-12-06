@@ -7,8 +7,8 @@ python hub.py
 
 batch_sizes=(1 2 4 8 16 32 64 128 256)
 large_model_batch_sizes=(1 2 4 8 16 32 64)
-backends=("torch" "ts_trt" "dynamo" "torch_compile" "inductor")
-backends_no_torchscript=("torch" "dynamo" "torch_compile" "inductor")
+backends=("torch" "ts_trt" "dynamo" "torch_compile" "inductor" "tensorrt")
+backends_no_torchscript=("torch" "dynamo" "torch_compile" "inductor" "tensorrt")
 
 
 # Benchmark VGG16 model
