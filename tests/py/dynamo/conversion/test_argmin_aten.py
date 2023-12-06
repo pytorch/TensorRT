@@ -6,7 +6,7 @@ from torch.testing._internal.common_utils import run_tests
 from .harness import DispatchTestCase
 
 
-class TestArgmaxConverter(DispatchTestCase):
+class TestArgminConverter(DispatchTestCase):
     @parameterized.expand(
         [
             # input dimension == 1
@@ -24,17 +24,17 @@ class TestArgmaxConverter(DispatchTestCase):
             ("dim_negative_keep_dim_true", (1, 2, 3), -1, True),
         ]
     )
-    def test_argmax(self, _, input_shape, dim, keep_dim):
-        class ArgMax(nn.Module):
+    def test_argmin(self, _, input_shape, dim, keep_dim):
+        class ArgMin(nn.Module):
             def __init__(self):
                 super().__init__()
 
             def forward(self, input):
-                return torch.ops.aten.argmax.default(input, dim, keep_dim)
+                return torch.ops.aten.argmin.default(input, dim, keep_dim)
 
         input = [torch.randn(*input_shape)]
 
-        self.run_test(ArgMax(), input)
+        self.run_test(ArgMin(), input)
 
 
 if __name__ == "__main__":
