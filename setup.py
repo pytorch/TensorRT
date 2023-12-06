@@ -12,8 +12,8 @@ from pathlib import Path
 from shutil import copyfile, rmtree
 from typing import List
 
-# import setuptools
-# import yaml
+import setuptools
+import yaml
 from setuptools import Extension, find_namespace_packages, setup
 from setuptools.command.build_ext import build_ext
 from setuptools.command.develop import develop
@@ -62,23 +62,23 @@ def get_base_version() -> str:
     return re.sub(LEGACY_BASE_VERSION_SUFFIX_PATTERN, "", dirty_version)
 
 
-# def load_dep_info():
-#     global __cuda_version__
-#     global __cudnn_version__
-#     global __tensorrt_version__
-#     with open("dev_dep_versions.yml", "r") as stream:
-#         versions = yaml.safe_load(stream)
-#         if (gpu_arch_version := os.environ.get("CU_VERSION")) is not None:
-#             __cuda_version__ = (
-#                 (gpu_arch_version[2:])[:-1] + "." + (gpu_arch_version[2:])[-1:]
-#             )
-#         else:
-#             __cuda_version__ = versions["__cuda_version__"]
-#         __cudnn_version__ = versions["__cudnn_version__"]
-#         __tensorrt_version__ = versions["__tensorrt_version__"]
+def load_dep_info():
+    global __cuda_version__
+    global __cudnn_version__
+    global __tensorrt_version__
+    with open("dev_dep_versions.yml", "r") as stream:
+        versions = yaml.safe_load(stream)
+        if (gpu_arch_version := os.environ.get("CU_VERSION")) is not None:
+            __cuda_version__ = (
+                (gpu_arch_version[2:])[:-1] + "." + (gpu_arch_version[2:])[-1:]
+            )
+        else:
+            __cuda_version__ = versions["__cuda_version__"]
+        __cudnn_version__ = versions["__cudnn_version__"]
+        __tensorrt_version__ = versions["__tensorrt_version__"]
 
 
-# load_dep_info()
+load_dep_info()
 
 dir_path = linux_path_to_windows(str(get_root_dir()) + "/py")
 
