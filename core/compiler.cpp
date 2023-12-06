@@ -9,6 +9,7 @@
 #include "ATen/core/function_schema.h"
 #include "ATen/core/jit_type.h"
 
+#include "partitioning/segmentedblock/SegmentedBlock.h"
 #include "torch/csrc/jit/frontend/function_schema_parser.h"
 #include "torch/csrc/jit/ir/ir.h"
 #include "torch/csrc/jit/passes/graph_fuser.h"
@@ -332,6 +333,20 @@ bool userRequestedFallback(CompileSpec& cfg) {
       cfg.partitioning_info.forced_fallback_operators.size() != 0;
 }
 
+std::vector<at::ScalarType> propagateOutputType(std::shared_ptr<torch::jit::Graph> g, CompileSpec cfg) {
+  LOG_DEBUG("Propagating output types\n");
+  partitioning::SegmentedBlock entire_block(partitioning::SegmentedBlock::SegmentedBlockTarget::kTensorRT, g);
+
+  auto input_type = ir::get_block_first_calc_dtypes_opt_collection(g->block());
+
+  std::unordered_map<const torch::jit::Value*, torch::jit::IValue> input_type_map =
+      partitioning::generateRandomInputs(cfg.partitioning_info.collection_input_spec_map, input_type);
+
+  partitioning::getSegmentsOutputByRunning(entire_block, input_type_map, cfg.partitioning_info, ir::ShapeMode::kOPT);
+
+  return entire_block.out_types();
+}
+
 torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) {
   torch::jit::Module new_mod(mod._ivalue()->name() + "_trt");
 
@@ -414,7 +429,8 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
         TORCHTRT_CHECK(
             conversion::VerifyConverterSupportForBlock(g->block()),
             "Not all operations in graph are supported by the compiler");
-        // TODO find the right
+        auto out_types = propagateOutputType(g, cfg);
+        cfg.convert_info.out_types = out_types;
         auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
         AddEngineToGraph(new_mod, new_g, engine, cuda_device, std::vector<std::string>(), std::vector<std::string>());
       }

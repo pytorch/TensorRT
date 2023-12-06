@@ -37,6 +37,12 @@ ExampleIValues generateRandomInputs(
     const ir::ShapeMode& shape_mode = ir::ShapeMode::kOPT,
     int64_t gpu_id = 0);
 
+void getSegmentsOutputByRunning(
+    SegmentedBlock& seg_block,
+    std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& ivalues_maps,
+    const PartitioningInfo& partitioning_info,
+    const ir::ShapeMode& shape_mode);
+
 void populateInputIValues(PartitioningCtx* ctx);
 
 void runShapeAnalysis(
