@@ -36,6 +36,7 @@ def test_base_dynamic(ir):
                 opt_shape=(4, 3, 224, 224),
                 max_shape=(8, 3, 224, 224),
                 dtype=torch.float32,
+                name="x",
             )
         ],
         "device": torchtrt.Device("cuda:0"),
@@ -88,6 +89,7 @@ def test_base_dynamic_fallback(ir):
                 opt_shape=(4, 3, 224, 224),
                 max_shape=(8, 3, 224, 224),
                 dtype=torch.float32,
+                name="x",
             )
         ],
         "device": torchtrt.Device("cuda:0"),

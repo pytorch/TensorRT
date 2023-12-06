@@ -34,7 +34,7 @@ from torch_tensorrt.dynamo.conversion import (
     convert_module,
     repair_long_or_double_inputs,
 )
-from torch_tensorrt.dynamo.lowering import apply_lowering_passes
+from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decompositions
 from torch_tensorrt.dynamo.utils import (
     get_torch_inputs,
     prepare_inputs,
@@ -146,6 +146,13 @@ def compile(
     inputs = prepare_inputs(inputs)
     device = to_torch_tensorrt_device(device)
 
+    if not isinstance(exported_program, ExportedProgram):
+        raise AssertionError(
+            f"Input graph should be an ExportedProgram but got type {type(exported_program)}"
+        )
+    exported_program = exported_program.run_decompositions(
+        get_decompositions(enable_experimental_decompositions)
+    )
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
 
