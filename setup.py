@@ -403,6 +403,7 @@ packages = [
     "torch_tensorrt.fx.tracer",
     "torch_tensorrt.fx.tracer.acc_tracer",
     "torch_tensorrt.fx.tracer.dispatch_tracer",
+    "torch_tensorrt.runtime",
 ]
 
 package_dir = {
@@ -430,6 +431,7 @@ package_dir = {
     "torch_tensorrt.fx.tracer": "py/torch_tensorrt/fx/tracer",
     "torch_tensorrt.fx.tracer.acc_tracer": "py/torch_tensorrt/fx/tracer/acc_tracer",
     "torch_tensorrt.fx.tracer.dispatch_tracer": "py/torch_tensorrt/fx/tracer/dispatch_tracer",
+    "torch_tensorrt.runtime": "py/torch_tensorrt/runtime",
 }
 
 package_data = {}

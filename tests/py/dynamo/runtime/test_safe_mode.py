@@ -7,16 +7,21 @@ from ..testing_utilities import DECIMALS_OF_AGREEMENT
 
 
 class TestSafeMode(TestCase):
-    def test_safe_mode_enabled(self):
-        torch_tensorrt.enable_safe_inference_mode()
-        self.assertTrue(torch.ops.tensorrt.get_safe_mode())
+    def test_multi_device_safe_mode_on(self):
+        torch_tensorrt.runtime.set_multi_device_safe_mode(True)
+        self.assertTrue(torch.ops.tensorrt.get_multi_device_safe_mode())
 
-    def test_unsafe_mode_enabled(self):
-        torch_tensorrt.enable_unsafe_inference_mode()
-        self.assertFalse(torch.ops.tensorrt.get_safe_mode())
+    def test_multi_device_safe_mode_off(self):
+        torch_tensorrt.runtime.set_multi_device_safe_mode(False)
+        self.assertFalse(torch.ops.tensorrt.get_multi_device_safe_mode())
 
-    def test_unsafe_mode_enabled_inference_python(self):
-        torch_tensorrt.enable_unsafe_inference_mode()
+    def test_multi_device_safe_mode_context(self):
+        with torch_tensorrt.runtime.set_multi_device_safe_mode(True):
+            self.assertTrue(torch.ops.tensorrt.get_multi_device_safe_mode())
+        self.assertFalse(torch.ops.tensorrt.get_multi_device_safe_mode())
+
+    def test_multi_device_safe_mode_enabled_inference_python(self):
+        torch_tensorrt.runtime.set_multi_device_safe_mode(True)
 
         class SampleModel(torch.nn.Module):
             def forward(self, x):
@@ -51,12 +56,12 @@ class TestSafeMode(TestCase):
             max_diff,
             0,
             DECIMALS_OF_AGREEMENT,
-            msg=f"Unsafe Mode Python TRT outputs don't match with the original model.",
+            msg=f"Safe Mode Python TRT outputs don't match with the original model.",
         )
         torch._dynamo.reset()
 
-    def test_unsafe_mode_enabled_inference_cpp(self):
-        torch_tensorrt.enable_unsafe_inference_mode()
+    def test_multi_device_safe_mode_enabled_inference_cpp(self):
+        torch_tensorrt.runtime.set_multi_device_safe_mode(True)
 
         class SampleModel(torch.nn.Module):
             def forward(self, x):
@@ -91,7 +96,7 @@ class TestSafeMode(TestCase):
             max_diff,
             0,
             DECIMALS_OF_AGREEMENT,
-            msg=f"Unsafe Mode C++ TRT outputs don't match with the original model.",
+            msg=f"Safe Mode C++ TRT outputs don't match with the original model.",
         )
         torch._dynamo.reset()
 

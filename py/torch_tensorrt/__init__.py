@@ -82,10 +82,6 @@ except ImportError:
 
 import torch
 from torch_tensorrt._compile import *  # noqa: F403
-from torch_tensorrt._compile import (
-    enable_safe_inference_mode,
-    enable_unsafe_inference_mode,
-)
 from torch_tensorrt._Device import Device  # noqa: F401
 from torch_tensorrt._enums import *  # noqa: F403
 from torch_tensorrt._Input import Input  # noqa: F401
@@ -93,6 +89,7 @@ from torch_tensorrt._utils import *  # noqa: F403
 from torch_tensorrt._utils import sanitized_torch_version
 from torch_tensorrt.logging import *
 from torch_tensorrt.ptq import *
+from torch_tensorrt.runtime import *  # noqa: F403
 
 if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
     from torch_tensorrt.dynamo import backend  # noqa: F401

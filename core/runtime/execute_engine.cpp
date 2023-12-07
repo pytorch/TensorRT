@@ -74,7 +74,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     LOG_INFO("" << log_info);
   }
 
-  if (SAFE_MODE) {
+  if (MULTI_DEVICE_SAFE_MODE) {
     std::unique_ptr<torch::autograd::profiler::RecordProfile> device_profiler_guard;
     if (compiled_engine->profile_execution) {
       device_profiler_guard =
@@ -129,15 +129,13 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     }
     for (size_t i = 0; i < inputs.size(); i++) {
       std::string name = compiled_engine->in_binding_names[i];
-      if (SAFE_MODE) {
-        TORCHTRT_CHECK(
-            inputs[i].is_cuda(), "Expected input tensors to have device cuda, found device " << inputs[i].device());
-        auto expected_type =
-            util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
-        TORCHTRT_CHECK(
-            inputs[i].dtype() == expected_type,
-            "Expected input tensors to have type " << expected_type << ", found type " << inputs[i].dtype());
-      }
+      TORCHTRT_CHECK(
+          inputs[i].is_cuda(), "Expected input tensors to have device cuda, found device " << inputs[i].device());
+      auto expected_type =
+          util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
+      TORCHTRT_CHECK(
+          inputs[i].dtype() == expected_type,
+          "Expected input tensors to have type " << expected_type << ", found type " << inputs[i].dtype());
       auto dims = core::util::toDims(inputs[i].sizes());
       auto shape = core::util::toVec(dims);
       LOG_DEBUG("Input Name: " << name << " Shape: " << dims);

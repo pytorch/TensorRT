@@ -8,7 +8,11 @@ import tensorrt as trt
 import torch
 from torch.nn import Module
 from torch_tensorrt._Device import Device
-from torch_tensorrt.dynamo.runtime.tools import _is_switch_required, _select_rt_device
+from torch_tensorrt.dynamo.runtime.tools import (
+    _is_switch_required,
+    _select_rt_device,
+    multi_gpu_device_check,
+)
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
 import torch_tensorrt
@@ -33,6 +37,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     ):
         super(PythonTorchTensorRTModule, self).__init__()
         self._register_state_dict_hook(PythonTorchTensorRTModule._on_state_dict)
+
+        # Run multi-gpu device check to validate engine instantiation
+        multi_gpu_device_check()
+
         self.engine = engine
         self.input_names = input_names if input_names is not None else []
         self.output_names = output_names if output_names is not None else []
@@ -133,6 +141,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     ) -> None:
         engine_bytes = state_dict[prefix + "engine"]
 
+        # Run multi-gpu device check to validate engine instantiation
+        multi_gpu_device_check()
+
         logger = trt.Logger()
         runtime = trt.Runtime(logger)
         self.engine = runtime.deserialize_cuda_engine(engine_bytes)
@@ -162,7 +173,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self._check_initialized()
 
             # If in safe mode, check at each iteration for for whether a switch is required
-            if torch_tensorrt._compile.SAFE_MODE:
+            if (
+                torch_tensorrt.runtime.multi_device_safe_mode._PY_RT_MULTI_DEVICE_SAFE_MODE
+            ):
                 curr_device_id = torch.cuda.current_device()
                 curr_device_properties = torch.cuda.get_device_properties(
                     curr_device_id
@@ -202,24 +215,22 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 )
 
                 for i, input_name in enumerate(self.input_names):
-                    # Check that the inputs are on cuda and have the correct data type if in safe mode
-                    if torch_tensorrt._compile.SAFE_MODE:
-                        if not contiguous_inputs[i].is_cuda:
-                            logger.warning(
-                                f"Detected input {input_name} of engine {self.engine.name} is not on a cuda device. "
-                                "This tensor is being moved by the runtime but for performance considerations, "
-                                "ensure your inputs are all on GPU and open an issue here "
-                                "(https://github.com/pytorch/TensorRT/issues) if this warning persists."
-                            )
-                            contiguous_inputs = (
-                                contiguous_inputs[:i]
-                                + [contiguous_inputs[i].cuda()]
-                                + contiguous_inputs[i + 1 :]
-                            )
+                    if not contiguous_inputs[i].is_cuda:
+                        logger.warning(
+                            f"Detected input {input_name} of engine {self.engine.name} is not on a cuda device. "
+                            "This tensor is being moved by the runtime but for performance considerations, "
+                            "ensure your inputs are all on GPU and open an issue here "
+                            "(https://github.com/pytorch/TensorRT/issues) if this warning persists."
+                        )
+                        contiguous_inputs = (
+                            contiguous_inputs[:i]
+                            + [contiguous_inputs[i].cuda()]
+                            + contiguous_inputs[i + 1 :]
+                        )
 
-                        assert (
-                            contiguous_inputs[i].dtype == self.input_dtypes[i]
-                        ), f"Dtype mismatch for {i}th input({input_name}). Expect {self.input_dtypes[i]}, got {contiguous_inputs[i].dtype}."
+                    assert (
+                        contiguous_inputs[i].dtype == self.input_dtypes[i]
+                    ), f"Dtype mismatch for {i}th input({input_name}). Expect {self.input_dtypes[i]}, got {contiguous_inputs[i].dtype}."
 
                     idx = self.input_binding_indices_in_order[i]
                     bindings[idx] = contiguous_inputs[i].data_ptr()

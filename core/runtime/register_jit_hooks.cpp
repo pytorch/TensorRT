@@ -114,8 +114,10 @@ TORCH_LIBRARY(tensorrt, m) {
   m.def("execute_engine", execute_engine);
   m.def("SERIALIZED_ENGINE_BINDING_DELIM", []() -> std::string { return std::string(1, TRTEngine::BINDING_DELIM); });
   m.def("ABI_VERSION", []() -> std::string { return ABI_VERSION; });
-  m.def("get_safe_mode", []() -> bool { return SAFE_MODE; });
-  m.def("set_safe_mode", [](bool safe_mode) -> void { SAFE_MODE = safe_mode; });
+  m.def("get_multi_device_safe_mode", []() -> bool { return MULTI_DEVICE_SAFE_MODE; });
+  m.def("set_multi_device_safe_mode", [](bool multi_device_safe_mode) -> void {
+    MULTI_DEVICE_SAFE_MODE = multi_device_safe_mode;
+  });
 }
 
 } // namespace

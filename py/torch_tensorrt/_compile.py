@@ -20,8 +20,6 @@ from packaging import version
 
 DYNAMO_ENABLED = version.parse(sanitized_torch_version()) >= version.parse("2.1.dev")
 
-SAFE_MODE = torch.ops.tensorrt.get_safe_mode()
-
 if DYNAMO_ENABLED:
     from torch._export import ExportedProgram
     from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
@@ -256,26 +254,6 @@ def torch_compile(module: torch.nn.Module, **kwargs: Any) -> Any:
     )
 
     return boxed_fn
-
-
-def enable_unsafe_inference_mode() -> None:
-    """
-    Enables unsafe inference mode for Torch-TensorRT
-    """
-    global SAFE_MODE
-    SAFE_MODE = False
-    torch.ops.tensorrt.set_safe_mode(False)
-    logger.info("Enabled unsafe inference mode")
-
-
-def enable_safe_inference_mode() -> None:
-    """
-    Enables safe inference mode for Torch-TensorRT
-    """
-    global SAFE_MODE
-    SAFE_MODE = True
-    torch.ops.tensorrt.set_safe_mode(True)
-    logger.info("Enabled safe inference mode")
 
 
 def convert_method_to_trt_engine(

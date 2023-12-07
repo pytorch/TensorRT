@@ -3,7 +3,25 @@ from typing import Optional, Tuple
 
 import torch
 
+import torch_tensorrt
+
 logger = logging.getLogger(__name__)
+
+
+def multi_gpu_device_check() -> None:
+    # If multi-device safe mode is disabled and more than 1 device is registered on the machine, warn user
+    if (
+        not torch_tensorrt.runtime.multi_device_safe_mode._PY_RT_MULTI_DEVICE_SAFE_MODE
+        and torch.cuda.device_count() > 1
+    ):
+        logger.warning(
+            "Detected this engine is being instantitated in a multi-GPU system with "
+            "multi-device safe mode disabled. For more on the implications of this "
+            "as well as workarounds, see MULTI_DEVICE_SAFE_MODE.md "
+            "(https://github.com/pytorch/TensorRT/blob/main/py/torch_tensorrt/dynamo/runtime/MULTI_DEVICE_SAFE_MODE.md). "
+            f"The engine is set to be instantiated on the current default cuda device, cuda:{torch.cuda.current_device()}. "
+            "If this is incorrect, please set the desired cuda device via torch.cuda.set_device(...) and retry."
+        )
 
 
 def _is_switch_required(
