@@ -229,6 +229,8 @@ def create_trt_exp_program(
     """
     input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]
     output_nodes = [node for node in gm.graph.nodes if node.op == "output"]
+    assert output_nodes
+    output_nodes = output_nodes[0].args[0]
 
     input_specs = [
         InputSpec(InputKind.USER_INPUT, TensorArgument(name=node.name), node.target)
@@ -276,6 +278,7 @@ def inline_trt_modules(
                 (trt_module_node.args, trt_module.engine),
             )
             trt_node.meta["val"] = []
+            assert num_outputs > 0
             # Generate meta data for TRT node (a FakeTensor with corresponding output shape)
             for idx in range(num_outputs):
                 trt_node.meta["val"].append(
@@ -292,12 +295,16 @@ def inline_trt_modules(
             # Insert getitem nodes as outputs (for export serialization to work)
             with gm.graph.inserting_after(trt_node):
                 getitem_output = gm.graph.call_function(operator.getitem, (trt_node, 0))
+                getitem_output.meta["val"] = trt_node.meta["val"]
             trt_module_node.replace_all_uses_with(getitem_output)
         else:
             # Multiple outputs case:
             # Replace uses of submodule with the trt_node.
             # getitem nodes are already added inherently by the partitioner
             trt_module_node.replace_all_uses_with(trt_node)
+            getitem_nodes = trt_node.users
+            for idx, getitem_node in enumerate(getitem_nodes):
+                getitem_node.meta["val"] = trt_node.meta["val"][idx]
 
         # Erase the TRT submodule (call_module) node.
         gm.graph.erase_node(trt_module_node)

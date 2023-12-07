@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._exporter &mdash; Torch-TensorRT v2.2.0.dev0+e3608a5 documentation</title>
+  <title>torch_tensorrt.dynamo._exporter &mdash; Torch-TensorRT v2.2.0.dev0+adb8c1b documentation</title>
   
 
   
@@ -234,7 +234,7 @@
               
               
                 <div class="version">
-                  v2.2.0.dev0+e3608a5
+                  v2.2.0.dev0+adb8c1b
                 </div>
               
             
@@ -640,6 +640,8 @@
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">input_nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;placeholder&quot;</span><span class="p">]</span>
     <span class="n">output_nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;output&quot;</span><span class="p">]</span>
+    <span class="k">assert</span> <span class="n">output_nodes</span>
+    <span class="n">output_nodes</span> <span class="o">=</span> <span class="n">output_nodes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
     <span class="n">input_specs</span> <span class="o">=</span> <span class="p">[</span>
         <span class="n">InputSpec</span><span class="p">(</span><span class="n">InputKind</span><span class="o">.</span><span class="n">USER_INPUT</span><span class="p">,</span> <span class="n">TensorArgument</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">),</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
@@ -687,6 +689,7 @@
                 <span class="p">(</span><span class="n">trt_module_node</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="n">trt_module</span><span class="o">.</span><span class="n">engine</span><span class="p">),</span>
             <span class="p">)</span>
             <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">assert</span> <span class="n">num_outputs</span> <span class="o">&gt;</span> <span class="mi">0</span>
             <span class="c1"># Generate meta data for TRT node (a FakeTensor with corresponding output shape)</span>
             <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_outputs</span><span class="p">):</span>
                 <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
@@ -703,12 +706,16 @@
             <span class="c1"># Insert getitem nodes as outputs (for export serialization to work)</span>
             <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_after</span><span class="p">(</span><span class="n">trt_node</span><span class="p">):</span>
                 <span class="n">getitem_output</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">getitem</span><span class="p">,</span> <span class="p">(</span><span class="n">trt_node</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+                <span class="n">getitem_output</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span>
             <span class="n">trt_module_node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">getitem_output</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Multiple outputs case:</span>
             <span class="c1"># Replace uses of submodule with the trt_node.</span>
             <span class="c1"># getitem nodes are already added inherently by the partitioner</span>
             <span class="n">trt_module_node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">trt_node</span><span class="p">)</span>
+            <span class="n">getitem_nodes</span> <span class="o">=</span> <span class="n">trt_node</span><span class="o">.</span><span class="n">users</span>
+            <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">getitem_node</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">getitem_nodes</span><span class="p">):</span>
+                <span class="n">getitem_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">][</span><span class="n">idx</span><span class="p">]</span>
 
         <span class="c1"># Erase the TRT submodule (call_module) node.</span>
         <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">trt_module_node</span><span class="p">)</span>

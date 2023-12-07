@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt &mdash; Torch-TensorRT v2.2.0.dev0+e3608a5 documentation</title>
+  <title>torch_tensorrt &mdash; Torch-TensorRT v2.2.0.dev0+adb8c1b documentation</title>
   
 
   
@@ -237,7 +237,7 @@
               
               
                 <div class="version">
-                  v2.2.0.dev0+e3608a5
+                  v2.2.0.dev0+adb8c1b
                 </div>
               
             
@@ -577,6 +577,8 @@ Note: All three of min_shape, opt_shape, max_shape must be provided, there must 
 <li><p><strong>format</strong> (<em>torch.memory_format</em><em> or </em><a class="reference internal" href="#torch_tensorrt.TensorFormat" title="torch_tensorrt.TensorFormat"><em>TensorFormat</em></a>) – The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)</p></li>
 <li><p><strong>tensor_domain</strong> (<em>Tuple</em><em>(</em><em>python:float</em><em>, </em><em>python:float</em><em>)</em><em>, </em><em>optional</em>) – The domain of allowed values for the tensor, as interval notation: [tensor_domain[0], tensor_domain[1]).
 Note: Entering “None” (or not specifying) will set the bound to [0, 2)</p></li>
+<li><p><strong>torch_tensor</strong> (<em>torch.Tensor</em>) – Holds a corresponding torch tensor with this Input.</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Name of this input in the input nn.Module’s forward function. Used to specify dynamic shapes for the corresponding input in dynamo tracer.</p></li>
 </ul>
 </dd>
 </dl>
