@@ -105,16 +105,14 @@ RTDevice get_current_device() {
   return RTDevice(device_id, nvinfer1::DeviceType::kGPU);
 }
 
-void multi_gpu_device_check(const RTDevice& most_compatible_device) {
+void multi_gpu_device_check() {
   // If multi-device safe mode is disabled and more than 1 device is registered on the machine, warn user
   if (!(MULTI_DEVICE_SAFE_MODE) && get_available_device_list().get_devices().size() > 1) {
     LOG_WARNING(
         "Detected this engine is being instantitated in a multi-GPU system with "
         << "multi-device safe mode disabled. For more on the implications of this "
-        << "as well as workarounds, see MULTI_DEVICE_SAFE_MODE.md "
-        << "(https://github.com/pytorch/TensorRT/blob/main/py/torch_tensorrt/dynamo/runtime/MULTI_DEVICE_SAFE_MODE.md). "
-        << "The engine is set to be instantiated on the cuda device, " << most_compatible_device << ". "
-        << "If this is incorrect, please set the desired cuda device as default and retry.");
+        << "as well as workarounds, see the linked documentation "
+        << "(https://pytorch.org/TensorRT/user_guide/runtime.html#multi-device-safe-mode)");
   }
 }
 

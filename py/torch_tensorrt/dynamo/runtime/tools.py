@@ -17,8 +17,8 @@ def multi_gpu_device_check() -> None:
         logger.warning(
             "Detected this engine is being instantitated in a multi-GPU system with "
             "multi-device safe mode disabled. For more on the implications of this "
-            "as well as workarounds, see MULTI_DEVICE_SAFE_MODE.md "
-            "(https://github.com/pytorch/TensorRT/blob/main/py/torch_tensorrt/dynamo/runtime/MULTI_DEVICE_SAFE_MODE.md). "
+            "as well as workarounds, see the linked documentation "
+            "(https://pytorch.org/TensorRT/user_guide/runtime.html#multi-device-safe-mode). "
             f"The engine is set to be instantiated on the current default cuda device, cuda:{torch.cuda.current_device()}. "
             "If this is incorrect, please set the desired cuda device via torch.cuda.set_device(...) and retry."
         )

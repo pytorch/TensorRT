@@ -34,7 +34,7 @@ std::vector<RTDevice> find_compatible_devices(const RTDevice& target_device);
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine);
 
-void multi_gpu_device_check(const RTDevice& most_compatible_device);
+void multi_gpu_device_check();
 
 class DeviceList {
   using DeviceMap = std::unordered_map<int, RTDevice>;
