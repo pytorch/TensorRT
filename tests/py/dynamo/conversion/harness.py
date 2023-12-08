@@ -50,7 +50,6 @@ class TRTTestCase(TestCase):
         interpreter,
         rtol,
         atol,
-        precision=torch.float,
         check_dtype=True,
     ):
         with torch.no_grad():
@@ -60,7 +59,7 @@ class TRTTestCase(TestCase):
 
             mod.eval()
             start = time.perf_counter()
-            interpreter_result = interpreter.run(precision=precision)
+            interpreter_result = interpreter.run()
             sec = time.perf_counter() - start
             _LOGGER.info(f"Interpreter run time(s): {sec}")
             trt_mod = PythonTorchTensorRTModule(
@@ -234,7 +233,9 @@ class DispatchTestCase(TRTTestCase):
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
-        compilation_settings = CompilationSettings(truncate_long_and_double=True)
+        compilation_settings = CompilationSettings(
+            precision=precision, truncate_long_and_double=True
+        )
 
         interp = TRTInterpreter(
             mod,
@@ -248,7 +249,6 @@ class DispatchTestCase(TRTTestCase):
             interp,
             rtol,
             atol,
-            precision,
             check_dtype,
         )
 
