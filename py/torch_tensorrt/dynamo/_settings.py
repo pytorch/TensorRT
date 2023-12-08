@@ -2,16 +2,25 @@ from dataclasses import dataclass, field
 from typing import Optional, Set
 
 import torch
+from tensorrt import EngineCapability
 from torch_tensorrt._Device import Device
 from torch_tensorrt.dynamo._defaults import (
     DEBUG,
+    DISABLE_TF32,
+    DLA_GLOBAL_DRAM_SIZE,
+    DLA_LOCAL_DRAM_SIZE,
+    DLA_SRAM_SIZE,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    ENGINE_CAPABILITY,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
+    NUM_AVG_TIMING_ITERS,
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
     PRECISION,
+    REFIT,
     REQUIRE_FULL_COMPILATION,
+    SPARSE_WEIGHTS,
     TRUNCATE_LONG_AND_DOUBLE,
     USE_FAST_PARTITIONER,
     USE_PYTHON_RUNTIME,
@@ -46,6 +55,14 @@ class CompilationSettings:
         device (Device): GPU to compile the model on
         require_full_compilation (bool): Whether to require the graph is fully compiled in TensorRT.
             Only applicable for `ir="dynamo"`; has no effect for `torch.compile` path
+        disable_tf32 (bool): Whether to disable TF32 computation for TRT layers
+        sparse_weights (bool): Whether to allow the builder to use sparse weights
+        refit (bool): Whether to build a refittable engine
+        engine_capability (trt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
+        num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
+        dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
+        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
+        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
     """
 
     precision: torch.dtype = PRECISION
@@ -63,3 +80,11 @@ class CompilationSettings:
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS
     device: Device = field(default_factory=default_device)
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION
+    disable_tf32: bool = DISABLE_TF32
+    sparse_weights: bool = SPARSE_WEIGHTS
+    refit: bool = REFIT
+    engine_capability: EngineCapability = ENGINE_CAPABILITY
+    num_avg_timing_iters: int = NUM_AVG_TIMING_ITERS
+    dla_sram_size: int = DLA_SRAM_SIZE
+    dla_local_dram_size: int = DLA_LOCAL_DRAM_SIZE
+    dla_global_dram_size: int = DLA_GLOBAL_DRAM_SIZE
