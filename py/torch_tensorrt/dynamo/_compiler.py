@@ -260,7 +260,7 @@ def compile_module(
     dryrun_tracker.total_ops_in_graph = total_ops
     dryrun_tracker.supported_ops_in_graph = num_supported_ops
     dryrun_tracker.graph_input_shapes = parse_complex_tensor_structs(
-        sample_inputs, "shape", tuple
+        sample_inputs, "shape", lambda x: dict(x) if isinstance(x, dict) else tuple(x)
     )
     dryrun_tracker.graph_input_dtypes = parse_complex_tensor_structs(
         sample_inputs, "torch_dtype"
@@ -372,7 +372,9 @@ def compile_module(
             )
 
         subgraph_data.subgraph_input_shapes = parse_complex_tensor_structs(
-            submodule_inputs, "shape", tuple
+            submodule_inputs,
+            "shape",
+            lambda x: dict(x) if isinstance(x, dict) else tuple(x),
         )
         subgraph_data.subgraph_input_dtypes = parse_complex_tensor_structs(
             submodule_inputs, "torch_dtype"
@@ -383,7 +385,9 @@ def compile_module(
         )
 
         subgraph_data.subgraph_output_shapes = parse_complex_tensor_structs(
-            submodule_outputs, "shape", tuple
+            submodule_outputs,
+            "shape",
+            lambda x: dict(x) if isinstance(x, dict) else tuple(x),
         )
         subgraph_data.subgraph_output_dtypes = parse_complex_tensor_structs(
             submodule_outputs, "dtype"
@@ -411,7 +415,7 @@ def compile_module(
         sample_outputs = [sample_outputs]
 
     dryrun_tracker.graph_output_shapes = parse_complex_tensor_structs(
-        sample_outputs, "shape", tuple
+        sample_outputs, "shape", lambda x: dict(x) if isinstance(x, dict) else tuple(x)
     )
     dryrun_tracker.graph_output_dtypes = parse_complex_tensor_structs(
         sample_outputs, "dtype"

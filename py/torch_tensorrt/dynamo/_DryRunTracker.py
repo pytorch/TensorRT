@@ -229,6 +229,21 @@ def input_formatter(shapes: Any, dtypes: Any) -> str:
         if isinstance(shapes, tuple) and all(isinstance(elt, int) for elt in shapes):
             return f"Tensor: {shapes}@{str(dtypes)[6:]}, "
 
+        # Base case - dynamic shape, single dtype
+        elif (
+            isinstance(shapes, dict)
+            and len(shapes) == 3
+            and all(
+                (
+                    isinstance(shape, tuple)
+                    and all(isinstance(elt, int) for elt in shape)
+                    and k in ("min_shape", "opt_shape", "max_shape")
+                )
+                for k, shape in shapes.items()
+            )
+        ):
+            return f"Tensor: {shapes}@{str(dtypes)[6:]}, "
+
         # Shapes is a sequence
         elif isinstance(shapes, (list, tuple)):
             formatted_str = "List[" if isinstance(shapes, list) else "Tuple("
