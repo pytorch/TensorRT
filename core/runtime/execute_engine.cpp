@@ -74,7 +74,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     LOG_INFO("" << log_info);
   }
 
-  {
+  if (MULTI_DEVICE_SAFE_MODE) {
     std::unique_ptr<torch::autograd::profiler::RecordProfile> device_profiler_guard;
     if (compiled_engine->profile_execution) {
       device_profiler_guard =

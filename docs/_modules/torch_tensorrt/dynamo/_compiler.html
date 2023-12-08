@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.2.0.dev0+adb8c1b documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.2.0.dev0+aad7d06 documentation</title>
   
 
   
@@ -234,7 +234,7 @@
               
               
                 <div class="version">
-                  v2.2.0.dev0+adb8c1b
+                  v2.2.0.dev0+aad7d06
                 </div>
               
             
@@ -427,13 +427,21 @@
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._defaults</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">DEBUG</span><span class="p">,</span>
     <span class="n">DEVICE</span><span class="p">,</span>
+    <span class="n">DISABLE_TF32</span><span class="p">,</span>
+    <span class="n">DLA_GLOBAL_DRAM_SIZE</span><span class="p">,</span>
+    <span class="n">DLA_LOCAL_DRAM_SIZE</span><span class="p">,</span>
+    <span class="n">DLA_SRAM_SIZE</span><span class="p">,</span>
     <span class="n">ENABLE_EXPERIMENTAL_DECOMPOSITIONS</span><span class="p">,</span>
+    <span class="n">ENGINE_CAPABILITY</span><span class="p">,</span>
     <span class="n">MAX_AUX_STREAMS</span><span class="p">,</span>
     <span class="n">MIN_BLOCK_SIZE</span><span class="p">,</span>
+    <span class="n">NUM_AVG_TIMING_ITERS</span><span class="p">,</span>
     <span class="n">OPTIMIZATION_LEVEL</span><span class="p">,</span>
     <span class="n">PASS_THROUGH_BUILD_FAILURES</span><span class="p">,</span>
     <span class="n">PRECISION</span><span class="p">,</span>
+    <span class="n">REFIT</span><span class="p">,</span>
     <span class="n">REQUIRE_FULL_COMPILATION</span><span class="p">,</span>
+    <span class="n">SPARSE_WEIGHTS</span><span class="p">,</span>
     <span class="n">TRUNCATE_LONG_AND_DOUBLE</span><span class="p">,</span>
     <span class="n">USE_FAST_PARTITIONER</span><span class="p">,</span>
     <span class="n">USE_PYTHON_RUNTIME</span><span class="p">,</span>
@@ -462,17 +470,18 @@
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Device</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="n">DEVICE</span><span class="p">,</span>
-    <span class="n">disable_tf32</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="n">sparse_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">disable_tf32</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DISABLE_TF32</span><span class="p">,</span>
+    <span class="n">sparse_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">SPARSE_WEIGHTS</span><span class="p">,</span>
     <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">]</span> <span class="o">|</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,),</span>
-    <span class="n">refit</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">engine_capability</span><span class="p">:</span> <span class="n">EngineCapability</span> <span class="o">=</span> <span class="n">ENGINE_CAPABILITY</span><span class="p">,</span>
+    <span class="n">refit</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">REFIT</span><span class="p">,</span>
     <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DEBUG</span><span class="p">,</span>
     <span class="n">capability</span><span class="p">:</span> <span class="n">EngineCapability</span> <span class="o">=</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
-    <span class="n">num_avg_timing_iters</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">num_avg_timing_iters</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">NUM_AVG_TIMING_ITERS</span><span class="p">,</span>
     <span class="n">workspace_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">WORKSPACE_SIZE</span><span class="p">,</span>
-    <span class="n">dla_sram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1048576</span><span class="p">,</span>
-    <span class="n">dla_local_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1073741824</span><span class="p">,</span>
-    <span class="n">dla_global_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">536870912</span><span class="p">,</span>
+    <span class="n">dla_sram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DLA_SRAM_SIZE</span><span class="p">,</span>
+    <span class="n">dla_local_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DLA_LOCAL_DRAM_SIZE</span><span class="p">,</span>
+    <span class="n">dla_global_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DLA_GLOBAL_DRAM_SIZE</span><span class="p">,</span>
     <span class="n">calibrator</span><span class="p">:</span> <span class="nb">object</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">truncate_long_and_double</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">TRUNCATE_LONG_AND_DOUBLE</span><span class="p">,</span>
     <span class="n">require_full_compilation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">REQUIRE_FULL_COMPILATION</span><span class="p">,</span>
@@ -610,6 +619,13 @@
         <span class="s2">&quot;use_fast_partitioner&quot;</span><span class="p">:</span> <span class="n">use_fast_partitioner</span><span class="p">,</span>
         <span class="s2">&quot;enable_experimental_decompositions&quot;</span><span class="p">:</span> <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
         <span class="s2">&quot;require_full_compilation&quot;</span><span class="p">:</span> <span class="n">require_full_compilation</span><span class="p">,</span>
+        <span class="s2">&quot;disable_tf32&quot;</span><span class="p">:</span> <span class="n">disable_tf32</span><span class="p">,</span>
+        <span class="s2">&quot;sparse_weights&quot;</span><span class="p">:</span> <span class="n">sparse_weights</span><span class="p">,</span>
+        <span class="s2">&quot;refit&quot;</span><span class="p">:</span> <span class="n">refit</span><span class="p">,</span>
+        <span class="s2">&quot;engine_capability&quot;</span><span class="p">:</span> <span class="n">engine_capability</span><span class="p">,</span>
+        <span class="s2">&quot;dla_sram_size&quot;</span><span class="p">:</span> <span class="n">dla_sram_size</span><span class="p">,</span>
+        <span class="s2">&quot;dla_local_dram_size&quot;</span><span class="p">:</span> <span class="n">dla_local_dram_size</span><span class="p">,</span>
+        <span class="s2">&quot;dla_global_dram_size&quot;</span><span class="p">:</span> <span class="n">dla_global_dram_size</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
