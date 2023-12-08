@@ -683,6 +683,7 @@ def aten_ops_where(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.clamp.default)
+@dynamo_tensorrt_converter(torch.ops.aten.clamp.Tensor)
 def aten_ops_clamp(
     ctx: ConversionContext,
     target: Target,
