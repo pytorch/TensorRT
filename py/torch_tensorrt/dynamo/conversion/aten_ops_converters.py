@@ -2284,7 +2284,27 @@ def aten_ops_argmax(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.argmax.argmax(
+    return impl.topk.argmax(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        dim=args_bounds_check(args, 1),
+        keep_dim=args_bounds_check(args, 2, False),
+    )
+
+
+@enforce_tensor_types({0: (TRTTensor,)})
+@dynamo_tensorrt_converter(torch.ops.aten.argmin.default)
+def aten_ops_argmin(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.topk.argmin(
         ctx,
         target,
         SourceIR.ATEN,
@@ -2442,4 +2462,46 @@ def aten_ops_pad(
         pad=args[1],
         mode=args_bounds_check(args, 2, "constant"),
         value=args_bounds_check(args, 3, None),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_nearest2d.vec)
+def upsample_nearest2d(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.upsample.upsample(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        out_shape=args_bounds_check(args, 1),
+        scale_factors=args_bounds_check(args, 2),
+        resize_mode="nearest",
+        align_corners=False,
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_bilinear2d.vec)
+def upsample_bilinear2d(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.upsample.upsample(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        out_shape=args_bounds_check(args, 1),
+        scale_factors=args_bounds_check(args, 3),
+        resize_mode="bilinear",
+        align_corners=args_bounds_check(args, 2),
     )

@@ -3,7 +3,6 @@ from torch_tensorrt.fx.converters.impl import convolution
 from . import (
     activation,
     addmm,
-    argmax,
     attention,
     cast,
     cat,
@@ -26,6 +25,8 @@ from . import (
     slice,
     split,
     squeeze,
+    topk,
     unary,
     unsqueeze,
+    upsample,
 )
