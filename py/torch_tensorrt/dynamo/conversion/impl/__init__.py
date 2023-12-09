@@ -28,4 +28,5 @@ from . import (
     topk,
     unary,
     unsqueeze,
+    upsample,
 )
