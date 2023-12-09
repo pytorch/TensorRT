@@ -2463,3 +2463,45 @@ def aten_ops_pad(
         mode=args_bounds_check(args, 2, "constant"),
         value=args_bounds_check(args, 3, None),
     )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_nearest2d.vec)
+def upsample_nearest2d(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.upsample.upsample(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        out_shape=args_bounds_check(args, 1),
+        scale_factors=args_bounds_check(args, 2),
+        resize_mode="nearest",
+        align_corners=False,
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_bilinear2d.vec)
+def upsample_bilinear2d(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.upsample.upsample(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        out_shape=args_bounds_check(args, 1),
+        scale_factors=args_bounds_check(args, 3),
+        resize_mode="bilinear",
+        align_corners=args_bounds_check(args, 2),
+    )
