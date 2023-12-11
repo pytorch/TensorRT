@@ -87,7 +87,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def_pickle(
             [](const c10::intrusive_ptr<TRTEngine>& self) -> std::vector<std::string> {
               // Serialize TensorRT engine
-              auto serialized_trt_engine = self->cuda_engine->serialize();
+              auto serialized_trt_engine = make_trt(self->cuda_engine->serialize());
 
               // Adding device info related meta data to the serialized file
               auto trt_engine = std::string((const char*)serialized_trt_engine->data(), serialized_trt_engine->size());
