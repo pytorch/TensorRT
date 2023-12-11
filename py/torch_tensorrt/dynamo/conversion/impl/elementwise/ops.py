@@ -187,19 +187,18 @@ def clamp(
     min_val: Optional[Union[int, float, TRTTensor]] = None,
     max_val: Optional[Union[int, float, TRTTensor]] = None,
 ) -> TRTTensor:
-    if min_val is None:
-        min_val = float("-inf")
-    if max_val is None:
-        max_val = float("inf")
+    clamped_val = input_val
+    if min_val is not None:
+        clamped_val = impl.elementwise.max(
+            ctx, target, source_ir, f"{name}_max", clamped_val, min_val
+        )
 
-    return impl.elementwise.min(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_min",
-        impl.elementwise.max(ctx, target, source_ir, f"{name}_max", input_val, min_val),
-        max_val,
-    )
+    if max_val is not None:
+        clamped_val = impl.elementwise.min(
+            ctx, target, source_ir, f"{name}_min", clamped_val, max_val
+        )
+
+    return clamped_val
 
 
 def add(
