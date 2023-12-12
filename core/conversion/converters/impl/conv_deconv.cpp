@@ -149,8 +149,8 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
       bool hasOutputPadding = false;
       add_output_padding(padding, out_padding, hasOutputPadding);
 
-      nvinfer1::IDeconvolutionLayer* deconvLayer =
-          ctx->net->addDeconvolutionNd(*in, kernel_dims.d[0], filter_dim, kernel_weights, bias.data);
+      nvinfer1::IDeconvolutionLayer* deconvLayer = ctx->net->addDeconvolutionNd(
+          *in, kernel_dims.d[0], filter_dim, kernel_weights, hasOutputPadding ? nvinfer1::Weights{} : bias.data);
       deconvLayer->setStrideNd(stride);
       deconvLayer->setDilationNd(dilation);
       deconvLayer->setNbGroups(groups);
@@ -161,151 +161,155 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
       deconvLayer->setInput(1, *kernel);
       TORCHTRT_CHECK(deconvLayer, "Unable to create deconv layer with non-const weights from node: " << *n);
       layer = deconvLayer;
-    } else {
-      nvinfer1::IConvolutionLayer* convLayer =
-          ctx->net->addConvolutionNd(*in, kernel_dims.d[0], filter_dim, kernel_weights, bias.data);
-      convLayer->setStrideNd(stride);
-      convLayer->setPaddingMode(nvinfer1::PaddingMode::kCAFFE_ROUND_DOWN);
-      convLayer->setPaddingNd(padding);
-      convLayer->setPostPadding(out_padding);
-      convLayer->setDilationNd(dilation);
-      convLayer->setNbGroups(groups);
+      if (hasOutputPadding) {
+        LOG_DEBUG("Padding output deconvolution tensor with:" << out_padding);
+        nvinfer1::ITensor* tensorPtr = deconvLayer->getOutput(0);
+        layer = add_bias_layer(ctx, tensorPtr, orig_dims, out_padding, bias);
+      } else {
+        nvinfer1::IConvolutionLayer* convLayer =
+            ctx->net->addConvolutionNd(*in, kernel_dims.d[0], filter_dim, kernel_weights, bias.data);
+        convLayer->setStrideNd(stride);
+        convLayer->setPaddingMode(nvinfer1::PaddingMode::kCAFFE_ROUND_DOWN);
+        convLayer->setPaddingNd(padding);
+        convLayer->setPostPadding(out_padding);
+        convLayer->setDilationNd(dilation);
+        convLayer->setNbGroups(groups);
 
-      // Set conv kernel weights
-      convLayer->setInput(1, *kernel);
-      layer = convLayer;
+        // Set conv kernel weights
+        convLayer->setInput(1, *kernel);
+        layer = convLayer;
+      }
+
+      ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
+      LOG_DEBUG("Output tensor shape: " << layer->getOutput(0)->getDimensions());
+      return true;
     }
 
-    ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
-    LOG_DEBUG("Output tensor shape: " << layer->getOutput(0)->getDimensions());
+    auto w = Weights(ctx, args[1].unwrapToTensor());
+    // TODO: Remove this when conv3d with kernel size=1 bug is fixed.
+    // Github issue: https://github.com/pytorch/TensorRT/issues/1445
+    bool is_kernel_size_one = true;
+    bool is_3d_kernel = w.kernel_shape.nbDims == 3;
+    for (int64_t i = 0; i < w.kernel_shape.nbDims; i++) {
+      if (w.kernel_shape.d[i] != 1.0f) {
+        is_kernel_size_one = false;
+      }
+    }
+    if (is_kernel_size_one && is_3d_kernel) {
+      LOG_WARNING(
+          "Conv3d layer with kernel size = 1 configuration incurs a failure with TensorRT tactic optimizer in some cases. \
+    Github issue: https://github.com/pytorch/TensorRT/issues/1445. Other conv variants do not have this issue.");
+    }
+    auto dims = in->getDimensions();
+    auto orig_dims = dims;
+    LOG_DEBUG("Input dims: " << orig_dims);
+    LOG_DEBUG("Weights: " << w);
+    LOG_DEBUG("stride: " << stride);
+    LOG_DEBUG("padding: " << padding);
+    LOG_DEBUG("dilation: " << dilation);
+    LOG_DEBUG("out_padding: " << out_padding);
+    LOG_DEBUG("groups: " << groups);
+
+    TORCHTRT_CHECK(orig_dims.nbDims > 2, "Unable to create convolution layer from node: " << *n);
+
+    bool expandDims = (orig_dims.nbDims < 4);
+    if (expandDims) {
+      in = addPadding(ctx, n, in, 4);
+      dims = in->getDimensions();
+      LOG_DEBUG("Reshaped Input dims: " << dims);
+    }
+    if (w.shape.nbDims < 4) {
+      for (int i = w.shape.nbDims; i < 4; ++i) {
+        w.shape.d[i] = 1;
+      }
+      w.shape.nbDims = 4;
+      w.kernel_shape.nbDims = 2;
+      w.kernel_shape.d[1] = 1;
+      LOG_DEBUG("Reshaped Weights: " << w);
+    }
+
+    nvinfer1::ILayer* new_layer;
+    if (transposed) {
+      // Refer to
+      // https://github.com/onnx/onnx-tensorrt/blob/c3cfcbc8248c6bd007e6630af2085df5e4834b42/builtin_op_importers.cpp#L734
+      nvinfer1::Dims begPadding = padding;
+      bool hasOutputPadding = false;
+      add_output_padding(padding, out_padding, hasOutputPadding);
+
+      // shape of deconvolution's weight: [in, out/groups, ...]
+      // If there is still output padding, remove the bias. Bias will be added below.
+      auto deconv = ctx->net->addDeconvolutionNd(
+          *in, w.shape.d[1] * groups, w.kernel_shape, w.data, hasOutputPadding ? nvinfer1::Weights{} : bias.data);
+      TORCHTRT_CHECK(deconv, "Unable to create deconvolution layer from node: " << *n);
+
+      deconv->setStrideNd(stride);
+      deconv->setPrePadding(begPadding);
+      deconv->setPostPadding(padding);
+#if NV_TENSORRT_MAJOR > 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR >= 1)
+      deconv->setDilationNd(dilation);
+      deconv->setNbGroups(groups);
+#else
+      TORCHTRT_CHECK(groups == 1, "for deconv with groups > 1, require TensorRT version >= 7.1");
+      for (int idx = 0; idx < dilation.nbDims; idx++) {
+        TORCHTRT_CHECK(dilation.d[idx] == 1, "for deconv with dilation > 1, require TensorRT version >= 7.1");
+      }
+#endif
+      if (hasOutputPadding) {
+        LOG_DEBUG("Padding output deconvolution tensor with:" << out_padding);
+        nvinfer1::ITensor* tensorPtr = deconv->getOutput(0);
+        new_layer = add_bias_layer(ctx, tensorPtr, orig_dims, out_padding, bias);
+      } else {
+        new_layer = deconv;
+      }
+    } else {
+      // shape of convolution's weight: [out, in/groups, ...]
+      auto conv = ctx->net->addConvolutionNd(*in, w.shape.d[0], w.kernel_shape, w.data, bias.data);
+      TORCHTRT_CHECK(conv, "Unable to create convolution layer from node: " << *n);
+
+      conv->setStrideNd(stride);
+      conv->setPaddingMode(nvinfer1::PaddingMode::kCAFFE_ROUND_DOWN);
+      conv->setPaddingNd(padding);
+      conv->setPostPadding(out_padding);
+      conv->setDilationNd(dilation);
+      conv->setNbGroups(groups);
+      new_layer = conv;
+    }
+
+    new_layer->setName(util::node_info(n).c_str());
+
+    // Un-expand spatial dims back to 1D if needed
+    auto out = addUnpadding(ctx, n, new_layer->getOutput(0), orig_dims.nbDims);
+
+    ctx->AssociateValueAndTensor(n->outputs()[0], out);
+
+    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+
     return true;
   }
 
-  auto w = Weights(ctx, args[1].unwrapToTensor());
-  // TODO: Remove this when conv3d with kernel size=1 bug is fixed.
-  // Github issue: https://github.com/pytorch/TensorRT/issues/1445
-  bool is_kernel_size_one = true;
-  bool is_3d_kernel = w.kernel_shape.nbDims == 3;
-  for (int64_t i = 0; i < w.kernel_shape.nbDims; i++) {
-    if (w.kernel_shape.d[i] != 1.0f) {
-      is_kernel_size_one = false;
-    }
-  }
-  if (is_kernel_size_one && is_3d_kernel) {
-    LOG_WARNING(
-        "Conv3d layer with kernel size = 1 configuration incurs a failure with TensorRT tactic optimizer in some cases. \
-    Github issue: https://github.com/pytorch/TensorRT/issues/1445. Other conv variants do not have this issue.");
-  }
-  auto dims = in->getDimensions();
-  auto orig_dims = dims;
-  LOG_DEBUG("Input dims: " << orig_dims);
-  LOG_DEBUG("Weights: " << w);
-  LOG_DEBUG("stride: " << stride);
-  LOG_DEBUG("padding: " << padding);
-  LOG_DEBUG("dilation: " << dilation);
-  LOG_DEBUG("out_padding: " << out_padding);
-  LOG_DEBUG("groups: " << groups);
-
-  TORCHTRT_CHECK(orig_dims.nbDims > 2, "Unable to create convolution layer from node: " << *n);
-
-  bool expandDims = (orig_dims.nbDims < 4);
-  if (expandDims) {
-    in = addPadding(ctx, n, in, 4);
-    dims = in->getDimensions();
-    LOG_DEBUG("Reshaped Input dims: " << dims);
-  }
-  if (w.shape.nbDims < 4) {
-    for (int i = w.shape.nbDims; i < 4; ++i) {
-      w.shape.d[i] = 1;
-    }
-    w.shape.nbDims = 4;
-    w.kernel_shape.nbDims = 2;
-    w.kernel_shape.d[1] = 1;
-    LOG_DEBUG("Reshaped Weights: " << w);
-  }
-
-  nvinfer1::ILayer* new_layer;
-  if (transposed) {
-    // Refer to
-    // https://github.com/onnx/onnx-tensorrt/blob/c3cfcbc8248c6bd007e6630af2085df5e4834b42/builtin_op_importers.cpp#L734
-    nvinfer1::Dims begPadding = padding;
-    bool hasOutputPadding = false;
-    add_output_padding(padding, out_padding, hasOutputPadding);
-
-    // shape of deconvolution's weight: [in, out/groups, ...]
-    // If there is still output padding, remove the bias. Bias will be added below.
-    auto deconv = ctx->net->addDeconvolutionNd(
-        *in, w.shape.d[1] * groups, w.kernel_shape, w.data, hasOutputPadding ? nvinfer1::Weights{} : bias.data);
-    TORCHTRT_CHECK(deconv, "Unable to create deconvolution layer from node: " << *n);
-
-    deconv->setStrideNd(stride);
-    deconv->setPrePadding(begPadding);
-    deconv->setPostPadding(padding);
-#if NV_TENSORRT_MAJOR > 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR >= 1)
-    deconv->setDilationNd(dilation);
-    deconv->setNbGroups(groups);
-#else
-    TORCHTRT_CHECK(groups == 1, "for deconv with groups > 1, require TensorRT version >= 7.1");
-    for (int idx = 0; idx < dilation.nbDims; idx++) {
-      TORCHTRT_CHECK(dilation.d[idx] == 1, "for deconv with dilation > 1, require TensorRT version >= 7.1");
-    }
-#endif
-    if (hasOutputPadding) {
-      LOG_DEBUG("Padding output deconvolution tensor with:" << out_padding);
-      nvinfer1::ITensor* tensorPtr = deconv->getOutput(0);
-      new_layer = add_bias_layer(ctx, tensorPtr, orig_dims, out_padding, bias);
-    } else {
-      new_layer = deconv;
-    }
-  } else {
-    // shape of convolution's weight: [out, in/groups, ...]
-    auto conv = ctx->net->addConvolutionNd(*in, w.shape.d[0], w.kernel_shape, w.data, bias.data);
-    TORCHTRT_CHECK(conv, "Unable to create convolution layer from node: " << *n);
-
-    conv->setStrideNd(stride);
-    conv->setPaddingMode(nvinfer1::PaddingMode::kCAFFE_ROUND_DOWN);
-    conv->setPaddingNd(padding);
-    conv->setPostPadding(out_padding);
-    conv->setDilationNd(dilation);
-    conv->setNbGroups(groups);
-    new_layer = conv;
-  }
-
-  new_layer->setName(util::node_info(n).c_str());
-
-  // Un-expand spatial dims back to 1D if needed
-  auto out = addUnpadding(ctx, n, new_layer->getOutput(0), orig_dims.nbDims);
-
-  ctx->AssociateValueAndTensor(n->outputs()[0], out);
-
-  LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-
-  return true;
-}
-
-auto conv_registrations TORCHTRT_UNUSED =
-    RegisterNodeConversionPatterns()
-        .pattern({
-            R"SIG(aten::_convolution(Tensor input, Tensor weight,
+  auto conv_registrations TORCHTRT_UNUSED =
+      RegisterNodeConversionPatterns()
+          .pattern({
+              R"SIG(aten::_convolution(Tensor input, Tensor weight,
                                  Tensor? bias, int[] stride, int[] padding,
                                  int[] dilation, bool transposed,
                                  int[] output_padding, int groups, bool benchmark,
                                  bool deterministic, bool cudnn_enabled, bool allow_tf32) -> (Tensor))SIG",
-            [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-              return add_conv_deconv(ctx, n, args);
-            }})
-        .pattern({
-            R"SIG(aten::_convolution.deprecated(Tensor input, Tensor weight,
+              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                return add_conv_deconv(ctx, n, args);
+              }})
+          .pattern({
+              R"SIG(aten::_convolution.deprecated(Tensor input, Tensor weight,
                                      Tensor? bias, int[] stride, int[] padding,
                                      int[] dilation, bool transposed,
                                      int[] output_padding, int groups, bool benchmark,
                                      bool deterministic, bool cudnn_enabled) -> (Tensor))SIG",
-            [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-              // This pattern is only matched for traced JIT models which do not
-              // have allow_tf32 bool in the function signature. The TRT conversion
-              // code is exactly same as the above call.
-              return add_conv_deconv(ctx, n, args);
-            }});
+              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                // This pattern is only matched for traced JIT models which do not
+                // have allow_tf32 bool in the function signature. The TRT conversion
+                // code is exactly same as the above call.
+                return add_conv_deconv(ctx, n, args);
+              }});
 } // namespace
 } // namespace impl
 } // namespace converters
