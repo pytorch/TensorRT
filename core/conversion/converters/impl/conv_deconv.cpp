@@ -164,7 +164,8 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
       if (hasOutputPadding) {
         LOG_DEBUG("Padding output deconvolution tensor with:" << out_padding);
         nvinfer1::ITensor* tensorPtr = deconvLayer->getOutput(0);
-        layer = add_bias_layer(ctx, tensorPtr, in->getDimensions(), out_padding, bias);
+        auto dims = in->getDimensions();
+        layer = add_bias_layer(ctx, tensorPtr, dims, out_padding, bias);
       }
     } else {
       nvinfer1::IConvolutionLayer* convLayer =
