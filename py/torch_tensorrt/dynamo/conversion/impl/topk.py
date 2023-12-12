@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple, Union
 
 import tensorrt as trt
 from torch.fx.node import Target
@@ -101,3 +101,36 @@ def argmin(
     return argmax_argmin(
         ctx, target, source_ir, name, input, trt.TopKOperation.MIN, dim, keep_dim
     )
+
+
+def sort(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    dim: int,
+    descending: bool,
+    return_indices: bool = True,
+) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
+    if descending:
+        topk_layer = ctx.net.add_topk(
+            input,
+            trt.TopKOperation.MAX,
+            input.shape[dim],
+            get_axes_for_reduce_op(get_positive_dim(dim, len(input.shape))),
+        )
+    else:
+        topk_layer = ctx.net.add_topk(
+            input,
+            trt.TopKOperation.MIN,
+            input.shape[dim],
+            get_axes_for_reduce_op(get_positive_dim(dim, len(input.shape))),
+        )
+
+    set_layer_name(topk_layer, target, name, source_ir)
+
+    if return_indices:
+        return topk_layer.get_output(0), topk_layer.get_output(1)
+    else:
+        return topk_layer.get_output(0)
