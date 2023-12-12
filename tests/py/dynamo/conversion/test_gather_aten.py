@@ -26,5 +26,6 @@ class TestIndexConverter(DispatchTestCase):
             input,
         )
 
+
 if __name__ == "__main__":
     run_tests()
