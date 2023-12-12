@@ -59,14 +59,14 @@ http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu121/libtorch-cxx11-abi-shared-with-deps-2.1.1%2Bcu121.zip"],
+    urls = ["https://download.pytorch.org/libtorch/cu118/libtorch-cxx11-abi-shared-with-deps-2.1.1%2Bcu118.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu121/libtorch-shared-with-deps-2.1.1%2Bcu121.zip"],
+    urls = ["https://download.pytorch.org/libtorch/cu118/libtorch-shared-with-deps-2.1.1%2Bcu118.zip"],
 )
 
 ####################################################################################
