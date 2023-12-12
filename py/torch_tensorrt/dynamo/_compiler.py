@@ -50,7 +50,7 @@ from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     UnsupportedOperatorException,
     convert_module,
-    interpret_module,
+    interpret_module_to_result,
     repair_long_or_double_inputs,
 )
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -452,25 +452,108 @@ def convert_method_to_trt_engine(
     module: torch.fx.GraphModule,
     method_name: str = "forward",
     inputs: Optional[Sequence[Input | torch.Tensor]] = None,
-    device: Device = Device._current_device(),
-    disable_tf32: bool = False,
-    sparse_weights: bool = False,
     enabled_precisions: Optional[Set[torch.dtype | _enums.dtype]] = None,
-    refit: bool = False,
-    debug: bool = False,
-    capability: _enums.EngineCapability = _enums.EngineCapability.default,
-    num_avg_timing_iters: int = 1,
-    workspace_size: int = 0,
-    dla_sram_size: int = 1048576,
-    dla_local_dram_size: int = 1073741824,
-    dla_global_dram_size: int = 536870912,
-    truncate_long_and_double: int = False,
-    calibrator: object = None,
-    allow_shape_tensors: bool = False,
+    debug: bool = DEBUG,
+    workspace_size: int = WORKSPACE_SIZE,
+    min_block_size: int = MIN_BLOCK_SIZE,
+    torch_executed_ops: Set[str] = set(),
+    pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES,
     max_aux_streams: Optional[int] = MAX_AUX_STREAMS,
     version_compatible: bool = VERSION_COMPATIBLE,
     optimization_level: Optional[int] = OPTIMIZATION_LEVEL,
+    use_python_runtime: Optional[bool] = USE_PYTHON_RUNTIME,
+    truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE,
+    use_fast_partitioner: bool = USE_FAST_PARTITIONER,
+    enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    device: Device = Device._current_device(),
+    require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
+    disable_tf32: bool = DISABLE_TF32,
+    sparse_weights: bool = SPARSE_WEIGHTS,
+    refit: bool = REFIT,
+    engine_capability: EngineCapability = ENGINE_CAPABILITY,
+    num_avg_timing_iters: int = NUM_AVG_TIMING_ITERS,
+    dla_sram_size: int = DLA_SRAM_SIZE,
+    dla_local_dram_size: int = DLA_LOCAL_DRAM_SIZE,
+    dla_global_dram_size: int = DLA_GLOBAL_DRAM_SIZE,
+    calibrator: object = None,
+    allow_shape_tensors: bool = False,
 ) -> bytes:
+    """Convert a GraphModule module method to a serialized TensorRT engine
+
+    Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings
+
+    Arguments:
+        module (torch.fx.GraphModule): Source module
+
+    Keyword Args:
+        inputs (List[Union(torch_tensorrt.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
+            to select device type. ::
+
+                input=[
+                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                    torch_tensorrt.Input(
+                        min_shape=(1, 224, 224, 3),
+                        opt_shape=(1, 512, 512, 3),
+                        max_shape=(1, 1024, 1024, 3),
+                        dtype=torch.int32
+                        format=torch.channel_last
+                    ), # Dynamic input shape for input #2
+                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+                ]
+
+        method_name (str): Name of method to convert
+        input_signature Union(List, Tuple, torch_tensorrt.Input, torch.Tensor): A formatted collection of input specifications for the module. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum to select device type. **This API should be considered beta-level stable and may change in the future** ::
+
+                input_signature=([
+                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                    torch_tensorrt.Input(
+                        min_shape=(1, 224, 224, 3),
+                        opt_shape=(1, 512, 512, 3),
+                        max_shape=(1, 1024, 1024, 3),
+                        dtype=torch.int32
+                        format=torch.channel_last
+                    ), # Dynamic input shape for input #2
+                ], torch.randn((1, 3, 224, 244))) # Use an example tensor and let torch_tensorrt infer settings for input #3
+
+        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
+
+            device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
+
+        debug (bool): Whether to print out verbose debugging information
+        workspace_size (int): Workspace TRT is allowed to use for the module (0 is default)
+        min_block_size (int): Minimum number of operators per TRT-Engine Block
+        torch_executed_ops (Sequence[str]): Sequence of operations to run in Torch, regardless of converter coverage
+        pass_through_build_failures (bool): Whether to fail on TRT engine build errors (True) or not (False)
+        max_aux_streams (Optional[int]): Maximum number of allowed auxiliary TRT streams for each engine
+        version_compatible (bool): Provide version forward-compatibility for engine plan files
+        optimization_level (Optional[int]): Builder optimization 0-5, higher levels imply longer build time,
+            searching for more optimization options. TRT defaults to 3
+        use_python_runtime (Optional[bool]): Whether to strictly use Python runtime or C++ runtime. To auto-select a runtime
+            based on C++ dependency presence (preferentially choosing C++ runtime if available), leave the
+            argument as None
+        truncate_long_and_double (bool): Whether to truncate int64/float64 TRT engine inputs or weights to int32/float32
+        use_fast_partitioner (bool): Whether to use the fast or global graph partitioning system
+        enable_experimental_decompositions (bool): Whether to enable all core aten decompositions
+            or only a selected subset of them
+        device (Device): GPU to compile the model on
+        require_full_compilation (bool): Whether to require the graph is fully compiled in TensorRT.
+            Only applicable for `ir="dynamo"`; has no effect for `torch.compile` path
+        disable_tf32 (bool): Whether to disable TF32 computation for TRT layers
+        sparse_weights (bool): Whether to allow the builder to use sparse weights
+        refit (bool): Whether to build a refittable engine
+        engine_capability (trt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
+        num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
+        dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
+        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
+        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
+        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
+        allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
+
+    Returns:
+        bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
+    """
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
 
@@ -504,18 +587,33 @@ def convert_method_to_trt_engine(
     compilation_options = {
         "precision": precision,
         "debug": debug,
-        "device": device,
         "workspace_size": workspace_size,
-        "truncate_long_and_double": truncate_long_and_double,
+        "min_block_size": min_block_size,
+        "torch_executed_ops": torch_executed_ops,
+        "pass_through_build_failures": pass_through_build_failures,
         "max_aux_streams": max_aux_streams,
         "version_compatible": version_compatible,
         "optimization_level": optimization_level,
+        "use_python_runtime": use_python_runtime,
+        "truncate_long_and_double": truncate_long_and_double,
+        "use_fast_partitioner": use_fast_partitioner,
+        "enable_experimental_decompositions": enable_experimental_decompositions,
+        "device": device,
+        "require_full_compilation": require_full_compilation,
+        "disable_tf32": disable_tf32,
+        "sparse_weights": sparse_weights,
+        "refit": refit,
+        "engine_capability": engine_capability,
+        "num_avg_timing_iters": num_avg_timing_iters,
+        "dla_sram_size": dla_sram_size,
+        "dla_local_dram_size": dla_local_dram_size,
+        "dla_global_dram_size": dla_global_dram_size,
     }
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
     try:
-        interpreter_result = interpret_module(module, input_list, settings, method_name)
+        interpreter_result = interpret_module_to_result(module, input_list, settings)
     except UnsupportedOperatorException:
         logger.error(
             f"Conversion of module {module} not currently fully supported or convertible!",

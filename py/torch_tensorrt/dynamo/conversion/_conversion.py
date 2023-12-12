@@ -15,12 +15,19 @@ from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensor
 from torch_tensorrt.dynamo.utils import get_torch_inputs, to_torch_device
 
 
-def interpret_module(
+def interpret_module_to_result(
     module: torch.fx.GraphModule,
     inputs: Sequence[Input],
     settings: CompilationSettings = CompilationSettings(),
-    name: str = "",
 ) -> TRTInterpreterResult:
+    """Interpret an FX module to a TRTInterpreterResult
+    Args:
+        module: FX GraphModule to interpret
+        inputs: Sequence of Tensors representing inputs to the module
+        settings: Compilation settings
+    Returns:
+        TRTInterpreterResult
+    """
     torch_inputs = get_torch_inputs(inputs, settings.device)
     module.to(to_torch_device(settings.device))
     module_outputs = module(*torch_inputs)
@@ -47,6 +54,25 @@ def interpret_module(
         compilation_settings=settings,
     )
     interpreter_result = interpreter.run()
+    return interpreter_result
+
+
+def convert_module(
+    module: torch.fx.GraphModule,
+    inputs: Sequence[Input],
+    settings: CompilationSettings = CompilationSettings(),
+    name: str = "",
+) -> PythonTorchTensorRTModule | TorchTensorRTModule:
+    """Convert an FX module to a TRT module
+    Args:
+        module: FX GraphModule to convert
+        inputs: Sequence of Tensors representing inputs to the module
+        settings: Compilation settings
+        name: TRT engine name
+    Returns:
+        _PythonTorchTensorRTModule or TorchTensorRTModule
+    """
+    interpreter_result = interpret_module_to_result(module, inputs, settings)
 
     if settings.use_python_runtime:
         return PythonTorchTensorRTModule(
