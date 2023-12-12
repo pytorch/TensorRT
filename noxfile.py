@@ -1,7 +1,8 @@
-from distutils.command.clean import clean
-import nox
 import os
 import sys
+from distutils.command.clean import clean
+
+import nox
 
 # Use system installed Python packages
 PYT_PATH = (
@@ -232,9 +233,7 @@ def run_dynamo_converter_tests(session):
 def run_dynamo_lower_tests(session):
     print("Running Dynamo lowering passes")
     session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/"))
-    tests = [
-        "lowering"
-    ]
+    tests = ["lowering"]
     for test in tests:
         if USE_HOST_DEPS:
             session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
@@ -245,9 +244,7 @@ def run_dynamo_lower_tests(session):
 def run_dynamo_partitioning_tests(session):
     print("Running Dynamo Partitioning tests")
     session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/"))
-    tests = [
-        "partitioning"
-    ]
+    tests = ["partitioning"]
     for test in tests:
         if USE_HOST_DEPS:
             session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
@@ -276,7 +273,13 @@ def run_dynamo_model_compile_tests(session):
     ]
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always("python", test, "--ir", str("torch_compile"), env={"PYTHONPATH": PYT_PATH})
+            session.run_always(
+                "python",
+                test,
+                "--ir",
+                str("torch_compile"),
+                env={"PYTHONPATH": PYT_PATH},
+            )
         else:
             session.run_always("python", test, "--ir", str("torch_compile"))
 
@@ -284,13 +287,12 @@ def run_dynamo_model_compile_tests(session):
 def run_dynamo_model_export_tests(session):
     print("Running model torch-export tests")
     session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/models"))
-    tests = [
-        "test_models_export.py",
-        "test_export_serde.py"
-    ]
+    tests = ["test_models_export.py", "test_export_serde.py"]
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always("python", test, "--ir", str("dynamo"), env={"PYTHONPATH": PYT_PATH})
+            session.run_always(
+                "python", test, "--ir", str("dynamo"), env={"PYTHONPATH": PYT_PATH}
+            )
         else:
             session.run_always("python", test, "--ir", str("dynamo"))
 
