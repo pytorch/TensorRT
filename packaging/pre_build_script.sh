@@ -1,5 +1,13 @@
 #!/bin/bash
 
+set -x
+echo "INITIAL SET OF PATHS"
+echo $LD_LIBRARY_PATH
+echo $CUDA_HOME
+echo $CUDA_PATH
+ls /usr/local/cuda/
+ls /usr/local/cuda/lib64/
+
 # Install dependencies
 python3 -m pip install pyyaml
 TRT_VERSION=$(python3 -c "import versions; versions.tensorrt_version()")
@@ -23,3 +31,10 @@ cat toolchains/ci_workspaces/WORKSPACE.x86_64.release.rhel.tmpl | envsubst > WOR
 export CI_BUILD=1
 
 export LD_LIBRARY_PATH=/usr/local/cuda/lib64/:$LD_LIBRARY_PATH
+
+echo "FINAL SET OF PATHS"
+echo $LD_LIBRARY_PATH
+echo $CUDA_HOME
+echo $CUDA_PATH
+ls /usr/local/cuda
+ls /usr/local/cuda/lib64/
