@@ -22,4 +22,4 @@ export TORCH_BUILD_NUMBER=$(python -c "import torch, urllib.parse as ul; print(u
 cat toolchains/ci_workspaces/WORKSPACE.x86_64.release.rhel.tmpl | envsubst > WORKSPACE
 export CI_BUILD=1
 
-echo $LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/usr/local/cuda/lib64/:$LD_LIBRARY_PATH
