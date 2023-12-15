@@ -330,6 +330,34 @@ def aten_ops_fmod(
     return impl.elementwise.fmod(ctx, target, SourceIR.ATEN, name, args[0], args[1])
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler)
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_2d)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        1: (TRTTensor,),
+    }
+)
+def aten_ops_grid(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.grid.grid(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        grid=args[1],
+        interpolation_mode=args[2],
+        padding_mode=args[3],
+        align_corners=args[4],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.relu.default)
 def aten_ops_relu(
     ctx: ConversionContext,
@@ -382,7 +410,20 @@ def aten_ops_symsize_int(
     )
 
 
+
+def index_dtype_validator(node: Node) -> bool:
+    index = node.args[1]
+    for ind in index:
+        if ind is not None:
+            val = ind.meta.get("val")
+            if val is not None and val.dtype != torch.int32:
+                return False
+    return True
+
 @dynamo_tensorrt_converter(torch.ops.aten.index.Tensor)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.index.Tensor, capability_validator=index_dtype_validator
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -705,6 +746,11 @@ def aten_ops_select(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.slice.Tensor)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
 def aten_ops_slice(
     ctx: ConversionContext,
     target: Target,
@@ -718,9 +764,9 @@ def aten_ops_slice(
         SourceIR.ATEN,
         name,
         args[0],
-        args[1],
-        args[2],
-        args[3],
+        args_bounds_check(args, 1, replacement=0),
+        args_bounds_check(args, 2, replacement=None),
+        args_bounds_check(args, 3, replacement=None),
         args_bounds_check(args, 4, replacement=1),
     )
 
@@ -772,12 +818,12 @@ def aten_ops_cumsum(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.tile.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.tile.default)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
     }
-)  # type: ignore[misc]
+)
 def aten_ops_tile(
     ctx: ConversionContext,
     target: Target,
@@ -795,7 +841,7 @@ def aten_ops_tile(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.permute.default)  # type: ignore[misc]
+@dynamo_tensorrt_converter(torch.ops.aten.permute.default)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -918,6 +964,11 @@ def aten_ops_clone_copy_placeholder(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.expand.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
 def aten_ops_expand(
     ctx: ConversionContext,
     target: Target,
@@ -935,18 +986,11 @@ def aten_ops_expand(
     )
 
 
-def amax_param_validator(amax_node: Node) -> bool:
-    if len(amax_node.args) < 2:
-        _LOGGER.debug(
-            f"At least two args input and dim should be provided, but only got {len(amax_node.args)} args."
-        )
-        return False
-
-    return True
-
-
-@dynamo_tensorrt_converter(
-    torch.ops.aten.amax.default, capability_validator=amax_param_validator
+@dynamo_tensorrt_converter(torch.ops.aten.amax.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
 )
 def aten_ops_amax(
     ctx: ConversionContext,
@@ -956,6 +1000,30 @@ def aten_ops_amax(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.reduce.amax(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, replacement=[]),
+        args_bounds_check(args, 2, replacement=False),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.amin.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_amin(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.amin(
         ctx,
         target,
         SourceIR.ATEN,
@@ -1719,9 +1787,177 @@ def aten_ops_logical_xor(
     )
 
 
+def bitwise_type_validator(node: Node) -> bool:
+    supported_type = [torch.bool, bool]
+
+    tensor_targets = [
+        torch.ops.aten.bitwise_and.Tensor,
+        torch.ops.aten.bitwise_or.Tensor,
+        torch.ops.aten.bitwise_xor.Tensor,
+    ]
+    scalar_targets = [
+        torch.ops.aten.bitwise_and.Scalar,
+        torch.ops.aten.bitwise_or.Scalar,
+        torch.ops.aten.bitwise_xor.Scalar,
+    ]
+    scalar_tensor_targets = [
+        torch.ops.aten.bitwise_and.Scalar_Tensor,
+        torch.ops.aten.bitwise_or.Scalar_Tensor,
+        torch.ops.aten.bitwise_xor.Scalar_Tensor,
+    ]
+
+    if node.target in tensor_targets:
+        lhs_val = node.args[0]
+        rhs_val = node.args[1]
+        lhs_meta = lhs_val.meta.get("tensor_meta")
+        rhs_meta = rhs_val.meta.get("tensor_meta")
+        if lhs_meta is None or rhs_meta is None:
+            return False
+        return lhs_meta.dtype in supported_type and rhs_meta.dtype in supported_type
+
+    elif node.target in scalar_targets:
+        lhs_val = node.args[0]
+        rhs_val = node.args[1]
+        lhs_meta = lhs_val.meta.get("tensor_meta")
+        if lhs_meta is None:
+            return False
+        return lhs_meta.dtype in supported_type and isinstance(rhs_val, bool)
+
+    elif node.target in scalar_tensor_targets:
+        lhs_val = node.args[0]
+        rhs_val = node.args[1]
+        rhs_meta = rhs_val.meta.get("tensor_meta")
+        if rhs_meta is None:
+            return False
+        return isinstance(lhs_val, bool) and rhs_meta.dtype in supported_type
+
+    else:
+        return False
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.bitwise_and.Tensor, capability_validator=bitwise_type_validator
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.bitwise_and.Scalar, capability_validator=bitwise_type_validator
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.bitwise_and.Scalar_Tensor,
+    capability_validator=bitwise_type_validator,
+)
+def aten_ops_bitwise_and(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.bitwise_and(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.bitwise_or.Tensor, capability_validator=bitwise_type_validator
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.bitwise_or.Scalar, capability_validator=bitwise_type_validator
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.bitwise_or.Scalar_Tensor, capability_validator=bitwise_type_validator
+)
+def aten_ops_bitwise_or(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.bitwise_or(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.bitwise_xor.Tensor, capability_validator=bitwise_type_validator
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.bitwise_xor.Scalar, capability_validator=bitwise_type_validator
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.bitwise_xor.Scalar_Tensor,
+    capability_validator=bitwise_type_validator,
+)
+def aten_ops_bitwise_xor(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.bitwise_xor(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+def bitwise_not_type_validator(node: Node) -> bool:
+    val = node.args[0]
+    val_meta = val.meta.get("tensor_meta")
+
+    if val_meta is None:
+        return False
+
+    supported_type = [torch.bool, bool]
+    return val_meta.dtype in supported_type
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.bitwise_not.default, capability_validator=bitwise_not_type_validator
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_bitwise_not(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.bitwise_not(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.eq.Tensor)
 @dynamo_tensorrt_converter(torch.ops.aten.eq.Scalar)
-def aten_ops_equal(
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_eq(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
@@ -1738,9 +1974,38 @@ def aten_ops_equal(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.ne.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.ne.Scalar)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_ne(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.ne(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.gt.Tensor)
 @dynamo_tensorrt_converter(torch.ops.aten.gt.Scalar)
-def aten_ops_greater(
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_gt(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
@@ -1757,9 +2022,38 @@ def aten_ops_greater(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.ge.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.ge.Scalar)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_ge(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.ge(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.lt.Tensor)
 @dynamo_tensorrt_converter(torch.ops.aten.lt.Scalar)
-def aten_ops_less(
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_lt(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
@@ -1767,6 +2061,30 @@ def aten_ops_less(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.elementwise.lt(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.le.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.le.Scalar)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_le(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.le(
         ctx,
         target,
         SourceIR.ATEN,
@@ -1997,7 +2315,7 @@ def aten_ops_argmax(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.argmax.argmax(
+    return impl.topk.argmax(
         ctx,
         target,
         SourceIR.ATEN,
@@ -2008,14 +2326,34 @@ def aten_ops_argmax(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.addmm.default)  # type: ignore[misc]
+@enforce_tensor_types({0: (TRTTensor,)})
+@dynamo_tensorrt_converter(torch.ops.aten.argmin.default)
+def aten_ops_argmin(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.topk.argmin(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        dim=args_bounds_check(args, 1),
+        keep_dim=args_bounds_check(args, 2, False),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.addmm.default)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
         1: (np.ndarray, torch.Tensor, TRTTensor),
         2: (np.ndarray, torch.Tensor, TRTTensor),
     }
-)  # type: ignore[misc]
+)
 def aten_ops_addmm(
     ctx: ConversionContext,
     target: Target,
@@ -2033,4 +2371,192 @@ def aten_ops_addmm(
         args[2],
         beta=kwargs.get("beta", 1),
         alpha=kwargs.get("alpha", 1),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.constant_pad_nd.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_constant_pad(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.pad.constant_padNd(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args_bounds_check(args, 2, 0),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.reflection_pad1d.default)
+@dynamo_tensorrt_converter(torch.ops.aten.reflection_pad2d.default)
+@dynamo_tensorrt_converter(torch.ops.aten.reflection_pad3d.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_reflection_pad(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.pad.reflection_padNd(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.replication_pad1d.default)
+@dynamo_tensorrt_converter(torch.ops.aten.replication_pad2d.default)
+@dynamo_tensorrt_converter(torch.ops.aten.replication_pad3d.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_replication_pad(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.pad.replication_padNd(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten._pad_circular.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_circular_pad(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.pad.circular_padNd(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.pad.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_pad(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.pad.pad(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        pad=args[1],
+        mode=args_bounds_check(args, 2, "constant"),
+        value=args_bounds_check(args, 3, None),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_nearest2d.vec)
+def upsample_nearest2d(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.upsample.upsample(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        out_shape=args_bounds_check(args, 1),
+        scale_factors=args_bounds_check(args, 2),
+        resize_mode="nearest",
+        align_corners=False,
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_bilinear2d.vec)
+def upsample_bilinear2d(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.upsample.upsample(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        out_shape=args_bounds_check(args, 1),
+        scale_factors=args_bounds_check(args, 3),
+        resize_mode="bilinear",
+        align_corners=args_bounds_check(args, 2),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.sort.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_sort(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.topk.sort(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        dim=args_bounds_check(args, 1, -1),
+        descending=args_bounds_check(args, 2, False),
     )

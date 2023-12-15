@@ -1,6 +1,7 @@
 from typing import Optional
 
 import tensorrt as trt
+import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -333,6 +334,18 @@ def logical_not(
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.NOT, input_val
+    )
+
+
+def bitwise_not(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+) -> TRTTensor:
+    return impl.unary.logical_not(
+        ctx, target, source_ir, f"{name}_logical_not", input_val
     )
 
 

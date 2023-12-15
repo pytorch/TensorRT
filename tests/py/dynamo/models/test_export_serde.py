@@ -5,7 +5,6 @@ import timm
 import torch
 import torch_tensorrt as torchtrt
 import torchvision.models as models
-from torch._export.serde.serialize import deserialize, serialize
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 assertions = unittest.TestCase()
@@ -45,8 +44,8 @@ def test_base_full_compile(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
     trt_exp_program = torchtrt.dynamo.export(trt_gm, [input], ir="exported_program")
-    serialized_prog = serialize(trt_exp_program)
-    deserialized_prog = deserialize(*serialized_prog)
+    torch.export.save(trt_exp_program, "/tmp/trt.ep")
+    deser_trt_exp_program = torch.export.load("/tmp/trt.ep")
 
     # Check Pyt and TRT exported program outputs
     cos_sim = cosine_similarity(model(input), trt_exp_program(input)[0])
@@ -55,7 +54,7 @@ def test_base_full_compile(ir):
         msg=f"test_base_model_full_compile TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
     # Check Pyt and deserialized TRT exported program outputs
-    cos_sim = cosine_similarity(model(input), deserialized_prog(input)[0])
+    cos_sim = cosine_similarity(model(input), deser_trt_exp_program(input)[0])
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
         msg=f"test_base_model_full_compile TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
@@ -97,8 +96,8 @@ def test_base_full_compile_multiple_outputs(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
     trt_exp_program = torchtrt.dynamo.export(trt_gm, [input], ir="exported_program")
-    serialized_prog = serialize(trt_exp_program)
-    deserialized_prog = deserialize(*serialized_prog)
+    torch.export.save(trt_exp_program, "/tmp/trt.ep")
+    deser_trt_exp_program = torch.export.load("/tmp/trt.ep")
     # Check Pyt and TRT exported program outputs
     outputs_pyt = model(input)
     outputs_trt = trt_exp_program(input)
@@ -110,7 +109,7 @@ def test_base_full_compile_multiple_outputs(ir):
         )
 
     # Check Pyt and deserialized TRT exported program outputs
-    outputs_trt_deser = deserialized_prog(input)
+    outputs_trt_deser = deser_trt_exp_program(input)
     for idx in range(len(outputs_pyt)):
         cos_sim = cosine_similarity(outputs_pyt[idx], outputs_trt_deser[idx])
         assertions.assertTrue(
@@ -154,8 +153,8 @@ def test_base_full_compile_save_load(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
     trt_exp_program = torchtrt.dynamo.export(trt_gm, [input], ir="exported_program")
-    torch._export.save(trt_exp_program, "/tmp/trt.ep")
-    deser_trt_exp_program = torch._export.load("/tmp/trt.ep")
+    torch.export.save(trt_exp_program, "/tmp/trt.ep")
+    deser_trt_exp_program = torch.export.load("/tmp/trt.ep")
 
     outputs_pyt = model(input)
     outputs_trt = trt_exp_program(input)
@@ -213,8 +212,8 @@ def test_hybrid_relu_fallback(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
     trt_exp_program = torchtrt.dynamo.export(trt_gm, [input], ir="exported_program")
-    torch._export.save(trt_exp_program, "/tmp/trt.ep")
-    deser_trt_exp_program = torch._export.load("/tmp/trt.ep")
+    torch.export.save(trt_exp_program, "/tmp/trt.ep")
+    deser_trt_exp_program = torch.export.load("/tmp/trt.ep")
 
     outputs_pyt = model(input)
     outputs_trt = trt_exp_program(input)
@@ -234,45 +233,45 @@ def test_hybrid_relu_fallback(ir):
         )
 
 
-# TODO (peri044) : Enable this test once the _frozen_param0 attribute resulting in sym_int ops issue is fixed.
-# @pytest.mark.unit
-# def test_resnet18_save_load(ir):
-#     """
-#     This tests export save and load functionality on Resnet18 model
-#     """
-#     model = models.resnet18().eval().cuda()
-#     input = torch.randn((1, 3, 224, 224)).to("cuda")
+@pytest.mark.unit
+def test_resnet18_save_load(ir):
+    """
+    This tests export save and load functionality on Resnet18 model
+    """
+    model = models.resnet18().eval().cuda()
+    input = torch.randn((1, 3, 224, 224)).to("cuda")
 
-#     compile_spec = {
-#         "inputs": [
-#             torchtrt.Input(
-#                 input.shape, dtype=torch.float, format=torch.contiguous_format
-#             )
-#         ],
-#         "ir": ir,
-#         "min_block_size": 1,
-#     }
+    compile_spec = {
+        "inputs": [
+            torchtrt.Input(
+                input.shape, dtype=torch.float, format=torch.contiguous_format
+            )
+        ],
+        "ir": ir,
+        "min_block_size": 1,
+    }
 
-#     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
-#     trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
-#     trt_exp_program = torchtrt.dynamo.export(trt_gm, [input], ir="exported_program")
-#     torch._export.save(trt_exp_program, "/tmp/trt.ep")
-#     deser_trt_exp_program = torch._export.load("/tmp/trt.ep")
+    exp_program = torchtrt.dynamo.trace(model, **compile_spec)
+    trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
+    trt_exp_program = torchtrt.dynamo.export(trt_gm, [input], ir="exported_program")
+    torch.export.save(trt_exp_program, "/tmp/trt.ep")
+    deser_trt_exp_program = torch.export.load("/tmp/trt.ep")
 
-#     outputs_pyt = model(input)
-#     outputs_trt = trt_exp_program(input)
-#     cos_sim = cosine_similarity(outputs_pyt, outputs_trt)
-#     assertions.assertTrue(
-#         cos_sim > COSINE_THRESHOLD,
-#         msg=f"test_resnet18_save_load TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
-#     )
+    outputs_pyt = model(input)
+    outputs_trt = trt_exp_program(input)
+    cos_sim = cosine_similarity(outputs_pyt, outputs_trt[0])
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_resnet18_save_load TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
 
-#     outputs_trt_deser = deser_trt_exp_program(input)
-#     cos_sim = cosine_similarity(outputs_pyt, outputs_trt_deser)
-#     assertions.assertTrue(
-#         cos_sim > COSINE_THRESHOLD,
-#         msg=f"test_resnet18_save_load TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
-#     )
+    outputs_trt_deser = deser_trt_exp_program(input)
+
+    cos_sim = cosine_similarity(outputs_pyt, outputs_trt_deser[0])
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_resnet18_save_load TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
 
 
 # Enable this test once this issue is resolved https://github.com/pytorch/TensorRT/issues/2341
@@ -310,8 +309,8 @@ def test_hybrid_relu_fallback(ir):
 #     }
 
 #     trt_exp_program = torchtrt.compile(model, **compile_spec)
-#     torch._export.save(trt_exp_program, "/tmp/trt.ep")
-#     deser_trt_exp_program = torch._export.load("/tmp/trt.ep")
+#     torch.export.save(trt_exp_program, "/tmp/trt.ep")
+#     deser_trt_exp_program = torch.export.load("/tmp/trt.ep")
 
 #     outputs_pyt = model(input)
 #     outputs_trt = trt_exp_program(input)

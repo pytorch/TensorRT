@@ -16,13 +16,21 @@ from torch_tensorrt.dynamo import partitioning
 from torch_tensorrt.dynamo._defaults import (
     DEBUG,
     DEVICE,
+    DISABLE_TF32,
+    DLA_GLOBAL_DRAM_SIZE,
+    DLA_LOCAL_DRAM_SIZE,
+    DLA_SRAM_SIZE,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    ENGINE_CAPABILITY,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
+    NUM_AVG_TIMING_ITERS,
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
     PRECISION,
+    REFIT,
     REQUIRE_FULL_COMPILATION,
+    SPARSE_WEIGHTS,
     TRUNCATE_LONG_AND_DOUBLE,
     USE_FAST_PARTITIONER,
     USE_PYTHON_RUNTIME,
@@ -34,7 +42,7 @@ from torch_tensorrt.dynamo.conversion import (
     convert_module,
     repair_long_or_double_inputs,
 )
-from torch_tensorrt.dynamo.lowering import apply_lowering_passes
+from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decompositions
 from torch_tensorrt.dynamo.utils import (
     get_torch_inputs,
     prepare_inputs,
@@ -51,17 +59,18 @@ def compile(
     inputs: Tuple[Any, ...],
     *,
     device: Optional[Union[Device, torch.device, str]] = DEVICE,
-    disable_tf32: bool = False,
-    sparse_weights: bool = False,
+    disable_tf32: bool = DISABLE_TF32,
+    sparse_weights: bool = SPARSE_WEIGHTS,
     enabled_precisions: Set[torch.dtype] | Tuple[torch.dtype] = (torch.float32,),
-    refit: bool = False,
+    engine_capability: EngineCapability = ENGINE_CAPABILITY,
+    refit: bool = REFIT,
     debug: bool = DEBUG,
     capability: EngineCapability = EngineCapability.default,
-    num_avg_timing_iters: int = 1,
+    num_avg_timing_iters: int = NUM_AVG_TIMING_ITERS,
     workspace_size: int = WORKSPACE_SIZE,
-    dla_sram_size: int = 1048576,
-    dla_local_dram_size: int = 1073741824,
-    dla_global_dram_size: int = 536870912,
+    dla_sram_size: int = DLA_SRAM_SIZE,
+    dla_local_dram_size: int = DLA_LOCAL_DRAM_SIZE,
+    dla_global_dram_size: int = DLA_GLOBAL_DRAM_SIZE,
     calibrator: object = None,
     truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE,
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
@@ -146,6 +155,13 @@ def compile(
     inputs = prepare_inputs(inputs)
     device = to_torch_tensorrt_device(device)
 
+    if not isinstance(exported_program, ExportedProgram):
+        raise AssertionError(
+            f"Input graph should be an ExportedProgram but got type {type(exported_program)}"
+        )
+    exported_program = exported_program.run_decompositions(
+        get_decompositions(enable_experimental_decompositions)
+    )
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
     # Apply lowering on the graph module
@@ -192,6 +208,13 @@ def compile(
         "use_fast_partitioner": use_fast_partitioner,
         "enable_experimental_decompositions": enable_experimental_decompositions,
         "require_full_compilation": require_full_compilation,
+        "disable_tf32": disable_tf32,
+        "sparse_weights": sparse_weights,
+        "refit": refit,
+        "engine_capability": engine_capability,
+        "dla_sram_size": dla_sram_size,
+        "dla_local_dram_size": dla_local_dram_size,
+        "dla_global_dram_size": dla_global_dram_size,
     }
 
     settings = CompilationSettings(**compilation_options)

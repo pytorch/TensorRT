@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._tracer &mdash; Torch-TensorRT v2.2.0.dev0+4da330d documentation</title>
+  <title>torch_tensorrt.dynamo._tracer &mdash; Torch-TensorRT v2.2.0.dev0+87fc615 documentation</title>
   
 
   
@@ -90,7 +90,7 @@
           <li>
           <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
               <a class="resource-option with-down-arrow">
-                PyTorch Edge
+                Edge
               </a>
               <div class="resources-dropdown-menu">
                 <a class="nav-dropdown-item" href="https://pytorch.org/edge">
@@ -234,7 +234,7 @@
               
               
                 <div class="version">
-                  v2.2.0.dev0+4da330d
+                  v2.2.0.dev0+87fc615
                 </div>
               
             
@@ -412,45 +412,20 @@
 <span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
 <span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">import</span> <span class="nn">unittest.mock</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Tuple</span>
 
 <span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torch._export</span> <span class="kn">import</span> <span class="n">dynamic_dim</span><span class="p">,</span> <span class="n">export</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._Device</span> <span class="kn">import</span> <span class="n">Device</span>
+<span class="kn">from</span> <span class="nn">torch.export</span> <span class="kn">import</span> <span class="n">Dim</span><span class="p">,</span> <span class="n">export</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt._Input</span> <span class="kn">import</span> <span class="n">Input</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._defaults</span> <span class="kn">import</span> <span class="p">(</span>
-    <span class="n">DEBUG</span><span class="p">,</span>
-    <span class="n">DEVICE</span><span class="p">,</span>
-    <span class="n">ENABLE_EXPERIMENTAL_DECOMPOSITIONS</span><span class="p">,</span>
-    <span class="n">default_device</span><span class="p">,</span>
-<span class="p">)</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.lowering</span> <span class="kn">import</span> <span class="n">get_decompositions</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._defaults</span> <span class="kn">import</span> <span class="n">DEBUG</span><span class="p">,</span> <span class="n">default_device</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="n">get_torch_inputs</span><span class="p">,</span> <span class="n">set_log_level</span><span class="p">,</span> <span class="n">to_torch_device</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">get_random_tensor</span><span class="p">(</span>
-    <span class="n">shape</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
-    <span class="k">if</span> <span class="n">dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">int32</span> <span class="ow">or</span> <span class="n">dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
-    <span class="k">elif</span> <span class="n">dtype</span> <span class="ow">in</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span>
-            <span class="s2">&quot;Invalid dtype detected in creating input tensors for tracing the graph.&quot;</span>
-        <span class="p">)</span>
-        <span class="k">raise</span>
-
-
 <div class="viewcode-block" id="trace"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.trace">[docs]</a><span class="k">def</span> <span class="nf">trace</span><span class="p">(</span>
     <span class="n">mod</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
-    <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Device</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="n">DEVICE</span><span class="p">,</span>
-    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DEBUG</span><span class="p">,</span>
-    <span class="n">enable_experimental_decompositions</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ENABLE_EXPERIMENTAL_DECOMPOSITIONS</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">ExportedProgram</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Exports a ``torch.export.ExportedProgram`` from a ``torch.nn.Module`` or ``torch.fx.GraphModule`` specifically targeting being compiled with Torch-TensorRT</span>
@@ -476,9 +451,9 @@
 <span class="sd">                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings</span>
 <span class="sd">                ]</span>
 <span class="sd">    Keyword Arguments:</span>
-<span class="sd">        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::</span>
+<span class="sd">        device (Union(torch.device, dict)): Target device for TensorRT engines to run on ::</span>
 
-<span class="sd">            device=torch_tensorrt.Device(&quot;dla:1&quot;, allow_gpu_fallback=True)</span>
+<span class="sd">            device=torch.device(&quot;cuda:0&quot;)</span>
 
 <span class="sd">        debug (bool): Enable debuggable engine</span>
 <span class="sd">        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the grap easier to covert to TensorRT, potentially increasing the amount of graphs run in TensorRT.</span>
@@ -488,51 +463,37 @@
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="c1"># Set log level at the top of compilation (torch_tensorrt.dynamo)</span>
+    <span class="n">debug</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;debug&quot;</span><span class="p">,</span> <span class="n">DEBUG</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">debug</span><span class="p">:</span>
         <span class="n">set_log_level</span><span class="p">(</span><span class="n">logger</span><span class="o">.</span><span class="n">parent</span><span class="p">,</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
-    <span class="n">device</span> <span class="o">=</span> <span class="n">to_torch_device</span><span class="p">(</span><span class="n">device</span> <span class="k">if</span> <span class="n">device</span> <span class="k">else</span> <span class="n">default_device</span><span class="p">())</span>
 
-    <span class="c1"># Determine the dynamic dimension and setup constraints to input dimensions as dictated by TensorRT</span>
-    <span class="c1"># Torch dynamo does not allow 0/1 value for dynamic dimensions</span>
-    <span class="c1"># for inputs during tracing. Hence we create new inputs for export</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="n">to_torch_device</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;device&quot;</span><span class="p">,</span> <span class="n">default_device</span><span class="p">()))</span>
     <span class="n">torch_inputs</span> <span class="o">=</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
-    <span class="n">trace_inputs</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="n">constraints</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="nb">input</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">inputs</span><span class="p">):</span>
-        <span class="k">if</span> <span class="nb">input</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">:</span>
+    <span class="n">dynamic_shapes</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="nb">input</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">Input</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">input</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">input</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Expected a name for a dynamic input with shape </span><span class="si">{</span><span class="nb">input</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2"> but found none&quot;</span>
+                <span class="p">)</span>
             <span class="n">min_shape</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">]</span>
             <span class="n">opt_shape</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">]</span>
             <span class="n">max_shape</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">]</span>
             <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">opt_shape</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">max_shape</span><span class="p">)</span>
-
-            <span class="n">constraint_dims</span> <span class="o">=</span> <span class="p">[]</span>
-            <span class="n">new_shape</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">dynamic_dims</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">min_shape</span><span class="p">)):</span>
                 <span class="k">if</span> <span class="n">min_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">==</span> <span class="n">opt_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">==</span> <span class="n">max_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">]:</span>
-                    <span class="n">new_shape</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">torch_inputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="n">dim</span><span class="p">])</span>
+                    <span class="k">continue</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="n">constraint_dims</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span>
-                    <span class="k">if</span> <span class="n">torch_inputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-                        <span class="n">new_shape</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">torch_inputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
-                    <span class="k">else</span><span class="p">:</span>
-                        <span class="n">new_shape</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">torch_inputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="n">dim</span><span class="p">])</span>
+                    <span class="n">dynamic_dims</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="n">Dim</span><span class="p">(</span>
+                        <span class="nb">input</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">dim</span><span class="p">),</span>
+                        <span class="nb">min</span><span class="o">=</span><span class="n">min_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">],</span>
+                        <span class="nb">max</span><span class="o">=</span><span class="n">max_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">],</span>
+                    <span class="p">)</span>
 
-            <span class="n">trace_input</span> <span class="o">=</span> <span class="n">get_random_tensor</span><span class="p">(</span><span class="n">new_shape</span><span class="p">,</span> <span class="n">torch_inputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+            <span class="n">dynamic_shapes</span><span class="p">[</span><span class="nb">input</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">dynamic_dims</span>
 
-            <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">constraint_dims</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">min_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
-                    <span class="n">constraints</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">min_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">dynamic_dim</span><span class="p">(</span><span class="n">trace_input</span><span class="p">,</span> <span class="n">dim</span><span class="p">))</span>
-                <span class="k">if</span> <span class="n">max_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
-                    <span class="n">constraints</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dynamic_dim</span><span class="p">(</span><span class="n">trace_input</span><span class="p">,</span> <span class="n">dim</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">max_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">])</span>
-            <span class="n">trace_inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">trace_input</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">trace_inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">torch_inputs</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
-
-    <span class="k">with</span> <span class="n">unittest</span><span class="o">.</span><span class="n">mock</span><span class="o">.</span><span class="n">patch</span><span class="p">(</span>
-        <span class="s2">&quot;torch._export.DECOMP_TABLE&quot;</span><span class="p">,</span>
-        <span class="n">get_decompositions</span><span class="p">(</span><span class="n">enable_experimental_decompositions</span><span class="p">),</span>
-    <span class="p">):</span>
-        <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">trace_inputs</span><span class="p">),</span> <span class="n">constraints</span><span class="o">=</span><span class="n">constraints</span><span class="p">)</span>
+    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">torch_inputs</span><span class="p">),</span> <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">exp_program</span></div>
 </pre></div>

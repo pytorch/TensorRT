@@ -16,6 +16,7 @@ namespace runtime {
 
 using EngineID = int64_t;
 const std::string ABI_VERSION = "4";
+extern bool MULTI_DEVICE_SAFE_MODE;
 typedef enum {
   ABI_TARGET_IDX = 0,
   NAME_IDX,
@@ -32,6 +33,8 @@ c10::optional<RTDevice> get_most_compatible_device(
 std::vector<RTDevice> find_compatible_devices(const RTDevice& target_device);
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine);
+
+void multi_gpu_device_check();
 
 class DeviceList {
   using DeviceMap = std::unordered_map<int, RTDevice>;

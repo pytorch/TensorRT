@@ -150,10 +150,10 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
 
         if (
-            node in CONVERTERS or (node.op == "get_attr" and "constant" in node_name)
+            node in CONVERTERS or node.op == "get_attr"
         ) and node_name not in self.torch_executed_ops:
             # If node is a proper, supported computational node, store the operator
-            if not node.is_impure():
+            if not node.is_impure() and node.op != "get_attr":
                 if node_name not in self.supported_operators:
                     self.supported_operators[node_name] = 1
                 else:

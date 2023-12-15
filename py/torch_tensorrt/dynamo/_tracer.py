@@ -1,18 +1,12 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Tuple
 
 import torch
 from torch.export import Dim, export
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo._defaults import (
-    DEBUG,
-    DEVICE,
-    ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
-    default_device,
-)
-from torch_tensorrt.dynamo.lowering import get_decompositions
+from torch_tensorrt.dynamo._defaults import DEBUG, default_device
 from torch_tensorrt.dynamo.utils import get_torch_inputs, set_log_level, to_torch_device
 
 logger = logging.getLogger(__name__)
@@ -21,9 +15,6 @@ logger = logging.getLogger(__name__)
 def trace(
     mod: torch.nn.Module | torch.fx.GraphModule,
     inputs: Tuple[Any, ...],
-    device: Optional[Union[torch.device, str]] = DEVICE,
-    debug: bool = DEBUG,
-    enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     **kwargs: Any,
 ) -> torch.export.ExportedProgram:
     """Exports a ``torch.export.ExportedProgram`` from a ``torch.nn.Module`` or ``torch.fx.GraphModule`` specifically targeting being compiled with Torch-TensorRT
@@ -61,15 +52,19 @@ def trace(
     """
 
     # Set log level at the top of compilation (torch_tensorrt.dynamo)
+    debug = kwargs.get("debug", DEBUG)
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
-    device = to_torch_device(device if device else default_device())
 
     device = to_torch_device(kwargs.get("device", default_device()))
     torch_inputs = get_torch_inputs(inputs, device)
     dynamic_shapes = {}
     for input in inputs:
         if isinstance(input, Input) and input.shape_mode == Input._ShapeMode.DYNAMIC:
+            if not input.name:
+                raise AssertionError(
+                    f"Expected a name for a dynamic input with shape {input.shape} but found none"
+                )
             min_shape = input.shape["min_shape"]
             opt_shape = input.shape["opt_shape"]
             max_shape = input.shape["max_shape"]
@@ -87,12 +82,6 @@ def trace(
 
             dynamic_shapes[input.name] = dynamic_dims
 
-    experimental_decompositions = kwargs.get(
-        "enable_experimental_decompositions", ENABLE_EXPERIMENTAL_DECOMPOSITIONS
-    )
-
-    exp_program = export(
-        mod, tuple(torch_inputs), dynamic_shapes=dynamic_shapes
-    ).run_decompositions(get_decompositions(experimental_decompositions))
+    exp_program = export(mod, tuple(torch_inputs), dynamic_shapes=dynamic_shapes)
 
     return exp_program
