@@ -29,6 +29,7 @@ mkdir -p /usr/lib/x86_64-linux-gnu
 cp /usr/tensorrt/targets/x86_64-linux-gnu/lib/* /usr/lib/x86_64-linux-gnu/ || :
 mkdir -p /usr/include/x86_64-linux-gnu
 cp /usr/tensorrt/targets/x86_64-linux-gnu/include/* /usr/include/x86_64-linux-gnu/ || :
+cp /usr/lib/x86_64-linux-gnu/libcudnn* /usr/lib64/ || :
 
 rm tensorrt-9.2.0.5.linux.x86_64-gnu.cuda-12.2.tar.gz
 rm -rf /usr/tensorrt
