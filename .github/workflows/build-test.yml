@@ -64,7 +64,7 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.1
+    uses: ./.github/workflows/linux-test.yml
     with:
       job-name: tests-py-torchscript-fe
       repository: "pytorch/tensorrt"
@@ -99,7 +99,7 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.1
+    uses: ./.github/workflows/linux-test.yml
     with:
       job-name: tests-py-dynamo-converters
       repository: "pytorch/tensorrt"
@@ -126,7 +126,7 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.1
+    uses: ./.github/workflows/linux-test.yml
     with:
       job-name: tests-py-dynamo-fe
       repository: "pytorch/tensorrt"
@@ -155,7 +155,7 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.1
+    uses: ./.github/workflows/linux-test.yml
     with:
       job-name: tests-py-torch-compile-be
       repository: "pytorch/tensorrt"
@@ -183,7 +183,7 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.1
+    uses: ./.github/workflows/linux-test.yml
     with:
       job-name: tests-py-dynamo-core
       repository: "pytorch/tensorrt"
