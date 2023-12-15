@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -x
 # Install dependencies
 python3 -m pip install pyyaml
 TRT_VERSION=$(python3 -c "import versions; versions.tensorrt_version()")
@@ -38,3 +38,5 @@ export TORCH_BUILD_NUMBER=$(python -c "import torch, urllib.parse as ul; print(u
 
 cat toolchains/ci_workspaces/WORKSPACE.x86_64.release.rhel.tmpl | envsubst > WORKSPACE
 export CI_BUILD=1
+
+find / -name libcudnn*
