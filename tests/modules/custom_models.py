@@ -1,8 +1,9 @@
+from typing import Dict, List, Tuple
+
 import torch
 import torch.nn as nn
-from transformers import BertModel, BertTokenizer, BertConfig
 import torch.nn.functional as F
-from typing import Tuple, List, Dict
+from transformers import BertConfig, BertModel, BertTokenizer
 
 
 # Sample Pool Model (for testing plugin serialization)
@@ -180,10 +181,12 @@ def BertModule():
         num_hidden_layers=12,
         num_attention_heads=12,
         intermediate_size=3072,
+        use_cache=False,
+        output_attentions=False,
+        output_hidden_states=False,
         torchscript=True,
     )
-    model = BertModel(config)
+    model = BertModel.from_pretrained(model_name, config=config)
     model.eval()
-    model = BertModel.from_pretrained(model_name, torchscript=True)
     traced_model = torch.jit.trace(model, [tokens_tensor, segments_tensors])
     return traced_model
