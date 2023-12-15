@@ -5,5 +5,5 @@ pybind11==2.6.2
 torch>=2.3.0.dev,<2.4.0
 torchvision>=0.18.0.dev,<0.19.0
 --extra-index-url https://pypi.nvidia.com
-tensorrt==9.2.0
+tensorrt==9.2.0.post12.dev5
 pyyaml
