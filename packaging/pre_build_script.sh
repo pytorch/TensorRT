@@ -5,7 +5,7 @@ python3 -m pip install pyyaml
 TRT_VERSION=$(python3 -c "import versions; versions.tensorrt_version()")
 yum-config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo
 yum check-update
-yum install -y ninja-build gettext tensorrt-${TRT_VERSION}.*
+yum install -y ninja-build gettext libcudnn8 libcudnn8-devel
 wget https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 \
     && mv bazelisk-linux-amd64 /usr/bin/bazel \
     && chmod +x /usr/bin/bazel
@@ -29,7 +29,7 @@ mkdir -p /usr/lib/x86_64-linux-gnu
 cp /usr/tensorrt/targets/x86_64-linux-gnu/lib/* /usr/lib/x86_64-linux-gnu/ || :
 mkdir -p /usr/include/x86_64-linux-gnu
 cp /usr/tensorrt/targets/x86_64-linux-gnu/include/* /usr/include/x86_64-linux-gnu/ || :
-cp /usr/lib/x86_64-linux-gnu/libcudnn* /usr/lib64/ || :
+# cp /usr/lib/x86_64-linux-gnu/libcudnn* /usr/lib64/ || :
 
 rm tensorrt-9.2.0.5.linux.x86_64-gnu.cuda-12.2.tar.gz
 rm -rf /usr/tensorrt
