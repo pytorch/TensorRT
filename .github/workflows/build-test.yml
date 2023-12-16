@@ -113,7 +113,7 @@ jobs:
         pushd .
         cd tests/py/dynamo
         ${CONDA_RUN} python -m pip install pytest timm transformers parameterized expecttest
-        ${CONDA_RUN} python -m pytest conversion/
+        ${CONDA_RUN} pytest conversion/
         popd
 
   # tests-py-dynamo-fe:
