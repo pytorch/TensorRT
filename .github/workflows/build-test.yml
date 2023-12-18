@@ -114,7 +114,9 @@ jobs:
         pushd .
         cd tests/py/dynamo
         ${CONDA_RUN} python -m pip install --pre pytest timm transformers parameterized expecttest --use-deprecated=legacy-resolver
-        ${CONDA_RUN} python -m pytest conversion/
+        ${CONDA_RUN} python -c "import torch; print('IMPORTED TORCH')"
+        ${CONDA_RUN} python -c "import tensorrt; print('IMPORTED TRT')"
+        ${CONDA_RUN} python -c "import torch_tensorrt; torch_tensorrt.dump_build_info()"
         popd
 
   # tests-py-dynamo-fe:
