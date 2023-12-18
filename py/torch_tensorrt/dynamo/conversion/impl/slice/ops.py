@@ -241,6 +241,7 @@ def flip(
 
     shape = input.shape
     rank = len(shape)
+    dims = get_positive_dim(dims, rank)
 
     for i in range(rank):
         if i in dims:
