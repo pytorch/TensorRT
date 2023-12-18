@@ -19,9 +19,36 @@ class TestClipConverter(DispatchTestCase):
     def test_clip(self, test_name, min=None, max=None):
         class TestModule(torch.nn.Module):
             def forward(self, x):
-                return torch.ops.aten.clamp.default(x, min, max)
+                return torch.ops.aten.clip.default(x, min, max)
 
         inputs = [torch.randn(3, 4)]
+        self.run_test(TestModule(), inputs)
+
+    @parameterized.expand(
+        [
+            param(
+                "defaultInt32",
+                min=torch.tensor(-1, dtype=torch.int32),
+                max=torch.tensor(0, dtype=torch.int32),
+            ),
+            param(
+                "defaultFloat32",
+                min=torch.tensor(0.5, dtype=torch.float32),
+                max=torch.tensor(1.0, dtype=torch.float32),
+            ),
+            param(
+                "minBiggerThanMax",
+                min=torch.tensor(1.0, dtype=torch.float32),
+                max=torch.tensor(0, dtype=torch.int32),
+            ),
+        ]
+    )
+    def test_clip(self, test_name, min=None, max=None):
+        class TestModule(torch.nn.Module):
+            def forward(self, x, min, max):
+                return torch.ops.aten.clip.Tensor(x, min, max)
+
+        inputs = [torch.randn(3, 4), min, max]
         self.run_test(TestModule(), inputs)
 
     @parameterized.expand(
@@ -37,12 +64,12 @@ class TestClipConverter(DispatchTestCase):
     ):
         class TestModule(torch.nn.Module):
             def forward(self, x):
-                return torch.ops.aten.clamp.default(x, min, max)
+                return torch.ops.aten.clip.default(x, min, max)
 
         class TestScalarModule(torch.nn.Module):
             def forward(self, x):
-                y = torch.ops.aten.mean.default(x)
-                return torch.ops.aten.clamp.default(y, min, max)
+                y = torch.ops.aten.mean.dim(x, None, True)
+                return torch.ops.aten.clip.default(y, min, max)
 
         input_specs = [
             Input(
