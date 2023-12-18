@@ -62,7 +62,7 @@ nvinfer1::ILayer* add_bias_layer(
   sliceLayer->setInput(1, *start);
   sliceLayer->setInput(2, *size);
   sliceLayer->setMode(nvinfer1::SliceMode::kFILL);
-  nvinfer1::ITensor* slide_output = sliceLayer->getOutput(0);
+  nvinfer1::ITensor* slice_output = sliceLayer->getOutput(0);
 
   nvinfer1::Dims constantDims;
   constantDims.nbDims = in_nbDims;
@@ -73,7 +73,7 @@ nvinfer1::ILayer* add_bias_layer(
       bias.shape.d[0]; // Set C dimension to bias dim and other dimensions to 1 to enable broadcast
   auto const_layer = ctx->net->addConstant(constantDims, bias.data);
   auto bias_layer =
-      ctx->net->addElementWise(*slide_output, *const_layer->getOutput(0), nvinfer1::ElementWiseOperation::kSUM);
+      ctx->net->addElementWise(*slice_output, *const_layer->getOutput(0), nvinfer1::ElementWiseOperation::kSUM);
 
   return bias_layer;
 }
