@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: linux.2xlarge
+    runs-on: linux.4xlarge.nvidia.gpu
 
     # Define key environment variables
     # Container name is of the form torch_tensorrt:<branch_name>
