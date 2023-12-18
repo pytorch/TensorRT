@@ -110,10 +110,11 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
+        export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
         pushd .
         cd tests/py/dynamo
-        ${CONDA_RUN} python -m pip install pytest timm transformers parameterized expecttest
-        ${CONDA_RUN} pytest conversion/
+        ${CONDA_RUN} python -m pip install --pre pytest timm transformers parameterized expecttest --use-deprecated=legacy-resolver
+        ${CONDA_RUN} python -m pytest conversion/
         popd
 
   # tests-py-dynamo-fe:
