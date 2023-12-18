@@ -319,7 +319,7 @@ def convert_method_to_trt_engine(
             "convert_method_to_trt_engine call is not supported for ir=fx"
         )
     elif target_ir == _IRType.dynamo:
-        return torch_tensorrt.dynamo.convert_method_to_trt_engine(  # type: ignore[no-any-return]
+        return torch_tensorrt.dynamo.convert_module_to_trt_engine(  # type: ignore[no-any-return]
             module,
             inputs=inputs,
             method_name=method_name,

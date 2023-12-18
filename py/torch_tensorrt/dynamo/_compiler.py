@@ -448,7 +448,7 @@ def compile_module(
     return partitioned_module
 
 
-def convert_method_to_trt_engine(
+def convert_module_to_trt_engine(
     module: torch.fx.GraphModule,
     method_name: str = "forward",
     inputs: Optional[Sequence[Input | torch.Tensor]] = None,

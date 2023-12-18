@@ -21,7 +21,7 @@ class TestConvertMethodToTrtEngine(unittest.TestCase):
         symbolic_traced_gm = torch.fx.symbolic_trace(model)
 
         # Convert to TensorRT engine
-        trt_engine_str = torch_tensorrt.dynamo.convert_method_to_trt_engine(
+        trt_engine_str = torch_tensorrt.dynamo.convert_module_to_trt_engine(
             symbolic_traced_gm, "forward", inputs=[input_data_0, input_data_1]
         )
 
