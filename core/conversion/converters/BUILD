@@ -66,6 +66,7 @@ cc_library(
         "impl/einsum.cpp",
         "impl/element_wise.cpp",
         "impl/expand.cpp",
+        "impl/internal_ops.cpp",
         "impl/interpolate.cpp",
         "impl/layer_norm.cpp",
         "impl/linear.cpp",
