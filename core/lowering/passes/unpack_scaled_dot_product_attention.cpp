@@ -1,7 +1,6 @@
 #include "torch/csrc/jit/ir/subgraph_matcher.h"
 #include "torch/csrc/jit/passes/subgraph_rewrite.h"
 
-#include "core/lowering/lowering_utils.h"
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/ir/irparser.h"
 
