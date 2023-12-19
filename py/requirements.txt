@@ -1,8 +1,8 @@
 numpy
 packaging
 pybind11==2.6.2
-torch==2.1.1
-torchvision==0.16.1
+torch==2.1.2
+torchvision==0.16.2
 --extra-index-url https://pypi.nvidia.com
 tensorrt==8.6.1
 pyyaml
