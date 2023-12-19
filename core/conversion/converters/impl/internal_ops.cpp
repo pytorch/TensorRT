@@ -21,7 +21,7 @@ auto linear_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pat
          auto not_layer = ctx->net->addUnary(*in, nvinfer1::UnaryOperation::kNOT);
          TORCHTRT_CHECK(not_layer, "Unable to create not layer for attn_bias_from_attn_mask");
          not_layer->setName((util::node_info(n) + "_not").c_str());
-         auto neg_inf = torch::tensor(-std::numeric_limits<float>::infinity(), );
+         auto neg_inf = torch::tensor(-std::numeric_limits<float>::infinity());
          auto neg_inf_itensor = tensor_to_const(ctx, neg_inf);
          auto prod_layer = add_elementwise(
              ctx,
