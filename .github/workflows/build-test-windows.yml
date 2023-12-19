@@ -23,7 +23,7 @@ jobs:
             pre-script: "packaging/pre_build_script_windows.sh"
             env-var-script: ""
             post-script: ""
-            smoke-test-script: "packaging/smoke_test.sh"
+            smoke-test-script: "packaging/smoke_test.py"
             package-name: torch_tensorrt
     name: Build torch-tensorrt whl package
     uses: pytorch/test-infra/.github/workflows/build_wheels_windows.yml@main
