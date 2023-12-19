@@ -109,15 +109,13 @@ jobs:
       test-infra-ref: release/2.1
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      channel: test
       script: |
         export USE_HOST_DEPS=1
-        export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
         pushd .
         cd tests/py/dynamo
-        ${CONDA_RUN} python -m pip install --pre pytest timm transformers parameterized expecttest --use-deprecated=legacy-resolver
-        ${CONDA_RUN} python -c "import torch; print('IMPORTED TORCH')"
-        ${CONDA_RUN} python -c "import tensorrt; print('IMPORTED TRT')"
-        ${CONDA_RUN} python -c "import torch_tensorrt; torch_tensorrt.dump_build_info()"
+        ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest --use-deprecated=legacy-resolver
+        ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 10 conversion/
         popd
 
   # tests-py-dynamo-fe:

@@ -53,6 +53,10 @@ on:
         description: 'Name to give artifacts uploaded from ${RUNNER_ARTIFACT_DIR}'
         default: ''
         type: string
+      channel:
+        description: "Channel to use (nightly, test, release, all)"
+        default: ""
+        type: string
 
 jobs:
   test:
@@ -66,6 +70,7 @@ jobs:
       REF: ${{ inputs.ref }}
       CU_VERSION: ${{ matrix.desired_cuda }}
       SCRIPT: ${{ inputs.script }}
+      CHANNEL: ${{ inputs.channel }}
       RUNNER_TEST_RESULTS_DIR: /tmp/test_results
     name: ${{ inputs.job-name }}-${{ matrix.desired_cuda }}
     runs-on: ${{ matrix.validation_runner }}
