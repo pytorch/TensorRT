@@ -74,7 +74,6 @@ jobs:
       test-infra-ref: release/2.1
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      channel: test
       script: |
         export USE_HOST_DEPS=1
         export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
@@ -110,7 +109,6 @@ jobs:
       test-infra-ref: release/2.1
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      channel: test
       script: |
         export USE_HOST_DEPS=1
         pushd .
@@ -138,7 +136,6 @@ jobs:
       test-infra-ref: release/2.1
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      channel: test
       script: |
         export USE_HOST_DEPS=1
         pushd .
@@ -168,7 +165,6 @@ jobs:
       test-infra-ref: release/2.1
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      channel: test
       script: |
         export USE_HOST_DEPS=1
         pushd .
@@ -197,7 +193,6 @@ jobs:
       test-infra-ref: release/2.1
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      channel: test
       script: |
         export USE_HOST_DEPS=1
         pushd .
