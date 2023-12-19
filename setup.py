@@ -33,11 +33,8 @@ LEGACY_BASE_VERSION_SUFFIX_PATTERN = re.compile("a0$")
 
 
 def get_root_dir() -> Path:
-    return Path(
-        subprocess.check_output(["git", "rev-parse", "--show-toplevel"])
-        .decode("ascii")
-        .strip()
-    )
+    dir_path = os.path.dirname(os.path.realpath(__file__)) 
+    return dir_path
 
 
 def get_git_revision_short_hash() -> str:
