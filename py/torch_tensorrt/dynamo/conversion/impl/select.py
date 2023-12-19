@@ -82,6 +82,7 @@ def gather(
     input: TRTTensor,
     dim: int,
     index: Sequence[Union[TRTTensor, np.ndarray, torch.Tensor]],
+    sparse_grad: bool = False,
 ) -> TRTTensor:
     gather_layer = ctx.net.add_gather(input, index, dim)
     set_layer_name(gather_layer, target, name + "_gather", source_ir)

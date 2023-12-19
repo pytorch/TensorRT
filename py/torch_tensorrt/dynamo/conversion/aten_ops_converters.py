@@ -204,7 +204,7 @@ def aten_ops_gather(
         input=args[0],
         dim=args[1],
         index=args[2],
-        sparse_grad=args_bounds_check(args, 4, False),
+        sparse_grad=args_bounds_check(args, 3, False),
     )
 
 
