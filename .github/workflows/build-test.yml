@@ -15,13 +15,13 @@ on:
 
 jobs:
   generate-matrix:
-    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@release/2.1
     with:
       package-type: wheel
       os: linux
       test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      channel: "release"
+      test-infra-ref: release/2.1
+      channel: test
       with-rocm: false
       with-cpu: false
 
@@ -38,12 +38,12 @@ jobs:
             smoke-test-script: ""
             package-name: torch_tensorrt
     name: Build torch-tensorrt whl package
-    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
+    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@release/2.1
     with:
       repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
+      test-infra-ref: release/2.1
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       env-var-script: ${{ matrix.env-var-script }}
@@ -71,7 +71,7 @@ jobs:
   #     repository: "pytorch/tensorrt"
   #     ref: ""
   #     test-infra-repository: pytorch/test-infra
-  #     test-infra-ref: main
+  #     test-infra-ref: release/2.1
   #     build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
   #     pre-script: ${{ matrix.pre-script }}
   #     script: |
@@ -106,7 +106,7 @@ jobs:
       repository: "pytorch/tensorrt"
       ref: ""
       test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
+      test-infra-ref: release/2.1
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
@@ -136,7 +136,7 @@ jobs:
   #     repository: "pytorch/tensorrt"
   #     ref: ""
   #     test-infra-repository: pytorch/test-infra
-  #     test-infra-ref: main
+  #     test-infra-ref: release/2.1
   #     build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
   #     pre-script: ${{ matrix.pre-script }}
   #     script: |
@@ -165,7 +165,7 @@ jobs:
   #     repository: "pytorch/tensorrt"
   #     ref: ""
   #     test-infra-repository: pytorch/test-infra
-  #     test-infra-ref: main
+  #     test-infra-ref: release/2.1
   #     build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
   #     pre-script: ${{ matrix.pre-script }}
   #     script: |
@@ -193,7 +193,7 @@ jobs:
   #     repository: "pytorch/tensorrt"
   #     ref: ""
   #     test-infra-repository: pytorch/test-infra
-  #     test-infra-ref: main
+  #     test-infra-ref: release/2.1
   #     build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
   #     pre-script: ${{ matrix.pre-script }}
   #     script: |
