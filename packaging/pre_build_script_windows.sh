@@ -5,5 +5,5 @@ python -m pip config set global.index-url "https://pypi.org/simple https://downl
 python -m pip config set global.extra-index-url "https://pypi.nvidia.com"
 python -m pip config set global.no-cache-dir true
 python -c "import torch; print('IMPORTED TORCH 2')"
-python -m pip install tensorrt==9.2.0.post12.dev5
+python -m pip install --no-deps tensorrt==9.2.0.post12.dev5 tensorrt_libs==9.2.0.post12.dev5 tensorrt_bindings==9.2.0.post12.dev5
 python -c "import torch; print('IMPORTED TORCH 3')"
