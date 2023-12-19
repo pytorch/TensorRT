@@ -8,9 +8,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data as data
-import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-
+import torchvision.transforms as transforms
 from vgg16 import vgg16
 
 PARSER = argparse.ArgumentParser(
@@ -241,6 +240,7 @@ def add_pr_curve_tensorboard(class_index, test_probs, test_preds, global_step=0)
     """
     tensorboard_preds = test_preds == class_index
     tensorboard_probs = test_probs[:, class_index]
+
 
 if __name__ == "__main__":
     main()
