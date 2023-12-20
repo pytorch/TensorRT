@@ -8,4 +8,4 @@ pytest
 transformers
 timm
 parameterized
-expecttest
+expecttest==0.1.6
