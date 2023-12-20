@@ -7,6 +7,8 @@ namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
+bool MULTI_DEVICE_SAFE_MODE = false;
+
 c10::optional<RTDevice> get_most_compatible_device(const RTDevice& target_device, const RTDevice& curr_device) {
   LOG_DEBUG("Target Device: " << target_device);
   auto device_options = find_compatible_devices(target_device);
@@ -31,13 +33,13 @@ c10::optional<RTDevice> get_most_compatible_device(const RTDevice& target_device
     if (device.device_name == target_device.device_name) {
       // First priority is selecting a candidate which agrees with the current device ID
       // If such a device is found, we can select it and break out of the loop
-      if (device.id == current_device.id && best_match.id != current_device.id) {
+      if (device.id == current_device.id) {
         best_match = device;
         break;
       }
       // Second priority is selecting a candidate which agrees with the target device ID
       // At deserialization time, the current device and target device may not agree
-      else if (device.id == target_device.id && best_match.id != target_device.id) {
+      else if (device.id == target_device.id) {
         best_match = device;
       }
       // If no such GPU ID is found, select the first available candidate GPU
@@ -101,6 +103,17 @@ RTDevice get_current_device() {
   int64_t device_id = static_cast<int64_t>(device);
 
   return RTDevice(device_id, nvinfer1::DeviceType::kGPU);
+}
+
+void multi_gpu_device_check() {
+  // If multi-device safe mode is disabled and more than 1 device is registered on the machine, warn user
+  if (!(MULTI_DEVICE_SAFE_MODE) && get_available_device_list().get_devices().size() > 1) {
+    LOG_WARNING(
+        "Detected this engine is being instantitated in a multi-GPU system with "
+        << "multi-device safe mode disabled. For more on the implications of this "
+        << "as well as workarounds, see the linked documentation "
+        << "(https://pytorch.org/TensorRT/user_guide/runtime.html#multi-device-safe-mode)");
+  }
 }
 
 namespace {

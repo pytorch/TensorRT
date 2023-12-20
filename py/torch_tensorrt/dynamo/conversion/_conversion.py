@@ -53,24 +53,15 @@ def convert_module(
         output_dtypes=output_dtypes,
         compilation_settings=settings,
     )
-    interpreter_result = interpreter.run(
-        workspace_size=settings.workspace_size,
-        precision=settings.precision,
-        profiling_verbosity=(
-            trt.ProfilingVerbosity.VERBOSE
-            if settings.debug
-            else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
-        ),
-        max_aux_streams=settings.max_aux_streams,
-        version_compatible=settings.version_compatible,
-        optimization_level=settings.optimization_level,
-    )
+    interpreter_result = interpreter.run()
 
     if settings.use_python_runtime:
         return PythonTorchTensorRTModule(
             engine=interpreter_result.engine,
             input_names=list(interpreter_result.input_names),
             output_names=list(interpreter_result.output_names),
+            target_device=settings.device,
+            profiling_enabled=settings.debug,
         )
 
     else:
