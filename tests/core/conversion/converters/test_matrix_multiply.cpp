@@ -21,9 +21,8 @@ TEST(Converters, ATenMMConvertsCorrectly) {
 
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
-  auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenMMWithDiffShapesConvertsCorrectly) {
@@ -42,9 +41,131 @@ TEST(Converters, ATenMMWithDiffShapesConvertsCorrectly) {
 
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
-  auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
+TEST(Converters, ATenMM1d2dConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : Tensor = aten::matmul(%0, %1)
+        return (%2))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in1 = at::randint(0, 5, {10}, {at::kCUDA});
+  auto in2 = at::randint(0, 5, {10, 1}, {at::kCUDA});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, in2});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
+TEST(Converters, ATenMM1d3dConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : Tensor = aten::matmul(%0, %1)
+        return (%2))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in1 = at::randint(0, 5, {10}, {at::kCUDA});
+  auto in2 = at::randint(0, 5, {2, 10, 8}, {at::kCUDA});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, in2});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
+TEST(Converters, ATenMM1d4dConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : Tensor = aten::matmul(%0, %1)
+        return (%2))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in1 = at::randint(0, 5, {10}, {at::kCUDA});
+  auto in2 = at::randint(0, 5, {2, 3, 10, 8}, {at::kCUDA});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, in2});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
+TEST(Converters, ATenMM3d1dConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : Tensor = aten::matmul(%0, %1)
+        return (%2))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in1 = at::randint(0, 5, {2, 10, 8}, {at::kCUDA});
+  auto in2 = at::randint(0, 5, {8}, {at::kCUDA});
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, in2});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
+TEST(Converters, ATenMM2d1dConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : Tensor = aten::matmul(%0, %1)
+        return (%2))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in1 = at::randint(0, 5, {1, 10}, {at::kCUDA});
+  auto in2 = at::randint(0, 5, {10}, {at::kCUDA});
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, in2});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
+TEST(Converters, ATenMM4d1dConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : Tensor = aten::matmul(%0, %1)
+        return (%2))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in1 = at::randint(0, 5, {2, 3, 10, 8}, {at::kCUDA});
+  auto in2 = at::randint(0, 5, {8}, {at::kCUDA});
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, in2});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenBMMConvertsCorrectly) {
@@ -63,9 +184,8 @@ TEST(Converters, ATenBMMConvertsCorrectly) {
 
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
-  auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenBADDBMMConvertsCorrectly) {

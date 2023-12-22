@@ -164,7 +164,7 @@ void ConversionCtx::RecordNewITensor(const torch::jit::Value* value, nvinfer1::I
 
 std::string ConversionCtx::SerializeEngine() {
 #if NV_TENSORRT_MAJOR > 7
-  auto serialized_network = builder->buildSerializedNetwork(*net, *cfg);
+  auto serialized_network = make_trt(builder->buildSerializedNetwork(*net, *cfg));
   if (!serialized_network) {
     TORCHTRT_THROW_ERROR("Building serialized network failed in TensorRT");
   }

@@ -365,5 +365,39 @@ class TestInputModifications(TestCase):
         torch._dynamo.reset()
 
 
+class TestDeconvolution(TestCase):
+    def test_ConvTranspose2d(self):
+        class Up(torch.nn.Module):
+            def __init__(self, in_channels, out_channels, upsample_stride):
+                super().__init__()
+                self.up = torch.nn.ConvTranspose2d(
+                    in_channels,
+                    out_channels,
+                    upsample_stride,
+                    stride=upsample_stride,
+                    bias=False,
+                )
+
+            def forward(self, x):
+                return self.up(x)
+
+        device = torch.device("cuda:0")
+        model = Up(64, 128, 2).to(device)
+        model.eval()
+        print(model)
+
+        x = torch.rand((1, 64, 100, 100)).to(device)
+        model_opt = torch.compile(
+            model,
+            backend="torch_tensorrt",
+            options={
+                "min_block_size": 1,
+                "debug": True,
+            },
+        )
+        with torch.no_grad():
+            _ = model_opt(x)
+
+
 if __name__ == "__main__":
     run_tests()
