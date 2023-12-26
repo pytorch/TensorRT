@@ -96,7 +96,7 @@ def where(
                 ctx, target, source_ir, f"{name}_y_expand", y_val, output_shape
             )
 
-    return select(ctx, target, source_ir, name, x_val, y_val, condition)
+    return select(ctx, target, source_ir, name, x_val, y_val, condition_val)
 
 
 def select(
