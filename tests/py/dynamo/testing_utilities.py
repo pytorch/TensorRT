@@ -70,13 +70,13 @@ def compile_module_testing(
 ) -> torch.fx.GraphModule:
     """Helper compiler exclusively for testing"""
     if use_fast_partitioner:
-        partitioned_module = partitioning.fast_partition(
+        partitioned_module, _ = partitioning.fast_partition(
             gm,
             min_block_size=min_block_size,
             torch_executed_ops=torch_executed_ops,
         )
     else:
-        partitioned_module = partitioning.global_partition(
+        partitioned_module, _ = partitioning.global_partition(
             gm,
             min_block_size=min_block_size,
             torch_executed_ops=torch_executed_ops,

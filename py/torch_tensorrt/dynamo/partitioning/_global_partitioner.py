@@ -1,5 +1,5 @@
 import logging
-from typing import Collection, Dict, List, Mapping, Optional, Sequence, Set
+from typing import Collection, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
 import torch
 from torch.fx.graph_module import GraphModule
@@ -203,7 +203,7 @@ def partition(
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Optional[Set[str]] = None,
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
-) -> torch.fx.GraphModule:
+) -> Tuple[torch.fx.GraphModule, TorchTensorRTOperatorSupport]:
     """Partition an FX GraphModule with aten ops into TRT engines
     Partitioning is based on converter operator support
 
@@ -214,7 +214,7 @@ def partition(
         torch_executed_ops: Sequence of operations to run in Torch, regardless of converter coverage
         require_full_compilation: Whether to require that all operators be run in TRT
     Returns:
-        torch.fx.GraphModule
+        torch.fx.GraphModule, TorchTensorRTOperatorSupport
     """
     supported_ops = TorchTensorRTOperatorSupport(
         torch_executed_ops=torch_executed_ops
@@ -236,4 +236,4 @@ def partition(
     if verbose:
         supported_ops.print_support_overview(len(partitions))
 
-    return fused_graph
+    return fused_graph, supported_ops
