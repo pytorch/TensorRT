@@ -2,7 +2,7 @@ import logging
 import os
 import warnings
 from datetime import datetime
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set, Tuple
 
 import numpy as np
 import tensorrt as trt
@@ -21,6 +21,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 )
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import CallingConvention
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    get_node_io,
     get_node_name,
     get_trt_tensor,
 )
@@ -105,6 +106,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self.output_dtypes = (
             [dtype._from(o) for o in output_dtypes] if output_dtypes else None
         )
+
+        # Mapping of constants to shapes and dtypes
+        self.const_mapping: Dict[str, Tuple[Sequence[int], str]] = {}
 
     def validate_conversion(self) -> Set[str]:
         missing_converters: Set[str] = set()
@@ -366,6 +370,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             f"with target {self._cur_node.target} in the TensorRT Interpreter"
         )
         trt_node: torch.fx.Node = super().run_node(n)
+
+        if n.op == "get_attr":
+            self.const_mapping[str(n)] = (tuple(trt_node.shape), str(trt_node.dtype))
+
+        _LOGGER.debug(
+            f"Ran node {self._cur_node_name} with properties: {get_node_io(n, self.const_mapping)}"
+        )
 
         # remove "_itensor_to_tensor_meta"
         kwargs = dict(n.kwargs)

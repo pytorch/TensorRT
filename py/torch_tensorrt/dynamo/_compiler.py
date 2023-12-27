@@ -310,7 +310,6 @@ def compile_module(
     # Partition module into components that can be TRT-accelerated
     fast_partitioner_failed = False
 
-    logger.info("Beginning TensorRT operator Partitioning Phase")
     # If specified, try using the fast partitioner and fall back to the global one on failure
     if settings.use_fast_partitioner:
         try:
@@ -345,11 +344,6 @@ def compile_module(
     # The global partitioner leaves non-TRT nodes as-is
     if not settings.use_fast_partitioner:
         dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(partitioned_module))
-
-    logger.info(
-        "Successfully completed graph partitioning phase. "
-        "Beginning the conversion phase."
-    )
 
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
