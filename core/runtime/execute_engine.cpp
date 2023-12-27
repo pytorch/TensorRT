@@ -43,8 +43,8 @@ bool is_switch_required(const RTDevice& curr_device, const RTDevice& engine_devi
   return false;
 }
 
-RTDevice select_rt_device(const RTDevice& engine_device, const RTDevice& curr_device) {
-  auto new_target_device_opt = get_most_compatible_device(engine_device, curr_device);
+RTDevice select_rt_device(const RTDevice& engine_device, const RTDevice& curr_device, bool hardware_compatible) {
+  auto new_target_device_opt = get_most_compatible_device(engine_device, curr_device, hardware_compatible);
 
   // REVIEW: THIS DOES NOT LIST DLA PROBABLY, WHICH WE SHOULD
   // TODO: I think this logic could be way simpler at execution time since if the tensors arent on the right
@@ -59,7 +59,9 @@ RTDevice select_rt_device(const RTDevice& engine_device, const RTDevice& curr_de
 }
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
-  LOG_DEBUG("Attempting to run engine (ID: " << compiled_engine->name << ")");
+  LOG_DEBUG(
+      "Attempting to run engine (ID: " << compiled_engine->name
+                                       << "); Hardware Compatible: " << compiled_engine->hardware_compatible);
 
   if (compiled_engine->profile_execution) {
     std::stringstream ss;
@@ -89,7 +91,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
     if (is_switch_required(curr_device, compiled_engine->device_info)) {
       // Scan through available CUDA devices and set the CUDA device context correctly
-      RTDevice device = select_rt_device(compiled_engine->device_info, curr_device);
+      RTDevice device =
+          select_rt_device(compiled_engine->device_info, curr_device, compiled_engine->hardware_compatible);
       set_rt_device(device);
 
       // Target device is new device

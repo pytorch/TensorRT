@@ -32,8 +32,15 @@ TRTEngine::TRTEngine(
     const std::string& serialized_engine,
     const RTDevice& cuda_device,
     const std::vector<std::string>& _in_binding_names,
-    const std::vector<std::string>& _out_binding_names)
-    : TRTEngine("deserialized_trt", serialized_engine, cuda_device, _in_binding_names, _out_binding_names) {}
+    const std::vector<std::string>& _out_binding_names,
+    bool hardware_compatible)
+    : TRTEngine(
+          "deserialized_trt",
+          serialized_engine,
+          cuda_device,
+          _in_binding_names,
+          _out_binding_names,
+          hardware_compatible) {}
 
 TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
     : TRTEngine(
@@ -41,15 +48,19 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           serialized_info[ENGINE_IDX],
           RTDevice(serialized_info[DEVICE_IDX]),
           split(serialized_info[INPUT_BINDING_NAMES_IDX], BINDING_DELIM),
-          split(serialized_info[OUTPUT_BINDING_NAMES_IDX], BINDING_DELIM)) {}
+          split(serialized_info[OUTPUT_BINDING_NAMES_IDX], BINDING_DELIM),
+          static_cast<bool>(std::stoi(serialized_info[HW_COMPATIBLE_IDX]))) {}
 
 TRTEngine::TRTEngine(
     const std::string& mod_name,
     const std::string& serialized_engine,
     const RTDevice& cuda_device,
     const std::vector<std::string>& _in_binding_names,
-    const std::vector<std::string>& _out_binding_names) {
-  auto most_compatible_device = get_most_compatible_device(cuda_device);
+    const std::vector<std::string>& _out_binding_names,
+    bool hardware_compatible) {
+  this->hardware_compatible = hardware_compatible;
+
+  auto most_compatible_device = get_most_compatible_device(cuda_device, RTDevice(), hardware_compatible);
   TORCHTRT_CHECK(most_compatible_device, "No compatible device was found for instantiating TensorRT engine");
   device_info = most_compatible_device.value();
   multi_gpu_device_check();
@@ -232,6 +243,7 @@ std::string TRTEngine::to_str() const {
   }
   ss << "  }" << std::endl;
   ss << "  Device: " << device_info << std::endl;
+  ss << "  Hardware Compatibility: " << (hardware_compatible ? "Enabled" : "Disabled") << std::endl;
   // clang-format on
   return ss.str();
 }

@@ -188,6 +188,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             if self.compilation_settings.version_compatible:
                 _LOGGER.info("Using version compatible")
                 builder_config.set_flag(trt.BuilderFlag.VERSION_COMPATIBLE)
+            if self.compilation_settings.hardware_compatible:
+                _LOGGER.info("Using hardware compatible")
+                builder_config.hardware_compatibility_level = (
+                    trt.HardwareCompatibilityLevel.AMPERE_PLUS
+                )
             if self.compilation_settings.optimization_level is not None:
                 _LOGGER.info(
                     f"Using optimization level {self.compilation_settings.optimization_level}"

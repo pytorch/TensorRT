@@ -13,6 +13,7 @@ from torch_tensorrt.dynamo._defaults import (
     DRYRUN,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     ENGINE_CAPABILITY,
+    HARDWARE_COMPATIBLE,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
@@ -67,6 +68,7 @@ class CompilationSettings:
         dryrun (Union[bool, str]): Toggle "Dryrun" mode, which runs everything through partitioning, short of conversion to
             TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the
             ouptut to a file if a string path is specified
+        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
     """
 
     precision: torch.dtype = PRECISION
@@ -93,3 +95,4 @@ class CompilationSettings:
     dla_local_dram_size: int = DLA_LOCAL_DRAM_SIZE
     dla_global_dram_size: int = DLA_GLOBAL_DRAM_SIZE
     dryrun: Union[bool, str] = DRYRUN
+    hardware_compatible: bool = HARDWARE_COMPATIBLE
