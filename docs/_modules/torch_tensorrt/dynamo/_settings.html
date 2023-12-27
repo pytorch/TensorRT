@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.2.0.dev0+15082c4 documentation</title>
+  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.2.0.dev0+3f8576c documentation</title>
   
 
   
@@ -234,7 +234,7 @@
               
               
                 <div class="version">
-                  v2.2.0.dev0+15082c4
+                  v2.2.0.dev0+3f8576c
                 </div>
               
             
@@ -424,6 +424,7 @@
     <span class="n">DRYRUN</span><span class="p">,</span>
     <span class="n">ENABLE_EXPERIMENTAL_DECOMPOSITIONS</span><span class="p">,</span>
     <span class="n">ENGINE_CAPABILITY</span><span class="p">,</span>
+    <span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
     <span class="n">MAX_AUX_STREAMS</span><span class="p">,</span>
     <span class="n">MIN_BLOCK_SIZE</span><span class="p">,</span>
     <span class="n">NUM_AVG_TIMING_ITERS</span><span class="p">,</span>
@@ -478,6 +479,7 @@
 <span class="sd">        dryrun (Union[bool, str]): Toggle &quot;Dryrun&quot; mode, which runs everything through partitioning, short of conversion to</span>
 <span class="sd">            TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the</span>
 <span class="sd">            ouptut to a file if a string path is specified</span>
+<span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">precision</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">PRECISION</span>
@@ -503,7 +505,8 @@
     <span class="n">dla_sram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DLA_SRAM_SIZE</span>
     <span class="n">dla_local_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DLA_LOCAL_DRAM_SIZE</span>
     <span class="n">dla_global_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DLA_GLOBAL_DRAM_SIZE</span>
-    <span class="n">dryrun</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">DRYRUN</span></div>
+    <span class="n">dryrun</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">DRYRUN</span>
+    <span class="n">hardware_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">HARDWARE_COMPATIBLE</span></div>
 </pre></div>
 
              </article>
