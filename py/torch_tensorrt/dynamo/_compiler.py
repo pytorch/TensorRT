@@ -5,7 +5,6 @@ import logging
 from typing import Any, List, Optional, Sequence, Set, Tuple, Union
 
 import torch
-import torch_tensorrt
 from torch.export import ExportedProgram
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
@@ -20,8 +19,10 @@ from torch_tensorrt.dynamo._defaults import (
     DLA_GLOBAL_DRAM_SIZE,
     DLA_LOCAL_DRAM_SIZE,
     DLA_SRAM_SIZE,
+    DRYRUN,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     ENGINE_CAPABILITY,
+    HARDWARE_COMPATIBLE,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
@@ -37,6 +38,12 @@ from torch_tensorrt.dynamo._defaults import (
     VERSION_COMPATIBLE,
     WORKSPACE_SIZE,
 )
+from torch_tensorrt.dynamo._DryRunTracker import (
+    DryRunTracker,
+    PerSubgraphData,
+    dryrun_stats_display,
+    parse_non_trt_nodes,
+)
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     convert_module,
@@ -45,11 +52,14 @@ from torch_tensorrt.dynamo.conversion import (
 from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decompositions
 from torch_tensorrt.dynamo.utils import (
     get_torch_inputs,
+    parse_complex_tensor_structs,
     prepare_inputs,
     set_log_level,
     to_torch_device,
     to_torch_tensorrt_device,
 )
+
+import torch_tensorrt
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +94,8 @@ def compile(
     use_python_runtime: bool = USE_PYTHON_RUNTIME,
     use_fast_partitioner: bool = USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    dryrun: bool = DRYRUN,
+    hardware_compatible: bool = HARDWARE_COMPATIBLE,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile a TorchScript module for NVIDIA GPUs using TensorRT
@@ -140,6 +152,8 @@ def compile(
         use_python_runtime: (bool): Return a graph using a pure Python runtime, reduces options for serialization
         use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optiminal. Use the global paritioner (``False``) if looking for best performance
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the grap easier to covert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
+        dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
+        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -215,6 +229,8 @@ def compile(
         "dla_sram_size": dla_sram_size,
         "dla_local_dram_size": dla_local_dram_size,
         "dla_global_dram_size": dla_global_dram_size,
+        "dryrun": dryrun,
+        "hardware_compatible": hardware_compatible,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -238,15 +254,34 @@ def compile_module(
     Returns:
         Compiled FX GraphModule
     """
+    dryrun_tracker = DryRunTracker()
 
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops = partitioning.get_graph_converter_support(
         gm, settings.debug, settings.torch_executed_ops
     )
 
+    dryrun_tracker.total_ops_in_graph = total_ops
+    dryrun_tracker.supported_ops_in_graph = num_supported_ops
+    dryrun_tracker.graph_input_shapes = parse_complex_tensor_structs(
+        sample_inputs, "shape", lambda x: dict(x) if isinstance(x, dict) else tuple(x)
+    )
+    dryrun_tracker.graph_input_dtypes = parse_complex_tensor_structs(
+        sample_inputs, "torch_dtype"
+    )
+    dryrun_tracker.compilation_settings = settings
+
+    if settings.dryrun and settings.min_block_size > 1:
+        logger.info(
+            "It is recommended to run `dryrun` mode with `min_block_size=1`, "
+            "for the most thorough analysis"
+        )
+
     # If the number of supported operations is 0 or less than the block size, skip the subgraph
     # TODO: Add condition to second expression below when require_full_compilation is added
-    if num_supported_ops == 0 or (num_supported_ops < settings.min_block_size):
+    if num_supported_ops == 0 or (
+        num_supported_ops < settings.min_block_size and not settings.dryrun
+    ):
         logger.warning(
             f"{num_supported_ops} supported operations detected in subgraph containing {total_ops} computational nodes. "
             f"Skipping this subgraph, since min_block_size was detected to be {settings.min_block_size}"
@@ -263,7 +298,7 @@ def compile_module(
     # If specified, try using the fast partitioner and fall back to the global one on failure
     if settings.use_fast_partitioner:
         try:
-            partitioned_module = partitioning.fast_partition(
+            partitioned_module, supported_ops = partitioning.fast_partition(
                 gm,
                 verbose=settings.debug,
                 min_block_size=settings.min_block_size,
@@ -280,12 +315,18 @@ def compile_module(
             settings.use_fast_partitioner = False
 
     if not settings.use_fast_partitioner:
-        partitioned_module = partitioning.global_partition(
+        partitioned_module, supported_ops = partitioning.global_partition(
             gm,
             verbose=settings.debug,
             min_block_size=settings.min_block_size,
             torch_executed_ops=settings.torch_executed_ops,
         )
+
+    dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
+
+    # The global partitioner leaves non-TRT nodes as-is
+    if not settings.use_fast_partitioner:
+        dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(partitioned_module))
 
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
@@ -295,7 +336,18 @@ def compile_module(
         submodule = getattr(partitioned_module, name)
         # Criteria for a module to be convertible to TRT
         if settings.use_fast_partitioner and "_run_on_acc" not in name:
+            dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(submodule))
             continue
+
+        subgraph_data = PerSubgraphData()
+        subgraph_data.subgraph_name = name
+        subgraph_data.subgraph_op_count = len(
+            [
+                node
+                for node in submodule.graph.nodes
+                if node.op in ("call_function", "call_method", "call_module")
+            ]
+        )
 
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
         submodule_inputs = partitioning.get_submod_inputs(
@@ -323,15 +375,55 @@ def compile_module(
                 name,
             )
 
-        # Create TRT engines from submodule
-        trt_module = convert_module(
-            submodule,
+        subgraph_data.subgraph_input_shapes = parse_complex_tensor_structs(
             submodule_inputs,
-            settings=settings,
-            name=name,
+            "shape",
+            lambda x: dict(x) if isinstance(x, dict) else tuple(x),
+        )
+        subgraph_data.subgraph_input_dtypes = parse_complex_tensor_structs(
+            submodule_inputs, "torch_dtype"
         )
 
-        trt_modules[name] = trt_module
+        submodule_outputs = submodule(
+            *get_torch_inputs(submodule_inputs, to_torch_device(settings.device))
+        )
+
+        subgraph_data.subgraph_output_shapes = parse_complex_tensor_structs(
+            submodule_outputs,
+            "shape",
+            lambda x: dict(x) if isinstance(x, dict) else tuple(x),
+        )
+        subgraph_data.subgraph_output_dtypes = parse_complex_tensor_structs(
+            submodule_outputs, "dtype"
+        )
+
+        dryrun_tracker.tensorrt_graph_count += 1
+        dryrun_tracker.per_subgraph_data.append(subgraph_data)
+
+        # Create TRT engines from submodule
+        if not settings.dryrun:
+            trt_module = convert_module(
+                submodule,
+                submodule_inputs,
+                settings=settings,
+                name=name,
+            )
+
+            trt_modules[name] = trt_module
+
+    sample_outputs = gm(
+        *get_torch_inputs(sample_inputs, to_torch_device(settings.device))
+    )
+
+    if not isinstance(sample_outputs, (list, tuple)):
+        sample_outputs = [sample_outputs]
+
+    dryrun_tracker.graph_output_shapes = parse_complex_tensor_structs(
+        sample_outputs, "shape", lambda x: dict(x) if isinstance(x, dict) else tuple(x)
+    )
+    dryrun_tracker.graph_output_dtypes = parse_complex_tensor_structs(
+        sample_outputs, "dtype"
+    )
 
     # Replace all FX Modules with TRT Modules
     for name, trt_module in trt_modules.items():
@@ -340,5 +432,7 @@ def compile_module(
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:
         settings.use_fast_partitioner = True
+
+    dryrun_stats_display(dryrun_tracker, settings.dryrun)
 
     return partitioned_module

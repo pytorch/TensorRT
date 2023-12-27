@@ -18,7 +18,7 @@ class TestFastPartitioning(TestCase):
                 return torch.ops.aten.add.Tensor(x, y)
 
         fx_graph = torch.fx.symbolic_trace(FullySupportedOneOp())
-        partitioned_graph = partitioning.fast_partition(deepcopy(fx_graph))
+        partitioned_graph, _ = partitioning.fast_partition(deepcopy(fx_graph))
         self.assertEquals(
             len(
                 [
@@ -40,7 +40,7 @@ class TestFastPartitioning(TestCase):
                 return torch.ops.aten.add.Tensor(x, y)
 
         fx_graph = torch.fx.symbolic_trace(FullySupportedOneOp())
-        partitioned_graph = partitioning.fast_partition(
+        partitioned_graph, _ = partitioning.fast_partition(
             deepcopy(fx_graph), require_full_compilation=True
         )
         self.assertEquals(
@@ -68,7 +68,7 @@ class TestFastPartitioning(TestCase):
                 return pow_
 
         fx_graph = torch.fx.symbolic_trace(FullySupportedMultiOp())
-        partitioned_graph = partitioning.fast_partition(
+        partitioned_graph, _ = partitioning.fast_partition(
             deepcopy(fx_graph), min_block_size=2
         )
         self.assertEquals(
@@ -97,7 +97,7 @@ class TestFastPartitioning(TestCase):
                 return pow_
 
         fx_graph = torch.fx.symbolic_trace(PartiallySupportedMultiOp())
-        partitioned_graph = partitioning.fast_partition(
+        partitioned_graph, _ = partitioning.fast_partition(
             deepcopy(fx_graph), min_block_size=2
         )
         self.assertEquals(

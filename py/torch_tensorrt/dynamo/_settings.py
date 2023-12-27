@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, Set
+from typing import Optional, Set, Union
 
 import torch
 from tensorrt import EngineCapability
@@ -10,8 +10,10 @@ from torch_tensorrt.dynamo._defaults import (
     DLA_GLOBAL_DRAM_SIZE,
     DLA_LOCAL_DRAM_SIZE,
     DLA_SRAM_SIZE,
+    DRYRUN,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     ENGINE_CAPABILITY,
+    HARDWARE_COMPATIBLE,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
@@ -63,6 +65,10 @@ class CompilationSettings:
         dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
         dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
+        dryrun (Union[bool, str]): Toggle "Dryrun" mode, which runs everything through partitioning, short of conversion to
+            TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the
+            ouptut to a file if a string path is specified
+        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
     """
 
     precision: torch.dtype = PRECISION
@@ -88,3 +94,5 @@ class CompilationSettings:
     dla_sram_size: int = DLA_SRAM_SIZE
     dla_local_dram_size: int = DLA_LOCAL_DRAM_SIZE
     dla_global_dram_size: int = DLA_GLOBAL_DRAM_SIZE
+    dryrun: Union[bool, str] = DRYRUN
+    hardware_compatible: bool = HARDWARE_COMPATIBLE

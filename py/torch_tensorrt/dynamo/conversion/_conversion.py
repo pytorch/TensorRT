@@ -76,4 +76,5 @@ def convert_module(
             input_binding_names=list(interpreter_result.input_names),
             output_binding_names=list(interpreter_result.output_names),
             target_device=settings.device,
+            hardware_compatible=settings.hardware_compatible,
         )
