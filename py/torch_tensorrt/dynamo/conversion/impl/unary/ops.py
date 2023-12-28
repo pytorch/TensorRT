@@ -5,7 +5,10 @@ import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.converter_utils import cast_trt_tensor
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_trt_tensor,
+    get_trt_tensor,
+)
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
 from torch_tensorrt.fx.types import TRTTensor
 
@@ -431,4 +434,28 @@ def erf(
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.ERF, input_val
+    )
+
+
+def trunc(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+) -> TRTTensor:
+    if input_val.dtype not in (trt.float16, trt.float32):
+        return impl.cast.to_copy(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_copy",
+            input_val,
+            input_val.dtype,
+            force_layer=True,
+        )
+
+    dividend = get_trt_tensor(ctx, 1, f"{name}_dividend")
+    return impl.elementwise.trunc_div(
+        ctx, target, source_ir, f"{name}_trunc", input_val, dividend
     )
