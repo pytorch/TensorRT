@@ -25,7 +25,7 @@ class TestRemainderConverter(DispatchTestCase):
             Remainder(),
             inputs,
         )
-    
+
     def test_remainder_scalar_int(self, scalar=3):
         class Remainder(nn.Module):
             def forward(self, lhs_val):
