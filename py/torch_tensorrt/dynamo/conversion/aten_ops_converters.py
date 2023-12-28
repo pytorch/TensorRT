@@ -499,25 +499,6 @@ def aten_ops_softplus(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.clip.default)
-def aten_ops_clip(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.activation.clip(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-        alpha=args_bounds_check(args, 1),
-        beta=args_bounds_check(args, 2),
-    )
-
-
 @dynamo_tensorrt_converter(torch.ops.aten.hardsigmoid.default)
 def aten_ops_hard_sigmoid(
     ctx: ConversionContext,
@@ -695,6 +676,9 @@ def aten_ops_where(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.clamp.default)
+@dynamo_tensorrt_converter(torch.ops.aten.clamp.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.clip.default)
+@dynamo_tensorrt_converter(torch.ops.aten.clip.Tensor)
 def aten_ops_clamp(
     ctx: ConversionContext,
     target: Target,
