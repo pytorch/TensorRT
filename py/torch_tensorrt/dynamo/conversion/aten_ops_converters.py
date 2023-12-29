@@ -2530,7 +2530,7 @@ def aten_ops_sort(
 @dynamo_tensorrt_converter(torch.ops.aten.trunc.default)
 @enforce_tensor_types(
     {
-        1: (TRTTensor,),
+        0: (TRTTensor,),
     }
 )
 def aten_ops_trunc(
