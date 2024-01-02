@@ -1,9 +1,9 @@
 import torch
+import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 
-import torch_tensorrt
-
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
+
 
 class TestLowering(TestCase):
     def test_lowering_inplace_op(self):
