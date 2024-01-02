@@ -2547,3 +2547,28 @@ def aten_ops_trunc(
         name,
         args[0],
     )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.copy.default)
+@enforce_tensor_types(
+    {
+        1: (TRTTensor,),
+    }
+)
+def aten_ops_copy(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    src = args[1]
+    return impl.cast.to_copy(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        src,
+        src.dtype,
+        force_layer=True,
+    )
