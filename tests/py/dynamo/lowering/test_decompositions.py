@@ -1,9 +1,9 @@
 import torch
-import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 
-from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
+import torch_tensorrt
 
+from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
 class TestLowering(TestCase):
     def test_lowering_inplace_op(self):
@@ -426,19 +426,18 @@ class TestLowering(TestCase):
                 super().__init__(*args, **kwargs)
 
             def forward(self, x, src, dim, index):
-                y = self.select_scatter(x, src, dim, index)
+                y = torch.ops.aten.select_scatter.default(x, src, dim, index)
                 return y
 
         # Operations expected to be removed in the traced graph after decompositions
         expected_ops = {
-            torch.ops.aten.lt.default,
-            torch.ops.aten.expand.default,
-            torch.ops.aten.unsqueeze.default,
-            torch.ops.aten.where.default,
+            torch.ops.aten.slice.Tensor,
+            torch.ops.aten.squeeze.dim,
+            torch.ops.aten.cat.default,
         }
-        unexpected_ops = {torch.ops.aten.select_scatter}
+        unexpected_ops = {torch.ops.aten.select_scatter.default}
 
-        inputs = [torch.randn(2, 2), torch.ones(2)]
+        inputs = [torch.zeros(2, 2).cuda(), torch.ones(2).cuda(), 0, 0]
 
         fx_graph = torch.fx.symbolic_trace(selectScatter())
         unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(

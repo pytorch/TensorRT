@@ -163,7 +163,7 @@ def var_decomposition(
 
 
 @register_torch_trt_decomposition(
-    torch.ops.select_scatter, registry=TORCH_TRT_DECOMPOSITIONS
+    torch.ops.aten.select_scatter.default, registry=TORCH_TRT_DECOMPOSITIONS
 )
 def select_scatter_decomposition(
     input_tensor: torch.Tensor,
@@ -177,21 +177,18 @@ def select_scatter_decomposition(
         raise AssertionError("The index should not be greater than dim")
 
     # expanding the src_tensor to have the same dimension as input_tensor
-    src_tensor = torch.expand(torch.unsqueeze(src_tensor, dim), input_tensor.shape)
     # check if the dimension of the src tensor is same as slice tensor
     select_tensor = torch.select(input_tensor, dim, index)
+
     if select_tensor.shape != src_tensor.shape:
         raise AssertionError(
             "The slice tensor shape should be equal to the src tensor shape"
         )
 
-    # make the index tensor
-    # input_tensor_shape = input_tensor.shape
-    # return torch.where(torch.eq((input_tensor_shape[dim]), index), src_tensor, input_tensor)
-
     unbind_tensors = torch.unbind(input_tensor, dim)
-    unbind_tensors[index] = src_tensor
-    return torch.cat(unbind_tensors, dim)
+    unbind_tensors_list = list(unbind_tensors)
+    unbind_tensors_list[index] = src_tensor
+    return torch.stack(tuple(unbind_tensors_list), dim)
 
 
 def get_decompositions(
