@@ -3,9 +3,10 @@ import unittest
 import pytest
 import timm
 import torch
-import torch_tensorrt as torchtrt
 import torchvision.models as models
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
+
+import torch_tensorrt as torchtrt
 
 assertions = unittest.TestCase()
 
@@ -206,7 +207,7 @@ def test_hybrid_relu_fallback(ir):
         ],
         "ir": ir,
         "min_block_size": 1,
-        "torch_executed_ops": "torch.ops.aten.relu.default",
+        "torch_executed_ops": {"torch.ops.aten.relu.default"},
     }
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
