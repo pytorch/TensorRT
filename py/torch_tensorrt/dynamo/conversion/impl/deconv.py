@@ -32,10 +32,11 @@ def deconvNd(
     input: TRTTensor,
     weight: Union[TRTTensor, torch.Tensor, np.ndarray],
     bias: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
-    stride: Optional[Union[int, Sequence[int]]],
-    padding: Optional[Union[int, Sequence[int]]],
+    stride: Union[int, Sequence[int]],
+    padding: Union[int, Sequence[int]],
+    dilation: Union[int, Sequence[int]],
     groups: Optional[int],
-    dilation: Optional[Union[int, Sequence[int]]],
+    output_padding: Union[int, Sequence[int]] = 0,
     scale: Optional[Union[torch.Tensor, float]] = None,
     zero_point: Optional[Union[torch.Tensor, float]] = None,
 ) -> TRTTensor:
@@ -86,7 +87,7 @@ def deconvNd(
     # add deconv layer
     deconv_layer = ctx.net.add_deconvolution_nd(
         input=input,
-        num_output_maps=weight.shape[0],
+        num_output_maps=weight.shape[1] * groups,
         kernel_shape=weight.shape[2:],
         kernel=trt.Weights() if isinstance(weight, TRTTensor) else weight,
         bias=trt.Weights() if isinstance(bias, TRTTensor) else bias,

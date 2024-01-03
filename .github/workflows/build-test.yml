@@ -15,12 +15,12 @@ on:
 
 jobs:
   generate-matrix:
-    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@release/2.1
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@release/2.2
     with:
       package-type: wheel
       os: linux
       test-infra-repository: pytorch/test-infra
-      test-infra-ref: release/2.1
+      test-infra-ref: release/2.2
       channel: test
       with-rocm: false
       with-cpu: false
@@ -38,12 +38,12 @@ jobs:
             smoke-test-script: ""
             package-name: torch_tensorrt
     name: Build torch-tensorrt whl package
-    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@release/2.1
+    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@release/2.2
     with:
       repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
-      test-infra-ref: release/2.1
+      test-infra-ref: release/2.2
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       env-var-script: ${{ matrix.env-var-script }}
@@ -57,6 +57,7 @@ jobs:
 
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
+    if:  success() || failure()
     needs: [generate-matrix, build]
     strategy:
       fail-fast: false
@@ -71,7 +72,7 @@ jobs:
       repository: "pytorch/tensorrt"
       ref: ""
       test-infra-repository: pytorch/test-infra
-      test-infra-ref: release/2.1
+      test-infra-ref: release/2.2
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
@@ -92,6 +93,7 @@ jobs:
 
   tests-py-dynamo-converters:
     name: Test dynamo converters [Python]
+    if:  success() || failure()
     needs: [generate-matrix, build]
     strategy:
       fail-fast: false
@@ -106,7 +108,7 @@ jobs:
       repository: "pytorch/tensorrt"
       ref: ""
       test-infra-repository: pytorch/test-infra
-      test-infra-ref: release/2.1
+      test-infra-ref: release/2.2
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
@@ -119,6 +121,7 @@ jobs:
 
   tests-py-dynamo-fe:
     name: Test dynamo frontend [Python]
+    if:  success() || failure()
     needs: [generate-matrix, build]
     strategy:
       fail-fast: false
@@ -133,7 +136,7 @@ jobs:
       repository: "pytorch/tensorrt"
       ref: ""
       test-infra-repository: pytorch/test-infra
-      test-infra-ref: release/2.1
+      test-infra-ref: release/2.2
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
@@ -148,6 +151,7 @@ jobs:
 
   tests-py-torch-compile-be:
     name: Test torch compile backend [Python]
+    if:  success() || failure()
     needs: [generate-matrix, build]
     strategy:
       fail-fast: false
@@ -162,7 +166,7 @@ jobs:
       repository: "pytorch/tensorrt"
       ref: ""
       test-infra-repository: pytorch/test-infra
-      test-infra-ref: release/2.1
+      test-infra-ref: release/2.2
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
@@ -176,6 +180,7 @@ jobs:
 
   tests-py-dynamo-core:
     name: Test dynamo core [Python]
+    if:  success() || failure()
     needs: [generate-matrix, build]
     strategy:
       fail-fast: false
@@ -190,7 +195,7 @@ jobs:
       repository: "pytorch/tensorrt"
       ref: ""
       test-infra-repository: pytorch/test-infra
-      test-infra-ref: release/2.1
+      test-infra-ref: release/2.2
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |

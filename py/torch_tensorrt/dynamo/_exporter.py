@@ -3,10 +3,16 @@ import operator
 from typing import Any, Dict, Sequence, Tuple, cast
 
 import torch
-from torch._export.exported_program import CallSpec
 from torch._guards import detect_fake_mode
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.export import ExportedProgram, ExportGraphSignature
+from torch.export.exported_program import (
+    InputKind,
+    InputSpec,
+    OutputKind,
+    OutputSpec,
+    TensorArgument,
+)
 from torch_tensorrt.dynamo import partitioning
 
 
@@ -14,7 +20,6 @@ def export(
     gm: torch.fx.GraphModule,
     inputs: Sequence[torch.Tensor],
     *,
-    call_spec: CallSpec = None,
     ir: str = "torchscript",
 ) -> ExportedProgram:
     """Export a program (``torch.fx.GraphModule``) for serialization with the TensorRT engines embedded.
@@ -40,15 +45,13 @@ def export(
                         format=torch.channel_last
                     ), # Dynamic input shape for input #2
                     torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
-        call_spec (CallSpec): CallSpec object of exported program. This is None for ir=torchscript. For ir=exported_program, this should be set to input ExportedProgram's call_spec object.
         ir (str): torchscript | exported_program. Based on the provided ir, the output type would be a torchscript or exported program.
     """
     if ir == "torchscript":
         return torch.jit.trace(gm, inputs)
     elif ir == "exported_program":
-        assert call_spec
         patched_module = transform(gm, inputs)
-        exp_program = create_trt_exp_program(patched_module, call_spec)
+        exp_program = create_trt_exp_program(patched_module)
 
         return exp_program
     else:
@@ -162,6 +165,7 @@ def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
 
                 # Copy all nodes in the submodule into gm and
                 # store the output node of this submodule which is now present in gm
+
                 submodule_output = gm.graph.graph_copy(submodule.graph, val_map)
 
                 # Get their references (since we copied) in the parent graph (gm)
@@ -218,39 +222,31 @@ def copy_submodule_attributes(gm: torch.fx.GraphModule, submod_name: str) -> Non
 
 
 def create_trt_exp_program(
-    gm: torch.fx.GraphModule, call_spec: CallSpec
+    gm: torch.fx.GraphModule,
 ) -> ExportedProgram:
     """Creates a new Exported Program. This function takes an torch.fx.GraphModule which has TRT engines
     and constructs an Exported Program object with the new IO node names and state_dict
     """
-    input_node_names = [
-        node.name for node in gm.graph.nodes if node.op == "placeholder"
+    input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]
+    output_nodes = [node for node in gm.graph.nodes if node.op == "output"]
+    assert output_nodes
+    output_nodes = output_nodes[0].args[0]
+
+    input_specs = [
+        InputSpec(InputKind.USER_INPUT, TensorArgument(name=node.name), node.target)
+        for node in input_nodes
     ]
-    output_node_names = [node.name for node in gm.graph.nodes if node.op == "output"]
-    param_names = [param[0] for param in gm.named_parameters()]
-    buffer_names = [buffer[0] for buffer in gm.named_buffers()]
-    inputs_to_parameters = {}
-    inputs_to_buffers = {}
-    for node in gm.graph.nodes:
-        if node.target in param_names:
-            inputs_to_parameters[node.name] = node.target
-        if node.target in buffer_names:
-            inputs_to_buffers[node.name] = node.target
+    output_specs = [
+        OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name=node.name), node.target)
+        for node in output_nodes
+    ]
 
     trt_graph_signature = ExportGraphSignature(
-        parameters=param_names,
-        buffers=buffer_names,
-        user_inputs=input_node_names,
-        user_outputs=output_node_names,
-        inputs_to_parameters=inputs_to_parameters,
-        inputs_to_buffers=inputs_to_buffers,
-        buffers_to_mutate={},
-        backward_signature=None,
-        assertion_dep_token=None,
+        input_specs=input_specs, output_specs=output_specs
     )
 
     trt_exp_program = ExportedProgram(
-        gm, gm.graph, trt_graph_signature, call_spec, gm.state_dict(), {}, [], []
+        gm, gm.graph, trt_graph_signature, gm.state_dict(), {}, [], [], []
     )
 
     return trt_exp_program
@@ -282,6 +278,7 @@ def inline_trt_modules(
                 (trt_module_node.args, trt_module.engine),
             )
             trt_node.meta["val"] = []
+            assert num_outputs > 0
             # Generate meta data for TRT node (a FakeTensor with corresponding output shape)
             for idx in range(num_outputs):
                 trt_node.meta["val"].append(
@@ -298,12 +295,16 @@ def inline_trt_modules(
             # Insert getitem nodes as outputs (for export serialization to work)
             with gm.graph.inserting_after(trt_node):
                 getitem_output = gm.graph.call_function(operator.getitem, (trt_node, 0))
+                getitem_output.meta["val"] = trt_node.meta["val"]
             trt_module_node.replace_all_uses_with(getitem_output)
         else:
             # Multiple outputs case:
             # Replace uses of submodule with the trt_node.
             # getitem nodes are already added inherently by the partitioner
             trt_module_node.replace_all_uses_with(trt_node)
+            getitem_nodes = trt_node.users
+            for idx, getitem_node in enumerate(getitem_nodes):
+                getitem_node.meta["val"] = trt_node.meta["val"][idx]
 
         # Erase the TRT submodule (call_module) node.
         gm.graph.erase_node(trt_module_node)

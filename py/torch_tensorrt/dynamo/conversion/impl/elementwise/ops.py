@@ -1,7 +1,8 @@
 from typing import Optional, Union
 
-import numpy as np
 import tensorrt as trt
+import torch
+import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -15,7 +16,6 @@ from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
 )
 from torch_tensorrt.dynamo.conversion.impl.unary import sign
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
-from torch_tensorrt.fx.converters.converter_utils import set_layer_name, squeeze_left
 from torch_tensorrt.fx.types import TRTTensor
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
@@ -184,63 +184,21 @@ def clamp(
     source_ir: Optional[SourceIR],
     name: str,
     input_val: TRTTensor,
-    min_val: Optional[float] = None,
-    max_val: Optional[float] = None,
+    min_val: Optional[Union[int, float, TRTTensor]] = None,
+    max_val: Optional[Union[int, float, TRTTensor]] = None,
 ) -> TRTTensor:
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"Clamp received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
-
-    def _add_layer(
-        ctx: ConversionContext,
-        input: TRTTensor,
-        val: float,
-        op: trt.ElementWiseOperation,
-        name: str,
-    ) -> (
-        trt.ILayer
-    ):  # TODO: Simplify and merge implementations, should just be max and min stacked
-        if not len(input.shape):
-            # clamping scalar
-            acc_ops_clamp_trt = get_trt_tensor(
-                ctx,
-                squeeze_left(
-                    np.array(
-                        [val],
-                        dtype=unified_dtype_converter(input.dtype, Frameworks.NUMPY),
-                    )
-                ),
-                f"{name}_clamp_{val}",
-            )
-        else:
-            acc_ops_clamp_shape = (1,) * len(input.shape)  # broadcast all dimensions
-            acc_ops_clamp_tensor = np.full(
-                acc_ops_clamp_shape,
-                val,
-                dtype=unified_dtype_converter(input.dtype, Frameworks.NUMPY),
-            )
-            acc_ops_clamp_trt = ctx.net.add_constant(
-                acc_ops_clamp_shape, acc_ops_clamp_tensor
-            ).get_output(0)
-        layer = ctx.net.add_elementwise(input, acc_ops_clamp_trt, op)
-        return layer
-
+    clamped_val = input_val
     if min_val is not None:
-        clamp_min_layer = _add_layer(
-            ctx, input_val, min_val, trt.ElementWiseOperation.MAX, name
+        clamped_val = impl.elementwise.max(
+            ctx, target, source_ir, f"{name}_max", clamped_val, min_val
         )
-        set_layer_name(clamp_min_layer, target, f"{name}_clamp_min")
-        input_val = clamp_min_layer.get_output(0)
-    if max_val is not None:
-        clamp_max_layer = _add_layer(
-            ctx, input_val, max_val, trt.ElementWiseOperation.MIN, name
-        )
-        set_layer_name(clamp_max_layer, target, f"{name}_clamp_max")
-        input_val = clamp_max_layer.get_output(0)
 
-    return input_val
+    if max_val is not None:
+        clamped_val = impl.elementwise.min(
+            ctx, target, source_ir, f"{name}_min", clamped_val, max_val
+        )
+
+    return clamped_val
 
 
 def add(
@@ -370,8 +328,8 @@ def logical_and(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: Union[TRTTensor, int, float, bool],
+    rhs_val: Union[TRTTensor, int, float, bool],
 ) -> TRTTensor:
     if isinstance(lhs_val, TRTTensor):
         lhs_val = cast_int_or_float_to_bool(ctx, name, lhs_val)
@@ -389,8 +347,8 @@ def logical_or(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: Union[TRTTensor, int, float, bool],
+    rhs_val: Union[TRTTensor, int, float, bool],
 ) -> TRTTensor:
     if isinstance(lhs_val, TRTTensor):
         lhs_val = cast_int_or_float_to_bool(ctx, name, lhs_val)
@@ -408,8 +366,8 @@ def logical_xor(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: Union[TRTTensor, int, float, bool],
+    rhs_val: Union[TRTTensor, int, float, bool],
 ) -> TRTTensor:
     if isinstance(lhs_val, TRTTensor):
         lhs_val = cast_int_or_float_to_bool(ctx, name, lhs_val)
@@ -422,13 +380,46 @@ def logical_xor(
     )
 
 
+def bitwise_and(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
+) -> TRTTensor:
+    return logical_and(ctx, target, source_ir, f"{name}_logical_and", lhs_val, rhs_val)
+
+
+def bitwise_or(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
+) -> TRTTensor:
+    return logical_or(ctx, target, source_ir, f"{name}_logical_or", lhs_val, rhs_val)
+
+
+def bitwise_xor(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor, bool],
+) -> TRTTensor:
+    return logical_xor(ctx, target, source_ir, f"{name}_logical_xor", lhs_val, rhs_val)
+
+
 def eq(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
 ) -> TRTTensor:
     return convert_binary_elementwise(
         ctx,
@@ -441,13 +432,30 @@ def eq(
     )
 
 
+def ne(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
+) -> TRTTensor:
+    return impl.unary.logical_not(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_logical_not",
+        eq(ctx, target, source_ir, f"{name}_eq", lhs_val, rhs_val),
+    )
+
+
 def gt(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
 ) -> TRTTensor:
     return convert_binary_elementwise(
         ctx,
@@ -460,13 +468,31 @@ def gt(
     )
 
 
+def ge(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
+) -> TRTTensor:
+    return logical_or(
+        ctx,
+        target,
+        source_ir,
+        name,
+        gt(ctx, target, source_ir, f"{name}_gt", lhs_val, rhs_val),
+        eq(ctx, target, source_ir, f"{name}_eq", lhs_val, rhs_val),
+    )
+
+
 def lt(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
 ) -> TRTTensor:
     return convert_binary_elementwise(
         ctx,
@@ -476,4 +502,22 @@ def lt(
         trt.ElementWiseOperation.LESS,
         lhs_val,
         rhs_val,
+    )
+
+
+def le(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: TRTTensor,
+    rhs_val: Union[TRTTensor, int, float, torch.Tensor],
+) -> TRTTensor:
+    return logical_or(
+        ctx,
+        target,
+        source_ir,
+        name,
+        lt(ctx, target, source_ir, f"{name}_lt", lhs_val, rhs_val),
+        eq(ctx, target, source_ir, f"{name}_eq", lhs_val, rhs_val),
     )

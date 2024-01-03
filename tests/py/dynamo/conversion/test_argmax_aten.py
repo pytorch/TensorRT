@@ -11,11 +11,11 @@ class TestArgmaxConverter(DispatchTestCase):
         [
             # input dimension == 1
             ("dim_1_keep_dim_true", (3,), 0, True),
-            ("dim_1_keep_dim_true", (3,), 0, False),
+            ("dim_1_keep_dim_false", (3,), 0, False),
             # dim == None
-            ("dim_none", (3,), None, True),
-            ("dim_none", (3, 3), None, True),
-            ("dim_none", (3, 3, 3), None, False),
+            ("dim_1_none_true", (3,), None, True),
+            ("dim_2_none_true", (3, 3), None, True),
+            ("dim_3_none_false", (3, 3, 3), None, False),
             # # common cases
             ("dim_1_keep_dim_true", (3, 3), 1, True),
             ("dim_1_keep_dim_false", (3, 3), 1, False),

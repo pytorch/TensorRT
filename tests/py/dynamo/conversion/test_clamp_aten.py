@@ -49,7 +49,7 @@ class TestClampConverter(DispatchTestCase):
 
         class TestScalarModule(torch.nn.Module):
             def forward(self, x):
-                y = torch.ops.aten.mean.default(x)
+                y = torch.ops.aten.mean.dim(x, None, True)
                 return torch.ops.aten.clamp.default(y, min, max)
 
         input_specs = [
@@ -62,6 +62,30 @@ class TestClampConverter(DispatchTestCase):
 
         self.run_test_with_dynamic_shape(TestModule(), input_specs)
         self.run_test_with_dynamic_shape(TestScalarModule(), input_specs)
+
+    @parameterized.expand(
+        [
+            param("default", min=-1 * torch.randn(3, 4), max=0 * torch.randn(3, 4)),
+            param("min", min=0.5 * torch.randn(3, 4)),
+            param("max", max=0.5 * torch.randn(3, 4)),
+            param(
+                "minBiggerThanMax", min=1 * torch.randn(3, 4), max=0 * torch.randn(3, 4)
+            ),
+            param("float32Boundary", min=-3.4028234663852886e38 * torch.randn(3, 4)),
+        ]
+    )
+    def test_clamp_tensor(
+        self,
+        test_name,
+        min=None,
+        max=None,
+    ):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.clamp.Tensor(x, min, max)
+
+        inputs = [torch.randn(3, 4)]
+        self.run_test(TestModule(), inputs)
 
 
 if __name__ == "__main__":

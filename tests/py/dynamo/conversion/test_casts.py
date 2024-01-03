@@ -75,6 +75,21 @@ class TestToCopyConverter(DispatchTestCase):
                 inputs,
             )
 
+    def test_to_copy_multiple_returns(self):
+        class ToCopyReturns(nn.Module):
+            def forward(self, x):
+                x_1 = x + 1
+                y = torch.ops.aten._to_copy.default(x_1, dtype=torch.float)
+                z = torch.ops.aten._to_copy.default(x_1, dtype=torch.float)
+                return y, z
+
+        inputs = [torch.rand((1, 3, 10))]
+        self.run_test(
+            ToCopyReturns(),
+            inputs,
+            precision=torch.float,
+        )
+
 
 if __name__ == "__main__":
     run_tests()
