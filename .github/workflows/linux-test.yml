@@ -21,7 +21,7 @@ on:
         type: string
       test-infra-repository:
         description: "Test infra repository to use"
-        default: "pytorch/test-infra"
+        default: "gs-olive/test-infra"
         type: string
       test-infra-ref:
         description: "Test infra reference to use"

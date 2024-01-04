@@ -19,7 +19,7 @@ jobs:
     with:
       package-type: wheel
       os: linux
-      test-infra-repository: pytorch/test-infra
+      test-infra-repository: gs-olive/test-infra
       test-infra-ref: release/2.2
       channel: test
       with-rocm: false
@@ -42,7 +42,7 @@ jobs:
     with:
       repository: ${{ matrix.repository }}
       ref: ""
-      test-infra-repository: pytorch/test-infra
+      test-infra-repository: gs-olive/test-infra
       test-infra-ref: release/2.2
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
@@ -71,7 +71,7 @@ jobs:
       job-name: tests-py-torchscript-fe
       repository: "pytorch/tensorrt"
       ref: ""
-      test-infra-repository: pytorch/test-infra
+      test-infra-repository: gs-olive/test-infra
       test-infra-ref: release/2.2
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
@@ -107,7 +107,7 @@ jobs:
       job-name: tests-py-dynamo-converters
       repository: "pytorch/tensorrt"
       ref: ""
-      test-infra-repository: pytorch/test-infra
+      test-infra-repository: gs-olive/test-infra
       test-infra-ref: release/2.2
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
@@ -135,7 +135,7 @@ jobs:
       job-name: tests-py-dynamo-fe
       repository: "pytorch/tensorrt"
       ref: ""
-      test-infra-repository: pytorch/test-infra
+      test-infra-repository: gs-olive/test-infra
       test-infra-ref: release/2.2
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
@@ -165,7 +165,7 @@ jobs:
       job-name: tests-py-torch-compile-be
       repository: "pytorch/tensorrt"
       ref: ""
-      test-infra-repository: pytorch/test-infra
+      test-infra-repository: gs-olive/test-infra
       test-infra-ref: release/2.2
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
@@ -194,7 +194,7 @@ jobs:
       job-name: tests-py-dynamo-core
       repository: "pytorch/tensorrt"
       ref: ""
-      test-infra-repository: pytorch/test-infra
+      test-infra-repository: gs-olive/test-infra
       test-infra-ref: release/2.2
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
