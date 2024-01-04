@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.2.0.dev0+a42dfb3 documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.2.0.dev0+c7a26fa documentation</title>
   
 
   
@@ -234,7 +234,7 @@
               
               
                 <div class="version">
-                  v2.2.0.dev0+a42dfb3
+                  v2.2.0.dev0+c7a26fa
                 </div>
               
             
@@ -413,10 +413,11 @@
 
 <span class="kn">import</span> <span class="nn">collections.abc</span>
 <span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">torch.export</span> <span class="kn">import</span> <span class="n">ExportedProgram</span>
+<span class="kn">from</span> <span class="nn">torch.fx.node</span> <span class="kn">import</span> <span class="n">Target</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt._Device</span> <span class="kn">import</span> <span class="n">Device</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt._enums</span> <span class="kn">import</span> <span class="p">(</span>  <span class="c1"># TODO: Should probabably be the TRT EngineCapability Enum</span>
     <span class="n">EngineCapability</span><span class="p">,</span>
@@ -460,6 +461,9 @@
     <span class="n">convert_module</span><span class="p">,</span>
     <span class="n">repair_long_or_double_inputs</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DYNAMO_CONVERTERS</span> <span class="k">as</span> <span class="n">CONVERTERS</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.lowering</span> <span class="kn">import</span> <span class="n">apply_lowering_passes</span><span class="p">,</span> <span class="n">get_decompositions</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">get_torch_inputs</span><span class="p">,</span>
@@ -496,7 +500,7 @@
     <span class="n">truncate_long_and_double</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">TRUNCATE_LONG_AND_DOUBLE</span><span class="p">,</span>
     <span class="n">require_full_compilation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">REQUIRE_FULL_COMPILATION</span><span class="p">,</span>
     <span class="n">min_block_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">MIN_BLOCK_SIZE</span><span class="p">,</span>
-    <span class="n">torch_executed_ops</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">torch_executed_ops</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Collection</span><span class="p">[</span><span class="n">Target</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">torch_executed_modules</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">pass_through_build_failures</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">PASS_THROUGH_BUILD_FAILURES</span><span class="p">,</span>
     <span class="n">max_aux_streams</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">MAX_AUX_STREAMS</span><span class="p">,</span>
@@ -554,7 +558,7 @@
 <span class="sd">        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration</span>
 <span class="sd">        require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch</span>
 <span class="sd">        min_block_size (int): The minimum number of contiguous TensorRT convertable operations in order to run a set of operations in TensorRT</span>
-<span class="sd">        torch_executed_ops (List[str]): List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True</span>
+<span class="sd">        torch_executed_ops (Collection[Target]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True</span>
 <span class="sd">        torch_executed_modules (List[str]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True</span>
 <span class="sd">        pass_through_build_failures (bool): Error out if there are issues during compilation (only applicable to torch.compile workflows)</span>
 <span class="sd">        max_aux_stream (Optional[int]): Maximum streams in the engine</span>
@@ -623,7 +627,7 @@
         <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="n">min_block_size</span><span class="p">,</span>
         <span class="s2">&quot;torch_executed_ops&quot;</span><span class="p">:</span> <span class="n">torch_executed_ops</span>
         <span class="k">if</span> <span class="n">torch_executed_ops</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-        <span class="k">else</span> <span class="p">[],</span>
+        <span class="k">else</span> <span class="nb">set</span><span class="p">(),</span>
         <span class="s2">&quot;pass_through_build_failures&quot;</span><span class="p">:</span> <span class="n">pass_through_build_failures</span><span class="p">,</span>
         <span class="s2">&quot;max_aux_streams&quot;</span><span class="p">:</span> <span class="n">max_aux_streams</span><span class="p">,</span>
         <span class="s2">&quot;version_compatible&quot;</span><span class="p">:</span> <span class="n">version_compatible</span><span class="p">,</span>
@@ -666,6 +670,9 @@
 <span class="sd">        Compiled FX GraphModule</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">dryrun_tracker</span> <span class="o">=</span> <span class="n">DryRunTracker</span><span class="p">()</span>
+
+    <span class="c1"># Set torch-executed ops</span>
+    <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">set_disallowed_targets</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">torch_executed_ops</span><span class="p">)</span>
 
     <span class="c1"># Check the number of supported operations in the graph</span>
     <span class="n">num_supported_ops</span><span class="p">,</span> <span class="n">total_ops</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">get_graph_converter_support</span><span class="p">(</span>

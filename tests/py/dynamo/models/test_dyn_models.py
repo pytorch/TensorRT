@@ -3,8 +3,9 @@ import unittest
 import pytest
 import timm
 import torch
-import torch_tensorrt as torchtrt
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
+
+import torch_tensorrt as torchtrt
 
 assertions = unittest.TestCase()
 
@@ -97,7 +98,7 @@ def test_base_dynamic_fallback(ir):
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
-        "torch_executed_ops": "torch.ops.aten.abs.default",
+        "torch_executed_ops": {"torch.ops.aten.abs.default"},
         "min_block_size": 1,
     }
 

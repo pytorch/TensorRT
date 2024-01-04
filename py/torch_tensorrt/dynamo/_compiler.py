@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import collections.abc
 import logging
-from typing import Any, List, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
 
 import torch
 from torch.export import ExportedProgram
+from torch.fx.node import Target
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
     EngineCapability,
@@ -49,6 +50,9 @@ from torch_tensorrt.dynamo.conversion import (
     convert_module,
     repair_long_or_double_inputs,
 )
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    DYNAMO_CONVERTERS as CONVERTERS,
+)
 from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decompositions
 from torch_tensorrt.dynamo.utils import (
     get_torch_inputs,
@@ -85,7 +89,7 @@ def compile(
     truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE,
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
     min_block_size: int = MIN_BLOCK_SIZE,
-    torch_executed_ops: Optional[List[str]] = None,
+    torch_executed_ops: Optional[Collection[Target]] = None,
     torch_executed_modules: Optional[List[str]] = None,
     pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES,
     max_aux_streams: Optional[int] = MAX_AUX_STREAMS,
@@ -143,7 +147,7 @@ def compile(
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
         min_block_size (int): The minimum number of contiguous TensorRT convertable operations in order to run a set of operations in TensorRT
-        torch_executed_ops (List[str]): List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+        torch_executed_ops (Collection[Target]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
         torch_executed_modules (List[str]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
         pass_through_build_failures (bool): Error out if there are issues during compilation (only applicable to torch.compile workflows)
         max_aux_stream (Optional[int]): Maximum streams in the engine
@@ -212,7 +216,7 @@ def compile(
         "min_block_size": min_block_size,
         "torch_executed_ops": torch_executed_ops
         if torch_executed_ops is not None
-        else [],
+        else set(),
         "pass_through_build_failures": pass_through_build_failures,
         "max_aux_streams": max_aux_streams,
         "version_compatible": version_compatible,
@@ -255,6 +259,9 @@ def compile_module(
         Compiled FX GraphModule
     """
     dryrun_tracker = DryRunTracker()
+
+    # Set torch-executed ops
+    CONVERTERS.set_disallowed_targets(settings.torch_executed_ops)
 
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops = partitioning.get_graph_converter_support(
