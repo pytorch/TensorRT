@@ -27,6 +27,7 @@ from torch_tensorrt.dynamo._defaults import (
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
     OPTIMIZATION_LEVEL,
+    OUTPUT_FORMAT,
     PASS_THROUGH_BUILD_FAILURES,
     PRECISION,
     REFIT,
@@ -38,6 +39,7 @@ from torch_tensorrt.dynamo._defaults import (
     VERSION_COMPATIBLE,
     WORKSPACE_SIZE,
 )
+from torch_tensorrt.dynamo._exporter import export
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     convert_module,
@@ -88,6 +90,7 @@ def compile(
     use_python_runtime: bool = USE_PYTHON_RUNTIME,
     use_fast_partitioner: bool = USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    output_format: str = OUTPUT_FORMAT,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile a TorchScript module for NVIDIA GPUs using TensorRT
@@ -144,6 +147,7 @@ def compile(
         use_python_runtime: (bool): Return a graph using a pure Python runtime, reduces options for serialization
         use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optiminal. Use the global paritioner (``False``) if looking for best performance
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the grap easier to covert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
+        output_format (str): Output format of the result of TRT compilation. Options include "exported_program" (or) "ep" | "torchscript" (or) "ts" | "graph_module" (or) "fx". Default is "exported_program"
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -219,11 +223,14 @@ def compile(
         "dla_sram_size": dla_sram_size,
         "dla_local_dram_size": dla_local_dram_size,
         "dla_global_dram_size": dla_global_dram_size,
+        "output_format": output_format,
     }
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-    return compile_module(gm, inputs, settings)
+    trt_gm = compile_module(gm, inputs, settings)
+    trt_result = export(trt_gm, torch_inputs, output_format)
+    return trt_result
 
 
 def compile_module(

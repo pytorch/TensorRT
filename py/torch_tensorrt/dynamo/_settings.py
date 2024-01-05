@@ -17,6 +17,7 @@ from torch_tensorrt.dynamo._defaults import (
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
     OPTIMIZATION_LEVEL,
+    OUTPUT_FORMAT,
     PASS_THROUGH_BUILD_FAILURES,
     PRECISION,
     REFIT,
@@ -64,6 +65,7 @@ class CompilationSettings:
         dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
         dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
+        output_format (str): Output format of the result of TRT compilation. Options include "exported_program" (or) "ep" | "torchscript" (or) "ts" | "graph_module" (or) "fx". Default is "exported_program"
     """
 
     precision: torch.dtype = PRECISION
@@ -89,3 +91,4 @@ class CompilationSettings:
     dla_sram_size: int = DLA_SRAM_SIZE
     dla_local_dram_size: int = DLA_LOCAL_DRAM_SIZE
     dla_global_dram_size: int = DLA_GLOBAL_DRAM_SIZE
+    output_format: str = OUTPUT_FORMAT

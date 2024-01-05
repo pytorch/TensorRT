@@ -24,6 +24,7 @@ USE_FAST_PARTITIONER = True
 ENABLE_EXPERIMENTAL_DECOMPOSITIONS = False
 REFIT = False
 REQUIRE_FULL_COMPILATION = False
+OUTPUT_FORMAT = "exported_program"
 
 
 def default_device() -> Device:
