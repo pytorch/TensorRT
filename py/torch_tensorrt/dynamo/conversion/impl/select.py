@@ -9,6 +9,7 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     broadcastable,
+    cast_trt_tensor,
     get_positive_dim,
     get_trt_tensor,
     to_numpy,
@@ -81,16 +82,16 @@ def gather(
     name: str,
     input: TRTTensor,
     dim: int,
-    index: Sequence[Union[TRTTensor, np.ndarray, torch.Tensor]],
+    index: Union[TRTTensor, np.ndarray, torch.Tensor],
     sparse_grad: bool = False,
 ) -> TRTTensor:
-    indices_tensor = []
-
-    for i, ind in enumerate(index):
-        indices_tensor.append(
-            get_trt_tensor(ctx, ind, name + f"_parameter_to_fp32_tensor_{i}")
-        )
-    gather_layer = ctx.net.add_gather(input, indices_tensor, dim)
+    if not isinstance(index, TRTTensor):
+        index = get_trt_tensor(ctx, index, name + f"_parameter_to_fp32_tensor")
+    # This is for the case where torch.ops.aten.gather requires torch.int64
+    # However TRTInterpreter complains that torch.int64 is not a supported type
+    # So the below cast does not help
+    # index = cast_trt_tensor(ctx, input, trt.int32, name, target, source_ir)
+    gather_layer = ctx.net.add_gather(input, index, dim)
     set_layer_name(gather_layer, target, name + "_gather", source_ir)
     return gather_layer.get_output(0)
 
