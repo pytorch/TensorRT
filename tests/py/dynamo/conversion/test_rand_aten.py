@@ -14,12 +14,12 @@ rand_ops = [
     (
         "rand_two_dimension",
         (lambda shape: torch.ops.aten.rand(shape)),
-        [2,3],
+        [2, 3],
     ),
     (
         "rand_three_dimension",
         (lambda shape: torch.ops.aten.rand(shape)),
-        [2,3,4],
+        [2, 3, 4],
     ),
     (
         "randn_one_dimension",
@@ -29,12 +29,12 @@ rand_ops = [
     (
         "randn_two_dimension",
         (lambda shape: torch.ops.aten.randn(shape)),
-        [2,3],
+        [2, 3],
     ),
     (
         "randn_three_dimension",
         (lambda shape: torch.ops.aten.randn(shape)),
-        [2,3,4],
+        [2, 3, 4],
     ),
     (
         "randperm_one_case",
@@ -51,8 +51,8 @@ rand_ops = [
         (lambda x: torch.ops.aten.randperm(x)),
         [1500],
     ),
-
 ]
+
 
 class TestRandConverter(DispatchTestCase):
     @parameterized.expand(
