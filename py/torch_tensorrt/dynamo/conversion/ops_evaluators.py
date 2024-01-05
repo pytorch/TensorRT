@@ -47,3 +47,83 @@ def aten_ops_arange_start_step(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return np.arange(*args)
+
+
+def rand_validator(rand_node: Node) -> bool:
+    dtype = rand_node.kwargs.get("dtype", None)
+    layout = rand_node.kwargs.get("layout", None)
+    if dtype is not None:
+        _LOGGER.debug(
+            f"Currently we don't support specifying output dtype, got {dtype}."
+        )
+        return False
+    if layout is not None:
+        _LOGGER.debug(
+            f"Currently we don't support specifying layout, got {layout}."
+        )
+        return False    
+@dynamo_tensorrt_converter(torch.ops.aten.rand.default)
+def aten_ops_rand(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    device = kwargs.get("device", None)
+    return np.random.rand(*args).to(device=device)
+
+
+def randn_validator(randn_node: Node) -> bool:
+    dtype = randn_node.kwargs.get("dtype", None)
+    layout = randn_node.kwargs.get("layout", None)
+    if dtype is not None:
+        _LOGGER.debug(
+            f"Currently we don't support specifying output dtype, got {dtype}."
+        )
+        return False
+    if layout is not None:
+        _LOGGER.debug(
+            f"Currently we don't support specifying layout, got {layout}."
+        )
+        return False   
+@dynamo_tensorrt_converter(torch.ops.aten.randn.default)
+def aten_ops_randn(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    device = kwargs.get("device", None)
+    return np.random.randn(*args).to(device=device)
+
+
+def randperm_validator(randperm_node: Node) -> bool:
+    dtype = randperm_node.kwargs.get("dtype", None)
+    layout = randperm_node.kwargs.get("layout", None)
+    if dtype is not None:
+        _LOGGER.debug(
+            f"Currently we don't support specifying output dtype, got {dtype}."
+        )
+        return False
+    if layout is not None:
+        _LOGGER.debug(
+            f"Currently we don't support specifying layout, got {layout}."
+        )
+        return False   
+@dynamo_tensorrt_converter(torch.ops.aten.randperm.default)
+def aten_ops_randperm(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    device = kwargs.get("device", None)
+    input = args[0]
+    if not isinstance(input, int):
+        raise RuntimeError(
+            f"The input must be an integer"
+        )
+    return np.random.randperm(*args).to(device=device)
