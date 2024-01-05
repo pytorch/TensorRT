@@ -26,6 +26,7 @@ REFIT = False
 REQUIRE_FULL_COMPILATION = False
 DRYRUN = False
 HARDWARE_COMPATIBLE = False
+OUTPUT_FORMAT = "exported_program"
 
 
 def default_device() -> Device:
