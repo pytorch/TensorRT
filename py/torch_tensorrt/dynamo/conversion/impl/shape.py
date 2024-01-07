@@ -32,7 +32,7 @@ def shape(
     input_shape = ctx.net.add_shape(input_val).get_output(0)
     if not dim:
         max_dim = len(input_val.shape)
-        dim = dim if dim > 0 else dim + max_dim
+        dim = dim if dim >= 0 else dim + max_dim
     indices = get_trt_tensor(ctx, dim, name + "_dim")
     gather_dim = ctx.net.add_gather(input_shape, indices, axis=0).get_output(0)
 
