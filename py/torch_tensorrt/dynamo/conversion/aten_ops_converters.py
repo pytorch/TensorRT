@@ -2572,3 +2572,27 @@ def aten_ops_copy(
         src.dtype,
         force_layer=True,
     )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.remainder.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.remainder.Tensor)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_remainder(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.remainder(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )

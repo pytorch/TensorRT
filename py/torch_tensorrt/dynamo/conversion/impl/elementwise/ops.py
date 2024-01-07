@@ -178,6 +178,41 @@ def fmod(
     return sub_value
 
 
+def remainder(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    other: TRTTensor,
+) -> TRTTensor:
+    fmod1_value = fmod(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_fmod1",
+        input,
+        other,
+    )
+    added_value = add(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_add",
+        fmod1_value,
+        other,
+    )
+    fmod2_value = fmod(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_fmod2",
+        added_value,
+        other,
+    )
+    return fmod2_value
+
+
 def clamp(
     ctx: ConversionContext,
     target: Target,
