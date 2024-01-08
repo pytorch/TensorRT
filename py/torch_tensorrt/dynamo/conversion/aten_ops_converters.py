@@ -400,7 +400,7 @@ def aten_ops_symsize_int(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.shape.shape(ctx, target, SourceIR.ATEN, name, args[0], kwargs["dim"])
+    return impl.shape.shape(ctx, target, SourceIR.ATEN, name, args[0], args[1])
 
 
 def index_dtype_validator(node: Node) -> bool:
