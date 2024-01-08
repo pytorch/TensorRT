@@ -30,13 +30,13 @@ def shape(
     the dynamic shape of the tensor optionally taking in a dim argument.
     """
     input_shape = ctx.net.add_shape(input_val).get_output(0)
-    if not dim:
+    if dim is not None:
         max_dim = len(input_val.shape)
         dim = dim if dim >= 0 else dim + max_dim
-    indices = get_trt_tensor(ctx, dim, name + "_dim")
-    gather_dim = ctx.net.add_gather(input_shape, indices, axis=0).get_output(0)
+        dim_tensor = get_trt_tensor(ctx, dim, name + "_dim")
+        input_shape = ctx.net.add_gather(input_shape, dim_tensor, axis=0).get_output(0)
 
-    return gather_dim
+    return input_shape
 
 
 def get_shape_with_dynamic_shape(

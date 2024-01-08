@@ -400,15 +400,7 @@ def aten_ops_symsize_int(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.shape.shape(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-        args_bounds_check(args, 1, None),
-    )
-
+    return impl.shape.shape(ctx, target, SourceIR.ATEN, name, args[0], kwargs["dim"])
 
 
 def index_dtype_validator(node: Node) -> bool:
@@ -419,6 +411,7 @@ def index_dtype_validator(node: Node) -> bool:
             if val is not None and val.dtype != torch.int32:
                 return False
     return True
+
 
 @dynamo_tensorrt_converter(torch.ops.aten.index.Tensor)
 @dynamo_tensorrt_converter(
