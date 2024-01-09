@@ -230,25 +230,26 @@ class CleanCommand(Command):
         pass
 
     def run(self):
-        for path_spec in self.PY_CLEAN_DIRS:
-            # Make paths absolute and relative to this path
-            abs_paths = glob.glob(os.path.normpath(os.path.join(dir_path, path_spec)))
-            for path in [str(p) for p in abs_paths]:
-                if not path.startswith(dir_path):
-                    # Die if path in CLEAN_FILES is absolute + outside this directory
-                    raise ValueError("%s is not a path inside %s" % (path, dir_path))
-                print("Removing %s" % os.path.relpath(path))
-                rmtree(path)
+        pass
+        # for path_spec in self.PY_CLEAN_DIRS:
+        #     # Make paths absolute and relative to this path
+        #     abs_paths = glob.glob(os.path.normpath(os.path.join(dir_path, path_spec)))
+        #     for path in [str(p) for p in abs_paths]:
+        #         if not path.startswith(dir_path):
+        #             # Die if path in CLEAN_FILES is absolute + outside this directory
+        #             raise ValueError("%s is not a path inside %s" % (path, dir_path))
+        #         print("Removing %s" % os.path.relpath(path))
+        #         rmtree(path)
 
-        for path_spec in self.PY_CLEAN_FILES:
-            # Make paths absolute and relative to this path
-            abs_paths = glob.glob(os.path.normpath(os.path.join(dir_path, path_spec)))
-            for path in [str(p) for p in abs_paths]:
-                if not path.startswith(dir_path):
-                    # Die if path in CLEAN_FILES is absolute + outside this directory
-                    raise ValueError("%s is not a path inside %s" % (path, dir_path))
-                print("Removing %s" % os.path.relpath(path))
-                os.remove(path)
+        # for path_spec in self.PY_CLEAN_FILES:
+        #     # Make paths absolute and relative to this path
+        #     abs_paths = glob.glob(os.path.normpath(os.path.join(dir_path, path_spec)))
+        #     for path in [str(p) for p in abs_paths]:
+        #         if not path.startswith(dir_path):
+        #             # Die if path in CLEAN_FILES is absolute + outside this directory
+        #             raise ValueError("%s is not a path inside %s" % (path, dir_path))
+        #         print("Removing %s" % os.path.relpath(path))
+        #         os.remove(path)
 
 
 ext_modules = []
