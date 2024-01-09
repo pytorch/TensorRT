@@ -2243,7 +2243,14 @@ def tensorrt_scaled_dot_product_attention(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.attention.scaled_dot_product_attention(
-        ctx, target, SourceIR.TORCHTRT_LOWERED, name, args[0], args[1], args[2]
+        ctx,
+        target,
+        SourceIR.TORCHTRT_LOWERED,
+        name,
+        args[0],
+        args[1],
+        args[2],
+        kwargs.get("scale", None),
     )
 
 
