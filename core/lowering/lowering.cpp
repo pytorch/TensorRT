@@ -146,6 +146,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, std::vector<torch::jit::I
   if (lower_info.converting_to_trt_engine) {
     passes::RemoveCollectionCast(g);
   }
+  passes::UnpackScaledDotProductAttention(g);
   passes::UnpackAndCastMaskedFill(g, lower_info.getGPUDeviceString());
   passes::UnpackAndCastNumToTensor(g, lower_info.getGPUDeviceString());
   passes::UnpackAndCastFull(g, lower_info.getGPUDeviceString());

@@ -49,6 +49,7 @@ void UnpackHardSigmoid(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackAndCastMaskedFill(std::shared_ptr<torch::jit::Graph>& graph, std::string target_device_name);
 void UnpackAndCastNumToTensor(std::shared_ptr<torch::jit::Graph>& graph, std::string target_device_name);
 void UnpackAndCastFull(std::shared_ptr<torch::jit::Graph>& graph, std::string target_device_name);
+void UnpackScaledDotProductAttention(std::shared_ptr<torch::jit::Graph>& graph);
 void ReplaceScalarImplicit(std::shared_ptr<torch::jit::Graph>& graph);
 void ReplaceAtenPad(std::shared_ptr<torch::jit::Graph>& graph);
 void ReplaceTileWithRepeat(std::shared_ptr<torch::jit::Graph>& graph);
