@@ -71,6 +71,10 @@ struct PartitioningCtx {
 
 std::ostream& operator<<(std::ostream& os, const PartitioningCtx& s);
 
+inline bool isConstantOrUninitialized(torch::jit::Node* n) {
+  return n->kind() == torch::jit::prim::Constant || n->kind() == torch::jit::prim::Uninitialized;
+}
+
 } // namespace partitioning
 } // namespace core
 } // namespace torch_tensorrt
