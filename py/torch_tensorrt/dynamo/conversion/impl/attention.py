@@ -17,6 +17,7 @@ def scaled_dot_product_attention(
     query: TRTTensor,
     key: TRTTensor,
     value: TRTTensor,
+    scale: Optional[float],
 ) -> TRTTensor:
     mm = impl.matmul.matrix_multiply(
         ctx,
@@ -27,16 +28,26 @@ def scaled_dot_product_attention(
         key,
         other_matrix_op=trt.MatrixOperation.TRANSPOSE,
     )
-    div = impl.elementwise.div(
-        ctx,
-        target,
-        source_ir,
-        name + "_scale",
-        mm,
-        math.sqrt(query.shape[-1]),
-    )
+    if scale is None:
+        scaled = impl.elementwise.div(
+            ctx,
+            target,
+            source_ir,
+            name + "_scale",
+            mm,
+            math.sqrt(query.shape[-1]),
+        )
+    else:
+        scaled = impl.elementwise.mul(
+            ctx,
+            target,
+            source_ir,
+            name + "_scale",
+            mm,
+            scale,
+        )
     softmax = impl.normalization.softmax(
-        ctx, target, source_ir, name + "_softmax", div, -1
+        ctx, target, source_ir, name + "_softmax", scaled, -1
     )
     out = impl.matmul.matrix_multiply(
         ctx,
