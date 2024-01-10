@@ -87,6 +87,7 @@ User Guide
    :maxdepth: 1
    :hidden:
 
+
    user_guide/dynamic_shapes
    user_guide/ptq
    user_guide/saving_models

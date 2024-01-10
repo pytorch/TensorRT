@@ -1,45 +1,20 @@
 from __future__ import annotations
 
 import logging
-import unittest.mock
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Tuple
 
 import torch
-from torch._export import dynamic_dim, export
-from torch_tensorrt._Device import Device
+from torch.export import Dim, export
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo._defaults import (
-    DEBUG,
-    DEVICE,
-    ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
-    default_device,
-)
-from torch_tensorrt.dynamo.lowering import get_decompositions
+from torch_tensorrt.dynamo._defaults import DEBUG, default_device
 from torch_tensorrt.dynamo.utils import get_torch_inputs, set_log_level, to_torch_device
 
 logger = logging.getLogger(__name__)
 
 
-def get_random_tensor(
-    shape: List[Any], dtype: torch.dtype, device: torch.device
-) -> torch.Tensor:
-    if dtype == torch.int32 or dtype == torch.int64:
-        return torch.randint(2, 10, shape, dtype=dtype, device=device)
-    elif dtype in (torch.float64, torch.float32, torch.float16):
-        return torch.randn(shape, dtype=dtype, device=device)
-    else:
-        logger.critical(
-            "Invalid dtype detected in creating input tensors for tracing the graph."
-        )
-        raise
-
-
 def trace(
     mod: torch.nn.Module | torch.fx.GraphModule,
     inputs: Tuple[Any, ...],
-    device: Optional[Union[Device, torch.device, str]] = DEVICE,
-    debug: bool = DEBUG,
-    enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     **kwargs: Any,
 ) -> torch.export.ExportedProgram:
     """Exports a ``torch.export.ExportedProgram`` from a ``torch.nn.Module`` or ``torch.fx.GraphModule`` specifically targeting being compiled with Torch-TensorRT
@@ -65,9 +40,9 @@ def trace(
                     torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
                 ]
     Keyword Arguments:
-        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
+        device (Union(torch.device, dict)): Target device for TensorRT engines to run on ::
 
-            device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
+            device=torch.device("cuda:0")
 
         debug (bool): Enable debuggable engine
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the grap easier to covert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
@@ -77,50 +52,36 @@ def trace(
     """
 
     # Set log level at the top of compilation (torch_tensorrt.dynamo)
+    debug = kwargs.get("debug", DEBUG)
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
-    device = to_torch_device(device if device else default_device())
 
-    # Determine the dynamic dimension and setup constraints to input dimensions as dictated by TensorRT
-    # Torch dynamo does not allow 0/1 value for dynamic dimensions
-    # for inputs during tracing. Hence we create new inputs for export
+    device = to_torch_device(kwargs.get("device", default_device()))
     torch_inputs = get_torch_inputs(inputs, device)
-    trace_inputs = []
-    constraints = []
-    for idx, input in enumerate(inputs):
-        if input.shape_mode == Input._ShapeMode.DYNAMIC:
-            min_shape = input.shape["min_shape"]
-            opt_shape = input.shape["opt_shape"]
-            max_shape = input.shape["max_shape"]
+    dynamic_shapes = {}
+    for input in inputs:
+        if isinstance(input, Input) and input.shape_mode == Input._ShapeMode.DYNAMIC:
+            if not input.name:
+                raise AssertionError(
+                    f"Expected a name for a dynamic input with shape {input.shape} but found none"
+                )
+            min_shape = input.shape["min_shape"]  # type: ignore
+            opt_shape = input.shape["opt_shape"]  # type: ignore
+            max_shape = input.shape["max_shape"]  # type: ignore
             assert len(min_shape) == len(opt_shape) == len(max_shape)
-
-            constraint_dims = []
-            new_shape = []
+            dynamic_dims = {}
             for dim in range(len(min_shape)):
                 if min_shape[dim] == opt_shape[dim] == max_shape[dim]:
-                    new_shape.append(torch_inputs[idx].shape[dim])
+                    continue
                 else:
-                    constraint_dims.append(dim)
-                    if torch_inputs[idx].shape[dim] == 1:
-                        new_shape.append(torch_inputs[idx].shape[dim] + 1)
-                    else:
-                        new_shape.append(torch_inputs[idx].shape[dim])
+                    dynamic_dims[dim] = Dim(
+                        input.name + "_" + str(dim),
+                        min=min_shape[dim],
+                        max=max_shape[dim],
+                    )
 
-            trace_input = get_random_tensor(new_shape, torch_inputs[idx].dtype, device)
+            dynamic_shapes[input.name] = dynamic_dims
 
-            for dim in constraint_dims:
-                if min_shape[dim] > 1:
-                    constraints.append(min_shape[dim] <= dynamic_dim(trace_input, dim))
-                if max_shape[dim] > 1:
-                    constraints.append(dynamic_dim(trace_input, dim) <= max_shape[dim])
-            trace_inputs.append(trace_input)
-        else:
-            trace_inputs.append(torch_inputs[idx])
-
-    with unittest.mock.patch(
-        "torch._export.DECOMP_TABLE",
-        get_decompositions(enable_experimental_decompositions),
-    ):
-        exp_program = export(mod, tuple(trace_inputs), constraints=constraints)
+    exp_program = export(mod, tuple(torch_inputs), dynamic_shapes=dynamic_shapes)
 
     return exp_program

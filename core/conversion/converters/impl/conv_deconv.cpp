@@ -10,6 +10,74 @@ namespace converters {
 namespace impl {
 namespace {
 
+void add_output_padding(nvinfer1::Dims& padding, nvinfer1::Dims& out_padding, bool& has_output_padding) {
+  int nbSpatialDims = out_padding.nbDims;
+  // When there is out_padding, if padding is larger than out_padding, just adjust padding Or reduce out_padding as
+  // minimum as possible.
+  for (int i = 0; i < nbSpatialDims; ++i) {
+    if (padding.d[i] - out_padding.d[i] >= 0) {
+      padding.d[i] -= out_padding.d[i];
+      out_padding.d[i] = 0;
+    } else {
+      // Reduce out_padding as possible.
+      out_padding.d[i] -= padding.d[i];
+      padding.d[i] = 0;
+      has_output_padding = true;
+    }
+  }
+}
+
+nvinfer1::ILayer* add_bias_layer(
+    ConversionCtx* ctx,
+    nvinfer1::ITensor* input_tensor,
+    nvinfer1::Dims& input_dims,
+    nvinfer1::Dims& output_padding,
+    Weights& bias) {
+  nvinfer1::ITensor* input_shape = ctx->net->addShape(*input_tensor)->getOutput(0);
+  // Add padding layer
+  nvinfer1::ITensor* start;
+  nvinfer1::ITensor* totalPadding;
+  auto in_nbDims = input_dims.nbDims;
+  std::vector<int32_t> startVec(in_nbDims, 0);
+  std::vector<int32_t> totalPaddingVec(in_nbDims, 0);
+  int32_t diff = in_nbDims - output_padding.nbDims;
+  for (int32_t i = diff; i < in_nbDims; i++) {
+    int32_t idx = i - diff;
+    startVec[i] = 0; // Don't need begin padding, only post padding
+    totalPaddingVec[i] = output_padding.d[idx];
+  }
+  start = tensor_to_const(ctx, torch::tensor(startVec, torch::kInt32));
+  totalPadding = tensor_to_const(ctx, torch::tensor(totalPaddingVec, torch::kInt32));
+
+  const auto size =
+      ctx->net->addElementWise(*input_shape, *totalPadding, nvinfer1::ElementWiseOperation::kSUM)->getOutput(0);
+
+  nvinfer1::Dims stride;
+  stride.nbDims = in_nbDims;
+  for (int64_t i = 0; i < in_nbDims; i++) {
+    stride.d[i] = 1;
+  }
+  const auto& dummy = stride;
+  auto* sliceLayer = ctx->net->addSlice(*input_tensor, dummy, dummy, stride);
+  sliceLayer->setInput(1, *start);
+  sliceLayer->setInput(2, *size);
+  sliceLayer->setMode(nvinfer1::SliceMode::kFILL);
+  nvinfer1::ITensor* slice_output = sliceLayer->getOutput(0);
+
+  nvinfer1::Dims constantDims;
+  constantDims.nbDims = in_nbDims;
+  for (int64_t i = 0; i < in_nbDims; i++) {
+    constantDims.d[i] = 1;
+  }
+  constantDims.d[diff - 1] =
+      bias.shape.d[0]; // Set C dimension to bias dim and other dimensions to 1 to enable broadcast
+  auto const_layer = ctx->net->addConstant(constantDims, bias.data);
+  auto bias_layer =
+      ctx->net->addElementWise(*slice_output, *const_layer->getOutput(0), nvinfer1::ElementWiseOperation::kSUM);
+
+  return bias_layer;
+}
+
 bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) {
   // Input to conv/deconv
   auto in = args[0].ITensor();
@@ -76,16 +144,29 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
 
     nvinfer1::ILayer* layer = nullptr;
     if (transposed) {
-      nvinfer1::IDeconvolutionLayer* deconvLayer =
-          ctx->net->addDeconvolutionNd(*in, kernel_dims.d[0], filter_dim, kernel_weights, bias.data);
+      // Fix padding based on output_padding provided
+      nvinfer1::Dims begPadding = padding;
+      bool hasOutputPadding = false;
+      add_output_padding(padding, out_padding, hasOutputPadding);
+
+      nvinfer1::IDeconvolutionLayer* deconvLayer = ctx->net->addDeconvolutionNd(
+          *in, kernel_dims.d[0], filter_dim, kernel_weights, hasOutputPadding ? nvinfer1::Weights{} : bias.data);
       deconvLayer->setStrideNd(stride);
       deconvLayer->setDilationNd(dilation);
       deconvLayer->setNbGroups(groups);
-      deconvLayer->setPaddingNd(padding);
+      deconvLayer->setPrePadding(begPadding);
+      deconvLayer->setPostPadding(padding);
+
       // Set deconv kernel weights
       deconvLayer->setInput(1, *kernel);
       TORCHTRT_CHECK(deconvLayer, "Unable to create deconv layer with non-const weights from node: " << *n);
       layer = deconvLayer;
+      if (hasOutputPadding) {
+        LOG_DEBUG("Padding output deconvolution tensor with:" << out_padding);
+        nvinfer1::ITensor* tensorPtr = deconvLayer->getOutput(0);
+        auto dims = in->getDimensions();
+        layer = add_bias_layer(ctx, tensorPtr, dims, out_padding, bias);
+      }
     } else {
       nvinfer1::IConvolutionLayer* convLayer =
           ctx->net->addConvolutionNd(*in, kernel_dims.d[0], filter_dim, kernel_weights, bias.data);
@@ -155,20 +236,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     // https://github.com/onnx/onnx-tensorrt/blob/c3cfcbc8248c6bd007e6630af2085df5e4834b42/builtin_op_importers.cpp#L734
     nvinfer1::Dims begPadding = padding;
     bool hasOutputPadding = false;
-    int nbSpatialDims = out_padding.nbDims;
-    // When there is out_padding, if padding is larger than out_padding, just adjust padding Or reduce out_padding as
-    // minimum as possible.
-    for (int i = 0; i < nbSpatialDims; ++i) {
-      if (padding.d[i] - out_padding.d[i] >= 0) {
-        padding.d[i] -= out_padding.d[i];
-        out_padding.d[i] = 0;
-      } else {
-        // Reduce out_padding as possible.
-        out_padding.d[i] -= padding.d[i];
-        padding.d[i] = 0;
-        hasOutputPadding = true;
-      }
-    }
+    add_output_padding(padding, out_padding, hasOutputPadding);
 
     // shape of deconvolution's weight: [in, out/groups, ...]
     // If there is still output padding, remove the bias. Bias will be added below.
@@ -190,51 +258,8 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
 #endif
     if (hasOutputPadding) {
       LOG_DEBUG("Padding output deconvolution tensor with:" << out_padding);
-
-      // Add padding layer
-      nvinfer1::ITensor* start;
-      nvinfer1::ITensor* totalPadding;
-      auto in_nbDims = orig_dims.nbDims;
-      std::vector<int32_t> startVec(in_nbDims, 0);
-      std::vector<int32_t> totalPaddingVec(in_nbDims, 0);
-      int32_t diff = in_nbDims - out_padding.nbDims;
-      for (int32_t i = diff; i < in_nbDims; i++) {
-        int32_t idx = i - diff;
-        startVec[i] = 0; // Don't need begin padding, only post padding
-        totalPaddingVec[i] = out_padding.d[idx];
-      }
-      start = tensor_to_const(ctx, torch::tensor(startVec, torch::kInt32));
-      totalPadding = tensor_to_const(ctx, torch::tensor(totalPaddingVec, torch::kInt32));
-
       nvinfer1::ITensor* tensorPtr = deconv->getOutput(0);
-      nvinfer1::ITensor* deconvOutShape = ctx->net->addShape(*tensorPtr)->getOutput(0);
-      const auto size =
-          ctx->net->addElementWise(*deconvOutShape, *totalPadding, nvinfer1::ElementWiseOperation::kSUM)->getOutput(0);
-
-      nvinfer1::Dims stride;
-      stride.nbDims = in_nbDims;
-      for (int64_t i = 0; i < in_nbDims; i++) {
-        stride.d[i] = 1;
-      }
-      const auto& dummy = stride;
-      auto* sliceLayer = ctx->net->addSlice(*tensorPtr, dummy, dummy, stride);
-      sliceLayer->setInput(1, *start);
-      sliceLayer->setInput(2, *size);
-      sliceLayer->setMode(nvinfer1::SliceMode::kFILL);
-      tensorPtr = sliceLayer->getOutput(0);
-
-      nvinfer1::Dims constantDims;
-      constantDims.nbDims = in_nbDims;
-      for (int64_t i = 0; i < in_nbDims; i++) {
-        constantDims.d[i] = 1;
-      }
-      constantDims.d[diff - 1] =
-          bias.shape.d[0]; // Set C dimension to bias dim and other dimensions to 1 to enable broadcast
-      auto const_layer = ctx->net->addConstant(constantDims, bias.data);
-      auto add_bias_layer =
-          ctx->net->addElementWise(*tensorPtr, *const_layer->getOutput(0), nvinfer1::ElementWiseOperation::kSUM);
-
-      new_layer = add_bias_layer;
+      new_layer = add_bias_layer(ctx, tensorPtr, orig_dims, out_padding, bias);
     } else {
       new_layer = deconv;
     }

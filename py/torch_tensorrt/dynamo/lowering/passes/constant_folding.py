@@ -2,7 +2,7 @@ import logging
 from typing import Any, Sequence
 
 import torch
-from torch._inductor.freezing import ConstantFolder, replace_node_with_constant
+from torch._inductor.constant_folding import ConstantFolder, replace_node_with_constant
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )

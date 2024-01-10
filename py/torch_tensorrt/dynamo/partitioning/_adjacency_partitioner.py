@@ -42,8 +42,10 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
 
         if (
-            node in CONVERTERS or node.op == "get_attr"
-        ) and node_name not in self.torch_executed_ops:
+            (node in CONVERTERS or node.op == "get_attr")
+            and node_name not in self.torch_executed_ops
+            and node.target not in self.torch_executed_ops
+        ):
             # If node is a proper, supported computational node, store the operator
             if not node.is_impure() and node.op != "get_attr":
                 if node_name not in self.supported_operators:
