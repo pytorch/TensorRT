@@ -111,6 +111,21 @@ TEST(Converters, ATenLogicalNotBoolConvertsCorrectly) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
+TEST(Converters, ATenSqrtIntConvertsCorrectly) {
+  const auto graph = gen_test_graph("sqrt");
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+  auto in = at::randint(0, 100, {7, 3, 1, 5}, {at::kCUDA});
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
 TEST(Converters, ATenFiniteConvertsCorrectly) {
   const auto graph = gen_test_graph("isfinite");
   auto g = std::make_shared<torch::jit::Graph>();

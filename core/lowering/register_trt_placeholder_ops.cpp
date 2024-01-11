@@ -1,3 +1,4 @@
+#include <limits>
 #include "torch/csrc/jit/runtime/custom_operator.h"
 
 namespace torch {
@@ -14,6 +15,17 @@ RegisterOperators trt_placeholder_ops_reg({
         "trt::const(Tensor val) -> Tensor",
         [](Stack& stack) { /*noop*/ },
         aliasAnalysisFromSchema()),
+    Operator(
+        "trt::attn_bias_from_attn_mask(Tensor attn_mask) -> Tensor",
+        [](Stack& stack) {
+          auto attn_mask = pop(stack).to<at::Tensor>();
+          if (attn_mask.scalar_type() == at::kBool) {
+            attn_mask = attn_mask;
+            attn_mask.masked_fill_(attn_mask.logical_not(), -std::numeric_limits<float>::infinity());
+          }
+          return attn_mask;
+        },
+        c10::AliasAnalysisKind::CONSERVATIVE),
 });
 
 } // namespace jit
