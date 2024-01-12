@@ -2278,6 +2278,29 @@ def aten_ops_reshape(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.pixel_shuffle.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_pixel_shuffle(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.shuffle.pixel_shuffle(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
 @enforce_tensor_types({0: (TRTTensor,)})
 @dynamo_tensorrt_converter(torch.ops.aten.argmax.default)
 def aten_ops_argmax(
