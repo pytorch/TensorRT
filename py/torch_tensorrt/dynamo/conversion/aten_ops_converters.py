@@ -2603,3 +2603,26 @@ def aten_ops_remainder(
         args[0],
         args[1],
     )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten._pdist_forward.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_pdist(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.normalization.pdist(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, 2),
+    )
