@@ -63,6 +63,7 @@ optimized_model = torch.compile(
     model,
     backend="torch_tensorrt",
     options=compilation_kwargs,
+    dynamic=False,
 )
 optimized_model(*inputs)
 
