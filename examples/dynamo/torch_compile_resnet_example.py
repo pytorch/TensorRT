@@ -54,6 +54,7 @@ optimized_model = torch_tensorrt.compile(
     workspace_size=workspace_size,
     min_block_size=min_block_size,
     torch_executed_ops=torch_executed_ops,
+    use_python_runtime=True,
 )
 
 # %%

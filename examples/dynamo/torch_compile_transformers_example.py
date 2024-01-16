@@ -55,6 +55,7 @@ compilation_kwargs = {
     "workspace_size": workspace_size,
     "min_block_size": min_block_size,
     "torch_executed_ops": torch_executed_ops,
+    "use_python_runtime": True,
 }
 
 # Build and compile the model with torch.compile, using Torch-TensorRT backend
