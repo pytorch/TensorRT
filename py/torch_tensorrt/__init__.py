@@ -87,7 +87,6 @@ from torch_tensorrt._enums import *  # noqa: F403
 from torch_tensorrt._Input import Input  # noqa: F401
 from torch_tensorrt._utils import *  # noqa: F403
 from torch_tensorrt._utils import sanitized_torch_version
-from torch_tensorrt.ptq import *
 from torch_tensorrt.runtime import *  # noqa: F403
 
 if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
