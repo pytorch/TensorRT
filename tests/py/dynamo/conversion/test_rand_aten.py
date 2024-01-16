@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
-import torch_tensorrt
 
 rand_ops = [
     (
@@ -75,13 +75,14 @@ class TestRandConverter(TestCase):
                 return self.rand_op(self.size)
 
         grid_model = TestModule(op, shape_or_input)
-        #cannot use self.run_test() since it expects input in form of tensor
-        
-        #self.run_test(grid_model, None)
+        # cannot use self.run_test() since it expects input in form of tensor
+
+        # self.run_test(grid_model, None)
         fx_graph = torch.fx.symbolic_trace(grid_model)
         torch._dynamo.reset()
 
-        optimized_model = torch_tensorrt.compile(fx_graph, 
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
             "torch_compile",
             None,
             min_block_size=1,
