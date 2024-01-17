@@ -2660,9 +2660,5 @@ def aten_ops_scalar_tensor(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.unary.scalar_tensor(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
+        ctx, target, SourceIR.ATEN, name, args[0], dtype=kwargs.get("dtype")
     )

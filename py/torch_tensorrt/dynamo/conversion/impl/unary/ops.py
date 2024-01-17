@@ -1,6 +1,7 @@
 from typing import Optional, Union
 
 import tensorrt as trt
+import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -468,8 +469,9 @@ def scalar_tensor(
     source_ir: Optional[SourceIR],
     name: str,
     scalar: Union[int, float, bool],
+    dtype: Union[torch.int, torch.float, torch.bool] = None,
 ) -> TRTTensor:
-    tensor = get_trt_tensor(ctx, scalar, f"{name}_scalar_tensor")
+    tensor = get_trt_tensor(ctx, scalar, f"{name}_scalar_tensor", dtype)
     identity_layer = ctx.net.add_identity(tensor)
     set_layer_name(identity_layer, target, name, source_ir)
     return identity_layer.get_output(0)

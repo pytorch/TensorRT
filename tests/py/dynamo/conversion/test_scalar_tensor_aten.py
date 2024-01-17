@@ -64,6 +64,32 @@ class TestScalarTensorConverter(DispatchTestCase):
             inputs,
         )
 
+    @parameterized.expand(
+        [
+            (-9999, torch.int),
+            (-2.00001, torch.float),
+            (-1, torch.float),
+            (0, torch.int),
+            (-0.0, torch.float),
+            (1.0, torch.int),
+            (2.99, torch.float),
+            (9999999, None),
+            (9999999.99999, None),
+            (True, torch.bool),
+        ]
+    )
+    def test_scalar_tensor_dtype(self, scalar, dtype):
+        class ScalarTensor(nn.Module):
+            def forward(self):
+                return torch.ops.aten.scalar_tensor.default(scalar, dtype=dtype)
+
+        inputs = []
+        self.run_test(
+            ScalarTensor(),
+            inputs,
+            output_dtypes=None if dtype is None else [dtype],
+        )
+
 
 if __name__ == "__main__":
     run_tests()
