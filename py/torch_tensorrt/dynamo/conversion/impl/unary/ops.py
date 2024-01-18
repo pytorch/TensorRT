@@ -469,7 +469,7 @@ def scalar_tensor(
     source_ir: Optional[SourceIR],
     name: str,
     scalar: Union[int, float, bool],
-    dtype: Union[torch.int, torch.float, torch.bool] = None,
+    dtype: Optional[Union[torch.int, torch.float, torch.bool]],
 ) -> TRTTensor:
     tensor = get_trt_tensor(ctx, scalar, f"{name}_scalar_tensor", dtype)
     identity_layer = ctx.net.add_identity(tensor)
