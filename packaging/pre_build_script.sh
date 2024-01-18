@@ -20,11 +20,6 @@ cp /usr/tensorrt/lib/* /usr/lib64/ || :
 mkdir -p /usr/include
 cp /usr/tensorrt/include/* /usr/include/ || :
 
-mkdir -p /usr/lib/aarch64-linux-gnu
-cp /usr/tensorrt/targets/aarch64-linux-gnu/lib/* /usr/lib/aarch64-linux-gnu/ || :
-mkdir -p /usr/include/aarch64-linux-gnu
-cp /usr/tensorrt/targets/aarch64-linux-gnu/include/* /usr/include/aarch64-linux-gnu/ || :
-
 mkdir -p /usr/lib/x86_64-linux-gnu
 cp /usr/tensorrt/targets/x86_64-linux-gnu/lib/* /usr/lib/x86_64-linux-gnu/ || :
 mkdir -p /usr/include/x86_64-linux-gnu
