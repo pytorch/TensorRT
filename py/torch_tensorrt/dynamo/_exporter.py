@@ -284,7 +284,13 @@ def create_trt_exp_program(
     gm, trt_graph_signature, state_dict = lift(gm, trt_graph_signature)
 
     trt_exp_program = ExportedProgram(
-        gm, gm.graph, trt_graph_signature, state_dict, {}, [], [], []
+        gm,
+        gm.graph,
+        trt_graph_signature,
+        state_dict,
+        {},
+        [],
+        [],
     )
 
     return trt_exp_program
