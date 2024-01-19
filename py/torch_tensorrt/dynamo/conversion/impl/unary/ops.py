@@ -1,5 +1,6 @@
 from typing import Optional, Union
 
+import numpy as np
 import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
@@ -12,7 +13,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
-from torch_tensorrt.fx.types import TRTTensor
+from torch_tensorrt.fx.types import TRTDataType, TRTTensor
 
 
 def exp(
@@ -469,7 +470,7 @@ def scalar_tensor(
     source_ir: Optional[SourceIR],
     name: str,
     scalar: Union[int, float, bool],
-    dtype: Optional[Union[torch.int, torch.float, torch.bool]],
+    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]] = None,
 ) -> TRTTensor:
     tensor = get_trt_tensor(ctx, scalar, f"{name}_scalar_tensor", dtype)
     identity_layer = ctx.net.add_identity(tensor)
