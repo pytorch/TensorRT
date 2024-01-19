@@ -10,6 +10,7 @@ from .harness import DispatchTestCase
 class TestRollConverter(DispatchTestCase):
     @parameterized.expand(
         [
+            ((4,), (2,), 0),
             ((4,), [2], [0]),
             ((4,), [3], [0]),
             ((4,), [-3, 2], [0, 0]),
@@ -29,7 +30,7 @@ class TestRollConverter(DispatchTestCase):
             ),
         ]
     )
-    def test_roll_list(self, shape, shifts, dims):
+    def test_roll(self, shape, shifts, dims):
         class Roll(nn.Module):
             def forward(self, x):
                 return torch.ops.aten.roll.default(x, shifts, dims)

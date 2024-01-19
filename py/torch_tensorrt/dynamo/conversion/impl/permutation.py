@@ -1,4 +1,4 @@
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Union
 
 import tensorrt as trt
 from torch.fx.node import Target
@@ -10,7 +10,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
 )
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
-from torch_tensorrt.fx.types import Shape, TRTTensor
+from torch_tensorrt.fx.types import TRTTensor
 
 
 def permute(
@@ -40,10 +40,15 @@ def roll(
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    shifts: Shape,
-    dims: Shape,
+    shifts: Union[int, Sequence[int]],
+    dims: Union[int, Sequence[int]],
 ) -> TRTTensor:
     shape = input.shape
+    if isinstance(shifts, int):
+        shifts = [shifts]
+    if isinstance(dims, int):
+        dims = [dims]
+
     if dims != []:
         rank = len(shape)
         start = [0] * rank
