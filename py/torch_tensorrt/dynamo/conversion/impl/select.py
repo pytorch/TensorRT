@@ -390,3 +390,76 @@ def index_select(
     set_layer_name(gather_layer, target, f"{name}_gather", source_ir)
 
     return gather_layer.get_output(0)
+
+
+def scatter_value(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    dim: Shape,
+    index: Shape,
+    value: TRTTensor,
+) -> TRTTensor:
+    if not isinstance(input, TRTTensor):
+        raise RuntimeError(
+            f"scatter_tensor received input {input} that is not part "
+            "of the TensorRT region!"
+        )
+
+    ranks = len(input.shape)
+    dim = get_positive_dim(cast(int, dim), ranks)
+    dynamic_shape = has_dynamic_shape(input.shape)
+    if dynamic_shape:
+        # Check whether slice target dim is dynamic shape dim
+        assert input.shape[dim] != -1, "Can't select on negative shape dimension!"
+    
+    input_dims = len(input.shape)
+    for i in range(0, input_dims):
+        if index[i] >= input.shape[i]:
+            raise RuntimeError(
+                f"cannot have index greater than the dimension length! {input.shape[dim]}"
+            )
+    value_tensor = value * torch.ones(index.shape)
+    scatter_layer = ctx.net.add_scatter(input, index, value_tensor, trt.tensorrt.ScatterModekELEMENT)
+    scatter_layer.set_axis(dim)
+    set_layer_name(scatter_layer, target, name + "_scatter_layer", source_ir)
+    out = scatter_layer.get_output(0)
+    return out
+
+
+def scatter_src(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    dim: Shape,
+    index: Shape,
+    src: float,
+) -> TRTTensor:
+    if not isinstance(input, TRTTensor):
+        raise RuntimeError(
+            f"scatter_tensor received input {input} that is not part "
+            "of the TensorRT region!"
+        )
+
+    ranks = len(input.shape)
+    dim = get_positive_dim(cast(int, dim), ranks)
+    dynamic_shape = has_dynamic_shape(input.shape)
+    if dynamic_shape:
+        # Check whether slice target dim is dynamic shape dim
+        assert input.shape[dim] != -1, "Can't select on negative shape dimension!"
+    
+    input_dims = len(input.shape)
+    for i in range(0, input_dims):
+        if index[i] >= input.shape[i]:
+            raise RuntimeError(
+                f"cannot have index greater than the dimension length! {input.shape[dim]}"
+            )
+    scatter_layer = ctx.net.add_scatter(input, index, src, trt.tensorrt.ScatterModekELEMENT)
+    scatter_layer.set_axis(dim)
+    set_layer_name(scatter_layer, target, name + "_scatter_layer", source_ir)
+    out = scatter_layer.get_output(0)
+    return out
