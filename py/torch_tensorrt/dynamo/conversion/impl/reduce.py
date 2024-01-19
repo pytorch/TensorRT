@@ -3,6 +3,7 @@ from typing import Optional, Sequence, Tuple, Union
 import tensorrt as trt
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
@@ -208,3 +209,32 @@ def mean(
     )
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
+
+
+def any(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+    dim: Union[int, Optional[Sequence[int]]] = None,
+    keepdim: bool = False,
+) -> TRTTensor:
+    if (isinstance(input_val, TRTTensor)) and (input_val.dtype == trt.bool):
+        input_val = cast_trt_tensor(ctx, input_val, trt.int32, f"{name}_cast")
+
+    abs_out = impl.unary.abs(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_abs",
+        input_val,
+    )
+    if dim is None:
+        dim = []
+    elif isinstance(dim, int):
+        dim = [dim]
+
+    max_out = amax(ctx, target, source_ir, f"{name}_amax", abs_out, dim, keepdim)
+
+    return cast_trt_tensor(ctx, max_out, trt.bool, f"{name}_cast_to_bool")
