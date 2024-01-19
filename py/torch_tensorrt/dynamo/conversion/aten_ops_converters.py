@@ -2605,6 +2605,27 @@ def aten_ops_remainder(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.any.default)
+@dynamo_tensorrt_converter(torch.ops.aten.any.dim)
+@dynamo_tensorrt_converter(torch.ops.aten.any.dims)
+def aten_ops_any(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.any(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, replacement=None),
+        args_bounds_check(args, 2, replacement=False),
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten._pdist_forward.default)
 @enforce_tensor_types(
     {
