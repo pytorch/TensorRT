@@ -2184,6 +2184,24 @@ def aten_ops_avg_pool(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool1d.default)
+def aten_ops_adaptive_avg_pool(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.pool.adaptive_avg_pool1d(
+        ctx,
+        target,
+        source_ir=SourceIR.ATEN,
+        name=name,
+        input=args[0],
+        output_size=args[1],
+    )
+
+
 def max_pool_param_validator(pool_node: Node) -> bool:
     dilation = args_bounds_check(pool_node.args, 4, 1)
     ceil_mode = args_bounds_check(pool_node.args, 5, False)
