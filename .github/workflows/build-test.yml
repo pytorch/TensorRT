@@ -150,7 +150,8 @@ jobs:
         popd
 
   tests-py-dynamo-serde:
-    name: Test dynamo export serde [Python]
+    name: Test dynamo frontend [Python]
+    if:  success() || failure()
     needs: [generate-matrix, build]
     strategy:
       fail-fast: false
@@ -159,13 +160,13 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+    uses: ./.github/workflows/linux-test.yml
     with:
-      job-name: tests-py-dynamo-serde
+      job-name: tests-py-dynamo-fe
       repository: "pytorch/tensorrt"
       ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
+      test-infra-repository: gs-olive/test-infra
+      test-infra-ref: release/2.2
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
