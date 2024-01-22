@@ -1,0 +1,3 @@
+pip list
+echo "TEST PRINT"
+python -c "import torch; print(torch.__version__)"
