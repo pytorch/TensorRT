@@ -8,6 +8,6 @@ print(f"Deleting directory: {extra_cudnn}")
 shutil.rmtree(extra_cudnn)
 
 
-import tensorrt
+# import tensorrt
 import torch
-import torch_tensorrt
+# import torch_tensorrt
