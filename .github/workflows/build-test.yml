@@ -150,7 +150,7 @@ jobs:
         popd
 
   tests-py-dynamo-serde:
-    name: Test dynamo frontend [Python]
+    name: Test dynamo serialization [Python]
     if:  success() || failure()
     needs: [generate-matrix, build]
     strategy:
@@ -162,7 +162,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
     uses: ./.github/workflows/linux-test.yml
     with:
-      job-name: tests-py-dynamo-fe
+      job-name: tests-py-dynamo-serde
       repository: "pytorch/tensorrt"
       ref: ""
       test-infra-repository: gs-olive/test-infra
