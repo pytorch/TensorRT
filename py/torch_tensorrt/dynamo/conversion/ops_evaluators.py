@@ -62,7 +62,9 @@ def rand_validator(rand_node: Node) -> bool:
         return False
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.rand.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.rand.default, capability_validator=rand_validator
+)
 def aten_ops_rand(
     ctx: ConversionContext,
     target: Target,
@@ -71,7 +73,7 @@ def aten_ops_rand(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     device = kwargs.get("device", None)
-    return np.random.rand(*args).to(device=device)
+    return np.random.rand(*args)
 
 
 def randn_validator(randn_node: Node) -> bool:
@@ -87,7 +89,9 @@ def randn_validator(randn_node: Node) -> bool:
         return False
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.randn.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.randn.default, capability_validator=randn_validator
+)
 def aten_ops_randn(
     ctx: ConversionContext,
     target: Target,
@@ -96,7 +100,7 @@ def aten_ops_randn(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     device = kwargs.get("device", None)
-    return np.random.randn(*args).to(device=device)
+    return np.random.randn(*args)
 
 
 def randperm_validator(randperm_node: Node) -> bool:
@@ -112,7 +116,9 @@ def randperm_validator(randperm_node: Node) -> bool:
         return False
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.randperm.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.randperm.default, capability_validator=randperm_validator
+)
 def aten_ops_randperm(
     ctx: ConversionContext,
     target: Target,
@@ -124,4 +130,4 @@ def aten_ops_randperm(
     input = args[0]
     if not isinstance(input, int):
         raise RuntimeError(f"The input must be an integer")
-    return np.random.randperm(*args).to(device=device)
+    return np.random.permutation(*args)
