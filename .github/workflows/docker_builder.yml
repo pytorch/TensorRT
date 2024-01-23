@@ -16,6 +16,9 @@ concurrency:
 
 jobs:
   build:
+    permissions:
+      packages: write
+
     runs-on: linux.4xlarge.nvidia.gpu
 
     # Define key environment variables
