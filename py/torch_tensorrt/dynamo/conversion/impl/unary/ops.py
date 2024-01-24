@@ -1,6 +1,8 @@
-from typing import Optional
+from typing import Optional, Union
 
+import numpy as np
 import tensorrt as trt
+import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -10,7 +12,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
 )
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
-from torch_tensorrt.fx.types import TRTTensor
+from torch_tensorrt.fx.converters.converter_utils import set_layer_name
+from torch_tensorrt.fx.types import TRTDataType, TRTTensor
 
 
 def exp(
@@ -459,3 +462,17 @@ def trunc(
     return impl.elementwise.trunc_div(
         ctx, target, source_ir, f"{name}_trunc", input_val, dividend
     )
+
+
+def scalar_tensor(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    scalar: Union[int, float, bool],
+    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]] = None,
+) -> TRTTensor:
+    tensor = get_trt_tensor(ctx, scalar, f"{name}_scalar_tensor", dtype)
+    identity_layer = ctx.net.add_identity(tensor)
+    set_layer_name(identity_layer, target, name, source_ir)
+    return identity_layer.get_output(0)
