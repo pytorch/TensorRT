@@ -235,36 +235,6 @@ def softplus(
     )
 
 
-def clip(
-    ctx: ConversionContext,
-    target: Target,
-    source_ir: Optional[SourceIR],
-    name: str,
-    input_val: TRTTensor,
-    alpha: float,
-    beta: float,
-) -> TRTTensor:
-    operation_type = trt.ActivationType.CLIP
-
-    def clip_dyn_range_fn(dyn_range: Tuple[float, float]) -> Tuple[float, float]:
-        def clip_fn(x: float) -> float:
-            return max(alpha, min(beta, x))
-
-        return clip_fn(dyn_range[0]), clip_fn(dyn_range[1])
-
-    return convert_activation(
-        ctx,
-        target,
-        source_ir,
-        name,
-        operation_type,
-        input_val,
-        alpha=alpha,
-        beta=beta,
-        dyn_range_fn=clip_dyn_range_fn,
-    )
-
-
 def hard_sigmoid(
     ctx: ConversionContext,
     target: Target,

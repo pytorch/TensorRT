@@ -8,11 +8,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data as data
-import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-
-from torch.utils.tensorboard import SummaryWriter
-
+import torchvision.transforms as transforms
 from vgg16 import vgg16
 
 PARSER = argparse.ArgumentParser(
@@ -64,7 +61,6 @@ now = datetime.now()
 
 timestamp = datetime.timestamp(now)
 
-writer = SummaryWriter(args.tensorboard + "/test_" + str(timestamp))
 classes = (
     "plane",
     "car",
@@ -82,7 +78,6 @@ classes = (
 def main():
     global state
     global classes
-    global writer
     if not os.path.isdir(args.ckpt_dir):
         os.makedirs(args.ckpt_dir)
 
@@ -131,9 +126,6 @@ def main():
     data = iter(training_dataloader)
     images, _ = next(data)
 
-    writer.add_graph(model, images.cuda())
-    writer.close()
-
     crit = nn.CrossEntropyLoss()
     opt = optim.SGD(
         model.parameters(),
@@ -156,8 +148,6 @@ def main():
 
     for epoch in range(args.start_from, args.epochs):
         adjust_lr(opt, epoch)
-        writer.add_scalar("Learning Rate", state["lr"], epoch)
-        writer.close()
         print("Epoch: [%5d / %5d] LR: %f" % (epoch + 1, args.epochs, state["lr"]))
 
         train(model, training_dataloader, crit, opt, epoch)
@@ -179,7 +169,6 @@ def main():
 
 
 def train(model, dataloader, crit, opt, epoch):
-    global writer
     model.train()
     running_loss = 0.0
     for batch, (data, labels) in enumerate(dataloader):
@@ -192,10 +181,6 @@ def train(model, dataloader, crit, opt, epoch):
 
         running_loss += loss.item()
         if batch % 50 == 49:
-            writer.add_scalar(
-                "Training Loss", running_loss / 100, epoch * len(dataloader) + batch
-            )
-            writer.close()
             print(
                 "Batch: [%5d | %5d] loss: %.3f"
                 % (batch + 1, len(dataloader), running_loss / 100)
@@ -204,7 +189,6 @@ def train(model, dataloader, crit, opt, epoch):
 
 
 def test(model, dataloader, crit, epoch):
-    global writer
     global classes
     total = 0
     correct = 0
@@ -222,12 +206,6 @@ def test(model, dataloader, crit, epoch):
             class_preds.append(preds)
             total += labels.size(0)
             correct += (preds == labels).sum().item()
-
-    writer.add_scalar("Testing Loss", loss / total, epoch)
-    writer.close()
-
-    writer.add_scalar("Testing Accuracy", correct / total * 100, epoch)
-    writer.close()
 
     test_probs = torch.cat([torch.stack(batch) for batch in class_probs])
     test_preds = torch.cat(class_preds)
@@ -262,14 +240,6 @@ def add_pr_curve_tensorboard(class_index, test_probs, test_preds, global_step=0)
     """
     tensorboard_preds = test_preds == class_index
     tensorboard_probs = test_probs[:, class_index]
-
-    writer.add_pr_curve(
-        classes[class_index],
-        tensorboard_preds,
-        tensorboard_probs,
-        global_step=global_step,
-    )
-    writer.close()
 
 
 if __name__ == "__main__":

@@ -511,25 +511,6 @@ def aten_ops_softplus(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.clip.default)
-def aten_ops_clip(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.activation.clip(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-        alpha=args_bounds_check(args, 1),
-        beta=args_bounds_check(args, 2),
-    )
-
-
 @dynamo_tensorrt_converter(torch.ops.aten.hardsigmoid.default)
 def aten_ops_hard_sigmoid(
     ctx: ConversionContext,
@@ -707,6 +688,9 @@ def aten_ops_where(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.clamp.default)
+@dynamo_tensorrt_converter(torch.ops.aten.clamp.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.clip.default)
+@dynamo_tensorrt_converter(torch.ops.aten.clip.Tensor)
 def aten_ops_clamp(
     ctx: ConversionContext,
     target: Target,
@@ -923,7 +907,7 @@ def aten_ops_clone_copy_dtype(
         name,
         args[0],
         kwargs.get("dtype", args[0].dtype),
-        force_layer=False,
+        force_layer=True,
     )
 
 
@@ -1055,7 +1039,7 @@ def aten_ops_sum(
             name,
             sum_,
             kwargs["output_dtype"],
-            force_layer=False,
+            force_layer=True,
         )
     else:
         return sum_
@@ -2271,7 +2255,14 @@ def tensorrt_scaled_dot_product_attention(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.attention.scaled_dot_product_attention(
-        ctx, target, SourceIR.TORCHTRT_LOWERED, name, args[0], args[1], args[2]
+        ctx,
+        target,
+        SourceIR.TORCHTRT_LOWERED,
+        name,
+        args[0],
+        args[1],
+        args[2],
+        kwargs.get("scale", None),
     )
 
 
@@ -2296,6 +2287,29 @@ def aten_ops_reshape(
         name,
         input=args[0],
         shape=args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.pixel_shuffle.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_pixel_shuffle(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.shuffle.pixel_shuffle(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
     )
 
 
@@ -2552,4 +2566,155 @@ def aten_ops_sort(
         args[0],
         dim=args_bounds_check(args, 1, -1),
         descending=args_bounds_check(args, 2, False),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.trunc.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_trunc(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.trunc(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.copy.default)
+@enforce_tensor_types(
+    {
+        1: (TRTTensor,),
+    }
+)
+def aten_ops_copy(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    src = args[1]
+    return impl.cast.to_copy(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        src,
+        src.dtype,
+        force_layer=True,
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.remainder.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.remainder.Tensor)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_remainder(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.remainder(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.any.default)
+@dynamo_tensorrt_converter(torch.ops.aten.any.dim)
+@dynamo_tensorrt_converter(torch.ops.aten.any.dims)
+def aten_ops_any(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.any(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, replacement=None),
+        args_bounds_check(args, 2, replacement=False),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten._pdist_forward.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_pdist(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.normalization.pdist(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, 2),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.flip.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_flip(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.slice.flip(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.scalar_tensor.default)
+def aten_ops_scalar_tensor(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.scalar_tensor(
+        ctx, target, SourceIR.ATEN, name, args[0], dtype=kwargs.get("dtype")
     )

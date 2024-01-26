@@ -79,6 +79,22 @@ auto logical_not_registration TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
        return true;
      }});
 
+auto sqrt_registration TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
+    {"aten::sqrt(Tensor self) -> Tensor", [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+       auto in = args[0].ITensorOrFreeze(ctx);
+       if (in->getType() == nvinfer1::DataType::kINT32) {
+         // unary sqrt layer only supports float inputs
+         in = castITensor(ctx, in, nvinfer1::DataType::kFLOAT, util::node_info(n).c_str());
+       }
+       auto unary_layer = ctx->net->addUnary(*in, nvinfer1::UnaryOperation::kSQRT);
+       TORCHTRT_CHECK(unary_layer, "Unable to create sqrt layer from node: " << *n);
+       unary_layer->setName(util::node_info(n).c_str());
+       unary_layer->setOutputType(0, in->getType());
+       auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], unary_layer->getOutput(0));
+       LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+       return true;
+     }});
+
 auto isfinite_registration TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
     {"aten::isfinite(Tensor self) -> Tensor", [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        auto in = args[0].ITensorOrFreeze(ctx);
@@ -126,7 +142,6 @@ convert(atan, kATAN);
 convert(floor, kFLOOR);
 convert(log, kLOG);
 convert(ceil, kCEIL);
-convert(sqrt, kSQRT);
 convert(exp, kEXP);
 convert(neg, kNEG);
 convert(erf, kERF);

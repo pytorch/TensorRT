@@ -1,8 +1,9 @@
 import logging
-from typing import Collection, Dict, List, Mapping, Optional, Sequence, Set
+from typing import Collection, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import torch
 from torch.fx.graph_module import GraphModule
+from torch.fx.node import Target
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
 from torch.fx.passes.operator_support import OperatorSupport, SupportDict
 from torch_tensorrt.dynamo._defaults import (
@@ -133,16 +134,14 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
     def __init__(
         self,
         support_dict: Optional[SupportDict] = None,
-        torch_executed_ops: Optional[Set[str]] = None,
+        torch_executed_ops: Collection[Target] = set(),
     ):
         super().__init__(support_dict)
 
         # Initialize sets of supported/unsupported operators
         self.supported_operators: Dict[str, int] = {}
         self.unsupported_operators: Dict[str, int] = {}
-        self.torch_executed_ops: Set[str] = (
-            torch_executed_ops if torch_executed_ops is not None else set()
-        )
+        self.torch_executed_ops: Collection[Target] = torch_executed_ops
 
     def is_node_supported(
         self, submodules: Mapping[str, torch.nn.Module], node: torch.fx.Node
@@ -150,8 +149,10 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
 
         if (
-            node in CONVERTERS or node.op == "get_attr"
-        ) and node_name not in self.torch_executed_ops:
+            (node in CONVERTERS or node.op == "get_attr")
+            and node_name not in self.torch_executed_ops
+            and node.target not in self.torch_executed_ops
+        ):
             # If node is a proper, supported computational node, store the operator
             if not node.is_impure() and node.op != "get_attr":
                 if node_name not in self.supported_operators:
@@ -201,9 +202,9 @@ def partition(
     gm: torch.fx.GraphModule,
     verbose: bool = DEBUG,
     min_block_size: int = MIN_BLOCK_SIZE,
-    torch_executed_ops: Optional[Set[str]] = None,
+    torch_executed_ops: Collection[Target] = set(),
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
-) -> torch.fx.GraphModule:
+) -> Tuple[torch.fx.GraphModule, TorchTensorRTOperatorSupport]:
     """Partition an FX GraphModule with aten ops into TRT engines
     Partitioning is based on converter operator support
 
@@ -211,16 +212,12 @@ def partition(
         gm: FX GraphModule to partition
         verbose: Bool representing whether to print operator support
         min_block_size: Minimum number of operators per TRT-Engine Block
-        torch_executed_ops: Sequence of operations to run in Torch, regardless of converter coverage
+        torch_executed_ops: Collection of operations to run in Torch, regardless of converter coverage
         require_full_compilation: Whether to require that all operators be run in TRT
     Returns:
-        torch.fx.GraphModule
+        torch.fx.GraphModule, TorchTensorRTOperatorSupport
     """
-    supported_ops = TorchTensorRTOperatorSupport(
-        torch_executed_ops=torch_executed_ops
-        if torch_executed_ops is not None
-        else set()
-    )
+    supported_ops = TorchTensorRTOperatorSupport(torch_executed_ops=torch_executed_ops)
     partitioner = TRTPartitioner(
         gm,
         supported_ops,
@@ -236,4 +233,4 @@ def partition(
     if verbose:
         supported_ops.print_support_overview(len(partitions))
 
-    return fused_graph
+    return fused_graph, supported_ops

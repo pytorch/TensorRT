@@ -42,8 +42,10 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
 
         if (
-            node in CONVERTERS or node.op == "get_attr"
-        ) and node_name not in self.torch_executed_ops:
+            (node in CONVERTERS or node.op == "get_attr")
+            and node_name not in self.torch_executed_ops
+            and node.target not in self.torch_executed_ops
+        ):
             # If node is a proper, supported computational node, store the operator
             if not node.is_impure() and node.op != "get_attr":
                 if node_name not in self.supported_operators:
@@ -248,7 +250,7 @@ def partition(
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Collection[Target] = set(),
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
-) -> torch.fx.GraphModule:
+) -> Tuple[torch.fx.GraphModule, OpSupportTester]:
     """Partition an FX GraphModule with aten ops into TRT engines
     Partitioning is based on converter operator support
 
@@ -259,7 +261,7 @@ def partition(
         torch_executed_ops: Collection of operations to run in Torch, regardless of converter coverage
         require_full_compilation: Require that all computational operators be run in TRT
     Returns:
-        torch.fx.GraphModule
+        torch.fx.GraphModule, OpSupportTester
     """
     # Ensure graph is clean prior to partitioning
     gm.graph.eliminate_dead_code()
@@ -280,4 +282,4 @@ def partition(
     if verbose:
         supported_ops.print_support_overview(partitioner.num_trt_accelerated_subgraphs)
 
-    return partitioned_graph
+    return partitioned_graph, supported_ops

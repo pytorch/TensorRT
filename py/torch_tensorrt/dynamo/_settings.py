@@ -1,8 +1,9 @@
 from dataclasses import dataclass, field
-from typing import Optional, Set
+from typing import Collection, Optional, Union
 
 import torch
 from tensorrt import EngineCapability
+from torch.fx.node import Target
 from torch_tensorrt._Device import Device
 from torch_tensorrt.dynamo._defaults import (
     DEBUG,
@@ -10,8 +11,10 @@ from torch_tensorrt.dynamo._defaults import (
     DLA_GLOBAL_DRAM_SIZE,
     DLA_LOCAL_DRAM_SIZE,
     DLA_SRAM_SIZE,
+    DRYRUN,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     ENGINE_CAPABILITY,
+    HARDWARE_COMPATIBLE,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
@@ -39,7 +42,7 @@ class CompilationSettings:
         debug (bool): Whether to print out verbose debugging information
         workspace_size (int): Workspace TRT is allowed to use for the module (0 is default)
         min_block_size (int): Minimum number of operators per TRT-Engine Block
-        torch_executed_ops (Sequence[str]): Sequence of operations to run in Torch, regardless of converter coverage
+        torch_executed_ops (Collection[Target]): Collection of operations to run in Torch, regardless of converter coverage
         pass_through_build_failures (bool): Whether to fail on TRT engine build errors (True) or not (False)
         max_aux_streams (Optional[int]): Maximum number of allowed auxiliary TRT streams for each engine
         version_compatible (bool): Provide version forward-compatibility for engine plan files
@@ -63,13 +66,17 @@ class CompilationSettings:
         dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
         dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
+        dryrun (Union[bool, str]): Toggle "Dryrun" mode, which runs everything through partitioning, short of conversion to
+            TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the
+            ouptut to a file if a string path is specified
+        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
     """
 
     precision: torch.dtype = PRECISION
     debug: bool = DEBUG
     workspace_size: int = WORKSPACE_SIZE
     min_block_size: int = MIN_BLOCK_SIZE
-    torch_executed_ops: Set[str] = field(default_factory=set)
+    torch_executed_ops: Collection[Target] = field(default_factory=set)
     pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES
     max_aux_streams: Optional[int] = MAX_AUX_STREAMS
     version_compatible: bool = VERSION_COMPATIBLE
@@ -88,3 +95,5 @@ class CompilationSettings:
     dla_sram_size: int = DLA_SRAM_SIZE
     dla_local_dram_size: int = DLA_LOCAL_DRAM_SIZE
     dla_global_dram_size: int = DLA_GLOBAL_DRAM_SIZE
+    dryrun: Union[bool, str] = DRYRUN
+    hardware_compatible: bool = HARDWARE_COMPATIBLE

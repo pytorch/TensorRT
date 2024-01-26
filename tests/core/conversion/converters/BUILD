@@ -203,6 +203,10 @@ converter_test(
     name = "test_where",
 )
 
+converter_test(
+    name = "test_scaled_dot_product_attention",
+)
+
 test_suite(
     name = "converter_tests",
     tests = [
@@ -238,6 +242,7 @@ test_suite(
         ":test_reduce",
         ":test_replication_pad",
         ":test_roll",
+        ":test_scaled_dot_product_attention",
         ":test_scatter",
         ":test_select",
         ":test_shuffle",

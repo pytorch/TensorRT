@@ -7,29 +7,29 @@ import tensorrt as trt
 import torch
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.conversion._TRTInterpreter import TRTInterpreter
+from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
+    TRTInterpreter,
+    TRTInterpreterResult,
+)
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
-from torch_tensorrt.dynamo.utils import get_torch_inputs
+from torch_tensorrt.dynamo.utils import get_torch_inputs, to_torch_device
 
 
-def convert_module(
+def interpret_module_to_result(
     module: torch.fx.GraphModule,
     inputs: Sequence[Input],
     settings: CompilationSettings = CompilationSettings(),
-    name: str = "",
-) -> PythonTorchTensorRTModule | TorchTensorRTModule:
-    """Convert an FX module to a TRT module
+) -> TRTInterpreterResult:
+    """Interpret an FX module to a TRTInterpreterResult
     Args:
-        module: FX GraphModule to convert
+        module: FX GraphModule to interpret
         inputs: Sequence of Tensors representing inputs to the module
         settings: Compilation settings
-        name: TRT engine name
     Returns:
-        _PythonTorchTensorRTModule or TorchTensorRTModule
+        TRTInterpreterResult
     """
-    # Specify module output data types to ensure TRT output types agree with
-    # that of the equivalent Torch module
     torch_inputs = get_torch_inputs(inputs, settings.device)
+    module.to(to_torch_device(settings.device))
     module_outputs = module(*torch_inputs)
 
     if not isinstance(module_outputs, (list, tuple)):
@@ -60,6 +60,25 @@ def convert_module(
         compilation_settings=settings,
     )
     interpreter_result = interpreter.run()
+    return interpreter_result
+
+
+def convert_module(
+    module: torch.fx.GraphModule,
+    inputs: Sequence[Input],
+    settings: CompilationSettings = CompilationSettings(),
+    name: str = "",
+) -> PythonTorchTensorRTModule | TorchTensorRTModule:
+    """Convert an FX module to a TRT module
+    Args:
+        module: FX GraphModule to convert
+        inputs: Sequence of Tensors representing inputs to the module
+        settings: Compilation settings
+        name: TRT engine name
+    Returns:
+        _PythonTorchTensorRTModule or TorchTensorRTModule
+    """
+    interpreter_result = interpret_module_to_result(module, inputs, settings)
 
     if settings.use_python_runtime:
         return PythonTorchTensorRTModule(
@@ -82,4 +101,5 @@ def convert_module(
             input_binding_names=list(interpreter_result.input_names),
             output_binding_names=list(interpreter_result.output_names),
             target_device=settings.device,
+            hardware_compatible=settings.hardware_compatible,
         )

@@ -38,6 +38,7 @@ cc_library(
         "unpack_hardswish.cpp",
         "unpack_log_softmax.cpp",
         "unpack_rsqrt.cpp",
+        "unpack_scaled_dot_product_attention.cpp",
         "unpack_std.cpp",
         "unpack_var.cpp",
         "view_to_reshape.cpp",

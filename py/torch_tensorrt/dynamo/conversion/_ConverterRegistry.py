@@ -6,6 +6,7 @@ from enum import Enum, auto
 from typing import (
     Any,
     Callable,
+    Collection,
     Dict,
     List,
     Optional,
@@ -212,7 +213,15 @@ class ConverterRegistry:
                 CallingConvention.CTX for _ in range(len(self.registries))
             ]
 
+        self.disallowed_targets: Collection[Target] = set()
+
         self.validate_invariants()
+
+    def set_disallowed_targets(self, torch_executed_ops: Collection[Target]) -> None:
+        self.disallowed_targets = torch_executed_ops
+
+    def get_disallowed_targets(self, torch_executed_ops: Collection[Target]) -> None:
+        self.disallowed_targets = torch_executed_ops
 
     def validate_invariants(self) -> None:
         """Validates the invariants required of the dictionaries in the registries
@@ -253,6 +262,14 @@ class ConverterRegistry:
 
         self.validate_invariants()
 
+        if (
+            key in self.disallowed_targets
+            or self.qualified_name_or_str(key) in self.disallowed_targets
+        ):
+            raise KeyError(
+                f"A converter exists for {key}, but it was " "explicitly disallowed"
+            )
+
         # Iterate over all registries and return the first converter found
         for registry, calling_convention in zip(
             self.registries, self.registry_calling_conventions
@@ -287,6 +304,14 @@ class ConverterRegistry:
 
         self.validate_invariants()
         key = node.target
+
+        if (
+            key in self.disallowed_targets
+            or self.qualified_name_or_str(key) in self.disallowed_targets
+        ):
+            raise KeyError(
+                f"A converter exists for {key}, but it was " "explicitly disallowed"
+            )
 
         # Iterate over all registries, validating the converter on the input node
         # If no capability_validator function is found, assume full coverage

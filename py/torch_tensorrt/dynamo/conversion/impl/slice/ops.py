@@ -225,3 +225,37 @@ def tile(
     layer.mode = trt.SampleMode.WRAP
     set_layer_name(layer, target, name)
     return layer.get_output(0)
+
+
+def flip(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    dims: Sequence[int],
+) -> TRTTensor:
+    start_slice = []
+    output_shape = list(input.shape)
+    stride_slice = []
+
+    shape = input.shape
+    rank = len(shape)
+    dims = get_positive_dim(dims, rank)
+
+    for i in range(rank):
+        if i in dims:
+            start_slice.append(shape[i] - 1)
+            stride_slice.append(-1)
+        else:
+            start_slice.append(0)
+            stride_slice.append(1)
+
+    layer = ctx.net.add_slice(
+        input,
+        start=start_slice,
+        shape=output_shape,
+        stride=stride_slice,
+    )
+    set_layer_name(layer, target, name, source_ir)
+    return layer.get_output(0)
