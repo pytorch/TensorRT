@@ -39,12 +39,6 @@ def interpret_module_to_result(
     # such as aten.sum - such outputs can be truncated
     output_dtypes = []
     for output in module_outputs:
-        if not isinstance(output, torch.Tensor):
-            output = torch.tensor(output)
-            if isinstance(output, int):
-                output = output.to(torch.int32)
-            elif isinstance(output, float):
-                output = output.to(torch.float32)
         if settings.truncate_long_and_double and output.dtype == torch.float64:
             output_dtypes.append(torch.float32)
         elif settings.truncate_long_and_double and output.dtype == torch.int64:
