@@ -8,7 +8,7 @@ extra_cudnn = os.path.join(python_site_packages, "nvidia", "cudnn")
 extra_torch = os.path.join(python_site_packages, "torch", "lib")
 
 for dll in glob.glob(os.path.join(extra_cudnn, "**", "*.dll"), recursive=True):
-    shutil.copy(extra_cudnn, extra_torch)
+    shutil.copy(dll, extra_torch)
 
 
 # import tensorrt
