@@ -11,7 +11,7 @@ for dll in glob.glob(os.path.join(extra_cudnn, "**", "*.dll"), recursive=True):
     shutil.copy(dll, extra_torch)
 
 
-# import tensorrt
+import tensorrt
 import torch
 
-# import torch_tensorrt
+import torch_tensorrt
