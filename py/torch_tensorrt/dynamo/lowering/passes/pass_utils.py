@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, Dict, List
 
 import torch
 
@@ -29,3 +29,20 @@ def get_tensor_placeholders(
     ]
 
     return placeholders
+
+
+def update_metadata(
+    gm: torch.fx.GraphModule, target_op: Any, metadata: Dict[int, torch._ops.OpOverload]
+) -> None:
+    """
+    Given a graph and a node which has target_op in the graph,
+    a) If the node has metadata, store it in the map
+    b) If the node does not have metadata, retrieve it from the map
+       and assign to the node.
+    """
+    for idx, node in enumerate(gm.graph.nodes):
+        if node.target == target_op:
+            if idx not in metadata and node.meta:
+                metadata[idx] = node.meta
+            elif idx in metadata and not node.meta:
+                node.meta = metadata[idx]

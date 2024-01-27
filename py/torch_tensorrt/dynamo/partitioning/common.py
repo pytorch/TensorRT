@@ -43,9 +43,9 @@ def construct_dynamic_input(input: Any) -> Input:
             if var_range.lower == 2:
                 min_shape.append(1)
             else:
-                min_shape.append(var_range.lower)
-            opt_shape.append(var_val)
-            max_shape.append(var_range.upper)
+                min_shape.append(int(var_range.lower))
+            opt_shape.append(int(var_val))
+            max_shape.append(int(var_range.upper))
         else:
             min_shape.append(dim)
             opt_shape.append(dim)

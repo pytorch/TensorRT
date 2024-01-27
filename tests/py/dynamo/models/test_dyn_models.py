@@ -3,9 +3,8 @@ import unittest
 import pytest
 import timm
 import torch
-from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
-
 import torch_tensorrt as torchtrt
+from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 assertions = unittest.TestCase()
 
