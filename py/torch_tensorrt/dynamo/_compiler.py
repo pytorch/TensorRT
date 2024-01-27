@@ -5,6 +5,7 @@ import logging
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
 
 import torch
+import torch_tensorrt
 from torch.export import ExportedProgram
 from torch.fx.node import Target
 from torch_tensorrt import _enums
@@ -65,8 +66,6 @@ from torch_tensorrt.dynamo.utils import (
     to_torch_device,
     to_torch_tensorrt_device,
 )
-
-import torch_tensorrt
 
 logger = logging.getLogger(__name__)
 
@@ -305,8 +304,8 @@ def compile_module(
     def contains_metadata(gm: torch.fx.GraphModule) -> bool:
         for node in gm.graph.nodes:
             if node.op != "output" and (not node.meta) and "val" not in node.meta:
-                logger.debug(
-                    f"Node {node.name} of op type {node.op} does not have metadata"
+                logger.warning(
+                    f"Node {node.name} of op type {node.op} does not have metadata. This could sometimes lead to undefined behavior."
                 )
                 return False
         return True
