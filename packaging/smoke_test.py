@@ -11,6 +11,8 @@ extra_torch = os.path.join(python_site_packages, "torch", "lib")
 for dll in glob.glob(os.path.join(extra_cudnn, "**", "*.dll"), recursive=True):
     shutil.copy(dll, extra_torch)
 
+import torch
+
 print(f"Torch CUDA version: {torch.version.cuda}")
 
 result = subprocess.run(
@@ -23,5 +25,4 @@ print(result.stderr)
 
 
 import tensorrt
-import torch
 import torch_tensorrt
