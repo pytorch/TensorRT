@@ -10,9 +10,14 @@ extra_torch = os.path.join(python_site_packages, "torch", "lib")
 
 print(f"CUDNN DLLS: {list(glob.glob(os.path.join(extra_cudnn, '**', '*.dll'), recursive=True))}")
 print(f"ALL TORCH DLLS: {list(glob.glob(os.path.join(extra_torch, '**', '*.dll'), recursive=True))}")
+print(f"Current PATH: {os.getenv('PATH')}")
 
-for dll in glob.glob(os.path.join(extra_cudnn, "**", "*.dll"), recursive=True):
-    shutil.copy(dll, extra_torch)
+# for dll in glob.glob(os.path.join(extra_cudnn, "**", "*.dll"), recursive=True):
+#     shutil.copy(dll, extra_torch)
+
+# Move Torch cuDNN DLLs into main path
+for dll in glob.glob(os.path.join(extra_torch, "**", "*cudnn*.dll"), recursive=True):
+    shutil.copy(dll, extra_cudnn)
 
 import torch
 
