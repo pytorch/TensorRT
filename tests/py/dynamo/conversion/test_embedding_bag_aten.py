@@ -1,7 +1,8 @@
 import torch
-from harness import DispatchTestCase
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
+
+from .harness import DispatchTestCase
 
 
 class TestEmbeddingBagConverter(DispatchTestCase):
