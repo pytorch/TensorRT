@@ -40,9 +40,7 @@ cc_library(
                 "include/aarch64-linux-gnu/NvInferPluginUtils.h",
             ],
         ),
-        ":ci_rhel_x86_64_linux": [
-            "include/NvUtils.h",
-        ] + glob(
+        ":ci_rhel_x86_64_linux": glob(
             [
                 "include/NvInfer*.h",
             ],
