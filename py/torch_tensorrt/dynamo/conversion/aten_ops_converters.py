@@ -281,17 +281,19 @@ def embedding_bag_validator(node: Node) -> bool:
     )
 
 
-@dynamo_tensorrt_converter(
-    torch.ops.aten.embedding_bag.default, capability_validator=embedding_bag_validator
-)
-@dynamo_tensorrt_converter(
-    torch.ops.aten._embedding_bag.default, capability_validator=embedding_bag_validator
-)
+# @dynamo_tensorrt_converter(
+#     torch.ops.aten.embedding_bag.default, capability_validator=embedding_bag_validator
+# )
+# @dynamo_tensorrt_converter(
+#     torch.ops.aten._embedding_bag.default, capability_validator=embedding_bag_validator
+# )
+@dynamo_tensorrt_converter(torch.ops.aten.embedding_bag.default)
+@dynamo_tensorrt_converter(torch.ops.aten._embedding_bag.default)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
         1: (TRTTensor,),
-        2: (np.ndarray, torch.Tensor),
+        # 2: (np.ndarray, torch.Tensor),
     }
 )
 def aten_ops_embedding_bag(

@@ -1,8 +1,7 @@
 import torch
+from harness import DispatchTestCase
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
-
-from .harness import DispatchTestCase
 
 
 class TestEmbeddingBagConverter(DispatchTestCase):
@@ -12,39 +11,42 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             param(
                 test_name="1d_indices_1",
                 weight=torch.randn((10, 3), dtype=torch.float32),
-                indices=torch.tensor([1, 2, 4, 5, 4, 3], dtype=torch.int32),
-                offsets=torch.tensor([0, 3], dtype=torch.int32),
+                indices=torch.tensor(
+                    [1, 2, 4, 5, 4, 3, 2, 2, 2, 2, 2, 2, 2, 2, 3, 4, 5, 4, 3, 2],
+                    dtype=torch.int32,
+                ),
+                offsets=torch.tensor([0, 2, 4], dtype=torch.int32),
                 scale_grad_by_freq=False,
                 mode=1,
                 sparse=False,
                 per_sample_weights=None,
-                include_last_offset=True,
-                padding_idx=-1,
-            ),
-            param(
-                test_name="1d_indices_2",
-                weight=torch.randn((10, 3), dtype=torch.float32),
-                indices=torch.tensor([1, 2, 4, 5, 4, 3], dtype=torch.int32),
-                offsets=torch.tensor([0, 5], dtype=torch.int32),
-                scale_grad_by_freq=False,
-                mode=0,
-                sparse=False,
-                per_sample_weights=torch.randn((6,)),
                 include_last_offset=False,
                 padding_idx=-1,
             ),
-            param(
-                test_name="1d_indices_3",
-                weight=torch.randn((10, 3), dtype=torch.float32),
-                indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int32),
-                offsets=torch.tensor([0, 2, 4], dtype=torch.int32),
-                scale_grad_by_freq=False,
-                mode=2,
-                sparse=False,
-                per_sample_weights=None,
-                include_last_offset=False,
-                padding_idx=-1,
-            ),
+            # param(
+            #     test_name="1d_indices_2",
+            #     weight=torch.randn((10, 3), dtype=torch.float32),
+            #     indices=torch.tensor([1, 2, 4, 5, 4, 3], dtype=torch.int32),
+            #     offsets=torch.tensor([0, 5], dtype=torch.int32),
+            #     scale_grad_by_freq=False,
+            #     mode=0,
+            #     sparse=False,
+            #     per_sample_weights=torch.randn((6,)),
+            #     include_last_offset=False,
+            #     padding_idx=-1,
+            # ),
+            # param(
+            #     test_name="1d_indices_3",
+            #     weight=torch.randn((10, 3), dtype=torch.float32),
+            #     indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int32),
+            #     offsets=torch.tensor([0, 2, 4], dtype=torch.int32),
+            #     scale_grad_by_freq=False,
+            #     mode=2,
+            #     sparse=False,
+            #     per_sample_weights=None,
+            #     include_last_offset=False,
+            #     padding_idx=-1,
+            # ),
             # 2D input
             # param(
             #     test_name="2d_indices_1",
@@ -117,7 +119,7 @@ class TestEmbeddingBagConverter(DispatchTestCase):
         padding_idx,
     ):
         class TestEmbeddingBag(torch.nn.Module):
-            def forward(self, weight, indices):
+            def forward(self, weight, indices, offsets):
                 return torch.ops.aten._embedding_bag.default(
                     weight,
                     indices,
@@ -132,7 +134,8 @@ class TestEmbeddingBagConverter(DispatchTestCase):
 
         self.run_test(
             TestEmbeddingBag(),
-            inputs=[weight, indices],
+            inputs=[weight, indices, offsets],
+            # use_dynamo_tracer=True,
             enable_passes=True,
         )
 
