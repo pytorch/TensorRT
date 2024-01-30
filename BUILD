@@ -34,6 +34,14 @@ pkg_tar(
 )
 
 pkg_tar(
+    name = "include_rt",
+    package_dir = "include/torch_tensorrt",
+    deps = [
+        "//core/runtime:include",
+    ],
+)
+
+pkg_tar(
     name = "include",
     srcs = [
         "//cpp:api_headers",
@@ -48,6 +56,18 @@ pkg_tar(
         "//conditions:default": [
             "//cpp/lib:libtorchtrt.so",
             "//cpp/lib:libtorchtrt_plugins.so",
+            "//cpp/lib:libtorchtrt_runtime.so",
+        ],
+    }),
+    mode = "0755",
+    package_dir = "lib/",
+)
+
+pkg_tar(
+    name = "lib_rt",
+    srcs = select({
+        ":windows": ["//cpp/lib:torch_tensorrt_runtime.dll"],
+        "//conditions:default": [
             "//cpp/lib:libtorchtrt_runtime.so",
         ],
     }),
@@ -81,4 +101,19 @@ pkg_tar(
         ":windows": [],
         "//conditions:default": [":bin"],
     }),
+)
+
+pkg_tar(
+    name = "libtorchtrt_runtime",
+    srcs = [
+        "//:LICENSE",
+        "//bzl_def:BUILD",
+        "//bzl_def:WORKSPACE",
+    ],
+    extension = "tar.gz",
+    package_dir = "torch_tensorrt_runtime",
+    deps = [
+        ":include_rt",
+        ":lib_rt",
+    ],
 )
