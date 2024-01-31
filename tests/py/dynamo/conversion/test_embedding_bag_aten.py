@@ -12,10 +12,7 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             param(
                 test_name="1d_indices_1",
                 weight=torch.randn((10, 3), dtype=torch.float32),
-                indices=torch.tensor(
-                    [1, 2, 4, 5, 4, 3, 2, 2, 2, 2, 2, 2, 2, 2, 3, 4, 5, 4, 3, 2],
-                    dtype=torch.int32,
-                ),
+                indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 6, 8, 1], dtype=torch.int32),
                 offsets=torch.tensor([0, 2, 4], dtype=torch.int32),
                 scale_grad_by_freq=False,
                 mode=1,

@@ -295,7 +295,7 @@ def embedding_bag(
 
         index_embed = impl.select.index(
             ctx, target, source_ir, f"{name}_index_{i}", embed, [sliced_indices]
-        )  # np.array([0,1,2,3,4,5])
+        )
         reduced_sliced_embed = reduce_op(
             name=f"{name}_{reduce_name}_{i}",
             input_val=index_embed,
