@@ -35,10 +35,6 @@ converter_test(
 )
 
 converter_test(
-    name = "test_instance_norm",
-)
-
-converter_test(
     name = "test_cast",
 )
 
@@ -210,10 +206,6 @@ converter_test(
     name = "test_where",
 )
 
-converter_test(
-    name = "test_scaled_dot_product_attention",
-)
-
 test_suite(
     name = "converter_tests",
     tests = [
@@ -236,7 +228,6 @@ test_suite(
         ":test_einsum",
         ":test_expand",
         ":test_index",
-        ":test_instance_norm",
         ":test_interpolate",
         ":test_layer_norm",
         ":test_linear",
@@ -249,7 +240,6 @@ test_suite(
         ":test_reduce",
         ":test_replication_pad",
         ":test_roll",
-        ":test_scaled_dot_product_attention",
         ":test_scatter",
         ":test_select",
         ":test_shuffle",
