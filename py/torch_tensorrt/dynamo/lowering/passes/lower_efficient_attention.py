@@ -27,12 +27,10 @@ def lower_efficient_attention(
     return gm
 
 
-def efficient_attention_replacement() -> (
-    Tuple[
-        torch.fx.GraphModule,
-        Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor],
-    ]
-):
+def efficient_attention_replacement() -> Tuple[
+    torch.fx.GraphModule,
+    Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor],
+]:
     """Constructs the original and replacement functions for efficient attention"""
 
     # Original graph

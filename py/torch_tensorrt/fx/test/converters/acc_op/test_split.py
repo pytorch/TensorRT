@@ -23,9 +23,11 @@ class TestSplitConverter(AccTestCase):
             Split(),
             inputs,
             expected_ops={
-                acc_ops.split
-                if isinstance(split_size_or_sections, int)
-                else acc_ops.slice_tensor
+                (
+                    acc_ops.split
+                    if isinstance(split_size_or_sections, int)
+                    else acc_ops.slice_tensor
+                )
             },
             test_explicit_batch_dim=False,
         )
@@ -70,9 +72,11 @@ class TestSplitConverter(AccTestCase):
             Split(),
             input_specs,
             expected_ops={
-                acc_ops.split
-                if isinstance(split_size_or_sections, int)
-                else acc_ops.slice_tensor
+                (
+                    acc_ops.split
+                    if isinstance(split_size_or_sections, int)
+                    else acc_ops.slice_tensor
+                )
             },
         )
 

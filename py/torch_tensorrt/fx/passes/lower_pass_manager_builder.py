@@ -5,19 +5,17 @@ from typing import Any, Callable, Optional, Sequence
 
 import torch
 from torch import nn
-from torch.fx.passes.pass_manager import inplace_wrapper, PassManager
+from torch.fx.passes.pass_manager import PassManager, inplace_wrapper
 from torch.fx.passes.shape_prop import ShapeProp
-from torch.fx.passes.splitter_base import generate_inputs_for_submodules, SplitResult
+from torch.fx.passes.splitter_base import SplitResult, generate_inputs_for_submodules
 from torch_tensorrt.fx.passes.pass_utils import apply_bfloat_float_conversion
 from torch_tensorrt.fx.utils import LowerPrecision
 
 from ..input_tensor_spec import generate_input_specs
-
 from ..lower_setting import LowerSetting
 from ..observer import Observer
 from ..passes.remove_duplicate_output_args import remove_duplicate_output_args
 from .graph_opts import common_subexpression_elimination
-
 from .lower_basic_pass import (  # noqa
     fix_clamp_numerical_limits_to_fp16,
     fix_reshape_batch_dim,
@@ -25,7 +23,6 @@ from .lower_basic_pass import (  # noqa
     replace_op_with_indices,
     run_const_fold,
 )
-
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -196,9 +193,11 @@ class LowerPassManagerBuilder:
                     self.lower_setting.input_specs = generate_input_specs(
                         submod_inputs,
                         self.lower_setting,
-                        additional_submodule_inputs[submod_name]
-                        if additional_submodule_inputs
-                        else None,
+                        (
+                            additional_submodule_inputs[submod_name]
+                            if additional_submodule_inputs
+                            else None
+                        ),
                     )
                     lowered_module = self._lower_func(
                         submod, submod_inputs, self.lower_setting, submod_name
@@ -236,9 +235,11 @@ class LowerPassManagerBuilder:
                     lowering_start_time = datetime.datetime.now()
 
                     self.lower_setting.additional_inputs = (
-                        additional_submodule_inputs[submod_name]
-                        if additional_submodule_inputs
-                        else None,
+                        (
+                            additional_submodule_inputs[submod_name]
+                            if additional_submodule_inputs
+                            else None
+                        ),
                     )
 
                     lowered_module = self._lower_func(

@@ -177,7 +177,7 @@ skip = [
 
 [tool.black]
 #line-length = 120
-target-versions = ["py38", "py39", "py310", "py311", "py312"]
+target-version = ["py38", "py39", "py310", "py311"]
 force-exclude = """
 elu_converter/setup.py
 """

@@ -28,9 +28,9 @@ from packaging import version
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[
-    Callable[[torch.fx.GraphModule], None]
-] = Observer("TRT_INTERPRETER_CALL_PRE_OBSERVER")
+TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[Callable[[torch.fx.GraphModule], None]] = (
+    Observer("TRT_INTERPRETER_CALL_PRE_OBSERVER")
+)
 
 
 class UnsupportedOperatorException(RuntimeError):
@@ -92,9 +92,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._cur_node: Optional[torch.fx.Node] = None
         self._input_names: List[str] = []
         self._output_names: List[str] = []
-        self._itensor_to_tensor_meta: Dict[
-            trt.tensorrt.ITensor, TensorMetadata
-        ] = dict()
+        self._itensor_to_tensor_meta: Dict[trt.tensorrt.ITensor, TensorMetadata] = (
+            dict()
+        )
         self.compilation_settings = compilation_settings
 
         # Data types for TRT Module output Tensors
