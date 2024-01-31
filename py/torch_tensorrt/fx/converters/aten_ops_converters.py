@@ -3,24 +3,22 @@ import logging
 import math
 import operator
 import warnings
-from typing import cast, Dict, Optional, Sequence, Tuple, Union
+from typing import Dict, Optional, Sequence, Tuple, Union, cast
 
 import numpy as np
 
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
-from torch_tensorrt.fx.converters import acc_ops_converters
-
-from ..converter_registry import tensorrt_converter
-
-from ..types import *  # noqa: F403
+import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch.fx.immutable_collections import immutable_list
 from torch.fx.node import Argument, Target
-
-from .converter_utils import *  # noqa: F403
-import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
+from torch_tensorrt.fx.converters import acc_ops_converters
 from torch_tensorrt.fx.converters.impl import activation, convolution
+
+from ..converter_registry import tensorrt_converter
+from ..types import *  # noqa: F403
+from .converter_utils import *  # noqa: F403
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -317,21 +315,19 @@ def aten_ops_max_poolnd(
     kwargs_new = {
         "input": args[0],
         "kernel_size": args[1],
-        "stride": args[2]
-        if len(args) > 2
-        else (None, None)
-        if len(args[1]) == 2
-        else (None, None, None),
-        "padding": args[3]
-        if len(args) > 3
-        else (0, 0)
-        if len(args[1]) == 2
-        else (0, 0, 0),
-        "dilation": args[4]
-        if len(args) > 4
-        else (1, 1)
-        if len(args[1]) == 2
-        else (1, 1, 1),
+        "stride": (
+            args[2]
+            if len(args) > 2
+            else (None, None)
+            if len(args[1]) == 2
+            else (None, None, None)
+        ),
+        "padding": (
+            args[3] if len(args) > 3 else (0, 0) if len(args[1]) == 2 else (0, 0, 0)
+        ),
+        "dilation": (
+            args[4] if len(args) > 4 else (1, 1) if len(args[1]) == 2 else (1, 1, 1)
+        ),
         "ceil_mode": args[5] if len(args) > 5 else False,
     }
     return acc_ops_converters.acc_ops_max_poolnd(
