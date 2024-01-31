@@ -2278,6 +2278,29 @@ def aten_ops_reshape(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.pixel_shuffle.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_pixel_shuffle(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.shuffle.pixel_shuffle(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
 @enforce_tensor_types({0: (TRTTensor,)})
 @dynamo_tensorrt_converter(torch.ops.aten.argmax.default)
 def aten_ops_argmax(
@@ -2605,6 +2628,27 @@ def aten_ops_remainder(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.any.default)
+@dynamo_tensorrt_converter(torch.ops.aten.any.dim)
+@dynamo_tensorrt_converter(torch.ops.aten.any.dims)
+def aten_ops_any(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.reduce.any(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, replacement=None),
+        args_bounds_check(args, 2, replacement=False),
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten._pdist_forward.default)
 @enforce_tensor_types(
     {
@@ -2648,4 +2692,17 @@ def aten_ops_flip(
         name,
         args[0],
         args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.scalar_tensor.default)
+def aten_ops_scalar_tensor(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.scalar_tensor(
+        ctx, target, SourceIR.ATEN, name, args[0], dtype=kwargs.get("dtype")
     )
