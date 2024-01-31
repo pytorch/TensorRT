@@ -86,6 +86,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             else None
         )
 
+        # profile = self.builder.create_optimization_profile()
+        # profile.set_shape_input(
+        #     "offsets", (0, 2, 4), (0, 2, 4), (0, 2, 4)
+        # )  # match with `offsets`
+        # self.optimization_profiles = [profile]
+
         self.input_specs = input_specs
         self.input_specs_iter = 0
         self._cur_node_name: Optional[str] = None
@@ -156,6 +162,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         build_engine_start_time = datetime.now()
 
         builder_config = self.builder.create_builder_config()
+        # builder_config.set_preview_feature(trt.PreviewFeature.PROFILE_SHARING_0806, True)
 
         if self.compilation_settings.workspace_size != 0:
             builder_config.set_memory_pool_limit(
