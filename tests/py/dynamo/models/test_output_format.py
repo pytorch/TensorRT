@@ -20,10 +20,9 @@ def test_output_format(ir):
             self.relu = torch.nn.ReLU()
 
         def forward(self, x):
-            conv = self.conv(x)
-            relu = self.relu(conv)
-            mul = relu * 0.5
-            return mul
+            out = self.conv(x)
+            out = self.relu(out)
+            return out
 
     model = MyModule().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
