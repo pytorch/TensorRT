@@ -1,12 +1,12 @@
 name: 'Torch-TensorRT Docker Build'
 
-# Apply workflow only to main branch
+# Apply workflow only to main, nightly, release branches
 on:
   push:
     branches:
       - main
       - nightly
-      - release/2.1
+      - release/2.2
 
 # If pushes to main are made in rapid succession,
 # cancel existing docker builds and use newer commits
@@ -16,7 +16,10 @@ concurrency:
 
 jobs:
   build:
-    runs-on: linux.2xlarge
+    permissions:
+      packages: write
+
+    runs-on: linux.4xlarge.nvidia.gpu
 
     # Define key environment variables
     # Container name is of the form torch_tensorrt:<branch_name>
