@@ -22,12 +22,10 @@ def view_to_reshape(
     return gm
 
 
-def view_replacement() -> (
-    Tuple[
-        torch.fx.GraphModule,
-        Callable[[torch.Tensor, List[torch.SymInt]], torch.Tensor],
-    ]
-):
+def view_replacement() -> Tuple[
+    torch.fx.GraphModule,
+    Callable[[torch.Tensor, List[torch.SymInt]], torch.Tensor],
+]:
     """Constructs the original and replacement functions for view"""
 
     # Original graph

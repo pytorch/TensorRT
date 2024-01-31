@@ -22,12 +22,10 @@ def lower_linear(
     return gm
 
 
-def linear_replacement() -> (
-    Tuple[
-        torch.fx.GraphModule,
-        Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor],
-    ]
-):
+def linear_replacement() -> Tuple[
+    torch.fx.GraphModule,
+    Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor],
+]:
     """Constructs the original and replacement functions for linear"""
 
     # Original graph

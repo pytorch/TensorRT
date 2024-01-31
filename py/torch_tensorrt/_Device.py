@@ -32,12 +32,14 @@ class Device(object):
         allow_gpu_fallback (bool): Whether falling back to GPU if DLA cannot support an op should be allowed
     """
 
-    device_type: Optional[
-        trt.DeviceType
-    ] = None  #: Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.
+    device_type: Optional[trt.DeviceType] = (
+        None  #: Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.
+    )
     gpu_id: int = -1  #: Device ID for target GPU
     dla_core: int = -1  #: Core ID for target DLA core
-    allow_gpu_fallback: bool = False  #: Whether falling back to GPU if DLA cannot support an op should be allowed
+    allow_gpu_fallback: bool = (
+        False  #: Whether falling back to GPU if DLA cannot support an op should be allowed
+    )
 
     def __init__(self, *args: Any, **kwargs: Any):
         """__init__ Method for torch_tensorrt.Device

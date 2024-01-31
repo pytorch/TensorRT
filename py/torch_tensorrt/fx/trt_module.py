@@ -4,7 +4,7 @@ from typing import Any, List, Sequence
 import tensorrt as trt
 import torch
 
-from .utils import unified_dtype_converter, Frameworks
+from .utils import Frameworks, unified_dtype_converter
 
 
 class TRTModule(torch.nn.Module):
@@ -69,9 +69,11 @@ class TRTModule(torch.nn.Module):
             for idx in self.output_binding_indices_in_order
         ]
         self.output_shapes = [
-            tuple(self.engine.get_binding_shape(idx))
-            if self.engine.has_implicit_batch_dimension
-            else tuple()
+            (
+                tuple(self.engine.get_binding_shape(idx))
+                if self.engine.has_implicit_batch_dimension
+                else tuple()
+            )
             for idx in self.output_binding_indices_in_order
         ]
         self.hidden_output_dtypes: Sequence[torch.dtype] = [
@@ -81,9 +83,11 @@ class TRTModule(torch.nn.Module):
             for idx in self.hidden_output_binding_indices_in_order
         ]
         self.hidden_output_shapes = [
-            tuple(self.engine.get_binding_shape(idx))
-            if self.engine.has_implicit_batch_dimension
-            else tuple()
+            (
+                tuple(self.engine.get_binding_shape(idx))
+                if self.engine.has_implicit_batch_dimension
+                else tuple()
+            )
             for idx in self.hidden_output_binding_indices_in_order
         ]
 
