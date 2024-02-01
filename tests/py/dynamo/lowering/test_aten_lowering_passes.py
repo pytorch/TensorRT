@@ -2,11 +2,19 @@ import sys
 import unittest
 
 import torch
+import torch_tensorrt
+from torch.testing._internal.common_cuda import PLATFORM_SUPPORTS_FLASH_ATTENTION
 from torch.testing._internal.common_utils import TestCase, run_tests
 
 import torch_tensorrt
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
+
+isSM8XDevice = torch.cuda.is_available() and torch.cuda.get_device_capability() in [
+    (8, 6),
+    (8, 7),
+    (8, 9),
+]
 
 
 class TestInputAsOutput(TestCase):
@@ -280,6 +288,10 @@ class TestLowerEfficientAttention(TestCase):
     "Test not supported on Windows",
 )
 class TestLowerFlashAttention(TestCase):
+    @unittest.skipIf(
+        not PLATFORM_SUPPORTS_FLASH_ATTENTION or not isSM8XDevice,
+        "Does not support fused SDPA or not SM86+ hardware",
+    )
     def test_lower_flash_attention(self):
         class FlashAttention(torch.nn.Module):
             def forward(self, q, k, v):
@@ -349,6 +361,10 @@ class TestLowerFlashAttention(TestCase):
         )
         torch._dynamo.reset()
 
+    @unittest.skipIf(
+        not PLATFORM_SUPPORTS_FLASH_ATTENTION or not isSM8XDevice,
+        "Does not support fused SDPA or not SM86+ hardware",
+    )
     def test_flash_attention_converter(self):
         class FlashAttention(torch.nn.Module):
             def forward(self, q, k, v):
