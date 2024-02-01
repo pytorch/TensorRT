@@ -537,9 +537,9 @@ def fix_reshape_batch_dim(mod: fx.GraphModule) -> fx.GraphModule:
         )
         if not reshape_batch_size:
             continue
-        reshape_batch_size_inferred_source: Optional[
-            fx.Node
-        ] = get_reshape_batch_size_inferred_source(reshape_batch_size)
+        reshape_batch_size_inferred_source: Optional[fx.Node] = (
+            get_reshape_batch_size_inferred_source(reshape_batch_size)
+        )
         if not reshape_batch_size_inferred_source:
             continue
 

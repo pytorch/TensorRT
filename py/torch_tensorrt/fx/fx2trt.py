@@ -21,9 +21,9 @@ from .utils import Frameworks, LowerPrecision, get_dynamic_dims, unified_dtype_c
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[
-    Callable[[torch.fx.GraphModule], None]
-] = Observer("TRT_INTERPRETER_CALL_PRE_OBSERVER")
+TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[Callable[[torch.fx.GraphModule], None]] = (
+    Observer("TRT_INTERPRETER_CALL_PRE_OBSERVER")
+)
 
 
 class TRTInterpreterResult(NamedTuple):
@@ -75,9 +75,9 @@ class TRTInterpreter(torch.fx.Interpreter):
         self._cur_node_name: Optional[str] = None
         self._input_names: List[str] = []
         self._output_names: List[str] = []
-        self._itensor_to_tensor_meta: Dict[
-            trt.tensorrt.ITensor, TensorMetadata
-        ] = dict()
+        self._itensor_to_tensor_meta: Dict[trt.tensorrt.ITensor, TensorMetadata] = (
+            dict()
+        )
 
     def validate_input_specs(self):
         for shape, _, _, shape_ranges, has_batch_dim in self.input_specs:
