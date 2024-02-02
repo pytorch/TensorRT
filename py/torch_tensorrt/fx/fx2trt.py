@@ -17,7 +17,7 @@ from torch.fx.passes.shape_prop import TensorMetadata
 from .converter_registry import CONVERTERS
 from .input_tensor_spec import InputTensorSpec
 from .observer import Observer
-from .utils import get_dynamic_dims, LowerPrecision, unified_dtype_converter, Frameworks
+from .utils import Frameworks, LowerPrecision, get_dynamic_dims, unified_dtype_converter
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

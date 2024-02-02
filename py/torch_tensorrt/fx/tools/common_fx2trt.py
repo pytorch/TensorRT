@@ -7,7 +7,6 @@ from typing import Callable, List, Optional, Set, Tuple
 import tensorrt as trt
 import torch
 import torch.fx
-
 import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 import torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer as aten_tracer
 from torch.fx.experimental.normalize import NormalizeArgs
@@ -154,9 +153,9 @@ class TRTTestCase(TestCase):
                 self.assert_has_op(mod, expected_ops)
 
             interpreter_result = interpreter.run(
-                lower_precision=LowerPrecision.FP16
-                if fp16_mode
-                else LowerPrecision.FP32
+                lower_precision=(
+                    LowerPrecision.FP16 if fp16_mode else LowerPrecision.FP32
+                )
             )
             trt_mod = TRTModule(
                 interpreter_result.engine,

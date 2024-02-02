@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Set
 
+import tensorrt as trt
 import torch
 import torch_tensorrt._C.ts as _ts_C
 from torch_tensorrt import _C, _enums
@@ -10,8 +11,6 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._Input import Input
 from torch_tensorrt.logging import Level, log
 from torch_tensorrt.ts._Input import TorchScriptInput
-
-import tensorrt as trt
 
 
 def _internal_input_to_torch_class_input(i: _C.Input) -> torch.classes.tensorrt._Input:
@@ -406,9 +405,9 @@ def TensorRTCompileSpec(
         "device": device,
         "disable_tf32": disable_tf32,  # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
         "sparse_weights": sparse_weights,  # Enable sparsity for convolution and fully connected layers.
-        "enabled_precisions": enabled_precisions
-        if enabled_precisions is not None
-        else set(),  # Enabling FP16 kernels
+        "enabled_precisions": (
+            enabled_precisions if enabled_precisions is not None else set()
+        ),  # Enabling FP16 kernels
         "refit": refit,  # enable refit
         "debug": debug,  # enable debuggable engine
         "capability": capability,  # Restrict kernel selection to safe gpu kernels or safe dla kernels

@@ -11,7 +11,6 @@ import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch.fx.experimental.const_fold import split_const_subgraphs
 
 from ..observer import observable
-
 from ..tracer.acc_tracer import acc_ops
 from ..tracer.acc_tracer.acc_utils import get_attr
 from .pass_utils import log_before_after, validate_inference

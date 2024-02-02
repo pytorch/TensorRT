@@ -16,7 +16,6 @@ from .passes.lower_pass_manager_builder import LowerPassManagerBuilder
 from .passes.pass_utils import PassFunc, validate_inference
 from .tools.timing_cache_utils import TimingCacheManager
 from .tools.trt_splitter import TRTSplitter, TRTSplitterSetting
-
 from .tracer.acc_tracer import acc_tracer
 from .trt_module import TRTModule
 from .utils import LowerPrecision
@@ -126,9 +125,11 @@ class LowerTrtInterpreter:
             input_specs=self.lower_setting.input_specs,
             explicit_batch_dimension=self.lower_setting.explicit_batch_dimension,
             explicit_precision=self.lower_setting.explicit_precision,
-            logger_level=trt.Logger.VERBOSE
-            if self.lower_setting.verbose_log
-            else trt.Logger.WARNING,
+            logger_level=(
+                trt.Logger.VERBOSE
+                if self.lower_setting.verbose_log
+                else trt.Logger.WARNING
+            ),
         )
 
         interp_result: TRTInterpreterResult = interpreter.run(
@@ -138,9 +139,11 @@ class LowerTrtInterpreter:
             strict_type_constraints=self.lower_setting.strict_type_constraints,
             algorithm_selector=algo_selector,
             timing_cache=cache_data,
-            profiling_verbosity=trt.ProfilingVerbosity.DETAILED
-            if self.lower_setting.verbose_profile
-            else trt.ProfilingVerbosity.LAYER_NAMES_ONLY,
+            profiling_verbosity=(
+                trt.ProfilingVerbosity.DETAILED
+                if self.lower_setting.verbose_profile
+                else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
+            ),
             tactic_sources=self.lower_setting.tactic_sources,
         )
 
@@ -297,10 +300,8 @@ class Lowerer:
                 # handle inputs with custom types. By default, just handle
                 # tensors and NoneType.
                 if fp16_conversion_fn is None:
-                    conversion_fn = (
-                        lambda x: x.half()
-                        if x is not None and x.dtype == torch.float32
-                        else x
+                    conversion_fn = lambda x: (
+                        x.half() if x is not None and x.dtype == torch.float32 else x
                     )
                 else:
                     conversion_fn = fp16_conversion_fn

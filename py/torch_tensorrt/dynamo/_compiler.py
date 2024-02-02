@@ -5,6 +5,7 @@ import logging
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
 
 import torch
+import torch_tensorrt
 from torch.export import ExportedProgram
 from torch.fx.node import Target
 from torch_tensorrt import _enums
@@ -65,8 +66,6 @@ from torch_tensorrt.dynamo.utils import (
     to_torch_device,
     to_torch_tensorrt_device,
 )
-
-import torch_tensorrt
 
 logger = logging.getLogger(__name__)
 
@@ -217,9 +216,9 @@ def compile(
         "device": device,
         "workspace_size": workspace_size,
         "min_block_size": min_block_size,
-        "torch_executed_ops": torch_executed_ops
-        if torch_executed_ops is not None
-        else set(),
+        "torch_executed_ops": (
+            torch_executed_ops if torch_executed_ops is not None else set()
+        ),
         "pass_through_build_failures": pass_through_build_failures,
         "max_aux_streams": max_aux_streams,
         "version_compatible": version_compatible,
