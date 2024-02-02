@@ -51,3 +51,42 @@ def test_dyn_full_compile(ir):
 
     with torch.no_grad():
         torch.cuda.empty_cache()
+
+
+@pytest.mark.unit
+def test_dyn_view(ir):
+    """
+    Tests the model (which is fully convertible) with dynamic shapes
+    """
+
+    class MyModule(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+
+        def forward(self, x):
+            torch._check(x.size()[0] <= 8)
+            input_shape = x.size()
+            y = x.view(input_shape[0], -1)
+            return y
+
+    model = MyModule().eval().cuda()
+    input_bs4 = torch.randn((4, 3, 4)).to("cuda")
+    torch._dynamo.mark_dynamic(input_bs4, 0)
+    compile_spec = {"inputs": [input_bs4], "min_block_size": 1, "debug": True}
+
+    # Compile the model
+    trt_model = torch.compile(model, backend="tensorrt", options=compile_spec)
+    trt_model(input_bs4)
+
+    input_bs6 = torch.randn((6, 3, 4)).to("cuda")
+    cos_sim = cosine_similarity(model(input_bs6), trt_model(input_bs6))
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_base_dynamic model TRT outputs don't match with the pytorch model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
+
+    # Clean up model env
+    torch._dynamo.reset()
+
+    with torch.no_grad():
+        torch.cuda.empty_cache()
