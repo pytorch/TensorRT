@@ -166,6 +166,12 @@ def compile(
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
 
+    if torch_executed_modules is not None and torch_executed_modules:
+        logger.warning(
+            f"Detected torch_executed_modules was non-empty: {torch_executed_modules}"
+            "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
+        )
+
     if not isinstance(inputs, collections.abc.Sequence):
         inputs = [inputs]
 
