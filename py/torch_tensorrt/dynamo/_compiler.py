@@ -81,7 +81,6 @@ def compile(
     engine_capability: EngineCapability = ENGINE_CAPABILITY,
     refit: bool = REFIT,
     debug: bool = DEBUG,
-    capability: EngineCapability = EngineCapability.default,
     num_avg_timing_iters: int = NUM_AVG_TIMING_ITERS,
     workspace_size: int = WORKSPACE_SIZE,
     dla_sram_size: int = DLA_SRAM_SIZE,
