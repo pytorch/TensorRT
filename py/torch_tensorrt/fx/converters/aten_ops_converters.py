@@ -318,9 +318,7 @@ def aten_ops_max_poolnd(
         "stride": (
             args[2]
             if len(args) > 2
-            else (None, None)
-            if len(args[1]) == 2
-            else (None, None, None)
+            else (None, None) if len(args[1]) == 2 else (None, None, None)
         ),
         "padding": (
             args[3] if len(args) > 3 else (0, 0) if len(args[1]) == 2 else (0, 0, 0)
