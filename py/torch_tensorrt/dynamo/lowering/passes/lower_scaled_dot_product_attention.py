@@ -60,12 +60,10 @@ def lower_scaled_dot_product_attention(
     return gm
 
 
-def scaled_dot_product_attention_replacement() -> (
-    Tuple[
-        Sequence[Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]],
-        Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor],
-    ]
-):
+def scaled_dot_product_attention_replacement() -> Tuple[
+    Sequence[Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]],
+    Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor],
+]:
     """Constructs the original and replacement functions for efficient attention"""
 
     # Efficient Attention original graph
