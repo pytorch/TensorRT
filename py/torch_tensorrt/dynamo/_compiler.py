@@ -71,13 +71,11 @@ def compile(
     engine_capability: EngineCapability = ENGINE_CAPABILITY,
     refit: bool = REFIT,
     debug: bool = DEBUG,
-    capability: EngineCapability = EngineCapability.default,
     num_avg_timing_iters: int = NUM_AVG_TIMING_ITERS,
     workspace_size: int = WORKSPACE_SIZE,
     dla_sram_size: int = DLA_SRAM_SIZE,
     dla_local_dram_size: int = DLA_LOCAL_DRAM_SIZE,
     dla_global_dram_size: int = DLA_GLOBAL_DRAM_SIZE,
-    calibrator: object = None,
     truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE,
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
     min_block_size: int = MIN_BLOCK_SIZE,
@@ -156,6 +154,12 @@ def compile(
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
 
+    if torch_executed_modules is not None and torch_executed_modules:
+        logger.warning(
+            f"Detected torch_executed_modules was non-empty: {torch_executed_modules}"
+            "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
+        )
+
     if not isinstance(inputs, collections.abc.Sequence):
         inputs = [inputs]
 
@@ -214,6 +218,7 @@ def compile(
         "use_python_runtime": use_python_runtime,
         "truncate_long_and_double": truncate_long_and_double,
         "use_fast_partitioner": use_fast_partitioner,
+        "num_avg_timing_iters": num_avg_timing_iters,
         "enable_experimental_decompositions": enable_experimental_decompositions,
         "require_full_compilation": require_full_compilation,
         "disable_tf32": disable_tf32,
