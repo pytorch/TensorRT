@@ -267,6 +267,123 @@ class TestLowerEfficientAttention(TestCase):
         torch._dynamo.reset()
 
 
+class TestLowerFlashAttention(TestCase):
+    def test_lower_flash_attention(self):
+        class FlashAttention(torch.nn.Module):
+            def forward(self, q, k, v):
+                attn = torch.ops.aten._scaled_dot_product_flash_attention.default(
+                    q,
+                    k,
+                    v,
+                    scale=0.15,
+                )
+                return attn[0]
+
+        inputs = [
+            torch.rand(8, 4, 16, 8).half().cuda(),
+            torch.rand(8, 4, 16, 8).half().cuda(),
+            torch.rand(8, 4, 16, 8).half().cuda(),
+        ]
+
+        fx_graph = torch.fx.symbolic_trace(FlashAttention())
+        expected_ops = {torch.nn.functional.scaled_dot_product_attention}
+        unexpected_ops = {torch.ops.aten._scaled_dot_product_flash_attention.default}
+
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEquals(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEquals(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = torch.cat(
+            [tensor.detach().cpu() for tensor in optimized_model(*inputs)]
+        )
+        torch_model_results = torch.cat(
+            [tensor.detach().cpu() for tensor in fx_graph(*inputs)]
+        )
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        # Remove 1 decimal from the requirement for FP16
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT - 1,
+            msg=f"FlashAttention TRT outputs don't match with the original model.",
+        )
+        torch._dynamo.reset()
+
+    def test_flash_attention_converter(self):
+        class FlashAttention(torch.nn.Module):
+            def forward(self, q, k, v):
+                attn = torch.ops.aten._scaled_dot_product_flash_attention.default(
+                    q,
+                    k,
+                    v,
+                    scale=0.25,
+                )
+                return attn[0]
+
+        inputs = [
+            torch.rand(1, 3, 6, 8).half().cuda(),
+            torch.rand(1, 3, 2, 8).half().cuda(),
+            torch.rand(1, 3, 2, 8).half().cuda(),
+        ]
+
+        fx_graph = torch.fx.symbolic_trace(FlashAttention())
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = torch.cat(
+            [tensor.detach().cpu() for tensor in optimized_model(*inputs)]
+        )
+        torch_model_results = torch.cat(
+            [tensor.detach().cpu() for tensor in fx_graph(*inputs)]
+        )
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        # Remove 1 decimal from the requirement for FP16
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT - 1,
+            msg=f"FlashAttention TRT outputs don't match with the original model.",
+        )
+        torch._dynamo.reset()
+
+
 class TestLowerLinear(TestCase):
     def test_lower_linear(self):
         class Linear(torch.nn.Module):
