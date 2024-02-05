@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import tensorrt as trt
 import torch
+import torch_tensorrt
 from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt.dynamo.runtime.tools import (
@@ -14,8 +15,6 @@ from torch_tensorrt.dynamo.runtime.tools import (
     multi_gpu_device_check,
 )
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
-
-import torch_tensorrt
 
 logger = logging.getLogger(__name__)
 
@@ -101,9 +100,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             for idx in self.output_binding_indices_in_order
         ]
         self.output_shapes = [
-            tuple(self.engine.get_binding_shape(idx))
-            if self.engine.has_implicit_batch_dimension
-            else tuple()
+            (
+                tuple(self.engine.get_binding_shape(idx))
+                if self.engine.has_implicit_batch_dimension
+                else tuple()
+            )
             for idx in self.output_binding_indices_in_order
         ]
         self.hidden_output_dtypes = [
@@ -113,9 +114,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             for idx in self.hidden_output_binding_indices_in_order
         ]
         self.hidden_output_shapes = [
-            tuple(self.engine.get_binding_shape(idx))
-            if self.engine.has_implicit_batch_dimension
-            else tuple()
+            (
+                tuple(self.engine.get_binding_shape(idx))
+                if self.engine.has_implicit_batch_dimension
+                else tuple()
+            )
             for idx in self.hidden_output_binding_indices_in_order
         ]
 
@@ -167,9 +170,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.context = self.engine.create_execution_context()
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
-        with torch.autograd.profiler.record_function(
-            "PythonTorchTensorRTModule:Forward"
-        ) if self.profiling_enabled else nullcontext():
+        with (
+            torch.autograd.profiler.record_function("PythonTorchTensorRTModule:Forward")
+            if self.profiling_enabled
+            else nullcontext()
+        ):
             self._check_initialized()
 
             # If in safe mode, check at each iteration for for whether a switch is required
@@ -200,9 +205,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     inputs = tuple([tensor.to(device) for tensor in inputs])
                     logger.warning(f"Moved all input Tensors to cuda:{device_id}")
 
-            with torch.autograd.profiler.record_function(
-                "PythonTorchTensorRTModule:ProcessInputs"
-            ) if self.profiling_enabled else nullcontext():
+            with (
+                torch.autograd.profiler.record_function(
+                    "PythonTorchTensorRTModule:ProcessInputs"
+                )
+                if self.profiling_enabled
+                else nullcontext()
+            ):
                 assert len(inputs) == len(
                     self.input_names
                 ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(inputs)}."
@@ -239,9 +248,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         idx, tuple(contiguous_inputs[i].shape)
                     )
 
-            with torch.autograd.profiler.record_function(
-                "PythonTorchTensorRTModule:ProcessOutputs"
-            ) if self.profiling_enabled else nullcontext():
+            with (
+                torch.autograd.profiler.record_function(
+                    "PythonTorchTensorRTModule:ProcessOutputs"
+                )
+                if self.profiling_enabled
+                else nullcontext()
+            ):
                 # create output tensors
                 outputs: List[torch.Tensor] = []
 
@@ -266,9 +279,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     )
                     bindings[idx] = output.data_ptr()
 
-            with torch.autograd.profiler.record_function(
-                "PythonTorchTensorRTModule:TensorRTRuntime"
-            ) if self.profiling_enabled else nullcontext():
+            with (
+                torch.autograd.profiler.record_function(
+                    "PythonTorchTensorRTModule:TensorRTRuntime"
+                )
+                if self.profiling_enabled
+                else nullcontext()
+            ):
                 self.context.execute_async_v2(
                     bindings, torch.cuda.current_stream().cuda_stream
                 )

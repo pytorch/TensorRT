@@ -195,9 +195,7 @@ def validate_inference(
                     kwargs2["rtol"] = rtol
                 if atol:
                     kwargs2["atol"] = atol
-                kwargs2[
-                    "msg"
-                ] = (
+                kwargs2["msg"] = (
                     lambda msg: f"Pass {pass_} failed correctness check due at output {kk}:\n{msg}"
                 )
                 # If tensors are on different devices, make sure to compare

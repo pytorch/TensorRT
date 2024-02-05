@@ -11,7 +11,6 @@ import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch.fx.experimental.const_fold import split_const_subgraphs
 
 from ..observer import observable
-
 from ..tracer.acc_tracer import acc_ops
 from ..tracer.acc_tracer.acc_utils import get_attr
 from .pass_utils import log_before_after, validate_inference
@@ -538,9 +537,9 @@ def fix_reshape_batch_dim(mod: fx.GraphModule) -> fx.GraphModule:
         )
         if not reshape_batch_size:
             continue
-        reshape_batch_size_inferred_source: Optional[
-            fx.Node
-        ] = get_reshape_batch_size_inferred_source(reshape_batch_size)
+        reshape_batch_size_inferred_source: Optional[fx.Node] = (
+            get_reshape_batch_size_inferred_source(reshape_batch_size)
+        )
         if not reshape_batch_size_inferred_source:
             continue
 

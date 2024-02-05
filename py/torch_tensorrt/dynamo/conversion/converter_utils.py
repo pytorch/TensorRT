@@ -324,13 +324,11 @@ def get_trt_tensor(
 
 
 @overload
-def get_positive_dim(dim: int, dim_size: int) -> int:
-    ...
+def get_positive_dim(dim: int, dim_size: int) -> int: ...
 
 
 @overload
-def get_positive_dim(dim: Sequence[int], dim_size: int) -> Tuple[int, ...]:
-    ...
+def get_positive_dim(dim: Sequence[int], dim_size: int) -> Tuple[int, ...]: ...
 
 
 def get_positive_dim(
