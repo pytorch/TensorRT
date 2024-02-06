@@ -7,9 +7,9 @@ from torch._ops import OpOverload, OpOverloadPacket
 
 aten = torch.ops.aten
 
-_core_aten_decompositions: Dict[
-    OpOverload, Callable[[Any], Any]
-] = core_aten_decompositions()
+_core_aten_decompositions: Dict[OpOverload, Callable[[Any], Any]] = (
+    core_aten_decompositions()
+)
 torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten._adaptive_avg_pool2d_backward,
     aten.addcdiv,
@@ -180,9 +180,9 @@ torch_disabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
 }
 
 
-ENABLED_TORCH_DECOMPOSITIONS: Dict[
-    OpOverload, Callable[[Any], Any]
-] = get_torch_decompositions(torch_enabled_decompositions)
+ENABLED_TORCH_DECOMPOSITIONS: Dict[OpOverload, Callable[[Any], Any]] = (
+    get_torch_decompositions(torch_enabled_decompositions)
+)
 TORCH_TRT_DECOMPOSITIONS: Dict[OpOverload, Callable[[Any], Any]] = {}
 
 
