@@ -1,9 +1,8 @@
-import operator
-
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt import Input
+
+from .harness import DispatchTestCase
 
 from .harness import DispatchTestCase
 
@@ -16,7 +15,6 @@ class TestIndexConverter(DispatchTestCase):
                 super().__init__()
 
             def forward(self, x):
-                index0 = torch.randint(0, 1, (1, 1))
                 indices = [None, self.index0]
                 out = torch.ops.aten.index.Tensor(x, indices)
                 return out
@@ -159,8 +157,6 @@ class TestIndexConverter(DispatchTestCase):
                 super().__init__()
 
             def forward(self, x):
-                index0 = torch.tensor([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7])
-                index1 = index0.unsqueeze(0).T.long()
                 indices = [None, None, self.index0, self.index1]
                 out = torch.ops.aten.index.Tensor(x, indices)
                 return out

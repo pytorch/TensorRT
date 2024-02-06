@@ -43,7 +43,7 @@ model = Model().eval().cuda()
 # For the default settings, we can simply call torch.compile
 # with the backend "torch_tensorrt", and run the model on an
 # input to cause compilation, as so:
-optimized_model = torch.compile(model, backend="torch_tensorrt")
+optimized_model = torch.compile(model, backend="torch_tensorrt", dynamic=False)
 optimized_model(*sample_inputs)
 
 # %%
@@ -81,7 +81,10 @@ backend_kwargs = {
 
 # Run the model on an input to cause compilation, as so:
 optimized_model_custom = torch.compile(
-    model_half, backend="torch_tensorrt", options=backend_kwargs
+    model_half,
+    backend="torch_tensorrt",
+    options=backend_kwargs,
+    dynamic=False,
 )
 optimized_model_custom(*sample_inputs_half)
 
