@@ -3,10 +3,12 @@
 - [Very Deep Convolutional Networks for Large-Scale Image Recognition](
     https://arxiv.org/abs/1409.1556) (ICLR 2015)
 """
+
+from functools import reduce
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from functools import reduce
 
 
 class VGG(nn.Module):

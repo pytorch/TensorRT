@@ -61,6 +61,7 @@ compilation_kwargs = {
 optimized_model = torch.compile(
     model,
     backend="torch_tensorrt",
+    dynamic=False,
     options=compilation_kwargs,
 )
 optimized_model(*inputs)

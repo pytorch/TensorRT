@@ -28,12 +28,12 @@ class Input(object):
         STATIC = 0
         DYNAMIC = 1
 
-    shape_mode: Optional[
-        _ShapeMode
-    ] = None  #: Is input statically or dynamically shaped
-    shape: Optional[
-        Tuple[int, ...] | Dict[str, Tuple[int, ...]]
-    ] = None  #: Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ "min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple }``
+    shape_mode: Optional[_ShapeMode] = (
+        None  #: Is input statically or dynamically shaped
+    )
+    shape: Optional[Tuple[int, ...] | Dict[str, Tuple[int, ...]]] = (
+        None  #: Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ "min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple }``
+    )
     dtype: _enums.dtype = (
         _enums.dtype.unknown
     )  #: The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)

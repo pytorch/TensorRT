@@ -408,7 +408,7 @@ def index_dtype_validator(node: Node) -> bool:
     for ind in index:
         if ind is not None:
             val = ind.meta.get("val")
-            if val is not None and val.dtype != torch.int32:
+            if val is not None and val.dtype not in (torch.int32, torch.int64):
                 return False
     return True
 
@@ -2717,4 +2717,28 @@ def aten_ops_scalar_tensor(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.unary.scalar_tensor(
         ctx, target, SourceIR.ATEN, name, args[0], dtype=kwargs.get("dtype")
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.roll.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_roll(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.permutation.roll(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args_bounds_check(args, 2, []),
     )
