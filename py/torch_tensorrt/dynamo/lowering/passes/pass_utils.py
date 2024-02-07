@@ -31,7 +31,9 @@ def get_tensor_placeholders(
     return placeholders
 
 
-def get_metadata(gm: torch.fx.GraphModule, target_op: Any) -> List[torch._ops.OpOverload]:
+def get_metadata(
+    gm: torch.fx.GraphModule, target_op: Any
+) -> List[torch._ops.OpOverload]:
     """
     Return the list which has the metadata of all the target_op nodes present in the graph.
     """
