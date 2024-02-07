@@ -270,7 +270,7 @@ def create_constant(
     """
     numpy_value = to_numpy(value, dtype)
     constant = ctx.net.add_constant(
-        (1,) if isinstance(value, (int, float, bool)) else value.shape,
+        trt.Dims() if isinstance(value, (int, float, bool)) else value.shape,
         numpy_value.copy() if isinstance(numpy_value, np.ndarray) else numpy_value,
     )
     constant.name = name
