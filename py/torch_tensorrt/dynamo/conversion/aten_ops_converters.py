@@ -413,7 +413,6 @@ def index_dtype_validator(node: Node) -> bool:
     return True
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.index.Tensor)
 @dynamo_tensorrt_converter(
     torch.ops.aten.index.Tensor, capability_validator=index_dtype_validator
 )
