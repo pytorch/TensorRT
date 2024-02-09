@@ -1,5 +1,5 @@
 import math
-from typing import Optional, Sequence, Union
+from typing import Dict, Optional, Sequence, Union
 
 import tensorrt as trt
 import torch_tensorrt.dynamo.conversion.impl as impl
@@ -128,6 +128,8 @@ def adaptive_avg_pool1d(
     out_dim = output_size if isinstance(output_size, int) else output_size[0]
     output_list = []
 
+    # store {index: slice} for reducing repeated slice ops
+    idx_slice_map: Dict[int, TRTTensor] = {}
     # iterate over each output dimension
     for i in range(out_dim):
         # calculate the start and end index of each pooling window
@@ -137,17 +139,22 @@ def adaptive_avg_pool1d(
         # slice the input tensor from start to end index, the result of which is the window waiting for pooling
         slices = []
         for j in range(start, end):
-            slice = impl.select.select(
-                ctx, target, source_ir, f"{name}_select_{i}_{j}", input, -1, j
-            )
-            slice = impl.shuffle.reshape(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_reshape_{i}_{j}",
-                slice,
-                (*slice.shape, 1),
-            )
+            if j in idx_slice_map:
+                slice = idx_slice_map[j]
+            else:
+                slice = impl.select.select(
+                    ctx, target, source_ir, f"{name}_select_{j}", input, -1, j
+                )
+                slice = impl.shuffle.reshape(
+                    ctx,
+                    target,
+                    source_ir,
+                    f"{name}_reshape_{i}_{j}",
+                    slice,
+                    (*slice.shape, 1),
+                )
+                idx_slice_map[j] = slice
+
             slices.append(slice)
 
         slices = impl.cat.cat(
