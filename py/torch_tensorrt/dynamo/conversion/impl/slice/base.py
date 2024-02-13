@@ -3,13 +3,14 @@ from typing import Optional
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
 from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
 from torch_tensorrt.fx.converters.converter_utils import (
     has_dynamic_shape,
     set_layer_name,
 )
-from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
 from torch_tensorrt.fx.types import Shape, TRTTensor
+
 
 def get_dynamic_shape(ctx, target, source_ir, name, shape, input):
     trt_shape = []
@@ -23,8 +24,9 @@ def get_dynamic_shape(ctx, target, source_ir, name, shape, input):
     shape_layer = ctx.net.add_concatenation(inputs=trt_shape)
     shape_layer.axis = 0
     shape_layer.name = f"{name}_output_shape"
-    
+
     return shape_layer.get_output(0)
+
 
 def slice(
     ctx: ConversionContext,
