@@ -8,8 +8,23 @@ from torch_tensorrt.fx.converters.converter_utils import (
     has_dynamic_shape,
     set_layer_name,
 )
+from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
 from torch_tensorrt.fx.types import Shape, TRTTensor
 
+def get_dynamic_shape(ctx, target, source_ir, name, shape, input):
+    trt_shape = []
+    shape = input.shape
+    for i, s in enumerate(shape):
+        if isinstance(s, TRTTensor):
+            trt_shape.append(s)
+        else:
+            a = get_trt_tensor(ctx, s, f"{name}_{i}")
+            trt_shape.append(a)
+    shape_layer = ctx.net.add_concatenation(inputs=trt_shape)
+    shape_layer.axis = 0
+    shape_layer.name = f"{name}_output_shape"
+    
+    return shape_layer.get_output(0)
 
 def slice(
     ctx: ConversionContext,
@@ -23,7 +38,7 @@ def slice(
 ) -> TRTTensor:
     dynamic_shape = has_dynamic_shape(input.shape)
     if dynamic_shape:
-        shape = get_shape_with_dynamic_shape(ctx, target, source_ir, name, shape, input)
+        shape = get_dynamic_shape(ctx, target, source_ir, name, shape, input)
     layer = ctx.net.add_slice(
         input,
         start=start,
