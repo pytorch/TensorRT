@@ -2708,6 +2708,23 @@ def aten_ops_scalar_tensor(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.log10.default)
+def log10(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.log10(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.roll.default)
 @enforce_tensor_types(
     {
