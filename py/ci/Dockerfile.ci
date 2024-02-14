@@ -3,8 +3,8 @@ ARG trt_version
 
 RUN echo -e "Installing with TensorRT ${trt_version}"
 
-RUN yum install -y ninja-build tensorrt-${trt_version}.*
-
+RUN yum-config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo
+RUN yum install -y ninja-build gettext tensorrt-${trt_version}.*
 RUN wget https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 \
     && mv bazelisk-linux-amd64 /usr/bin/bazel \
     && chmod +x /usr/bin/bazel
