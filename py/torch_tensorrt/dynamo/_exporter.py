@@ -63,7 +63,7 @@ def transform(
 
     # Inline pytorch submodules
     inline_torch_modules(gm)
-
+    breakpoint()
     # Clean the graph
     gm.delete_all_unused_submodules()
     gm.graph.eliminate_dead_code()
@@ -104,19 +104,23 @@ def lift(gm: torch.fx.GraphModule, graph_signature: Any) -> torch.fx.GraphModule
     non_user_input_idx = 0
     for node in gm.graph.nodes:
         if node.op == "get_attr":
-            constant_tensor = getattr(gm, node.target)
+            if node.target not in state_dict:
+                raise ValueError(
+                    f"The get_attr node : {node.name} with target: {node.target} value could not be found in state_dict. Please check the input exported_program's graphmodule parameters."
+                )
+
+            constant_tensor = state_dict[node.target]
             input_kind = InputKind.CONSTANT_TENSOR
 
             # state_dict has these parameters/buffers as torch.Tensors. We override them as torch.nn.Parameter/torch.Tensors respectively.
             for name, _ in gm.named_parameters():
                 if node.target == name:
                     input_kind = InputKind.PARAMETER
-                    state_dict[name] = constant_tensor
+                    state_dict[name] = torch.nn.Parameter(state_dict[name])
                     break
             for name, _ in gm.named_buffers():
                 if node.target == name:
                     input_kind = InputKind.BUFFER
-                    state_dict[name] = constant_tensor
                     break
 
             # Replace get_attr nodes with placeholder nodes and copy metadata.
@@ -228,9 +232,9 @@ def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
 
                 # Replace the pytorch submodule node (call_module) with the inlined subgraph output
                 gm_node.replace_all_uses_with(submodule_output)
-
+                breakpoint()
                 # copy the attributes of the submodule into gm (graph_copy doesn't do this)
-                copy_submodule_attributes(gm, gm_node.name)
+                copy_submodule_attributes(gm, submodule, gm_node.name)
 
             # Erase the pytorch submodule (call_module) node
             gm.graph.erase_node(gm_node)
@@ -238,20 +242,41 @@ def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     return gm
 
 
-def copy_submodule_attributes(gm: torch.fx.GraphModule, submod_name: str) -> None:
+def copy_submodule_attributes(
+    gm: torch.fx.GraphModule, submodule: torch.fx.GraphModule, submodule_name: str
+) -> None:
     """
-    Copy the getattr attriibutes from submodule to parent module gm.
-    The graph_copy call doesn't do this for us unfortunately.
+    Rename the submodule parameters in the state_dict because we graph_copied
+    submodule into parent module gm. The graph_copy call doesn't do this for us unfortunately.
     """
-    for param in gm.named_parameters():
-        if param[0].startswith(submod_name + "."):
-            attr_name = param[0].replace(submod_name + ".", "")
-            gm.register_parameter(attr_name, param[1])
 
-    for buffer in gm.named_buffers():
-        if buffer[0].startswith(submod_name + "."):
-            attr_name = buffer[0].replace(submod_name + ".", "")
-            gm.register_buffer(attr_name, buffer[1])
+    gm_state_dict = gm.state_dict()
+    sub_state_dict = submodule.state_dict()
+    # This state dict should have submodule parameters with the submodule name removed in their keys.
+    breakpoint()
+    updated_state_dict = {}
+    for key, value in gm_state_dict.items():
+        parent_key = key.replace(submodule_name + ".", "")
+        if parent_key in sub_state_dict:
+            updated_state_dict[parent_key] = value
+        else:
+            updated_state_dict[key] = value
+    breakpoint()
+    gm.load_state_dict(updated_state_dict)
+
+    # for param in gm.named_parameters():
+    #     if param[0].startswith(submod_name + "."):
+    #         param_name = param[0].replace(submod_name + ".", "")
+    #         gm.register_parameter(param_name, param[1])
+    #         # gm.state_dict().pop(param[0])
+    #         # gm.state_dict()[param_name] = param[1]
+
+    # for buffer in gm.named_buffers():
+    #     if buffer[0].startswith(submod_name + "."):
+    #         buffer_name = buffer[0].replace(submod_name + ".", "")
+    #         gm.register_buffer(buffer_name, buffer[1])
+    #         # gm.state_dict().pop(buffer[0])
+    #         # gm.state_dict()[buffer_name] = buffer[1]
 
 
 def create_trt_exp_program(
