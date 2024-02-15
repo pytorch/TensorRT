@@ -434,6 +434,7 @@ class TestLowering(TestCase):
             torch.ops.aten.slice.Tensor,
             torch.ops.aten.squeeze.dim,
             torch.ops.aten.cat.default,
+            torch.ops.aten.reshape.default,
         }
         unexpected_ops = {torch.ops.aten.select_scatter.default}
 
@@ -496,6 +497,7 @@ class TestLowering(TestCase):
         expected_ops = {
             torch.ops.aten.slice.Tensor,
             torch.ops.aten.squeeze.dim,
+            torch.ops.aten.unsqueeze.default,
             torch.ops.aten.cat.default,
         }
         unexpected_ops = {torch.ops.aten.select_scatter.default}
