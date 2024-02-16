@@ -63,7 +63,7 @@ def transform(
 
     # Inline pytorch submodules
     inline_torch_modules(gm)
-    breakpoint()
+
     # Clean the graph
     gm.delete_all_unused_submodules()
     gm.graph.eliminate_dead_code()
@@ -126,11 +126,8 @@ def lift(gm: torch.fx.GraphModule, graph_signature: Any) -> torch.fx.GraphModule
             # Replace get_attr nodes with placeholder nodes and copy metadata.
             with gm.graph.inserting_before(first_user_input):
                 const_placeholder_node = gm.graph.placeholder(node.target)
-                for k, v in node.meta.items():
-                    const_placeholder_node.meta[k] = v
-                const_placeholder_node.meta["val"] = fake_mode.from_tensor(
-                    constant_tensor
-                )
+                # Copy the node meta into this new placeholder node
+                const_placeholder_node.meta = node.meta
                 node.replace_all_uses_with(const_placeholder_node)
                 gm.graph.erase_node(node)
 
@@ -232,9 +229,9 @@ def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
 
                 # Replace the pytorch submodule node (call_module) with the inlined subgraph output
                 gm_node.replace_all_uses_with(submodule_output)
-                breakpoint()
+
                 # copy the attributes of the submodule into gm (graph_copy doesn't do this)
-                copy_submodule_attributes(gm, submodule, gm_node.name)
+                # copy_submodule_attributes(gm, submodule, gm_node.name)
 
             # Erase the pytorch submodule (call_module) node
             gm.graph.erase_node(gm_node)
@@ -253,7 +250,6 @@ def copy_submodule_attributes(
     gm_state_dict = gm.state_dict()
     sub_state_dict = submodule.state_dict()
     # This state dict should have submodule parameters with the submodule name removed in their keys.
-    breakpoint()
     updated_state_dict = {}
     for key, value in gm_state_dict.items():
         parent_key = key.replace(submodule_name + ".", "")
@@ -261,15 +257,15 @@ def copy_submodule_attributes(
             updated_state_dict[parent_key] = value
         else:
             updated_state_dict[key] = value
-    breakpoint()
-    gm.load_state_dict(updated_state_dict)
 
-    # for param in gm.named_parameters():
-    #     if param[0].startswith(submod_name + "."):
-    #         param_name = param[0].replace(submod_name + ".", "")
-    #         gm.register_parameter(param_name, param[1])
-    #         # gm.state_dict().pop(param[0])
-    #         # gm.state_dict()[param_name] = param[1]
+    # gm.load_state_dict(updated_state_dict)
+
+    for param in gm.named_parameters():
+        if param[0].startswith(submodule_name + "."):
+            param_name = param[0].replace(submodule_name + ".", "")
+            gm.register_parameter(param_name, param[1])
+            # gm.state_dict().pop(param[0])
+            # gm.state_dict()[param_name] = param[1]
 
     # for buffer in gm.named_buffers():
     #     if buffer[0].startswith(submod_name + "."):
