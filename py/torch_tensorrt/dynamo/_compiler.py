@@ -106,7 +106,7 @@ def compile(
     hardware_compatible: bool = HARDWARE_COMPATIBLE,
     output_format: str = OUTPUT_FORMAT,
     **kwargs: Any,
-) -> torch.fx.GraphModule:
+) -> Union[ExportedProgram, torch.jit.ScriptModule, torch.fx.GraphModule]:
     """Compile a TorchScript module for NVIDIA GPUs using TensorRT
 
     Takes a existing TorchScript module and a set of settings to configure the compiler
