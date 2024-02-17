@@ -128,6 +128,14 @@ def lift(gm: torch.fx.GraphModule, graph_signature: Any) -> torch.fx.GraphModule
                 const_placeholder_node = gm.graph.placeholder(node.target)
                 # Copy the node meta into this new placeholder node
                 const_placeholder_node.meta = node.meta
+                const_placeholder_node.meta["val"] = cast(
+                    FakeTensor,
+                    torch.empty_strided(
+                        tuple(constant_tensor.shape),
+                        tuple([1] * len(constant_tensor.shape)),
+                    ),
+                )
+
                 node.replace_all_uses_with(const_placeholder_node)
                 gm.graph.erase_node(node)
 
@@ -231,7 +239,7 @@ def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
                 gm_node.replace_all_uses_with(submodule_output)
 
                 # copy the attributes of the submodule into gm (graph_copy doesn't do this)
-                # copy_submodule_attributes(gm, submodule, gm_node.name)
+                copy_submodule_attributes(gm, submodule, gm_node.name)
 
             # Erase the pytorch submodule (call_module) node
             gm.graph.erase_node(gm_node)
@@ -243,36 +251,20 @@ def copy_submodule_attributes(
     gm: torch.fx.GraphModule, submodule: torch.fx.GraphModule, submodule_name: str
 ) -> None:
     """
-    Rename the submodule parameters in the state_dict because we graph_copied
-    submodule into parent module gm. The graph_copy call doesn't do this for us unfortunately.
+    The submodule parameters are available in the parent gm's state_dict, but they have
+    the submodule name as a prefix in their keys. For eg: gm.state_dict() would have
+    _run_on_gpu_0.conv.weight etc. Since we graph copied the submodule into gm, we should
+    also copy it's parameters and buffers into gm without the submodule namespace as prefix.
+    _assign_attr does exactly that. It creates a module for eg: conv, adds an attribute weight
+    to it and adds this conv module as an attribute to parent gm.
     """
+    from torch.export.unflatten import _assign_attr, _AttrKind
 
-    gm_state_dict = gm.state_dict()
-    sub_state_dict = submodule.state_dict()
-    # This state dict should have submodule parameters with the submodule name removed in their keys.
-    updated_state_dict = {}
-    for key, value in gm_state_dict.items():
-        parent_key = key.replace(submodule_name + ".", "")
-        if parent_key in sub_state_dict:
-            updated_state_dict[parent_key] = value
-        else:
-            updated_state_dict[key] = value
+    for key, value in submodule.named_parameters():
+        _assign_attr(value, gm, key, _AttrKind.PARAMETER)
 
-    # gm.load_state_dict(updated_state_dict)
-
-    for param in gm.named_parameters():
-        if param[0].startswith(submodule_name + "."):
-            param_name = param[0].replace(submodule_name + ".", "")
-            gm.register_parameter(param_name, param[1])
-            # gm.state_dict().pop(param[0])
-            # gm.state_dict()[param_name] = param[1]
-
-    # for buffer in gm.named_buffers():
-    #     if buffer[0].startswith(submod_name + "."):
-    #         buffer_name = buffer[0].replace(submod_name + ".", "")
-    #         gm.register_buffer(buffer_name, buffer[1])
-    #         # gm.state_dict().pop(buffer[0])
-    #         # gm.state_dict()[buffer_name] = buffer[1]
+    for key, value in submodule.named_buffers():
+        _assign_attr(value, gm, key, _AttrKind.BUFFER)
 
 
 def create_trt_exp_program(
