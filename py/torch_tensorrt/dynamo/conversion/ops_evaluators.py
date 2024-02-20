@@ -106,6 +106,10 @@ def aten_ops_randn(
 def randperm_validator(randperm_node: Node) -> bool:
     dtype = randperm_node.kwargs.get("dtype", None)
     layout = randperm_node.kwargs.get("layout", None)
+    input = randperm_node.args[0]
+    if not isinstance(input, int):
+        _LOGGER.error(f"Input should be of type int.")
+        return False
     if dtype is not None:
         _LOGGER.debug(
             f"Currently we don't support specifying output dtype, got {dtype}."
