@@ -30,6 +30,7 @@ from torch_tensorrt.dynamo._defaults import (
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
     OPTIMIZATION_LEVEL,
+    OUTPUT_FORMAT,
     PASS_THROUGH_BUILD_FAILURES,
     PRECISION,
     REFIT,
@@ -47,6 +48,7 @@ from torch_tensorrt.dynamo._DryRunTracker import (
     dryrun_stats_display,
     parse_non_trt_nodes,
 )
+from torch_tensorrt.dynamo._exporter import export
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     UnsupportedOperatorException,
@@ -100,8 +102,9 @@ def compile(
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = DRYRUN,
     hardware_compatible: bool = HARDWARE_COMPATIBLE,
+    output_format: str = OUTPUT_FORMAT,
     **kwargs: Any,
-) -> torch.fx.GraphModule:
+) -> Union[ExportedProgram, torch.jit.ScriptModule, torch.fx.GraphModule]:
     """Compile a TorchScript module for NVIDIA GPUs using TensorRT
 
     Takes a existing TorchScript module and a set of settings to configure the compiler
@@ -158,6 +161,7 @@ def compile(
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the grap easier to covert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
+        output_format (str): Output format of the result of TRT compilation. Options include "exported_program" (or) "ep" | "torchscript" (or) "ts" | "graph_module" (or) "fx". Default is "exported_program"
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -242,11 +246,14 @@ def compile(
         "dla_global_dram_size": dla_global_dram_size,
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
+        "output_format": output_format,
     }
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-    return compile_module(gm, inputs, settings)
+    trt_gm = compile_module(gm, inputs, settings)
+    trt_result = export(trt_gm, torch_inputs, output_format)
+    return trt_result
 
 
 def compile_module(
