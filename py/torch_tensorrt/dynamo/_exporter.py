@@ -264,7 +264,12 @@ def create_trt_exp_program(
     input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]
     output_nodes = [node for node in gm.graph.nodes if node.op == "output"]
     assert output_nodes
-    output_nodes = output_nodes[0].args[0]
+    # breakpoint()
+    outputs = output_nodes[0].args[0]
+    if not isinstance(outputs, (tuple, list)):
+        outputs = (outputs,)
+        # HACK : Change the graph output node to be a tuple for ExportedProgram verifier to pass
+        output_nodes[0].args = (outputs,)
 
     input_specs = [
         InputSpec(InputKind.USER_INPUT, TensorArgument(name=node.name), node.target)

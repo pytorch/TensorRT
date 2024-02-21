@@ -21,6 +21,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterRegistry
+from torch_tensorrt.dynamo.partitioning.split_utils import split_by_tags
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +188,14 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
                 else:
                     result.append(subgraph)
         return result
+
+    def split(self, remove_tag: bool = False) -> torch.fx.GraphModule:
+        split_module = split_by_tags(self.module, self.tags)
+        if remove_tag:
+            for node in self.module.graph.nodes:
+                if hasattr(node, "tag"):
+                    del node.tag
+        return split_module
 
     def partition_graph(self) -> torch.fx.GraphModule:
         """Partitions the GraphModule into subgraphs based on operator support
