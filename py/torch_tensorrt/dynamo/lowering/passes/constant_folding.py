@@ -42,11 +42,6 @@ def constant_fold(
     for node in gm.graph.nodes:
         # If get_attr node has no users, mark it for deletion
         if node.op == "get_attr" and len(node.users) == 0:
-            # If the node's parameter is not a parameter of any other node, remove it
-            if not any(
-                other.target == node.target for other in gm.graph.nodes if other != node
-            ):
-                delattr(gm, node.target)
             erased_params.append(node)
 
     # Remove unused nodes from the graph

@@ -2,9 +2,8 @@ import os
 import unittest
 
 import torch
-from torch.testing._internal.common_utils import TestCase, run_tests
-
 import torch_tensorrt
+from torch.testing._internal.common_utils import TestCase, run_tests
 
 
 class TestHardwareCompatibility(TestCase):
@@ -24,6 +23,7 @@ class TestHardwareCompatibility(TestCase):
             pass_through_build_failures=True,
             hardware_compatible=True,
             use_python_runtime=False,
+            output_format="graph_module",
         )
 
         self.assertTrue(optimized_model_hw_compat._run_on_acc_0.hardware_compatible)
@@ -41,6 +41,7 @@ class TestHardwareCompatibility(TestCase):
             pass_through_build_failures=True,
             hardware_compatible=False,
             use_python_runtime=False,
+            output_format="graph_module",
         )
 
         self.assertFalse(
