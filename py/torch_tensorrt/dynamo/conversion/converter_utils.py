@@ -270,7 +270,7 @@ def create_constant(
     """
     numpy_value = to_numpy(value, dtype)
     constant = ctx.net.add_constant(
-        (1,) if isinstance(value, (int, float, bool)) else value.shape,
+        trt.Dims() if isinstance(value, (int, float, bool)) else value.shape,
         numpy_value.copy() if isinstance(numpy_value, np.ndarray) else numpy_value,
     )
     constant.name = name
@@ -324,13 +324,11 @@ def get_trt_tensor(
 
 
 @overload
-def get_positive_dim(dim: int, dim_size: int) -> int:
-    ...
+def get_positive_dim(dim: int, dim_size: int) -> int: ...
 
 
 @overload
-def get_positive_dim(dim: Sequence[int], dim_size: int) -> Tuple[int, ...]:
-    ...
+def get_positive_dim(dim: Sequence[int], dim_size: int) -> Tuple[int, ...]: ...
 
 
 def get_positive_dim(

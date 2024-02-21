@@ -17,13 +17,13 @@ from torch.fx.passes.shape_prop import TensorMetadata
 from .converter_registry import CONVERTERS
 from .input_tensor_spec import InputTensorSpec
 from .observer import Observer
-from .utils import get_dynamic_dims, LowerPrecision, unified_dtype_converter, Frameworks
+from .utils import Frameworks, LowerPrecision, get_dynamic_dims, unified_dtype_converter
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[
-    Callable[[torch.fx.GraphModule], None]
-] = Observer("TRT_INTERPRETER_CALL_PRE_OBSERVER")
+TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[Callable[[torch.fx.GraphModule], None]] = (
+    Observer("TRT_INTERPRETER_CALL_PRE_OBSERVER")
+)
 
 
 class TRTInterpreterResult(NamedTuple):
@@ -75,9 +75,9 @@ class TRTInterpreter(torch.fx.Interpreter):
         self._cur_node_name: Optional[str] = None
         self._input_names: List[str] = []
         self._output_names: List[str] = []
-        self._itensor_to_tensor_meta: Dict[
-            trt.tensorrt.ITensor, TensorMetadata
-        ] = dict()
+        self._itensor_to_tensor_meta: Dict[trt.tensorrt.ITensor, TensorMetadata] = (
+            dict()
+        )
 
     def validate_input_specs(self):
         for shape, _, _, shape_ranges, has_batch_dim in self.input_specs:

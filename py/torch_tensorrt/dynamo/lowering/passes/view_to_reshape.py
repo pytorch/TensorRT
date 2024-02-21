@@ -1,10 +1,11 @@
 import logging
-from typing import Dict, List, Sequence
+from typing import List, Sequence
 
 import torch
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
-    update_metadata,
+    get_metadata,
+    set_metadata,
 )
 
 logger = logging.getLogger(__name__)
@@ -25,14 +26,15 @@ def view_to_reshape(
     def replacement(input: torch.Tensor, shape: List[torch.SymInt]) -> torch.Tensor:
         return replacement_op(input, shape)
 
-    # Store metadata of the orig_op and copy it to the replacement op
-    meta_map: Dict[int, torch._ops.OpOverload] = {}
-    update_metadata(gm, orig_op, meta_map)
+    # Store metadata of the orig_op
+    metadata = get_metadata(gm, orig_op)
+    # breakpoint()
 
     if torch.fx.subgraph_rewriter.replace_pattern(gm, orig, replacement):
         gm = clean_up_graph_after_modifications(gm)
         logger.debug(f"Graph after replacing view with reshape:\n{gm.graph}")
 
-    update_metadata(gm, replacement_op, meta_map)
+    # Copy the orig_op's metadata to the replacement op
+    set_metadata(gm, replacement_op, metadata)
 
     return gm

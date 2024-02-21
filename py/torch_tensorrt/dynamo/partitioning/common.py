@@ -19,19 +19,18 @@ def contains_sym_int(tensor: torch.Tensor) -> bool:
     return False
 
 
-def construct_dynamic_input(input: Any) -> Input:
+def construct_dynamic_input(input_shape: torch.Size, input_dtype: torch.dtype) -> Input:
     """
     Constructs a torch_tensorrt.Input based on a symbolic input
     Args:
-        input: A symbolic shape tensor (which can have a  mix of SymInt nodes and static values)
+        input_shape: A symbolic shape / regular shape of a tensor (which can have a  mix of SymInt nodes and static values)
     Returns:
         A dynamic shaped torch_tensorrt.Input which has the properties of the symbolic shaped input.
     """
-    input_sym_shape = input.size()
     min_shape = []
     opt_shape = []
     max_shape = []
-    for dim in input_sym_shape:
+    for dim in input_shape:
         if isinstance(dim, torch.SymInt):
             node = dim.node
             expr = node.expr
@@ -52,8 +51,18 @@ def construct_dynamic_input(input: Any) -> Input:
             max_shape.append(dim)
 
     return Input(
-        min_shape=min_shape, opt_shape=opt_shape, max_shape=max_shape, dtype=input.dtype
+        min_shape=min_shape, opt_shape=opt_shape, max_shape=max_shape, dtype=input_dtype
     )
+
+
+def get_input(input_shape: torch.Size, input_dtype: torch.dtype) -> Input:
+    """
+    Based on type of dimensions in the input_shape, construct regular or dynamic shaped inputs
+    """
+    if contains_sym_int(input_shape):
+        return construct_dynamic_input(input_shape, input_dtype)
+    else:
+        return Input(shape=input_shape, dtype=input_dtype)
 
 
 def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
@@ -68,13 +77,19 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
     torchtrt_inputs = []
     module_inputs = [node for node in module.graph.nodes if node.op == "placeholder"]
     for input in module_inputs:
-        if input.meta and "val" in input.meta:
-            input_meta = input.meta["val"]
-            input_shape = input_meta.size()
-            if contains_sym_int(input_shape):
-                torchtrt_inputs.append(construct_dynamic_input(input_meta))
+        if input.meta:
+            if "val" in input.meta:
+                input_meta = input.meta["val"]
+                input_shape = input_meta.size()
+                torchtrt_inputs.append(get_input(input_shape, input_meta.dtype))
+            elif "tensor_meta" in input.meta:
+                input_meta = input.meta["tensor_meta"]
+                input_shape = input_meta.shape
+                torchtrt_inputs.append(get_input(input_shape, input_meta.dtype))
             else:
-                torchtrt_inputs.append(Input(shape=input_shape, dtype=input_meta.dtype))
+                raise AssertionError(
+                    f"Input {input.name} does not contain val and tensor_meta fields in the metadata. Please ensure you have exported the graph correctly"
+                )
         else:
             raise AssertionError(
                 f"Input {input.name} does not contain metadata. Please ensure you have exported the graph correctly"
