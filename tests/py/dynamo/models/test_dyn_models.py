@@ -3,9 +3,8 @@ import unittest
 import pytest
 import timm
 import torch
-from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
-
 import torch_tensorrt as torchtrt
+from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 assertions = unittest.TestCase()
 
@@ -49,7 +48,7 @@ def test_base_dynamic(ir):
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
-    cos_sim = cosine_similarity(model(input), trt_mod(input)[0])
+    cos_sim = cosine_similarity(model(input), trt_mod(input))
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
         msg=f"test_base_dynamic model TRT outputs don't match with the pytorch model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
@@ -103,7 +102,7 @@ def test_base_dynamic_fallback(ir):
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
-    cos_sim = cosine_similarity(model(input), trt_mod(input)[0])
+    cos_sim = cosine_similarity(model(input), trt_mod(input))
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
         msg=f"test_base_dynamic model TRT outputs don't match with the pytorch model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
