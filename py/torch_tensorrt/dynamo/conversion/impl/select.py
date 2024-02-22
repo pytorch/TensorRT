@@ -69,10 +69,7 @@ def select(
     indices_tensor = ctx.net.add_constant(
         index_value.shape, to_numpy(index_value)
     ).get_output(0)
-    out = gather(ctx, target, source_ir, name, input, indices_tensor, dim)
-    if len(out.shape) != 1:
-        layer = ctx.net.add_shuffle(out)
-    return layer.get_output(0)
+    return gather(ctx, target, source_ir, name, input, dim, indices_tensor)
 
 
 def gather(
@@ -93,6 +90,9 @@ def gather(
     # index = cast_trt_tensor(ctx, input, trt.int32, name, target, source_ir)
     gather_layer = ctx.net.add_gather(input, index, dim)
     set_layer_name(gather_layer, target, name + "_gather", source_ir)
+    out = gather_layer.get_output(0)
+    if len(out.shape) != 1:
+        gather_layer = ctx.net.add_shuffle(out)
     return gather_layer.get_output(0)
 
 
