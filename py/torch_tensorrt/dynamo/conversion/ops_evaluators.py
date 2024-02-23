@@ -47,3 +47,14 @@ def aten_ops_arange_start_step(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return np.arange(*args)
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.empty_like.default)
+def aten_ops_empty_like(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> TRTTensor:
+    return np.empty_like(*args)
