@@ -400,20 +400,25 @@ def scatter_value(
     input: TRTTensor,
     dim: Shape,
     index: Shape,
-    value: TRTTensor,
+    value: float,
 ) -> TRTTensor:
     if not isinstance(input, TRTTensor):
         raise RuntimeError(
             f"scatter_tensor received input {input} that is not part "
             "of the TensorRT region!"
         )
-
-    ranks = len(input.shape)
+    input_shape = input.shape
+    index_shape = index.shape
+    if (len(input_shape) != len(index_shape)):
+        raise RuntimeError(
+                f"The no of dimensions of input and index should be equal"
+            )
+    ranks = len(input_shape)
     dim = get_positive_dim(cast(int, dim), ranks)
     dynamic_shape = has_dynamic_shape(input.shape)
     if dynamic_shape:
         # Check whether slice target dim is dynamic shape dim
-        assert input.shape[dim] != -1, "Can't select on negative shape dimension!"
+        assert input.shape[dim] != -1, "Can't scatter on negative shape dimension!"
     
     input_dims = len(input.shape)
     for i in range(0, input_dims):
@@ -437,22 +442,32 @@ def scatter_src(
     input: TRTTensor,
     dim: Shape,
     index: Shape,
-    src: float,
+    src: TRTTensor,
 ) -> TRTTensor:
     if not isinstance(input, TRTTensor):
         raise RuntimeError(
             f"scatter_tensor received input {input} that is not part "
             "of the TensorRT region!"
         )
-
-    ranks = len(input.shape)
-    dim = get_positive_dim(cast(int, dim), ranks)
+    input_shape = input.shape
+    index_shape = index.shape
+    src_shape = src.shape
+    if (len(input_shape) != len(index_shape)):
+        raise RuntimeError(
+                f"The no of dimensions of input and index should be equal"
+            )
+    if (len(index_shape) != len(src_shape)):
+        raise RuntimeError(
+                f"The no of dimensions of src and index should be equal"
+            )
+    
+    input_dims = len(input_shape)
+    dim = get_positive_dim(cast(int, dim), input_dims)
     dynamic_shape = has_dynamic_shape(input.shape)
     if dynamic_shape:
         # Check whether slice target dim is dynamic shape dim
-        assert input.shape[dim] != -1, "Can't select on negative shape dimension!"
+        assert input.shape[dim] != -1, "Can't scatter on negative shape dimension!"
     
-    input_dims = len(input.shape)
     for i in range(0, input_dims):
         if index[i] >= input.shape[i]:
             raise RuntimeError(
