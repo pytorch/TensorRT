@@ -34,7 +34,7 @@ cc_binary(
 )
 
 cc_binary(
-    name = "torch_tensorrt.dll",
+    name = "torchtrt.dll",
     srcs = [],
     linkshared = True,
     linkstatic = True,
