@@ -409,17 +409,15 @@ def scatter_value(
         )
     input_shape = input.shape
     index_shape = index.shape
-    if (len(input_shape) != len(index_shape)):
-        raise RuntimeError(
-                f"The no of dimensions of input and index should be equal"
-            )
+    if len(input_shape) != len(index_shape):
+        raise RuntimeError(f"The no of dimensions of input and index should be equal")
     ranks = len(input_shape)
     dim = get_positive_dim(cast(int, dim), ranks)
     dynamic_shape = has_dynamic_shape(input.shape)
     if dynamic_shape:
         # Check whether slice target dim is dynamic shape dim
         assert input.shape[dim] != -1, "Can't scatter on negative shape dimension!"
-    
+
     input_dims = len(input.shape)
     for i in range(0, input_dims):
         if index[i] >= input.shape[i]:
@@ -427,7 +425,9 @@ def scatter_value(
                 f"cannot have index greater than the dimension length! {input.shape[dim]}"
             )
     value_tensor = value * torch.ones(index.shape)
-    scatter_layer = ctx.net.add_scatter(input, index, value_tensor, trt.tensorrt.ScatterModekELEMENT)
+    scatter_layer = ctx.net.add_scatter(
+        input, index, value_tensor, trt.tensorrt.ScatterModekELEMENT
+    )
     scatter_layer.set_axis(dim)
     set_layer_name(scatter_layer, target, name + "_scatter_layer", source_ir)
     out = scatter_layer.get_output(0)
@@ -452,28 +452,26 @@ def scatter_src(
     input_shape = input.shape
     index_shape = index.shape
     src_shape = src.shape
-    if (len(input_shape) != len(index_shape)):
-        raise RuntimeError(
-                f"The no of dimensions of input and index should be equal"
-            )
-    if (len(index_shape) != len(src_shape)):
-        raise RuntimeError(
-                f"The no of dimensions of src and index should be equal"
-            )
-    
+    if len(input_shape) != len(index_shape):
+        raise RuntimeError(f"The no of dimensions of input and index should be equal")
+    if len(index_shape) != len(src_shape):
+        raise RuntimeError(f"The no of dimensions of src and index should be equal")
+
     input_dims = len(input_shape)
     dim = get_positive_dim(cast(int, dim), input_dims)
     dynamic_shape = has_dynamic_shape(input.shape)
     if dynamic_shape:
         # Check whether slice target dim is dynamic shape dim
         assert input.shape[dim] != -1, "Can't scatter on negative shape dimension!"
-    
+
     for i in range(0, input_dims):
         if index[i] >= input.shape[i]:
             raise RuntimeError(
                 f"cannot have index greater than the dimension length! {input.shape[dim]}"
             )
-    scatter_layer = ctx.net.add_scatter(input, index, src, trt.tensorrt.ScatterModekELEMENT)
+    scatter_layer = ctx.net.add_scatter(
+        input, index, src, trt.tensorrt.ScatterModekELEMENT
+    )
     scatter_layer.set_axis(dim)
     set_layer_name(scatter_layer, target, name + "_scatter_layer", source_ir)
     out = scatter_layer.get_output(0)

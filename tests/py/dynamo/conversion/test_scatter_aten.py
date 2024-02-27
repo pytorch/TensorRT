@@ -23,7 +23,7 @@ class TestScatterValueConverter(DispatchTestCase):
             def forward(self, input, src):
                 return torch.ops.aten.scatter.value(input, dim, index, value)
 
-        input = [torch.zeros(3, 5, dtype = torch.int32)]
+        input = [torch.zeros(3, 5, dtype=torch.int32)]
         self.run_test(
             TestModule(),
             input,
@@ -46,14 +46,11 @@ class TestScatterSrcConverter(DispatchTestCase):
 
             def forward(self, input, src):
                 return torch.ops.aten.scatter.src(input, dim, index, src)
-        
-        src = [torch.arange(1, 11).reshape((2,5))]
-        input = torch.zeros(3, 5, dtype = src.dtype)
+
+        src = [torch.arange(1, 11).reshape((2, 5))]
+        input = torch.zeros(3, 5, dtype=src.dtype)
         inputs = [input, src]
         self.run_test(
             TestModule(),
             inputs,
         )
-
-
-    
