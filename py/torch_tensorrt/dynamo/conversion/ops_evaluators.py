@@ -60,6 +60,7 @@ def rand_validator(rand_node: Node) -> bool:
     if layout is not None:
         _LOGGER.debug(f"Currently we don't support specifying layout, got {layout}.")
         return False
+    return True
 
 
 @dynamo_tensorrt_converter(
@@ -76,21 +77,8 @@ def aten_ops_rand(
     return np.random.rand(*args)
 
 
-def randn_validator(randn_node: Node) -> bool:
-    dtype = randn_node.kwargs.get("dtype", None)
-    layout = randn_node.kwargs.get("layout", None)
-    if dtype is not None:
-        _LOGGER.debug(
-            f"Currently we don't support specifying output dtype, got {dtype}."
-        )
-        return False
-    if layout is not None:
-        _LOGGER.debug(f"Currently we don't support specifying layout, got {layout}.")
-        return False
-
-
 @dynamo_tensorrt_converter(
-    torch.ops.aten.randn.default, capability_validator=randn_validator
+    torch.ops.aten.randn.default, capability_validator=rand_validator
 )
 def aten_ops_randn(
     ctx: ConversionContext,
@@ -118,6 +106,7 @@ def randperm_validator(randperm_node: Node) -> bool:
     if layout is not None:
         _LOGGER.debug(f"Currently we don't support specifying layout, got {layout}.")
         return False
+    return True
 
 
 @dynamo_tensorrt_converter(
@@ -131,7 +120,4 @@ def aten_ops_randperm(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     device = kwargs.get("device", None)
-    input = args[0]
-    if not isinstance(input, int):
-        raise RuntimeError(f"The input must be an integer")
     return np.random.permutation(*args)
