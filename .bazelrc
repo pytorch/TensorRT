@@ -25,6 +25,9 @@ build --cxxopt="-fdiagnostics-color=always"
 build --cxxopt='-std=c++17'
 #build --linkopt="-Wl,--no-as-needed"
 
+build:windows --cxxopt="/GS-" --cxxopt="/std:c++17" --cxxopt="/permissive-"
+build:windows --cxxopt="/wd4244" --cxxopt="/wd4267" --cxxopt="/wd4819"
+build:windows --features=windows_export_all_symbols
 
 build:python --cxxopt="-D_GLIBCXX_USE_CXX11_ABI=0"
 build:python --linkopt="-D_GLIBCXX_USE_CXX11_ABI=0"
