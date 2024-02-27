@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_import", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -35,13 +35,13 @@ cc_library(
     visibility = ["//visibility:private"],
 )
 
-cc_import(
+cc_library(
     name = "cudnn_lib",
-    shared_library = select({
-        ":aarch64_linux": "lib/aarch64-linux-gnu/libcudnn.so",
-        ":ci_rhel_x86_64_linux": "lib64/libcudnn.so",
-        ":windows": "bin/cudnn64_7.dll",  #Need to configure specific version for windows
-        "//conditions:default": "lib/x86_64-linux-gnu/libcudnn.so",
+    srcs = select({
+        ":aarch64_linux": ["lib/aarch64-linux-gnu/libcudnn.so"],
+        ":ci_rhel_x86_64_linux": ["lib64/libcudnn.so"],
+        ":windows": ["lib/x64/cudnn.lib"],
+        "//conditions:default": ["lib/x86_64-linux-gnu/libcudnn.so"],
     }),
     visibility = ["//visibility:private"],
 )
