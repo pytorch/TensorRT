@@ -74,10 +74,9 @@ class TestRandConverter(TestCase):
             def forward(self):
                 return self.rand_op(self.size)
 
-        grid_model = TestModule(op, shape_or_input)
+        rand_model = TestModule(op, shape_or_input)
         # cannot use self.run_test() since it expects input in form of tensor
 
-        # self.run_test(grid_model, None)
         fx_graph = torch.fx.symbolic_trace(grid_model)
         torch._dynamo.reset()
 
