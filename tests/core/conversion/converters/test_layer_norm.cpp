@@ -29,8 +29,7 @@ TEST(Converters, ATenLayerNormConvertsCorrectlyLast3DimsNoGammaBeta) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenLayerNormConvertsCorrectlyLast3Dims) {
@@ -60,8 +59,7 @@ TEST(Converters, ATenLayerNormConvertsCorrectlyLast3Dims) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {gamma, beta});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenLayerNormConvertsCorrectlyLast2Dims) {
@@ -90,8 +88,7 @@ TEST(Converters, ATenLayerNormConvertsCorrectlyLast2Dims) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {gamma, beta});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenLayerNormConvertsCorrectlyLast1Dims) {
@@ -119,8 +116,7 @@ TEST(Converters, ATenLayerNormConvertsCorrectlyLast1Dims) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {gamma, beta});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenLayerNormConvertsCorrectly3dInput1dNormalizedShape) {
@@ -134,7 +130,6 @@ TEST(Converters, ATenLayerNormConvertsCorrectly3dInput1dNormalizedShape) {
         %8 : float = prim::Constant[value=1.0000000000000001e-05]()
         %9 : Tensor = aten::layer_norm(%0, %4, %gamma, %beta, %8, %7)
         return (%9))IR";
-
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
@@ -148,6 +143,5 @@ TEST(Converters, ATenLayerNormConvertsCorrectly3dInput1dNormalizedShape) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {gamma, beta});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
