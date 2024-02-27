@@ -116,6 +116,57 @@ TEST(Converters, ATenConvolution1dConvertsCorrectly) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
+TEST(Converters, ATenConv1dWithWeightTensorsConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor,
+            %1 : Float(4, 5, 3, strides=[15, 3, 1])):
+        %2 : int = prim::Constant[value=-128]()
+        %3 : float = prim::Constant[value=3.5]()
+        %4 : int = prim::Constant[value=0]()
+        %5 : int = prim::Constant[value=127]()
+        %quant_input : Tensor = aten::fake_quantize_per_tensor_affine(%0, %3, %4, %2, %5)
+        %6 : int = prim::Constant[value=6]()
+        %7 : int = prim::Constant[value=5]()
+        %8 : Device = prim::Constant[value="cuda:0"]()
+        %9 : None = prim::Constant()
+        %10 : int[] = prim::ListConstruct(%7)
+        %11 : Tensor = aten::full(%10, %3, %6, %9, %8, %9)
+        %12 : int[] = prim::ListConstruct(%7)
+        %13 : int = prim::Constant[value=1]()
+        %14 : Tensor = aten::full(%12, %13, %6, %9, %8, %9)
+        %quant_wts : Tensor = aten::fake_quantize_per_channel_affine(%1, %11, %14, %13, %2, %5)
+        %15 : None = prim::Constant()
+        %16 : int = prim::Constant[value=1]()
+        %17 : int = prim::Constant[value=0]()
+        %18 : int = prim::Constant[value=1]()
+        %19 : int = prim::Constant[value=0]()
+        %20 : bool = prim::Constant[value=0]()
+        %21 : int[] = prim::ListConstruct(%16)
+        %22 : int[] = prim::ListConstruct(%17)
+        %23 : int[] = prim::ListConstruct(%18)
+        %24 : int[] = prim::ListConstruct(%19)
+        %25 : Tensor = aten::_convolution(%quant_input, %quant_wts, %15, %21, %22, %23, %20, %24, %16, %20, %20, %20, %20)
+        return (%25))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {4, 5, 3}, {at::kCUDA});
+  auto w = at::randint(1, 2, {4, 5, 3}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto jit_w = at::clone(w);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  auto trt_w = at::clone(w);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in}, nvinfer1::DataType::kINT8);
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
 TEST(Converters, ATenConvolutionNoBiasConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor,
@@ -607,6 +658,57 @@ TEST(Converters, ATenConv1dTransposeWithPaddingOutPaddingConvertsCorrectly) {
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+}
+
+TEST(Converters, ATenConv1dTransposeWithWeightTensorsConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor,
+            %1 : Float(4, 5, 3, strides=[15, 3, 1])):
+        %2 : int = prim::Constant[value=-128]()
+        %3 : float = prim::Constant[value=3.5]()
+        %4 : int = prim::Constant[value=0]()
+        %5 : int = prim::Constant[value=127]()
+        %quant_input : Tensor = aten::fake_quantize_per_tensor_affine(%0, %3, %4, %2, %5)
+        %6 : int = prim::Constant[value=6]()
+        %7 : int = prim::Constant[value=4]()
+        %8 : Device = prim::Constant[value="cuda:0"]()
+        %9 : None = prim::Constant()
+        %10 : int[] = prim::ListConstruct(%7)
+        %11 : Tensor = aten::full(%10, %3, %6, %9, %8, %9)
+        %12 : int[] = prim::ListConstruct(%7)
+        %13 : int = prim::Constant[value=1]()
+        %14 : Tensor = aten::full(%12, %13, %6, %9, %8, %9)
+        %quant_wts : Tensor = aten::fake_quantize_per_channel_affine(%1, %11, %14, %13, %2, %5)
+        %15 : None = prim::Constant()
+        %16 : int = prim::Constant[value=1]()
+        %17 : int = prim::Constant[value=0]()
+        %18 : int = prim::Constant[value=1]()
+        %19 : int = prim::Constant[value=0]()
+        %20 : bool = prim::Constant[value=0]()
+        %21 : int[] = prim::ListConstruct(%16)
+        %22 : int[] = prim::ListConstruct(%17)
+        %23 : int[] = prim::ListConstruct(%18)
+        %24 : int[] = prim::ListConstruct(%19)
+        %25 : bool = prim::Constant[value=1]()
+        %26 : Tensor = aten::_convolution(%quant_input, %quant_wts, %15, %21, %22, %23, %25, %24, %18, %20, %20, %20, %20)
+        return (%26))IR";
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {4, 5, 3}, {at::kCUDA});
+  auto w = at::randint(1, 2, {5, 4, 3}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto jit_w = at::clone(w);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  auto trt_w = at::clone(w);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in}, nvinfer1::DataType::kINT8);
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenConvTransposeWithPaddingOutPaddingConvertsCorrectly) {
