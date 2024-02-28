@@ -131,6 +131,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
 
     // Make a new Dims with only the spatial dimensions.
     nvinfer1::Dims filter_dim;
+    nvinfer1::Dims original_dim = in->getDimensions();
     int64_t nbSpatialDims = in->getDimensions().nbDims - 2;
     TORCHTRT_CHECK(
         nbSpatialDims = kernel_dims.nbDims - 2,
@@ -138,11 +139,27 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     filter_dim.nbDims = nbSpatialDims;
     filter_dim.d[0] = kernel_dims.d[2];
     filter_dim.d[1] = kernel_dims.d[3];
+    int32_t num_output_maps = kernel_dims.d[0];
+    bool expand_dims = nbSpatialDims == 1;
+    if (expand_dims) {
+      // In case of Conv1D -> map it to 2D version
+      // TensorRT expects nbSpatialDims = 2 or 3
+      filter_dim = util::unsqueezeDims(filter_dim, filter_dim.nbDims, 1, false);
+      // Reshape input dimensions
+      in = addPadding(ctx, n, in, 4);
+      LOG_DEBUG("Reshaping input dimensions to: " << in->getDimensions());
+      kernel = addPadding(ctx, n, kernel, 4);
+      LOG_DEBUG("Reshaping kernel dimensions to: " << kernel->getDimensions());
+      if (transposed) {
+        num_output_maps = kernel_dims.d[1];
+      }
+    }
 
     // Initialize a dummy constant kernel to pass it to INetwork->addConvolutionNd/addDeconvolutionNd API.
     auto kernel_weights = nvinfer1::Weights{nvinfer1::DataType::kFLOAT, nullptr, 0};
 
     nvinfer1::ILayer* layer = nullptr;
+    nvinfer1::ITensor* out = nullptr;
     if (transposed) {
       // Fix padding based on output_padding provided
       nvinfer1::Dims begPadding = padding;
@@ -150,7 +167,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
       add_output_padding(padding, out_padding, hasOutputPadding);
 
       nvinfer1::IDeconvolutionLayer* deconvLayer = ctx->net->addDeconvolutionNd(
-          *in, kernel_dims.d[0], filter_dim, kernel_weights, hasOutputPadding ? nvinfer1::Weights{} : bias.data);
+          *in, num_output_maps, filter_dim, kernel_weights, hasOutputPadding ? nvinfer1::Weights{} : bias.data);
       deconvLayer->setStrideNd(stride);
       deconvLayer->setDilationNd(dilation);
       deconvLayer->setNbGroups(groups);
@@ -161,15 +178,21 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
       deconvLayer->setInput(1, *kernel);
       TORCHTRT_CHECK(deconvLayer, "Unable to create deconv layer with non-const weights from node: " << *n);
       layer = deconvLayer;
+      out = deconvLayer->getOutput(0);
       if (hasOutputPadding) {
         LOG_DEBUG("Padding output deconvolution tensor with:" << out_padding);
         nvinfer1::ITensor* tensorPtr = deconvLayer->getOutput(0);
         auto dims = in->getDimensions();
         layer = add_bias_layer(ctx, tensorPtr, dims, out_padding, bias);
+        out = layer->getOutput(0);
+      }
+      if (expand_dims) {
+        // Un-expand the expanded dimension
+        out = addUnpadding(ctx, n, out, original_dim.nbDims);
       }
     } else {
       nvinfer1::IConvolutionLayer* convLayer =
-          ctx->net->addConvolutionNd(*in, kernel_dims.d[0], filter_dim, kernel_weights, bias.data);
+          ctx->net->addConvolutionNd(*in, num_output_maps, filter_dim, kernel_weights, bias.data);
       convLayer->setStrideNd(stride);
       convLayer->setPaddingMode(nvinfer1::PaddingMode::kCAFFE_ROUND_DOWN);
       convLayer->setPaddingNd(padding);
@@ -180,10 +203,11 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
       // Set conv kernel weights
       convLayer->setInput(1, *kernel);
       layer = convLayer;
+      out = layer->getOutput(0);
     }
 
-    ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
-    LOG_DEBUG("Output tensor shape: " << layer->getOutput(0)->getDimensions());
+    ctx->AssociateValueAndTensor(n->outputs()[0], out);
+    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
     return true;
   }
 
