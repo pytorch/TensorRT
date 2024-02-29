@@ -152,6 +152,12 @@ def cast_trt_tensor(
         identity_layer = ctx.net.add_identity(input_val)
         identity_layer.set_output_type(0, trt_dtype)
         identity_layer.name = f"Cast ITensor {input_val.name} from {input_val.dtype} to {trt_dtype} - [{target_name}]-[{name}]"
+        identity_layer.metadata = f"[{identity_layer.type.name}]-[{target_name}]-[{name}]-[#_of_outputs_{identity_layer.num_outputs}]"
+
+        for i in range(identity_layer.num_outputs):
+            output = identity_layer.get_output(i)
+            output.name = f"[{output.name}]"
+
         return identity_layer.get_output(0)
     else:
         return input_val
