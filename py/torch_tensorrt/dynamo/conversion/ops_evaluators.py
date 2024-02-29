@@ -73,7 +73,6 @@ def aten_ops_rand(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    device = kwargs.get("device", None)
     return np.random.rand(*args)
 
 
@@ -87,7 +86,6 @@ def aten_ops_randn(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    device = kwargs.get("device", None)
     return np.random.randn(*args)
 
 
@@ -119,5 +117,4 @@ def aten_ops_randperm(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    device = kwargs.get("device", None)
     return np.random.permutation(*args)
