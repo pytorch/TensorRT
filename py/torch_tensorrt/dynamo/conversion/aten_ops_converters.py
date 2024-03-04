@@ -2695,6 +2695,23 @@ def aten_ops_flip(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.log2.default)
+def log2(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.log2(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.scalar_tensor.default)
 def aten_ops_scalar_tensor(
     ctx: ConversionContext,
