@@ -77,6 +77,22 @@ def log10(
     )
 
 
+def log2(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+) -> TRTTensor:
+    log_layer_output = log(ctx, target, source_ir, f"{name}_log", input_val)
+
+    ln2 = 0.693147180559945309
+
+    return impl.elementwise.div(
+        ctx, target, source_ir, f"{name}_div", log_layer_output, ln2
+    )
+
+
 def sqrt(
     ctx: ConversionContext,
     target: Target,
