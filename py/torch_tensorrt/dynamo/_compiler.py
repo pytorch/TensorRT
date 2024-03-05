@@ -59,7 +59,11 @@ from torch_tensorrt.dynamo.conversion import (
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
-from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decompositions
+from torch_tensorrt.dynamo.lowering import (
+    get_decompositions,
+    post_lowering,
+    pre_export_lowering,
+)
 from torch_tensorrt.dynamo.utils import (
     get_torch_inputs,
     parse_complex_tensor_structs,
@@ -181,12 +185,15 @@ def compile(
 
     # Prepare torch_trt inputs
     inputs = prepare_inputs(inputs)
+    torch_inputs = get_torch_inputs(inputs, device)
     device = to_torch_tensorrt_device(device)
 
     if not isinstance(exported_program, ExportedProgram):
         raise AssertionError(
             f"Input graph should be an ExportedProgram but got type {type(exported_program)}"
         )
+
+    exported_program = pre_export_lowering(exported_program, torch_inputs)
     exported_program = exported_program.run_decompositions(
         get_decompositions(enable_experimental_decompositions)
     )
@@ -194,10 +201,8 @@ def compile(
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module
-    torch_inputs = get_torch_inputs(inputs, device)
-    gm = apply_lowering_passes(gm, torch_inputs)
+    gm = post_lowering(gm, torch_inputs)
     logger.debug("Lowered Input graph: " + str(gm.graph))
-
     enabled_precisions = set(enabled_precisions)
 
     if (

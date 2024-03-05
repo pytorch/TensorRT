@@ -11,8 +11,8 @@ from torch._functorch.aot_autograd import aot_export_joint_simple
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo._compiler import compile_module
 from torch_tensorrt.dynamo.lowering import (
-    apply_lowering_passes,
     get_decompositions,
+    post_lowering,
     repair_input_aliasing,
 )
 from torch_tensorrt.dynamo.utils import (
@@ -87,7 +87,7 @@ def _pretraced_backend(
 
             logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
 
-            gm = apply_lowering_passes(gm, sample_inputs)
+            gm = post_lowering(gm, sample_inputs)
 
             torchtrt_inputs = prepare_inputs(
                 sample_inputs, disable_memory_format_check=True

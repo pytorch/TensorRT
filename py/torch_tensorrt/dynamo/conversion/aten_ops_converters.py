@@ -573,6 +573,24 @@ def aten_ops_neg(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.ptq.scaled_e4m3.default)
+def aten_ops_quantize_fp8(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.quantize.quantize_fp8(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim)
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims)
 def aten_ops_squeeze(

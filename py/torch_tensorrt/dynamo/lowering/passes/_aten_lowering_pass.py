@@ -8,12 +8,13 @@ from .fuse_prims_broadcast import fuse_prims_broadcast
 from .lower_linear import lower_linear
 from .lower_scaled_dot_product_attention import lower_scaled_dot_product_attention
 from .pass_manager import DynamoPassManager
+from .remove_detach import remove_detach
 from .remove_input_alias_fixing_clones import remove_input_alias_fixing_clones
 from .repair_input_as_output import repair_input_as_output
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
 from .view_to_reshape import view_to_reshape
 
-ATEN_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
+ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
     [
         remove_input_alias_fixing_clones,
         constant_fold,
@@ -23,6 +24,12 @@ ATEN_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
         fuse_prims_broadcast,
         replace_max_pool_with_indices,
         view_to_reshape,
+    ]
+)
+
+ATEN_PRE_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
+    [
+        remove_detach,
     ]
 )
 
@@ -48,9 +55,9 @@ def _aten_lowering_pass(
     def add_lowering_pass(
         lowering_pass: LoweringPassSignature,
     ) -> LoweringPassSignature:
-        ATEN_LOWERING_PASSES.add_pass_with_index(lowering_pass, index)
+        ATEN_POST_LOWERING_PASSES.add_pass_with_index(lowering_pass, index)
         logger.debug(
-            f"Added lowering pass {lowering_pass} to list at index {index}, current passlist: {ATEN_LOWERING_PASSES}"
+            f"Added lowering pass {lowering_pass} to list at index {index}, current passlist: {ATEN_POST_LOWERING_PASSES}"
         )
         return lowering_pass
 
@@ -72,23 +79,37 @@ def _aten_lowering_pass(
 
 def _remove_lowering_pass(*, index: int) -> None:
     """Removes a lowering pass at a specific index from the registry"""
-    ATEN_LOWERING_PASSES.remove_pass_with_index(index)
+    ATEN_POST_LOWERING_PASSES.remove_pass_with_index(index)
     logger.debug(
-        f"Removed lowering pass at index {index}, current passlist: {ATEN_LOWERING_PASSES}"
+        f"Removed lowering pass at index {index}, current passlist: {ATEN_POST_LOWERING_PASSES}"
     )
     return
 
 
-def apply_lowering_passes(
+def post_lowering(
     gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]
 ) -> torch.fx.GraphModule:
-    """Applies the lowering passes to a graph module, returns the modified GraphModule"""
+    """Applies the lowering passes to a graph module after torch.export/ torch.compile and their decompositions, returns the modified GraphModule"""
     logging.debug(
-        f"Invoking DynamoPassManager and applying lowering passes: {ATEN_LOWERING_PASSES}"
+        f"Invoking DynamoPassManager and applying lowering passes: {ATEN_POST_LOWERING_PASSES}"
     )
-    return ATEN_LOWERING_PASSES(gm, sample_inputs)
+    return ATEN_POST_LOWERING_PASSES(gm, sample_inputs)
+
+
+def pre_export_lowering(
+    ep: torch.export.ExportedProgram, sample_inputs: Sequence[torch.Tensor]
+) -> torch.fx.GraphModule:
+    """Applies the lowering passes to a graph module after torch.export/ torch.compile and their decompositions, returns the modified GraphModule"""
+    logging.debug(
+        f"Invoking DynamoPassManager and applying lowering passes: {ATEN_PRE_LOWERING_PASSES}"
+    )
+    gm = ep.module()
+    gm = ATEN_PRE_LOWERING_PASSES(gm, sample_inputs)
+    # TODO: Check if re-exporting changes the metadata
+    transformed_ep = torch.export.export(gm, tuple(sample_inputs), strict=False)
+    return transformed_ep
 
 
 def dump_lowering_passes() -> str:
     """Returns a string containing the lowering passes"""
-    return str(ATEN_LOWERING_PASSES)
+    return str(ATEN_POST_LOWERING_PASSES)
