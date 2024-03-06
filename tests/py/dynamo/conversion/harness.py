@@ -1,3 +1,4 @@
+import copy
 import logging
 import time
 import unittest
@@ -10,6 +11,9 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    DYNAMO_CONVERTERS as CONVERTERS,
+)
 from torch_tensorrt.dynamo.lowering import apply_lowering_passes
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 
@@ -46,7 +50,8 @@ class TRTTestCase(TestCase):
     def run_test(
         self,
         mod,
-        inputs,
+        fx_inputs,
+        trt_interpreter_inputs,
         interpreter,
         rtol,
         atol,
@@ -54,7 +59,8 @@ class TRTTestCase(TestCase):
     ):
         with torch.no_grad():
             cuda_inputs = []
-            for i in inputs:
+            cuda_fx_inputs = []
+            for i in trt_interpreter_inputs:
                 cuda_inputs.append(i.cuda())
 
             mod.eval()
@@ -68,7 +74,7 @@ class TRTTestCase(TestCase):
                 interpreter_result.output_names,
             )
 
-            ref_outputs = mod(*inputs)
+            ref_outputs = mod(*fx_inputs)
 
             torch.cuda.synchronize()
             start_event = torch.cuda.Event(enable_timing=True)
@@ -237,15 +243,35 @@ class DispatchTestCase(TRTTestCase):
             precision=precision, truncate_long_and_double=True
         )
 
+        num_inputs = len(inputs)
+        trt_inputs = inputs
+        for num_input in range(num_inputs):
+            input = inputs[num_input]
+            if input.dtype in (torch.int64, torch.float64):
+                dtype_32bit = (
+                    torch.int32 if (input.dtype == torch.int64) else torch.int64
+                )
+                # should we modify graph here to insert clone nodes?
+                # ideally not required
+                trt_inputs = (
+                    list(trt_inputs[:num_input])
+                    + [
+                        input.to(dtype_32bit),
+                    ]
+                    + list(trt_inputs[num_input + 1 :])
+                )
+
         interp = TRTInterpreter(
             mod,
-            Input.from_tensors(inputs),
+            Input.from_tensors(trt_inputs),
             output_dtypes=output_dtypes,
             compilation_settings=compilation_settings,
         )
+
         super().run_test(
             mod,
             inputs,
+            trt_inputs,
             interp,
             rtol,
             atol,

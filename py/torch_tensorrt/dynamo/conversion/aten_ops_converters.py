@@ -706,7 +706,7 @@ def aten_ops_scatter_value(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.select.scatter_value(
-        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2]
+        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2], args[3]
     )
 
 
@@ -719,19 +719,7 @@ def aten_ops_scatter_src(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.select.scatter_src(
-        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2]
-    )
-
-
-def aten_ops_select(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.select.select(
-        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2]
+        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2], args[3]
     )
 
 
