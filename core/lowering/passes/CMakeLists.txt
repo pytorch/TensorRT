@@ -26,6 +26,7 @@ target_sources(${lib_name}
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_rsqrt.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_std.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/unpack_var.cpp"
+	    "${CMAKE_CURRENT_SOURCE_DIR}/unpack_scaled_dot_product_attention.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/view_to_reshape.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/rewrite_inputs_with_params.cpp"
 )
