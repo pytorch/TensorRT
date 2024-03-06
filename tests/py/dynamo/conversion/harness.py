@@ -1,5 +1,4 @@
-# type: ignore
-
+import copy
 import logging
 import time
 import unittest
@@ -14,6 +13,9 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
 from torch_tensorrt.dynamo.conversion._conversion import infer_module_output_dtypes
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    DYNAMO_CONVERTERS as CONVERTERS,
+)
 from torch_tensorrt.dynamo.lowering import apply_lowering_passes
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 
@@ -50,16 +52,20 @@ class TRTTestCase(TestCase):
     def run_test(
         self,
         mod,
-        inputs,
+        fx_inputs,
+        trt_interpreter_inputs,
         interpreter,
         rtol,
         atol,
         check_dtype=True,
     ):
         with torch.no_grad():
-            cuda_inputs = []
-            for i in inputs:
-                cuda_inputs.append(i.cuda())
+            cuda_fx_inputs = []
+            cuda_trt_inputs = []
+            for i in trt_interpreter_inputs:
+                cuda_trt_inputs.append(i.cuda())
+            for i in fx_inputs:
+                cuda_fx_inputs.append(i.cuda())
 
             mod.eval()
             start = time.perf_counter()
@@ -73,13 +79,13 @@ class TRTTestCase(TestCase):
             )
 
             mod = mod.cuda()
-            ref_outputs = mod(*cuda_inputs)
+            ref_outputs = mod(*cuda_fx_inputs)
 
             torch.cuda.synchronize()
             start_event = torch.cuda.Event(enable_timing=True)
             end_event = torch.cuda.Event(enable_timing=True)
             start_event.record()
-            outputs = trt_mod(*cuda_inputs)
+            outputs = trt_mod(*cuda_trt_inputs)
             end_event.record()
             torch.cuda.synchronize()
             _LOGGER.info(
@@ -237,6 +243,25 @@ class DispatchTestCase(TRTTestCase):
             debug=True,
         )
 
+        num_inputs = len(inputs)
+        trt_inputs = inputs
+        for num_input in range(num_inputs):
+            input = inputs[num_input]
+            if input.dtype in (torch.int64, torch.float64):
+                dtype_32bit = (
+                    torch.int32 if (input.dtype == torch.int64) else torch.int64
+                )
+                # should we modify graph here to insert clone nodes?
+                # ideally not required
+                trt_inputs = (
+                    list(trt_inputs[:num_input])
+                    + [
+                        input.to(dtype_32bit),
+                    ]
+                    + list(trt_inputs[num_input + 1 :])
+                )        
+
+        trt_input_specs = [Input.from_tensor(i) for i in trt_inputs]
         input_specs = [Input.from_tensor(i) for i in inputs]
 
         output_dtypes = None
@@ -245,7 +270,7 @@ class DispatchTestCase(TRTTestCase):
                 mod,
                 input_specs,
                 compilation_settings.device,
-                truncate_double=compilation_settings.truncate_double,
+                truncate_long_and_double=compilation_settings.truncate_long_and_double,
             )
 
         _LOGGER.debug(f"Compilation settings: {compilation_settings}")
@@ -254,13 +279,15 @@ class DispatchTestCase(TRTTestCase):
 
         interp = TRTInterpreter(
             mod,
-            input_specs,
+            trt_input_specs,
             output_dtypes=output_dtypes,
             compilation_settings=compilation_settings,
         )
+
         super().run_test(
             mod,
             inputs,
+            trt_inputs,
             interp,
             rtol,
             atol,

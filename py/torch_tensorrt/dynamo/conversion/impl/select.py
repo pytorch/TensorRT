@@ -21,6 +21,7 @@ from torch_tensorrt.fx.converters.converter_utils import (
     set_layer_name,
 )
 from torch_tensorrt.fx.types import Shape, TRTTensor
+from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -398,8 +399,8 @@ def scatter_value(
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    dim: Shape,
-    index: Shape,
+    dim: int,
+    index: Union[TRTTensor, np.ndarray, torch.Tensor],
     value: float,
 ) -> TRTTensor:
     if not isinstance(input, TRTTensor):
@@ -409,26 +410,34 @@ def scatter_value(
         )
     input_shape = input.shape
     index_shape = index.shape
+    index_shape_list = list(index.shape)
+    if not (isinstance(index, TRTTensor)):
+        index = get_trt_tensor(ctx, index, f"_index_tensor")
     if len(input_shape) != len(index_shape):
         raise RuntimeError(f"The no of dimensions of input and index should be equal")
-    ranks = len(input_shape)
-    dim = get_positive_dim(cast(int, dim), ranks)
+    dim = get_positive_dim(dim, len(input_shape))
     dynamic_shape = has_dynamic_shape(input.shape)
     if dynamic_shape:
         # Check whether slice target dim is dynamic shape dim
         assert input.shape[dim] != -1, "Can't scatter on negative shape dimension!"
 
-    input_dims = len(input.shape)
+    input_dims = len(input_shape)
     for i in range(0, input_dims):
-        if index[i] >= input.shape[i]:
+        if i != dim and (index_shape[i] >= input.shape[i]):
             raise RuntimeError(
-                f"cannot have index greater than the dimension length! {input.shape[dim]}"
+                f"cannot have index size greater than the input size along dimension {dim}"
             )
-    value_tensor = value * torch.ones(index.shape)
-    scatter_layer = ctx.net.add_scatter(
-        input, index, value_tensor, trt.tensorrt.ScatterModekELEMENT
+
+    value_tensor = get_trt_tensor(
+        ctx, value * torch.ones(index_shape_list), name + "_value_tensor"
     )
-    scatter_layer.set_axis(dim)
+    value_tensor = cast_trt_tensor(
+        ctx, value_tensor, input.dtype, name + "_cast_value_tensor"
+    )
+    scatter_layer = ctx.net.add_scatter(
+        input, index, value_tensor, trt.ScatterMode.ELEMENT
+    )
+    scatter_layer.axis = dim
     set_layer_name(scatter_layer, target, name + "_scatter_layer", source_ir)
     out = scatter_layer.get_output(0)
     return out
@@ -452,6 +461,8 @@ def scatter_src(
     input_shape = input.shape
     index_shape = index.shape
     src_shape = src.shape
+    if not (isinstance(index, TRTTensor)):
+        index = get_trt_tensor(ctx, index, f"_index_tensor")
     if len(input_shape) != len(index_shape):
         raise RuntimeError(f"The no of dimensions of input and index should be equal")
     if len(index_shape) != len(src_shape):
@@ -465,14 +476,23 @@ def scatter_src(
         assert input.shape[dim] != -1, "Can't scatter on negative shape dimension!"
 
     for i in range(0, input_dims):
-        if index[i] >= input.shape[i]:
+        if i != dim and (index_shape[i] >= input.shape[i]):
             raise RuntimeError(
-                f"cannot have index greater than the dimension length! {input.shape[dim]}"
+                f"cannot have index size greater than the input size along dimension {dim}"
             )
+    input_dtype = input.dtype
+    # required for cases where src is a constant
+    src_dtype = unified_dtype_converter(src.dtype, Frameworks.TRT)
+    if input_dtype != src_dtype:
+        raise RuntimeError(f"The type of input and src should be made")
+    src_tensor = src
+    if not (isinstance(src, TRTTensor)):
+        src_tensor = get_trt_tensor(ctx, src, name + "_src_tensor")
+
     scatter_layer = ctx.net.add_scatter(
-        input, index, src, trt.tensorrt.ScatterModekELEMENT
+        input, index, src_tensor, trt.ScatterMode.ELEMENT
     )
-    scatter_layer.set_axis(dim)
+    scatter_layer.axis = dim
     set_layer_name(scatter_layer, target, name + "_scatter_layer", source_ir)
     out = scatter_layer.get_output(0)
     return out
