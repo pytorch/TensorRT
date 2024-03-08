@@ -80,10 +80,9 @@ def gather(
     input: TRTTensor,
     dim: int,
     index: Union[TRTTensor, np.ndarray, torch.Tensor],
-    sparse_grad: bool = False,
 ) -> TRTTensor:
     if not isinstance(index, TRTTensor):
-        index = get_trt_tensor(ctx, index, name + f"_parameter_to_fp32_tensor")
+        index = get_trt_tensor(ctx, index, name + f"_index_to_fp32_tensor")
     # This is for the case where torch.ops.aten.gather requires torch.int64
     # However TRTInterpreter complains that torch.int64 is not a supported type
     # So the below cast does not help

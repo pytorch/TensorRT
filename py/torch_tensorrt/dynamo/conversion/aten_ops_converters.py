@@ -183,31 +183,6 @@ def aten_ops_native_group_norm(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.gather.default)
-@enforce_tensor_types(
-    {
-        0: (TRTTensor,),
-    }
-)  # type: ignore[misc]
-def aten_ops_gather(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.select.gather(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        input=args[0],
-        dim=args[1],
-        index=args[2],
-        sparse_grad=args_bounds_check(args, 3, False),
-    )
-
-
 @dynamo_tensorrt_converter(torch.ops.aten.group_norm.default)
 @dynamo_tensorrt_converter(torch.ops.aten.group_norm)
 @enforce_tensor_types(
