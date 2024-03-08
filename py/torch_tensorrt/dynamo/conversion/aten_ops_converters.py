@@ -229,26 +229,7 @@ def aten_ops_cat(
     )
 
 
-def embedding_param_validator(embedding_node: Node) -> bool:
-    scale_grad_by_freq = args_bounds_check(embedding_node.args, 3)
-    sparse = args_bounds_check(embedding_node.args, 4)
-
-    if scale_grad_by_freq is not None:
-        _LOGGER.debug(
-            f"Currently we don't support specifying scale gradient by word frequency, got {scale_grad_by_freq}."
-        )
-        return False
-
-    if sparse is not None:
-        _LOGGER.debug(f"Currently we don't support sparse gradient, got {sparse}.")
-        return False
-
-    return True
-
-
-@dynamo_tensorrt_converter(
-    torch.ops.aten.embedding.default, capability_validator=embedding_param_validator
-)
+@dynamo_tensorrt_converter(torch.ops.aten.embedding.default)
 def aten_ops_embedding(
     ctx: ConversionContext,
     target: Target,
@@ -263,37 +244,30 @@ def aten_ops_embedding(
         name,
         input=args[1],
         weight=args[0],
-        # args[2] is the padding index, which is useful for training only
-        scale_grad_by_freq=args_bounds_check(args, 3),
-        sparse=args_bounds_check(args, 4),
+        # args[2, 3, 4] are useful for training only
+        padding_idx=args_bounds_check(args, 2, -1),
+        scale_grad_by_freq=args_bounds_check(args, 3, False),
+        sparse=args_bounds_check(args, 4, False),
     )
 
 
 def embedding_bag_validator(node: Node) -> bool:
-    mode = args_bounds_check(node.args, 4, 0)
     indices = node.args[1].meta.get("tensor_meta")
     if indices is None:
         return False
-    return (
-        bool(node.args[2].op == "get_attr")
-        and (mode == 0 or mode == 1 or mode == 2)
-        and len(indices.shape) == 1
-    )
+    return len(indices.shape) == 1  # currently only support 1D indices
 
 
-# @dynamo_tensorrt_converter(
-#     torch.ops.aten.embedding_bag.default, capability_validator=embedding_bag_validator
-# )
-# @dynamo_tensorrt_converter(
-#     torch.ops.aten._embedding_bag.default, capability_validator=embedding_bag_validator
-# )
-@dynamo_tensorrt_converter(torch.ops.aten.embedding_bag.default)
-@dynamo_tensorrt_converter(torch.ops.aten._embedding_bag.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.embedding_bag.default, capability_validator=embedding_bag_validator
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten._embedding_bag.default, capability_validator=embedding_bag_validator
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
         1: (TRTTensor,),
-        # 2: (np.ndarray, torch.Tensor),
     }
 )
 def aten_ops_embedding_bag(
@@ -311,12 +285,13 @@ def aten_ops_embedding_bag(
         weight=args[0],
         indices=args[1],
         offsets=args[2],
-        scale_grad_by_freq=args_bounds_check(args, 3, False),
         mode=args_bounds_check(args, 4, 0),
-        sparse=args_bounds_check(args, 5, False),
         per_sample_weights=args_bounds_check(args, 6, None),
         include_last_offset=args_bounds_check(args, 7, False),
-        # padding index is useful for training only
+        # scale_grad_by_freq, sparse, and padding_idx are useful for training only
+        scale_grad_by_freq=args_bounds_check(args, 3, False),
+        sparse=args_bounds_check(args, 5, False),
+        padding_idx=args_bounds_check(args, 8, -1),
     )
 
 
