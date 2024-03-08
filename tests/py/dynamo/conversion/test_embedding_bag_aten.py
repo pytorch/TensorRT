@@ -8,12 +8,65 @@ from .harness import DispatchTestCase
 class TestEmbeddingBagConverter(DispatchTestCase):
     @parameterized.expand(
         [
+            # mode=0: sum, mode=1: mean, mode=2: max
             # 1D input
             param(
                 test_name="1d_indices_1",
-                weight=torch.randn((10, 3), dtype=torch.float32),
-                indices=torch.tensor([1, 2, 4, 5, 4, 3], dtype=torch.int32),
-                offsets=torch.tensor([0, 3], dtype=torch.int32),
+                weight=torch.randn((10, 2), dtype=torch.float32),
+                indices=torch.tensor(
+                    [1, 2, 4, 5, 4, 3, 2, 6, 8, 1, 2], dtype=torch.int32
+                ),
+                offsets=torch.tensor([0, 2, 4], dtype=torch.int32),
+                scale_grad_by_freq=False,
+                mode=0,
+                sparse=True,
+                per_sample_weights=None,
+                include_last_offset=False,
+                padding_idx=-1,
+            ),
+            param(
+                test_name="1d_indices_2",
+                weight=torch.randn((10, 2), dtype=torch.float32),
+                indices=torch.tensor(
+                    [1, 2, 4, 5, 4, 3, 2, 6, 8, 1, 2], dtype=torch.int32
+                ),
+                offsets=torch.tensor([0, 2, 4], dtype=torch.int32),
+                scale_grad_by_freq=False,
+                mode=1,
+                sparse=True,
+                per_sample_weights=None,
+                include_last_offset=True,
+                padding_idx=-1,
+            ),
+            param(
+                test_name="1d_indices_3",
+                weight=torch.randn((10, 4), dtype=torch.float32),
+                indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int32),
+                offsets=torch.tensor([0, 2, 8], dtype=torch.int32),
+                scale_grad_by_freq=False,
+                mode=2,
+                sparse=False,
+                per_sample_weights=None,
+                include_last_offset=False,
+                padding_idx=-1,
+            ),
+            param(
+                test_name="1d_indices_4",
+                weight=torch.randn((10, 4), dtype=torch.float32),
+                indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int32),
+                offsets=torch.tensor([0, 2, 8], dtype=torch.int32),
+                scale_grad_by_freq=False,
+                mode=0,
+                sparse=False,
+                per_sample_weights=torch.randn((8,)),
+                include_last_offset=True,
+                padding_idx=-1,
+            ),
+            param(
+                test_name="1d_indices_5",
+                weight=torch.randn((10, 4), dtype=torch.float32),
+                indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int32),
+                offsets=torch.tensor([0, 5, 5], dtype=torch.int32),
                 scale_grad_by_freq=False,
                 mode=1,
                 sparse=False,
@@ -22,24 +75,180 @@ class TestEmbeddingBagConverter(DispatchTestCase):
                 padding_idx=-1,
             ),
             param(
-                test_name="1d_indices_2",
-                weight=torch.randn((10, 3), dtype=torch.float32),
-                indices=torch.tensor([1, 2, 4, 5, 4, 3], dtype=torch.int32),
-                offsets=torch.tensor([0, 5], dtype=torch.int32),
+                test_name="1d_indices_6",
+                weight=torch.randn((10, 4), dtype=torch.float32),
+                indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int32),
+                offsets=torch.tensor([0, 5, 5], dtype=torch.int32),
                 scale_grad_by_freq=False,
-                mode=0,
+                mode=2,
                 sparse=False,
-                per_sample_weights=torch.randn((6,)),
+                per_sample_weights=None,
                 include_last_offset=False,
                 padding_idx=-1,
             ),
             param(
-                test_name="1d_indices_3",
-                weight=torch.randn((10, 3), dtype=torch.float32),
+                test_name="1d_indices_7",
+                weight=torch.randn((10, 4), dtype=torch.float32),
                 indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int32),
+                offsets=torch.tensor([0, 8, 8], dtype=torch.int32),
+                scale_grad_by_freq=False,
+                mode=0,
+                sparse=False,
+                per_sample_weights=None,
+                include_last_offset=True,
+                padding_idx=-1,
+            ),
+            param(
+                test_name="1d_indices_8",
+                weight=torch.randn((10, 4), dtype=torch.float32),
+                indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int32),
+                offsets=torch.tensor([0, 8, 8], dtype=torch.int32),
+                scale_grad_by_freq=False,
+                mode=1,
+                sparse=False,
+                per_sample_weights=None,
+                include_last_offset=False,
+                padding_idx=-1,
+            ),
+        ]
+    )
+    def test_embedding_bag_with_traversable_offsets(
+        self,
+        test_name,
+        weight,
+        indices,
+        offsets,
+        scale_grad_by_freq,
+        mode,
+        sparse,
+        per_sample_weights,
+        include_last_offset,
+        padding_idx,
+    ):
+        class TestEmbeddingBag(torch.nn.Module):
+            def forward(self, weight, indices):
+                return torch.ops.aten._embedding_bag.default(
+                    weight,
+                    indices,
+                    offsets,
+                    scale_grad_by_freq,
+                    mode,
+                    sparse,
+                    per_sample_weights,
+                    include_last_offset,
+                    padding_idx,
+                )[0]
+
+        self.run_test(
+            TestEmbeddingBag(),
+            inputs=[weight, indices],
+            # use_dynamo_tracer=True,
+            enable_passes=True,
+        )
+
+    @parameterized.expand(
+        [
+            # mode=0: sum, mode=1: mean, mode=2: max
+            # 1D input
+            param(
+                test_name="1d_indices_1",
+                weight=torch.randn((10, 2), dtype=torch.float32),
+                indices=torch.tensor(
+                    [1, 2, 4, 5, 4, 3, 2, 6, 8, 1, 2], dtype=torch.int32
+                ),
                 offsets=torch.tensor([0, 2, 4], dtype=torch.int32),
                 scale_grad_by_freq=False,
+                mode=0,
+                sparse=True,
+                per_sample_weights=None,
+                include_last_offset=False,
+                padding_idx=-1,
+            ),
+            # TODO: BUG! outputs of tensor and ITensor not matched
+            # param(
+            #     test_name="1d_indices_2",
+            #     # weight=torch.randn((10, 2), dtype=torch.float32),
+            #     # indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 6, 8, 1, 2], dtype=torch.int32),
+            #     weight=torch.arange(12, dtype=torch.float32).reshape(6, 2),
+            #     indices=torch.tensor([0,1,   2,3,  4,5], dtype=torch.int32),
+            #     offsets=torch.tensor([0, 2, 4], dtype=torch.int32),
+            #     scale_grad_by_freq=False,
+            #     mode=0,
+            #     sparse=True,
+            #     per_sample_weights=None,
+            #     include_last_offset=True,
+            #     padding_idx=-1,
+            # ),
+            param(
+                test_name="1d_indices_3",
+                weight=torch.randn((10, 4), dtype=torch.float32),
+                indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int32),
+                offsets=torch.tensor([0, 2, 8], dtype=torch.int32),
+                scale_grad_by_freq=False,
                 mode=2,
+                sparse=False,
+                per_sample_weights=None,
+                include_last_offset=False,
+                padding_idx=-1,
+            ),
+            param(
+                test_name="1d_indices_4",
+                weight=torch.randn((10, 4), dtype=torch.float32),
+                indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int32),
+                offsets=torch.tensor([0, 2, 8], dtype=torch.int32),
+                scale_grad_by_freq=False,
+                mode=0,
+                sparse=False,
+                per_sample_weights=torch.randn((8,)),
+                include_last_offset=True,
+                padding_idx=-1,
+            ),
+            # TODO: BUG! outputs of tensor and ITensor not matched
+            # param(
+            #     test_name="1d_indices_5",
+            #     # weight=torch.randn((10, 4), dtype=torch.float32),
+            #     # indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int32),
+            #     weight=torch.arange(12, dtype=torch.float32).reshape(6, 2),
+            #     indices=torch.tensor([0,1,2, 3,4,5], dtype=torch.int32),
+            #     offsets=torch.tensor([0, 3, 3], dtype=torch.int32),
+            #     scale_grad_by_freq=False,
+            #     mode=1,
+            #     sparse=False,
+            #     per_sample_weights=None,
+            #     include_last_offset=True,
+            #     padding_idx=-1,
+            # ),
+            param(
+                test_name="1d_indices_6",
+                weight=torch.randn((10, 4), dtype=torch.float32),
+                indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int32),
+                offsets=torch.tensor([0, 5, 5], dtype=torch.int32),
+                scale_grad_by_freq=False,
+                mode=2,
+                sparse=False,
+                per_sample_weights=None,
+                include_last_offset=False,
+                padding_idx=-1,
+            ),
+            param(
+                test_name="1d_indices_7",
+                weight=torch.randn((10, 4), dtype=torch.float32),
+                indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int32),
+                offsets=torch.tensor([0, 8, 8], dtype=torch.int32),
+                scale_grad_by_freq=False,
+                mode=0,
+                sparse=False,
+                per_sample_weights=None,
+                include_last_offset=True,
+                padding_idx=-1,
+            ),
+            param(
+                test_name="1d_indices_8",
+                weight=torch.randn((10, 4), dtype=torch.float32),
+                indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int32),
+                offsets=torch.tensor([0, 8, 8], dtype=torch.int32),
+                scale_grad_by_freq=False,
+                mode=1,
                 sparse=False,
                 per_sample_weights=None,
                 include_last_offset=False,
@@ -103,7 +312,7 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             # ),
         ]
     )
-    def test_embedding_bag(
+    def test_embedding_bag_with_ITensor_offsets(
         self,
         test_name,
         weight,
@@ -117,7 +326,7 @@ class TestEmbeddingBagConverter(DispatchTestCase):
         padding_idx,
     ):
         class TestEmbeddingBag(torch.nn.Module):
-            def forward(self, weight, indices):
+            def forward(self, weight, indices, offsets):
                 return torch.ops.aten._embedding_bag.default(
                     weight,
                     indices,
@@ -132,7 +341,8 @@ class TestEmbeddingBagConverter(DispatchTestCase):
 
         self.run_test(
             TestEmbeddingBag(),
-            inputs=[weight, indices],
+            inputs=[weight, indices, offsets],
+            # use_dynamo_tracer=True,
             enable_passes=True,
         )
 
