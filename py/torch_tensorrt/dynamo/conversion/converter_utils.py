@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, 
 
 import numpy as np
 import torch
+import torch_tensorrt.dynamo.conversion.impl as impl
 from torch import SymBool, SymFloat, SymInt
 from torch.fx.node import Argument, Target
 from torch_tensorrt import _enums
@@ -530,3 +531,73 @@ def flatten_dims(
     new_shape = tuple(shape[:start_dim]) + (num_elements,) + tuple(shape[end_dim + 1 :])
 
     return new_shape
+
+
+def append(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    original_tensor: TRTTensor,
+    new_value: Union[TRTTensor, int, float, torch.Tensor, np.ndarray],
+) -> TRTTensor:
+    if isinstance(new_value, (int, float)):
+        new_value = np.array([new_value])
+
+    return impl.cat.cat(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_concat",
+        [original_tensor, new_value],
+        0,
+    )
+
+
+def set_item(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    original_tensor: TRTTensor,
+    index: int,
+    new_value: Union[TRTTensor, int, float, torch.Tensor, np.ndarray],
+) -> TRTTensor:
+    if isinstance(new_value, (int, float)):
+        new_value = np.array([new_value])
+
+    len_original_tensor = original_tensor.shape[0]
+    index = get_positive_dim(index, len_original_tensor)
+
+    front_tensor = impl.slice.slice_op(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_slice_front",
+        original_tensor,
+        dim=0,
+        start=0,
+        stop=index,
+        step=1,
+    )
+    rear_tensor = impl.slice.slice_op(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_slice_rear",
+        original_tensor,
+        dim=0,
+        start=index + 1,
+        stop=len_original_tensor,
+        step=1,
+    )
+
+    ans = impl.cat.cat(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_concat",
+        [front_tensor, new_value, rear_tensor],
+        0,
+    )
+    return ans
