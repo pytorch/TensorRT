@@ -33,7 +33,9 @@ def constant_fold(
     cf.run()
 
     for node, constant in cf.node_replacements.items():
-        replace_node_with_constant(gm, node, torch.nn.Parameter(constant.cuda()))
+        replace_node_with_constant(
+            gm, node, torch.nn.Parameter(constant.cuda(), requires_grad=False)
+        )
 
     erased_params = []
     for node in gm.graph.nodes:
