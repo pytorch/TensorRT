@@ -177,7 +177,7 @@ def embedding_bag_with_ITensor_offsets(
     incremental_tensor_list = []
     for i in range(0, len_embed):
         incremental_tensor_list.append(
-            get_trt_tensor(ctx, i, f"incremental_tensor_{i}")
+            get_trt_tensor(ctx, i, f"{name}_incremental_tensor_{i}")
         )
 
     # traverse offsets to calculate the embedding of each bag
