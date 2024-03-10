@@ -2491,6 +2491,7 @@ def aten_ops_pad(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_nearest2d.default)
 @dynamo_tensorrt_converter(torch.ops.aten.upsample_nearest2d.vec)
 def upsample_nearest2d(
     ctx: ConversionContext,
@@ -2512,6 +2513,7 @@ def upsample_nearest2d(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_bilinear2d.default)
 @dynamo_tensorrt_converter(torch.ops.aten.upsample_bilinear2d.vec)
 def upsample_bilinear2d(
     ctx: ConversionContext,
