@@ -254,7 +254,10 @@ def aten_ops_embedding(
 
 
 def embedding_bag_validator(node: Node) -> bool:
-    indices = node.args[1].meta.get("tensor_meta")
+    meta = node.args[1].meta
+    indices = meta.get("tensor_meta")
+    if indices is None:
+        indices = meta.get("val")
     if indices is None:
         return False
     return len(indices.shape) == 1  # currently only support 1D indices
