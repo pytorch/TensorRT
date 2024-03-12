@@ -58,6 +58,7 @@ class TRTTestCase(TestCase):
                 cuda_inputs.append(i.cuda())
 
             mod.eval()
+            mod = mod.cuda()
             start = time.perf_counter()
             interpreter_result = interpreter.run()
             sec = time.perf_counter() - start
@@ -68,7 +69,7 @@ class TRTTestCase(TestCase):
                 interpreter_result.output_names,
             )
 
-            ref_outputs = mod(*inputs)
+            ref_outputs = mod(*cuda_inputs)
 
             torch.cuda.synchronize()
             start_event = torch.cuda.Event(enable_timing=True)
@@ -98,7 +99,7 @@ class TRTTestCase(TestCase):
                     ref = ref.int()  # convert torch.max's index output tensor to int32
                 torch.testing.assert_close(
                     out.cpu(),
-                    ref,
+                    ref.cpu(),
                     rtol=rtol,
                     atol=atol,
                     equal_nan=True,
