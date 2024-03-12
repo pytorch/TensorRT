@@ -55,7 +55,7 @@ auto constant_pad_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns
            util::toDims(c10::IntArrayRef(stride)));
        TORCHTRT_CHECK(slice_layer, "Unable to create slice layer from node: " << *n);
        slice_layer->setName((util::node_info(n) + "_slice").c_str());
-       slice_layer->setMode(nvinfer1::SliceMode::kFILL);
+       slice_layer->setMode(nvinfer1::SampleMode::kFILL);
        slice_layer->setInput(4, *value_itensor);
 
        if (ctx->input_is_dynamic) {

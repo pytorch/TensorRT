@@ -72,7 +72,7 @@ void resize_layer_size(
     nvinfer1::ITensor* in,
     std::vector<int64_t> out_shape,
     std::vector<float> scales,
-    nvinfer1::ResizeMode mode,
+    nvinfer1::InterpolationMode mode,
     bool align_corners = false) {
   TORCHTRT_CHECK((out_shape.size() > 0) ^ (scales.size() > 0), "only one of out_shape or scales should be defined");
   auto resize_layer = ctx->net->addResize(*in);
@@ -141,7 +141,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  float scale = args[2].IValue()->toDouble();
                  std::vector<float> padded_scales(in_shape.size(), 1);
                  padded_scales[padded_scales.size() - 1] = scale;
-                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kNEAREST);
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::InterpolationMode::kNEAREST);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -150,7 +150,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kNEAREST);
+                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::InterpolationMode::kNEAREST);
                }
 
                return true;
@@ -172,7 +172,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  float scale = scale_factors[0];
                  std::vector<float> padded_scales(in_shape.size(), 1);
                  padded_scales[padded_scales.size() - 1] = scale;
-                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kNEAREST);
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::InterpolationMode::kNEAREST);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -181,7 +181,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kNEAREST);
+                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::InterpolationMode::kNEAREST);
                }
 
                return true;
@@ -203,7 +203,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  std::vector<float> padded_scales(in_shape.size(), 1);
                  padded_scales[padded_scales.size() - 2] = scale_h;
                  padded_scales[padded_scales.size() - 1] = scale_w;
-                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kNEAREST);
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::InterpolationMode::kNEAREST);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -212,7 +212,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kNEAREST);
+                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::InterpolationMode::kNEAREST);
                }
 
                return true;
@@ -236,7 +236,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  std::vector<float> padded_scales(in_shape.size(), 1);
                  padded_scales[padded_scales.size() - 2] = scale_h;
                  padded_scales[padded_scales.size() - 1] = scale_w;
-                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kNEAREST);
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::InterpolationMode::kNEAREST);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -245,7 +245,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kNEAREST);
+                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::InterpolationMode::kNEAREST);
                }
 
                return true;
@@ -270,7 +270,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  padded_scales[padded_scales.size() - 3] = scale_d;
                  padded_scales[padded_scales.size() - 2] = scale_h;
                  padded_scales[padded_scales.size() - 1] = scale_w;
-                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kNEAREST);
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::InterpolationMode::kNEAREST);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -279,7 +279,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kNEAREST);
+                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::InterpolationMode::kNEAREST);
                }
 
                return true;
@@ -306,7 +306,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  padded_scales[padded_scales.size() - 3] = scale_d;
                  padded_scales[padded_scales.size() - 2] = scale_h;
                  padded_scales[padded_scales.size() - 1] = scale_w;
-                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kNEAREST);
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::InterpolationMode::kNEAREST);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -315,7 +315,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kNEAREST);
+                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::InterpolationMode::kNEAREST);
                }
 
                return true;
@@ -336,7 +336,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  float scale = args[3].IValue()->toDouble();
                  std::vector<float> padded_scales(in_shape.size(), 1);
                  padded_scales[padded_scales.size() - 1] = scale;
-                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::InterpolationMode::kLINEAR, align_corners);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -345,7 +345,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, align_corners);
+                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::InterpolationMode::kLINEAR, align_corners);
                }
 
                return true;
@@ -368,7 +368,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  float scale = scale_factors[0];
                  std::vector<float> padded_scales(in_shape.size(), 1);
                  padded_scales[padded_scales.size() - 1] = scale;
-                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::InterpolationMode::kLINEAR, align_corners);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -377,7 +377,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, align_corners);
+                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::InterpolationMode::kLINEAR, align_corners);
                }
 
                return true;
@@ -400,7 +400,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  std::vector<float> padded_scales(in_shape.size(), 1);
                  padded_scales[padded_scales.size() - 2] = scale_h;
                  padded_scales[padded_scales.size() - 1] = scale_w;
-                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::InterpolationMode::kLINEAR, align_corners);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -410,7 +410,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, align_corners);
+                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::InterpolationMode::kLINEAR, align_corners);
                }
 
                return true;
@@ -435,7 +435,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  std::vector<float> padded_scales(in_shape.size(), 1);
                  padded_scales[padded_scales.size() - 2] = scale_h;
                  padded_scales[padded_scales.size() - 1] = scale_w;
-                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::InterpolationMode::kLINEAR, align_corners);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -445,7 +445,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, align_corners);
+                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::InterpolationMode::kLINEAR, align_corners);
                }
 
                return true;
@@ -470,7 +470,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  padded_scales[padded_scales.size() - 3] = scale_d;
                  padded_scales[padded_scales.size() - 2] = scale_h;
                  padded_scales[padded_scales.size() - 1] = scale_w;
-                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::InterpolationMode::kLINEAR, align_corners);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -480,7 +480,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, align_corners);
+                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::InterpolationMode::kLINEAR, align_corners);
                }
 
                return true;
@@ -507,7 +507,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                  padded_scales[padded_scales.size() - 3] = scale_d;
                  padded_scales[padded_scales.size() - 2] = scale_h;
                  padded_scales[padded_scales.size() - 1] = scale_w;
-                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::ResizeMode::kLINEAR, align_corners);
+                 resize_layer_size(ctx, n, in, {}, padded_scales, nvinfer1::InterpolationMode::kLINEAR, align_corners);
                } else {
                  // Case 2: user uses output size
                  auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -517,7 +517,7 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::ResizeMode::kLINEAR, align_corners);
+                 resize_layer_size(ctx, n, in, out_shape, {}, nvinfer1::InterpolationMode::kLINEAR, align_corners);
                }
 
                return true;

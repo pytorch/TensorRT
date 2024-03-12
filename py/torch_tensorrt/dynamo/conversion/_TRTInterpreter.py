@@ -172,7 +172,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         if version.parse(trt.__version__) >= version.parse("8.2"):
             builder_config.profiling_verbosity = (
-                trt.ProfilingVerbosity.VERBOSE
+                trt.ProfilingVerbosity.DETAILED
                 if self.compilation_settings.debug
                 else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
             )
@@ -252,7 +252,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if tactic_sources is not None:
             builder_config.set_tactic_sources(tactic_sources=tactic_sources)
 
-        engine = self.builder.build_engine(self.ctx.net, builder_config)
+        engine = self.builder.build_serialized_network(self.ctx.net, builder_config)
         assert engine
 
         serialized_cache = (
@@ -263,7 +263,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
-        _LOGGER.info(f"TRT Engine uses: {engine.device_memory_size} bytes of Memory")
+        _LOGGER.info(f"TRT Engine uses: {engine.nbytes} bytes of Memory")
 
         return TRTInterpreterResult(
             engine, self._input_names, self._output_names, serialized_cache

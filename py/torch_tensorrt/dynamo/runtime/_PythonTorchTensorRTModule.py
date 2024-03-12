@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import nullcontext
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import tensorrt as trt
 import torch
@@ -55,72 +55,68 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
     def _initialize(self) -> None:
         self.initialized = True
+        logger = trt.Logger()
+        runtime = trt.Runtime(logger)
+        self.engine = runtime.deserialize_cuda_engine(self.engine)
         self.context = self.engine.create_execution_context()
 
         # Indices of inputs/outputs in the trt engine bindings, in the order
         # as they are in the original PyTorch model.
-        self.input_binding_indices_in_order: Sequence[int] = [
-            self.engine.get_binding_index(name) for name in self.input_names
-        ]
-        self.output_binding_indices_in_order: Sequence[int] = [
-            self.engine.get_binding_index(name) for name in self.output_names
-        ]
-        primary_input_outputs = set()
-        primary_input_outputs.update(self.input_binding_indices_in_order)
-        primary_input_outputs.update(self.output_binding_indices_in_order)
-        self.hidden_output_binding_indices_in_order: Sequence[int] = []
-        self.hidden_output_names: Sequence[str] = []
-        for i in range(
-            self.engine.num_bindings // self.engine.num_optimization_profiles
-        ):
-            if i not in primary_input_outputs:
-                self.hidden_output_binding_indices_in_order.append(i)
-                self.hidden_output_names.append(self.engine.get_binding_name(i))
 
-        assert (self.engine.num_bindings // self.engine.num_optimization_profiles) == (
+        # TODO: Verify if the following is required especially the hidden outputs
+        # self.input_binding_indices_in_order: Sequence[int] = [
+        #     self.engine.get_binding_index(name) for name in self.input_names
+        # ]
+        # self.output_binding_indices_in_order: Sequence[int] = [
+        #     self.engine.get_binding_index(name) for name in self.output_names
+        # ]
+        # primary_input_outputs = set()
+        # primary_input_outputs.update(self.input_binding_indices_in_order)
+        # primary_input_outputs.update(self.output_binding_indices_in_order)
+        # self.hidden_output_binding_indices_in_order: Sequence[int] = []
+        # self.hidden_output_names: Sequence[str] = []
+        # for i in range(
+        #     self.engine.num_bindings // self.engine.num_optimization_profiles
+        # ):
+        #     if i not in primary_input_outputs:
+        #         self.hidden_output_binding_indices_in_order.append(i)
+        #         self.hidden_output_names.append(self.engine.get_binding_name(i))
+
+        assert (
+            self.engine.num_io_tensors // self.engine.num_optimization_profiles
+        ) == (
             len(self.input_names)
             + len(self.output_names)
-            + len(self.hidden_output_names)
+            # + len(self.hidden_output_names) #TODO: Verify if this is required
         )
 
         self.input_dtypes = [
             unified_dtype_converter(
-                self.engine.get_binding_dtype(idx), Frameworks.TORCH
+                self.engine.get_tensor_dtype(input_name), Frameworks.TORCH
             )
-            for idx in self.input_binding_indices_in_order
+            for input_name in self.input_names
         ]
-        self.input_shapes: Sequence[Sequence[int]] = [
-            tuple(self.engine.get_binding_shape(idx))
-            for idx in self.input_binding_indices_in_order
+        self.input_shapes = [
+            self.engine.get_tensor_shape(input_name) for input_name in self.input_names
         ]
         self.output_dtypes = [
             unified_dtype_converter(
-                self.engine.get_binding_dtype(idx), Frameworks.TORCH
+                self.engine.get_tensor_dtype(output_name), Frameworks.TORCH
             )
-            for idx in self.output_binding_indices_in_order
+            for output_name in self.output_names
         ]
         self.output_shapes = [
-            (
-                tuple(self.engine.get_binding_shape(idx))
-                if self.engine.has_implicit_batch_dimension
-                else tuple()
-            )
-            for idx in self.output_binding_indices_in_order
+            self.engine.get_tensor_shape(output_name)
+            for output_name in self.output_names
         ]
-        self.hidden_output_dtypes = [
-            unified_dtype_converter(
-                self.engine.get_binding_dtype(idx), Frameworks.TORCH
-            )
-            for idx in self.hidden_output_binding_indices_in_order
-        ]
-        self.hidden_output_shapes = [
-            (
-                tuple(self.engine.get_binding_shape(idx))
-                if self.engine.has_implicit_batch_dimension
-                else tuple()
-            )
-            for idx in self.hidden_output_binding_indices_in_order
-        ]
+
+        # TODO: Verify what this is for ?
+        # self.hidden_output_dtypes = [
+        #     unified_dtype_converter(
+        #         self.engine.get_binding_dtype(idx), Frameworks.TORCH
+        #     )
+        #     for idx in self.hidden_output_binding_indices_in_order
+        # ]
 
     def _check_initialized(self) -> None:
         if not self.initialized:
@@ -217,12 +213,12 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(inputs)}."
 
                 contiguous_inputs: List[torch.Tensor] = [i.contiguous() for i in inputs]
-                bindings: List[Any] = [None] * (
-                    len(self.input_names)
-                    + len(self.output_names)
-                    + len(self.hidden_output_names)
-                )
-
+                bindings = []
+                # [None] * (
+                #     len(self.input_names)
+                #     + len(self.output_names)
+                #     # + len(self.hidden_output_names) # TODO: Verify if this is required
+                # )
                 for i, input_name in enumerate(self.input_names):
                     if not contiguous_inputs[i].is_cuda:
                         logger.warning(
@@ -241,11 +237,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         contiguous_inputs[i].dtype == self.input_dtypes[i]
                     ), f"Dtype mismatch for {i}th input({input_name}). Expect {self.input_dtypes[i]}, got {contiguous_inputs[i].dtype}."
 
-                    idx = self.input_binding_indices_in_order[i]
-                    bindings[idx] = contiguous_inputs[i].data_ptr()
-
-                    self.context.set_binding_shape(
-                        idx, tuple(contiguous_inputs[i].shape)
+                    bindings.append(contiguous_inputs[i].data_ptr())
+                    self.context.set_input_shape(
+                        input_name, tuple(contiguous_inputs[i].shape)
                     )
 
             with (
@@ -258,26 +252,32 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 # create output tensors
                 outputs: List[torch.Tensor] = []
 
-                for i, idx in enumerate(self.output_binding_indices_in_order):
-                    shape = tuple(self.context.get_binding_shape(idx))
+                for i, output_name in enumerate(self.output_names):
+                    shape = tuple(self.context.get_tensor_shape(output_name))
 
                     output = torch.empty(
                         size=shape,
                         dtype=self.output_dtypes[i],
                         device=torch.cuda.current_device(),
                     )
+                    bindings.append(output.data_ptr())
                     outputs.append(output)
-                    bindings[idx] = output.data_ptr()
 
-                for i, idx in enumerate(self.hidden_output_binding_indices_in_order):
-                    shape = tuple(self.context.get_binding_shape(idx))
+                # TODO: Check what is this for ?
+                # for i, idx in enumerate(self.hidden_output_binding_indices_in_order):
+                #     shape = tuple(self.context.get_binding_shape(idx))
 
-                    output = torch.empty(
-                        size=shape,
-                        dtype=self.hidden_output_dtypes[i],
-                        device=torch.cuda.current_device(),
-                    )
-                    bindings[idx] = output.data_ptr()
+                #     output = torch.empty(
+                #         size=shape,
+                #         dtype=self.hidden_output_dtypes[i],
+                #         device=torch.cuda.current_device(),
+                #     )
+
+            # Assign tensor address appropriately
+            for idx in range(self.engine.num_io_tensors):
+                self.context.set_tensor_address(
+                    self.engine.get_tensor_name(idx), bindings[idx]
+                )
 
             with (
                 torch.autograd.profiler.record_function(
@@ -286,9 +286,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if self.profiling_enabled
                 else nullcontext()
             ):
-                self.context.execute_async_v2(
-                    bindings, torch.cuda.current_stream().cuda_stream
-                )
+                self.context.execute_async_v3(torch.cuda.current_stream().cuda_stream)
 
             if len(outputs) == 1:
                 return outputs[0]

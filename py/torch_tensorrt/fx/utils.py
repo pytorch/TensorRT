@@ -1,18 +1,21 @@
 from enum import Enum
-from typing import Dict, List, Optional, Callable, Union
+from typing import Callable, Dict, List, Optional, Union
+
 import numpy as np
-from packaging import version
 
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
 from functorch import make_fx
 from functorch.experimental import functionalize
+from torch_tensorrt._utils import sanitized_torch_version
 from torch_tensorrt.fx.passes.lower_basic_pass import (
     replace_op_with_indices,
     run_const_fold,
 )
-from torch_tensorrt._utils import sanitized_torch_version
+
+from packaging import version
+
 from .types import Shape, TRTDataType
 
 
@@ -44,6 +47,11 @@ DataTypeEquivalence: Dict[
         Frameworks.NUMPY: np.float32,
         Frameworks.TORCH: torch.float32,
         Frameworks.TRT: trt.float32,
+    },
+    trt.bool: {
+        Frameworks.NUMPY: bool,
+        Frameworks.TORCH: torch.bool,
+        Frameworks.TRT: trt.bool,
     },
 }
 
@@ -89,10 +97,10 @@ def unified_dtype_converter(
         The equivalent data type in the requested framework.
     """
     assert to in Frameworks, f"Expected valid Framework for translation, got {to}"
-
+    trt_major_version = int(trt.__version__.split(".")[0])
     if dtype in (np.int8, torch.int8, trt.int8):
         return DataTypeEquivalence[trt.int8][to]
-    elif trt.__version__ >= "7.0" and dtype in (np.bool_, torch.bool, trt.bool):
+    elif trt_major_version >= 7 and dtype in (np.bool_, torch.bool, trt.bool):
         return DataTypeEquivalence[trt.bool][to]
     elif dtype in (np.int32, torch.int32, trt.int32):
         return DataTypeEquivalence[trt.int32][to]

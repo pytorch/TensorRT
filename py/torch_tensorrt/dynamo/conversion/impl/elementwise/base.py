@@ -147,17 +147,6 @@ def convert_binary_elementwise(
             ctx, rhs_val, trt_promoted_type, name, target, source_ir
         )
 
-    # Check the limitation in the doc string.
-    if ctx.net.has_implicit_batch_dimension:
-        if is_lhs_trt_tensor and not is_rhs_trt_tensor:
-            assert len(lhs_val.shape) >= len(
-                rhs_val.shape
-            ), f"{lhs_val.shape} >= {rhs_val.shape}"
-        elif not is_lhs_trt_tensor and is_rhs_trt_tensor:
-            assert len(rhs_val.shape) >= len(
-                lhs_val.shape
-            ), f"{rhs_val.shape} >= {lhs_val.shape}"
-
     lhs_val, rhs_val = broadcast(
         ctx.net, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
     )
