@@ -324,6 +324,12 @@ You can register a converter for your op using the `NodeConverterRegistry` insid
 | [**py**](py)             | Python API for Torch-TensorRT                                |
 | [**tests**](tests)       | Unit tests for Torch-TensorRT                                |
 
+## Deprecation Policy
+
+Deprecation is used to inform developers that some APIs and tools are no longer recommended for use. Beginning with version 2.3, Torch-TensorRT has the following deprecation policy:
+
+Deprecation notices are communicated in the Release Notes. Deprecated API functions will have a statement in the source documenting when they were deprecated. Deprecated methods and classes will issue deprecation warnings at runtime, if they are used. Torch-TensorRT provides a 6-month migration period after the deprecation. APIs and tools continue to work during the migration period. After the migration period ends, APIs and tools are removed in a manner consistent with semantic versioning.
+
 ## Contributing
 
 Take a look at the [CONTRIBUTING.md](CONTRIBUTING.md)
