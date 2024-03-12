@@ -61,7 +61,7 @@ nvinfer1::ILayer* add_bias_layer(
   auto* sliceLayer = ctx->net->addSlice(*input_tensor, dummy, dummy, stride);
   sliceLayer->setInput(1, *start);
   sliceLayer->setInput(2, *size);
-  sliceLayer->setMode(nvinfer1::SliceMode::kFILL);
+  sliceLayer->setMode(nvinfer1::SampleMode::kFILL);
   nvinfer1::ITensor* slice_output = sliceLayer->getOutput(0);
 
   nvinfer1::Dims constantDims;
@@ -194,7 +194,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
       nvinfer1::IConvolutionLayer* convLayer =
           ctx->net->addConvolutionNd(*in, num_output_maps, filter_dim, kernel_weights, bias.data);
       convLayer->setStrideNd(stride);
-      convLayer->setPaddingMode(nvinfer1::PaddingMode::kCAFFE_ROUND_DOWN);
+      convLayer->setPaddingMode(nvinfer1::PaddingMode::kEXPLICIT_ROUND_DOWN);
       convLayer->setPaddingNd(padding);
       convLayer->setPostPadding(out_padding);
       convLayer->setDilationNd(dilation);
@@ -293,7 +293,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     TORCHTRT_CHECK(conv, "Unable to create convolution layer from node: " << *n);
 
     conv->setStrideNd(stride);
-    conv->setPaddingMode(nvinfer1::PaddingMode::kCAFFE_ROUND_DOWN);
+    conv->setPaddingMode(nvinfer1::PaddingMode::kEXPLICIT_ROUND_DOWN);
     conv->setPaddingNd(padding);
     conv->setPostPadding(out_padding);
     conv->setDilationNd(dilation);
