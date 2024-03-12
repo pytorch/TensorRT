@@ -41,11 +41,10 @@ auto linear_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pat
        }
 
        // Convert w_tensor to ITensor
-       auto weight_tensor = args[1].IValue()->toTensor();
-       weight_tensor = tensor_to_const(ctx, weight_tensor, util::node_info(n) + "_weight")
-
-           auto mm_layer = ctx->net->addMatrixMultiply(
-               *in, nvinfer1::MatrixOperation::kNONE, *weight_tensor, nvinfer1::MatrixOperation::kNONE);
+       auto weight = args[1].IValue()->toTensor();
+       auto weight_tensor = tensor_to_const(ctx, weight, util::node_info(n) + "_weight");
+       auto mm_layer = ctx->net->addMatrixMultiply(
+           *in, nvinfer1::MatrixOperation::kNONE, *weight_tensor, nvinfer1::MatrixOperation::kNONE);
 
        TORCHTRT_CHECK(mm_layer, "Unable to create linear layer from node: " << *n);
        mm_layer->setName(util::node_info(n).c_str());
@@ -54,10 +53,11 @@ auto linear_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pat
 
        if (!args[2].IValue()->isNone()) {
          // Convert bias to ITensor
-         auto bias_tensor = args[2].IValue()->toTensor();
-         bias_tensor = tensor_to_const(ctx, bias_tensor, util::node_info(n) + "_bias");
-         mm_output = add_elementwise(
+         auto bias = args[2].IValue()->toTensor();
+         auto bias_tensor = tensor_to_const(ctx, bias, util::node_info(n) + "_bias");
+         auto bias_add_layer = add_elementwise(
              ctx, nvinfer1::ElementWiseOperation::kSUM, mm_output, bias_tensor, util::node_info(n) + "_bias_add");
+         mm_output = bias_add_layer->getOutput(0);
        }
        auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mm_output);
 

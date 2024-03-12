@@ -21,10 +21,10 @@
 #include "torch_tensorrt/macros.h"
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
-namespace nvinfer1 {
-class IInt8Calibrator;
-class IInt8EntropyCalibrator2;
-} // namespace nvinfer1
+// namespace nvinfer1 {
+// class IInt8Calibrator;
+// class IInt8EntropyCalibrator2;
+// } // namespace nvinfer1
 
 namespace torch_tensorrt {
 namespace ptq {
