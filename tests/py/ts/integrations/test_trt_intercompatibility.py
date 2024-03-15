@@ -5,7 +5,10 @@ import torchvision.models as models
 import tensorrt as trt
 from utils import cosine_similarity, COSINE_THRESHOLD
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestPyTorchToTRTEngine(unittest.TestCase):
     def test_pt_to_trt(self):
         self.model = models.resnet18(pretrained=True).eval().to("cuda:0")

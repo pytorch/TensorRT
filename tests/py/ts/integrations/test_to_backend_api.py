@@ -5,6 +5,10 @@ import torchvision.models as models
 from utils import cosine_similarity, COSINE_THRESHOLD
 
 
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestToBackendLowering(unittest.TestCase):
     def setUp(self):
         self.input = torch.randn((1, 3, 300, 300)).to("cuda")
@@ -23,7 +27,7 @@ class TestToBackendLowering(unittest.TestCase):
                         "dla_core": 0,
                         "allow_gpu_fallback": True,
                     },
-                    "capability": torchtrt.EngineCapability.default,
+                    "capability": torchtrt.ts.EngineCapability.default,
                     "num_avg_timing_iters": 1,
                     "disable_tf32": False,
                 }

@@ -4,6 +4,7 @@ from typing import Any, List, Optional, Sequence, Set, Tuple
 
 import torch
 import torch_tensorrt._C.ts as _C
+from torch_tensorrt.ts import _enums
 from torch_tensorrt._Device import Device
 from torch_tensorrt._Input import Input
 from torch_tensorrt.ts._compile_spec import _parse_compile_spec, _parse_device

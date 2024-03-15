@@ -196,10 +196,7 @@ def to_torch_device(device: Optional[Union[Device, torch.device, str]]) -> torch
     Returns the corresponding torch.device
     """
     if isinstance(device, Device):
-        if device.gpu_id != -1:
-            return torch.device(device.gpu_id)
-        else:
-            raise ValueError("Invalid GPU ID provided for the CUDA device provided")
+        return device.to(torch.device)
 
     elif isinstance(device, torch.device):
         return device
@@ -218,17 +215,7 @@ def to_torch_tensorrt_device(
 
     Returns the corresponding torch_tensorrt.Device
     """
-    if isinstance(device, Device):
-        return device
-
-    elif isinstance(device, torch.device):
-        return Device(gpu_id=device.index)
-
-    elif device is None:
-        return Device(gpu_id=torch.cuda.current_device())
-
-    else:
-        return Device(device)
+    return Device._from(device)
 
 
 def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:

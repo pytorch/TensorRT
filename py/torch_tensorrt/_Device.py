@@ -1,25 +1,17 @@
 import sys
 from typing import Any, Optional, Tuple
 
+import logging
+
 if sys.version_info >= (3, 11):
     from typing import Self
 else:
     from typing_extensions import Self
 
-import warnings
-
-# from torch_tensorrt import _enums
 import tensorrt as trt
 import torch
-from torch_tensorrt import logging
-
-try:
-    from torch_tensorrt import _C
-except ImportError:
-    warnings.warn(
-        "Unable to import torchscript frontend core and torch-tensorrt runtime. Some dependent features may be unavailable."
-    )
-
+from torch_tensorrt._enums import DeviceType
+from torch_tensorrt._features import ENABLED_FEATURES
 
 class Device(object):
     """
@@ -32,9 +24,7 @@ class Device(object):
         allow_gpu_fallback (bool): Whether falling back to GPU if DLA cannot support an op should be allowed
     """
 
-    device_type: Optional[trt.DeviceType] = (
-        None  #: Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.
-    )
+    device_type: Optional[DeviceType] = None  #: Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.
     gpu_id: int = -1  #: Device ID for target GPU
     dla_core: int = -1  #: Core ID for target DLA core
     allow_gpu_fallback: bool = (
@@ -62,6 +52,7 @@ class Device(object):
             - Device(dla_core=0, allow_gpu_fallback=True)
             - Device(gpu_id=1)
         """
+        print(args, kwargs)
         if len(args) == 1:
             if not isinstance(args[0], str):
                 raise TypeError(
@@ -69,32 +60,32 @@ class Device(object):
                 )
             else:
                 (self.device_type, id) = Device._parse_device_str(args[0])
-                if self.device_type == trt.DeviceType.GPU:
-                    self.gpu_id = id
-                else:
+                if self.device_type == DeviceType.DLA:
                     self.dla_core = id
                     self.gpu_id = 0
-                    logging.log(
-                        logging.Level.Warning,
-                        "Setting GPU id to 0 for device because device 0 manages DLA on Xavier",
+                    logging.warn(
+                        "Setting GPU id to 0 for device because device 0 manages DLA on AGX Devices",
                     )
+                else:
+                    self.gpu_id = id
 
         elif len(args) == 0:
             if "gpu_id" in kwargs or "dla_core" in kwargs:
                 if "dla_core" in kwargs:
-                    self.device_type = trt.DeviceType.DLA
                     self.dla_core = kwargs["dla_core"]
-                    if "gpu_id" in kwargs:
-                        self.gpu_id = kwargs["gpu_id"]
-                    else:
+                if "gpu_id" in kwargs:
+                    self.gpu_id = kwargs["gpu_id"]
+
+
+                if self.dla_core >= 0:
+                    self.device_type = DeviceType.DLA
+                    if self.gpu_id != 0:
                         self.gpu_id = 0
-                        logging.log(
-                            logging.Level.Warning,
-                            "Setting GPU id to 0 for device because device 0 manages DLA on Xavier",
+                        logging.warn(
+                            "Setting GPU id to 0 for device because device 0 manages DLA on AGX Platforms",
                         )
                 else:
-                    self.gpu_id = kwargs["gpu_id"]
-                    self.device_type = trt.DeviceType.GPU
+                    self.device_type = DeviceType.GPU
             else:
                 raise ValueError(
                     "Either gpu_id or dla_core or both must be defined if no string with device specs is provided as an arg"
@@ -112,58 +103,82 @@ class Device(object):
                 raise TypeError("allow_gpu_fallback must be a bool")
             self.allow_gpu_fallback = kwargs["allow_gpu_fallback"]
 
+        if "device_type" in kwargs:
+            if isinstance(kwargs["device_type"], trt.DeviceType):
+                self.device_type = DeviceType._from(kwargs["device_type"])
+
+
     def __str__(self) -> str:
-        return (
-            "Device(type={}, gpu_id={}".format(self.device_type, self.gpu_id) + ")"
-            if self.device_type == trt.DeviceType.GPU
-            else ", dla_core={}, allow_gpu_fallback={}".format(
-                self.dla_core, self.allow_gpu_fallback
-            )
-        )
+        suffix = ")" if self.device_type == DeviceType.GPU else ", dla_core={}, allow_gpu_fallback={})".format(self.dla_core, self.allow_gpu_fallback)
+        return "Device(type={}, gpu_id={}{}".format(self.device_type, self.gpu_id, suffix)
+
 
     def __repr__(self) -> str:
         return self.__str__()
 
-    def _to_internal(self) -> _C.Device:
-        internal_dev = _C.Device()
-        if self.device_type == trt.DeviceType.GPU:
-            internal_dev.device_type = _C.DeviceType.GPU
-        elif self.device_type == trt.DeviceType.DLA:
-            internal_dev.device_type = _C.DeviceType.DLA
+    @classmethod
+    def _from(cls, d: Optional[Self | torch.device | str]) -> Self:
+        """Cast a device-type to torch_tensorrt.Device
+
+        Returns the corresponding torch_tensorrt.Device
+        """
+        if isinstance(d, Device):
+            return d
+
+        elif isinstance(d, torch.device):
+            if d.type != "cuda":
+                raise ValueError('Torch Device specs must have type "cuda"')
+            return cls(gpu_id=d.index)
+
+        elif d is None:
+            return cls(gpu_id=torch.cuda.current_device())
+
         else:
-            raise ValueError(
-                "Invalid DeviceType detected while parsing the Device class"
-            )
-
-        internal_dev.gpu_id = self.gpu_id
-        internal_dev.dla_core = self.dla_core
-        internal_dev.allow_gpu_fallback = self.allow_gpu_fallback
-        return internal_dev
-
-    def _to_serialized_rt_device(self) -> str:
-        internal_dev = self._to_internal()
-        serialized_rt_device: str = internal_dev._to_serialized_rt_device()
-        return serialized_rt_device
+            return cls(d)
 
     @classmethod
     def _from_torch_device(cls, torch_dev: torch.device) -> Self:
-        if torch_dev.type != "cuda":
-            raise ValueError('Torch Device specs must have type "cuda"')
-        gpu_id = torch_dev.index
-        return cls(gpu_id=gpu_id)
+        return cls._from(torch_dev)
 
     @classmethod
     def _current_device(cls) -> Self:
-        dev = _C._get_current_device()
-        return cls(gpu_id=dev.gpu_id)
+        dev_id = torch.cuda.current_device()
+        return cls(gpu_id=dev_id)
 
     @staticmethod
     def _parse_device_str(s: str) -> Tuple[trt.DeviceType, int]:
         s = s.lower()
         spec = s.split(":")
         if spec[0] == "gpu" or spec[0] == "cuda":
-            return (trt.DeviceType.GPU, int(spec[1]))
+            return (DeviceType.GPU, int(spec[1]))
         elif spec[0] == "dla":
-            return (trt.DeviceType.DLA, int(spec[1]))
+            return (DeviceType.DLA, int(spec[1]))
         else:
             raise ValueError(f"Unknown device type {spec[0]}")
+
+    def to(self, t: type) -> torch.device:
+        if t == torch.device:
+            if self.gpu_id != -1:
+                return torch.device(self.gpu_id)
+            else:
+                raise ValueError("Invalid GPU ID provided for the CUDA device provided")
+        else:
+            raise TypeError("Unsupported target type for device conversion")
+
+    def _to_serialized_rt_device(self) -> str:
+        if ENABLED_FEATURES.torch_tensorrt_runtime:
+            delim = torch.ops.tensorrt.SERIALIZED_RT_DEVICE_DELIM()[0]
+            dev_info = torch.cuda.get_device_properties(self.gpu_id)
+            rt_info = [
+                self.gpu_id,
+                dev_info.major,
+                dev_info.minor,
+                int(self.device_type.to(trt.DeviceType)),
+                dev_info.name
+            ]
+            rt_info = [str(i) for i in rt_info]
+            packed_rt_info = delim.join(rt_info)
+            logging.debug("Serialized Device Info: {}".format(packed_rt_info))
+            return packed_rt_info
+        else:
+            raise NotImplementedError("Torch-TensorRT runtime is not available")

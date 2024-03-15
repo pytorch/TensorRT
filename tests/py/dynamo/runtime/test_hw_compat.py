@@ -7,6 +7,14 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 
 
 class TestHardwareCompatibility(TestCase):
+    @unittest.skipIf(
+        not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+        "Torch-TensorRT Runtime is not available"
+    )
+    @unittest.skipIf(
+        not torch.cuda.get_device_properties(torch.cuda.current_device()).major >= 8,
+        "HW Compatibility is not supported on cards older than Ampere"
+    )
     def test_hw_compat_enabled(self):
         class SampleModel(torch.nn.Module):
             def forward(self, x):
@@ -57,6 +65,14 @@ class TestHardwareCompatibility(TestCase):
     @unittest.skipIf(
         torch.ops.tensorrt.ABI_VERSION() != "5",
         "Detected incorrect ABI version, please update this test case",
+    )
+    @unittest.skipIf(
+        not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+        "Torch-TensorRT runtime is not available"
+    )
+    @unittest.skipIf(
+        not torch.cuda.get_device_properties(torch.cuda.current_device()).major >= 8,
+        "HW Compatibility is not supported on cards older than Ampere"
     )
     def test_hw_compat_3080_build(self):
         inputs = [torch.randn(5, 7).cuda()]

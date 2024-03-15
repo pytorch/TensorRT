@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import io
 from typing import Sequence
+import logging
 
 import tensorrt as trt
 import torch
 from torch_tensorrt._Input import Input
+from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreter,
@@ -14,6 +16,7 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import get_torch_inputs
 
+logger = logging.getLogger(__name__)
 
 def interpret_module_to_result(
     module: torch.fx.GraphModule,
@@ -73,7 +76,9 @@ def convert_module(
     """
     interpreter_result = interpret_module_to_result(module, inputs, settings)
 
-    if settings.use_python_runtime:
+    if settings.use_python_runtime or not ENABLED_FEATURES.torch_tensorrt_runtime:
+        if not settings.use_python_runtime:
+            logger.info("Since Torch-TensorRT runtime is not available, using Python Runtime, some features may not be available")
         return PythonTorchTensorRTModule(
             engine=interpreter_result.engine,
             input_names=list(interpreter_result.input_names),

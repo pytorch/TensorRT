@@ -80,14 +80,23 @@ dir_path = str(get_root_dir()) + "/py"
 
 CXX11_ABI = False
 JETPACK_VERSION = None
-FX_ONLY = False
+PY_ONLY = False
+NO_TS = False
 LEGACY = False
 RELEASE = False
 CI_BUILD = False
 
 if "--fx-only" in sys.argv:
-    FX_ONLY = True
+    PY_ONLY = True
     sys.argv.remove("--fx-only")
+
+if "--py-only" in sys.argv:
+    PY_ONLY = True
+    sys.argv.remove("--py-only")
+
+if "--no-ts" in sys.argv:
+    NO_TS = True
+    sys.argv.remove("--no-ts")
 
 if "--legacy" in sys.argv:
     LEGACY = True
@@ -96,6 +105,14 @@ if "--legacy" in sys.argv:
 if "--release" in sys.argv:
     RELEASE = True
     sys.argv.remove("--release")
+
+if (no_ts_env_var := os.environ.get("NO_TORCHSCRIPT")) is not None:
+    if no_ts_env_var == "1":
+        NO_TS = True
+
+if (py_only_env_var := os.environ.get("PYTHON_ONLY")) is not None:
+    if py_only_env_var == "1":
+        PY_ONLY = True
 
 if (release_env_var := os.environ.get("RELEASE")) is not None:
     if release_env_var == "1":
@@ -168,7 +185,7 @@ def which(program):
 
 
 BAZEL_EXE = None
-if not FX_ONLY:
+if not PY_ONLY:
     BAZEL_EXE = which("bazelisk")
 
     if BAZEL_EXE is None:
@@ -177,9 +194,13 @@ if not FX_ONLY:
             sys.exit("Could not find bazel in PATH")
 
 
-def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
+def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False, rt_only=False):
     cmd = [BAZEL_EXE, "build"]
-    cmd.append("//:libtorchtrt")
+    if rt_only:
+        cmd.append("//:libtorchtrt_runtime")
+    else:
+        cmd.append("//:libtorchtrt")
+
     if develop:
         cmd.append("--compilation_mode=dbg")
     else:
@@ -224,7 +245,7 @@ def gen_version_file():
         f.write('__tensorrt_version__ = "' + __tensorrt_version__ + '"\n')
 
 
-def copy_libtorchtrt(multilinux=False):
+def copy_libtorchtrt(multilinux=False, rt_only=False):
     if not os.path.exists(dir_path + "/torch_tensorrt/lib"):
         os.makedirs(dir_path + "/torch_tensorrt/lib")
 
@@ -233,6 +254,14 @@ def copy_libtorchtrt(multilinux=False):
         copyfile(
             dir_path + "/build/libtrtorch_build/libtrtorch.so",
             dir_path + "/trtorch/lib/libtrtorch.so",
+        )
+    elif rt_only:
+        os.system(
+            "tar -xzf "
+            + dir_path
+            + "/../bazel-bin/libtorchtrt_runtime.tar.gz --strip-components=1 -C "
+            + dir_path
+            + "/torch_tensorrt"
         )
     else:
         os.system(
@@ -252,17 +281,18 @@ class DevelopCommand(develop):
 
     def finalize_options(self):
         develop.finalize_options(self)
+        if NO_TS:
+            self.root_is_pure = False
 
     def run(self):
-        if FX_ONLY:
-            gen_version_file()
-            develop.run(self)
-        else:
+
+        if not PY_ONLY:
             global CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(develop=True, cxx11_abi=CXX11_ABI)
-            gen_version_file()
-            copy_libtorchtrt()
-            develop.run(self)
+            build_libtorchtrt_pre_cxx11_abi(develop=True, cxx11_abi=CXX11_ABI, rt_only=NO_TS)
+            copy_libtorchtrt(rt_only=NO_TS)
+
+        gen_version_file()
+        develop.run(self)
 
 
 class InstallCommand(install):
@@ -273,17 +303,18 @@ class InstallCommand(install):
 
     def finalize_options(self):
         install.finalize_options(self)
+        if NO_TS:
+            self.root_is_pure = False
 
     def run(self):
-        if FX_ONLY:
-            gen_version_file()
-            install.run(self)
-        else:
+
+        if not PY_ONLY:
             global CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI)
-            gen_version_file()
-            copy_libtorchtrt()
-            install.run(self)
+            build_libtorchtrt_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI, rt_only=NO_TS)
+            copy_libtorchtrt(rt_only=NO_TS)
+
+        gen_version_file()
+        install.run(self)
 
 
 class BdistCommand(bdist_wheel):
@@ -294,12 +325,16 @@ class BdistCommand(bdist_wheel):
 
     def finalize_options(self):
         bdist_wheel.finalize_options(self)
+        if NO_TS:
+            self.root_is_pure = False
 
     def run(self):
-        global CXX11_ABI
-        build_libtorchtrt_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI)
+        if not PY_ONLY:
+            global CXX11_ABI
+            build_libtorchtrt_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI, rt_only=NO_TS)
+            copy_libtorchtrt(rt_only=NO_TS)
+
         gen_version_file()
-        copy_libtorchtrt()
         bdist_wheel.run(self)
 
 
@@ -311,16 +346,18 @@ class EditableWheelCommand(editable_wheel):
 
     def finalize_options(self):
         editable_wheel.finalize_options(self)
+        if NO_TS:
+            self.root_is_pure = False
 
     def run(self):
-        if FX_ONLY:
+        if PY_ONLY:
             gen_version_file()
             editable_wheel.run(self)
         else:
             global CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(develop=True, cxx11_abi=CXX11_ABI)
+            build_libtorchtrt_pre_cxx11_abi(develop=True, cxx11_abi=CXX11_ABI, rt_only=NO_TS)
             gen_version_file()
-            copy_libtorchtrt()
+            copy_libtorchtrt(rt_only=NO_TS)
             editable_wheel.run(self)
 
 
@@ -436,7 +473,7 @@ package_dir = {
 
 package_data = {}
 
-if not FX_ONLY:
+if not (PY_ONLY or NO_TS):
     ext_modules += [
         cpp_extension.CUDAExtension(
             "torch_tensorrt._C",
@@ -532,6 +569,19 @@ if not FX_ONLY:
                 "include/torch_tensorrt/core/util/*.h",
                 "include/torch_tensorrt/core/util/logging/*.h",
                 "bin/*",
+                "lib/*",
+            ]
+        }
+    )
+elif NO_TS:
+        package_data.update(
+        {
+            "torch_tensorrt": [
+                "BUILD",
+                "WORKSPACE",
+                "include/torch_tensorrt/*.h",
+                "include/torch_tensorrt/core/*.h",
+                "include/torch_tensorrt/core/runtime/*.h",
                 "lib/*",
             ]
         }

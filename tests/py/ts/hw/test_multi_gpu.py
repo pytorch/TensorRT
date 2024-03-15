@@ -5,7 +5,10 @@ import torchvision.models as models
 
 from model_test_case import ModelTestCase
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestMultiGpuSwitching(ModelTestCase):
     def setUp(self):
         if torch.cuda.device_count() < 2:
@@ -64,7 +67,10 @@ class TestMultiGpuSwitching(ModelTestCase):
             msg=f"TestMultiGpuSwitching scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
     def setUp(self):
         if torch.cuda.device_count() < 2:

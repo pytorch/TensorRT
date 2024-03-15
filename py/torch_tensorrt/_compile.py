@@ -3,26 +3,24 @@ from __future__ import annotations
 import logging
 from enum import Enum
 from typing import Any, Callable, List, Optional, Sequence, Set
+from typing_extensions import TypeGuard
 
 import torch
 import torch.fx
-import torch_tensorrt.ts
-from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
-from torch_tensorrt._utils import sanitized_torch_version
+from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.fx import InputTensorSpec
 from torch_tensorrt.fx.lower import compile as fx_compile
 from torch_tensorrt.fx.utils import LowerPrecision
-from torch_tensorrt.ts._compiler import compile as torchscript_compile
-from typing_extensions import TypeGuard
 
-from packaging import version
+if ENABLED_FEATURES.torchscript_frontend:
+    import torch_tensorrt.ts
+    from torch_tensorrt.ts._compiler import compile as torchscript_compile
 
-DYNAMO_ENABLED = version.parse(sanitized_torch_version()) >= version.parse("2.1.dev")
-
-if DYNAMO_ENABLED:
+if ENABLED_FEATURES.dynamo_frontend:
     from torch._export import ExportedProgram
     from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
+    from torch_tensorrt.dynamo._tracer import trace as dynamo_trace
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +28,6 @@ __all__ = [
     "compile",
     "convert_method_to_trt_engine",
 ]
-
 
 def _non_fx_input_interface(
     inputs: Sequence[Input | torch.Tensor | InputTensorSpec],
@@ -71,7 +68,7 @@ def _parse_module_type(module: Any) -> _ModuleType:
         return _ModuleType.ts
     elif isinstance(module, torch.fx.GraphModule):
         return _ModuleType.fx
-    elif DYNAMO_ENABLED and isinstance(module, ExportedProgram):
+    elif isinstance(module, ExportedProgram):
         return _ModuleType.ep
     elif isinstance(module, torch.nn.Module):
         return _ModuleType.nn
@@ -79,7 +76,7 @@ def _parse_module_type(module: Any) -> _ModuleType:
         raise RuntimeError("Module is an unknown format")
 
 
-def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
+def _get_target_fe(module_type: _ModuleType, ir: str) -> _IRType:
     module_is_tsable = any(module_type == t for t in [_ModuleType.nn, _ModuleType.ts])
     module_is_fxable = any(module_type == t for t in [_ModuleType.nn, _ModuleType.fx])
     module_is_exportable = module_type == _ModuleType.ep
@@ -89,36 +86,31 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
     ir_targets_dynamo = ir == "dynamo"
     ir_targets_torch_compile = ir == "torch_compile"
 
-    if module_is_tsable and ir_targets_torchscript:
+    if (module_is_tsable and ir_targets_torchscript) and ENABLED_FEATURES.torchscript_frontend:
         return _IRType.ts
-    elif module_is_fxable and ir_targets_fx:
+    elif (module_is_fxable and ir_targets_fx) and ENABLED_FEATURES.fx_frontend:
         return _IRType.fx
-    elif module_is_fxable and ir_targets_dynamo:
+    elif ((module_is_fxable or module_is_exportable) and ir_targets_dynamo) and ENABLED_FEATURES.dynamo_frontend:
         return _IRType.dynamo
-    elif module_is_fxable and ir_targets_torch_compile:
+    elif (module_is_fxable and ir_targets_torch_compile) and ENABLED_FEATURES.dynamo_frontend:
         return _IRType.torch_compile
     else:
         if ir == "default":
             # Options are listed in order of preference
-            if DYNAMO_ENABLED and module_is_fxable:
-                logger.info("ir was set to default, using dynamo as ir")
+            if ENABLED_FEATURES.dynamo_frontend and module_is_fxable:
+                logger.info("ir was set to default, using dynamo frontend")
                 return _IRType.dynamo
-            elif module_is_tsable:
-                if DYNAMO_ENABLED:
+            elif ENABLED_FEATURES.torchscript_frontend and module_is_tsable:
+                if ENABLED_FEATURES.dynamo_frontend:
                     logger.warning(
-                        "Input graph is a Torchscript module but the ir provided is default (dynamo). Please set ir=torchscript to suppress the warning. Compiling the module with ir=torchscript"
+                        "Input is a torchscript module but the ir was not specified (default=dynamo), please set ir=torchscript to suppress the warning."
                     )
                 return _IRType.ts
             elif module_is_exportable:
-                raise ValueError(
-                    "Input graph is an ExportedProgram which is not currently supported. Please provide torch.nn.Module or torch.fx.GraphModule as input."
-                )
+                logger.info("ir was set to default, using dynamo frontend")
+                return _IRType.dynamo
             else:
-                raise ValueError("Module was provided in an unsupported format")
-        elif ir == "exported_program":
-            raise ValueError(
-                "ir=exported_program is not currently supported. Supported ir options : ts|fx|dynamo"
-            )
+                raise ValueError(f"Module was provided in an unsupported format\nInstalled frontends:\n\tDynamo - {ENABLED_FEATURES.dynamo_frontend}\n\tTorchScript - {ENABLED_FEATURES.torchscript_frontend}\n\tFX - {ENABLED_FEATURES.fx_frontend})")
         else:
             raise ValueError("Unknown ir was requested")
 
@@ -127,7 +119,7 @@ def compile(
     module: Any,
     ir: str = "default",
     inputs: Optional[Sequence[Input | torch.Tensor | InputTensorSpec]] = None,
-    enabled_precisions: Optional[Set[torch.dtype | dtype]] = None,
+    enabled_precisions: Optional[torch.dtype] = None,
     **kwargs: Any,
 ) -> (
     torch.nn.Module | torch.jit.ScriptModule | torch.fx.GraphModule | Callable[..., Any]
@@ -173,7 +165,7 @@ def compile(
     )
 
     module_type = _parse_module_type(module)
-    target_ir = _get_target_ir(module_type, ir)
+    target_ir = _get_target_fe(module_type, ir)
     if target_ir == _IRType.ts:
         ts_mod = module
         if module_type == _ModuleType.nn:
@@ -224,7 +216,7 @@ def compile(
 
         # Export the module
         torchtrt_inputs = prepare_inputs(input_list)
-        exp_program = torch_tensorrt.dynamo.trace(module, torchtrt_inputs, **kwargs)
+        exp_program = dynamo_trace(module, torchtrt_inputs, **kwargs)
         trt_graph_module = dynamo_compile(
             exp_program,
             inputs=torchtrt_inputs,
@@ -261,7 +253,7 @@ def convert_method_to_trt_engine(
     method_name: str = "forward",
     inputs: Optional[Sequence[Input | torch.Tensor]] = None,
     ir: str = "default",
-    enabled_precisions: Optional[Set[torch.dtype | dtype]] = None,
+    enabled_precisions: Optional[Set[torch.dtype]] = None,
     **kwargs: Any,
 ) -> bytes:
     """Convert a TorchScript module method to a serialized TensorRT engine
@@ -299,7 +291,7 @@ def convert_method_to_trt_engine(
     )
 
     module_type = _parse_module_type(module)
-    target_ir = _get_target_ir(module_type, ir)
+    target_ir = _get_target_fe(module_type, ir)
     if target_ir == _IRType.ts:
         ts_mod = module
         if module_type == _ModuleType.nn:

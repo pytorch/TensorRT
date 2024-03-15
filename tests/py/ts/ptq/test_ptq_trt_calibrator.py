@@ -1,7 +1,7 @@
 import unittest
 import os
 import torch_tensorrt as torchtrt
-from torch_tensorrt.logging import *
+from torch_tensorrt.ts.logging import *
 import torch
 import tensorrt as trt
 import torch.nn as nn
@@ -48,7 +48,10 @@ def compute_accuracy(testing_dataloader, model):
     test_preds = torch.cat(class_preds)
     return correct / total
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TRTEntropyCalibrator(trt.IInt8EntropyCalibrator2):
     def __init__(self, dataloader, **kwargs):
         trt.IInt8EntropyCalibrator2.__init__(self)
@@ -93,7 +96,10 @@ class TRTEntropyCalibrator(trt.IInt8EntropyCalibrator2):
             with open(self.cache_file, "wb") as f:
                 f.write(cache)
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestAccuracy(unittest.TestCase):
     def test_compile_script(self):
         self.model = (

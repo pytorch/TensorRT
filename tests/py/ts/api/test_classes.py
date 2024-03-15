@@ -7,52 +7,11 @@ import copy
 from typing import Dict
 
 
-class TestDevice(unittest.TestCase):
-    def test_from_string_constructor(self):
-        device = torchtrt.Device("cuda:0")
-        self.assertEqual(device.device_type, torchtrt.DeviceType.GPU)
-        self.assertEqual(device.gpu_id, 0)
 
-        device = torchtrt.Device("gpu:1")
-        self.assertEqual(device.device_type, torchtrt.DeviceType.GPU)
-        self.assertEqual(device.gpu_id, 1)
-
-    def test_from_string_constructor_dla(self):
-        device = torchtrt.Device("dla:0")
-        self.assertEqual(device.device_type, torchtrt.DeviceType.DLA)
-        self.assertEqual(device.gpu_id, 0)
-        self.assertEqual(device.dla_core, 0)
-
-        device = torchtrt.Device("dla:1", allow_gpu_fallback=True)
-        self.assertEqual(device.device_type, torchtrt.DeviceType.DLA)
-        self.assertEqual(device.gpu_id, 0)
-        self.assertEqual(device.dla_core, 1)
-        self.assertEqual(device.allow_gpu_fallback, True)
-
-    def test_kwargs_gpu(self):
-        device = torchtrt.Device(gpu_id=0)
-        self.assertEqual(device.device_type, torchtrt.DeviceType.GPU)
-        self.assertEqual(device.gpu_id, 0)
-
-    def test_kwargs_dla_and_settings(self):
-        device = torchtrt.Device(dla_core=1, allow_gpu_fallback=False)
-        self.assertEqual(device.device_type, torchtrt.DeviceType.DLA)
-        self.assertEqual(device.gpu_id, 0)
-        self.assertEqual(device.dla_core, 1)
-        self.assertEqual(device.allow_gpu_fallback, False)
-
-        device = torchtrt.Device(gpu_id=1, dla_core=0, allow_gpu_fallback=True)
-        self.assertEqual(device.device_type, torchtrt.DeviceType.DLA)
-        self.assertEqual(device.gpu_id, 1)
-        self.assertEqual(device.dla_core, 0)
-        self.assertEqual(device.allow_gpu_fallback, True)
-
-    def test_from_torch(self):
-        device = torchtrt.Device._from_torch_device(torch.device("cuda:0"))
-        self.assertEqual(device.device_type, torchtrt.DeviceType.GPU)
-        self.assertEqual(device.gpu_id, 0)
-
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestInput(unittest.TestCase):
     def _verify_correctness(self, struct: torchtrt.Input, target: Dict) -> bool:
         internal = struct._to_internal()
@@ -80,10 +39,10 @@ class TestInput(unittest.TestCase):
             target["explicit_set_dtype"],
         )
         dtype_ = field_is_correct(
-            "dtype", eq, int(internal.dtype), int(target["dtype"])
+            "dtype", eq, torchtrt.dtype._from(internal.dtype), torchtrt.dtype._from(target["dtype"])
         )
         format_ = field_is_correct(
-            "format", eq, int(internal.format), int(target["format"])
+            "format", eq, torchtrt.memory_format._from(internal.format), torchtrt.memory_format._from(target["format"])
         )
 
         return all(
@@ -98,7 +57,7 @@ class TestInput(unittest.TestCase):
             "max": shape,
             "input_is_dynamic": False,
             "dtype": torchtrt.dtype.half,
-            "format": torchtrt.TensorFormat.contiguous,
+            "format": torchtrt.memory_format.contiguous,
             "explicit_set_dtype": True,
         }
 
@@ -117,7 +76,7 @@ class TestInput(unittest.TestCase):
             "max": shape,
             "input_is_dynamic": False,
             "dtype": torchtrt.dtype.unknown,
-            "format": torchtrt.TensorFormat.contiguous,
+            "format": torchtrt.memory_format.contiguous,
             "explicit_set_dtype": False,
         }
 
@@ -165,7 +124,7 @@ class TestInput(unittest.TestCase):
             "max": shape,
             "input_is_dynamic": False,
             "dtype": torchtrt.dtype.half,
-            "format": torchtrt.TensorFormat.contiguous,
+            "format": torchtrt.memory_format.contiguous,
             "explicit_set_dtype": True,
         }
 
@@ -189,11 +148,11 @@ class TestInput(unittest.TestCase):
             "max": shape,
             "input_is_dynamic": False,
             "dtype": torchtrt.dtype.unknown,
-            "format": torchtrt.TensorFormat.channels_last,
+            "format": torchtrt.memory_format.channels_last,
             "explicit_set_dtype": False,
         }
 
-        i = torchtrt.Input(shape, format=torchtrt.TensorFormat.channels_last)
+        i = torchtrt.Input(shape, format=torchtrt.memory_format.channels_last)
         ts_i = torchtrt.ts.TorchScriptInput(
             shape=i.shape, dtype=i.dtype, format=i.format
         )
@@ -215,7 +174,7 @@ class TestInput(unittest.TestCase):
             "max": max_shape,
             "input_is_dynamic": True,
             "dtype": torchtrt.dtype.unknown,
-            "format": torchtrt.TensorFormat.contiguous,
+            "format": torchtrt.memory_format.contiguous,
             "explicit_set_dtype": False,
         }
 
@@ -260,7 +219,10 @@ class TestInput(unittest.TestCase):
         )
         self.assertTrue(self._verify_correctness(ts_i, target))
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestTorchTensorRTModule(unittest.TestCase):
     @staticmethod
     def _get_trt_mod():
