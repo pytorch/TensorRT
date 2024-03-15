@@ -116,6 +116,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
 TORCH_LIBRARY(tensorrt, m) {
   m.def("execute_engine", execute_engine);
   m.def("SERIALIZED_ENGINE_BINDING_DELIM", []() -> std::string { return std::string(1, TRTEngine::BINDING_DELIM); });
+  m.def("SERIALIZED_RT_DEVICE_DELIM", []() -> std::string { return DEVICE_INFO_DELIM; });
   m.def("ABI_VERSION", []() -> std::string { return ABI_VERSION; });
   m.def("get_multi_device_safe_mode", []() -> bool { return MULTI_DEVICE_SAFE_MODE; });
   m.def("set_multi_device_safe_mode", [](bool multi_device_safe_mode) -> void {

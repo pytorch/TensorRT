@@ -23,6 +23,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
+from torch_tensorrt.logging import TRT_LOGGER
 
 from packaging import version
 
@@ -56,7 +57,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         super().__init__(module)
 
         # TODO: @narendasan replace with Torch-TensorRT Logger
-        self.logger = trt.Logger(logger_level)
+        self.logger = TRT_LOGGER
         self.builder = trt.Builder(self.logger)
 
         flag = 0
@@ -207,6 +208,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         )
 
         if self.compilation_settings.device.device_type == trt.DeviceType.DLA:
+            device_info = torch.cuda.get_device_properties(self.compilation_settings.device.gpu_id)
+            assert (device_info.major == 8 and device_info.minor == 7) or (device_info.major == 7 and device_info.minor == 2)
             builder_config.DLA_core = self.compilation_settings.device.dla_core
             _LOGGER.info(f"Using DLA core {self.compilation_settings.device.dla_core}")
             builder_config.set_memory_pool_limit(

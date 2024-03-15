@@ -1,6 +1,6 @@
 import unittest
 import torch_tensorrt as torchtrt
-from torch_tensorrt.logging import *
+from torch_tensorrt.ts.logging import *
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -50,7 +50,10 @@ def compute_accuracy(testing_dataloader, model):
     test_preds = torch.cat(class_preds)
     return correct / total
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestAccuracy(unittest.TestCase):
     def test_compile_script(self):
         self.model = (

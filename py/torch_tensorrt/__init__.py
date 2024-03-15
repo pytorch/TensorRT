@@ -81,25 +81,38 @@ except ImportError:
             ctypes.CDLL(_find_lib(lib, LINUX_PATHS))
 
 import torch
-from torch_tensorrt._compile import *  # noqa: F403
-from torch_tensorrt._Device import Device  # noqa: F401
-from torch_tensorrt._enums import *  # noqa: F403
-from torch_tensorrt._Input import Input  # noqa: F401
-from torch_tensorrt._utils import *  # noqa: F403
-from torch_tensorrt._utils import sanitized_torch_version
-from torch_tensorrt.logging import *
-from torch_tensorrt.ptq import *
-from torch_tensorrt.runtime import *  # noqa: F403
+from torch_tensorrt._features import ENABLED_FEATURES, _enabled_features_str
 
-if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
-    from torch_tensorrt.dynamo import backend  # noqa: F401
-
-    from torch_tensorrt import dynamo  # noqa: F401
-
+import logging
+_LOGGER = logging.getLogger(__name__)
+_LOGGER.debug(_enabled_features_str())
 
 def _register_with_torch() -> None:
     trtorch_dir = os.path.dirname(__file__)
-    torch.ops.load_library(trtorch_dir + "/lib/libtorchtrt.so")
-
+    if os.path.isfile(trtorch_dir + "/lib/libtorchtrt.so"):
+        assert ENABLED_FEATURES.torchscript_frontend == True
+        assert ENABLED_FEATURES.torch_tensorrt_runtime== True
+        torch.ops.load_library(trtorch_dir + "/lib/libtorchtrt.so")
+    elif os.path.isfile(trtorch_dir + "/lib/libtorchtrt_runtime.so"):
+        assert ENABLED_FEATURES.torch_tensorrt_runtime == True
+        torch.ops.load_library(trtorch_dir + "/lib/libtorchtrt_runtime.so")
 
 _register_with_torch()
+
+from torch_tensorrt._enums import dtype, memory_format, DeviceType # noqa: F401
+from torch_tensorrt._Device import Device  # noqa: F401
+from torch_tensorrt._Input import Input  # noqa: F401
+from torch_tensorrt.runtime import *  # noqa: F403
+
+if ENABLED_FEATURES.torchscript_frontend:
+    from torch_tensorrt import ts
+
+if ENABLED_FEATURES.fx_frontend:
+    from torch_tensorrt import fx
+
+if ENABLED_FEATURES.dynamo_frontend:
+    from torch_tensorrt.dynamo import backend  # noqa: F401
+    from torch_tensorrt import dynamo  # noqa: F401
+
+from torch_tensorrt._compile import *  # noqa: F403
+

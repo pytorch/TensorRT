@@ -8,7 +8,10 @@ import custom_models as cm
 from typing import Dict
 from utils import cosine_similarity, COSINE_THRESHOLD
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestModelToEngineToModel(unittest.TestCase):
     def test_multiple_engines(self):
         self.resnet18 = models.resnet18(pretrained=True).eval().to("cuda")

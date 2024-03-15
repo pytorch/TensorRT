@@ -39,7 +39,7 @@ class TestInputTypeDefaultsFP32Model(unittest.TestCase):
 
         ts_model = torch.jit.script(self.model)
         input_spec = torchtrt.Input(self.input.shape)
-        input_spec.dtype = torch.half
+        input_spec.dtype = torchtrt.dtype.half
 
         trt_mod = torchtrt.ts.compile(
             ts_model,
@@ -100,7 +100,7 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
         half_mod.half()
 
         input_spec = torchtrt.Input(self.input.shape)
-        input_spec.dtype = torch.float
+        input_spec.dtype = torchtrt.dtype.float
 
         trt_mod = torchtrt.ts.compile(
             half_mod,

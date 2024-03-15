@@ -20,7 +20,10 @@ def find_repo_root(max_depth=10):
 
 MODULE_DIR = find_repo_root() + "/tests/modules"
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestStandardTensorInput(unittest.TestCase):
     def test_compile(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -48,7 +51,10 @@ class TestStandardTensorInput(unittest.TestCase):
             msg=f"standard_tensor_input_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestStandardTensorInputLong(unittest.TestCase):
     def test_compile(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -77,7 +83,10 @@ class TestStandardTensorInputLong(unittest.TestCase):
             msg=f"standard_tensor_input_long_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestStandardTensorInputDomain(unittest.TestCase):
     def test_compile(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -105,7 +114,10 @@ class TestStandardTensorInputDomain(unittest.TestCase):
             msg=f"standard_tensor_input_scripted with tensor domain specified TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestTupleInput(unittest.TestCase):
     def test_compile(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -133,7 +145,10 @@ class TestTupleInput(unittest.TestCase):
             msg=f"tuple_input_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestListInput(unittest.TestCase):
     def test_compile(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -159,7 +174,10 @@ class TestListInput(unittest.TestCase):
             msg=f"list_input_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestTupleInputOutput(unittest.TestCase):
     def test_compile(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -216,7 +234,10 @@ class TestTupleInputOutput(unittest.TestCase):
                 msg=f"tuple_input_output_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
             )
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestListInputOutput(unittest.TestCase):
     def test_compile(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -275,7 +296,10 @@ class TestListInputOutput(unittest.TestCase):
                 msg=f"list_input_output_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
             )
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestListInputTupleOutput(unittest.TestCase):
     def test_compile(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")

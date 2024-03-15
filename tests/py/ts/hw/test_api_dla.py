@@ -5,6 +5,10 @@ import torchvision.models as models
 from utils import cosine_similarity, COSINE_THRESHOLD
 
 
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class ModelTestCaseOnDLA(unittest.TestCase):
     def __init__(self, methodName="runTest", model=None):
         super(ModelTestCaseOnDLA, self).__init__(methodName)
@@ -20,7 +24,10 @@ class ModelTestCaseOnDLA(unittest.TestCase):
             suite.addTest(testcase_class(name, model=model))
         return suite
 
-
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available"
+)
 class TestCompile(ModelTestCaseOnDLA):
     def setUp(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda").half()

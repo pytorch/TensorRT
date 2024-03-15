@@ -5,14 +5,10 @@ import logging
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
 
 import torch
-import torch_tensorrt
+import tensorrt as trt
 from torch.export import ExportedProgram
 from torch.fx.node import Target
-from torch_tensorrt import _enums
 from torch_tensorrt._Device import Device
-from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
-    EngineCapability,
-)
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import partitioning
 from torch_tensorrt.dynamo._defaults import (
@@ -80,7 +76,7 @@ def compile(
     disable_tf32: bool = DISABLE_TF32,
     sparse_weights: bool = SPARSE_WEIGHTS,
     enabled_precisions: Set[torch.dtype] | Tuple[torch.dtype] = (torch.float32,),
-    engine_capability: EngineCapability = ENGINE_CAPABILITY,
+    engine_capability: trt.EngineCapability = ENGINE_CAPABILITY,
     refit: bool = REFIT,
     debug: bool = DEBUG,
     num_avg_timing_iters: int = NUM_AVG_TIMING_ITERS,
@@ -463,7 +459,7 @@ def convert_module_to_trt_engine(
     module: torch.fx.GraphModule,
     method_name: str = "forward",
     inputs: Optional[Sequence[Input | torch.Tensor]] = None,
-    enabled_precisions: Optional[Set[torch.dtype | _enums.dtype]] = None,
+    enabled_precisions: Optional[Set[torch.dtype]] = None,
     debug: bool = DEBUG,
     workspace_size: int = WORKSPACE_SIZE,
     min_block_size: int = MIN_BLOCK_SIZE,
@@ -481,7 +477,7 @@ def convert_module_to_trt_engine(
     disable_tf32: bool = DISABLE_TF32,
     sparse_weights: bool = SPARSE_WEIGHTS,
     refit: bool = REFIT,
-    engine_capability: EngineCapability = ENGINE_CAPABILITY,
+    engine_capability: trt.EngineCapability = ENGINE_CAPABILITY,
     num_avg_timing_iters: int = NUM_AVG_TIMING_ITERS,
     dla_sram_size: int = DLA_SRAM_SIZE,
     dla_local_dram_size: int = DLA_LOCAL_DRAM_SIZE,
