@@ -172,7 +172,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         if version.parse(trt.__version__) >= version.parse("8.2"):
             builder_config.profiling_verbosity = (
-                trt.ProfilingVerbosity.VERBOSE
+                trt.ProfilingVerbosity.DETAILED
                 if self.compilation_settings.debug
                 else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
             )
@@ -227,6 +227,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         if precision == torch.int8:
             builder_config.set_flag(trt.BuilderFlag.INT8)
+
+        if precision == torch.float8_e4m3fn:
+            builder_config.set_flag(trt.BuilderFlag.FP8)
 
         if self.compilation_settings.sparse_weights:
             builder_config.set_flag(trt.BuilderFlag.SPARSE_WEIGHTS)

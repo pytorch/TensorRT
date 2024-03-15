@@ -573,22 +573,30 @@ def aten_ops_neg(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.ptq.scaled_e4m3.default)
-def aten_ops_quantize_fp8(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.quantize.quantize_fp8(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-        args[1],
+try:
+    assert torch.ops.trt.quantize_fp8.default
+except Exception as e:
+    _LOGGER.warn(
+        f"Unable to import quantize_fp8 op.: {e}. Please install nvidia-ammo library in order to register torch.ops.trt.quantize_fp8 op"
     )
+else:
+
+    @dynamo_tensorrt_converter(torch.ops.trt.quantize_fp8.default)
+    def aten_ops_quantize_fp8(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        return impl.quantize.quantize_fp8(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+            args[1],
+        )
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim)
