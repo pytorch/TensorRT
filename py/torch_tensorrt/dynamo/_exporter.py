@@ -1,3 +1,4 @@
+import copy
 import operator
 from typing import Any, Dict, Sequence, Tuple, cast
 
@@ -6,8 +7,11 @@ from torch._guards import detect_fake_mode
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.export import ExportedProgram, ExportGraphSignature
 from torch.export.exported_program import (
+    CustomObjArgument,
     InputKind,
     InputSpec,
+    ModuleCallEntry,
+    ModuleCallSignature,
     OutputKind,
     OutputSpec,
     TensorArgument,
@@ -44,24 +48,27 @@ def transform(
 
     Returns an inlined torch.fx.GraphModule
     """
+    gm_export = copy.deepcopy(gm)
     # Run shape analysis
-    _, outputs_map = partitioning.run_shape_analysis(gm, inputs)
+    _, outputs_map = partitioning.run_shape_analysis(gm_export, inputs)
 
     # Inline TensorRT submodules
-    inline_trt_modules(gm, outputs_map)
+    inline_trt_modules(gm_export, outputs_map)
 
     # Inline pytorch submodules
-    inline_torch_modules(gm)
+    inline_torch_modules(gm_export)
 
     # Clean the graph
-    gm.delete_all_unused_submodules()
-    gm.graph.eliminate_dead_code()
-    gm.graph.lint()
+    gm_export.delete_all_unused_submodules()
+    gm_export.graph.eliminate_dead_code()
+    gm_export.graph.lint()
 
-    return gm
+    return gm_export
 
 
-def lift(gm: torch.fx.GraphModule, graph_signature: Any) -> torch.fx.GraphModule:
+def lift(
+    gm: torch.fx.GraphModule, graph_signature: Any
+) -> Tuple[torch.fx.GraphModule, ExportGraphSignature, Dict[str, Any], Dict[str, Any]]:
     """
     Given an unlifted fx.GraphModule, lift all parameters, buffers into placeholders.
     Arguments:
@@ -75,6 +82,7 @@ def lift(gm: torch.fx.GraphModule, graph_signature: Any) -> torch.fx.GraphModule
     # exp_program.state_dict contains parameters and buffers whereas a graph_module's state_dict
     # has all parameters registered as torch.tensors.
     state_dict = gm.state_dict()
+    constants = {}
 
     fake_mode = detect_fake_mode(
         tuple(node.meta["val"] for node in gm.graph.nodes if node.op == "placeholder")
@@ -89,52 +97,68 @@ def lift(gm: torch.fx.GraphModule, graph_signature: Any) -> torch.fx.GraphModule
             break
 
     # At first the user_inputs are only present in the graph_signature.input_specs and hence non_user_input_idx=0
-    # The input_specs should be of the form [params, buffers, constant_tensors, user_inputs]
+    # The input_specs should be of the form [params, buffers, constant_tensors, custom_obj, user_inputs]
     non_user_input_idx = 0
     for node in gm.graph.nodes:
         if node.op == "get_attr":
+
+            lift_val = None
+            input_kind = None
+
             if node.target not in state_dict:
-                raise ValueError(
-                    f"The get_attr node : {node.name} with target: {node.target} value could not be found in state_dict. Please check the input exported_program's graphmodule parameters."
-                )
+                constants[node.target] = getattr(gm, node.target)
+                input_kind = InputKind.CUSTOM_OBJ
+                lift_val = constants[node.target]
+            else:
+                lift_val = state_dict[node.target]
 
-            constant_tensor = state_dict[node.target]
-            input_kind = InputKind.CONSTANT_TENSOR
+                input_kind = InputKind.CONSTANT_TENSOR
 
-            # state_dict has these parameters/buffers as torch.Tensors. We override them as torch.nn.Parameter/torch.Tensors respectively.
-            for name, _ in gm.named_parameters():
-                if node.target == name:
-                    input_kind = InputKind.PARAMETER
-                    state_dict[name] = torch.nn.Parameter(state_dict[name])
-                    break
-            for name, _ in gm.named_buffers():
-                if node.target == name:
-                    input_kind = InputKind.BUFFER
-                    break
+                # state_dict has these parameters/buffers as torch.Tensors. We override them as torch.nn.Parameter/torch.Tensors respectively.
+                for name, _ in gm.named_parameters():
+                    if node.target == name:
+                        input_kind = InputKind.PARAMETER
+                        state_dict[name] = torch.nn.Parameter(state_dict[name])
+                        break
+                for name, _ in gm.named_buffers():
+                    if node.target == name:
+                        input_kind = InputKind.BUFFER
+                        break
+
+            assert lift_val is not None and input_kind is not None
 
             # Replace get_attr nodes with placeholder nodes and copy metadata.
             with gm.graph.inserting_before(first_user_input):
-                const_placeholder_node = gm.graph.placeholder(node.target)
+                const_placeholder_node = gm.graph.placeholder(
+                    node.target.replace(".", "_")
+                )
                 # Copy the node meta into this new placeholder node
                 const_placeholder_node.meta = node.meta
-                const_placeholder_node.meta["val"] = cast(
-                    FakeTensor,
-                    torch.empty_strided(
-                        tuple(constant_tensor.shape),
-                        tuple([1] * len(constant_tensor.shape)),
-                    ),
-                )
+
+                if isinstance(lift_val, torch.Tensor):
+                    const_placeholder_node.meta["val"] = cast(
+                        FakeTensor,
+                        torch.empty_strided(
+                            tuple(lift_val.shape),
+                            tuple([1] * len(lift_val.shape)),
+                        ),
+                    )
 
                 node.replace_all_uses_with(const_placeholder_node)
                 gm.graph.erase_node(node)
 
                 # Add these parameters/buffers/constants to the existing graph signature
                 # before user inputs. These specs are looked up in the state_dict during ExportedProgram creation.
+                input_spec_arg = TensorArgument(name=const_placeholder_node.name)
+                if input_kind == InputKind.CUSTOM_OBJ:
+                    input_spec_arg = CustomObjArgument(
+                        name=const_placeholder_node.name, class_fqn=""
+                    )
                 graph_signature.input_specs.insert(
                     non_user_input_idx,
                     InputSpec(
                         kind=input_kind,
-                        arg=TensorArgument(name=const_placeholder_node.name),
+                        arg=input_spec_arg,
                         target=node.target,
                     ),
                 )
@@ -143,7 +167,7 @@ def lift(gm: torch.fx.GraphModule, graph_signature: Any) -> torch.fx.GraphModule
     gm.graph.eliminate_dead_code()
     gm.graph.lint()
 
-    return gm, graph_signature, state_dict
+    return gm, graph_signature, state_dict, constants
 
 
 def get_duplicate_nodes(
@@ -281,18 +305,30 @@ def create_trt_exp_program(
         input_specs=input_specs, output_specs=output_specs
     )
 
+    module_call_graph = [
+        ModuleCallEntry(
+            "",
+            ModuleCallSignature(
+                inputs=[],
+                outputs=[],
+                in_spec=gm.graph._codegen.pytree_info.in_spec,
+                out_spec=gm.graph._codegen.pytree_info.out_spec,
+            ),
+        )
+    ]
+
     # Lift parameters/buffers/constants in the graph
     # torch.export serialization expects them to be lifted
-    gm, trt_graph_signature, state_dict = lift(gm, trt_graph_signature)
+    gm, trt_graph_signature, state_dict, constants = lift(gm, trt_graph_signature)
 
     trt_exp_program = ExportedProgram(
-        gm,
-        gm.graph,
-        trt_graph_signature,
-        state_dict,
-        {},
-        [],
-        [],
+        root=gm,
+        graph=gm.graph,
+        graph_signature=trt_graph_signature,
+        state_dict=state_dict,
+        range_constraints={},
+        module_call_graph=module_call_graph,
+        constants=constants,
     )
 
     return trt_exp_program
@@ -319,9 +355,13 @@ def inline_trt_modules(
         num_outputs = len(outputs_map[trt_module_node.name])
         # Insert a call_function node to perform inference on TRT engine
         with gm.graph.inserting_before(trt_module_node):
+            engine_name = f"{name}_engine"
+            setattr(gm, engine_name, trt_module.engine)
+            engine_node = gm.graph.get_attr(engine_name)
+
             trt_node = gm.graph.call_function(
                 torch.ops.tensorrt.execute_engine.default,
-                (trt_module_node.args, trt_module.engine),
+                (trt_module_node.args, engine_node),
             )
             trt_node.meta["val"] = []
             assert num_outputs > 0
@@ -336,6 +376,13 @@ def inline_trt_modules(
                         ),
                     )
                 )
+
+            # meta["val"] should be a lighter version of a tensor. For eg: it should be a FakeTensor (with output shape and dtype properties)
+            # Lighter version of a custom_obj is not defined clearly. meta["val"] does not have any type expectations but
+            # for custom object nodes, it should be CustomObjArgument
+            engine_node.meta["val"] = CustomObjArgument(
+                name=engine_node.name, class_fqn=""
+            )
 
         if num_outputs == 1:
             # Insert getitem nodes as outputs (for export serialization to work)
