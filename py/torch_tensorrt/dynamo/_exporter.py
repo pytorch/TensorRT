@@ -153,14 +153,25 @@ def lift(
 
                 # Add these parameters/buffers/constants to the existing graph signature
                 # before user inputs. These specs are looked up in the state_dict during ExportedProgram creation.
-                graph_signature.input_specs.insert(
-                    non_user_input_idx,
-                    InputSpec(
-                        kind=input_kind,
-                        arg=TensorArgument(name=const_placeholder_node.name),
-                        target=node.target,
-                    ),
-                )
+                if isinstance(lift_val, torch.Tensor):
+                    graph_signature.input_specs.insert(
+                        non_user_input_idx,
+                        InputSpec(
+                            kind=input_kind,
+                            arg=TensorArgument(name=const_placeholder_node.name),
+                            target=node.target,
+                        ),
+                    )
+                else:
+                    graph_signature.input_specs.insert(
+                        non_user_input_idx,
+                        InputSpec(
+                            kind=input_kind,
+                            arg=CustomObjArgument(name=const_placeholder_node.name, class_fqn=""),
+                            target=node.target,
+                        ),
+                    )
+
                 non_user_input_idx += 1
 
     gm.graph.eliminate_dead_code()
