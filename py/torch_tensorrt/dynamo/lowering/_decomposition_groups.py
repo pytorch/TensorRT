@@ -37,6 +37,7 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.elu_backward,
     aten._embedding_bag,
     aten.embedding_dense_backward,
+    aten.empty_like,
     aten._euclidean_dist.default,
     aten.expand_as,
     aten.eye,
