@@ -171,10 +171,8 @@ def select_scatter_decomposition(
     dim: int,
     index: int,
 ) -> torch.Tensor:
-    unbind_tensors = torch.unbind(input_tensor, dim)
-    unbind_tensors_list = list(unbind_tensors)
-    unbind_tensors_list[index] = src_tensor
-    return torch.stack(tuple(unbind_tensors_list), dim)
+    src_tensor = torch.unsqueeze(src_tensor, dim)
+    return torch.slice_scatter(input_tensor, src_tensor, dim, index, index + 1, 1)
 
 
 def get_decompositions(

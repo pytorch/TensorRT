@@ -430,13 +430,11 @@ class TestLowering(TestCase):
                 return y
 
         # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {
-            torch.ops.aten.slice.Tensor,
-            torch.ops.aten.squeeze.dim,
-            torch.ops.aten.cat.default,
-            torch.ops.aten.reshape.default,
+        expected_ops = {torch.ops.aten.scatter.src, torch.ops.aten.unsqueeze.default}
+        unexpected_ops = {
+            torch.ops.aten.select_scatter.default,
+            torch.ops.aten.slice_scatter.default,
         }
-        unexpected_ops = {torch.ops.aten.select_scatter.default}
 
         inputs = [torch.zeros(2, 2).cuda(), torch.ones(2).cuda(), 0, 0]
 
@@ -469,6 +467,7 @@ class TestLowering(TestCase):
             "torch_compile",
             inputs,
             min_block_size=1,
+            truncate_long_and_double=True,
             pass_through_build_failures=True,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
@@ -494,13 +493,11 @@ class TestLowering(TestCase):
                 return y
 
         # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {
-            torch.ops.aten.slice.Tensor,
-            torch.ops.aten.squeeze.dim,
-            torch.ops.aten.unsqueeze.default,
-            torch.ops.aten.cat.default,
+        expected_ops = {torch.ops.aten.scatter.src, torch.ops.aten.unsqueeze.default}
+        unexpected_ops = {
+            torch.ops.aten.select_scatter.default,
+            torch.ops.aten.slice_scatter.default,
         }
-        unexpected_ops = {torch.ops.aten.select_scatter.default}
 
         inputs = [torch.zeros(2, 2).cuda(), torch.ones(2).cuda(), 1, 0]
 
@@ -533,6 +530,7 @@ class TestLowering(TestCase):
             "torch_compile",
             inputs,
             min_block_size=1,
+            truncate_long_and_double=True,
             pass_through_build_failures=True,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
