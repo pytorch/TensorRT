@@ -159,11 +159,11 @@ def test_bert_base_uncased(ir):
     model = BertModel.from_pretrained("bert-base-uncased").cuda().eval()
     input = torch.randint(0, 1, (1, 14), dtype=torch.int32).to("cuda")
     input2 = torch.randint(0, 1, (1, 14), dtype=torch.int32).to("cuda")
-    model = (
-        transformers_trace(model, input_names=["input_ids", "attention_mask"])
-        .eval()
-        .cuda()
-    )
+    # model = (
+    #     transformers_trace(model, input_names=["input_ids", "attention_mask"])
+    #     .eval()
+    #     .cuda()
+    # )
 
     compile_spec = {
         "inputs": [
@@ -182,8 +182,8 @@ def test_bert_base_uncased(ir):
         "enabled_precisions": {torch.float},
         "truncate_long_and_double": True,
         "ir": ir,
-        "min_block_size": 10,
-        "torch_executed_ops": {"torch.ops.aten.gelu.default"},
+        "min_block_size": 15,
+        "debug": True,
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
     model_outputs = model(input, input2)
@@ -192,8 +192,9 @@ def test_bert_base_uncased(ir):
         len(model_outputs) == len(trt_model_outputs),
         msg=f"Number of outputs for BERT model compilation is different with Pytorch {len(model_outputs)} and TensorRT {len(trt_model_outputs)}. Please check the compilation.",
     )
-    for index, key in enumerate(model_outputs):
-        out, trt_out = model_outputs[key], trt_model_outputs[index]
+
+    for key, _ in model_outputs.items():
+        out, trt_out = model_outputs[key], trt_model_outputs[key]
         cos_sim = cosine_similarity(out, trt_out)
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,

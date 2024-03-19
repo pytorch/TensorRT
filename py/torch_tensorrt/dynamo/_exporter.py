@@ -129,6 +129,7 @@ def lift(
 
             # Replace get_attr nodes with placeholder nodes and copy metadata.
             with gm.graph.inserting_before(first_user_input):
+                # Ensure name doesn't contain period as it is used for submodules
                 const_placeholder_node = gm.graph.placeholder(
                     node.target.replace(".", "_")
                 )
