@@ -543,6 +543,7 @@ def append(
 ) -> TRTTensor:
     if isinstance(new_value, (int, float)):
         new_value = np.array([new_value])
+    new_value = get_trt_tensor(ctx, new_value, name, original_tensor.dtype)
 
     return impl.cat.cat(
         ctx,
@@ -565,6 +566,7 @@ def set_item(
 ) -> TRTTensor:
     if isinstance(new_value, (int, float)):
         new_value = np.array([new_value])
+    new_value = get_trt_tensor(ctx, new_value, name, original_tensor.dtype)
 
     len_original_tensor = original_tensor.shape[0]
     index = get_positive_dim(index, len_original_tensor)

@@ -151,12 +151,6 @@ def embedding_bag_with_ITensor_offsets(
         # add the end index to `offsets`
         offsets = append(ctx, target, source_ir, f"{name}_append", offsets, len_embed)
 
-    reduced_embed_bags = []
-    # get the first item in offsets
-    start = ctx.net.add_gather(
-        offsets, get_trt_tensor(ctx, 0, f"{name}_tensor_0"), 0
-    ).get_output(0)
-
     # create a placeholder tensor, whose shape is the same as an embedding
     # if mode is 0 (sum) or 1 (mean), the placeholder tensor is filled with zeros
     # if mode is 2 (max), the placeholder tensor is filled with negative infinity
@@ -181,6 +175,8 @@ def embedding_bag_with_ITensor_offsets(
         )
 
     # traverse offsets to calculate the embedding of each bag
+    reduced_embed_bags = []
+    start = ctx.net.add_gather(offsets, incremental_tensor_list[0], 0).get_output(0)
     for i in range(1, offsets.shape[0]):
         end = ctx.net.add_gather(offsets, incremental_tensor_list[i], 0).get_output(0)
 
