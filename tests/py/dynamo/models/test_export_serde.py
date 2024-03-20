@@ -146,7 +146,6 @@ def test_no_compile(ir):
             )
         ],
         "ir": ir,
-        "debug": True,
     }
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
@@ -306,6 +305,7 @@ def test_hybrid_conv_fallback(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
+
     torchtrt.save(trt_module, "/tmp/trt.ep", inputs=[input])
     deser_trt_exp_program = torch.export.load("/tmp/trt.ep")
     deser_trt_module = deser_trt_exp_program.module()
