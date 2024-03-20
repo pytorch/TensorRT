@@ -13,6 +13,7 @@ from torch_tensorrt.dynamo._compiler import compile_module
 from torch_tensorrt.dynamo.lowering import (
     apply_lowering_passes,
     get_decompositions,
+    remove_sym_nodes,
     repair_input_aliasing,
 )
 from torch_tensorrt.dynamo.utils import (
@@ -74,10 +75,17 @@ def _pretraced_backend(
             fake_mode, "allow_non_fake_inputs", True
         ), fake_mode:
             repair_input_aliasing(gm)
+
+            # Remove sym_int placeholders and inputs
+            remove_sym_nodes(gm)
+            torch_inputs = [
+                input for input in sample_inputs if isinstance(input, torch.Tensor)
+            ]
+
             # Invoke AOTAutograd to translate operators to aten
             gm = aot_export_joint_simple(
                 gm,
-                sample_inputs,
+                torch_inputs,
                 trace_joint=False,
                 decompositions=get_decompositions(
                     settings.enable_experimental_decompositions
@@ -86,10 +94,10 @@ def _pretraced_backend(
 
             logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
 
-            gm = apply_lowering_passes(gm, sample_inputs)
+            gm = apply_lowering_passes(gm, torch_inputs)
 
             torchtrt_inputs = prepare_inputs(
-                sample_inputs, disable_memory_format_check=True
+                torch_inputs, disable_memory_format_check=True
             )
             trt_compiled = compile_module(
                 gm,

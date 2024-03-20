@@ -102,7 +102,6 @@ def expand(
 
     # set_layer_name(layer, target, name, source_ir)
     # return layer.get_output(0)
-    breakpoint()
     expand_output = slice(ctx, target, source_ir, name, input_t, start, shape, stride)
     return expand_output
 

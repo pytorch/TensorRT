@@ -11,7 +11,6 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     get_trt_tensor,
-    to_numpy,
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
@@ -87,8 +86,9 @@ def get_shape_with_dynamic_shape(
     scale_res = scale_layer.get_output(0)
 
     length = input_shape.shape[0]
+
     zero_layer = ctx.net.add_constant(
-        input_shape.shape, to_numpy(torch.zeros((length), dtype=torch.int32))
+        input_shape.shape, np.zeros((length), dtype=np.int32)
     )
     set_layer_name(zero_layer, target, f"{name}_zeros")
 
