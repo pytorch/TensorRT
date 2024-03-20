@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from typing import Optional, Sequence, Set
 
 import torch
 from torch.fx.node import _get_qualified_name
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo.utils import get_torch_inputs
+
+logger = logging.getLogger(__name__)
 
 
 def _extract_downstream_get_nodes(
@@ -61,6 +64,10 @@ def _repair_64bit_input(
         torch.int64,
         torch.float64,
     ), f"dtype argument must be torch.int64 or torch.float64, got {dtype}"
+
+    logger.info(
+        f"Downcasting a 64-bit input at position {position} of submodule {submodule_name}"
+    )
 
     # Determine target data type in 32 and 64 bit forms
     dtype_64bit = dtype

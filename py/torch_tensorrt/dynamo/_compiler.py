@@ -319,6 +319,7 @@ def compile_module(
     # If specified, try using the fast partitioner and fall back to the global one on failure
     if settings.use_fast_partitioner:
         try:
+            logger.info("Partitioning the graph via the fast partitioner")
             partitioned_module, supported_ops = partitioning.fast_partition(
                 gm,
                 verbose=settings.debug,
@@ -328,7 +329,7 @@ def compile_module(
         except torch.fx.passes.splitter_base.FxNetSplitterInternalError:
             logger.error(
                 "Partitioning failed on the subgraph with fast partition. See trace above. "
-                + "Retrying with global partition.",
+                "Retrying with global partition.",
                 exc_info=True,
             )
 
@@ -336,6 +337,7 @@ def compile_module(
             settings.use_fast_partitioner = False
 
     if not settings.use_fast_partitioner:
+        logger.info("Partitioning the graph via the global partitioner")
         partitioned_module, supported_ops = partitioning.global_partition(
             gm,
             verbose=settings.debug,
@@ -378,14 +380,15 @@ def compile_module(
             to_torch_device(settings.device),
         )
 
+        assert submodule_inputs is not None
+
         logger.debug(
-            "Submodule name: %s\n Input shapes: %s\n %s",
+            "Converting submodule: %s\n Input shapes: %s\n %s",
             str(name),
             [input.shape for input in submodule_inputs],
             str(submodule.graph),
         )
 
-        assert submodule_inputs is not None
         # Handle long/double inputs if requested by the user
         if settings.truncate_long_and_double:
             submodule_inputs = repair_long_or_double_inputs(
