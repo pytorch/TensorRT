@@ -110,11 +110,6 @@ def test_bert_base_uncased(ir):
     model = BertModel.from_pretrained("bert-base-uncased").cuda().eval()
     input = torch.randint(0, 1, (1, 14), dtype=torch.int32).to("cuda")
     input2 = torch.randint(0, 1, (1, 14), dtype=torch.int32).to("cuda")
-    # model = (
-    #     transformers_trace(model, input_names=["input_ids", "attention_mask"])
-    #     .eval()
-    #     .cuda()
-    # )
 
     compile_spec = {
         "inputs": [
