@@ -8,6 +8,8 @@ from torch.export import ExportedProgram, ExportGraphSignature
 from torch.export.exported_program import (
     InputKind,
     InputSpec,
+    ModuleCallEntry,
+    ModuleCallSignature,
     OutputKind,
     OutputSpec,
     TensorArgument,
@@ -296,13 +298,25 @@ def create_trt_exp_program(
     # torch.export serialization expects them to be lifted
     gm, trt_graph_signature, state_dict = lift(gm, trt_graph_signature)
 
+    module_call_graph = [
+        ModuleCallEntry(
+            "",
+            ModuleCallSignature(
+                inputs=[],
+                outputs=[],
+                in_spec=gm.graph._codegen.pytree_info.in_spec,
+                out_spec=gm.graph._codegen.pytree_info.out_spec,
+            ),
+        )
+    ]
+
     trt_exp_program = ExportedProgram(
         gm,
         gm.graph,
         trt_graph_signature,
         state_dict,
         {},
-        [],
+        module_call_graph,
         [],
     )
 

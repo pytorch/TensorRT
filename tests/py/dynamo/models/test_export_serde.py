@@ -47,7 +47,7 @@ def test_base_full_compile(ir):
     deser_trt_exp_program = torch.export.load("/tmp/trt.ep")
 
     # Check Pyt and TRT exported program outputs
-    cos_sim = cosine_similarity(model(input), trt_exp_program(input)[0])
+    cos_sim = cosine_similarity(model(input), trt_exp_program(input))
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
         msg=f"test_base_model_full_compile TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
@@ -213,20 +213,21 @@ def test_hybrid_relu_fallback(ir):
 
     outputs_pyt = model(input)
     outputs_trt = trt_exp_program(input)
-    for idx in range(len(outputs_pyt)):
-        cos_sim = cosine_similarity(outputs_pyt[idx], outputs_trt[idx])
-        assertions.assertTrue(
-            cos_sim > COSINE_THRESHOLD,
-            msg=f"test_hybrid_relu_fallback TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
-        )
 
+    # Check Pyt and TRT exported program outputs
+    cos_sim = cosine_similarity(outputs_pyt, outputs_trt)
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_hybrid_relu_fallback TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
+
+    # Check Pyt and deserialized TRT exported program outputs
     outputs_trt_deser = deser_trt_exp_program(input)
-    for idx in range(len(outputs_pyt)):
-        cos_sim = cosine_similarity(outputs_pyt[idx], outputs_trt_deser[idx])
-        assertions.assertTrue(
-            cos_sim > COSINE_THRESHOLD,
-            msg=f"test_hybrid_relu_fallback deserialized TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
-        )
+    cos_sim = cosine_similarity(outputs_pyt, outputs_trt_deser)
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_hybrid_relu_fallback TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
 
 
 @pytest.mark.unit
@@ -254,7 +255,7 @@ def test_resnet18(ir):
 
     outputs_pyt = model(input)
     outputs_trt = trt_exp_program(input)
-    cos_sim = cosine_similarity(outputs_pyt, outputs_trt[0])
+    cos_sim = cosine_similarity(outputs_pyt, outputs_trt)
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
         msg=f"test_resnet18 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
@@ -262,7 +263,7 @@ def test_resnet18(ir):
 
     outputs_trt_deser = deser_trt_exp_program(input)
 
-    cos_sim = cosine_similarity(outputs_pyt, outputs_trt_deser[0])
+    cos_sim = cosine_similarity(outputs_pyt, outputs_trt_deser)
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
         msg=f"test_resnet18 deserialized TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
@@ -310,17 +311,15 @@ def test_hybrid_conv_fallback(ir):
     outputs_pyt = model(input)
     outputs_trt = trt_exp_program(input)
 
-    for idx in range(len(outputs_pyt)):
-        cos_sim = cosine_similarity(outputs_pyt[idx], outputs_trt[idx])
-        assertions.assertTrue(
-            cos_sim > COSINE_THRESHOLD,
-            msg=f"test_hybrid_conv_fallback TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
-        )
+    cos_sim = cosine_similarity(outputs_pyt, outputs_trt)
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_hybrid_conv_fallback TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
 
     outputs_trt_deser = deser_trt_exp_program(input)
-    for idx in range(len(outputs_pyt)):
-        cos_sim = cosine_similarity(outputs_pyt[idx], outputs_trt_deser[idx])
-        assertions.assertTrue(
-            cos_sim > COSINE_THRESHOLD,
-            msg=f"test_hybrid_conv_fallback deserialized TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
-        )
+    cos_sim = cosine_similarity(outputs_pyt, outputs_trt_deser)
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_hybrid_conv_fallback deserialized TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
