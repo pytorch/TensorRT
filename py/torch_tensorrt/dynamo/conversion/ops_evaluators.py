@@ -2,7 +2,7 @@ import logging
 import operator
 from typing import Dict, Sequence, Tuple, Union
 
-import numpy as np
+import tensorrt as trt
 import torch
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -46,4 +46,14 @@ def aten_ops_arange_start_step(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return np.arange(*args)
+    # breakpoint()
+    fill_layer = ctx.net.add_fill(trt.Dims(), trt.FillOperation.LINSPACE)
+    fill_layer.set_input(0, args[1])
+    fill_layer.set_output_type(0, trt.DataType.INT32)
+    # fill_layer.set_input(1, 0)
+    # fill_layer.set_input(2, 1)
+    # start_tensor = get_trt_tensor(ctx, 0, "_start_tensor")
+    # fill_layer.set_input(1, start_tensor)
+    # delta_tensor = get_trt_tensor(ctx, torch.tensor([0], dtype=torch.int32), "_delta_tensor")
+    # fill_layer.set_input(2, delta_tensor)
+    return fill_layer.get_output(0)

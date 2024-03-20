@@ -8,12 +8,43 @@ import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.converter_utils import to_numpy
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    get_positive_dim,
+    get_trt_tensor,
+    to_numpy,
+)
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
 )
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 from torch_tensorrt.fx.types import TRTTensor
+
+
+def shape(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+    dim: int,
+) -> TRTTensor:
+    """
+    This is the general shape layer implementation in TensorRT.
+    sym_size.int ops map to addShape layer in TensorRT and returns
+    the dynamic shape of the tensor optionally taking in a dim argument.
+    """
+    shape_layer = ctx.net.add_shape(input_val)
+    input_shape = shape_layer.get_output(0)
+    set_layer_name(shape_layer, target, name + "_shape", source_ir)
+
+    n_dims = len(input_val.shape)
+    dim = get_positive_dim(dim, n_dims)
+    dim_tensor = get_trt_tensor(ctx, dim, name + "_dim")
+    gather_layer = ctx.net.add_gather(input_shape, dim_tensor, axis=0)
+    set_layer_name(gather_layer, target, name + "_gather", source_ir)
+    input_shape = gather_layer.get_output(0)
+
+    return input_shape
 
 
 def get_shape_with_dynamic_shape(

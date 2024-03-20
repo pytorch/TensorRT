@@ -88,7 +88,8 @@ def get_torch_inputs(
             if isinstance(input, Input)
         ]
     return [
-        input.torch_tensor.to(device) for input in inputs if isinstance(input, Input)
+        input.torch_tensor.to(device) if isinstance(input, Input) else input
+        for input in inputs
     ]
 
 
