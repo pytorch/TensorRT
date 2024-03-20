@@ -1,7 +1,7 @@
 from typing import Any
 
 import torch
-from torch_tensorrt._version import __version__
+
 
 def sanitized_torch_version() -> Any:
     return (

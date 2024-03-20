@@ -1,5 +1,5 @@
 import sys
-from typing import Any, Optional, Tuple
+from typing import Any
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -8,9 +8,6 @@ else:
 
 import warnings
 
-import tensorrt as trt
-import torch
-from torch_tensorrt._enums import DeviceType
 from torch_tensorrt._Device import Device
 
 try:
@@ -31,13 +28,6 @@ class TorchScriptDevice(Device):
         dla_core (int): Core ID for target DLA core
         allow_gpu_fallback (bool): Whether falling back to GPU if DLA cannot support an op should be allowed
     """
-
-    device_type: Optional[
-        DeviceType
-    ] = None  #: Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.
-    gpu_id: int = -1  #: Device ID for target GPU
-    dla_core: int = -1  #: Core ID for target DLA core
-    allow_gpu_fallback: bool = False  #: Whether falling back to GPU if DLA cannot support an op should be allowed
 
     def __init__(self, *args: Any, **kwargs: Any):
         """__init__ Method for torch_tensorrt.Device
@@ -72,5 +62,9 @@ class TorchScriptDevice(Device):
         return internal_dev
 
     @classmethod
-    def _from(cls, d: Device) -> Self:
-        return cls(gpu_id=d.gpu_id, dla_core=d.dla_core, allow_gpu_fallback=d.allow_gpu_fallback)
+    def _from(cls, d: object) -> Self:
+        return cls(
+            gpu_id=d.gpu_id,
+            dla_core=d.dla_core,
+            allow_gpu_fallback=d.allow_gpu_fallback,
+        )

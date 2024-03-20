@@ -4,12 +4,12 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set
 
 import numpy as np
-import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch.utils._python_dispatch import _disable_current_modes
+from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -22,9 +22,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
 )
 from torch_tensorrt.fx.observer import Observer
-from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 from torch_tensorrt.logging import TRT_LOGGER
 
+import tensorrt as trt
 from packaging import version
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -51,12 +51,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         module: torch.fx.GraphModule,
         input_specs: Sequence[Input],
         logger_level: trt.ILogger.Severity = trt.ILogger.Severity.WARNING,
-        output_dtypes: Optional[Sequence[torch.dtype]] = None,
+        output_dtypes: Optional[Sequence[dtype]] = None,
         compilation_settings: CompilationSettings = CompilationSettings(),
     ):
         super().__init__(module)
 
-        # TODO: @narendasan replace with Torch-TensorRT Logger
         self.logger = TRT_LOGGER
         self.builder = trt.Builder(self.logger)
 
@@ -99,7 +98,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self.compilation_settings = compilation_settings
 
         # Data types for TRT Module output Tensors
-        self.output_dtypes = output_dtypes
+        self.output_dtypes = (
+            [dtype._from(o) for o in output_dtypes] if output_dtypes else None
+        )
 
     def validate_conversion(self) -> Set[str]:
         missing_converters: Set[str] = set()
@@ -140,12 +141,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         precision = self.compilation_settings.precision
         # For float outputs, we set their dtype to fp16 only if precision == torch.float16 and
         # force_fp32_output=False. Overriden by specifying output_dtypes
-        self.output_fp16 = not force_fp32_output and precision == torch.float16
+        self.output_fp16 = not force_fp32_output and precision == dtype.float16
 
-        if precision == torch.int8 and not self.builder.platform_has_fast_int8:
+        if precision == dtype.int8 and not self.builder.platform_has_fast_int8:
             raise RuntimeError("Current platform doesn't support fast native int8!")
 
-        if precision == torch.float16 and not self.builder.platform_has_fast_fp16:
+        if precision == dtype.float16 and not self.builder.platform_has_fast_fp16:
             warnings.warn("Current platform doesn't support fast native fp16!")
 
         self.input_specs_iter = 0
@@ -202,14 +203,20 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     self.compilation_settings.optimization_level
                 )
 
-        builder_config.engine_capability = self.compilation_settings.engine_capability
+        builder_config.engine_capability = (
+            self.compilation_settings.engine_capability.to(trt.EngineCapability)
+        )
         builder_config.avg_timing_iterations = (
             self.compilation_settings.num_avg_timing_iters
         )
 
         if self.compilation_settings.device.device_type == trt.DeviceType.DLA:
-            device_info = torch.cuda.get_device_properties(self.compilation_settings.device.gpu_id)
-            assert (device_info.major == 8 and device_info.minor == 7) or (device_info.major == 7 and device_info.minor == 2)
+            device_info = torch.cuda.get_device_properties(
+                self.compilation_settings.device.gpu_id
+            )
+            assert (device_info.major == 8 and device_info.minor == 7) or (
+                device_info.major == 7 and device_info.minor == 2
+            )
             builder_config.DLA_core = self.compilation_settings.device.dla_core
             _LOGGER.info(f"Using DLA core {self.compilation_settings.device.dla_core}")
             builder_config.set_memory_pool_limit(
@@ -225,10 +232,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 self.compilation_settings.dla_global_dram_size,
             )
 
-        if precision == torch.float16:
+        if precision == dtype.float16:
             builder_config.set_flag(trt.BuilderFlag.FP16)
 
-        if precision == torch.int8:
+        if precision == dtype.int8:
             builder_config.set_flag(trt.BuilderFlag.INT8)
 
         if self.compilation_settings.sparse_weights:
@@ -288,7 +295,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         del kwargs["_itensor_to_tensor_meta"]
         n.kwargs = kwargs
 
-        if isinstance(trt_node, trt.tensorrt.ITensor):
+        if isinstance(trt_node, trt.ITensor):
             self._itensor_to_tensor_meta[trt_node] = n.meta.get("tensor_meta")
 
         return trt_node
@@ -329,7 +336,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         return self.ctx.net.add_input(
             name=target,
             shape=tuple(shape),
-            dtype=unified_dtype_converter(current_input.torch_dtype, Frameworks.TRT),
+            dtype=current_input.dtype.to(trt.DataType, use_default=True),
         )
 
     def call_module(
@@ -412,13 +419,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         for output_idx in range(len(outputs)):
             output = outputs[output_idx]
 
-            if not isinstance(output, trt.tensorrt.ITensor):
+            if not isinstance(output, trt.ITensor):
                 new_output = get_trt_tensor(self.ctx, output, target)
                 outputs = (
                     outputs[:output_idx] + (new_output,) + outputs[output_idx + 1 :]
                 )
 
-        if not all(isinstance(output, trt.tensorrt.ITensor) for output in outputs):
+        if not all(isinstance(output, trt.ITensor) for output in outputs):
             raise RuntimeError("TensorRT requires all outputs to be Tensor!")
 
         if self.output_dtypes is not None and len(self.output_dtypes) != len(outputs):
@@ -449,13 +456,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             output.name = name
             self.ctx.net.mark_output(output)
             if output_bool:
-                output.dtype = trt.bool
+                output.dtype = trt.DataType.BOOL
             elif self.output_dtypes is not None:
-                output.dtype = unified_dtype_converter(
-                    self.output_dtypes[i], Frameworks.TRT
-                )
-            elif self.output_fp16 and output.dtype == trt.float32:
-                output.dtype = trt.float16
+                output.dtype = self.output_dtypes[i].to(trt.DataType)
+            elif self.output_fp16 and output.dtype == trt.DataType.FLOAT:
+                output.dtype = trt.DataType.HALF
             self._output_names.append(name)
 
         return list(outputs)

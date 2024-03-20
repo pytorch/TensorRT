@@ -1,13 +1,14 @@
 import unittest
-import torch_tensorrt as torchtrt
+
 import torch
+import torch_tensorrt as torchtrt
 import torchvision.models as models
-from utils import cosine_similarity, COSINE_THRESHOLD
+from utils import COSINE_THRESHOLD, cosine_similarity
 
 
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
-    "TorchScript Frontend is not available"
+    "TorchScript Frontend is not available",
 )
 class TestToBackendLowering(unittest.TestCase):
     def setUp(self):

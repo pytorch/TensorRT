@@ -3,15 +3,16 @@ from __future__ import annotations
 import logging
 from enum import Enum
 from typing import Any, Callable, List, Optional, Sequence, Set
-from typing_extensions import TypeGuard
 
 import torch
 import torch.fx
-from torch_tensorrt._Input import Input
+from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
+from torch_tensorrt._Input import Input
 from torch_tensorrt.fx import InputTensorSpec
 from torch_tensorrt.fx.lower import compile as fx_compile
 from torch_tensorrt.fx.utils import LowerPrecision
+from typing_extensions import TypeGuard
 
 if ENABLED_FEATURES.torchscript_frontend:
     import torch_tensorrt.ts
@@ -28,6 +29,7 @@ __all__ = [
     "compile",
     "convert_method_to_trt_engine",
 ]
+
 
 def _non_fx_input_interface(
     inputs: Sequence[Input | torch.Tensor | InputTensorSpec],
@@ -86,13 +88,19 @@ def _get_target_fe(module_type: _ModuleType, ir: str) -> _IRType:
     ir_targets_dynamo = ir == "dynamo"
     ir_targets_torch_compile = ir == "torch_compile"
 
-    if (module_is_tsable and ir_targets_torchscript) and ENABLED_FEATURES.torchscript_frontend:
+    if (
+        module_is_tsable and ir_targets_torchscript
+    ) and ENABLED_FEATURES.torchscript_frontend:
         return _IRType.ts
     elif (module_is_fxable and ir_targets_fx) and ENABLED_FEATURES.fx_frontend:
         return _IRType.fx
-    elif ((module_is_fxable or module_is_exportable) and ir_targets_dynamo) and ENABLED_FEATURES.dynamo_frontend:
+    elif (
+        (module_is_fxable or module_is_exportable) and ir_targets_dynamo
+    ) and ENABLED_FEATURES.dynamo_frontend:
         return _IRType.dynamo
-    elif (module_is_fxable and ir_targets_torch_compile) and ENABLED_FEATURES.dynamo_frontend:
+    elif (
+        module_is_fxable and ir_targets_torch_compile
+    ) and ENABLED_FEATURES.dynamo_frontend:
         return _IRType.torch_compile
     else:
         if ir == "default":
@@ -110,7 +118,9 @@ def _get_target_fe(module_type: _ModuleType, ir: str) -> _IRType:
                 logger.info("ir was set to default, using dynamo frontend")
                 return _IRType.dynamo
             else:
-                raise ValueError(f"Module was provided in an unsupported format\nInstalled frontends:\n\tDynamo - {ENABLED_FEATURES.dynamo_frontend}\n\tTorchScript - {ENABLED_FEATURES.torchscript_frontend}\n\tFX - {ENABLED_FEATURES.fx_frontend})")
+                raise ValueError(
+                    f"Module was provided in an unsupported format\nInstalled frontends:\n\tDynamo - {ENABLED_FEATURES.dynamo_frontend}\n\tTorchScript - {ENABLED_FEATURES.torchscript_frontend}\n\tFX - {ENABLED_FEATURES.fx_frontend})"
+                )
         else:
             raise ValueError("Unknown ir was requested")
 
@@ -119,7 +129,7 @@ def compile(
     module: Any,
     ir: str = "default",
     inputs: Optional[Sequence[Input | torch.Tensor | InputTensorSpec]] = None,
-    enabled_precisions: Optional[torch.dtype] = None,
+    enabled_precisions: Optional[Set[torch.dtype | dtype]] = None,
     **kwargs: Any,
 ) -> (
     torch.nn.Module | torch.jit.ScriptModule | torch.fx.GraphModule | Callable[..., Any]
@@ -160,8 +170,8 @@ def compile(
         torch.nn.Module: Compiled Module, when run it will execute via TensorRT
     """
     input_list = inputs if inputs is not None else []
-    enabled_precisions_set = (
-        enabled_precisions if enabled_precisions is not None else {torch.float}
+    enabled_precisions_set: Set[dtype | torch.dtype] = (
+        enabled_precisions if enabled_precisions is not None else {dtype.float}
     )
 
     module_type = _parse_module_type(module)
@@ -299,7 +309,7 @@ def convert_method_to_trt_engine(
                 "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript"
             )
             ts_mod = torch.jit.script(module)
-        return torch_tensorrt.ts.convert_method_to_trt_engine(  # type: ignore[no-any-return]
+        return torch_tensorrt.ts.convert_method_to_trt_engine(
             ts_mod,
             inputs=inputs,
             method_name=method_name,

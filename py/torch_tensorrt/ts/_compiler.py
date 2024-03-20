@@ -4,8 +4,8 @@ from typing import Any, List, Optional, Sequence, Set, Tuple
 
 import torch
 import torch_tensorrt._C.ts as _C
-from torch_tensorrt.ts import _enums
 from torch_tensorrt._Device import Device
+from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.ts._compile_spec import _parse_compile_spec, _parse_device
 
@@ -19,10 +19,10 @@ def compile(
     device: Device = Device._current_device(),
     disable_tf32: bool = False,
     sparse_weights: bool = False,
-    enabled_precisions: Optional[Set[torch.dtype | _enums.dtype]] = None,
+    enabled_precisions: Optional[Set[torch.dtype | dtype]] = None,
     refit: bool = False,
     debug: bool = False,
-    capability: _enums.EngineCapability = _enums.EngineCapability.default,
+    capability: EngineCapability = EngineCapability.STANDARD,
     num_avg_timing_iters: int = 1,
     workspace_size: int = 0,
     dla_sram_size: int = 1048576,
@@ -167,10 +167,10 @@ def convert_method_to_trt_engine(
     device: Device = Device._current_device(),
     disable_tf32: bool = False,
     sparse_weights: bool = False,
-    enabled_precisions: Optional[Set[torch.dtype | _enums.dtype]] = None,
+    enabled_precisions: Optional[Set[torch.dtype | dtype]] = None,
     refit: bool = False,
     debug: bool = False,
-    capability: _enums.EngineCapability = _enums.EngineCapability.default,
+    capability: EngineCapability = EngineCapability.STANDARD,
     num_avg_timing_iters: int = 1,
     workspace_size: int = 0,
     dla_sram_size: int = 1048576,

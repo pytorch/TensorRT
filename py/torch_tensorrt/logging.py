@@ -1,17 +1,19 @@
 import logging
 from typing import Any
 
-import tensorrt as trt
 from torch_tensorrt._features import ENABLED_FEATURES
 
+import tensorrt as trt
 
 _LOGGER = logging.getLogger("torch_tensorrt [TensorRT Conversion Context]")
 
-class _TRTLogger(trt.ILogger):
-    def __init__(self):
+
+class _TRTLogger(trt.ILogger):  # type: ignore[misc]
+
+    def __init__(self) -> None:
         trt.ILogger.__init__(self)
 
-    def log(self, severity, msg):
+    def log(self, severity: trt.ILogger.Severity, msg: str) -> None:
         # TODO: Move to match once py39 reaches EoL
         if severity == trt.ILogger.Severity.INTERNAL_ERROR:
             _LOGGER.critical(msg)
@@ -25,7 +27,9 @@ class _TRTLogger(trt.ILogger):
         elif severity == trt.ILogger.Severity.VERBOSE:
             _LOGGER.debug(msg)
 
+
 TRT_LOGGER = _TRTLogger()
+
 
 class internal_errors:
     """Context-manager to limit displayed log messages to just internal errors
@@ -42,6 +46,7 @@ class internal_errors:
 
         if ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt.ts import logging as ts_logging
+
             self.ts_level = ts_logging.get_reportable_log_level()
             ts_logging.set_reportable_log_level(ts_logging.Level.InternalError)
 
@@ -50,6 +55,7 @@ class internal_errors:
 
         if ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt.ts import logging as ts_logging
+
             ts_logging.set_reportable_log_level(self.ts_level)
 
 
@@ -68,6 +74,7 @@ class errors:
 
         if ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt.ts import logging as ts_logging
+
             self.ts_level = ts_logging.get_reportable_log_level()
             ts_logging.set_reportable_log_level(ts_logging.Level.Error)
 
@@ -76,6 +83,7 @@ class errors:
 
         if ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt.ts import logging as ts_logging
+
             ts_logging.set_reportable_log_level(self.ts_level)
 
 
@@ -94,6 +102,7 @@ class warnings:
 
         if ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt.ts import logging as ts_logging
+
             self.ts_level = ts_logging.get_reportable_log_level()
             ts_logging.set_reportable_log_level(ts_logging.Level.Warning)
 
@@ -102,6 +111,7 @@ class warnings:
 
         if ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt.ts import logging as ts_logging
+
             ts_logging.set_reportable_log_level(self.ts_level)
 
 
@@ -120,6 +130,7 @@ class info:
 
         if ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt.ts import logging as ts_logging
+
             self.ts_level = ts_logging.get_reportable_log_level()
             ts_logging.set_reportable_log_level(ts_logging.Level.Info)
 
@@ -128,6 +139,7 @@ class info:
 
         if ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt.ts import logging as ts_logging
+
             ts_logging.set_reportable_log_level(self.ts_level)
 
 
@@ -146,6 +158,7 @@ class debug:
 
         if ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt.ts import logging as ts_logging
+
             self.ts_level = ts_logging.get_reportable_log_level()
             ts_logging.set_reportable_log_level(ts_logging.Level.Debug)
 
@@ -154,6 +167,7 @@ class debug:
 
         if ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt.ts import logging as ts_logging
+
             ts_logging.set_reportable_log_level(self.ts_level)
 
 
@@ -173,6 +187,7 @@ class graphs:
 
         if ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt.ts import logging as ts_logging
+
             self.ts_level = ts_logging.get_reportable_log_level()
             ts_logging.set_reportable_log_level(ts_logging.Level.Graph)
 
@@ -181,4 +196,5 @@ class graphs:
 
         if ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt.ts import logging as ts_logging
+
             ts_logging.set_reportable_log_level(self.ts_level)

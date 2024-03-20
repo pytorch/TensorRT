@@ -1,17 +1,20 @@
-import sys
-from typing import Any, Optional, Tuple
+from __future__ import annotations
 
 import logging
+import sys
+from typing import Any, Optional, Tuple
 
 if sys.version_info >= (3, 11):
     from typing import Self
 else:
     from typing_extensions import Self
 
-import tensorrt as trt
 import torch
 from torch_tensorrt._enums import DeviceType
 from torch_tensorrt._features import ENABLED_FEATURES
+
+import tensorrt as trt
+
 
 class Device(object):
     """
@@ -24,7 +27,9 @@ class Device(object):
         allow_gpu_fallback (bool): Whether falling back to GPU if DLA cannot support an op should be allowed
     """
 
-    device_type: Optional[DeviceType] = None  #: Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.
+    device_type: DeviceType = (
+        DeviceType.UNKNOWN
+    )  #: Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.
     gpu_id: int = -1  #: Device ID for target GPU
     dla_core: int = -1  #: Core ID for target DLA core
     allow_gpu_fallback: bool = (
@@ -52,7 +57,6 @@ class Device(object):
             - Device(dla_core=0, allow_gpu_fallback=True)
             - Device(gpu_id=1)
         """
-        print(args, kwargs)
         if len(args) == 1:
             if not isinstance(args[0], str):
                 raise TypeError(
@@ -63,7 +67,7 @@ class Device(object):
                 if self.device_type == DeviceType.DLA:
                     self.dla_core = id
                     self.gpu_id = 0
-                    logging.warn(
+                    logging.warning(
                         "Setting GPU id to 0 for device because device 0 manages DLA on AGX Devices",
                     )
                 else:
@@ -76,12 +80,11 @@ class Device(object):
                 if "gpu_id" in kwargs:
                     self.gpu_id = kwargs["gpu_id"]
 
-
                 if self.dla_core >= 0:
                     self.device_type = DeviceType.DLA
                     if self.gpu_id != 0:
                         self.gpu_id = 0
-                        logging.warn(
+                        logging.warning(
                             "Setting GPU id to 0 for device because device 0 manages DLA on AGX Platforms",
                         )
                 else:
@@ -93,9 +96,7 @@ class Device(object):
 
         else:
             raise ValueError(
-                "Unexpected number of positional arguments for class Device \n    Found {} arguments, expected either zero or a single positional arguments".format(
-                    len(args)
-                )
+                f"Unexpected number of positional arguments for class Device \n    Found {len(args)} arguments, expected either zero or a single positional arguments"
             )
 
         if "allow_gpu_fallback" in kwargs:
@@ -107,17 +108,20 @@ class Device(object):
             if isinstance(kwargs["device_type"], trt.DeviceType):
                 self.device_type = DeviceType._from(kwargs["device_type"])
 
-
     def __str__(self) -> str:
-        suffix = ")" if self.device_type == DeviceType.GPU else ", dla_core={}, allow_gpu_fallback={})".format(self.dla_core, self.allow_gpu_fallback)
-        return "Device(type={}, gpu_id={}{}".format(self.device_type, self.gpu_id, suffix)
-
+        suffix = (
+            ")"
+            if self.device_type == DeviceType.GPU
+            else f", dla_core={self.dla_core}, allow_gpu_fallback={self.allow_gpu_fallback})"
+        )
+        dev_str: str = f"Device(type={self.device_type}, gpu_id={self.gpu_id}{suffix}"
+        return dev_str
 
     def __repr__(self) -> str:
         return self.__str__()
 
     @classmethod
-    def _from(cls, d: Optional[Self | torch.device | str]) -> Self:
+    def _from(cls, d: Optional[Self | torch.device | str]) -> Device:
         """Cast a device-type to torch_tensorrt.Device
 
         Returns the corresponding torch_tensorrt.Device
@@ -137,11 +141,11 @@ class Device(object):
             return cls(d)
 
     @classmethod
-    def _from_torch_device(cls, torch_dev: torch.device) -> Self:
+    def _from_torch_device(cls, torch_dev: torch.device) -> Device:
         return cls._from(torch_dev)
 
     @classmethod
-    def _current_device(cls) -> Self:
+    def _current_device(cls) -> Device:
         dev_id = torch.cuda.current_device()
         return cls(gpu_id=dev_id)
 
@@ -166,19 +170,19 @@ class Device(object):
             raise TypeError("Unsupported target type for device conversion")
 
     def _to_serialized_rt_device(self) -> str:
-        if ENABLED_FEATURES.torch_tensorrt_runtime:
-            delim = torch.ops.tensorrt.SERIALIZED_RT_DEVICE_DELIM()[0]
-            dev_info = torch.cuda.get_device_properties(self.gpu_id)
-            rt_info = [
-                self.gpu_id,
-                dev_info.major,
-                dev_info.minor,
-                int(self.device_type.to(trt.DeviceType)),
-                dev_info.name
-            ]
-            rt_info = [str(i) for i in rt_info]
-            packed_rt_info = delim.join(rt_info)
-            logging.debug("Serialized Device Info: {}".format(packed_rt_info))
-            return packed_rt_info
-        else:
+        if not ENABLED_FEATURES.torch_tensorrt_runtime:
             raise NotImplementedError("Torch-TensorRT runtime is not available")
+
+        delim = torch.ops.tensorrt.SERIALIZED_RT_DEVICE_DELIM()[0]
+        dev_info = torch.cuda.get_device_properties(self.gpu_id)
+        rt_info = [
+            self.gpu_id,
+            dev_info.major,
+            dev_info.minor,
+            int(self.device_type.to(trt.DeviceType)),  # type: ignore[arg-type]
+            dev_info.name,
+        ]
+        rt_info = [str(i) for i in rt_info]
+        packed_rt_info: str = delim.join(rt_info)
+        logging.debug(f"Serialized Device Info: {packed_rt_info}")
+        return packed_rt_info

@@ -1,7 +1,6 @@
 import torch
-
-from torch_tensorrt._version import __version__
 from torch_tensorrt import _C
+from torch_tensorrt._version import __version__
 
 
 def dump_build_info() -> None:

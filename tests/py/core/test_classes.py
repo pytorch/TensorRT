@@ -1,11 +1,13 @@
-import unittest
-import torch_tensorrt as torchtrt
-from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
-import torch
-import torchvision.models as models
-import tensorrt as trt
 import copy
+import unittest
 from typing import Dict
+
+import torch
+import torch_tensorrt as torchtrt
+import torchvision.models as models
+from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
+
+import tensorrt as trt
 
 
 class TestDevice(unittest.TestCase):
@@ -44,7 +46,9 @@ class TestDevice(unittest.TestCase):
 
         device = torchtrt.Device(gpu_id=1, dla_core=0, allow_gpu_fallback=True)
         self.assertEqual(device.device_type, torchtrt.DeviceType.DLA)
-        self.assertEqual(device.gpu_id, 0) # Override since AGX platforms use iGPU to manage DLA
+        self.assertEqual(
+            device.gpu_id, 0
+        )  # Override since AGX platforms use iGPU to manage DLA
         self.assertEqual(device.dla_core, 0)
         self.assertEqual(device.allow_gpu_fallback, True)
 

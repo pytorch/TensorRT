@@ -1,12 +1,15 @@
-from typing import Self, Optional
+from __future__ import annotations
 
-from enum import Enum, auto
-import torch
-import numpy as np
-import tensorrt as trt
 import logging
+from enum import Enum, auto
+from typing import Any, Optional, Type, Union
 
+import numpy as np
+import torch
 from torch_tensorrt._features import ENABLED_FEATURES
+
+import tensorrt as trt
+
 
 class dtype(Enum):
     """Enum to set supported dtypes in the compiler"""
@@ -20,15 +23,14 @@ class dtype(Enum):
     f16 = auto()
     f32 = auto()
     f64 = auto()
-    bool = auto()
-
+    b = auto()
     # TODO: Enable FP8 and BF16
-    #f8 = auto()
-    #bf16 = auto()
+    # f8 = auto()
+    # bf16 = auto()
 
     uint8 = u8
+    int8 = i8
 
-    int = i32
     int32 = i32
 
     long = i64
@@ -47,19 +49,33 @@ class dtype(Enum):
     float64 = f64
 
     # TODO: Enable when FP8 is enabled
-    #float8 = f8
-    #fp8 = f8
+    # float8 = f8
+    # fp8 = f8
 
     # TODO: Enable when BF16 is enabled
-    #bfloat16 = bf16
-
+    # bfloat16 = bf16
 
     @staticmethod
-    def _from(t: torch.dtype | trt.DataType | np.dtype, use_default=False) -> Self:
+    def _is_np_obj(t: Any) -> bool:
+        if isinstance(t, np.dtype):
+            return True
+        elif isinstance(t, type):
+            if issubclass(t, np.generic):
+                return True
+        return False
+
+    @classmethod
+    def _from(
+        cls,
+        t: Union[torch.dtype, trt.DataType, np.dtype, dtype, type],
+        use_default: bool = False,
+    ) -> dtype:
         # TODO: Ideally implemented with match statement but need to wait for Py39 EoL
         if isinstance(t, torch.dtype):
             if t == torch.uint8:
                 return dtype.u8
+            elif t == torch.int8:
+                return dtype.i8
             elif t == torch.long:
                 return dtype.i64
             elif t == torch.int32:
@@ -71,14 +87,15 @@ class dtype(Enum):
             elif t == torch.float64:
                 return dtype.f64
             elif t == torch.bool:
-                return dtype.bool
+                return dtype.b
             elif use_default:
-                logging.warning("Given dtype that does not have direct mapping to Torch-TensorRT supported types ({}), defaulting to torch_tensorrt.dtype.float".format(t))
+                logging.warning(
+                    f"Given dtype that does not have direct mapping to Torch-TensorRT supported types ({t}), defaulting to torch_tensorrt.dtype.float"
+                )
                 return dtype.float
             else:
                 raise TypeError(
-                    "Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: "
-                    + str(t)
+                    f"Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: {t}"
                 )
         elif isinstance(t, trt.DataType):
             if t == trt.uint8:
@@ -91,15 +108,14 @@ class dtype(Enum):
                 return dtype.f16
             elif t == trt.float32:
                 return dtype.f32
-            elif (trt.__version__ >= "7.0" and t == torch.bool):
-                return dtype.bool
+            elif trt.__version__ >= "7.0" and t == trt.bool:
+                return dtype.b
             else:
                 raise TypeError(
-                    "Provided an unsupported data type as an input data type (support: bool, int32, half, float), got: "
-                    + str(t)
+                    f"Provided an unsupported data type as an input data type (support: bool, int32, half, float), got: {t}"
                 )
 
-        elif isinstance(t, np.dtype):
+        elif dtype._is_np_obj(t):
             if t == np.uint8:
                 return dtype.u8
             elif t == np.int8:
@@ -115,9 +131,11 @@ class dtype(Enum):
             elif t == np.float64:
                 return dtype.f64
             elif t == np.bool:
-                return dtype.bool
+                return dtype.b
             elif use_default:
-                logging.warning("Given dtype that does not have direct mapping to Torch-TensorRT supported types ({}), defaulting to torch_tensorrt.dtype.float".format(t))
+                logging.warning(
+                    f"Given dtype that does not have direct mapping to Torch-TensorRT supported types ({t}), defaulting to torch_tensorrt.dtype.float"
+                )
                 return dtype.float
             else:
                 raise TypeError(
@@ -130,11 +148,14 @@ class dtype(Enum):
 
         elif ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt import _C
+
             if isinstance(t, _C.dtype):
                 if t == _C.dtype.long:
                     return dtype.i64
-                elif t ==  _C.dtype.int32:
+                elif t == _C.dtype.int32:
                     return dtype.i32
+                elif t == _C.dtype.int8:
+                    return dtype.i8
                 elif t == _C.dtype.half:
                     return dtype.f16
                 elif t == _C.dtype.float:
@@ -142,29 +163,36 @@ class dtype(Enum):
                 elif t == _C.dtype.double:
                     return dtype.f64
                 elif t == _C.dtype.bool:
-                    return dtype.bool
+                    return dtype.b
                 elif t == _C.dtype.unknown:
                     return dtype.unknown
                 else:
                     raise TypeError(
-                        "Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: "
-                        + str(t)
+                        f"Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: {t}"
                     )
-        else:
-            raise TypeError(
-                "Provided unsupported source type for dtype conversion"
-            )
+        # else: # commented out for mypy
+        raise TypeError(
+            f"Provided unsupported source type for dtype conversion (got: {t})"
+        )
 
-    @staticmethod
-    def try_from(t: torch.dtype | trt.DataType | np.dtype) -> Optional[Self]:
+    @classmethod
+    def try_from(
+        cls,
+        t: Union[torch.dtype, trt.DataType, np.dtype, dtype],
+        use_default: bool = False,
+    ) -> Optional[dtype]:
         try:
-            casted_format = dtype._from(t)
+            casted_format = dtype._from(t, use_default=use_default)
             return casted_format
         except (ValueError, TypeError) as e:
             logging.debug(e)
             return None
 
-    def to(self, t: type, use_default: bool=False) -> torch.dtype | trt.DataType | np.dtype:
+    def to(
+        self,
+        t: Union[Type[torch.dtype], Type[trt.DataType], Type[np.dtype], Type[dtype]],
+        use_default: bool = False,
+    ) -> Union[torch.dtype, trt.DataType, np.dtype, dtype]:
         # TODO: Ideally implemented with match statement but need to wait for Py39 EoL
         if t == torch.dtype:
             if self == dtype.u8:
@@ -181,13 +209,15 @@ class dtype(Enum):
                 return torch.float
             elif self == dtype.f64:
                 return torch.double
-            elif self == dtype.bool:
+            elif self == dtype.b:
                 return torch.bool
             elif use_default:
-                logging.warning("Given dtype that does not have direct mapping to torch ({}), defaulting to torch.float".format(self))
+                logging.warning(
+                    f"Given dtype that does not have direct mapping to torch ({self}), defaulting to torch.float"
+                )
                 return torch.float
             else:
-                raise TypeError("Unsupported torch dtype")
+                raise TypeError(f"Unsupported torch dtype (had: {self})")
 
         elif t == trt.DataType:
             if self == dtype.u8:
@@ -200,7 +230,7 @@ class dtype(Enum):
                 return trt.DataType.HALF
             elif self == dtype.f32:
                 return trt.DataType.FLOAT
-            elif self == dtype.bool:
+            elif self == dtype.b:
                 return trt.DataType.BOOL
             elif use_default:
                 return trt.DataType.FLOAT
@@ -222,8 +252,8 @@ class dtype(Enum):
                 return np.float32
             elif self == dtype.f64:
                 return np.float64
-            elif self == dtype.bool:
-                return np.bool
+            elif self == dtype.b:
+                return np.bool_
             elif use_default:
                 return np.float32
             else:
@@ -234,9 +264,12 @@ class dtype(Enum):
 
         elif ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt import _C
+
             if t == _C.dtype:
                 if self == dtype.i64:
                     return _C.dtype.long
+                elif self == dtype.i8:
+                    return _C.dtype.int8
                 elif self == dtype.i32:
                     return _C.dtype.int32
                 elif self == dtype.f16:
@@ -245,21 +278,24 @@ class dtype(Enum):
                     return _C.dtype.float
                 elif self == dtype.f64:
                     return _C.dtype.double
-                elif self == dtype.bool:
+                elif self == dtype.b:
                     return _C.dtype.bool
                 elif self == dtype.unknown:
                     return _C.dtype.unknown
                 else:
                     raise TypeError(
-                        "Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: "
-                        + str(self)
+                        f"Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: {self}"
                     )
-        else:
-            raise TypeError(
-                "Provided unsupported destination type for dtype conversion"
-            )
+        # else: # commented out for mypy
+        raise TypeError(
+            f"Provided unsupported destination type for dtype conversion {t}"
+        )
 
-    def try_to(self, t: type, use_default: bool=False) -> Optional[torch.dtype | trt.DataType | np.dtype]:
+    def try_to(
+        self,
+        t: Union[Type[torch.dtype], Type[trt.DataType], Type[np.dtype], Type[dtype]],
+        use_default: bool,
+    ) -> Optional[Union[torch.dtype, trt.DataType, np.dtype, dtype]]:
         try:
             print(self)
             casted_format = self.to(t, use_default)
@@ -267,6 +303,18 @@ class dtype(Enum):
         except (ValueError, TypeError) as e:
             logging.debug(e)
             return None
+
+    def __eq__(self, other: Union[torch.dtype, trt.DataType, np.dtype, dtype]) -> bool:
+        other_ = dtype._from(other)
+        return bool(self.value == other_.value)
+
+    def __hash__(self) -> int:
+        return hash(self.value)
+
+    # Putting aliases here that mess with mypy
+    bool = b
+    int = i32
+
 
 class memory_format(Enum):
 
@@ -290,8 +338,10 @@ class memory_format(Enum):
     channels_last = hwc
     channels_last_3d = dhwc
 
-    @staticmethod
-    def _from(f: torch.memory_format | trt.TensorFormat) -> Self:
+    @classmethod
+    def _from(
+        cls, f: Union[torch.memory_format, trt.TensorFormat, memory_format]
+    ) -> memory_format:
         # TODO: Ideally implemented with match statement but need to wait for Py39 EoL
         if isinstance(f, torch.memory_format):
             if f == torch.contiguous_format:
@@ -302,8 +352,7 @@ class memory_format(Enum):
                 return memory_format.channels_last_3d
             else:
                 raise TypeError(
-                    "Provided an unsupported memory format for tensor, got: "
-                    + str(dtype)
+                    f"Provided an unsupported memory format for tensor, got: {dtype}"
                 )
 
         elif isinstance(f, trt.DataType):
@@ -335,8 +384,7 @@ class memory_format(Enum):
                 return memory_format.dhwc
             else:
                 raise TypeError(
-                    "Provided an unsupported tensor format for tensor, got: "
-                    + str(dtype)
+                    f"Provided an unsupported tensor format for tensor, got: {dtype}"
                 )
 
         elif isinstance(f, memory_format):
@@ -344,22 +392,23 @@ class memory_format(Enum):
 
         elif ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt import _C
+
             if isinstance(f, _C.TensorFormat):
                 if f == _C.TensorFormat.contiguous:
                     return memory_format.contiguous
-                if f == _C.TensorFormat.channels_last:
+                elif f == _C.TensorFormat.channels_last:
                     return memory_format.channels_last
                 else:
                     raise ValueError(
                         "Provided an unsupported tensor format (support: NCHW/contiguous_format, NHWC/channel_last)"
                     )
-        else:
-            raise TypeError(
-                "Provided unsupported source type for memory_format conversion"
-            )
+        # else: # commented out for mypy
+        raise TypeError("Provided unsupported source type for memory_format conversion")
 
-    @staticmethod
-    def try_from(f: torch.memory_format | trt.TensorFormat) -> Optional[Self]:
+    @classmethod
+    def try_from(
+        cls, f: Union[torch.memory_format, trt.TensorFormat, memory_format]
+    ) -> Optional[memory_format]:
         try:
             casted_format = memory_format._from(f)
             return casted_format
@@ -367,8 +416,12 @@ class memory_format(Enum):
             logging.debug(e)
             return None
 
-
-    def to(self, t: type) -> torch.memory_format | trt.TensorFormat:
+    def to(
+        self,
+        t: Union[
+            Type[torch.memory_format], Type[trt.TensorFormat], Type[memory_format]
+        ],
+    ) -> Union[torch.memory_format, trt.TensorFormat, memory_format]:
         if t == torch.memory_format:
             if self == memory_format.contiguous:
                 return torch.contiguous_format
@@ -380,15 +433,15 @@ class memory_format(Enum):
                 raise TypeError("Unsupported torch dtype")
 
         elif t == trt.TensorFormat:
-            if self ==  memory_format.linear:
+            if self == memory_format.linear:
                 return trt.TensorFormat.LINEAR
             elif self == memory_format.chw2:
                 return trt.TensorFormat.CHW2
-            elif self ==  memory_format.hwc8:
+            elif self == memory_format.hwc8:
                 return trt.TensorFormat.HWC8
             elif self == memory_format.chw4:
                 return trt.TensorFormat.CHW4
-            elif self ==  memory_format.chw16:
+            elif self == memory_format.chw16:
                 return trt.TensorFormat.CHW16
             elif self == memory_format.chw32:
                 return trt.TensorFormat.CHW32
@@ -407,13 +460,14 @@ class memory_format(Enum):
             elif self == memory_format.dhwc:
                 return trt.TensorFormat.DHWC
             else:
-                raise TypeError("Unsupported tensorrt dtype")
+                raise TypeError("Unsupported tensorrt memory format")
 
-        elif (t == memory_format):
+        elif t == memory_format:
             return self
 
         elif ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt import _C
+
             if t == _C.TensorFormat:
                 if self == memory_format.contiguous:
                     return _C.TensorFormat.contiguous
@@ -423,13 +477,17 @@ class memory_format(Enum):
                     raise ValueError(
                         "Provided an unsupported tensor format (support: NCHW/contiguous_format, NHWC/channel_last)"
                     )
+        # else: # commented out for mypy
+        raise TypeError(
+            "Provided unsupported destination type for memory format conversion"
+        )
 
-        else:
-            raise TypeError(
-                "Provided unsupported destination type for memory format conversion"
-            )
-
-    def try_to(self, t: type) -> Optional[torch.memory_format | trt.TensorFormat]:
+    def try_to(
+        self,
+        t: Union[
+            Type[torch.memory_format], Type[trt.TensorFormat], Type[memory_format]
+        ],
+    ) -> Optional[Union[torch.memory_format, trt.TensorFormat, memory_format]]:
         try:
             casted_format = self.to(t)
             return casted_format
@@ -437,12 +495,23 @@ class memory_format(Enum):
             logging.debug(e)
             return None
 
+    def __eq__(
+        self, other: Union[torch.memory_format, trt.TensorFormat, memory_format]
+    ) -> bool:
+        other_ = memory_format._from(other)
+        return self.value == other_.value
+
+    def __hash__(self) -> int:
+        return hash(self.value)
+
+
 class DeviceType(Enum):
+    UNKNOWN = auto()
     GPU = auto()
     DLA = auto()
 
-    @staticmethod
-    def _from(d: trt.DeviceType) -> Self:
+    @classmethod
+    def _from(cls, d: Union[trt.DeviceType, DeviceType]) -> DeviceType:
         if isinstance(d, trt.DeviceType):
             if d == trt.DeviceType.GPU:
                 return DeviceType.GPU
@@ -458,18 +527,21 @@ class DeviceType(Enum):
 
         elif ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt import _C
+
             if isinstance(d, _C.DeviceType):
                 if d == _C.DeviceType.GPU:
                     return DeviceType.GPU
-                if d == _C.DeviceType.DLA:
+                elif d == _C.DeviceType.DLA:
                     return DeviceType.DLA
                 else:
                     raise ValueError(
                         "Provided an unsupported device type (support: GPU/DLA)"
                     )
+        # else: # commented out for mypy
+        raise TypeError("Provided unsupported source type for DeviceType conversion")
 
-    @staticmethod
-    def try_from(d: trt.DeviceType) -> Optional[Self]:
+    @classmethod
+    def try_from(cls, d: Union[trt.DeviceType, DeviceType]) -> Optional[DeviceType]:
         try:
             casted_format = DeviceType._from(d)
             return casted_format
@@ -477,12 +549,18 @@ class DeviceType(Enum):
             logging.debug(e)
             return None
 
-    def to(self, t: type) -> trt.DeviceType:
+    def to(
+        self,
+        t: Union[Type[trt.DeviceType], Type[DeviceType]],
+        use_default: bool = False,
+    ) -> Union[trt.DeviceType, DeviceType]:
         if t == trt.DeviceType:
             if self == DeviceType.GPU:
                 return trt.DeviceType.GPU
             elif self == DeviceType.DLA:
                 return trt.DeviceType.DLA
+            elif use_default:
+                return trt.DeviceType.GPU
             else:
                 raise ValueError(
                     "Provided an unsupported device type (support: GPU/DLA)"
@@ -493,6 +571,7 @@ class DeviceType(Enum):
 
         elif ENABLED_FEATURES.torchscript_frontend:
             from torch_tensorrt import _C
+
             if t == _C.DeviceType:
                 if self == DeviceType.GPU:
                     return _C.DeviceType.GPU
@@ -502,15 +581,127 @@ class DeviceType(Enum):
                     raise ValueError(
                         "Provided an unsupported device type (support: GPU/DLA)"
                     )
-        else:
-           raise TypeError(
-                "Provided unsupported destination type for device type conversion"
-            )
+        # else: # commented out for mypy
+        raise TypeError(
+            "Provided unsupported destination type for device type conversion"
+        )
 
-    def try_to(self, t: type) -> Optional[trt.DeviceType]:
+    def try_to(
+        self,
+        t: Union[Type[trt.DeviceType], Type[DeviceType]],
+        use_default: bool = False,
+    ) -> Optional[Union[trt.DeviceType, DeviceType]]:
+        try:
+            casted_format = self.to(t, use_default=use_default)
+            return casted_format
+        except (ValueError, TypeError) as e:
+            logging.debug(e)
+            return None
+
+    def __eq__(self, other: Union[trt.DeviceType, DeviceType]) -> bool:
+        other_ = DeviceType._from(other)
+        return bool(self.value == other_.value)
+
+    def __hash__(self) -> int:
+        return hash(self.value)
+
+
+class EngineCapability(Enum):
+    STANDARD = auto()
+    SAFETY = auto()
+    DLA_STANDALONE = auto()
+
+    @classmethod
+    def _from(
+        cls, c: Union[trt.EngineCapability, EngineCapability]
+    ) -> EngineCapability:
+        if isinstance(c, trt.EngineCapability):
+            if c == trt.EngineCapability.STANDARD:
+                return EngineCapability.STANDARD
+            elif c == trt.EngineCapability.SAFETY:
+                return EngineCapability.SAFETY
+            elif c == trt.EngineCapability.DLA_STANDALONE:
+                return EngineCapability.DLA_STANDALONE
+            else:
+                raise ValueError("Provided an unsupported engine capability")
+
+        elif isinstance(c, EngineCapability):
+            return c
+
+        elif ENABLED_FEATURES.torchscript_frontend:
+            from torch_tensorrt import _C
+
+            if isinstance(c, _C.EngineCapability):
+                if c == _C.EngineCapability.STANDARD:
+                    return EngineCapability.STANDARD
+                elif c == _C.EngineCapability.SAFETY:
+                    return EngineCapability.SAFETY
+                elif c == _C.EngineCapability.DLA_STANDALONE:
+                    return EngineCapability.DLA_STANDALONE
+                else:
+                    raise ValueError("Provided an unsupported engine capability")
+        # else: # commented out for mypy
+        raise TypeError(
+            "Provided unsupported source type for EngineCapability conversion"
+        )
+
+    @classmethod
+    def try_from(
+        c: Union[trt.EngineCapability, EngineCapability]
+    ) -> Optional[EngineCapability]:
+        try:
+            casted_format = EngineCapability._from(c)
+            return casted_format
+        except (ValueError, TypeError) as e:
+            logging.debug(e)
+            return None
+
+    def to(
+        self, t: Union[Type[trt.EngineCapability], Type[EngineCapability]]
+    ) -> Union[trt.EngineCapability, EngineCapability]:
+        if t == trt.EngineCapability:
+            if self == EngineCapability.STANDARD:
+                return trt.EngineCapability.STANDARD
+            elif self == EngineCapability.SAFETY:
+                return trt.EngineCapability.SAFETY
+            elif self == EngineCapability.DLA_STANDALONE:
+                return trt.EngineCapability.DLA_STANDALONE
+            else:
+                raise ValueError("Provided an unsupported engine capability")
+
+        elif t == DeviceType:
+            return self
+
+        elif ENABLED_FEATURES.torchscript_frontend:
+            from torch_tensorrt import _C
+
+            if t == _C.EngineCapability:
+                if self == EngineCapability.STANDARD:
+                    return _C.EngineCapability.STANDARD
+                elif self == EngineCapability.SAFETY:
+                    return _C.EngineCapability.SAFETY
+                elif self == EngineCapability.DLA_STANDALONE:
+                    return _C.EngineCapability.DLA_STANDALONE
+                else:
+                    raise ValueError("Provided an unsupported engine capability")
+        # else: # commented out for mypy
+        raise TypeError(
+            "Provided unsupported destination type for engine capablity type conversion"
+        )
+
+    def try_to(
+        self, t: Union[Type[trt.EngineCapability], Type[EngineCapability]]
+    ) -> Optional[Union[trt.EngineCapability, EngineCapability]]:
         try:
             casted_format = self.to(t)
             return casted_format
         except (ValueError, TypeError) as e:
             logging.debug(e)
             return None
+
+    def __eq__(self, other: Union[trt.EngineCapability, EngineCapability]) -> bool:
+        other_ = EngineCapability._from(other)
+        return bool(self.value == other_.value)
+
+    def __hash__(self) -> int:
+        return hash(self.value)

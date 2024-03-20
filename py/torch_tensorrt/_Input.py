@@ -4,10 +4,8 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import torch
-import numpy as np
-import tensorrt as trt
-
 from torch_tensorrt._enums import dtype, memory_format
+
 
 class Input(object):
     """
@@ -30,12 +28,12 @@ class Input(object):
         STATIC = 0
         DYNAMIC = 1
 
-    shape_mode: Optional[
-        _ShapeMode
-    ] = None  #: Is input statically or dynamically shaped
-    shape: Optional[
-        Tuple[int, ...] | Dict[str, Tuple[int, ...]]
-    ] = None  #: Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ "min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple }``
+    shape_mode: Optional[_ShapeMode] = (
+        None  #: Is input statically or dynamically shaped
+    )
+    shape: Optional[Tuple[int, ...] | Dict[str, Tuple[int, ...]]] = (
+        None  #: Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ "min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple }``
+    )
     dtype: dtype = (
         dtype.unknown
     )  #: The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)
@@ -47,7 +45,6 @@ class Input(object):
     DOMAIN_OFFSET: float = 2.0
     low_tensor_domain_incl: float = 0.0
     high_tensor_domain_excl: float = low_tensor_domain_incl + DOMAIN_OFFSET
-    torch_dtype: torch.dtype = torch.float32
     torch_tensor: torch.Tensor = None
     name: str = ""
 
@@ -153,16 +150,11 @@ class Input(object):
 
         else:
             raise ValueError(
-                "Unexpected number of positional arguments for class Input \n    Found {} arguments, expected either zero or a single positional arguments".format(
-                    len(args)
-                )
+                f"Unexpected number of positional arguments for class Input \n    Found {len(args)} arguments, expected either zero or a single positional arguments"
             )
 
         if "dtype" in kwargs:
             self.dtype = dtype._from(kwargs["dtype"])
-            self.torch_dtype = self.dtype.to(torch.dtype, use_default=True)
-            print(self.dtype)
-            print(self.torch_dtype)
 
         if self.dtype != dtype.unknown:
             self._explicit_set_dtype = True
@@ -352,7 +344,9 @@ class Input(object):
                 )
             else:
                 if isinstance(self.shape, tuple):
-                    return torch.rand(self.shape).to(dtype=self.torch_dtype)
+                    return torch.rand(self.shape).to(
+                        dtype=self.dtype.to(torch.dtype, use_default=True)
+                    )
                 else:
                     RuntimeError(
                         f"Input shape is dynamic but shapes are not provided as sequence (found: {self.shape})"
@@ -371,7 +365,7 @@ class Input(object):
 
                 if isinstance(self.shape, dict):
                     return torch.rand(self.shape[optimization_profile_field]).to(
-                        dtype=self.torch_dtype
+                        dtype=self.dtype.to(torch.dtype, use_default=True)
                     )
                 else:
                     raise RuntimeError(

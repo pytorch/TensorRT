@@ -1,8 +1,8 @@
 import torch
-from tensorrt import EngineCapability
 from torch_tensorrt._Device import Device
+from torch_tensorrt._enums import EngineCapability, dtype
 
-PRECISION = torch.float32
+PRECISION = dtype.float32
 DEBUG = False
 DEVICE = None
 DISABLE_TF32 = False
