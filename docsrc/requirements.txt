@@ -1,4 +1,4 @@
-sphinx==4.5.0
+sphinx==7.2.6
 sphinx-gallery==0.13.0
 breathe==4.33.1
 exhale==0.3.1
