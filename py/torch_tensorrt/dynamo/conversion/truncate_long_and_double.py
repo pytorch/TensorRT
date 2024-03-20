@@ -4,6 +4,7 @@ from typing import Optional, Sequence, Set
 
 import torch
 from torch.fx.node import _get_qualified_name
+from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo.utils import get_torch_inputs
 
@@ -217,6 +218,8 @@ def repair_long_or_double_inputs(
             # Set the 32bit inputs and their types to the submodule Inputs
             for idx in range(len(submodule_inputs)):
                 submodule_inputs[idx].torch_tensor = submodule_torch_inputs[idx]
-                submodule_inputs[idx].torch_dtype = submodule_torch_inputs[idx].dtype
+                submodule_inputs[idx].dtype = dtype._from(
+                    submodule_torch_inputs[idx].dtype
+                )
 
     return submodule_inputs

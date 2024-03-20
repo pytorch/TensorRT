@@ -2,7 +2,6 @@ import logging
 from typing import Optional, Sequence, Union, cast
 
 import numpy as np
-import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -20,6 +19,8 @@ from torch_tensorrt.fx.converters.converter_utils import (
     set_layer_name,
 )
 from torch_tensorrt.fx.types import Shape, TRTTensor
+
+import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -81,7 +82,7 @@ def index(
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    index: Sequence[Union[TRTTensor, np.ndarray, torch.Tensor]],
+    indices: Sequence[Union[TRTTensor, np.ndarray, torch.Tensor]],
 ) -> TRTTensor:
     adv_indx_indices = []
     tensor_indices = []
@@ -90,15 +91,17 @@ def index(
     # is_numpy is a flag to specify if all the indices are numpy or torchTensor.
     # If any is not this flag will be set to False
     _LOGGER.debug(
-        f"Determining whether aten.index constant-index optimization can be invoked"
+        "Determining whether aten.index constant-index optimization can be invoked"
     )
     is_numpy = all(
-        isinstance(ind, (torch.Tensor, np.ndarray)) for ind in index if ind is not None
+        isinstance(ind, (torch.Tensor, np.ndarray))
+        for ind in indices
+        if ind is not None
     )
     # here we need to check if all the index are broadcastable
     # if no, then we need to broadcast
     last_index = None
-    for i, ind in enumerate(index):
+    for i, ind in enumerate(indices):
         if ind is not None:
             _LOGGER.debug(f"Shape of {i} index is {ind.shape}")
             adv_indx_indices.append(i)
@@ -123,7 +126,7 @@ def index(
         return identity_layer.get_output(0)
     elif len(tensor_indices) == 1:
         indices_tensor = get_trt_tensor(
-            ctx, tensor_indices[0], name + f"_parameter_to_fp32_tensor"
+            ctx, tensor_indices[0], name + "_parameter_to_fp32_tensor"
         )
         index = adv_indx_indices[0]
         _LOGGER.debug(f"The advanced index indices is {adv_indx_indices}")
@@ -204,7 +207,7 @@ def index(
                 cum_adv_index = cum_adv_index + adv_index
                 multiplier = multiplier * input_shape[adv_indx_indices[i]]
             cum_adv_index = get_trt_tensor(
-                ctx, cum_adv_index, name + f"_index_sum_intermediate"
+                ctx, cum_adv_index, name + "_index_sum_intermediate"
             )
         else:
             multiplier = get_trt_tensor(
@@ -263,7 +266,7 @@ def index(
             adv_indx_count
             == adv_indx_indices[adv_indx_count - 1] - adv_indx_indices[0] + 1
         ):
-            _LOGGER.debug(f"The indices are continuous in this case")
+            _LOGGER.debug("The indices are continuous in this case")
             concat_tensor_reshape.append(
                 get_trt_tensor(ctx, -1, name + "_dynamic_concat")
             )
@@ -287,7 +290,7 @@ def index(
                 source_ir,
             )
             unfold_tensor = regular_index_shuffle_layer.get_output(0)
-            _LOGGER.debug(f"The tensor is unfolded now")
+            _LOGGER.debug("The tensor is unfolded now")
             _LOGGER.debug(f"The unfolded tensor shape is {unfold_tensor.shape}")
 
             # Transpose folded advanced indexed axis to its original location.
@@ -342,7 +345,7 @@ def index(
             reshape_output = unfold_advanced_shuffle_layer.get_output(0)
 
         else:
-            _LOGGER.debug(f"The indices are not continuous in this case")
+            _LOGGER.debug("The indices are not continuous in this case")
             concat_final_tensor = []
             concat_final_tensor.append(cum_adv_index_shape_tensor)
             for i in range(0, rank):
@@ -369,4 +372,4 @@ def index(
             )
             reshape_output = reshape_layer.get_output(0)
 
-    return reshape_output
+        return reshape_output

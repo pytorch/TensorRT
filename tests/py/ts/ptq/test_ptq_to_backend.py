@@ -1,12 +1,13 @@
+import os
 import unittest
-import torch_tensorrt as torchtrt
-from torch_tensorrt.ts.logging import *
+
 import torch
 import torch.nn as nn
-from torch.nn import functional as F
+import torch_tensorrt as torchtrt
 import torchvision
 import torchvision.transforms as transforms
-import os
+from torch.nn import functional as F
+from torch_tensorrt.ts.logging import *
 
 
 def find_repo_root(max_depth=10):
@@ -47,9 +48,10 @@ def compute_accuracy(testing_dataloader, model):
     test_preds = torch.cat(class_preds)
     return correct / total
 
+
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
-    "TorchScript Frontend is not available"
+    "TorchScript Frontend is not available",
 )
 class TestAccuracy(unittest.TestCase):
     def test_compile_script(self):

@@ -9,9 +9,10 @@ import torch_tensorrt as torchtrt
 import torchvision.models as models
 from utils import COSINE_THRESHOLD, cosine_similarity
 
+
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
-    "TorchScript Frontend is not available"
+    "TorchScript Frontend is not available",
 )
 class TestModels(unittest.TestCase):
     def test_resnet18(self):

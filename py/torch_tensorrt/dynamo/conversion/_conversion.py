@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import io
-from typing import Sequence
 import logging
+from typing import Sequence
 
-import tensorrt as trt
 import torch
-from torch_tensorrt._Input import Input
+from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
+from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreter,
@@ -16,7 +16,10 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import get_torch_inputs
 
+import tensorrt as trt
+
 logger = logging.getLogger(__name__)
+
 
 def interpret_module_to_result(
     module: torch.fx.GraphModule,
@@ -41,12 +44,12 @@ def interpret_module_to_result(
     # such as aten.sum - such outputs can be truncated
     output_dtypes = []
     for output in module_outputs:
-        if settings.truncate_long_and_double and output.dtype == torch.float64:
-            output_dtypes.append(torch.float32)
-        elif settings.truncate_long_and_double and output.dtype == torch.int64:
-            output_dtypes.append(torch.int32)
+        if settings.truncate_long_and_double and output.dtype == dtype.float64:
+            output_dtypes.append(dtype.float32)
+        elif settings.truncate_long_and_double and output.dtype == dtype.int64:
+            output_dtypes.append(dtype.int32)
         else:
-            output_dtypes.append(output.dtype)
+            output_dtypes.append(dtype._from(output.dtype))
 
     interpreter = TRTInterpreter(
         module,
@@ -78,7 +81,9 @@ def convert_module(
 
     if settings.use_python_runtime or not ENABLED_FEATURES.torch_tensorrt_runtime:
         if not settings.use_python_runtime:
-            logger.info("Since Torch-TensorRT runtime is not available, using Python Runtime, some features may not be available")
+            logger.info(
+                "Since Torch-TensorRT runtime is not available, using Python Runtime, some features may not be available"
+            )
         return PythonTorchTensorRTModule(
             engine=interpreter_result.engine,
             input_names=list(interpreter_result.input_names),

@@ -1,9 +1,10 @@
-import unittest
-import torch_tensorrt as torchtrt
-import torch
-import torchvision.models as models
 import os
-from utils import cosine_similarity, COSINE_THRESHOLD
+import unittest
+
+import torch
+import torch_tensorrt as torchtrt
+import torchvision.models as models
+from utils import COSINE_THRESHOLD, cosine_similarity
 
 
 def find_repo_root(max_depth=10):
@@ -20,9 +21,10 @@ def find_repo_root(max_depth=10):
 
 MODULE_DIR = find_repo_root() + "/tests/modules"
 
+
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
-    "TorchScript Frontend is not available"
+    "TorchScript Frontend is not available",
 )
 class TestStandardTensorInput(unittest.TestCase):
     def test_compile(self):
@@ -51,9 +53,10 @@ class TestStandardTensorInput(unittest.TestCase):
             msg=f"standard_tensor_input_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
+
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
-    "TorchScript Frontend is not available"
+    "TorchScript Frontend is not available",
 )
 class TestStandardTensorInputLong(unittest.TestCase):
     def test_compile(self):
@@ -83,9 +86,10 @@ class TestStandardTensorInputLong(unittest.TestCase):
             msg=f"standard_tensor_input_long_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
+
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
-    "TorchScript Frontend is not available"
+    "TorchScript Frontend is not available",
 )
 class TestStandardTensorInputDomain(unittest.TestCase):
     def test_compile(self):
@@ -114,9 +118,10 @@ class TestStandardTensorInputDomain(unittest.TestCase):
             msg=f"standard_tensor_input_scripted with tensor domain specified TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
+
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
-    "TorchScript Frontend is not available"
+    "TorchScript Frontend is not available",
 )
 class TestTupleInput(unittest.TestCase):
     def test_compile(self):
@@ -145,9 +150,10 @@ class TestTupleInput(unittest.TestCase):
             msg=f"tuple_input_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
+
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
-    "TorchScript Frontend is not available"
+    "TorchScript Frontend is not available",
 )
 class TestListInput(unittest.TestCase):
     def test_compile(self):
@@ -174,9 +180,10 @@ class TestListInput(unittest.TestCase):
             msg=f"list_input_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
+
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
-    "TorchScript Frontend is not available"
+    "TorchScript Frontend is not available",
 )
 class TestTupleInputOutput(unittest.TestCase):
     def test_compile(self):
@@ -234,9 +241,10 @@ class TestTupleInputOutput(unittest.TestCase):
                 msg=f"tuple_input_output_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
             )
 
+
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
-    "TorchScript Frontend is not available"
+    "TorchScript Frontend is not available",
 )
 class TestListInputOutput(unittest.TestCase):
     def test_compile(self):
@@ -296,9 +304,10 @@ class TestListInputOutput(unittest.TestCase):
                 msg=f"list_input_output_scripted TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
             )
 
+
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
-    "TorchScript Frontend is not available"
+    "TorchScript Frontend is not available",
 )
 class TestListInputTupleOutput(unittest.TestCase):
     def test_compile(self):

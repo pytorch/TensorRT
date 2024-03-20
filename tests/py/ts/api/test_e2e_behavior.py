@@ -1,9 +1,10 @@
-import unittest
-import torch_tensorrt as torchtrt
-import torch
-import torchvision.models as models
 import copy
+import unittest
 from typing import Dict
+
+import torch
+import torch_tensorrt as torchtrt
+import torchvision.models as models
 from utils import same_output_format
 
 

@@ -1,11 +1,12 @@
 from typing import Optional, Sequence
 
-import tensorrt as trt
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 from torch_tensorrt.fx.types import TRTTensor
+
+import tensorrt as trt
 
 
 def upsample(
@@ -29,7 +30,7 @@ def upsample(
         resize_layer.scales = [1.0, 1.0] + list(scale_factors)
     else:
         raise RuntimeError(
-            f"At least one of out_shape and scale_factors should be specified."
+            "At least one of out_shape and scale_factors should be specified."
         )
 
     # interpolate mode

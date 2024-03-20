@@ -1,14 +1,15 @@
-import unittest
-import torch_tensorrt as torchtrt
-import torch
-import torchvision.models as models
 import copy
+import unittest
 from typing import Dict
+
+import torch
+import torch_tensorrt as torchtrt
+import torchvision.models as models
 
 
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
-    "TorchScript Frontend is not available"
+    "TorchScript Frontend is not available",
 )
 class TestLoggingAPIs(unittest.TestCase):
     def test_logging_prefix(self):

@@ -194,7 +194,9 @@ if not PY_ONLY:
             sys.exit("Could not find bazel in PATH")
 
 
-def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False, rt_only=False):
+def build_libtorchtrt_pre_cxx11_abi(
+    develop=True, use_dist_dir=True, cxx11_abi=False, rt_only=False
+):
     cmd = [BAZEL_EXE, "build"]
     if rt_only:
         cmd.append("//:libtorchtrt_runtime")
@@ -288,7 +290,9 @@ class DevelopCommand(develop):
 
         if not PY_ONLY:
             global CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(develop=True, cxx11_abi=CXX11_ABI, rt_only=NO_TS)
+            build_libtorchtrt_pre_cxx11_abi(
+                develop=True, cxx11_abi=CXX11_ABI, rt_only=NO_TS
+            )
             copy_libtorchtrt(rt_only=NO_TS)
 
         gen_version_file()
@@ -310,7 +314,9 @@ class InstallCommand(install):
 
         if not PY_ONLY:
             global CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI, rt_only=NO_TS)
+            build_libtorchtrt_pre_cxx11_abi(
+                develop=False, cxx11_abi=CXX11_ABI, rt_only=NO_TS
+            )
             copy_libtorchtrt(rt_only=NO_TS)
 
         gen_version_file()
@@ -331,7 +337,9 @@ class BdistCommand(bdist_wheel):
     def run(self):
         if not PY_ONLY:
             global CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI, rt_only=NO_TS)
+            build_libtorchtrt_pre_cxx11_abi(
+                develop=False, cxx11_abi=CXX11_ABI, rt_only=NO_TS
+            )
             copy_libtorchtrt(rt_only=NO_TS)
 
         gen_version_file()
@@ -355,7 +363,9 @@ class EditableWheelCommand(editable_wheel):
             editable_wheel.run(self)
         else:
             global CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(develop=True, cxx11_abi=CXX11_ABI, rt_only=NO_TS)
+            build_libtorchtrt_pre_cxx11_abi(
+                develop=True, cxx11_abi=CXX11_ABI, rt_only=NO_TS
+            )
             gen_version_file()
             copy_libtorchtrt(rt_only=NO_TS)
             editable_wheel.run(self)
@@ -574,7 +584,7 @@ if not (PY_ONLY or NO_TS):
         }
     )
 elif NO_TS:
-        package_data.update(
+    package_data.update(
         {
             "torch_tensorrt": [
                 "BUILD",

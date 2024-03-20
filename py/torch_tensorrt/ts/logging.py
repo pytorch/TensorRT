@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import Any
 
 from torch_tensorrt._C import (
     LogLevel,
@@ -114,5 +113,3 @@ def log(level: Level, msg: str) -> None:
     Info = LogLevel.INFO
     Debug = LogLevel.DEBUG
     Graph = LogLevel.GRAPH
-
-

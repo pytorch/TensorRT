@@ -1,16 +1,16 @@
-import unittest
-import torch_tensorrt as torchtrt
-from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
-import torch
-import torchvision.models as models
 import copy
+import unittest
 from typing import Dict
 
+import torch
+import torch_tensorrt as torchtrt
+import torchvision.models as models
+from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 
 
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
-    "TorchScript Frontend is not available"
+    "TorchScript Frontend is not available",
 )
 class TestInput(unittest.TestCase):
     def _verify_correctness(self, struct: torchtrt.Input, target: Dict) -> bool:
@@ -39,10 +39,16 @@ class TestInput(unittest.TestCase):
             target["explicit_set_dtype"],
         )
         dtype_ = field_is_correct(
-            "dtype", eq, torchtrt.dtype._from(internal.dtype), torchtrt.dtype._from(target["dtype"])
+            "dtype",
+            eq,
+            torchtrt.dtype._from(internal.dtype),
+            torchtrt.dtype._from(target["dtype"]),
         )
         format_ = field_is_correct(
-            "format", eq, torchtrt.memory_format._from(internal.format), torchtrt.memory_format._from(target["format"])
+            "format",
+            eq,
+            torchtrt.memory_format._from(internal.format),
+            torchtrt.memory_format._from(target["format"]),
         )
 
         return all(
@@ -219,9 +225,10 @@ class TestInput(unittest.TestCase):
         )
         self.assertTrue(self._verify_correctness(ts_i, target))
 
+
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
-    "TorchScript Frontend is not available"
+    "TorchScript Frontend is not available",
 )
 class TestTorchTensorRTModule(unittest.TestCase):
     @staticmethod
