@@ -1,6 +1,8 @@
-from typing import Optional, Sequence, Union
+import math
+from typing import Dict, Optional, Sequence, Union
 
 import tensorrt as trt
+import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -104,3 +106,66 @@ def max_poolNd(
 
     set_layer_name(pool_layer, target, name, source_ir)
     return pool_layer.get_output(0)
+
+
+def adaptive_avg_pool1d(
+    ctx: ConversionContext,
+    target: Union[Target, str],
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    output_size: Union[int, Sequence[int]],
+) -> TRTTensor:
+    def start_index(idx: int, out_dim: int, in_dim: int) -> int:
+        """Calculate the start index of each pooling window"""
+        return math.floor((float(idx) * float(in_dim)) / out_dim)
+
+    def end_index(idx: int, out_dim: int, in_dim: int) -> int:
+        """Calculate the end index of each pooling window"""
+        return math.ceil((float(idx + 1) * float(in_dim)) / out_dim)
+
+    in_dim = input.shape[-1]
+    out_dim = output_size if isinstance(output_size, int) else output_size[0]
+    output_list = []
+
+    # store {index: slice} for reducing repeated slice ops
+    idx_slice_map: Dict[int, TRTTensor] = {}
+    # iterate over each output dimension
+    for i in range(out_dim):
+        # calculate the start and end index of each pooling window
+        start = start_index(i, out_dim, in_dim)
+        end = end_index(i, out_dim, in_dim)
+
+        # slice the input tensor from start to end index, the result of which is the window waiting for pooling
+        slices = []
+        for j in range(start, end):
+            if j in idx_slice_map:
+                slice = idx_slice_map[j]
+            else:
+                slice = impl.select.select(
+                    ctx, target, source_ir, f"{name}_select_{j}", input, -1, j
+                )
+                slice = impl.shuffle.reshape(
+                    ctx,
+                    target,
+                    source_ir,
+                    f"{name}_reshape_{i}_{j}",
+                    slice,
+                    (*slice.shape, 1),
+                )
+                idx_slice_map[j] = slice
+
+            slices.append(slice)
+
+        slices = impl.cat.cat(
+            ctx, target, source_ir, f"{name}_slices_cat_{i}", slices, dim=-1
+        )
+        # calculate the mean of the slices (average pooling output) and append to the output list
+        output_list.append(
+            impl.reduce.mean(
+                ctx, target, source_ir, f"{name}_sum_{i}", slices, dim=-1, keepdim=True
+            )
+        )
+
+    output = impl.cat.cat(ctx, target, source_ir, f"{name}_cat", output_list, dim=-1)
+    return output
