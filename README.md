@@ -1,11 +1,88 @@
-# Torch-TensorRT
+<div align="center">
+
+Torch-TensorRT
+===========================
+<h4> Easily achieve the best inference performance for any PyTorch model on the NVIDIA platform. </h4>
 
 [![Documentation](https://img.shields.io/badge/docs-master-brightgreen)](https://nvidia.github.io/Torch-TensorRT/)
+[![pytorch](https://img.shields.io/badge/PyTorch-2.2-green)](https://www.python.org/downloads/release/python-31013/)
+[![cuda](https://img.shields.io/badge/cuda-12.1-green)](https://developer.nvidia.com/cuda-downloads)
+[![trt](https://img.shields.io/badge/TensorRT-8.6.1-green)](https://github.com/nvidia/tensorrt-llm)
+[![license](https://img.shields.io/badge/license-Apache%202-blue)](./LICENSE)
 [![CircleCI](https://circleci.com/gh/pytorch/TensorRT.svg?style=svg)](https://app.circleci.com/pipelines/github/pytorch/TensorRT)
 
-> Ahead of Time (AOT) compiling for PyTorch JIT and FX
+---
+<div align="left">
 
-Torch-TensorRT is a compiler for PyTorch/TorchScript/FX, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime. Unlike PyTorch's Just-In-Time (JIT) compiler, Torch-TensorRT is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your TorchScript code, you go through an explicit compile step to convert a standard TorchScript or FX program into an module targeting a TensorRT engine. Torch-TensorRT operates as a PyTorch extention and compiles modules that integrate into the JIT runtime seamlessly. After compilation using the optimized graph should feel no different than running a TorchScript module. You also have access to TensorRT's suite of configurations at compile time, so you are able to specify operating precision (FP32/FP16/INT8) and other settings for your module.
+Optimum-NVIDIA delivers the best inference performance on the NVIDIA platform through Hugging Face. Run LLaMA 2 at 1,200 tokens/second (up to 28x faster than the framework) by changing just a single line in your existing transformers code.
+
+</div></div>
+
+## Installation
+Stable versions are published on PyPI
+```bash
+pip install torch-tensorrt
+```
+
+Nightly versions are published on the PyTorch package index
+```bash
+pip install --pre torch-tensorrt --index-url https://download.pytorch.org/whl/nightly/cu121
+```
+
+Torch-TensorRT is also distributed in the ready-to-run [NVIDIA NGC PyTorch Container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch) which has all dependencies with the proper versions and example notebooks included.
+
+For more advanced installation  methods, please see here < TO FILL> 
+
+## Quickstart
+
+### Option 1: torch.compile
+You can use Torch-TensorRT anywhere you use `torch.compile`:
+
+```python
+import torch
+import torch_tensorrt
+
+model = <YOUR  MODEL HERE>
+x = <YOUR INPUT HERE>
+
+optimized_model = torch.compile(model, backend="tensorrt")
+optimized_model(x) # compiled on first run
+
+optimized_model(x) # this will be fast!
+```
+
+### Option 2: Export
+If you want to optimize your model ahead-of-time and/or run inference in a C++ environment, Torch-TensorRT provides an export-style workflow that serializes an optimized module. This module can be deployed in PyTorch or with libtorch (i.e. without a Python dependency). 
+
+#### Step 1: Optimize + serialize
+```python
+import torch
+import torch_tensorrt
+
+model = <YOUR  MODEL HERE>
+x = <YOUR INPUT HERE>
+
+optimized_model = torch_tensorrt.compile(model, example_inputs)
+serialize
+```
+
+#### Step 2: Deploy
+##### Deployment in PyTorch:
+```python
+
+```
+
+##### Deployment in C++:
+```cpp
+
+```
+
+## Further resources
+- [Optimize models from Hugging Face with Torch-TensorRT]() \[coming soon\]
+- [Run your model in FP8 with Torch-TensorRT]() \[coming soon\]
+- []
+
+Torch-TensorRT compiles PyTorch by natively converting FX graphs,  a compiler for PyTorch/TorchScript/FX, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime. Unlike PyTorch's Just-In-Time (JIT) compiler, Torch-TensorRT is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your TorchScript code, you go through an explicit compile step to convert a standard TorchScript or FX program into an module targeting a TensorRT engine. Torch-TensorRT operates as a PyTorch extention and compiles modules that integrate into the JIT runtime seamlessly. After compilation using the optimized graph should feel no different than running a TorchScript module. You also have access to TensorRT's suite of configurations at compile time, so you are able to specify operating precision (FP32/FP16/INT8) and other settings for your module.
 
 Resources:
 - [Documentation](https://nvidia.github.io/Torch-TensorRT/)
@@ -13,9 +90,6 @@ Resources:
 - [Torch-TensorRT Explained in 2 minutes!](https://www.youtube.com/watch?v=TU5BMU6iYZ0&ab_channel=NVIDIADeveloper)
 - [Comprehensive Discusion (GTC Event)](https://www.nvidia.com/en-us/on-demand/session/gtcfall21-a31107/)
 - [Pre-built Docker Container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch). To use this container, make an NGC account and sign in to NVIDIA's registry with an API key. Refer to [this guide](https://docs.nvidia.com/ngc/ngc-catalog-user-guide/index.html#registering-activating-ngc-account) for the same.
-
-## NVIDIA NGC Container
-Torch-TensorRT is distributed in the ready-to-run NVIDIA [NGC PyTorch Container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch) starting with 21.11. We recommend using this prebuilt container to experiment & develop with Torch-TensorRT; it has all dependencies with the proper versions as well as example notebooks included.
 
 ## Building a docker container for Torch-TensorRT
 
@@ -120,14 +194,6 @@ These are the following dependencies used to verify the testcases. Torch-TensorR
 - CUDA 12.1
 - cuDNN 8.9.5
 - TensorRT 8.6.1
-
-## Prebuilt Binaries and Wheel files
-
-Releases: https://github.com/pytorch/TensorRT/releases
-
-```
-pip install tensorrt torch-tensorrt
-```
 
 ## Compiling Torch-TensorRT
 
