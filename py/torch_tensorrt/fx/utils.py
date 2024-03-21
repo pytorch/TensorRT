@@ -38,6 +38,11 @@ DataTypeEquivalence: Dict[
         Frameworks.TORCH: torch.int32,
         Frameworks.TRT: trt.int32,
     },
+    trt.int64: {
+        Frameworks.NUMPY: np.int64,
+        Frameworks.TORCH: torch.int64,
+        Frameworks.TRT: trt.int64,
+    },
     trt.float16: {
         Frameworks.NUMPY: np.float16,
         Frameworks.TORCH: torch.float16,
@@ -104,6 +109,8 @@ def unified_dtype_converter(
         return DataTypeEquivalence[trt.bool][to]
     elif dtype in (np.int32, torch.int32, trt.int32):
         return DataTypeEquivalence[trt.int32][to]
+    elif dtype in (np.int64, torch.int64, trt.int64):
+        return DataTypeEquivalence[trt.int64][to]
     elif dtype in (np.float16, torch.float16, trt.float16):
         return DataTypeEquivalence[trt.float16][to]
     elif dtype in (np.float32, torch.float32, trt.float32):

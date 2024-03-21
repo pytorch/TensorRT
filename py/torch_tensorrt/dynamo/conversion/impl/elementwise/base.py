@@ -150,6 +150,7 @@ def convert_binary_elementwise(
     lhs_val, rhs_val = broadcast(
         ctx.net, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
     )
+
     layer = ctx.net.add_elementwise(lhs_val, rhs_val, op_type)
     set_layer_name(layer, target, name, source_ir)
     output = layer.get_output(0)
