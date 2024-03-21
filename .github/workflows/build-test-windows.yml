@@ -1,0 +1,244 @@
+name: Build and test Windows wheels
+
+on: [pull_request]
+
+jobs:
+  generate-matrix:
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    with:
+      package-type: wheel
+      os: windows
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      with-rocm: false
+      with-cpu: false
+
+  build:
+    needs: generate-matrix
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            pre-script: "packaging/pre_build_script_windows.sh"
+            env-var-script: ""
+            post-script: ""
+            smoke-test-script: "packaging/smoke_test.py"
+            package-name: torch_tensorrt
+    name: Build torch-tensorrt whl package
+    uses: pytorch/test-infra/.github/workflows/build_wheels_windows.yml@main
+    with:
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      post-script: ${{ matrix.post-script }}
+      package-name: ${{ matrix.package-name }}
+      smoke-test-script: ${{ matrix.smoke-test-script }}
+      trigger-event: ${{ github.event_name }}
+
+  # tests-py-torchscript-fe:
+  #   name: Test torchscript frontend [Python]
+  #   needs: [generate-matrix, build]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #   uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+  #   with:
+  #     job-name: tests-py-torchscript-fe
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       export USE_HOST_DEPS=1
+  #       export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
+  #       pushd .
+  #       cd tests/modules
+  #       ${CONDA_RUN} python -m pip install --pre -r requirements.txt --use-deprecated=legacy-resolver
+  #       ${CONDA_RUN} python hub.py
+  #       popd
+  #       pushd .
+  #       cd tests/py/ts
+  #       ${CONDA_RUN} python -m pip install --pre pytest timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
+  #       ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_api_test_results.xml api/
+  #       ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_models_test_results.xml models/
+  #       ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_integrations_test_results.xml integrations/
+  #       popd
+
+  # tests-py-dynamo-converters:
+  #   name: Test dynamo converters [Python]
+  #   needs: [generate-matrix, build]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #   uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+  #   with:
+  #     job-name: tests-py-dynamo-converters
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       export USE_HOST_DEPS=1
+  #       pushd .
+  #       cd tests/py/dynamo
+  #       ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
+  #       ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 10 conversion/
+  #       popd
+
+  # tests-py-dynamo-fe:
+  #   name: Test dynamo frontend [Python]
+  #   needs: [generate-matrix, build]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #   uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+  #   with:
+  #     job-name: tests-py-dynamo-fe
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       export USE_HOST_DEPS=1
+  #       pushd .
+  #       cd tests/py/dynamo
+  #       ${CONDA_RUN} python -m pip install --pre pytest timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
+  #       ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_fe_test_results.xml --ir dynamo models/test_models_export.py
+  #       ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/test_dyn_models.py
+  #       popd
+
+  # tests-py-dynamo-serde:
+  #   name: Test dynamo export serde [Python]
+  #   needs: [generate-matrix, build]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #   uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+  #   with:
+  #     job-name: tests-py-dynamo-serde
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       export USE_HOST_DEPS=1
+  #       pushd .
+  #       cd tests/py/dynamo
+  #       ${CONDA_RUN} python -m pip install --pre pytest timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
+  #       ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/export_serde_test_results.xml --ir dynamo models/test_export_serde.py
+  #       popd
+
+  # tests-py-torch-compile-be:
+  #   name: Test torch compile backend [Python]
+  #   needs: [generate-matrix, build]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #   uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+  #   with:
+  #     job-name: tests-py-torch-compile-be
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       export USE_HOST_DEPS=1
+  #       pushd .
+  #       cd tests/py/dynamo
+  #       ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
+  #       ${CONDA_RUN} python -m pytest -n 10 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_be_test_results.xml backend/
+  #       ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_comple_be_e2e_test_results.xml --ir torch_compile models/test_models.py
+  #       popd
+
+  # tests-py-dynamo-core:
+  #   name: Test dynamo core [Python]
+  #   needs: [generate-matrix, build]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #   uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+  #   with:
+  #     job-name: tests-py-dynamo-core
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       export USE_HOST_DEPS=1
+  #       pushd .
+  #       cd tests/py/dynamo
+  #       ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
+  #       ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_test_results.xml runtime/
+  #       ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_partitioning_test_results.xml partitioning/
+  #       ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_lowering_test_results.xml lowering/
+  #       popd
+
+  # tests-py-core:
+  #   name: Test core [Python]
+  #   needs: [generate-matrix, build]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #   uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+  #   with:
+  #     job-name: tests-py-core
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       export USE_HOST_DEPS=1
+  #       pushd .
+  #       cd tests/py/core
+  #       ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
+  #       ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_core_test_results.xml .
+  #       popd
