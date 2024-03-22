@@ -30,7 +30,7 @@ cc_library(
     name = "nvinfer_headers",
     hdrs = select({
         ":aarch64_linux": [
-            "include/aarch64-linux-gnu/NvUtils.h",
+            # "include/aarch64-linux-gnu/NvUtils.h",
         ] + glob(
             [
                 "include/aarch64-linux-gnu/NvInfer*.h",
@@ -41,7 +41,7 @@ cc_library(
             ],
         ),
         ":ci_rhel_x86_64_linux": [
-            "include/NvUtils.h",
+            # "include/NvUtils.h",
         ] + glob(
             [
                 "include/NvInfer*.h",
@@ -52,7 +52,7 @@ cc_library(
             ],
         ),
         ":windows": [
-            "include/NvUtils.h",
+            # "include/NvUtils.h",
         ] + glob(
             [
                 "include/NvInfer*.h",
@@ -63,7 +63,7 @@ cc_library(
             ],
         ),
         "//conditions:default": [
-            "include/x86_64-linux-gnu/NvUtils.h",
+            # "include/x86_64-linux-gnu/NvUtils.h",
         ] + glob(
             [
                 "include/x86_64-linux-gnu/NvInfer*.h",
