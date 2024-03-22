@@ -1,3 +1,5 @@
+# type: ignore
+
 import glob
 import os
 import platform
@@ -283,7 +285,7 @@ class DevelopCommand(develop):
 
     def finalize_options(self):
         develop.finalize_options(self)
-        if NO_TS:
+        if NO_TS or PY_ONLY:
             self.root_is_pure = False
 
     def run(self):
@@ -307,7 +309,7 @@ class InstallCommand(install):
 
     def finalize_options(self):
         install.finalize_options(self)
-        if NO_TS:
+        if NO_TS or PY_ONLY:
             self.root_is_pure = False
 
     def run(self):
@@ -331,7 +333,7 @@ class BdistCommand(bdist_wheel):
 
     def finalize_options(self):
         bdist_wheel.finalize_options(self)
-        if NO_TS:
+        if NO_TS or PY_ONLY:
             self.root_is_pure = False
 
     def run(self):
@@ -354,7 +356,7 @@ class EditableWheelCommand(editable_wheel):
 
     def finalize_options(self):
         editable_wheel.finalize_options(self)
-        if NO_TS:
+        if NO_TS or PY_ONLY:
             self.root_is_pure = False
 
     def run(self):
