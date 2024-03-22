@@ -95,7 +95,7 @@ def _register_with_torch() -> None:
         "/torchtrt.dll" if sys.platform.startswith("win") else "/lib/libtorchtrt.so"
     )
     linked_file_runtime = (
-        "/torch_tensorrt_runtime.dll"
+        "/torchtrt_runtime.dll"
         if sys.platform.startswith("win")
         else "/lib/libtorchtrt_runtime.so"
     )
