@@ -1,10 +1,9 @@
 from dataclasses import dataclass, field
 from typing import Collection, Optional, Union
 
-import torch
-from tensorrt import EngineCapability
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
+from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
     DEBUG,
     DISABLE_TF32,
@@ -74,7 +73,7 @@ class CompilationSettings:
         output_format (str): Output format of the result of TRT compilation. Options include "exported_program" (or) "ep" | "torchscript" (or) "ts" | "graph_module" (or) "fx". Default is "exported_program"
     """
 
-    precision: torch.dtype = PRECISION
+    precision: dtype = field(default_factory=lambda: PRECISION)
     debug: bool = DEBUG
     workspace_size: int = WORKSPACE_SIZE
     min_block_size: int = MIN_BLOCK_SIZE
@@ -92,7 +91,9 @@ class CompilationSettings:
     disable_tf32: bool = DISABLE_TF32
     sparse_weights: bool = SPARSE_WEIGHTS
     refit: bool = REFIT
-    engine_capability: EngineCapability = ENGINE_CAPABILITY
+    engine_capability: EngineCapability = field(
+        default_factory=lambda: ENGINE_CAPABILITY
+    )
     num_avg_timing_iters: int = NUM_AVG_TIMING_ITERS
     dla_sram_size: int = DLA_SRAM_SIZE
     dla_local_dram_size: int = DLA_LOCAL_DRAM_SIZE

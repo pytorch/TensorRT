@@ -1,6 +1,7 @@
 from typing import Any
 
-from torch_tensorrt import _C, _enums
+from torch_tensorrt import _C
+from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 
 
@@ -49,11 +50,16 @@ class TorchScriptInput(Input):
         """
         super().__init__(*args, **kwargs)
 
+    def is_trt_dtype(self) -> bool:
+        return bool(self.dtype != dtype.long)
+
     def _to_internal(self) -> _C.Input:
         internal_in = _C.Input()
         if self.shape_mode == Input._ShapeMode.DYNAMIC:
             if isinstance(self.shape, dict):
-                if not Input._supported_input_size_type(self.shape["min_shape"]):
+                if not TorchScriptInput._supported_input_size_type(
+                    self.shape["min_shape"]
+                ):
                     raise TypeError(
                         "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
                         + str(type(self.shape["min_shape"]))
@@ -62,7 +68,9 @@ class TorchScriptInput(Input):
                 else:
                     internal_in.min = self.shape["min_shape"]
 
-                if not Input._supported_input_size_type(self.shape["opt_shape"]):
+                if not TorchScriptInput._supported_input_size_type(
+                    self.shape["opt_shape"]
+                ):
                     raise TypeError(
                         "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
                         + str(type(self.shape["opt_shape"]))
@@ -71,7 +79,9 @@ class TorchScriptInput(Input):
                 else:
                     internal_in.opt = self.shape["opt_shape"]
 
-                if not Input._supported_input_size_type(self.shape["max_shape"]):
+                if not TorchScriptInput._supported_input_size_type(
+                    self.shape["max_shape"]
+                ):
                     raise TypeError(
                         "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
                         + str(type(self.shape["max_shape"]))
@@ -81,7 +91,7 @@ class TorchScriptInput(Input):
                     internal_in.max = self.shape["max_shape"]
                 internal_in.input_is_dynamic = True
         else:
-            if not Input._supported_input_size_type(self.shape):
+            if not TorchScriptInput._supported_input_size_type(self.shape):
                 raise TypeError(
                     "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
                     + str(type(self.shape))
@@ -91,14 +101,11 @@ class TorchScriptInput(Input):
                 internal_in.opt = self.shape
             internal_in.input_is_dynamic = False
 
-        if self.dtype != _enums.dtype.unknown:
-            self._explicit_set_dtype = True
-        else:
-            self._explicit_set_dtype = False
-
-        internal_in.dtype = Input._parse_dtype(self.dtype)
+        internal_in.dtype = self.dtype.to(_C.dtype)
         internal_in._explicit_set_dtype = self._explicit_set_dtype
-        internal_in.format = Input._parse_format(self.format)
+        internal_in.format = self.format.to(_C.TensorFormat)
 
-        internal_in.tensor_domain = Input._parse_tensor_domain(self.tensor_domain)
+        internal_in.tensor_domain = TorchScriptInput._parse_tensor_domain(
+            self.tensor_domain
+        )
         return internal_in

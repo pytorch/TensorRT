@@ -7,8 +7,6 @@ namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
-const std::string DEVICE_INFO_DELIM = "%";
-
 typedef enum { ID_IDX = 0, SM_MAJOR_IDX, SM_MINOR_IDX, DEVICE_TYPE_IDX, DEVICE_NAME_IDX } SerializedDeviceInfoIndex;
 
 RTDevice::RTDevice() : id{-1}, major{-1}, minor{-1}, device_type{nvinfer1::DeviceType::kGPU} {}

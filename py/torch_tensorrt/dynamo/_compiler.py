@@ -5,14 +5,10 @@ import logging
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
 
 import torch
-import torch_tensorrt
 from torch.export import ExportedProgram
 from torch.fx.node import Target
-from torch_tensorrt import _enums
 from torch_tensorrt._Device import Device
-from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
-    EngineCapability,
-)
+from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import partitioning
 from torch_tensorrt.dynamo._defaults import (
@@ -79,7 +75,9 @@ def compile(
     device: Optional[Union[Device, torch.device, str]] = DEVICE,
     disable_tf32: bool = DISABLE_TF32,
     sparse_weights: bool = SPARSE_WEIGHTS,
-    enabled_precisions: Set[torch.dtype] | Tuple[torch.dtype] = (torch.float32,),
+    enabled_precisions: Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype] = (
+        dtype.float32,
+    ),
     engine_capability: EngineCapability = ENGINE_CAPABILITY,
     refit: bool = REFIT,
     debug: bool = DEBUG,
@@ -170,6 +168,8 @@ def compile(
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
 
+    engine_capability = EngineCapability._from(engine_capability)
+
     if torch_executed_modules is not None and torch_executed_modules:
         logger.warning(
             f"Detected torch_executed_modules was non-empty: {torch_executed_modules}"
@@ -198,18 +198,10 @@ def compile(
     gm = apply_lowering_passes(gm, torch_inputs)
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
-    enabled_precisions = set(enabled_precisions)
-
-    if (
-        torch.float16 in enabled_precisions
-        or torch_tensorrt.dtype.half in enabled_precisions
-    ):
-        precision = torch.float16
-    elif (
-        torch.float32 in enabled_precisions
-        or torch_tensorrt.dtype.float in enabled_precisions
-    ):
-        precision = torch.float32
+    if dtype.float16 in enabled_precisions or dtype.half in enabled_precisions:
+        precision = dtype.float16
+    elif dtype.float32 in enabled_precisions or dtype.float in enabled_precisions:
+        precision = dtype.float32
     elif len(enabled_precisions) == 0:
         logger.info(f"No precision specified, defaulting to {PRECISION}")
         precision = PRECISION
@@ -217,6 +209,7 @@ def compile(
         raise ValueError(
             f"Precision {enabled_precisions} not supported in the Dynamo Path"
         )
+    enabled_precisions = {dtype._from(e) for e in enabled_precisions}
 
     compilation_options = {
         "precision": precision,
@@ -288,7 +281,7 @@ def compile_module(
         sample_inputs, "shape", lambda x: dict(x) if isinstance(x, dict) else tuple(x)
     )
     dryrun_tracker.graph_input_dtypes = parse_complex_tensor_structs(
-        sample_inputs, "torch_dtype"
+        sample_inputs, "dtype", lambda t: t.to(torch.dtype, use_default=True)
     )
     dryrun_tracker.compilation_settings = settings
 
@@ -402,7 +395,7 @@ def compile_module(
             lambda x: dict(x) if isinstance(x, dict) else tuple(x),
         )
         subgraph_data.subgraph_input_dtypes = parse_complex_tensor_structs(
-            submodule_inputs, "torch_dtype"
+            submodule_inputs, "dtype", lambda t: t.to(torch.dtype)
         )
 
         submodule_outputs = submodule(
@@ -463,11 +456,13 @@ def convert_module_to_trt_engine(
     module: torch.fx.GraphModule,
     method_name: str = "forward",
     inputs: Optional[Sequence[Input | torch.Tensor]] = None,
-    enabled_precisions: Optional[Set[torch.dtype | _enums.dtype]] = None,
+    enabled_precisions: Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype] = (
+        dtype.float32,
+    ),
     debug: bool = DEBUG,
     workspace_size: int = WORKSPACE_SIZE,
     min_block_size: int = MIN_BLOCK_SIZE,
-    torch_executed_ops: Set[str] = set(),
+    torch_executed_ops: Optional[Set[str]] = None,
     pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES,
     max_aux_streams: Optional[int] = MAX_AUX_STREAMS,
     version_compatible: bool = VERSION_COMPATIBLE,
@@ -569,24 +564,15 @@ def convert_module_to_trt_engine(
         set_log_level(logger.parent, logging.DEBUG)
 
     input_list = list(inputs) if inputs is not None else []
+    torch_executed_ops = torch_executed_ops if torch_executed_ops is not None else set()
     # Prepare torch_trt inputs
     input_list = prepare_inputs(input_list)
     device = to_torch_tensorrt_device(device)
 
-    enabled_precisions = (
-        enabled_precisions if enabled_precisions is not None else {torch.float}
-    )
-
-    if (
-        torch.float16 in enabled_precisions
-        or torch_tensorrt.dtype.half in enabled_precisions
-    ):
-        precision = torch.float16
-    elif (
-        torch.float32 in enabled_precisions
-        or torch_tensorrt.dtype.float in enabled_precisions
-    ):
-        precision = torch.float32
+    if dtype.float16 in enabled_precisions or dtype.half in enabled_precisions:
+        precision = dtype.float16
+    elif dtype.float32 in enabled_precisions or dtype.float in enabled_precisions:
+        precision = dtype.float32
     elif len(enabled_precisions) == 0:
         logger.info(f"No precision specified, defaulting to {PRECISION}")
         precision = PRECISION
@@ -594,6 +580,8 @@ def convert_module_to_trt_engine(
         raise ValueError(
             f"Precision {enabled_precisions} not supported in the Dynamo Path"
         )
+
+    enabled_precisions = {dtype._from(e) for e in enabled_precisions}
 
     compilation_options = {
         "precision": precision,

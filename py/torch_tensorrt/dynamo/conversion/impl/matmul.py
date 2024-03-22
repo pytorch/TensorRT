@@ -1,13 +1,15 @@
 from typing import Optional
 
-import tensorrt as trt
+import torch
 from torch.fx.node import Target
+from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
 from torch_tensorrt.fx.converters.converter_utils import broadcast, set_layer_name
 from torch_tensorrt.fx.types import TRTTensor
-from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
+
+import tensorrt as trt
 
 
 def matrix_multiply(
@@ -20,14 +22,14 @@ def matrix_multiply(
     input_matrix_op: trt.MatrixOperation = trt.MatrixOperation.NONE,
     other_matrix_op: trt.MatrixOperation = trt.MatrixOperation.NONE,
 ) -> TRTTensor:
-    if not isinstance(input, trt.tensorrt.ITensor):
+    if not isinstance(input, trt.ITensor):
         input = get_trt_tensor(ctx, input, f"{name}_input")
-    if not isinstance(other, trt.tensorrt.ITensor):
+    if not isinstance(other, trt.ITensor):
         other = get_trt_tensor(
             ctx,
             other,
             f"{name}_other",
-            dtype=unified_dtype_converter(input.dtype, Frameworks.TORCH),
+            dtype=_enums.dtype._from(input.dtype).to(torch.dtype),
         )
 
     preset_diff = 0
