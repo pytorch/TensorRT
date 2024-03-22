@@ -6,3 +6,5 @@ python -m pip config set global.no-cache-dir true
 python -c "import torch; print('IMPORTED TORCH 2')"
 python -m pip install tensorrt==9.3.0.post12.dev1 tensorrt_libs==9.3.0.post12.dev1 tensorrt_bindings==9.3.0.post12.dev1
 python -c "import torch; print('IMPORTED TORCH 3')"
+choco install bazelisk
+cat toolchains/ci_workspaces/WORKSPACE.win.release.tmpl | envsubst > WORKSPACE
