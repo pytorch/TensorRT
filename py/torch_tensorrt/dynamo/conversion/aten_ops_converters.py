@@ -697,6 +697,32 @@ def aten_ops_clamp(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.scatter.value)
+def aten_ops_scatter_value(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.select.scatter_value(
+        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2], args[3]
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.scatter.src)
+def aten_ops_scatter_src(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.select.scatter_src(
+        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2], args[3]
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.select.int)
 def aten_ops_select(
     ctx: ConversionContext,
