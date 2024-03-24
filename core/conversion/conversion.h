@@ -14,6 +14,7 @@ namespace conversion {
 struct ConversionInfo {
   ir::InputSpecMap inputs;
   ir::CollectionInputSpecMap collection_input_spec_map;
+  std::vector<at::ScalarType> out_types;
   BuilderSettings engine_settings;
 };
 

@@ -21,6 +21,15 @@ SegmentedBlock::SegmentedBlock(SegmentedBlockTarget blk_target, const std::vecto
   }
 }
 
+SegmentedBlock::SegmentedBlock(SegmentedBlockTarget blk_target, std::shared_ptr<torch::jit::Graph> g)
+    : target_(blk_target), g_(g) {
+  for (auto input : g_->inputs())
+    inputs_.push_back(input);
+
+  for (auto output : g_->outputs())
+    outputs_.push_back(output);
+}
+
 void SegmentedBlock::registerOutput(torch::jit::Value* raw_output) {
   outputs_.push_back(raw_output);
   g_->registerOutput(old_to_new_[raw_output]);

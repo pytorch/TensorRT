@@ -340,6 +340,19 @@ void getSegmentsOutputByRunning(
 
   seg_block.register_inshapes(input_shapes, shape_mode);
   seg_block.register_intypes(input_types);
+
+  // get output type for each segmented block so this can be used in conversion process
+  std::vector<at::ScalarType> output_types;
+  for (size_t i = 0; i < seg_block.outputs().size(); ++i) {
+    auto current_output = seg_block.raw_outputs()[i];
+
+    if (ivalues_maps[current_output].isTensor()) {
+      auto cur_ivalue = ivalues_maps[current_output];
+
+      output_types.push_back(cur_ivalue.toTensor().scalar_type());
+    }
+  }
+  seg_block.register_outtypes(output_types);
 }
 
 void runShapeAnalysis(
