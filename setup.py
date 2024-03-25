@@ -82,7 +82,7 @@ dir_path = os.path.join(str(get_root_dir()), "py")
 
 CXX11_ABI = False
 JETPACK_VERSION = None
-PY_ONLY = False
+PY_ONLY = sys.platform.startswith("win")
 NO_TS = False
 LEGACY = False
 RELEASE = False
