@@ -18,7 +18,7 @@ from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
 )
 from torch_tensorrt.dynamo.conversion.impl.unary import atan, sign
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
-from torch_tensorrt.fx.converters.converter_utils import set_layer_name
+from torch_tensorrt.fx.converters.converter_utils import broadcast
 from torch_tensorrt.fx.types import TRTTensor
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
@@ -248,9 +248,11 @@ def atan2(
     pi_tensor = get_trt_tensor(ctx, pi_value, f"{name}_pi")
 
     if isinstance(input, TRTTensor):
-        input = cast_trt_tensor(ctx, input, trt.float32, name)
+        input = cast_trt_tensor(ctx, input, trt.float32, f"{name}_input")
     if isinstance(other, TRTTensor):
-        other = cast_trt_tensor(ctx, other, trt.float32, name)
+        other = cast_trt_tensor(ctx, other, trt.float32, f"{name}_other")
+
+    input, other = broadcast(ctx.net, input, other, f"{name}_input", f"{name}_other")
 
     # Calculate x_zero, y_zero (whether inputs are zero)
     x_zero = eq(ctx, target, source_ir, f"{name}_x_zero", input, 0)
@@ -280,7 +282,7 @@ def atan2(
     )
 
     # atan(x/y)+π if x≥0 and y<0,
-    atan_corrected = get_value_by_condition(
+    atan_corrected = impl.condition.select(
         ctx,
         target,
         source_ir,
@@ -298,7 +300,7 @@ def atan2(
     )
 
     # atan(x/y)-π if x<0 and y<0,
-    atan_corrected_2 = get_value_by_condition(
+    atan_corrected_2 = impl.condition.select(
         ctx,
         target,
         source_ir,
@@ -316,7 +318,7 @@ def atan2(
     )
 
     # atan(x/y) if y>0
-    atan_output = get_value_by_condition(
+    atan_output = impl.condition.select(
         ctx,
         target,
         source_ir,
@@ -347,7 +349,7 @@ def atan2(
     )
 
     # π/2 if x>0 and y=0,
-    pi_over_2_output = get_value_by_condition(
+    pi_over_2_output = impl.condition.select(
         ctx,
         target,
         source_ir,
@@ -360,7 +362,7 @@ def atan2(
     )
 
     # -π/2 if x<0 and y=0,
-    minus_pi_over_2_output = get_value_by_condition(
+    minus_pi_over_2_output = impl.condition.select(
         ctx,
         target,
         source_ir,
@@ -373,7 +375,7 @@ def atan2(
     )
 
     # 0 if x=0 and y=0,
-    zero_output = get_value_by_condition(
+    zero_output = impl.condition.select(
         ctx,
         target,
         source_ir,
@@ -731,17 +733,3 @@ def le(
         lt(ctx, target, source_ir, f"{name}_lt", lhs_val, rhs_val),
         eq(ctx, target, source_ir, f"{name}_eq", lhs_val, rhs_val),
     )
-
-
-def get_value_by_condition(
-    ctx: ConversionContext,
-    target: Target,
-    source_ir: Optional[SourceIR],
-    name: str,
-    input: TRTTensor,
-    other: TRTTensor,
-    condition: TRTTensor,
-) -> TRTTensor:
-    select_layer = ctx.net.add_select(condition, input, other)
-    set_layer_name(select_layer, target, name + "_select", source_ir)
-    return select_layer.get_output(0)

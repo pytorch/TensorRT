@@ -1392,6 +1392,12 @@ def aten_ops_atanh(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.atan2.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        1: (TRTTensor,),
+    }
+)
 def aten_ops_atan2(
     ctx: ConversionContext,
     target: Target,
