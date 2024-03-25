@@ -30,7 +30,6 @@ from torch_tensorrt.dynamo._defaults import (
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
     OPTIMIZATION_LEVEL,
-    OUTPUT_FORMAT,
     PASS_THROUGH_BUILD_FAILURES,
     PRECISION,
     REFIT,
@@ -48,7 +47,6 @@ from torch_tensorrt.dynamo._DryRunTracker import (
     dryrun_stats_display,
     parse_non_trt_nodes,
 )
-from torch_tensorrt.dynamo._exporter import export
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     UnsupportedOperatorException,
@@ -102,9 +100,8 @@ def compile(
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = DRYRUN,
     hardware_compatible: bool = HARDWARE_COMPATIBLE,
-    output_format: str = OUTPUT_FORMAT,
     **kwargs: Any,
-) -> Union[ExportedProgram, torch.jit.ScriptModule, torch.fx.GraphModule]:
+) -> torch.fx.GraphModule:
     """Compile a TorchScript module for NVIDIA GPUs using TensorRT
 
     Takes a existing TorchScript module and a set of settings to configure the compiler
@@ -246,14 +243,12 @@ def compile(
         "dla_global_dram_size": dla_global_dram_size,
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
-        "output_format": output_format,
     }
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
     trt_gm = compile_module(gm, inputs, settings)
-    trt_result = export(trt_gm, torch_inputs, output_format)
-    return trt_result
+    return trt_gm
 
 
 def compile_module(
