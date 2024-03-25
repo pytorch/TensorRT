@@ -8,7 +8,7 @@ requires = [
     "cffi>=1.15.1",
     "typing-extensions>=4.7.0",
     "future>=0.18.3",
-    "tensorrt>=8.6,<8.7",
+    "tensorrt>=10.0",
     "torch >=2.3.0.dev,<2.4.0",
     "pybind11==2.6.2",
     "numpy",
@@ -42,7 +42,7 @@ requires-python = ">=3.8"
 keywords = ["pytorch", "torch", "tensorrt", "trt", "ai", "artificial intelligence", "ml", "machine learning", "dl", "deep learning", "compiler", "dynamo", "torchscript", "inference"]
 dependencies = [
     "torch >=2.3.0.dev,<2.4.0",
-    "tensorrt>=8.6,<8.7",
+    "tensorrt>=10.0",
     "packaging>=23",
     "numpy",
     "typing-extensions>=4.7.0",
