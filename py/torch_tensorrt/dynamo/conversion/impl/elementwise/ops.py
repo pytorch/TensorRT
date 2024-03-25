@@ -1,5 +1,6 @@
 from typing import Optional, Union
 
+import numpy as np
 import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
@@ -9,13 +10,15 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_int_int_div_trt_tensor,
     cast_int_or_float_to_bool,
+    cast_trt_tensor,
     get_trt_tensor,
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
 )
-from torch_tensorrt.dynamo.conversion.impl.unary import sign
+from torch_tensorrt.dynamo.conversion.impl.unary import atan, sign
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
+from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 from torch_tensorrt.fx.types import TRTTensor
 from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
@@ -211,6 +214,178 @@ def remainder(
         other,
     )
     return fmod2_value
+
+
+def atan2(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    other: TRTTensor,
+) -> TRTTensor:
+    """
+    Perform atan2 operation on Tensor, calculating the arctangent of the quotient of input tensors.
+    atan2(x,y) = atan(x/y) if y > 0,
+            = atan(x/y) + π if x ≥ 0 and y < 0,
+            = atan(x/y) - π if x < 0 and y < 0,
+            = π/2 if x > 0 and y = 0,
+            = -π/2 if x < 0 and y = 0,
+            = 0 if x = 0 and y = 0
+
+    Args:
+        ctx: ConversionContext.
+        target: node target
+        source_ir (SourceIR): Source IR calling the function.
+        name: namespace for the op
+        input: Tensor or constant representing the dividend.
+        other: Tensor or constant representing the divisor.
+
+    Returns:
+        A TensorRT tensor representing the result of the atan2 operation.
+    """
+    pi_value = 3.141592653589793
+    pi_tensor = get_trt_tensor(ctx, pi_value, f"{name}_pi")
+
+    if isinstance(input, TRTTensor):
+        input = cast_trt_tensor(ctx, input, trt.float32, name)
+    if isinstance(other, TRTTensor):
+        other = cast_trt_tensor(ctx, other, trt.float32, name)
+
+    # Calculate x_zero, y_zero (whether inputs are zero)
+    x_zero = eq(ctx, target, source_ir, f"{name}_x_zero", input, 0)
+    y_zero = eq(ctx, target, source_ir, f"{name}_y_zero", other, 0)
+
+    # Get sign of inputs
+    x_positive = gt(ctx, target, source_ir, f"{name}_x_positive", input, 0)
+    x_zero_positive = ge(ctx, target, source_ir, f"{name}_x_zero_positive", input, 0)
+    x_negative = lt(ctx, target, source_ir, f"{name}_x_negative", input, 0)
+    y_positive = gt(ctx, target, source_ir, f"{name}_y_positive", other, 0)
+    y_negative = lt(ctx, target, source_ir, f"{name}_y_negative", other, 0)
+
+    # Calculate atan(x/y)
+    input_div_other = div(
+        ctx, target, source_ir, f"{name}_input_div_other", input, other
+    )
+    atan_val = atan(ctx, target, source_ir, f"{name}_atan", input_div_other)
+
+    # atan(x/y)+π if x≥0 and y<0,
+    atan_add_pi = add(
+        ctx, target, source_ir, f"{name}_atan_add_pi", atan_val, pi_tensor
+    )
+
+    # atan(x/y)-π if x<0 and y<0,
+    atan_sub_pi = sub(
+        ctx, target, source_ir, f"{name}_atan_sub_pi", atan_val, pi_tensor
+    )
+
+    # atan(x/y)+π if x≥0 and y<0,
+    atan_corrected = get_value_by_condition(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_atan_corrected",
+        atan_add_pi,
+        atan_val,
+        logical_and(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_x_zero_positive_and_y_negative",
+            x_zero_positive,
+            y_negative,
+        ),
+    )
+
+    # atan(x/y)-π if x<0 and y<0,
+    atan_corrected_2 = get_value_by_condition(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_atan_corrected_2",
+        atan_sub_pi,
+        atan_corrected,
+        logical_and(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_x_negative_and_y_negative",
+            x_negative,
+            y_negative,
+        ),
+    )
+
+    # atan(x/y) if y>0
+    atan_output = get_value_by_condition(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_atan_output",
+        atan_val,
+        atan_corrected_2,
+        y_positive,
+    )
+
+    # on x or y-axis
+    pi_over_2_tensor = get_trt_tensor(
+        ctx,
+        (pi_value / 2) * np.ones(input.shape, dtype=np.float32),
+        f"{name}_pi_over_2_tensor",
+        dtype=trt.float32,
+    )
+    minus_pi_over_2_tensor = get_trt_tensor(
+        ctx,
+        (-pi_value / 2) * np.ones(input.shape, dtype=np.float32),
+        f"{name}_minus_pi_over_2_tensor",
+        dtype=trt.float32,
+    )
+    zero_tensor = get_trt_tensor(
+        ctx,
+        np.zeros(input.shape, dtype=np.float32),
+        f"{name}_zero_tensor",
+        dtype=trt.float32,
+    )
+
+    # π/2 if x>0 and y=0,
+    pi_over_2_output = get_value_by_condition(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_pi_over_2_output",
+        pi_over_2_tensor,
+        atan_output,
+        logical_and(
+            ctx, target, source_ir, f"{name}_x_zero_and_y_positive", x_positive, y_zero
+        ),
+    )
+
+    # -π/2 if x<0 and y=0,
+    minus_pi_over_2_output = get_value_by_condition(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_minus_pi_over_2_output",
+        minus_pi_over_2_tensor,
+        pi_over_2_output,
+        logical_and(
+            ctx, target, source_ir, f"{name}_x_zero_and_y_negative", x_negative, y_zero
+        ),
+    )
+
+    # 0 if x=0 and y=0,
+    zero_output = get_value_by_condition(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_zero_output",
+        zero_tensor,
+        minus_pi_over_2_output,
+        logical_and(
+            ctx, target, source_ir, f"{name}_x_zero_and_y_zero", y_zero, x_zero
+        ),
+    )
+
+    return zero_output
 
 
 def clamp(
@@ -556,3 +731,17 @@ def le(
         lt(ctx, target, source_ir, f"{name}_lt", lhs_val, rhs_val),
         eq(ctx, target, source_ir, f"{name}_eq", lhs_val, rhs_val),
     )
+
+
+def get_value_by_condition(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    other: TRTTensor,
+    condition: TRTTensor,
+) -> TRTTensor:
+    select_layer = ctx.net.add_select(condition, input, other)
+    set_layer_name(select_layer, target, name + "_select", source_ir)
+    return select_layer.get_output(0)
