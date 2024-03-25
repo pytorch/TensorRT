@@ -142,8 +142,11 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       auto dims = core::util::toDims(inputs[i].sizes());
       auto shape = core::util::toVec(dims);
       LOG_DEBUG("Input Name: " << name << " Shape: " << dims);
-      compiled_engine->exec_ctx->setInputShape(name.c_str(), dims);
-      compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputs[i].view(shape).contiguous().data_ptr());
+      TORCHTRT_CHECK(
+          compiled_engine->exec_ctx->setInputShape(name.c_str(), dims), "Error while setting the input shape");
+      TORCHTRT_CHECK(
+          compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputs[i].view(shape).contiguous().data_ptr()),
+          "Error while setting the input tensor address");
     }
 
     TORCHTRT_CHECK(
@@ -168,7 +171,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       auto dims = core::util::toVec(out_shape);
       auto type = util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
       outputs[pyt_idx] = std::move(at::empty(dims, {at::kCUDA}).to(type).contiguous());
-      compiled_engine->exec_ctx->setTensorAddress(name.c_str(), outputs[pyt_idx].data_ptr());
+      TORCHTRT_CHECK(
+          compiled_engine->exec_ctx->setTensorAddress(name.c_str(), outputs[pyt_idx].data_ptr()),
+          "Error while setting the output tensor address");
     }
   }
 
