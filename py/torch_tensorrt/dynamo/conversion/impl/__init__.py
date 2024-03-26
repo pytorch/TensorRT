@@ -12,6 +12,7 @@ from . import (
     elementwise,
     embedding,
     grid,
+    index,
     linear,
     matmul,
     normalization,
