@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, List, Optional
 import torch
 from torch._decomp import register_decomposition
 from torch._ops import OpOverload
+from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
 
 from ._decomposition_groups import (
     ENABLED_TORCH_DECOMPOSITIONS,
@@ -160,6 +161,45 @@ def var_decomposition(
     variance = variance_unnormalized / correction_term
 
     return variance
+
+
+@register_torch_trt_decomposition(
+    torch.ops.aten.slice_scatter.default, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def slice_scatter_decomposition(
+    input_tensor: torch.Tensor,
+    src_tensor: torch.Tensor,
+    dim: int,
+    start: Optional[int] = None,
+    end: Optional[int] = None,
+    step: Optional[int] = None,
+):
+    dim_size = input_tensor.shape[dim]
+    start = get_positive_dim(start, input_tensor.shape[dim])
+    if end is None:
+        end = dim_size
+    end = get_positive_dim(end, input_tensor.shape[dim])
+    if step is None:
+        step = 1
+
+    src_dim = src_tensor.shape
+    # step == 0 is not a valid torch case
+    # also src_dim should be equal to slice dimension
+
+    if start == 0 and end == dim_size and step == 1:
+        return src_tensor
+
+    cat_tensors = []
+    index_tensor_shape = []
+    for i, src_each_dim in enumerate(list(src_dim)):
+        if i != dim:
+            index_tensor_shape.append(src_each_dim)
+    indices = torch.arange(start, end, step)
+    cat_tensors = [(indices * torch.ones(index_tensor_shape))]
+    index_tensor = torch.stack(cat_tensors, dim)
+    index_tensor = index_tensor.to(torch.int64).cuda()
+    output_tensor = torch.scatter(input_tensor, dim, index_tensor, src_tensor)
+    return output_tensor
 
 
 def get_decompositions(
