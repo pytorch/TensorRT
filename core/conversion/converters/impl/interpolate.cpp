@@ -91,7 +91,7 @@ void resize_layer_size(
 
     auto dynamic_shape_mask = tensor_to_const(ctx, th_dynamic_shape_mask);
     auto static_shape_mask = tensor_to_const(ctx, th_static_shape_mask);
-    auto input_shape = ctx->net->addShape(*in)->getOutput(0);
+    nvinfer1::ITensor* input_shape = getShapeOutput(ctx, in);
     auto dynamic_shape =
         ctx->net->addElementWise(*input_shape, *dynamic_shape_mask, nvinfer1::ElementWiseOperation::kPROD)
             ->getOutput(0);

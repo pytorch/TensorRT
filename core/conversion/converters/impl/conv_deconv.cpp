@@ -33,7 +33,7 @@ nvinfer1::ILayer* add_bias_layer(
     nvinfer1::Dims& input_dims,
     nvinfer1::Dims& output_padding,
     Weights& bias) {
-  nvinfer1::ITensor* input_shape = ctx->net->addShape(*input_tensor)->getOutput(0);
+  nvinfer1::ITensor* input_shape = getShapeOutput(ctx, input_tensor, std::string("bias_shape_cast").c_str());
   // Add padding layer
   nvinfer1::ITensor* start;
   nvinfer1::ITensor* totalPadding;
