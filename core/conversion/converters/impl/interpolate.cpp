@@ -521,6 +521,37 @@ auto interpolate_registrations TORCHTRT_UNUSED =
                }
 
                return true;
+             }})
+        .pattern(
+            {"aten::grid_sampler(Tensor input, Tensor grid, int interpolation_mode, int padding_mode, bool align_corners) -> Tensor",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto in = args[0].ITensorOrFreeze(ctx);
+               auto grid = args[1].ITensorOrFreeze(ctx);
+               auto interpolation_mode = args[2].unwrapToInt();
+               auto padding_mode = args[3].unwrapToInt();
+               auto align_corners = args[4].unwrapToBool();
+
+               static const auto sample_map = std::map<int, nvinfer1::SampleMode>{
+                   {0, nvinfer1::SampleMode::kFILL},
+                   {1, nvinfer1::SampleMode::kCLAMP},
+                   {2, nvinfer1::SampleMode::kREFLECT}};
+
+               static const auto interpolation_map = std::map<int, nvinfer1::InterpolationMode>{
+                   {0, nvinfer1::InterpolationMode::kLINEAR},
+                   {1, nvinfer1::InterpolationMode::kNEAREST},
+                   {2, nvinfer1::InterpolationMode::kCUBIC}};
+
+               auto grid_sample_layer = ctx->net->addGridSample(*in, *grid);
+               TORCHTRT_CHECK(
+                   grid_sample_layer, "Unable to create grid_sample layer from node: " << util::node_info(n));
+
+               grid_sample_layer->setAlignCorners(align_corners);
+               grid_sample_layer->setSampleMode(sample_map.at(padding_mode));
+               grid_sample_layer->setInterpolationMode(interpolation_map.at(interpolation_mode));
+
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], grid_sample_layer->getOutput(0));
+               LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+               return true;
              }});
 
 } // namespace
