@@ -8,3 +8,6 @@ python -m pip install tensorrt==9.3.0.post12.dev1 tensorrt_libs==9.3.0.post12.de
 python -c "import torch; print('IMPORTED TORCH 3')"
 choco install bazelisk -y
 cat toolchains/ci_workspaces/WORKSPACE.win.release.tmpl | envsubst > WORKSPACE
+
+wget https://developer.download.nvidia.com/compute/cuda/12.1.0/local_installers/cuda_12.1.0_531.14_windows.exe
+cuda_12.1.0_531.14_windows.exe -s nvcc_12.1 Display.Driver -n
