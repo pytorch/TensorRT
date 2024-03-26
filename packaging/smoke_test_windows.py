@@ -20,13 +20,13 @@ import torch
 
 print(f"Torch CUDA version: {torch.version.cuda}")
 
-# result = subprocess.run(
-#     ["nvidia-smi"],
-#     capture_output=True,
-#     text=True,
-# )
-# print(result.stdout)
-# print(result.stderr)
+result = subprocess.run(
+    ["systeminfo"],
+    capture_output=True,
+    text=True,
+)
+print(result.stdout)
+print(result.stderr)
 
 
 import tensorrt
