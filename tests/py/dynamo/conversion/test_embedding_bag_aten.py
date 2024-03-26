@@ -342,6 +342,69 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             enable_passes=True,
         )
 
+    @parameterized.expand(
+        [
+            param(
+                test_name="dynamic_offsets_1",
+                weight=torch.range(0, 29, dtype=torch.float32).reshape(15, 2),
+                indices=torch.tensor([i for i in range(15)], dtype=torch.int32),
+                offsets=torch.tensor([0, 2], dtype=torch.int32),
+                scale_grad_by_freq=False,
+                mode=0,
+                sparse=False,
+                per_sample_weights=None,
+                include_last_offset=False,
+                padding_idx=-1,
+            ),
+        ]
+    )
+    def test_embedding_bag_with_dynamic_offsets(
+        self,
+        test_name,
+        weight,
+        indices,
+        offsets,
+        scale_grad_by_freq,
+        mode,
+        sparse,
+        per_sample_weights,
+        include_last_offset,
+        padding_idx,
+    ):
+        class TestEmbeddingBag(torch.nn.Module):
+            def forward(self, weight, indices, offsets):
+                offsets_list = []
+                end = torch.randint(8, 14, (1,))[0]
+                for i in range(3, 0, -1):
+                    rand_tensor = torch.arange(5, end, step=i, dtype=torch.int32)
+                    offsets_list.append(
+                        torch.ops.aten.cat.default((offsets, rand_tensor))
+                    )
+
+                res = []
+                for one_offsets in offsets_list:
+                    output = torch.ops.aten._embedding_bag.default(
+                        weight,
+                        indices,
+                        one_offsets,
+                        scale_grad_by_freq,
+                        mode,
+                        sparse,
+                        per_sample_weights,
+                        include_last_offset,
+                        padding_idx,
+                    )[0]
+                    res.append(output)
+
+                return res
+
+        self.run_test(
+            TestEmbeddingBag(),
+            inputs=[weight, indices, offsets],
+            # use_dynamo_tracer=True,
+            enable_passes=True,
+        )
+
 
 if __name__ == "__main__":
     run_tests()
