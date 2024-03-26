@@ -8,5 +8,3 @@ python -m pip install tensorrt==9.3.0.post12.dev1 tensorrt_libs==9.3.0.post12.de
 python -c "import torch; print('IMPORTED TORCH 3')"
 choco install bazelisk -y
 cat toolchains/ci_workspaces/WORKSPACE.win.release.tmpl | envsubst > WORKSPACE
-rmmod nvidia
-conda install nvidia/label/cuda-12.1.1::cuda-toolkit
