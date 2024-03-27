@@ -6,6 +6,7 @@ from typing import Any, Callable, List, Optional, Sequence, Set
 
 import torch
 import torch.fx
+import torch_tensorrt.dynamo
 import torch_tensorrt.ts
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
@@ -26,10 +27,7 @@ if DYNAMO_ENABLED:
 
 logger = logging.getLogger(__name__)
 
-__all__ = [
-    "compile",
-    "convert_method_to_trt_engine",
-]
+__all__ = ["compile", "convert_method_to_trt_engine", "save", "load"]
 
 
 def _non_fx_input_interface(
@@ -332,3 +330,108 @@ def convert_method_to_trt_engine(
         )
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
+
+
+def load(file_path: str = "") -> Any:
+    """
+    Load either a Torchscript model or ExportedProgram. Autodetect the type using
+    try, except
+    """
+    try:
+        logger.debug("Loading the provided file using torch.jit.load()")
+        ts_module = torch.jit.load(file_path)
+        return ts_module
+    except Exception:
+        logger.debug(
+            "Loading the provided file via torch.jit.load() failed with the following error",
+            exc_info=True,
+        )
+        pass
+
+    try:
+        logger.debug("Loading the provided file using torch.export.load()")
+        exp_program = torch.export.load(file_path)
+        return exp_program
+    except Exception:
+        logger.debug(
+            "Loading the provided file via torch.export.load() failed with the following error",
+            exc_info=True,
+        )
+        raise ValueError(
+            "The file doesn't correspond to a valid Torchscript module or ExportedProgram. Please verify the file path."
+        )
+
+
+def save(
+    module: Any,
+    file_path: str = "",
+    *,
+    output_format: str = "exported_program",
+    inputs: Optional[Sequence[torch.Tensor]] = None,
+    retrace: bool = False,
+) -> None:
+    """
+    Save the model to disk in the specified output format.
+    Arguments:
+        module : Compiled Torch-TensorRT module (Options include torch.jit.ScriptModule | torch.export.ExportedProgram | torch.fx.GraphModule)
+        inputs (torch.Tensor): Torch input tensors
+        output_format: Format to save the model. Options include exported_program | torchscript.
+        retrace: When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
+                This flag is experimental for now.
+    """
+    module_type = _parse_module_type(module)
+    accepted_formats = {"exported_program", "torchscript"}
+    if inputs is not None and not all(
+        isinstance(input, torch.Tensor) for input in inputs
+    ):
+        raise ValueError(
+            "Not all inputs provided are torch.tensors. Please provide torch.tensors as inputs"
+        )
+    if output_format not in accepted_formats:
+        raise ValueError(
+            f"Provided output_format {output_format} is not supported. Supported options are exported_program | torchscript"
+        )
+    if not file_path:
+        raise ValueError("File path cannot be empty. Please provide a valid file path")
+
+    if module_type == _ModuleType.nn:
+        raise ValueError(
+            "Input model is of type nn.Module. Saving nn.Module directly is not supported. Supported model types torch.jit.ScriptModule | torch.fx.GraphModule | torch.export.ExportedProgram."
+        )
+    elif module_type == _ModuleType.ts:
+        if output_format == "exported_program":
+            raise ValueError(
+                "Provided model is a torch.jit.ScriptModule but the output_format specified is exported_program. Please verify the output_format"
+            )
+        else:
+            torch.jit.save(module, file_path)
+    elif module_type == _ModuleType.ep:
+        if output_format == "torchscript":
+            raise ValueError(
+                "Provided model is a torch.export.ExportedProgram but the output_format specified is torchscript. Please verify the output_format"
+            )
+        else:
+            torch.export.save(module, file_path)
+    elif module_type == _ModuleType.fx:
+        if inputs is None:
+            raise ValueError(
+                "Provided model is a torch.fx.GraphModule however the inputs are empty. Please provide valid torch.tensors as inputs to trace and save the model"
+            )
+        # The module type is torch.fx.GraphModule
+        if output_format == "torchscript":
+            module_ts = torch.jit.trace(module, inputs)
+            torch.jit.save(module_ts, file_path)
+        else:
+            if not retrace:
+                from torch_tensorrt.dynamo._exporter import export
+
+                exp_program = export(module, inputs)
+                torch.export.save(exp_program, file_path)
+            else:
+                from torch._higher_order_ops.torchbind import enable_torchbind_tracing
+
+                with enable_torchbind_tracing():
+                    exp_program = torch.export.export(
+                        module, tuple(inputs), strict=False
+                    )
+                    torch.export.save(exp_program, file_path)

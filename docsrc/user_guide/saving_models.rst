@@ -9,23 +9,22 @@ Saving models compiled with Torch-TensorRT
    :undoc-members:
    :show-inheritance:
 
-Saving models compiled with Torch-TensorRT varies slightly with the `ir` that has been used for compilation.
+Saving models compiled with Torch-TensorRT can be done using `torch_tensorrt.save` API.
 
 Dynamo IR
 -------------
 
-The output type of `ir=dynamo` compilation of Torch-TensorRT is `torch.export.ExportedProgram` object by default. 
-In addition, we provide a new parameter `output_format` in the `CompilationSetting` object provided before compilation.
-The `output_format` can take the following options 
+The output type of `ir=dynamo` compilation of Torch-TensorRT is `torch.fx.GraphModule` object by default. 
+We can save this object in either `TorchScript` (`torch.jit.ScriptModule`) or `ExportedProgram` (`torch.export.ExportedProgram`) formats by 
+specifying the `output_format` flag. Here are the options `output_format` will accept
 
-* `exported_program` (or) `ep` : This is the default. Returns an ExportedProgram 
-* `torchscript` (or) `ts` : This returns a TorchScript module
-* `graph_module` (or) `fx` : This returns a torch.fx.GraphModule which can be traced into Torchscript to save to disk.
+* `exported_program` : This is the default. We perform transformations on the graphmodule first and use `torch.export.save` to save the module.
+* `torchscript` : We trace the graphmodule via `torch.jit.trace` and save it via `torch.jit.save`.
 
-a) Torchscript
+a) ExportedProgram
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-If you set the `output_format="torchscript"`, this will return a `ScriptModule` which can be serialized via torch.jit.save
+Here's an example usage
 
 .. code-block:: python
 
@@ -34,40 +33,16 @@ If you set the `output_format="torchscript"`, this will return a `ScriptModule` 
 
     model = MyModel().eval().cuda()
     inputs = [torch.randn((1, 3, 224, 224)).cuda()]
-    # trt_ts is a torch.jit.ScriptModule object
-    trt_ts = torch_tensorrt.compile(model, ir="dynamo", inputs, output_format="torchscript")
-    torch.jit.save(trt_ts, "trt_model.ts")
+    # trt_ep is a torch.fx.GraphModule object
+    trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs) 
+    torchtrt.save(trt_gm, "trt.ep", inputs=inputs)
 
     # Later, you can load it and run inference
-    model = torch.jit.load("trt_model.ts").cuda()
+    model = torch.export.load("trt.ep").module()
     model(*inputs)
 
-b) ExportedProgram
+b) Torchscript
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-`torch.export.ExportedProgram`, a new format introduced in Pytorch 2.X is the default return type of Torch-TensorRT compilation.
-
-.. code-block:: python
-
-    import torch
-    import torch_tensorrt
-
-    model = MyModel().eval().cuda()
-    inputs = [torch.randn((1, 3, 224, 224)).cuda()]
-    # trt_ep is a torch.export.ExportedProgram object
-    trt_ep = torch_tensorrt.compile(model, ir="dynamo", inputs) 
-    torch.export.save(trt_ep, "trt_model.ep")
-
-    # Later, you can load it and run inference
-    model = torch.export.load("trt_model.ep")
-    model(*inputs)
-
-c) GraphModule
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-We can also return a `torch.fx.GraphModule` object as the output of Torch-TensorRT compilation by setting `output_format="graph_module"`.
-Internally, partitioning, lowering, conversion phases operate using GraphModule objects. These can be either traced into a Torchscript modules or 
-exported into `ExportedProgram` objects
 
 .. code-block:: python
 
@@ -77,7 +52,13 @@ exported into `ExportedProgram` objects
     model = MyModel().eval().cuda()
     inputs = [torch.randn((1, 3, 224, 224)).cuda()]
     # trt_gm is a torch.fx.GraphModule object
-    trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs, output_format="graph_module") 
+    trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs)
+    torch_tensorrt.save(trt_gm, "trt.ts", output_format="torchscript", inputs=inputs)
+
+    # Later, you can load it and run inference
+    model = torch.jit.load("trt.ts").cuda()
+    model(*inputs)
+
 
 Torchscript IR
 -------------
@@ -99,3 +80,21 @@ For `ir=ts`, this behavior stays the same in 2.X versions as well.
   model = torch.jit.load("trt_model.ts").cuda()
   model(*inputs)
 
+
+Loading the models
+--------------------
+
+We can load torchscript or exported_program models using `torch.jit.load` and `torch.export.load` APIs from PyTorch directly.
+Alternatively, we provide a light wrapper `torch_tensorrt.load(file_path)` which can load either of the above model types.
+
+Here's an example usage
+
+.. code-block:: python
+
+    import torch
+    import torch_tensorrt
+
+    # file_path can be trt.ep or trt.ts file obtained via saving the model (refer to the above section)
+    inputs = [torch.randn((1, 3, 224, 224)).cuda()]
+    model = torch_tensorrt.load(<file_path>).module()
+    model(*inputs)
