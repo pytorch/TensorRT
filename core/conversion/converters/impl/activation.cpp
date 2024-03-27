@@ -91,7 +91,7 @@ auto acthardtanh TORCHTRT_UNUSED =
 
                // Out_tensor of ParametricReLU shape is all 0, when slopes nDims is not equal to in nDims.
                // Since make sure splopes nDims is equal to in nDims.
-               if (slopes.ndimension() == 1 and original_shape.nbDims != slopes.ndimension()) {
+               if (slopes.ndimension() == 1 && original_shape.nbDims != slopes.ndimension()) {
                  std::vector<int64_t> slopes_new_shape(original_shape.nbDims, 1);
                  auto first_inputs_allowed_formats = ctx->net->getInput(0)->getAllowedFormats();
                  for (size_t inputs_index = 1; inputs_index < ctx->num_inputs; inputs_index++) {

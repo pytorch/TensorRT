@@ -34,11 +34,22 @@ cc_binary(
 )
 
 cc_binary(
-    name = "torch_tensorrt.dll",
+    name = "torchtrt.dll",
     srcs = [],
     linkshared = True,
     linkstatic = True,
     deps = [
         "//cpp:torch_tensorrt",
+    ],
+)
+
+cc_binary(
+    name = "torchtrt_runtime.dll",
+    srcs = [],
+    linkshared = True,
+    linkstatic = True,
+    deps = [
+        "//core/plugins:torch_tensorrt_plugins",
+        "//core/runtime",
     ],
 )

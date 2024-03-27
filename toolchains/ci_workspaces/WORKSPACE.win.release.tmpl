@@ -36,54 +36,58 @@ http_archive(
 # External dependency for torch_tensorrt if you already have precompiled binaries.
 local_repository(
     name = "torch_tensorrt",
-    path = "/opt/conda/lib/python3.8/site-packages/torch_tensorrt",
+    path = "/opt/circleci/.pyenv/versions/3.10.9/lib/python3.10/site-packages/torch_tensorrt"
 )
 
 # CUDA should be installed on the system locally
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",
-    path = "C:/CUDA/v12.1",
+    path = "${CUDA_HOME}",
+)
+
+new_local_repository(
+    name = "cublas",
+    build_file = "@//third_party/cublas:BUILD",
+    path = "C:/",
+)
+#############################################################################################################
+# Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
+#############################################################################################################
+
+http_archive(
+    name = "libtorch",
+    build_file = "@//third_party/libtorch:BUILD",
+    strip_prefix = "libtorch",
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
+)
+
+http_archive(
+    name = "libtorch_pre_cxx11_abi",
+    build_file = "@//third_party/libtorch:BUILD",
+    strip_prefix = "libtorch",
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-shared-with-deps-latest.zip"],
 )
 
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
 ####################################################################################
 
-# NOTE: In the case you are using just the pre-cxx11-abi path or just the cxx11 abi path
-# with your local libtorch, just point deps at the same path to satisfy bazel.
-
-# NOTE: NVIDIA's aarch64 PyTorch (python) wheel file uses the CXX11 ABI unlike PyTorch's standard
-# x86_64 python distribution. If using NVIDIA's version just point to the root of the package
-# for both versions here and do not use --config=pre-cxx11-abi
-
-new_local_repository(
-    name = "libtorch",
-    build_file = "third_party/libtorch/BUILD",
-    path = "C:/Python311/Lib/site-packages/torch",
-)
-
-new_local_repository(
-    name = "libtorch_pre_cxx11_abi",
-    build_file = "third_party/libtorch/BUILD",
-    path = "C:/Python311/Lib/site-packages/torch",
-)
-
 new_local_repository(
     name = "cudnn",
-    build_file = "@//third_party/cudnn/local:BUILD",
-    path = "C:/cudnn-windows-x86_64-8.9.7.29_cuda12-archive",
+    path = "C:/",
+    build_file = "@//third_party/cudnn/local:BUILD"
 )
 
 new_local_repository(
-    name = "tensorrt",
-    build_file = "@//third_party/tensorrt/local:BUILD",
-    path = "C:/TensorRT-8.6.1.6",
+   name = "tensorrt",
+   path = "C:/",
+   build_file = "@//third_party/tensorrt/local:BUILD"
 )
 
-#########################################################################
-# Development Dependencies (optional - comment out on aarch64)
-#########################################################################
+# #########################################################################
+# # Testing Dependencies (optional - comment out on aarch64)
+# #########################################################################
 
 load("@rules_python//python:pip.bzl", "pip_parse")
 
