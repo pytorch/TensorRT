@@ -7,7 +7,8 @@ python -c "import torch; print('IMPORTED TORCH 2')"
 python -m pip install tensorrt==9.3.0.post12.dev1 tensorrt_libs==9.3.0.post12.dev1 tensorrt_bindings==9.3.0.post12.dev1
 python -c "import torch; print('IMPORTED TORCH 3')"
 choco install bazelisk -y
+pwd
 cat toolchains/ci_workspaces/WORKSPACE.win.release.tmpl | envsubst > WORKSPACE
 
-curl -o cuda_12.1.0_531.14_windows.exe https://developer.download.nvidia.com/compute/cuda/12.1.0/local_installers/cuda_12.1.0_531.14_windows.exe
-cuda_12.1.0_531.14_windows.exe -s nvcc_12.1 Display.Driver -n
+curl -o cuda_12.1.0_windows_network.exe https://developer.download.nvidia.com/compute/cuda/12.1.0/network_installers/cuda_12.1.0_windows_network.exe
+./cuda_12.1.0_windows_network.exe -s nvcc_12.1 Display.Driver -n
