@@ -34,11 +34,8 @@ c10::IValue dynamic_size_layer(ConversionCtx* ctx, const torch::jit::Node* n, kw
   auto in = args.at(n->input(0)).ITensorOrFreeze(ctx);
   auto input_dims = in->getDimensions();
   LOG_DEBUG("Input dimensions: " << input_dims);
-
-  auto shape_layer = ctx->net->addShape(*in);
-  TORCHTRT_CHECK(shape_layer, "Unable to create shape layer from node: " << *n);
-  auto shape_1d_tensor = shape_layer->getOutput(0);
-
+  nvinfer1::ITensor* shape_1d_tensor = torch_tensorrt::core::conversion::converters::getShapeOutput(
+      ctx, in, std::string(util::node_info(n) + "_dynamic_shape_layer_cast").c_str());
   if (n->inputs().size() != 1) {
     auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
     auto dim = args.at(n->input(1)).unwrapToInt();
@@ -423,13 +420,12 @@ c10::optional<torch::jit::IValue> newTensorLikeImplementation(
     // broadcast constant to output shape
     std::vector<int64_t> start_vec(self->getDimensions().nbDims, 0);
     auto start_offset = util::toDims(c10::IntArrayRef(start_vec));
-    auto shape_layer = ctx->net->addShape(*self);
-    TORCHTRT_CHECK(shape_layer, "Unable to create shape layer from node: " << *n);
-    shape_layer->setName((util::node_info(n) + "_shape").c_str());
+    nvinfer1::ITensor* shape_output = torch_tensorrt::core::conversion::converters::getShapeOutput(
+        ctx, self, std::string(util::node_info(n) + "_shape").c_str());
     // slice implements expand
     auto slice_layer = ctx->net->addSlice(*constant_itensor, start_offset, self->getDimensions(), start_offset);
     TORCHTRT_CHECK(slice_layer, "Unable to create slice layer from node: " << *n);
-    slice_layer->setInput(2, *shape_layer->getOutput(0));
+    slice_layer->setInput(2, *shape_output);
     slice_layer->setName((util::node_info(n) + "_slice").c_str());
     auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], slice_layer->getOutput(0));
     LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());

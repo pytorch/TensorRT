@@ -2,6 +2,7 @@
 #include "pybind11/stl.h"
 
 #include "ATen/core/jit_type.h"
+#include "NvInferRuntimeBase.h"
 #include "Python.h"
 #include "core/compiler.h"
 #include "core/conversion/conversion.h"
@@ -76,6 +77,10 @@ class pyIInt8Calibrator : public pyCalibratorTrampoline<nvinfer1::IInt8Calibrato
  public:
   using Derived = pyCalibratorTrampoline<nvinfer1::IInt8Calibrator>;
   using Derived::Derived;
+
+  nvinfer1::InterfaceInfo getInterfaceInfo() const noexcept override {
+    return nvinfer1::InterfaceInfo{"PYTHON CALIBRATOR", 1, 0};
+  }
 
   nvinfer1::CalibrationAlgoType getAlgorithm() noexcept override {
     try {

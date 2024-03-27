@@ -53,7 +53,7 @@ def constant_padNd(
     )
     value_const = get_trt_tensor(ctx, value, f"{name}_value", input.dtype)
     layer.set_input(4, value_const)
-    layer.mode = trt.SliceMode.FILL
+    layer.mode = trt.SampleMode.FILL
 
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
@@ -91,7 +91,7 @@ def reflection_padNd(
         shape=tuple(new_shape),
         stride=tuple(stride_list),
     )
-    layer.mode = trt.SliceMode.REFLECT
+    layer.mode = trt.SampleMode.REFLECT
 
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
@@ -129,7 +129,7 @@ def replication_padNd(
         shape=tuple(new_shape),
         stride=tuple(stride_list),
     )
-    layer.mode = trt.SliceMode.CLAMP
+    layer.mode = trt.SampleMode.CLAMP
 
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
@@ -167,7 +167,7 @@ def circular_padNd(
         shape=tuple(new_shape),
         stride=tuple(stride_list),
     )
-    layer.mode = trt.SliceMode.WRAP
+    layer.mode = trt.SampleMode.WRAP
 
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)

@@ -1,8 +1,8 @@
 import operator
 import warnings
+from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
-from enum import Enum, auto
 import numpy as np
 
 # @manual=//deeplearning/trt/python:py_tensorrt
@@ -20,7 +20,7 @@ from ..types import (
     TRTPluginFieldCollection,
     TRTTensor,
 )
-from ..utils import unified_dtype_converter, Frameworks
+from ..utils import Frameworks, unified_dtype_converter
 
 
 class SourceIR(Enum):
@@ -351,13 +351,17 @@ def prepend_ones(
     # compute the final shape.
     if has_dynamic_shape(tensor.shape):
         tensor_shape_layer = network.add_shape(tensor)
+        tensor_shape = tensor_shape_layer.get_output(0)
+        tensor_shape = type_cast(
+            network, "shape", name + "shape_casted", tensor_shape, trt.int32
+        )
         tensor_shape_layer.name = f"{name}_broadcast_orig_shape"
         prepend_shape_layer = network.add_constant(
             (num_prepend_ones,), np.ones((num_prepend_ones,), dtype=np.int32)
         )
         prepend_shape_layer.name = f"{name}_broadcast_prepend_ones"
         reshape_dim_layer = network.add_concatenation(
-            [prepend_shape_layer.get_output(0), tensor_shape_layer.get_output(0)]
+            [prepend_shape_layer.get_output(0), tensor_shape]
         )
         reshape_dim_layer.axis = 0
         reshape_dim_layer.name = f"{name}_broadcast_final_shape"

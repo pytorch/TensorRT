@@ -62,6 +62,9 @@ nvinfer1::ITensor* castITensor(
     nvinfer1::DataType dtype,
     const std::string& layer_name_prefix = "");
 
+// Get the shape of the input tensor and cast it to INT32 type
+nvinfer1::ITensor* getShapeOutput(ConversionCtx* ctx, nvinfer1::ITensor* input_tensor, const std::string& name = "");
+
 // Freeze an at::Tensor in a IConstant layer
 nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t, const std::string& name = std::string());
 

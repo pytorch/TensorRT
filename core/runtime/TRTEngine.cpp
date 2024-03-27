@@ -120,16 +120,25 @@ TRTEngine::TRTEngine(
   } else {
     uint64_t inputs_size = _in_binding_names.size();
     in_binding_names.resize(inputs_size);
-    for (size_t pyt_idx = 0; pyt_idx < inputs_size; pyt_idx++) {
+    for (uint64_t pyt_idx = 0; pyt_idx < inputs_size; pyt_idx++) {
       auto binding_name = _in_binding_names[pyt_idx];
-      auto trt_idx = cuda_engine->getBindingIndex(binding_name.c_str());
-      std::string engine_binded_name = cuda_engine->getIOTensorName(trt_idx);
+      // Check if the binding name provided is in the list of engine's bindings
+      // by iterating through nbIOTensors and verify it is an input binding
+      bool is_binding = false, is_input = false;
+      int32_t trt_idx;
+      for (int32_t idx = 0; idx < cuda_engine->getNbIOTensors(); idx++) {
+        std::string curr_bind_name = cuda_engine->getIOTensorName(idx);
+        if (curr_bind_name == binding_name) {
+          is_binding = true;
+          trt_idx = idx;
+          if (cuda_engine->getTensorIOMode(binding_name.c_str()) == nvinfer1::TensorIOMode::kINPUT) {
+            is_input = true;
+          }
+        }
+      }
+      TORCHTRT_CHECK(is_binding, "Could not find a TensorRT engine binding for input named " << binding_name);
       TORCHTRT_CHECK(
-          (binding_name == engine_binded_name),
-          "Could not find a TensorRT engine binding for input named " << binding_name);
-      TORCHTRT_CHECK(
-          (cuda_engine->getTensorIOMode(binding_name.c_str()) == nvinfer1::TensorIOMode::kINPUT),
-          "Binding " << binding_name << " specified as input but found as output in TensorRT engine");
+          is_input, "Binding " << binding_name << " specified as input but found as output in TensorRT engine");
       LOG_DEBUG(
           "Input binding name: " << binding_name << " has TensorRT binding index: " << trt_idx
                                  << ", Torch binding index: " << pyt_idx);
@@ -141,11 +150,25 @@ TRTEngine::TRTEngine(
     out_binding_names.resize(outputs);
     for (size_t pyt_idx = 0; pyt_idx < outputs; pyt_idx++) {
       auto binding_name = _out_binding_names[pyt_idx];
-      auto trt_idx = cuda_engine->getBindingIndex(binding_name.c_str());
-      TORCHTRT_CHECK((trt_idx != -1), "Could not find a TensorRT engine binding for output named " << binding_name);
+      // Check if the binding name provided is in the list of engine's bindings
+      // by iterating through nbIOTensors and verify it is an output binding
+      bool is_binding = false, is_output = false;
+      int32_t trt_idx;
+      for (int32_t idx = 0; idx < cuda_engine->getNbIOTensors(); idx++) {
+        std::string curr_bind_name = cuda_engine->getIOTensorName(idx);
+        if (curr_bind_name == binding_name) {
+          is_binding = true;
+          trt_idx = idx;
+          if (cuda_engine->getTensorIOMode(binding_name.c_str()) == nvinfer1::TensorIOMode::kOUTPUT) {
+            is_output = true;
+          }
+        }
+      }
+
+      TORCHTRT_CHECK(is_binding, "Could not find a TensorRT engine binding for output named " << binding_name);
       TORCHTRT_CHECK(
-          !(cuda_engine->getTensorIOMode(binding_name.c_str()) == nvinfer1::TensorIOMode::kINPUT),
-          "Binding " << binding_name << " specified as output but found as input in TensorRT engine");
+          is_output, "Binding " << binding_name << " specified as output but found as input in TensorRT engine");
+
       LOG_DEBUG(
           "Output binding name: " << binding_name << " has TensorRT binding index: " << trt_idx
                                   << ", Torch binding index: " << inputs_size + pyt_idx);

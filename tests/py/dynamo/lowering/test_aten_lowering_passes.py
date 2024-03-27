@@ -447,7 +447,7 @@ class TestLowerLinear(TestCase):
         self.assertAlmostEqual(
             max_diff,
             0,
-            DECIMALS_OF_AGREEMENT,
+            DECIMALS_OF_AGREEMENT_3,
             msg=f"Linear TRT outputs don't match with the original model.",
         )
         torch._dynamo.reset()

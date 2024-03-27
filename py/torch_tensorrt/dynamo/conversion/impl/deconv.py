@@ -63,7 +63,7 @@ def deconvNd(
         )
 
     # Process weight terms
-    if ctx.net.has_explicit_precision or isinstance(weight, TRTTensor):
+    if isinstance(weight, TRTTensor):
         weight = get_trt_tensor(ctx, weight, f"{name}_weight")
         # Append new dimension (unsqueeze) if the deconvolution is 1d
         if is_deconv1d:

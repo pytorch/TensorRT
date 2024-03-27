@@ -40,22 +40,29 @@ auto linear_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pat
          in = in_shuffle->getOutput(0);
        }
 
-       auto w_tensor = args[1].IValue()->toTensor();
-       Weights w = Weights(ctx, w_tensor);
+       // Convert w_tensor to ITensor and broadcast 2d to 4d if needed
+       auto weight = args[1].IValue()->toTensor();
+       auto weight_tensor = tensor_to_const(ctx, weight, util::node_info(n) + "_weight");
+       auto weight_shape = util::toVec(weight_tensor->getDimensions());
+       weight_tensor = addPadding(ctx, n, weight_tensor, in->getDimensions().nbDims, false, false);
 
-       nvinfer1::ILayer* new_layer;
+       auto mm_layer = ctx->net->addMatrixMultiply(
+           *in, nvinfer1::MatrixOperation::kNONE, *weight_tensor, nvinfer1::MatrixOperation::kTRANSPOSE);
+
+       TORCHTRT_CHECK(mm_layer, "Unable to create linear layer from node: " << *n);
+       mm_layer->setName(util::node_info(n).c_str());
+
+       auto mm_output = mm_layer->getOutput(0);
+
        if (!args[2].IValue()->isNone()) {
-         Weights b(ctx, args[2].IValue()->toTensor());
-         new_layer = ctx->net->addFullyConnected(*in, w.num_output_maps, w.data, b.data);
-       } else {
-         LOG_DEBUG("There is no bias for the linear layer");
-         new_layer = ctx->net->addFullyConnected(*in, w.num_output_maps, w.data, Weights().data);
+         // Convert bias to ITensor
+         auto bias = args[2].IValue()->toTensor();
+         auto bias_tensor = tensor_to_const(ctx, bias, util::node_info(n) + "_bias");
+         auto bias_add_layer = add_elementwise(
+             ctx, nvinfer1::ElementWiseOperation::kSUM, mm_output, bias_tensor, util::node_info(n) + "_bias_add");
+         mm_output = bias_add_layer->getOutput(0);
        }
-
-       TORCHTRT_CHECK(new_layer, "Unable to create linear layer from node: " << *n);
-
-       new_layer->setName(util::node_info(n).c_str());
-       auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+       auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mm_output);
 
        LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
 

@@ -634,7 +634,7 @@ def convert_module_to_trt_engine(
     import io
 
     with io.BytesIO() as engine_bytes:
-        engine_bytes.write(interpreter_result.engine.serialize())
+        engine_bytes.write(interpreter_result.engine)
         engine_bytearray = engine_bytes.getvalue()
 
     return engine_bytearray

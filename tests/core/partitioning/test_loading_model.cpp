@@ -7,7 +7,7 @@
 
 #ifndef DISABLE_TEST_IN_CI
 
-TEST(Partitioning, ComputeResNet50FallbackGraphCorrectly) {
+TEST(Partitioning, ComputeConditionalLoadingGraphCorrectly) {
   torch::jit::script::Module mod;
   try {
     mod = torch::jit::load("tests/modules/conditional_scripted.jit.pt");

@@ -3,30 +3,27 @@ import logging
 import math
 import operator
 import warnings
-from typing import cast, Dict, Optional, Sequence, Tuple, Union
+from typing import Dict, Optional, Sequence, Tuple, Union, cast
 
 import numpy as np
 
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
-
-from ..converter_registry import tensorrt_converter
-
-from ..tracer.acc_tracer import acc_ops
-from ..types import *  # noqa: F403
 from torch.fx.immutable_collections import immutable_list
 from torch.fx.node import Argument, Target
-
-from ..utils import get_dynamic_dims, unified_dtype_converter, Frameworks
-
-from .converter_utils import *  # noqa: F403
+from torch_tensorrt.fx.converters.impl import activation, convolution
 from torch_tensorrt.fx.passes.lower_basic_pass import (
     trt_transposed_linear,
     trt_transposed_matmul,
 )
 from torch_tensorrt.fx.tracer.acc_tracer.acc_ops import contiguous
-from torch_tensorrt.fx.converters.impl import activation, convolution
+
+from ..converter_registry import tensorrt_converter
+from ..tracer.acc_tracer import acc_ops
+from ..types import *  # noqa: F403
+from ..utils import Frameworks, get_dynamic_dims, unified_dtype_converter
+from .converter_utils import *  # noqa: F403
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -323,7 +320,7 @@ def acc_ops_pad_with_slice_layer(
     )
 
     layer.set_input(4, value_const)
-    layer.mode = trt.SliceMode.FILL
+    layer.mode = trt.SampleMode.FILL
     set_layer_name(layer, target, name)
 
     return layer.get_output(0)
@@ -840,7 +837,7 @@ def acc_ops_tile(
         shapes = [1] * len(dims)
     strides = [1] * len(dims)
     layer = network.add_slice(input_val, starts, shapes, strides)
-    layer.mode = trt.SliceMode.WRAP
+    layer.mode = trt.SampleMode.WRAP
     set_layer_name(layer, target, name)
 
     if has_dynamic_shape(input_val.shape):  # type: ignore[union-attr]
@@ -3536,9 +3533,9 @@ def acc_ops_interpolate(
                 layer.scales = [1, 1] + list(scale_factor)
 
     if mode.lower() in ["linear", "bilinear", "trilinear"]:
-        layer.resize_mode = trt.ResizeMode.LINEAR
+        layer.resize_mode = trt.InterpolationMode.LINEAR
     else:
-        layer.resize_mode = trt.ResizeMode.NEAREST
+        layer.resize_mode = trt.InterpolationMode.NEAREST
 
     if (align_corners is not None) and align_corners:
         layer.coordinate_transformation = (

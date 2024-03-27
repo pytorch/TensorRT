@@ -8,11 +8,14 @@ import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.converter_utils import to_numpy
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
 )
-from torch_tensorrt.fx.converters.converter_utils import set_layer_name
+from torch_tensorrt.fx.converters.converter_utils import (
+    Frameworks,
+    set_layer_name,
+    unified_dtype_converter,
+)
 from torch_tensorrt.fx.types import TRTTensor
 
 
@@ -48,16 +51,17 @@ def get_shape_with_dynamic_shape(
     """
     # Ger real shape info for input_val
     input_shape = ctx.net.add_shape(input_val).get_output(0)
-
+    # input_shape.dtype is int64 in TRT 10.0
+    input_np_dtype = unified_dtype_converter(input_shape.dtype, Frameworks.NUMPY)
     scale_layer = ctx.net.add_constant(
-        input_shape.shape, np.ascontiguousarray(shape, dtype=np.int32)
+        input_shape.shape, np.ascontiguousarray(shape, dtype=input_np_dtype)
     )
     set_layer_name(scale_layer, target, f"{name}_scale")
     scale_res = scale_layer.get_output(0)
 
     length = input_shape.shape[0]
     zero_layer = ctx.net.add_constant(
-        input_shape.shape, to_numpy(torch.zeros((length), dtype=torch.int32))
+        input_shape.shape, np.zeros(length, dtype=input_np_dtype)
     )
     set_layer_name(zero_layer, target, f"{name}_zeros")
 

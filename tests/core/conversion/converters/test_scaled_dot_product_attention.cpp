@@ -10,8 +10,9 @@ TEST(Converters, ATenScaledDotProductAttentionConvertsCorrectly) {
       graph(%query : Tensor, %key : Tensor, %value : Tensor):
         %none : NoneType = prim::Constant()
         %0 : float = prim::Constant[value=0.]()
+        %scale : float = prim::Constant[value=1.]()
         %false : bool = prim::Constant[value=0]()
-        %3 : Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %none, %0, %false)
+        %3 : Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %none, %0, %false, %scale)
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -36,7 +37,8 @@ TEST(Converters, ATenScaledDotProductAttnMaskFloatConvertsCorrectly) {
       graph(%query : Tensor, %key : Tensor, %value : Tensor, %attn_mask : Tensor):
         %0 : float = prim::Constant[value=0.]()
         %false : bool = prim::Constant[value=0]()
-        %3 : Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %attn_mask, %0, %false)
+        %scale : float = prim::Constant[value=1.]()
+        %3 : Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %attn_mask, %0, %false, %scale)
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -62,7 +64,8 @@ TEST(Converters, ATenScaledDotProductAttnMaskBoolConvertsCorrectly) {
       graph(%query : Tensor, %key : Tensor, %value : Tensor, %attn_mask : Tensor):
         %0 : float = prim::Constant[value=0.]()
         %false : bool = prim::Constant[value=0]()
-        %3 : Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %attn_mask, %0, %false)
+        %scale : float = prim::Constant[value=1.]()
+        %3 : Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %attn_mask, %0, %false, %scale)
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();

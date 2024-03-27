@@ -66,7 +66,7 @@ def roll(
             shape=shape,
             stride=stride,
         )
-        layer.mode = trt.SliceMode.WRAP
+        layer.mode = trt.SampleMode.WRAP
         set_layer_name(layer, target, f"{name}_slice_wrap", source_ir)
         return layer.get_output(0)
 
@@ -83,7 +83,7 @@ def roll(
             shape=flatten_shape,
             stride=stride,
         )
-        layer.mode = trt.SliceMode.WRAP
+        layer.mode = trt.SampleMode.WRAP
         set_layer_name(layer, target, f"{name}_slice_wrap", source_ir)
         output = layer.get_output(0)
         output = impl.shuffle.reshape(

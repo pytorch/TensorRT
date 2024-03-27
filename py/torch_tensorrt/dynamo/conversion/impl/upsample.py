@@ -29,14 +29,14 @@ def upsample(
         resize_layer.scales = [1.0, 1.0] + list(scale_factors)
     else:
         raise RuntimeError(
-            f"At least one of out_shape and scale_factors should be specified."
+            "At least one of out_shape and scale_factors should be specified."
         )
 
     # interpolate mode
     if resize_mode == "nearest" or None:
-        resize_layer.resize_mode = trt.ResizeMode.NEAREST
+        resize_layer.resize_mode = trt.InterpolationMode.NEAREST
     elif resize_mode == "bilinear":
-        resize_layer.resize_mode = trt.ResizeMode.LINEAR
+        resize_layer.resize_mode = trt.InterpolationMode.LINEAR
         if align_corners is None or not align_corners:
             raise RuntimeError(
                 f"Interpolation works differently is align_corners is False for {resize_mode} mode in PyTorch and TensorRT."

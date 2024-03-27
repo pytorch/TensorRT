@@ -87,8 +87,9 @@ def convert_module(
         from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
         with io.BytesIO() as engine_bytes:
-            engine_bytes.write(interpreter_result.engine.serialize())
+            engine_bytes.write(interpreter_result.engine)
             engine_str = engine_bytes.getvalue()
+
         return TorchTensorRTModule(
             serialized_engine=engine_str,
             name=name,

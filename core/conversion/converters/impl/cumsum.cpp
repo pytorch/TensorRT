@@ -36,7 +36,7 @@ auto cumsum_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pat
          torch::Tensor axis = torch::tensor(input_dims.d[dim], torch::kInt32);
          tripLimit = tensor_to_const(ctx, axis);
        } else {
-         nvinfer1::ITensor* inpShape = ctx->net->addShape(*in)->getOutput(0);
+         nvinfer1::ITensor* inpShape = getShapeOutput(ctx, in);
          torch::Tensor dimValue = torch::tensor(dim, torch::kInt32);
          nvinfer1::ITensor* axis = tensor_to_const(ctx, dimValue);
          tripLimit = ctx->net->addGather(*inpShape, *axis, 0)->getOutput(0);
