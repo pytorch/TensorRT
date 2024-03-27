@@ -293,8 +293,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     TORCHTRT_CHECK(conv, "Unable to create convolution layer from node: " << *n);
     conv->setStrideNd(stride);
     conv->setPaddingMode(nvinfer1::PaddingMode::kEXPLICIT_ROUND_DOWN);
-    conv->setPrePadding(padding);
-    conv->setPostPadding(padding);
+    conv->setPaddingNd(padding);
     conv->setDilationNd(dilation);
     conv->setNbGroups(groups);
     new_layer = conv;
