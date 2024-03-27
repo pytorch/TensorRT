@@ -56,7 +56,7 @@ on:
         type: string
       gpu-arch-type:
         description: "GPU arch type to use"
-        default: "cpu"
+        default: "cuda"
         type: string
       gpu-arch-version:
         description: "GPU arch version to use"
