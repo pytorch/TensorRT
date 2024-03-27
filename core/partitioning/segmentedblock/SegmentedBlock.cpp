@@ -46,6 +46,12 @@ torch::jit::Value* SegmentedBlock::getOrAddInputForValue(torch::jit::Value* old_
       old_to_new_[old_value] = new_const->output();
       return new_const->output();
     }
+    if (node->kind() == torch::jit::prim::Uninitialized) {
+      auto new_uninitialized = g_->createUninitialized(old_value->type());
+      g_->block()->prependNode(new_uninitialized);
+      old_to_new_[old_value] = new_uninitialized->output();
+      return new_uninitialized->output();
+    }
     auto new_value = g_->block()->addInput();
     // every time when we addInput, we push back the corresponding lowering graph torch::jit::Value to our raw_inputs
     inputs_.push_back(old_value);
