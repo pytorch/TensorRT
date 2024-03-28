@@ -59,6 +59,7 @@ cc_library(
         "//conditions:default": [
         ] + glob(
             [
+	        "x86_64-linux-gnu/include/NvInfer.h",
                 "x86_64-linux-gnu/include/NvInfer*.h",
             ],
             exclude = [

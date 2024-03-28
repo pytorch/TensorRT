@@ -88,6 +88,16 @@ new_local_repository(
 #     ],
 # )
 
+http_archive(
+    name = "tensorrt",
+    build_file = "@//third_party/tensorrt/archive:BUILD",
+    sha256 = "3dd505a9e0d0adf9257080b543f51d91df736dbd1f75417b9dde1a7b7a5d87f2",
+    strip_prefix = "TensorRT-9.2.0.5",
+    urls = [
+        "http://cuda-repo.nvidia.com/release-candidates/Libraries/TensorRT/v9.2/9.2.0.5-f370751d/12.2-r535/Linux-x64-agnostic/tar/TensorRT-9.2.0.5.Linux.x86_64-gnu.cuda-12.2.tar.gz",
+    ],
+)
+
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
 ####################################################################################
@@ -117,11 +127,11 @@ new_local_repository(
    build_file = "@//third_party/cudnn/local:BUILD"
 )
 
-new_local_repository(
-  name = "tensorrt",
-  path = "/usr/local/tensorrt/targets/",
-  build_file = "@//third_party/tensorrt/local:BUILD"
-)
+# new_local_repository(
+#   name = "tensorrt",
+#   path = "/usr/local/tensorrt/targets/",
+#   build_file = "@//third_party/tensorrt/local:BUILD"
+# )
 
 #########################################################################
 # Development Dependencies (optional - comment out on aarch64)
