@@ -832,6 +832,58 @@ auto select_registrations TORCHTRT_UNUSED =
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
                LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
                return true;
+             }})
+        .pattern(
+            {"aten::flip(Tensor self, int[] dims) -> Tensor",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto self = args[0].ITensorOrFreeze(ctx);
+               auto dims = args[1].unwrapToIntList().vec();
+               auto ndims = self->getDimensions().nbDims;
+               for (auto& dim : dims) {
+                 dim = dim < 0 ? ndims + dim : dim;
+               }
+               auto dims_mask = std::vector(ndims, 0);
+               auto steps = std::vector(ndims, 1);
+               for (auto& dim : dims) {
+                 dims_mask[dim] = 1;
+                 steps[dim] = -1;
+               }
+               auto dims_mask_tensor = tensor_to_const(ctx, torch::tensor(dims_mask, torch::kInt32));
+               auto step_tensor = tensor_to_const(ctx, torch::tensor(steps, torch::kInt32));
+
+               auto self_shape_layer = ctx->net->addShape(*self);
+               TORCHTRT_CHECK(self_shape_layer, "Unable to create shape layer from node: " << util::node_info(n));
+               self_shape_layer->setName((util::node_info(n) + "_shape").c_str());
+               auto self_shape = self_shape_layer->getOutput(0);
+
+               // For dims we're flipping set start to size - 1
+               auto start_layer = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kPROD,
+                   self_shape,
+                   dims_mask_tensor,
+                   util::node_info(n) + "_start");
+               auto start_tensor = start_layer->getOutput(0);
+               auto start_adjust = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kSUB,
+                   start_tensor,
+                   dims_mask_tensor,
+                   util::node_info(n) + "_start_adjust");
+               start_tensor = start_adjust->getOutput(0);
+
+               // all args after slice are placeholders that will be replaced with dynamic tensors
+               auto slice_layer =
+                   ctx->net->addSlice(*self, self->getDimensions(), self->getDimensions(), self->getDimensions());
+               TORCHTRT_CHECK(slice_layer, "Unable to create slice layer from node: " << util::node_info(n));
+               slice_layer->setName((util::node_info(n) + "_slice").c_str());
+               slice_layer->setInput(1, *start_tensor);
+               slice_layer->setInput(2, *self_shape);
+               slice_layer->setInput(3, *step_tensor);
+               auto slice_out = slice_layer->getOutput(0);
+               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], slice_out);
+               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+               return true;
              }});
 
 } // namespace
