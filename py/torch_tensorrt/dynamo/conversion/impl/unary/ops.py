@@ -67,10 +67,7 @@ def expm1(
     # Compute e^x for each element of the input tensor
     exp_result = exp(ctx, target, source_ir, f"{name}_exp", input_val)
 
-    # # Subtract 1 from the result of the exponential operation
-    # expm1_result = sub(ctx, target, source_ir, f"{name}_sub", exp_result, 1)
-
-    return impl.elementwise.sub(ctx, target, source_ir, f"{name}_div", exp_result, 1)
+    return impl.elementwise.sub(ctx, target, source_ir, f"{name}_sub", exp_result, 1)
 
 
 def log(
