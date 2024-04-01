@@ -518,7 +518,7 @@ def isnan(
     input: TRTTensor,
 ) -> TRTTensor:
     # False for NaN elements since NaN is not equal to anything, including itself.
-    equality_result = impl.elementwise.ops.eq(
+    equality_result = impl.elementwise.eq(
         ctx, target, source_ir, f"{name}_eq_nan", input, input
     )
 
