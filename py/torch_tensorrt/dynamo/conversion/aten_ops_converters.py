@@ -2798,7 +2798,7 @@ def aten_ops_index_select(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.index.index_select(
+    return impl.select.index_select(
         ctx,
         target,
         SourceIR.ATEN,

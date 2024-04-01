@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
-from harness import DispatchTestCase
-from parameterized import param, parameterized
+from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt import Input
+
+from .harness import DispatchTestCase
 
 
 class TestIndexSelectConverter(DispatchTestCase):
@@ -12,8 +12,11 @@ class TestIndexSelectConverter(DispatchTestCase):
             ("1d_input", (10,), 0, (1,)),
             ("2d_input_dim_0", (10, 3), 0, (0, 2)),
             ("2d_input_dim_1", (5, 10), 1, (1, 2, 3)),
+            ("2d_input_dim_-2", (5, 10), -2, (1, 2, 3)),
             ("3d_input_dim_0", (10, 5, 10), 0, (0, 5)),
             ("3d_input_dim_2", (10, 5, 10), 2, (3, 3, 4)),
+            ("3d_input_dim_-1", (10, 5, 10), -1, (3, 3, 4)),
+            ("3d_input_dim_-3", (10, 5, 10), -3, (5, 3, 4)),
         ]
     )
     def test_index_select(self, _, source_shape, dim, indices_val):
