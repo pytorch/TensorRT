@@ -74,6 +74,14 @@ def convert_module(
     """
     interpreter_result = interpret_module_to_result(module, inputs, settings)
 
+    if torch.distributed.is_initialized():
+        rank = torch.distributed.get_rank()
+    else:
+        rank = 0
+    print(f"Generating engine for rank: {rank}")
+    with open("engine-rank-" + str(rank) + ".engine", "wb") as f:
+        f.write(interpreter_result.engine.serialize())
+
     if settings.use_python_runtime:
         return PythonTorchTensorRTModule(
             engine=interpreter_result.engine,
