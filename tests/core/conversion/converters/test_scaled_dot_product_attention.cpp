@@ -10,7 +10,7 @@ TEST(Converters, ATenScaledDotProductAttentionConvertsCorrectly) {
       graph(%query : Tensor, %key : Tensor, %value : Tensor):
         %none : NoneType = prim::Constant()
         %0 : float = prim::Constant[value=0.]()
-        %scale : float = prim::Constant[value=1.]()
+        %scale : NoneType = prim::Constant()
         %false : bool = prim::Constant[value=0]()
         %3 : Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %none, %0, %false, %scale)
         return (%3))IR";
@@ -37,7 +37,7 @@ TEST(Converters, ATenScaledDotProductAttnMaskFloatConvertsCorrectly) {
       graph(%query : Tensor, %key : Tensor, %value : Tensor, %attn_mask : Tensor):
         %0 : float = prim::Constant[value=0.]()
         %false : bool = prim::Constant[value=0]()
-        %scale : float = prim::Constant[value=1.]()
+        %scale : NoneType = prim::Constant()
         %3 : Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %attn_mask, %0, %false, %scale)
         return (%3))IR";
 
@@ -64,7 +64,7 @@ TEST(Converters, ATenScaledDotProductAttnMaskBoolConvertsCorrectly) {
       graph(%query : Tensor, %key : Tensor, %value : Tensor, %attn_mask : Tensor):
         %0 : float = prim::Constant[value=0.]()
         %false : bool = prim::Constant[value=0]()
-        %scale : float = prim::Constant[value=1.]()
+        %scale : NoneType = prim::Constant()
         %3 : Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %attn_mask, %0, %false, %scale)
         return (%3))IR";
 
