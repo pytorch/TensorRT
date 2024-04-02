@@ -104,7 +104,6 @@ cc_library(
         "nvinfer_headers",
         "nvinfer_lib",
         "@cuda//:cudart",
-        "@cudnn",
     ],
 )
 
@@ -358,7 +357,6 @@ cc_library(
     deps = [
         "nvinfer",
         "@cuda//:cudart",
-        "@cudnn",
     ],
     alwayslink = True,
 )
