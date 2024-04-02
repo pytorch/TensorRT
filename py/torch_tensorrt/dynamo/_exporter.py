@@ -48,22 +48,25 @@ def transform(
 
     Returns an inlined torch.fx.GraphModule
     """
-    gm_export = copy.deepcopy(gm)
+    # Make a copy the graph since this function transforms the input graph and changes it's attributes.
+    # This transformed graph is meant to be consumed by `create_trt_exp_program`
+    gm = copy.deepcopy(gm)
+
     # Run shape analysis
-    _, outputs_map = partitioning.run_shape_analysis(gm_export, inputs)
+    _, outputs_map = partitioning.run_shape_analysis(gm, inputs)
 
     # Inline TensorRT submodules
-    inline_trt_modules(gm_export, outputs_map)
+    inline_trt_modules(gm, outputs_map)
 
     # Inline pytorch submodules
-    inline_torch_modules(gm_export)
+    inline_torch_modules(gm)
 
     # Clean the graph
-    gm_export.delete_all_unused_submodules()
-    gm_export.graph.eliminate_dead_code()
-    gm_export.graph.lint()
+    gm.delete_all_unused_submodules()
+    gm.graph.eliminate_dead_code()
+    gm.graph.lint()
 
-    return gm_export
+    return gm
 
 
 def lift(
