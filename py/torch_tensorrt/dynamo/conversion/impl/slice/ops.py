@@ -98,10 +98,7 @@ def expand(
     stride = tuple(
         [int(i == o) for i, o in zip(input_tensor_shape, shape)]
     )  # stride == 1 if dimensions match, 0 otherwise
-    # layer = ctx.net.add_slice(input_t, start=start, shape=shape, stride=stride)
 
-    # set_layer_name(layer, target, name, source_ir)
-    # return layer.get_output(0)
     expand_output = slice(ctx, target, source_ir, name, input_t, start, shape, stride)
     return expand_output
 

@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 @td.register_backend(name="tensorrt")  # type: ignore[misc]
 @td.register_backend(name="torch_tensorrt")  # type: ignore[misc]
 def torch_tensorrt_backend(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor], **kwargs: Any
+    gm: torch.fx.GraphModule, sample_inputs: Sequence[Any], **kwargs: Any
 ) -> torch.nn.Module:
     # Set log level at the top of compilation (torch_tensorrt.dynamo)
     if (
@@ -45,7 +45,7 @@ def torch_tensorrt_backend(
 
 @td.register_backend(name="aot_torch_tensorrt_aten")  # type: ignore[misc]
 def aot_torch_tensorrt_aten_backend(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor], **kwargs: Any
+    gm: torch.fx.GraphModule, sample_inputs: Sequence[Any], **kwargs: Any
 ) -> torch.nn.Module:
     settings = parse_dynamo_kwargs(kwargs)
     return _pretraced_backend(gm, sample_inputs, settings)
@@ -53,7 +53,7 @@ def aot_torch_tensorrt_aten_backend(
 
 def _pretraced_backend(
     gm: torch.fx.GraphModule,
-    sample_inputs: Sequence[torch.Tensor],
+    sample_inputs: Sequence[Any],
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.fx.GraphModule | Callable[..., Any]:
     """Helper function to manage translation of traced FX module to TRT engines

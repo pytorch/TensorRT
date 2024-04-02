@@ -28,7 +28,6 @@ def view_to_reshape(
 
     # Store metadata of the orig_op
     metadata = get_metadata(gm, orig_op)
-    # breakpoint()
 
     if torch.fx.subgraph_rewriter.replace_pattern(gm, orig, replacement):
         gm = clean_up_graph_after_modifications(gm)
