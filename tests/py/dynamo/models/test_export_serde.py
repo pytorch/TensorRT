@@ -44,8 +44,7 @@ def test_base_full_compile(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
     torchtrt.save(trt_module, "/tmp/trt.ep", inputs=[input])
-    deser_trt_exp_program = torch.export.load("/tmp/trt.ep")
-    deser_trt_module = deser_trt_exp_program.module()
+    deser_trt_module = torchtrt.load("/tmp/trt.ep").module()
     # Check Pyt and TRT exported program outputs
     cos_sim = cosine_similarity(model(input), trt_module(input)[0])
     assertions.assertTrue(
@@ -95,8 +94,7 @@ def test_base_full_compile_multiple_outputs(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
     torchtrt.save(trt_module, "/tmp/trt.ep", inputs=[input])
-    deser_trt_exp_program = torch.export.load("/tmp/trt.ep")
-    deser_trt_module = deser_trt_exp_program.module()
+    deser_trt_module = torchtrt.load("/tmp/trt.ep").module()
     # Check Pyt and TRT exported program outputs
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
@@ -151,8 +149,7 @@ def test_no_compile(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
     torchtrt.save(trt_module, "/tmp/trt.ep", inputs=[input])
-    deser_trt_exp_program = torch.export.load("/tmp/trt.ep")
-    deser_trt_module = deser_trt_exp_program.module()
+    deser_trt_module = torchtrt.load("/tmp/trt.ep").module()
     # Check Pyt and TRT exported program outputs
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
@@ -210,8 +207,7 @@ def test_hybrid_relu_fallback(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
     torchtrt.save(trt_module, "/tmp/trt.ep", inputs=[input])
-    deser_trt_exp_program = torch.export.load("/tmp/trt.ep")
-    deser_trt_module = deser_trt_exp_program.module()
+    deser_trt_module = torchtrt.load("/tmp/trt.ep").module()
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
     for idx in range(len(outputs_pyt)):
@@ -251,8 +247,7 @@ def test_resnet18(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
     torchtrt.save(trt_module, "/tmp/trt.ep", inputs=[input])
-    deser_trt_exp_program = torch.export.load("/tmp/trt.ep")
-    deser_trt_module = deser_trt_exp_program.module()
+    deser_trt_module = torchtrt.load("/tmp/trt.ep").module()
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
     cos_sim = cosine_similarity(outputs_pyt, outputs_trt[0])
@@ -307,8 +302,7 @@ def test_hybrid_conv_fallback(ir):
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
 
     torchtrt.save(trt_module, "/tmp/trt.ep", inputs=[input])
-    deser_trt_exp_program = torch.export.load("/tmp/trt.ep")
-    deser_trt_module = deser_trt_exp_program.module()
+    deser_trt_module = torchtrt.load("/tmp/trt.ep").module()
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
 
@@ -326,3 +320,43 @@ def test_hybrid_conv_fallback(ir):
             cos_sim > COSINE_THRESHOLD,
             msg=f"test_hybrid_conv_fallback deserialized TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
+
+
+@pytest.mark.unit
+def test_save_load_ts(ir):
+    """
+    This tests save/load API on Torchscript format (model still compiled using dynamo workflow)
+    """
+
+    class MyModule(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = torch.nn.Conv2d(3, 16, 3, stride=1, bias=True)
+            self.relu = torch.nn.ReLU()
+
+        def forward(self, x):
+            conv = self.conv(x)
+            relu = self.relu(conv)
+            mul = relu * 0.5
+            return mul
+
+    model = MyModule().eval().cuda()
+    input = torch.randn((1, 3, 224, 224)).to("cuda")
+
+    trt_gm = torchtrt.compile(model, ir=ir, inputs=[input], min_block_size=1)
+    assertions.assertTrue(
+        isinstance(trt_gm, torch.fx.GraphModule),
+        msg=f"test_save_load_ts output type does not match with torch.fx.GraphModule",
+    )
+    outputs_trt = trt_gm(input)
+    # Save it as torchscript representation
+    torchtrt.save(trt_gm, "/tmp/trt.ts", output_format="torchscript", inputs=[input])
+
+    trt_ts_module = torchtrt.load("/tmp/trt.ts")
+    outputs_trt_deser = trt_ts_module(input)
+
+    cos_sim = cosine_similarity(outputs_trt, outputs_trt_deser)
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_save_load_ts TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )

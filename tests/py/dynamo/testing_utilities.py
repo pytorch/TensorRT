@@ -14,7 +14,6 @@ from torch_tensorrt.dynamo.lowering import (
 )
 
 DECIMALS_OF_AGREEMENT = 4
-DECIMALS_OF_AGREEMENT_3 = 3
 
 
 def fx_dynamo_testing_backend(
