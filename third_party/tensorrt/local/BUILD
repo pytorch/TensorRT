@@ -329,7 +329,7 @@ cc_library(
     name = "nvinferplugin",
     srcs = select({
         ":aarch64_linux": ["lib/aarch64-linux-gnu/libnvinfer_plugin.so"],
-        ":ci_rhel_x86_64_linux": ["lib64/libnvinfer_plugin.so"],
+        ":ci_rhel_x86_64_linux": ["lib/libnvinfer_plugin.so"],
         ":windows": ["lib/nvinfer_plugin.dll"],
         "//conditions:default": ["lib/x86_64-linux-gnu/libnvinfer_plugin.so"],
     }),
