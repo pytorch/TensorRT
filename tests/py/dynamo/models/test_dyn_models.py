@@ -64,7 +64,7 @@ def test_base_dynamic(ir):
 @pytest.mark.unit
 def test_base_dynamic_fallback(ir):
     """
-    Tests the model (which is fully convertible) with dynamic shapes
+    Tests the model with dynamic shapes where torch.abs op is forced to run in PyTorch
     """
 
     class MyModule(torch.nn.Module):

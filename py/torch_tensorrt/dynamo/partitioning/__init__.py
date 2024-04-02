@@ -3,6 +3,5 @@ from ._global_partitioner import partition as global_partition
 from .common import (
     construct_submodule_inputs,
     get_graph_converter_support,
-    get_submod_inputs,
     run_shape_analysis,
 )

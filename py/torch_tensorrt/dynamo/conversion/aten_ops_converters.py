@@ -392,6 +392,11 @@ def aten_ops_sigmoid(
     )
 
 
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
 @dynamo_tensorrt_converter(torch.ops.aten.sym_size.int)
 def aten_ops_symsize_int(
     ctx: ConversionContext,
