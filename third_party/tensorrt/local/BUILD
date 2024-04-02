@@ -29,9 +29,7 @@ config_setting(
 cc_library(
     name = "nvinfer_headers",
     hdrs = select({
-        ":aarch64_linux": [
-            "include/aarch64-linux-gnu/NvUtils.h",
-        ] + glob(
+        ":aarch64_linux": glob(
             [
                 "include/aarch64-linux-gnu/NvInfer*.h",
             ],
@@ -40,9 +38,7 @@ cc_library(
                 "include/aarch64-linux-gnu/NvInferPluginUtils.h",
             ],
         ),
-        ":ci_rhel_x86_64_linux": [
-            "include/NvUtils.h",
-        ] + glob(
+        ":ci_rhel_x86_64_linux": glob(
             [
                 "include/NvInfer*.h",
             ],
@@ -51,9 +47,7 @@ cc_library(
                 "include/NvInferPluginUtils.h",
             ],
         ),
-        ":windows": [
-            "include/NvUtils.h",
-        ] + glob(
+        ":windows": glob(
             [
                 "include/NvInfer*.h",
             ],
@@ -62,9 +56,7 @@ cc_library(
                 "include/NvInferPluginUtils.h",
             ],
         ),
-        "//conditions:default": [
-            "include/x86_64-linux-gnu/NvUtils.h",
-        ] + glob(
+        "//conditions:default": glob(
             [
                 "include/x86_64-linux-gnu/NvInfer*.h",
             ],
