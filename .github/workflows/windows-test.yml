@@ -119,6 +119,20 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ runner.temp }}/artifacts/
 
+      - name: Pack script
+        continue-on-error: ${{ inputs.continue-on-error }}
+        working-directory: ${{ inputs.repository }}
+        env:
+          ALL_SECRETS: ${{ toJSON(secrets) }}
+        run: |
+          set -euxo pipefail
+          # shellcheck disable=SC2086
+          source "${BUILD_ENV_FILE}"
+          {
+            echo "${SCRIPT}";
+          } > "user_script"
+          cat .github/scripts/install-torch-tensorrt-windows.sh user_script > ${RUNNER_TEMP}/exec_script
+
       - name: Run script
         shell: bash -l {0}
         continue-on-error: ${{ inputs.continue-on-error }}
