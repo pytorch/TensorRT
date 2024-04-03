@@ -3,7 +3,7 @@
 # Install dependencies
 python3 -m pip install pyyaml
 TRT_VERSION=$(python3 -c "import versions; versions.tensorrt_version()")
-yum-config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo
+yum-config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo
 yum check-update
 yum install -y ninja-build gettext tensorrt-${TRT_VERSION}
 wget https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 \
