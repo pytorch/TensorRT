@@ -250,7 +250,7 @@ def aten_ops_embedding(
 
 
 def embedding_bag_validator(node: Node) -> bool:
-    if one_user_validator(node) is False:
+    if not one_user_validator(node):
         return False
     meta = node.args[1].meta
     indices = meta.get("tensor_meta")
