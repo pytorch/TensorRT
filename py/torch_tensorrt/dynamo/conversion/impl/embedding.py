@@ -1,7 +1,9 @@
 import functools
+import time
 from typing import Optional, Sequence, Tuple, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
@@ -23,9 +25,9 @@ def embedding(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: trt.ITensor,
-    weight: trt.ITensor,
-) -> trt.ITensor:
+    input: TRTTensor,
+    weight: TRTTensor,
+) -> TRTTensor:
     indices_tensor = input
     embedding_tensor = weight
     indices_tensor = get_trt_tensor(ctx, indices_tensor, f"{name}_indices_tensor")
@@ -154,150 +156,167 @@ def embedding_bag_with_ITensor_offsets(
     # create a placeholder tensor, whose shape is the same as an embedding
     # if mode is 0 (sum) or 1 (mean), the placeholder tensor is filled with zeros
     # if mode is 2 (max), the placeholder tensor is filled with negative infinity
-    zero_tensor = get_trt_tensor(
-        ctx, np.zeros((1, embed.shape[1]), dtype=np.float32), f"{name}_zero_tensor"
-    )
     placeholder_tensor = (
         get_trt_tensor(
             ctx,
-            np.full((1, embed.shape[1]), -np.inf, dtype=np.float32),
+            np.full(embed.shape, -np.inf, dtype=np.float32),
             f"{name}_negative_inf_tensor",
         )
         if mode == 2
-        else zero_tensor
+        else get_trt_tensor(
+            ctx, np.zeros(embed.shape, dtype=np.float32), f"{name}_zero_tensors"
+        )
     )
 
-    # create a list of constant ITensor for reuse
-    incremental_tensor_list = []
-    for i in range(0, len_embed):
-        incremental_tensor_list.append(
-            get_trt_tensor(ctx, i, f"{name}_incremental_tensor_{i}")
-        )
+    # prepare some tensors for future use
+    zero_tensor = get_trt_tensor(
+        ctx, np.zeros((embed.shape[1],), dtype=np.float32), f"{name}_zero_tensor"
+    )
+    constant_0 = get_trt_tensor(ctx, 0, f"{name}_constant_0")
+    constant_1 = get_trt_tensor(ctx, 1, f"{name}_constant_1")
 
-    # traverse offsets to calculate the embedding of each bag
-    reduced_embed_bags = []
-    start = ctx.net.add_gather(offsets, incremental_tensor_list[0], 0).get_output(0)
-    for i in range(1, offsets.shape[0]):
-        end = ctx.net.add_gather(offsets, incremental_tensor_list[i], 0).get_output(0)
+    # Use two for loops to calculate the embedding of each bag
+    ###### Outer loop: traverse offsets ######
+    loop1 = ctx.net.add_loop()
+    trip_limit1 = ctx.net.add_constant(
+        shape=(),
+        weights=trt.Weights(np.array([offsets.shape[0] - 1], dtype=np.dtype("i"))),
+    ).get_output(0)
+    loop1.add_trip_limit(trip_limit1, trt.TripLimit.COUNT)
 
-        one_bag_list = []
-        # traverse the constant list to see if the index is in the range of the current bag
-        for j in range(0, len_embed):
-            j_tensor = incremental_tensor_list[j]
+    rec1_i_tensor = loop1.add_recurrence(constant_1)
+    set_layer_name(rec1_i_tensor, target, f"{name}_rec1_i_tensor", source_ir)
+    i_tensor = rec1_i_tensor.get_output(0)
 
-            # create a TRT conditional layer
-            conditional_layer = ctx.net.add_if_conditional()
-            # two conditions
-            cond1 = impl.elementwise.ge(
-                ctx, target, source_ir, f"{name}_ge_{i}_{j}", j_tensor, start
-            )
-            cond2 = impl.elementwise.lt(
-                ctx, target, source_ir, f"{name}_lt_{i}_{j}", j_tensor, end
-            )
-            condition = impl.elementwise.logical_and(
-                ctx, target, source_ir, f"{name}_and_{i}_{j}", cond1, cond2
-            )
-            condition = impl.shuffle.reshape(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_reshape_condition_{i}_{j}",
-                condition,
-                [],
-            )
-            # set the combined condition to the conditional layer
-            conditional_layer.set_condition(condition)
-            # if true, run this subgraph
-            one_piece_embed = impl.select.index(
-                ctx, target, source_ir, f"{name}_index_{i}_{j}", embed, [j_tensor]
-            )
-            true_sg = conditional_layer.add_input(one_piece_embed)
-            # if false, run this subgraph
-            false_sg = conditional_layer.add_input(placeholder_tensor)
+    start = ctx.net.add_gather(offsets, constant_0, 0).get_output(0)
+    rec1_start = loop1.add_recurrence(start)
+    set_layer_name(rec1_start, target, f"{name}_rec1_start", source_ir)
+    start = rec1_start.get_output(0)
 
-            cond_output_layer = conditional_layer.add_output(
-                true_sg.get_output(0), false_sg.get_output(0)
-            )
-            one_bag_list.append(cond_output_layer.get_output(0))
+    end = ctx.net.add_gather(offsets, constant_1, 0).get_output(0)
+    rec1_end = loop1.add_recurrence(end)
+    set_layer_name(rec1_end, target, f"{name}_rec1_end", source_ir)
+    end = rec1_end.get_output(0)
 
-        # concat the one_bag_list along the first dimension
-        one_bag = impl.cat.cat(
+    ###### Inner loop: traverse indices ######
+    loop2 = ctx.net.add_loop()
+    trip_limit2 = ctx.net.add_constant(
+        shape=(), weights=trt.Weights(np.array([len_embed], dtype=np.dtype("i")))
+    ).get_output(0)
+    loop2.add_trip_limit(trip_limit2, trt.TripLimit.COUNT)
+    rec2_j_tensor = loop2.add_recurrence(constant_0)
+    set_layer_name(rec2_j_tensor, target, f"{name}_rec2_j_tensor", source_ir)
+    j_tensor = rec2_j_tensor.get_output(0)
+
+    # create a TRT Select layer
+    cond1 = impl.elementwise.ge(
+        ctx, target, source_ir, f"{name}_ge_{time.time()}", j_tensor, start
+    )
+    cond2 = impl.elementwise.lt(
+        ctx, target, source_ir, f"{name}_lt_{time.time()}", j_tensor, end
+    )
+    condition1 = impl.elementwise.logical_and(
+        ctx, target, source_ir, f"{name}_and_{time.time()}", cond1, cond2
+    )
+    next_j = impl.elementwise.add(
+        ctx, target, source_ir, f"{name}_j_tensor_add_1_{time.time()}", j_tensor, 1
+    )
+    rec2_j_tensor.set_input(1, next_j)
+    loop_out2 = loop2.add_loop_output(condition1, trt.LoopOutput.CONCATENATE)
+    loop_out2.set_input(1, trip_limit2)
+    ####### Inner loop end #######
+
+    select_layer1 = ctx.net.add_select(
+        loop_out2.get_output(0), embed, placeholder_tensor
+    )
+    one_bag = select_layer1.get_output(0)
+
+    # reduce the one_bag along the dim=0, the result of which is an embedding of each bag
+    if mode == 0:  # sum
+        reduced_one_bag = impl.reduce.sum(
             ctx,
             target,
             source_ir,
-            f"{name}_concat_bag{i}",
-            one_bag_list,
+            name=f"{name}_sum_bag{time.time()}",
+            input_val=one_bag,
             dim=0,
+            keepdim=False,
         )
 
-        # reduce the one_bag along the first dimension, the result of which is an embedding of each bag
-        if mode == 0:  # sum
-            reduced_one_bag = impl.reduce.sum(
-                ctx,
-                target,
-                source_ir,
-                name=f"{name}_sum_bag{i}",
-                input_val=one_bag,
-                dim=0,
-                keepdim=True,
-            )
-
-        # Since one_bag includes many zeros, directly calculating mean will cause results incorrect
-        elif mode == 1:  # mean
-            reduced_one_bag = impl.reduce.sum(
-                ctx,
-                target,
-                source_ir,
-                name=f"{name}_sum_bag{i}",
-                input_val=one_bag,
-                dim=0,
-                keepdim=True,
-            )
-            diff = impl.elementwise.sub(
-                ctx, target, source_ir, f"{name}_diff_bag{i}", end, start
-            )
-            reduced_one_bag = impl.elementwise.div(
-                ctx, target, source_ir, f"{name}_div_bag{i}", reduced_one_bag, diff
-            )
-
-        elif mode == 2:  # max
-            reduced_one_bag = impl.reduce.max(
-                ctx,
-                target,
-                source_ir,
-                name=f"{name}_max_bag{i}",
-                input_val=one_bag,
-                dim=0,
-                keepdim=True,
-                return_indices=False,
-            )
-
-        # create a TRT conditional layer
-        conditional_layer = ctx.net.add_if_conditional()
-        # two conditions
-        condition = impl.elementwise.eq(
-            ctx, target, source_ir, f"{name}_eq_{i}", start, end
+    # Since one_bag includes many zeros, directly calculating mean will cause results incorrect
+    elif mode == 1:  # mean
+        reduced_one_bag = impl.reduce.sum(
+            ctx,
+            target,
+            source_ir,
+            name=f"{name}_sum_bag{time.time()}",
+            input_val=one_bag,
+            dim=0,
+            keepdim=False,
         )
-        condition = impl.shuffle.reshape(
-            ctx, target, source_ir, f"{name}_reshape_condition_eq_{i}", condition, []
+        diff = impl.elementwise.sub(
+            ctx, target, source_ir, f"{name}_diff_bag{time.time()}", end, start
         )
-        # set the combined condition to the conditional layer
-        conditional_layer.set_condition(condition)
-        # if true, run this subgraph
-        true_sg = conditional_layer.add_input(zero_tensor)
-        # if false, run this subgraph
-        false_sg = conditional_layer.add_input(reduced_one_bag)
-
-        reduced_one_bag_layer = conditional_layer.add_output(
-            true_sg.get_output(0), false_sg.get_output(0)
+        reduced_one_bag = impl.elementwise.div(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_div_bag{time.time()}",
+            reduced_one_bag,
+            diff,
         )
 
-        reduced_embed_bags.append(reduced_one_bag_layer.get_output(0))
-        start = end
+    elif mode == 2:  # max
+        reduced_one_bag = impl.reduce.max(
+            ctx,
+            target,
+            source_ir,
+            name=f"{name}_max_bag{time.time()}",
+            input_val=one_bag,
+            dim=0,
+            keepdim=False,
+            return_indices=False,
+        )
 
-    # concat the reduced_embed_bags along the first dimension
-    out = impl.cat.cat(ctx, target, source_ir, f"{name}_cat", reduced_embed_bags, 0)
-    return out, None, None, None
+    # create a TRT conditional layer
+    conditional_layer1 = ctx.net.add_if_conditional()
+    condition2 = impl.elementwise.eq(
+        ctx, target, source_ir, f"{name}_condition2_eq_{time.time()}", start, end
+    )
+    condition2 = impl.shuffle.reshape(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_reshape_condition2_eq_{time.time()}",
+        condition2,
+        [],
+    )
+    # set the combined condition to the conditional layer
+    conditional_layer1.set_condition(condition2)
+    # if true, run this subgraph
+    true_sg = conditional_layer1.add_input(zero_tensor)
+    # if false, run this subgraph
+    false_sg = conditional_layer1.add_input(reduced_one_bag)
+
+    reduced_one_bag_layer = conditional_layer1.add_output(
+        true_sg.get_output(0), false_sg.get_output(0)
+    )
+
+    # reset the variables for the next iteration of the outer loop
+    next_i = impl.elementwise.add(
+        ctx, target, source_ir, f"{name}_i_tensor_add_1_{time.time()}", i_tensor, 1
+    )
+    rec1_i_tensor.set_input(1, next_i)
+    rec1_start.set_input(1, end)
+    rec1_end.set_input(1, ctx.net.add_gather(offsets, next_i, 0).get_output(0))
+
+    loop_out1 = loop1.add_loop_output(
+        reduced_one_bag_layer.get_output(0), trt.LoopOutput.CONCATENATE
+    )
+    loop_out1.set_input(1, trip_limit1)
+    reduced_embed_bags = loop_out1.get_output(0)
+    ####### Outer loop end #######
+    return reduced_embed_bags, None, None, None
 
 
 def embedding_bag(
@@ -308,12 +327,9 @@ def embedding_bag(
     weight: TRTTensor,
     indices: TRTTensor,
     offsets: TRTTensor,
-    scale_grad_by_freq: bool,
     mode: int,
-    sparse: bool,
     per_sample_weights: Optional[TRTTensor],  # for sum mode only
     include_last_offset: bool,
-    padding_idx: int,
 ) -> Tuple[TRTTensor, TRTTensor, TRTTensor, TRTTensor]:
     """
     This function is for calculating embedding bags.
@@ -338,9 +354,6 @@ def embedding_bag(
         f"{name}_embedding",
         indices,
         weight,
-        padding_idx,
-        scale_grad_by_freq,
-        sparse,
     )
 
     # give weights to embedding

@@ -540,7 +540,25 @@ def append(
     name: str,
     original_tensor: TRTTensor,
     new_value: Union[TRTTensor, int, float, torch.Tensor, np.ndarray],
+    dim: int = 0,
 ) -> TRTTensor:
+    """
+    Append a new value to the last of the original tensor along the specified dimension (default 0).
+    For example, if the original tensor is [1, 2, 3], the new value is 4, and the dim is 0,
+    the new tensor will be [1, 2, 3, 4].
+
+    Args:
+        ctx (ConversionContext): A ConversionContext containing the TensorRT network
+        target (Target): Target of calling node
+        source_ir (Optional[SourceIR]): SourceIR of calling converter
+        name (str): Name of the calling layer
+        original_tensor (TRTTensor): A TRTTensor to append the new value to
+        new_value (Union[TRTTensor, int, float, torch.Tensor, np.ndarray]): A new value to append
+        dim (int, optional): Dimention to append the new value. Defaults to 0.
+
+    Returns:
+        TRTTensor: A new TRTTensor that is the result of appending the new value to the original tensor
+    """
     if isinstance(new_value, (int, float)):
         new_value = np.array([new_value])
     new_value = get_trt_tensor(ctx, new_value, name, original_tensor.dtype)
@@ -551,7 +569,7 @@ def append(
         source_ir,
         f"{name}_concat",
         [original_tensor, new_value],
-        0,
+        get_positive_dim(dim, len(original_tensor.shape)),
     )
 
 
@@ -564,6 +582,24 @@ def set_item(
     index: int,
     new_value: Union[TRTTensor, int, float, torch.Tensor, np.ndarray],
 ) -> TRTTensor:
+    """
+    Set a new value to the original tensor at the specified index. For example,
+    if the original tensor is [1, 2, 3], the new value is 4, and the index is 1,
+    the new tensor will be [1, 4, 3].
+    If the index is out of bound, the new value will be appended to the end.
+
+    Args:
+        ctx (ConversionContext): A ConversionContext containing the TensorRT network
+        target (Target): Target of calling node
+        source_ir (Optional[SourceIR]): SourceIR of calling converter
+        name (str): Name of the calling layer
+        original_tensor (TRTTensor): A TRTTensor to set the new value to
+        index (int): The index to set the new value
+        new_value (Union[TRTTensor, int, float, torch.Tensor, np.ndarray]): A new value to set
+
+    Returns:
+        TRTTensor: A new TRTTensor that is the result of setting the new value to the original tensor
+    """
     if isinstance(new_value, (int, float)):
         new_value = np.array([new_value])
     new_value = get_trt_tensor(ctx, new_value, name, original_tensor.dtype)

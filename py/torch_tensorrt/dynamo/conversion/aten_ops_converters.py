@@ -246,14 +246,12 @@ def aten_ops_embedding(
         name,
         input=args[1],
         weight=args[0],
-        # args[2, 3, 4] are useful for training only
-        padding_idx=args_bounds_check(args, 2, -1),
-        scale_grad_by_freq=args_bounds_check(args, 3, False),
-        sparse=args_bounds_check(args, 4, False),
     )
 
 
 def embedding_bag_validator(node: Node) -> bool:
+    if one_user_validator(node) is False:
+        return False
     meta = node.args[1].meta
     indices = meta.get("tensor_meta")
     if indices is None:
@@ -293,10 +291,6 @@ def aten_ops_embedding_bag(
         mode=args_bounds_check(args, 4, 0),
         per_sample_weights=args_bounds_check(args, 6, None),
         include_last_offset=args_bounds_check(args, 7, False),
-        # scale_grad_by_freq, sparse, and padding_idx are useful for training only
-        scale_grad_by_freq=args_bounds_check(args, 3, False),
-        sparse=args_bounds_check(args, 5, False),
-        padding_idx=args_bounds_check(args, 8, -1),
     )
 
 
