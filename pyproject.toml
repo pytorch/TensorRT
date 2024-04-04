@@ -8,7 +8,7 @@ requires = [
     "cffi>=1.15.1",
     "typing-extensions>=4.7.0",
     "future>=0.18.3",
-    "tensorrt==10.0.0b6",
+    "tensorrt>=10.0",
     "torch >=2.3.0.dev,<2.4.0",
     "pybind11==2.6.2",
     "numpy",
