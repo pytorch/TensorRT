@@ -29,7 +29,9 @@ config_setting(
 cc_library(
     name = "nvinfer_headers",
     hdrs = select({
-        ":aarch64_linux": glob(
+        ":aarch64_linux": [
+            "include/aarch64-linux-gnu/NvUtils.h",
+        ] + glob(
             [
                 "include/aarch64-linux-gnu/NvInfer*.h",
             ],
@@ -38,7 +40,9 @@ cc_library(
                 "include/aarch64-linux-gnu/NvInferPluginUtils.h",
             ],
         ),
-        ":ci_rhel_x86_64_linux": glob(
+        ":ci_rhel_x86_64_linux": [
+            "include/NvUtils.h",
+        ] + glob(
             [
                 "include/NvInfer*.h",
             ],
@@ -47,7 +51,9 @@ cc_library(
                 "include/NvInferPluginUtils.h",
             ],
         ),
-        ":windows": glob(
+        ":windows": [
+            "include/NvUtils.h",
+        ] + glob(
             [
                 "include/NvInfer*.h",
             ],
@@ -56,7 +62,9 @@ cc_library(
                 "include/NvInferPluginUtils.h",
             ],
         ),
-        "//conditions:default": glob(
+        "//conditions:default": [
+            "include/x86_64-linux-gnu/NvUtils.h",
+        ] + glob(
             [
                 "include/x86_64-linux-gnu/NvInfer*.h",
             ],
@@ -79,7 +87,7 @@ cc_import(
     name = "nvinfer_static_lib",
     static_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvinfer_static.a",
-        ":ci_rhel_x86_64_linux": "lib/libnvinfer_static.a",
+        ":ci_rhel_x86_64_linux": "lib64/libnvinfer_static.a",
         ":windows": "lib/nvinfer.lib",
         "//conditions:default": "lib/x86_64-linux-gnu/libnvinfer_static.a",
     }),
@@ -90,7 +98,7 @@ cc_import(
     name = "nvinfer_lib",
     shared_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvinfer.so",
-        ":ci_rhel_x86_64_linux": "lib/libnvinfer.so",
+        ":ci_rhel_x86_64_linux": "lib64/libnvinfer.so",
         ":windows": "lib/nvinfer.dll",
         "//conditions:default": "lib/x86_64-linux-gnu/libnvinfer.so",
     }),
@@ -104,6 +112,7 @@ cc_library(
         "nvinfer_headers",
         "nvinfer_lib",
         "@cuda//:cudart",
+        "@cudnn",
     ],
 )
 
@@ -113,7 +122,7 @@ cc_import(
     name = "nvparsers_lib",
     shared_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvparsers.so",
-        ":ci_rhel_x86_64_linux": "lib/libnvparsers.so",
+        ":ci_rhel_x86_64_linux": "lib64/libnvparsers.so",
         ":windows": "lib/nvparsers.dll",
         "//conditions:default": "lib/x86_64-linux-gnu/libnvparsers.so",
     }),
@@ -177,7 +186,7 @@ cc_import(
     name = "nvonnxparser_lib",
     shared_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvonnxparser.so",
-        ":ci_rhel_x86_64_linux": "lib/libnvonnxparser.so",
+        ":ci_rhel_x86_64_linux": "lib64/libnvonnxparser.so",
         ":windows": "lib/nvonnxparser.dll",
         "//conditions:default": "lib/x86_64-linux-gnu/libnvonnxparser.so",
     }),
@@ -233,7 +242,7 @@ cc_import(
     name = "nvonnxparser_runtime_lib",
     shared_library = select({
         ":aarch64_linux": "lib/x86_64-linux-gnu/libnvonnxparser_runtime.so",
-        ":ci_rhel_x86_64_linux": "lib/libnvonnxparser_runtime.so",
+        ":ci_rhel_x86_64_linux": "lib64/libnvonnxparser_runtime.so",
         ":windows": "lib/nvonnxparser_runtime.dll",
         "//conditions:default": "lib/x86_64-linux-gnu/libnvonnxparser_runtime.so",
     }),
@@ -281,7 +290,7 @@ cc_import(
     name = "nvcaffeparser_lib",
     shared_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvcaffe_parsers.so",
-        ":ci_rhel_x86_64_linux": "lib/libnvcaffe_parsers.so",
+        ":ci_rhel_x86_64_linux": "lib64/libnvcaffe_parsers.so",
         ":windows": "lib/nvcaffe_parsers.dll",
         "//conditions:default": "lib/x86_64-linux-gnu/libnvcaffe_parsers.so",
     }),
@@ -329,7 +338,7 @@ cc_library(
     name = "nvinferplugin",
     srcs = select({
         ":aarch64_linux": ["lib/aarch64-linux-gnu/libnvinfer_plugin.so"],
-        ":ci_rhel_x86_64_linux": ["lib/libnvinfer_plugin.so"],
+        ":ci_rhel_x86_64_linux": ["lib64/libnvinfer_plugin.so"],
         ":windows": ["lib/nvinfer_plugin.dll"],
         "//conditions:default": ["lib/x86_64-linux-gnu/libnvinfer_plugin.so"],
     }),
@@ -357,6 +366,7 @@ cc_library(
     deps = [
         "nvinfer",
         "@cuda//:cudart",
+        "@cudnn",
     ],
     alwayslink = True,
 )

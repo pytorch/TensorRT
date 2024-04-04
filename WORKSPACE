@@ -17,6 +17,7 @@ http_archive(
     name = "rules_pkg",
     sha256 = "8f9ee2dc10c1ae514ee599a8b42ed99fa262b757058f65ad3c384289ff70c4b8",
     urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.9.1/rules_pkg-0.9.1.tar.gz",
         "https://github.com/bazelbuild/rules_pkg/releases/download/0.9.1/rules_pkg-0.9.1.tar.gz",
     ],
 )
@@ -68,12 +69,22 @@ http_archive(
 # or modify the urls to "file:///<PATH TO TARBALL>/<TARBALL NAME>.tar.gz
 
 http_archive(
+    name = "cudnn",
+    build_file = "@//third_party/cudnn/archive:BUILD",
+    sha256 = "2a2eb89a2ab51071151c6082f1e816c702167a711a9372f9f73a7b5c4b06e01a",
+    strip_prefix = "cudnn-linux-x86_64-8.9.5.30_cuda12-archive",
+    urls = [
+        "https://developer.nvidia.com/downloads/compute/cudnn/secure/8.9.5/local_installers/12.x/cudnn-linux-x86_64-8.9.5.30_cuda12-archive.tar.xz",
+    ],
+)
+
+http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    sha256 = "7ad5c8eab8fe8803bef5d8cee54ec1f407797ac8edb8ea3186cb9f24af726486",
-    strip_prefix = "TensorRT-10.0.0.6",
+    sha256 = "0f8157a5fc5329943b338b893591373350afa90ca81239cdadd7580cd1eba254",
+    strip_prefix = "TensorRT-8.6.1.6",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.0.0/tars/TensorRT-10.0.0.6.Linux.x86_64-gnu.cuda-12.4.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/secure/8.6.1/tars/TensorRT-8.6.1.6.Linux.x86_64-gnu.cuda-12.0.tar.gz",
     ],
 )
 
