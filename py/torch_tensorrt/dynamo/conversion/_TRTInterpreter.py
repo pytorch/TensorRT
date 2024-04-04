@@ -188,6 +188,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             if self.compilation_settings.version_compatible:
                 _LOGGER.info("Using version compatible")
                 builder_config.set_flag(trt.BuilderFlag.VERSION_COMPATIBLE)
+                builder_config.set_flag(trt.BuilderFlag.EXCLUDE_LEAN_RUNTIME)
             if self.compilation_settings.hardware_compatible:
                 _LOGGER.info("Using hardware compatible")
                 builder_config.hardware_compatibility_level = (
