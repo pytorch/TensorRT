@@ -254,6 +254,7 @@ def create_constant(
     value: Union[int, float, bool, np.ndarray, torch.Tensor],
     name: str,
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]],
+    rank: Optional[int] = 1,
 ) -> TRTTensor:
     """
     Add a TensorRT constant layer whose value is `value` to `ctx.net`.
@@ -269,8 +270,13 @@ def create_constant(
         A TensorRT ITensor that represents the given value.
     """
     numpy_value = to_numpy(value, dtype)
+    shape = (1,)
+    # Rank 0 constant is required in IFillLayer inputs.
+    if rank == 0:
+        shape = trt.Dims()
+
     constant = ctx.net.add_constant(
-        (1,) if isinstance(value, (int, float, bool)) else value.shape,
+        shape if isinstance(value, (int, float, bool)) else value.shape,
         numpy_value.copy() if isinstance(numpy_value, np.ndarray) else numpy_value,
     )
     constant.name = name
@@ -282,6 +288,7 @@ def get_trt_tensor(
     input_val: Any,
     name: str,
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]] = None,
+    rank: int = 1,
 ) -> TRTTensor:
     """
     Given a value of random type, we try to convert it to a TensorRT ITensor.
@@ -316,7 +323,7 @@ def get_trt_tensor(
             input_val = input_val.astype(np.float32)
 
     if isinstance(input_val, (torch.Tensor, np.ndarray, int, float, bool)):
-        return create_constant(ctx, input_val, name, dtype)
+        return create_constant(ctx, input_val, name, dtype, rank)
     elif isinstance(input_val, TRTTensor):
         return input_val
     else:
