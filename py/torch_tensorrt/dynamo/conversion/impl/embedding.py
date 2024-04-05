@@ -172,8 +172,8 @@ def embedding_bag_with_ITensor_offsets(
     zero_tensor = get_trt_tensor(
         ctx, np.zeros((embed.shape[1],), dtype=np.float32), f"{name}_zero_tensor"
     )
-    constant_0 = get_trt_tensor(ctx, 0, f"{name}_constant_0")
-    constant_1 = get_trt_tensor(ctx, 1, f"{name}_constant_1")
+    constant_0 = get_trt_tensor(ctx, 0, f"{name}_constant_tensor_0")
+    constant_1 = get_trt_tensor(ctx, 1, f"{name}_constant_tensor_1")
 
     # Use two for loops to calculate the embedding of each bag
     ###### Outer loop: traverse offsets ######
