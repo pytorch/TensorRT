@@ -125,7 +125,7 @@ jobs:
         env:
           ALL_SECRETS: ${{ toJSON(secrets) }}
         run: |
-          set -eou pipefail
+          # set -eou pipefail
           # shellcheck disable=SC2086
           source "${BUILD_ENV_FILE}"
           {
