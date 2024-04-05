@@ -127,7 +127,7 @@ jobs:
         run: |
           # set -eou pipefail
           # shellcheck disable=SC2086
-          source "${BUILD_ENV_FILE}"
+          # source "${BUILD_ENV_FILE}"
           {
             echo "${SCRIPT}";
           } > "user_script"
