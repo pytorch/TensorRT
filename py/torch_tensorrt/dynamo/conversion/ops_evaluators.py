@@ -73,7 +73,7 @@ def aten_ops_rand(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return np.random.rand(*args)
+    return np.random.rand(*args[0])
 
 
 @dynamo_tensorrt_converter(
@@ -86,7 +86,7 @@ def aten_ops_randn(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return np.random.randn(*args)
+    return np.random.randn(*args[0])
 
 
 def randperm_validator(randperm_node: Node) -> bool:
@@ -117,4 +117,4 @@ def aten_ops_randperm(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return np.random.permutation(*args)
+    return np.random.permutation(args[0])

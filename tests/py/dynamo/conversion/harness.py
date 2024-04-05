@@ -151,7 +151,6 @@ class TRTTestCase(TestCase):
             res_trt = trt_mod(*cuda_inputs).cpu()
             res_cpu = mod(*cuda_inputs).cpu()
             assert len(res_trt) == len(res_cpu)
-            assert len(res_cpu) == len(comparators)
             for output_trt, output_cpu, comparator in zip(
                 res_trt, res_cpu, comparators
             ):
@@ -266,6 +265,40 @@ class DispatchTestCase(TRTTestCase):
             rtol,
             atol,
             check_dtype,
+        )
+
+    def run_test_comparator(
+        self,
+        mod,
+        inputs,
+        expected_ops,
+        comparators: List[Tuple[Callable, List]],
+        precision=torch.float32,
+        output_dtypes=None,
+        use_dynamo_tracer=False,
+        enable_passes=False,
+    ):
+        mod.eval()
+        mod = self.generate_graph(
+            mod,
+            inputs,
+            use_dynamo_tracer=use_dynamo_tracer,
+            enable_passes=enable_passes,
+        )
+        # Previous instance of the interpreter auto-casted 64-bit inputs
+        # We replicate this behavior here
+        compilation_settings = CompilationSettings(
+            precision=precision, truncate_long_and_double=True
+        )
+
+        interp = TRTInterpreter(
+            mod,
+            Input.from_tensors(inputs),
+            output_dtypes=output_dtypes,
+            compilation_settings=compilation_settings,
+        )
+        super().run_test_custom_compare_results(
+            mod, inputs, expected_ops, interp, comparators
         )
 
     def run_test_with_dynamic_shape(

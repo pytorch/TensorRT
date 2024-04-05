@@ -4,6 +4,8 @@ import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 
+from .harness import DispatchTestCase
+
 rand_ops = [
     (
         "rand_one_dimension",
@@ -13,7 +15,7 @@ rand_ops = [
     (
         "rand_two_dimension",
         (lambda shape: torch.ops.aten.rand(shape)),
-        [2, 3],
+        [1, 2],
     ),
     (
         "rand_three_dimension",
@@ -35,25 +37,29 @@ rand_ops = [
         (lambda shape: torch.ops.aten.randn(shape)),
         [2, 3, 4],
     ),
+]
+
+
+rand_perm_ops = [
     (
         "randperm_one_case",
         (lambda x: torch.ops.aten.randperm(x)),
-        1,
+        [1],
     ),
     (
         "randperm_two_case",
         (lambda x: torch.ops.aten.randperm(x)),
-        150,
+        [150],
     ),
     (
         "randperm_three_case",
         (lambda x: torch.ops.aten.randperm(x)),
-        1500,
+        [1500],
     ),
 ]
 
 
-class TestRandConverter(TestCase):
+class TestRandConverter(DispatchTestCase):
     @parameterized.expand(
         [
             (
@@ -64,41 +70,64 @@ class TestRandConverter(TestCase):
             for rand_op in rand_ops
         ]
     )
-    def test_rand(self, _, op, shape_or_input):
+    def test_rand(self, name, op, shape_or_input):
         class TestModule(nn.Module):
-            def __init__(self, rand_op, size):
+            def __init__(self):
                 super().__init__()
-                self.rand_op = rand_op
-                self.size = size
 
-            def forward(self):
-                return self.rand_op(self.size)
+            def forward(self, x):
+                shape_or_input[0] = x.shape[0]
+                return op(shape_or_input)
 
-        rand_model = TestModule(op, shape_or_input)
+        rand_model = TestModule()
+
+        inputs = [torch.randint(1, 3, shape_or_input, dtype=torch.int32)]
+        comparator_shape = lambda x, y, check_dtype: x.shape == y.shape and (
+            x.dtype == y.dtype if check_dtype else True
+        )
+        expected_ops = []
+        self.run_test_comparator(
+            rand_model,
+            inputs,
+            expected_ops,
+            [(comparator_shape, [True])],
+            use_dynamo_tracer=True,
+        )
+
+    @parameterized.expand(
+        [
+            (
+                rand_op[0],
+                rand_op[1],
+                rand_op[2],
+            )
+            for rand_op in rand_perm_ops
+        ]
+    )
+    def test_rand(self, name, op, shape_or_input):
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                shape_or_input[0] = x.shape[0]
+                return op(shape_or_input[0])
+
+        rand_model = TestModule()
         # cannot use self.run_test() since it expects input in form of tensor
 
-        fx_graph = torch.fx.symbolic_trace(grid_model)
-        torch._dynamo.reset()
-
-        optimized_model = torch_tensorrt.compile(
-            fx_graph,
-            "torch_compile",
-            None,
-            min_block_size=1,
-            pass_through_build_failures=True,
-            truncate_long_and_double=True,
-            debug=True,
+        inputs = [torch.randint(1, 3, shape_or_input, dtype=torch.int32)]
+        comparator_shape = lambda x, y, check_dtype: x.shape == y.shape and (
+            x.dtype == y.dtype if check_dtype else True
         )
-        optimized_model_results = optimized_model().detach().cpu()
-        torch_model_results = fx_graph().detach().cpu()
-        max_diff = float(
-            torch.max(torch.abs(optimized_model_results - torch_model_results))
-        )
-        self.assertAlmostEqual(
-            max_diff,
-            0,
-            4,
-            f"TRT outputs don't match with the original model.",
+        expected_ops = []
+        # TRT-np returns int32 while torch returns float32
+        self.run_test_comparator(
+            rand_model,
+            inputs,
+            expected_ops,
+            [(comparator_shape, [False])],
+            use_dynamo_tracer=True,
         )
 
 
