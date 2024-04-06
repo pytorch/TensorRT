@@ -45,7 +45,6 @@ cc_library(
         "nvinfer_headers",
         "nvinfer_lib",
         "@cuda//:cudart",
-        "@cudnn",
     ],
 )
 
@@ -182,6 +181,5 @@ cc_library(
         "nvinferplugin_headers",
         "nvinferplugin_lib",
         "@cuda//:cudart",
-        "@cudnn",
     ],
 )
