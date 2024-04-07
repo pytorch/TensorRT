@@ -1,10 +1,6 @@
-#!/usr/bin/env bash
-set -eou pipefail
-# Source conda so it's available to the script environment
-source ${BUILD_ENV_FILE}
-/c/Jenkins/Miniconda3/python.exe ${PIP_INSTALL_TORCH} torchvision
-/c/Jenkins/Miniconda3/python.exe -m pip install pyyaml mpmath==1.3.0
-export TRT_VERSION=$(/c/Jenkins/Miniconda3/python.exe -c "import versions; versions.tensorrt_version()")
-/c/Jenkins/Miniconda3/python.exe -m pip install /opt/torch-tensorrt-builds/torch_tensorrt*+${CU_VERSION}*.whl tensorrt~=${TRT_VERSION} tensorrt-bindings~=${TRT_VERSION} --extra-index-url=https://pypi.ngc.nvidia.com
+source "${BUILD_ENV_FILE}"
+${CONDA_RUN} ${PIP_INSTALL_TORCH} torchvision
+${CONDA_RUN} pip install pyyaml mpmath==1.3.0
+${CONDA_RUN} pip install ${RUNNER_ARTIFACT_DIR}/torch_tensorrt*.whl tensorrt==9.3.0.post12.dev1 --extra-index-url https://pypi.nvidia.com
 
 echo -e "Running test script";
