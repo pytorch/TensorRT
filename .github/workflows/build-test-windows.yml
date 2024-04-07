@@ -4,12 +4,12 @@ on: [pull_request]
 
 jobs:
   generate-matrix:
-    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    uses: gs-olive/test-infra/.github/workflows/generate_binary_build_matrix.yml@windows_builds
     with:
       package-type: wheel
       os: windows
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
+      test-infra-repository: gs-olive/test-infra
+      test-infra-ref: windows_builds
       with-rocm: false
       with-cpu: false
 
@@ -23,23 +23,20 @@ jobs:
       matrix:
         include:
           - repository: pytorch/tensorrt
-            pre-script: "packaging/pre_build_script_windows.sh"
-            env-var-script: ""
-            post-script: ""
-            smoke-test-script: "packaging/smoke_test_windows.py"
+            pre-script: packaging/pre_build_script_windows.sh
+            smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
     name: Build torch-tensorrt whl package
-    uses: pytorch/test-infra/.github/workflows/build_wheels_windows.yml@main
+    uses: gs-olive/test-infra/.github/workflows/build_wheels_windows.yml@windows_builds
     with:
       repository: ${{ matrix.repository }}
       ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
+      test-infra-repository: gs-olive/test-infra
+      test-infra-ref: windows_builds
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      post-script: ${{ matrix.post-script }}
-      package-name: ${{ matrix.package-name }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
+      package-name: ${{ matrix.package-name }}
       trigger-event: ${{ github.event_name }}
 
   # tests-py-torchscript-fe:
@@ -171,10 +168,10 @@ jobs:
     uses: ./.github/workflows/windows-test.yml
     with:
       job-name: tests-py-torch-compile-be
-      repository: "pytorch/tensorrt"
+      repository: ${{ matrix.repository }}
       ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
+      test-infra-repository: gs-olive/test-infra
+      test-infra-ref: windows_builds
       binary-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       script: |
         export USE_HOST_DEPS=1
