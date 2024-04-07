@@ -30,4 +30,4 @@ print(result.stderr)
 
 
 import tensorrt
-import torch_tensorrt
+# import torch_tensorrt
