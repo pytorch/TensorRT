@@ -131,7 +131,8 @@ jobs:
           {
             echo "${SCRIPT}";
           } > "user_script"
-          cat .github/scripts/install-torch-tensorrt-windows.sh user_script > ${RUNNER_TEMP}/exec_script
+          cat .github/scripts/install-torch-tensorrt-windows.sh > ${RUNNER_TEMP}/exec_script
+          cat user_script >> ${RUNNER_TEMP}/exec_script
 
       - name: Run script
         shell: bash -l {0}
