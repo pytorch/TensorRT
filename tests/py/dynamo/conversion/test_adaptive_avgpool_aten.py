@@ -96,6 +96,10 @@ class TestAdaptiveAvgPoolConverter(DispatchTestCase):
                 (4, 4),
             ),
             (
+                (2, 3, 2),
+                (5, 3),
+            ),
+            (
                 (2, 8, 16),
                 (4, 8),
             ),
@@ -157,6 +161,69 @@ class TestAdaptiveAvgPoolConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
+            ((1, 2),),
+        ]
+    )
+    def test_adaptive_avg_pool2d_dynamic(self, output_size):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                out = torch.ops.aten.adaptive_avg_pool2d.default(x, output_size)
+                return out
+
+        input_specs = [
+            Input(
+                shape=(-1, 2, 3, 2),
+                dtype=torch.float32,
+                shape_ranges=[((1, 2, 3, 2), (3, 2, 3, 2), (10, 2, 3, 2))],
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            TestModule(),
+            input_specs,
+        )
+
+    @parameterized.expand(
+        [
+            # 4d input
+            (
+                (1, 1, 4, 3),
+                (4, 8, 2),
+            ),
+            (
+                (1, 2, 3, 1),
+                (1, 5, 2),
+            ),
+            (
+                (1, 2, 3, 2),
+                (1, 5, 3),
+            ),
+            (
+                (4, 2, 2, 8),
+                (8, 5, 2),
+            ),
+            (
+                (3, 2, 3, 3),
+                (6, 4, 1),
+            ),
+            (
+                (1, 2, 3, 2),
+                (2, 2, 2),
+            ),
+            (
+                (2, 2, 32, 16),
+                (8, 8, 8),
+            ),
+            (
+                (2, 2, 32, 32),
+                (31, 16, 64),
+            ),
+            (
+                (1, 1, 64, 64),
+                (64, 16, 1),
+            ),
             # 5d input
             (
                 (1, 1, 1, 4, 3),
@@ -203,6 +270,32 @@ class TestAdaptiveAvgPoolConverter(DispatchTestCase):
             inputs,
             # use_dynamo_tracer=True,
             enable_passes=True,
+        )
+
+    @parameterized.expand(
+        [
+            ((1, 2, 3),),
+        ]
+    )
+    def test_adaptive_avg_pool3d_dynamic(self, output_size):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                out = torch.ops.aten.adaptive_avg_pool3d.default(x, output_size)
+                return out
+
+        input_specs = [
+            Input(
+                shape=(-1, 2, 3, 1, 4),
+                dtype=torch.float32,
+                shape_ranges=[((1, 2, 3, 1, 4), (3, 2, 3, 1, 4), (10, 2, 3, 1, 4))],
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            TestModule(),
+            input_specs,
         )
 
 

@@ -2202,35 +2202,35 @@ def aten_ops_adaptive_avg_pool1d(
     )
 
 
-def adaptive_pool_static_input_validator(pool_node: Node) -> bool:
-    output_size = args_bounds_check(pool_node.args, 1)
-    return all([x > 0 for x in output_size])
-
-
-@dynamo_tensorrt_converter(
-    torch.ops.aten.adaptive_avg_pool2d.default,
-    capability_validator=adaptive_pool_static_input_validator,
-)
-@dynamo_tensorrt_converter(
-    torch.ops.aten._adaptive_avg_pool2d.default,
-    capability_validator=adaptive_pool_static_input_validator,
-)
-@dynamo_tensorrt_converter(
-    torch.ops.aten.adaptive_avg_pool3d.default,
-    capability_validator=adaptive_pool_static_input_validator,
-)
-@dynamo_tensorrt_converter(
-    torch.ops.aten._adaptive_avg_pool3d.default,
-    capability_validator=adaptive_pool_static_input_validator,
-)
-def aten_ops_adaptive_avg_poolNd(
+@dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool2d.default)
+@dynamo_tensorrt_converter(torch.ops.aten._adaptive_avg_pool2d.default)
+def aten_ops_adaptive_avg_pool2d(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.pool.adaptive_avg_poolNd(
+    return impl.pool.adaptive_avg_pool2d(
+        ctx,
+        target,
+        source_ir=SourceIR.ATEN,
+        name=name,
+        input=args[0],
+        output_size=args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool3d.default)
+@dynamo_tensorrt_converter(torch.ops.aten._adaptive_avg_pool3d.default)
+def aten_ops_adaptive_avg_pool3d(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.pool.adaptive_avg_pool3d(
         ctx,
         target,
         source_ir=SourceIR.ATEN,
