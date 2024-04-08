@@ -43,7 +43,49 @@ local_repository(
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",
-    path = "C:/CUDA/v12.1",
+    path = "/usr/local/cuda-12.1/",
+)
+
+#############################################################################################################
+# Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
+#############################################################################################################
+
+http_archive(
+    name = "libtorch",
+    build_file = "@//third_party/libtorch:BUILD",
+    strip_prefix = "libtorch",
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
+)
+
+http_archive(
+    name = "libtorch_pre_cxx11_abi",
+    build_file = "@//third_party/libtorch:BUILD",
+    strip_prefix = "libtorch",
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-shared-with-deps-latest.zip"],
+)
+
+# Download these tarballs manually from the NVIDIA website
+# Either place them in the distdir directory in third_party and use the --distdir flag
+# or modify the urls to "file:///<PATH TO TARBALL>/<TARBALL NAME>.tar.gz
+
+http_archive(
+    name = "cudnn",
+    build_file = "@//third_party/cudnn/archive:BUILD",
+    sha256 = "2a2eb89a2ab51071151c6082f1e816c702167a711a9372f9f73a7b5c4b06e01a",
+    strip_prefix = "cudnn-linux-x86_64-8.9.5.30_cuda12-archive",
+    urls = [
+        "https://developer.nvidia.com/downloads/compute/cudnn/secure/8.9.5/local_installers/12.x/cudnn-linux-x86_64-8.9.5.30_cuda12-archive.tar.xz",
+    ],
+)
+
+http_archive(
+    name = "tensorrt",
+    build_file = "@//third_party/tensorrt/archive:BUILD",
+    sha256 = "0f8157a5fc5329943b338b893591373350afa90ca81239cdadd7580cd1eba254",
+    strip_prefix = "TensorRT-8.6.1.6",
+    urls = [
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/secure/8.6.1/tars/TensorRT-8.6.1.6.Linux.x86_64-gnu.cuda-12.0.tar.gz",
+    ],
 )
 
 ####################################################################################
@@ -57,29 +99,29 @@ new_local_repository(
 # x86_64 python distribution. If using NVIDIA's version just point to the root of the package
 # for both versions here and do not use --config=pre-cxx11-abi
 
-new_local_repository(
-    name = "libtorch",
-    build_file = "third_party/libtorch/BUILD",
-    path = "C:/Python311/Lib/site-packages/torch",
-)
+#new_local_repository(
+#    name = "libtorch",
+#    path = "/usr/local/lib/python3.6/dist-packages/torch",
+#    build_file = "third_party/libtorch/BUILD"
+#)
 
-new_local_repository(
-    name = "libtorch_pre_cxx11_abi",
-    build_file = "third_party/libtorch/BUILD",
-    path = "C:/Python311/Lib/site-packages/torch",
-)
+#new_local_repository(
+#    name = "libtorch_pre_cxx11_abi",
+#    path = "/usr/local/lib/python3.6/dist-packages/torch",
+#    build_file = "third_party/libtorch/BUILD"
+#)
 
-new_local_repository(
-    name = "cudnn",
-    build_file = "@//third_party/cudnn/local:BUILD",
-    path = "C:/cudnn-windows-x86_64-8.9.7.29_cuda12-archive",
-)
+#new_local_repository(
+#    name = "cudnn",
+#    path = "/usr/",
+#    build_file = "@//third_party/cudnn/local:BUILD"
+#)
 
-new_local_repository(
-    name = "tensorrt",
-    build_file = "@//third_party/tensorrt/local:BUILD",
-    path = "C:/TensorRT-8.6.1.6",
-)
+#new_local_repository(
+#   name = "tensorrt",
+#   path = "/usr/",
+#   build_file = "@//third_party/tensorrt/local:BUILD"
+#)
 
 #########################################################################
 # Development Dependencies (optional - comment out on aarch64)
