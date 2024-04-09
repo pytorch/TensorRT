@@ -11,6 +11,7 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     append,
+    cast_trt_tensor,
     get_trt_tensor,
     set_item,
     to_numpy,
@@ -354,6 +355,9 @@ def embedding_bag(
         f"{name}_embedding",
         indices,
         weight,
+    )
+    embed = cast_trt_tensor(
+        ctx, embed, torch.float, f"{name}_cast_embed_to_fp16", target, source_ir
     )
 
     # give weights to embedding
