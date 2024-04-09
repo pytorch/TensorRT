@@ -150,7 +150,7 @@ jobs:
             echo "source /c/Jenkins/Miniconda3/etc/profile.d/conda.sh";
             echo 'export PATH="/c/Jenkins/Miniconda3/Scripts:${PATH}"'
           } > "${EXEC_SCRIPT}"
-          $(cat ${RUNNER_TEMP}/exec_script_tmp) >> "${EXEC_SCRIPT}"
+          echo "${RUNNER_TEMP}/exec_script_tmp" >> "${EXEC_SCRIPT}"
           if [[ ${{ inputs.gpu-arch-type }} == cuda ]]; then
             {
               echo 'export CUDA_HOME="/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${{ inputs.gpu-arch-version }}"'
