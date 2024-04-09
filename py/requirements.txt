@@ -5,5 +5,10 @@ pybind11==2.6.2
 torch==2.3.0
 torchvision==0.18.0
 --extra-index-url https://pypi.ngc.nvidia.com
-tensorrt>=10.0
 pyyaml
+# Extras
+ninja>=1.11.0
+cffi>=1.15.1
+pybind11==2.6.2
+wheel>=0.40.0
+future>=0.18.3
