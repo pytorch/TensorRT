@@ -36,7 +36,7 @@ jobs:
           - repository: pytorch/tensorrt
             pre-script: packaging/pre_build_script.sh
             env-var-script: packaging/env_vars.txt
-            post-script: ""
+            post-script: packaging/post_build_script.sh
             smoke-test-script: ""
             package-name: torch_tensorrt
     name: Build torch-tensorrt whl package
@@ -64,6 +64,7 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
     uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
     with:
       job-name: tests-py-torchscript-fe
@@ -99,6 +100,7 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
     uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
     with:
       job-name: tests-py-dynamo-converters
@@ -126,6 +128,7 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
     uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
     with:
       job-name: tests-py-dynamo-fe
@@ -154,6 +157,7 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
     uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
     with:
       job-name: tests-py-dynamo-serde
@@ -181,6 +185,7 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
     uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
     with:
       job-name: tests-py-torch-compile-be
@@ -209,6 +214,7 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
     uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
     with:
       job-name: tests-py-dynamo-core
