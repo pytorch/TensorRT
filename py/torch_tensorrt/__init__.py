@@ -60,7 +60,12 @@ except ImportError:
 
     elif sys.platform.startswith("linux"):
         LINUX_PATHS = ["/usr/local/cuda-12.1/lib64", "/usr/lib", "/usr/lib64"]
-        print("==== BOOL CHECK", "LD_LIBRARY_PATH" in os.environ)
+        print(
+            "==== BOOL CHECK",
+            "LD_LIBRARY_PATH" in os.environ,
+            " path: ",
+            os.environ["LD_LIBRARY_PATH"],
+        )
         if "LD_LIBRARY_PATH" in os.environ:
             LINUX_PATHS += os.environ["LD_LIBRARY_PATH"].split(os.path.pathsep)
 
