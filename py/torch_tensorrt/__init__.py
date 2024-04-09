@@ -60,7 +60,7 @@ except ImportError:
 
     elif sys.platform.startswith("linux"):
         LINUX_PATHS = ["/usr/local/cuda-12.1/lib64", "/usr/lib", "/usr/lib64"]
-
+        print("==== BOOL CHECK", "LD_LIBRARY_PATH" in os.environ)
         if "LD_LIBRARY_PATH" in os.environ:
             LINUX_PATHS += os.environ["LD_LIBRARY_PATH"].split(os.path.pathsep)
 
@@ -92,9 +92,8 @@ from torch_tensorrt.ptq import *
 from torch_tensorrt.runtime import *  # noqa: F403
 
 if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
-    from torch_tensorrt.dynamo import backend  # noqa: F401
-
     from torch_tensorrt import dynamo  # noqa: F401
+    from torch_tensorrt.dynamo import backend  # noqa: F401
 
 
 def _register_with_torch() -> None:
