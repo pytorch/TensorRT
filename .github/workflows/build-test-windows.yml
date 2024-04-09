@@ -172,7 +172,7 @@ jobs:
       ref: ""
       test-infra-repository: gs-olive/test-infra
       test-infra-ref: windows_builds
-      binary-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       script: |
         export USE_HOST_DEPS=1
         pushd .
