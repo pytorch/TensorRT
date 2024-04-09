@@ -243,6 +243,37 @@ def empty_strided_decomposition(*args, **kwargs) -> torch.Tensor:
     )
 
 
+@register_torch_trt_decomposition(
+    torch.ops.aten.scatter_add.default, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def scatter_add_decomposition(
+    input_tensor: torch.Tensor,
+    src_tensor: torch.Tensor,
+    dim: int,
+    index: torch.Tensor,
+) -> torch.Tensor:
+    scatter_add_tensor = input_tensor
+    src_copy = src_tensor
+    src_shape = list(src_tensor.shape)
+    del src_shape[dim]
+    select_src_dim = src_copy.shape[dim]
+    to_stack_dummy_src = tuple(torch.empty(src_shape) for _ in range(select_src_dim))
+    for index_src_dim in range(0, select_src_dim, 1):
+        select_tensor_dim = torch.select(src_copy, dim, index_src_dim)
+        to_stack_src = to_stack_dummy_src
+        if(index_src_dim == 0):
+            to_stack_src = (select_tensor_dim.cpu(),) + to_stack_dummy_src[index_src_dim+1:] 
+        elif(index_src_dim == select_src_dim - 1 ):
+            to_stack_src = to_stack_dummy_src[:index_src_dim] + (select_tensor_dim.cpu(),)
+        else:
+            to_stack_src = to_stack_dummy_src[:index_src_dim] + (select_tensor_dim.cpu(),) + to_stack_dummy_src[index_src_dim+1:]
+
+        stacked_src = torch.stack(to_stack_src, dim)
+        input_tensor_to_add = torch.scatter(torch.empty_like(input_tensor, dtype= torch.float32), dim, index, stacked_src.cuda())
+        scatter_add_tensor = torch.add(scatter_add_tensor, input_tensor_to_add)
+    return scatter_add_tensor
+
+    
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
