@@ -12,6 +12,7 @@ jobs:
       test-infra-ref: windows_builds
       with-rocm: false
       with-cpu: false
+      python-version: "3.9"
 
   build:
     needs: generate-matrix
