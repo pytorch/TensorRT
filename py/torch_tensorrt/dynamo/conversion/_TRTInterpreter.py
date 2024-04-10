@@ -11,6 +11,7 @@ from torch.fx.passes.shape_prop import TensorMetadata
 from torch.utils._python_dispatch import _disable_current_modes
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -69,9 +70,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self.builder.create_network(flag), compilation_settings
         )
 
+        assert TRTInterpreter._all_precisions_supported(
+            compilation_settings.enabled_precisions
+        ), f"Attempted to enable kernel precisions that are not supported (got: {compilation_settings.enabled_precisions}, support: {_defaults.SUPPORTED_KERNEL_PRECISIONS})"
         missing_ops = self.validate_conversion()
         if missing_ops:
-            # TODO: @narendasan make sure to set logging.captureWarnings(True)
             warnings.warn(
                 "Interpretation will fail due to missing operations \n"
                 + "\n".join(f"{i}" for i in missing_ops)
@@ -118,59 +121,35 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         return missing_converters
 
-    def run(
-        self,
-        force_fp32_output: bool = False,
-        strict_type_constraints: bool = False,
-        algorithm_selector: Optional[trt.IAlgorithmSelector] = None,
-        timing_cache: Optional[trt.ITimingCache] = None,
-        tactic_sources: Optional[int] = None,
-    ) -> TRTInterpreterResult:
-        """
-        Build TensorRT engine with some configs.
-        Args:
-            force_fp32_output: force output to be fp32
-            strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric reasons.
-            algorithm_selector: set up algorithm selection for certain layer
-            timing_cache: enable timing cache for TensorRT
-        Return:
-            TRTInterpreterResult
-        """
-        TRT_INTERPRETER_CALL_PRE_OBSERVER.observe(self.module)
+    @staticmethod
+    def _all_precisions_supported(enabled_precisions: Set[dtype]) -> bool:
+        return enabled_precisions.issubset(_defaults.SUPPORTED_KERNEL_PRECISIONS)
 
-        precision = self.compilation_settings.precision
-        # For float outputs, we set their dtype to fp16 only if precision == torch.float16 and
-        # force_fp32_output=False. Overriden by specifying output_dtypes
-        self.output_fp16 = not force_fp32_output and precision == dtype.float16
-
-        if precision == dtype.int8 and not self.builder.platform_has_fast_int8:
+    def validate_compile_settings(self) -> None:
+        if (
+            dtype.i8 in self.compilation_settings.enabled_precisions
+            and not self.builder.platform_has_fast_int8
+        ):
             raise RuntimeError("Current platform doesn't support fast native int8!")
 
-        if precision == dtype.float16 and not self.builder.platform_has_fast_fp16:
+        if (
+            dtype.f16 in self.compilation_settings.enabled_precisions
+            and not self.builder.platform_has_fast_fp16
+        ):
             warnings.warn("Current platform doesn't support fast native fp16!")
 
-        self.input_specs_iter = 0
-        run_module_start_time = datetime.now()
-        super().run()
-        _LOGGER.info(
-            f"TRT INetwork construction elapsed time: {datetime.now() - run_module_start_time}"
-        )
-        build_engine_start_time = datetime.now()
+    def _populate_trt_builder_config(
+        self,
+        strict_type_constraints: bool = False,
+        algorithm_selector: Optional[trt.IAlgorithmSelector] = None,
+        tactic_sources: Optional[int] = None,
+    ) -> trt.IBuilderConfig:
 
         builder_config = self.builder.create_builder_config()
-
         if self.compilation_settings.workspace_size != 0:
             builder_config.set_memory_pool_limit(
                 trt.MemoryPoolType.WORKSPACE, self.compilation_settings.workspace_size
             )
-
-        cache = None
-        if timing_cache:
-            cache_file = np.array(timing_cache)
-            cache = builder_config.create_timing_cache(cache_file.tobytes())
-        else:
-            cache = builder_config.create_timing_cache(b"")
-        builder_config.set_timing_cache(cache, False)
 
         if version.parse(trt.__version__) >= version.parse("8.2"):
             builder_config.profiling_verbosity = (
@@ -216,7 +195,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             )
             assert (device_info.major == 8 and device_info.minor == 7) or (
                 device_info.major == 7 and device_info.minor == 2
-            )
+            ), "DLA is not available on non AGX systems"
             builder_config.DLA_core = self.compilation_settings.device.dla_core
             _LOGGER.info(f"Using DLA core {self.compilation_settings.device.dla_core}")
             builder_config.set_memory_pool_limit(
@@ -232,10 +211,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 self.compilation_settings.dla_global_dram_size,
             )
 
-        if precision == dtype.float16:
+        if dtype.float16 in self.compilation_settings.enabled_precisions:
             builder_config.set_flag(trt.BuilderFlag.FP16)
 
-        if precision == dtype.int8:
+        if dtype.int8 in self.compilation_settings.enabled_precisions:
             builder_config.set_flag(trt.BuilderFlag.INT8)
 
         if self.compilation_settings.sparse_weights:
@@ -262,11 +241,58 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if tactic_sources is not None:
             builder_config.set_tactic_sources(tactic_sources=tactic_sources)
 
+        return builder_config
+
+    def _create_timing_cache(
+        self,
+        builder_config: trt.IBuilderConfig,
+        existing_cache: Optional[trt.ITimingCache] = None,
+    ) -> trt.ITimingCache:
+        cache = None
+        if existing_cache:
+            cache_file = np.array(existing_cache)
+            cache = builder_config.create_timing_cache(cache_file.tobytes())
+        else:
+            cache = builder_config.create_timing_cache(b"")
+        builder_config.set_timing_cache(cache, False)
+        return cache
+
+    def run(
+        self,
+        strict_type_constraints: bool = False,
+        algorithm_selector: Optional[trt.IAlgorithmSelector] = None,
+        existing_cache: Optional[trt.ITimingCache] = None,
+        tactic_sources: Optional[int] = None,
+    ) -> TRTInterpreterResult:
+        """
+        Build TensorRT engine with some configs.
+        Args:
+            strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric reasons.
+            algorithm_selector: set up algorithm selection for certain layer
+            existing_cache: enable timing cache for TensorRT
+        Return:
+            TRTInterpreterResult
+        """
+        TRT_INTERPRETER_CALL_PRE_OBSERVER.observe(self.module)
+
+        self.input_specs_iter = 0
+        run_module_start_time = datetime.now()
+        super().run()
+        _LOGGER.info(
+            f"TRT INetwork construction elapsed time: {datetime.now() - run_module_start_time}"
+        )
+        build_engine_start_time = datetime.now()
+
+        builder_config = self._populate_trt_builder_config(
+            strict_type_constraints, algorithm_selector, tactic_sources
+        )
+        timing_cache = self._create_timing_cache(builder_config, existing_cache)
+
         engine = self.builder.build_engine(self.ctx.net, builder_config)
         assert engine
 
         serialized_cache = (
-            bytearray(cache.serialize())
+            bytearray(timing_cache.serialize())
             if builder_config.get_timing_cache()
             else bytearray()
         )

@@ -1,3 +1,5 @@
+# type: ignore
+
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import run_tests

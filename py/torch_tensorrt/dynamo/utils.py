@@ -5,10 +5,10 @@ from dataclasses import fields, replace
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import torch
-import torch_tensorrt
 from torch_tensorrt._Device import Device
+from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo._defaults import PRECISION
+from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 from packaging import version
@@ -244,25 +244,15 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
 
     # TODO: Remove once Dynamo precisions refactoring is complete
     if "enabled_precisions" in kwargs:
-        enabled_precisions = kwargs["enabled_precisions"]
+        enabled_precisions = {dtype._from(e) for e in kwargs["enabled_precisions"]}
 
-        if (
-            torch.float16 in enabled_precisions
-            or torch_tensorrt.dtype.half in enabled_precisions
-        ):
-            settings.precision = torch.float16
-        elif (
-            torch.float32 in enabled_precisions
-            or torch_tensorrt.dtype.float in enabled_precisions
-        ):
-            settings.precision = torch.float32
-        elif len(enabled_precisions) == 0:
-            logger.info(f"No precision specified, defaulting to {PRECISION}")
-            settings.precision = PRECISION
-        else:
-            raise ValueError(
-                f"Precision {enabled_precisions} not supported in the Dynamo Path"
+        if len(enabled_precisions) == 0:
+            logger.info(
+                f"No precision specified, defaulting to {_defaults.ENABLED_PRECISION}"
             )
+            enabled_precisions = _defaults.ENABLED_PRECISIONS
+
+        settings.enabled_precisions = enabled_precisions
 
     # Parse input runtime specification
     settings.use_python_runtime = use_python_runtime_parser(settings.use_python_runtime)

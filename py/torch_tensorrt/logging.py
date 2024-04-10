@@ -5,6 +5,7 @@ from torch_tensorrt._features import ENABLED_FEATURES
 
 import tensorrt as trt
 
+logging.captureWarnings(True)
 _LOGGER = logging.getLogger("torch_tensorrt [TensorRT Conversion Context]")
 
 

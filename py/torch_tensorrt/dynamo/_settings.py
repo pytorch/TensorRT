@@ -12,6 +12,7 @@ from torch_tensorrt.dynamo._defaults import (
     DLA_SRAM_SIZE,
     DRYRUN,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
     MAX_AUX_STREAMS,
@@ -20,7 +21,6 @@ from torch_tensorrt.dynamo._defaults import (
     OPTIMIZATION_LEVEL,
     OUTPUT_FORMAT,
     PASS_THROUGH_BUILD_FAILURES,
-    PRECISION,
     REFIT,
     REQUIRE_FULL_COMPILATION,
     SPARSE_WEIGHTS,
@@ -38,7 +38,7 @@ class CompilationSettings:
     """Compilation settings for Torch-TensorRT Dynamo Paths
 
     Args:
-        precision (torch.dtype): Model Layer precision
+        enabled_precisions (Set[dtype]): Available kernel dtype precisions
         debug (bool): Whether to print out verbose debugging information
         workspace_size (int): Workspace TRT is allowed to use for the module (0 is default)
         min_block_size (int): Minimum number of operators per TRT-Engine Block
@@ -73,7 +73,7 @@ class CompilationSettings:
         output_format (str): Output format of the result of TRT compilation. Options include "exported_program" (or) "ep" | "torchscript" (or) "ts" | "graph_module" (or) "fx". Default is "exported_program"
     """
 
-    precision: dtype = field(default_factory=lambda: PRECISION)
+    enabled_precisions: dtype = field(default_factory=lambda: ENABLED_PRECISIONS)
     debug: bool = DEBUG
     workspace_size: int = WORKSPACE_SIZE
     min_block_size: int = MIN_BLOCK_SIZE

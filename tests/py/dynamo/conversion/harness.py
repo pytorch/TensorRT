@@ -8,6 +8,7 @@ from typing import Callable, List, Optional, Set, Tuple
 import torch
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt import Input
+from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
@@ -219,7 +220,7 @@ class DispatchTestCase(TRTTestCase):
         inputs,
         rtol=1e-03,
         atol=1e-03,
-        precision=torch.float,
+        precision=dtype.f32,
         check_dtype=True,
         output_dtypes=None,
         use_dynamo_tracer=False,
@@ -236,7 +237,7 @@ class DispatchTestCase(TRTTestCase):
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
         compilation_settings = CompilationSettings(
-            precision=precision, truncate_long_and_double=True
+            enabled_precisions={dtype._from(precision)}, truncate_long_and_double=True
         )
 
         interp = TRTInterpreter(

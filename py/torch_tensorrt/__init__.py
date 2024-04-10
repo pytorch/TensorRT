@@ -92,11 +92,11 @@ _LOGGER.debug(_enabled_features_str())
 def _register_with_torch() -> None:
     trtorch_dir = os.path.dirname(__file__)
     if os.path.isfile(trtorch_dir + "/lib/libtorchtrt.so"):
-        assert ENABLED_FEATURES.torchscript_frontend == True
-        assert ENABLED_FEATURES.torch_tensorrt_runtime == True
+        assert ENABLED_FEATURES.torchscript_frontend
+        assert ENABLED_FEATURES.torch_tensorrt_runtime
         torch.ops.load_library(trtorch_dir + "/lib/libtorchtrt.so")
     elif os.path.isfile(trtorch_dir + "/lib/libtorchtrt_runtime.so"):
-        assert ENABLED_FEATURES.torch_tensorrt_runtime == True
+        assert ENABLED_FEATURES.torch_tensorrt_runtime
         torch.ops.load_library(trtorch_dir + "/lib/libtorchtrt_runtime.so")
 
 

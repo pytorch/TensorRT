@@ -9,6 +9,7 @@ import torch.fx
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.fx import InputTensorSpec
 from torch_tensorrt.fx.lower import compile as fx_compile
 from torch_tensorrt.fx.utils import LowerPrecision
@@ -17,6 +18,9 @@ from typing_extensions import TypeGuard
 if ENABLED_FEATURES.torchscript_frontend:
     import torch_tensorrt.ts
     from torch_tensorrt.ts._compiler import compile as torchscript_compile
+    from torch_tensorrt.ts._compiler import (
+        convert_method_to_trt_engine as ts_convert_method_to_trt_engine,
+    )
 
 if ENABLED_FEATURES.dynamo_frontend:
     from torch._export import ExportedProgram
@@ -88,20 +92,34 @@ def _get_target_fe(module_type: _ModuleType, ir: str) -> _IRType:
     ir_targets_dynamo = ir == "dynamo"
     ir_targets_torch_compile = ir == "torch_compile"
 
-    if (
-        module_is_tsable and ir_targets_torchscript
-    ) and ENABLED_FEATURES.torchscript_frontend:
-        return _IRType.ts
-    elif (module_is_fxable and ir_targets_fx) and ENABLED_FEATURES.fx_frontend:
-        return _IRType.fx
-    elif (
-        (module_is_fxable or module_is_exportable) and ir_targets_dynamo
-    ) and ENABLED_FEATURES.dynamo_frontend:
-        return _IRType.dynamo
-    elif (
-        module_is_fxable and ir_targets_torch_compile
-    ) and ENABLED_FEATURES.dynamo_frontend:
-        return _IRType.torch_compile
+    if module_is_tsable and ir_targets_torchscript:
+        if ENABLED_FEATURES.torchscript_frontend:
+            return _IRType.ts
+        else:
+            raise ValueError(
+                "Requested using the TS frontend but the TS frontend is not available in this build of Torch-TensorRT"
+            )
+    elif module_is_fxable and ir_targets_fx:
+        if ENABLED_FEATURES.fx_frontend:
+            return _IRType.fx
+        else:
+            raise ValueError(
+                "Requested using the FX frontend but the FX frontend is not available in this build of Torch-TensorRT"
+            )
+    elif (module_is_fxable or module_is_exportable) and ir_targets_dynamo:
+        if ENABLED_FEATURES.dynamo_frontend:
+            return _IRType.dynamo
+        else:
+            raise ValueError(
+                "Requested using the Dynamo frontend but the Dynamo frontend is not available in this build of Torch-TensorRT"
+            )
+    elif module_is_fxable and ir_targets_torch_compile:
+        if ENABLED_FEATURES.dynamo_frontend:
+            return _IRType.torch_compile
+        else:
+            raise ValueError(
+                "Requested using the Torch-TensorRT torch.compile backend but the Torch-TensorRT torch.compile backend is not available in this build of Torch-TensorRT"
+            )
     else:
         if ir == "default":
             # Options are listed in order of preference
@@ -169,9 +187,9 @@ def compile(
     Returns:
         torch.nn.Module: Compiled Module, when run it will execute via TensorRT
     """
-    input_list = inputs if inputs is not None else []
+    input_list = inputs if inputs else []
     enabled_precisions_set: Set[dtype | torch.dtype] = (
-        enabled_precisions if enabled_precisions is not None else {dtype.float}
+        enabled_precisions if enabled_precisions else _defaults.ENABLED_PRECISIONS
     )
 
     module_type = _parse_module_type(module)
@@ -309,13 +327,14 @@ def convert_method_to_trt_engine(
                 "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript"
             )
             ts_mod = torch.jit.script(module)
-        return torch_tensorrt.ts.convert_method_to_trt_engine(
+        serialized_engine: bytes = ts_convert_method_to_trt_engine(
             ts_mod,
             inputs=inputs,
             method_name=method_name,
             enabled_precisions=enabled_precisions_set,
             **kwargs,
         )
+        return serialized_engine
     elif target_ir == _IRType.fx:
         raise RuntimeError(
             "convert_method_to_trt_engine call is not supported for ir=fx"
