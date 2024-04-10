@@ -26,6 +26,7 @@ jobs:
             pre-script: packaging/pre_build_script_windows.sh
             smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
+            python-version: "3.9"
     name: Build torch-tensorrt whl package
     uses: gs-olive/test-infra/.github/workflows/build_wheels_windows.yml@windows_builds
     with:
