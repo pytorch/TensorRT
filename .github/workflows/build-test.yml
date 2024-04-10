@@ -79,7 +79,8 @@ jobs:
         export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
         pushd .
         cd tests/modules
-        ${CONDA_RUN} python -m pip install --pre -r requirements.txt --use-deprecated=legacy-resolver
+        # Don't use requirements.txt here as it contains tensorrt and torch which should have been installed by now.
+        ${CONDA_RUN} python -m pip install numpy packaging pyyaml pybind11==2.6.2
         ${CONDA_RUN} python hub.py
         popd
         pushd .
