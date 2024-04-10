@@ -81,7 +81,7 @@ jobs:
         pushd .
         cd tests/modules
         # Don't use requirements.txt here as it contains tensorrt and torch which should have been installed by now.
-        ${CONDA_RUN} python -m pip install numpy packaging pyyaml pybind11==2.6.2
+        ${CONDA_RUN} python -m pip install numpy packaging pyyaml transformers pybind11==2.6.2
         ${CONDA_RUN} python hub.py
         popd
         pushd .
