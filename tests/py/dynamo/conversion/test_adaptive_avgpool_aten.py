@@ -76,7 +76,6 @@ class TestAdaptiveAvgPoolConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             inputs,
-            # use_dynamo_tracer=True,
             enable_passes=True,
         )
 
@@ -155,7 +154,6 @@ class TestAdaptiveAvgPoolConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             inputs,
-            # use_dynamo_tracer=True,
             enable_passes=True,
         )
 
@@ -268,7 +266,6 @@ class TestAdaptiveAvgPoolConverter(DispatchTestCase):
         self.run_test(
             TestModule(),
             inputs,
-            # use_dynamo_tracer=True,
             enable_passes=True,
         )
 
