@@ -121,7 +121,7 @@ class TestRandConverter(DispatchTestCase):
             x.dtype == y.dtype if check_dtype else True
         )
         expected_ops = []
-        # TRT-np returns int32 while torch returns float32
+        # TRT-TRT returns int32  while torch returns int64
         self.run_test_comparator(
             rand_model,
             inputs,

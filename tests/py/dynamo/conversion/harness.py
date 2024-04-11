@@ -273,7 +273,7 @@ class DispatchTestCase(TRTTestCase):
         inputs,
         expected_ops,
         comparators: List[Tuple[Callable, List]],
-        precision=torch.float32,
+        precision=torch.float,
         output_dtypes=None,
         use_dynamo_tracer=False,
         enable_passes=False,
