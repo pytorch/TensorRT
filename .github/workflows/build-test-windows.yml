@@ -26,6 +26,7 @@ jobs:
             pre-script: packaging/pre_build_script_windows.sh
             smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
+            validation-runner: windows-2019
     name: Build torch-tensorrt whl package
     uses: pytorch/test-infra/.github/workflows/build_wheels_windows.yml@main
     with:
