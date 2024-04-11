@@ -172,6 +172,7 @@ jobs:
       ref: ""
       test-infra-repository: gs-olive/test-infra
       test-infra-ref: windows_builds
+      pre-script: packaging/pre_build_script_driver_upgrade.sh
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       script: |
         export USE_HOST_DEPS=1
