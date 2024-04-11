@@ -29,7 +29,7 @@ def upsample(
         resize_layer.scales = [1.0, 1.0] + list(scale_factors)
     else:
         raise RuntimeError(
-            f"At least one of out_shape and scale_factors should be specified."
+            "At least one of out_shape and scale_factors should be specified."
         )
 
     # interpolate mode
