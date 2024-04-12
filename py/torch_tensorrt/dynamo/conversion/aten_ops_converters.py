@@ -2242,7 +2242,12 @@ def aten_ops_avg_pool(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool1d.default)
-def aten_ops_adaptive_avg_pool(
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_adaptive_avg_pool1d(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
@@ -2250,6 +2255,32 @@ def aten_ops_adaptive_avg_pool(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.pool.adaptive_avg_pool1d(
+        ctx,
+        target,
+        source_ir=SourceIR.ATEN,
+        name=name,
+        input=args[0],
+        output_size=args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool2d.default)
+@dynamo_tensorrt_converter(torch.ops.aten._adaptive_avg_pool2d.default)
+@dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool3d.default)
+@dynamo_tensorrt_converter(torch.ops.aten._adaptive_avg_pool3d.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_adaptive_avg_poolNd(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.pool.adaptive_avg_poolNd(
         ctx,
         target,
         source_ir=SourceIR.ATEN,
