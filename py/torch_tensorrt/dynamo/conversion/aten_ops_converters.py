@@ -1152,6 +1152,23 @@ def aten_ops_exp(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.expm1.default)
+def aten_ops_expm1(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.expm1(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.log.default)
 def aten_ops_log(
     ctx: ConversionContext,

@@ -44,6 +44,32 @@ def exp(
     )
 
 
+def expm1(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+) -> TRTTensor:
+    """
+    Computes e^x - 1 for each element of the input tensor.
+
+    Args:
+        ctx (ConversionContext): TensorRT ConversionContext object.
+        target (Target): fx node target.
+        source_ir (SourceIR): Source IR calling the function
+        name (str): Name of the fx node with optional suffix.
+        input_val (TRTTensor): The input tensor.
+
+    Returns:
+        TRTTensor: A TensorRT tensor represent the result of expm1 operator.
+    """
+    # Compute e^x for each element of the input tensor
+    exp_result = exp(ctx, target, source_ir, f"{name}_exp", input_val)
+
+    return impl.elementwise.sub(ctx, target, source_ir, f"{name}_sub", exp_result, 1)
+
+
 def log(
     ctx: ConversionContext,
     target: Target,
