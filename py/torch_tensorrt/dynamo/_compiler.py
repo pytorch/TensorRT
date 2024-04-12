@@ -189,10 +189,10 @@ def compile(
     )
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
-
     # Apply lowering on the graph module
     torch_inputs = get_torch_inputs(inputs, device)
     gm = apply_lowering_passes(gm, torch_inputs)
+
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     enabled_precisions = set(enabled_precisions)
@@ -308,6 +308,24 @@ def compile_module(
             f"Detected support for {num_supported_ops} operators out of {total_ops} in subgraph."
         )
 
+    def contains_metadata(gm: torch.fx.GraphModule) -> bool:
+        for node in gm.graph.nodes:
+            if node.op != "output" and (not node.meta) and "val" not in node.meta:
+                logger.warning(
+                    f"Node {node.name} of op type {node.op} does not have metadata. This could sometimes lead to undefined behavior."
+                )
+                return False
+        return True
+
+    # Check if the module has metadata (shape, dtype). If not, run symbolic shape propagation.
+    if not contains_metadata(gm):
+        from torch._inductor.compile_fx import fake_tensor_prop
+
+        torch_inputs = get_torch_inputs(sample_inputs, settings.device)
+        with torch.no_grad():
+            # This fails if the module has data-dependent shape operators.
+            fake_tensor_prop(gm, torch_inputs)
+
     # Partition module into components that can be TRT-accelerated
     fast_partitioner_failed = False
 
@@ -366,12 +384,7 @@ def compile_module(
         )
 
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
-        submodule_inputs = partitioning.get_submod_inputs(
-            partitioned_module,
-            submodule,
-            sample_inputs,
-            to_torch_device(settings.device),
-        )
+        submodule_inputs = partitioning.construct_submodule_inputs(submodule)
 
         logger.debug(
             "Submodule name: %s\n Input shapes: %s\n %s",
