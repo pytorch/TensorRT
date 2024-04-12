@@ -4,10 +4,11 @@ from typing import Any, List, Optional, Sequence, Set, Tuple
 
 import torch
 import torch_tensorrt._C.ts as _C
-from torch_tensorrt import _enums
 from torch_tensorrt._Device import Device
 from torch_tensorrt._Input import Input
 from torch_tensorrt.ts._compile_spec import _parse_compile_spec, _parse_device
+
+from torch_tensorrt import _enums
 
 
 def compile(
@@ -137,6 +138,9 @@ def compile(
         "capability": capability,  # Restrict kernel selection to safe gpu kernels or safe dla kernels
         "num_avg_timing_iters": num_avg_timing_iters,  # Number of averaging timing iterations used to select kernels
         "workspace_size": workspace_size,  # Maximum size of workspace given to TensorRT
+        "dla_sram_size": dla_sram_size,
+        "dla_local_dram_size": dla_local_dram_size,
+        "dla_global_dram_size": dla_global_dram_size,
         "calibrator": calibrator,
         "truncate_long_and_double": truncate_long_and_double,
         "torch_fallback": {
