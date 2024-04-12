@@ -508,3 +508,23 @@ def scalar_tensor(
     identity_layer = ctx.net.add_identity(tensor)
     set_layer_name(identity_layer, target, name, source_ir)
     return identity_layer.get_output(0)
+
+
+def isnan(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+) -> TRTTensor:
+    # False for NaN elements since NaN is not equal to anything, including itself.
+    equality_result = impl.elementwise.eq(
+        ctx, target, source_ir, f"{name}_eq_nan", input, input
+    )
+
+    # Invert equality_result to get a mask where NaN values are marked as True.
+    nan_values_mask = logical_not(
+        ctx, target, source_ir, f"{name}_logical_not", equality_result
+    )
+
+    return nan_values_mask
