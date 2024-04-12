@@ -84,7 +84,7 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
-    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+    uses: ./.github/workflows/windows-test.yml
     with:
       job-name: tests-py-dynamo-converters
       repository: "pytorch/tensorrt"
@@ -92,7 +92,7 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
+      pre-script: packaging/pre_build_script_driver_upgrade.sh
       script: |
         export USE_HOST_DEPS=1
         pushd .
@@ -111,7 +111,7 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
-    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+    uses: ./.github/workflows/windows-test.yml
     with:
       job-name: tests-py-dynamo-fe
       repository: "pytorch/tensorrt"
@@ -119,7 +119,7 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
+      pre-script: packaging/pre_build_script_driver_upgrade.sh
       script: |
         export USE_HOST_DEPS=1
         pushd .
@@ -193,7 +193,7 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
-    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+    uses: ./.github/workflows/windows-test.yml
     with:
       job-name: tests-py-dynamo-core
       repository: "pytorch/tensorrt"
@@ -201,7 +201,7 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
+      pre-script: packaging/pre_build_script_driver_upgrade.sh
       script: |
         export USE_HOST_DEPS=1
         pushd .
