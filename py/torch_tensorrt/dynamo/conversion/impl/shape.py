@@ -9,6 +9,7 @@ from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_trt_tensor,
     get_positive_dim,
     get_trt_tensor,
 )
@@ -38,6 +39,12 @@ def shape(
     """
     shape_layer = ctx.net.add_shape(input_val)
     input_shape = shape_layer.get_output(0)
+    input_shape = cast_trt_tensor(
+        ctx,
+        input_shape,
+        trt.int32,
+        name + "_shape_casted",
+    )
     set_layer_name(shape_layer, target, name + "_shape", source_ir)
 
     n_dims = len(input_val.shape)
@@ -82,6 +89,12 @@ def get_shape_with_dynamic_shape(
     """
     # Ger real shape info for input_val
     input_shape = ctx.net.add_shape(input_val).get_output(0)
+    input_shape = cast_trt_tensor(
+        ctx,
+        input_shape,
+        trt.int32,
+        name + "_int32_casted",
+    )
     # input_shape.dtype is int64 in TRT 10.0
     input_np_dtype = unified_dtype_converter(input_shape.dtype, Frameworks.NUMPY)
     scale_layer = ctx.net.add_constant(
