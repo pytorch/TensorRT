@@ -83,7 +83,6 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
     uses: ./.github/workflows/windows-test.yml
     with:
       job-name: tests-py-dynamo-converters
@@ -110,7 +109,6 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
     uses: ./.github/workflows/windows-test.yml
     with:
       job-name: tests-py-dynamo-fe
@@ -124,37 +122,36 @@ jobs:
         export USE_HOST_DEPS=1
         pushd .
         cd tests/py/dynamo
-        ${CONDA_RUN} python -m pip install --pre pytest timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
+        ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
         ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_fe_test_results.xml --ir dynamo models/test_models_export.py
         ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/test_dyn_models.py
         popd
 
-  # tests-py-dynamo-serde:
-  #   name: Test dynamo export serde [Python]
-  #   needs: [generate-matrix, build]
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       include:
-  #         - repository: pytorch/tensorrt
-  #           package-name: torch_tensorrt
-  #           pre-script: packaging/pre_build_script.sh
-  #   uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
-  #   with:
-  #     job-name: tests-py-dynamo-serde
-  #     repository: "pytorch/tensorrt"
-  #     ref: ""
-  #     test-infra-repository: pytorch/test-infra
-  #     test-infra-ref: main
-  #     build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
-  #     pre-script: ${{ matrix.pre-script }}
-  #     script: |
-  #       export USE_HOST_DEPS=1
-  #       pushd .
-  #       cd tests/py/dynamo
-  #       ${CONDA_RUN} python -m pip install --pre pytest timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
-  #       ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/export_serde_test_results.xml --ir dynamo models/test_export_serde.py
-  #       popd
+  tests-py-dynamo-serde:
+    name: Test dynamo export serde [Python]
+    needs: [generate-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+    with:
+      job-name: tests-py-dynamo-serde
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: packaging/pre_build_script_driver_upgrade.sh
+      script: |
+        export USE_HOST_DEPS=1
+        pushd .
+        cd tests/py/dynamo
+        ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
+        ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/export_serde_test_results.xml --ir dynamo models/test_export_serde.py
+        popd
 
   tests-py-torch-compile-be:
     name: Test torch compile backend [Python]
@@ -192,7 +189,6 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
     uses: ./.github/workflows/windows-test.yml
     with:
       job-name: tests-py-dynamo-core
