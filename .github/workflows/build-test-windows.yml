@@ -136,7 +136,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+    uses: ./.github/workflows/windows-test.yml
     with:
       job-name: tests-py-dynamo-serde
       repository: "pytorch/tensorrt"
