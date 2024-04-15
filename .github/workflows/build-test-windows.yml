@@ -91,7 +91,7 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
-      pre-script: packaging/pre_build_script_driver_upgrade.sh
+      pre-script: packaging/driver_upgrade.bat
       script: |
         export USE_HOST_DEPS=1
         pushd .
@@ -117,7 +117,7 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
-      pre-script: packaging/pre_build_script_driver_upgrade.sh
+      pre-script: packaging/driver_upgrade.bat
       script: |
         export USE_HOST_DEPS=1
         pushd .
@@ -144,7 +144,7 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
-      pre-script: packaging/pre_build_script_driver_upgrade.sh
+      pre-script: packaging/driver_upgrade.bat
       script: |
         export USE_HOST_DEPS=1
         pushd .
@@ -169,7 +169,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      pre-script: packaging/pre_build_script_driver_upgrade.sh
+      pre-script: packaging/driver_upgrade.bat
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       script: |
         export USE_HOST_DEPS=1
@@ -197,7 +197,7 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
-      pre-script: packaging/pre_build_script_driver_upgrade.sh
+      pre-script: packaging/driver_upgrade.bat
       script: |
         export USE_HOST_DEPS=1
         pushd .
