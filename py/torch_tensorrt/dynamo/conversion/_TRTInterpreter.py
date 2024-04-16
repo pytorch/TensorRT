@@ -125,15 +125,22 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
     @staticmethod
     def _args_str(args: List[Any]) -> str:
-        args_ = [
-            (
-                f"ITensor {a.name} (shape: {a.shape}, dtype: {a.dtype})"
-                if isinstance(a, trt.ITensor)
-                else a
-            )
-            for a in args
-        ]
-        return str(tuple(args_))
+        def clean_repr(x: Any) -> Any:
+            if isinstance(x, trt.ITensor):
+                return f"{x.name} <tensorrt.ITensor [shape={x.shape}, dtype={x.dtype}]>"
+            elif isinstance(x, torch.Tensor):
+                return f"<torch.Tensor [shape={x.shape}, dtype={x.dtype}]>"
+            elif isinstance(x, np.ndarray):
+                return (
+                    f"<torch.Tensor as np.ndarray [shape={x.shape}, dtype={x.dtype}]>"
+                )
+            elif isinstance(x, Sequence):
+                return type(x)([clean_repr(i) for i in x])  # type: ignore[call-arg]
+            else:
+                return x
+
+        str_args = [clean_repr(a) for a in args]
+        return repr(tuple(str_args))
 
     @staticmethod
     def _all_precisions_supported(enabled_precisions: Set[dtype]) -> bool:
@@ -375,7 +382,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         trt_input_dtype = current_input.dtype.to(trt.DataType, use_default=True)
         _LOGGER.debug(
-            f"Adding input to in-progress INetwork: {target} (shape={shape}, dtype={trt_input_dtype})"
+            f"Adding input to in-progress INetwork: {target} [shape={shape}, dtype={trt_input_dtype}]"
         )
         return self.ctx.net.add_input(
             name=target,
@@ -516,7 +523,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
             self._output_names.append(name)
             _LOGGER.debug(
-                f"Marking output {name} (shape: {output.shape}, dtype: {output.dtype})"
+                f"Marking output {name} [shape={output.shape}, dtype={output.dtype}]"
             )
 
         return list(outputs)
