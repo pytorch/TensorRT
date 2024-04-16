@@ -357,7 +357,7 @@ def embedding_bag(
         weight,
     )
     embed = cast_trt_tensor(
-        ctx, embed, torch.float, f"{name}_cast_embed_to_fp16", target, source_ir
+        ctx, embed, torch.float, f"{name}_cast_embed_to_fp32", target, source_ir
     )
 
     # give weights to embedding

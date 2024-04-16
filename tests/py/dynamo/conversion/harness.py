@@ -96,12 +96,14 @@ class TRTTestCase(TestCase):
             ):
                 ref_outputs = [ref_outputs]
             for out, ref in zip(outputs, ref_outputs):
+                ref = ref.cpu()  # to_dtype test has cases with gpu output
                 if not isinstance(ref, torch.Tensor):
                     ref = torch.tensor([ref])
-                ref = ref.cpu()  # to_dtype test has cases with gpu output
+                if ref.dtype == torch.int64:
+                    ref = ref.int()  # convert torch.max's index output tensor to int32
                 torch.testing.assert_close(
                     out.cpu(),
-                    ref.cpu(),
+                    ref,
                     rtol=rtol,
                     atol=atol,
                     equal_nan=True,
