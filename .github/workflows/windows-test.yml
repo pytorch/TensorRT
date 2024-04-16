@@ -52,6 +52,7 @@ jobs:
       REF: ${{ inputs.ref }}
       CU_VERSION: ${{ matrix.desired_cuda }}
       SCRIPT: ${{ inputs.script }}
+      PYTHONUTF8: 1
     name: ${{ inputs.job-name }}-${{ matrix.desired_cuda }}
     runs-on: windows.8xlarge.nvidia.gpu.nonephemeral
     defaults:
