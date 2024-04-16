@@ -13,6 +13,7 @@ from torch_tensorrt.dynamo._compiler import compile_module
 from torch_tensorrt.dynamo.lowering import (
     apply_lowering_passes,
     get_decompositions,
+    remove_sym_nodes,
     repair_input_aliasing,
 )
 from torch_tensorrt.dynamo.utils import (
@@ -27,7 +28,7 @@ logger = logging.getLogger(__name__)
 @td.register_backend(name="tensorrt")  # type: ignore[misc]
 @td.register_backend(name="torch_tensorrt")  # type: ignore[misc]
 def torch_tensorrt_backend(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor], **kwargs: Any
+    gm: torch.fx.GraphModule, sample_inputs: Sequence[Any], **kwargs: Any
 ) -> torch.nn.Module:
     # Set log level at the top of compilation (torch_tensorrt.dynamo)
     if (
@@ -44,7 +45,7 @@ def torch_tensorrt_backend(
 
 @td.register_backend(name="aot_torch_tensorrt_aten")  # type: ignore[misc]
 def aot_torch_tensorrt_aten_backend(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor], **kwargs: Any
+    gm: torch.fx.GraphModule, sample_inputs: Sequence[Any], **kwargs: Any
 ) -> torch.nn.Module:
     settings = parse_dynamo_kwargs(kwargs)
     return _pretraced_backend(gm, sample_inputs, settings)
@@ -52,7 +53,7 @@ def aot_torch_tensorrt_aten_backend(
 
 def _pretraced_backend(
     gm: torch.fx.GraphModule,
-    sample_inputs: Sequence[torch.Tensor],
+    sample_inputs: Sequence[Any],
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.fx.GraphModule | Callable[..., Any]:
     """Helper function to manage translation of traced FX module to TRT engines
@@ -74,10 +75,17 @@ def _pretraced_backend(
             fake_mode, "allow_non_fake_inputs", True
         ), fake_mode:
             repair_input_aliasing(gm)
+
+            # Remove sym_int placeholders and inputs
+            remove_sym_nodes(gm)
+            torch_inputs = [
+                input for input in sample_inputs if isinstance(input, torch.Tensor)
+            ]
+
             # Invoke AOTAutograd to translate operators to aten
             gm = aot_export_joint_simple(
                 gm,
-                sample_inputs,
+                torch_inputs,
                 trace_joint=False,
                 decompositions=get_decompositions(
                     settings.enable_experimental_decompositions
@@ -86,10 +94,10 @@ def _pretraced_backend(
 
             logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
 
-            gm = apply_lowering_passes(gm, sample_inputs)
+            gm = apply_lowering_passes(gm, torch_inputs)
 
             torchtrt_inputs = prepare_inputs(
-                sample_inputs, disable_memory_format_check=True
+                torch_inputs, disable_memory_format_check=True
             )
             trt_compiled = compile_module(
                 gm,
