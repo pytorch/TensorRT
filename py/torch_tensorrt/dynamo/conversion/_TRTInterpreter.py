@@ -499,6 +499,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     "not",
                     "ne",
                     "isinf",
+                    "isnan",
                     "any",
                 )
             ):

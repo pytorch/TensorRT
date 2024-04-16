@@ -1,3 +1,4 @@
+# type: ignore
 import unittest
 
 import torch
@@ -28,7 +29,7 @@ class TestToBackendLowering(unittest.TestCase):
                         "dla_core": 0,
                         "allow_gpu_fallback": True,
                     },
-                    "capability": torchtrt.ts.EngineCapability.default,
+                    "capability": torchtrt.ts.EngineCapability.DEFAULT,
                     "num_avg_timing_iters": 1,
                     "disable_tf32": False,
                 }

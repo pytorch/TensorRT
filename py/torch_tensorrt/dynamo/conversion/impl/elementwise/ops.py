@@ -1,5 +1,6 @@
 from typing import Optional, Union
 
+import numpy as np
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
