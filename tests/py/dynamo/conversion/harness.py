@@ -267,7 +267,7 @@ class DispatchTestCase(TRTTestCase):
             check_dtype,
         )
 
-    def run_test_comparator(
+    def run_test_compare_tensor_attributes_only(
         self,
         mod,
         inputs,

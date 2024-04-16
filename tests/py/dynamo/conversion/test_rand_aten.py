@@ -86,7 +86,7 @@ class TestRandConverter(DispatchTestCase):
             x.dtype == y.dtype if check_dtype else True
         )
         expected_ops = []
-        self.run_test_comparator(
+        self.run_test_compare_tensor_attributes_only(
             rand_model,
             inputs,
             expected_ops,
@@ -122,7 +122,7 @@ class TestRandConverter(DispatchTestCase):
         )
         expected_ops = []
         # TRT-TRT returns int32  while torch returns int64
-        self.run_test_comparator(
+        self.run_test_compare_tensor_attributes_only(
             rand_model,
             inputs,
             expected_ops,
