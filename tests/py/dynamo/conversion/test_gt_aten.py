@@ -22,7 +22,6 @@ class TestGtConverter(DispatchTestCase):
         self.run_test(
             gt(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
     @parameterized.expand(
@@ -40,7 +39,6 @@ class TestGtConverter(DispatchTestCase):
         self.run_test(
             gt(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
     @parameterized.expand(
@@ -58,7 +56,6 @@ class TestGtConverter(DispatchTestCase):
         self.run_test(
             gt(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
 

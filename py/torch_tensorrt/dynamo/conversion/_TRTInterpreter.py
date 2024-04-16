@@ -105,6 +105,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             [dtype._from(o) for o in output_dtypes] if output_dtypes else None
         )
 
+        _LOGGER.debug(f"Graph to be compiled to TensorRT: {self.module.graph}")
+
     def validate_conversion(self) -> Set[str]:
         missing_converters: Set[str] = set()
 
@@ -120,6 +122,18 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     missing_converters.add(f"{node.op} {torch.typename(submod_type)}")
 
         return missing_converters
+
+    @staticmethod
+    def _args_str(args: List[Any]) -> str:
+        args_ = [
+            (
+                f"ITensor {a.name} (shape: {a.shape}, dtype: {a.dtype})"
+                if isinstance(a, trt.ITensor)
+                else a
+            )
+            for a in args
+        ]
+        return str(tuple(args_))
 
     @staticmethod
     def _all_precisions_supported(enabled_precisions: Set[dtype]) -> bool:
@@ -359,10 +373,14 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 f"Unable to access shape spec for input: {target} (got: {current_input})"
             )
 
+        trt_input_dtype = current_input.dtype.to(trt.DataType, use_default=True)
+        _LOGGER.debug(
+            f"Adding input to in-progress INetwork: {target} (shape={shape}, dtype={trt_input_dtype})"
+        )
         return self.ctx.net.add_input(
             name=target,
             shape=tuple(shape),
-            dtype=current_input.dtype.to(trt.DataType, use_default=True),
+            dtype=trt_input_dtype,
         )
 
     def call_module(
@@ -381,6 +399,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         converter, calling_convention = converter_packet
 
         assert self._cur_node_name is not None
+        _LOGGER.debug(
+            f"Converting node {self._cur_node_name} (kind: {target}, args: {TRTInterpreter._args_str(args)})"
+        )
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, submod, args, kwargs, self._cur_node_name)
         else:
@@ -397,6 +418,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         converter, calling_convention = converter_packet
 
         assert self._cur_node_name is not None
+        _LOGGER.debug(
+            f"Converting node {self._cur_node_name} (kind: {target}, args: {TRTInterpreter._args_str(args)})"
+        )
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
         else:
@@ -428,6 +452,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         converter, calling_convention = converter_packet
 
         assert self._cur_node_name is not None
+        _LOGGER.debug(
+            f"Converting node {self._cur_node_name} (kind: {target}, args: {TRTInterpreter._args_str(args)})"
+        )
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
         else:
@@ -485,8 +512,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 output.dtype = trt.DataType.BOOL
             elif self.output_dtypes is not None:
                 output.dtype = self.output_dtypes[i].to(trt.DataType)
-            elif self.output_fp16 and output.dtype == trt.DataType.FLOAT:
-                output.dtype = trt.DataType.HALF
+
             self._output_names.append(name)
+            _LOGGER.debug(
+                f"Marking output {name} (shape: {output.shape}, dtype: {output.dtype})"
+            )
 
         return list(outputs)

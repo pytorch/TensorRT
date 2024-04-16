@@ -42,7 +42,6 @@ def get_node_name(node: torch.fx.Node) -> str:
         # like the node.meta['source_fn'] attr
         pass
 
-    _LOGGER.debug(f"Node meta name {node_name}")
     return node_name
 
 

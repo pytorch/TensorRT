@@ -13,6 +13,7 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
+from torch_tensorrt.dynamo.conversion._conversion import infer_module_output_dtypes
 from torch_tensorrt.dynamo.lowering import apply_lowering_passes
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 
@@ -71,7 +72,8 @@ class TRTTestCase(TestCase):
                 interpreter_result.output_names,
             )
 
-            ref_outputs = mod(*inputs)
+            mod = mod.cuda()
+            ref_outputs = mod(*cuda_inputs)
 
             torch.cuda.synchronize()
             start_event = torch.cuda.Event(enable_timing=True)
@@ -147,7 +149,7 @@ class TRTTestCase(TestCase):
                 interpreter_result.output_names,
             )
             res_trt = trt_mod(*cuda_inputs).cpu()
-            res_cpu = mod(*inputs)
+            res_cpu = mod(*cuda_inputs).cpu()
             assert len(res_trt) == len(res_cpu)
             assert len(res_cpu) == len(comparators)
             for output_trt, output_cpu, comparator in zip(
@@ -211,7 +213,6 @@ class DispatchTestCase(TRTTestCase):
             fx_module = torch.fx.symbolic_trace(mod)
         if enable_passes:
             fx_module = apply_lowering_passes(fx_module, original_inputs)
-        _LOGGER.info(f"FX graph= {fx_module.graph}")
         return fx_module
 
     def run_test(
@@ -222,7 +223,6 @@ class DispatchTestCase(TRTTestCase):
         atol=1e-03,
         precision=dtype.f32,
         check_dtype=True,
-        output_dtypes=None,
         use_dynamo_tracer=False,
         enable_passes=False,
     ):
@@ -237,12 +237,24 @@ class DispatchTestCase(TRTTestCase):
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
         compilation_settings = CompilationSettings(
-            enabled_precisions={dtype._from(precision)}, truncate_long_and_double=True
+            enabled_precisions={dtype._from(precision)},
+            truncate_long_and_double=True,
         )
+
+        input_specs = [Input.from_tensor(i) for i in inputs]
+
+        output_dtypes = None
+        if check_dtype:
+            output_dtypes = infer_module_output_dtypes(
+                mod,
+                input_specs,
+                compilation_settings.device,
+                truncate_long_and_double=compilation_settings.truncate_long_and_double,
+            )
 
         interp = TRTInterpreter(
             mod,
-            Input.from_tensors(inputs),
+            input_specs,
             output_dtypes=output_dtypes,
             compilation_settings=compilation_settings,
         )
