@@ -313,6 +313,22 @@ def compile_module(
             f"Detected support for {num_supported_ops} operators out of {total_ops} in subgraph."
         )
 
+    def contains_metadata(gm: torch.fx.GraphModule) -> bool:
+        for node in gm.graph.nodes:
+            if node.op != "output" and (not node.meta) and "val" not in node.meta:
+                logger.warning(
+                    f"Node {node.name} of op type {node.op} does not have metadata. This could sometimes lead to undefined behavior."
+                )
+                return False
+        return True
+
+    # Check if the module has metadata (shape, dtype).
+    if not contains_metadata(gm):
+        # TODO: For future, explore when nodes don't have metadata and if fake_tensor_prop can resolve this.
+        logger.warning(
+            "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
+        )
+
     # Partition module into components that can be TRT-accelerated
     fast_partitioner_failed = False
 
