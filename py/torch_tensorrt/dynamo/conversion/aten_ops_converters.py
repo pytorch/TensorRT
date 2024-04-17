@@ -332,6 +332,8 @@ def aten_ops_fmod(
 
 @dynamo_tensorrt_converter(torch.ops.aten.grid_sampler)
 @dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_2d)
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler.default)
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_2d.default)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
