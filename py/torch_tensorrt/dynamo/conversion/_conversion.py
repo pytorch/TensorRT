@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import io
-from typing import Sequence
+import logging
+from typing import List, Sequence
 
-import tensorrt as trt
 import torch
+from torch_tensorrt._Device import Device
+from torch_tensorrt._enums import dtype
+from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
@@ -13,6 +16,37 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import get_torch_inputs
+
+import tensorrt as trt
+
+logger = logging.getLogger(__name__)
+
+
+def infer_module_output_dtypes(
+    module: torch.fx.GraphModule,
+    inputs: Sequence[Input],
+    device: Device,
+    truncate_long_and_double: bool = False,
+) -> List[dtype]:
+    torch_inputs = get_torch_inputs(inputs, device)
+    module = module.to(device.to(torch.device))
+    module_outputs = module(*torch_inputs)
+
+    if not isinstance(module_outputs, (list, tuple)):
+        module_outputs = [module_outputs]
+
+    # Int64 outputs can sometimes be generated from within other operators
+    # such as aten.sum - such outputs can be truncated
+    output_dtypes = []
+    for output in module_outputs:
+        if truncate_long_and_double and output.dtype == dtype.float64:
+            output_dtypes.append(dtype.float32)
+        elif truncate_long_and_double and output.dtype == dtype.int64:
+            output_dtypes.append(dtype.int32)
+        else:
+            output_dtypes.append(dtype._from(output.dtype))
+
+    return output_dtypes
 
 
 def interpret_module_to_result(
@@ -28,22 +62,12 @@ def interpret_module_to_result(
     Returns:
         TRTInterpreterResult
     """
-    torch_inputs = get_torch_inputs(inputs, settings.device)
-    module_outputs = module(*torch_inputs)
-
-    if not isinstance(module_outputs, (list, tuple)):
-        module_outputs = [module_outputs]
-
-    # Int64 outputs can sometimes be generated from within other operators
-    # such as aten.sum - such outputs can be truncated
-    output_dtypes = []
-    for output in module_outputs:
-        if settings.truncate_long_and_double and output.dtype == torch.float64:
-            output_dtypes.append(torch.float32)
-        elif settings.truncate_long_and_double and output.dtype == torch.int64:
-            output_dtypes.append(torch.int32)
-        else:
-            output_dtypes.append(output.dtype)
+    output_dtypes = infer_module_output_dtypes(
+        module,
+        inputs,
+        settings.device,
+        truncate_long_and_double=settings.truncate_long_and_double,
+    )
 
     interpreter = TRTInterpreter(
         module,
@@ -73,7 +97,11 @@ def convert_module(
     """
     interpreter_result = interpret_module_to_result(module, inputs, settings)
 
-    if settings.use_python_runtime:
+    if settings.use_python_runtime or not ENABLED_FEATURES.torch_tensorrt_runtime:
+        if not settings.use_python_runtime:
+            logger.info(
+                "Since Torch-TensorRT runtime is not available, using Python Runtime, some features may not be available"
+            )
         return PythonTorchTensorRTModule(
             engine=interpreter_result.engine,
             input_names=list(interpreter_result.input_names),
