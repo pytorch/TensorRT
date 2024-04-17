@@ -9,12 +9,12 @@ import torch
 import torch_tensorrt
 from torch.nn import Module
 from torch_tensorrt._Device import Device
+from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo.runtime.tools import (
     _is_switch_required,
     _select_rt_device,
     multi_gpu_device_check,
 )
-from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
 logger = logging.getLogger(__name__)
 
@@ -84,9 +84,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         )
 
         self.input_dtypes = [
-            unified_dtype_converter(
-                self.engine.get_binding_dtype(idx), Frameworks.TORCH
-            )
+            dtype._from(self.engine.get_binding_dtype(idx))
             for idx in self.input_binding_indices_in_order
         ]
         self.input_shapes: Sequence[Sequence[int]] = [
@@ -94,9 +92,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             for idx in self.input_binding_indices_in_order
         ]
         self.output_dtypes = [
-            unified_dtype_converter(
-                self.engine.get_binding_dtype(idx), Frameworks.TORCH
-            )
+            dtype._from(self.engine.get_binding_dtype(idx))
             for idx in self.output_binding_indices_in_order
         ]
         self.output_shapes = [
@@ -108,9 +104,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             for idx in self.output_binding_indices_in_order
         ]
         self.hidden_output_dtypes = [
-            unified_dtype_converter(
-                self.engine.get_binding_dtype(idx), Frameworks.TORCH
-            )
+            dtype._from(self.engine.get_binding_dtype(idx))
             for idx in self.hidden_output_binding_indices_in_order
         ]
         self.hidden_output_shapes = [
@@ -263,7 +257,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
                     output = torch.empty(
                         size=shape,
-                        dtype=self.output_dtypes[i],
+                        dtype=self.output_dtypes[i].to(torch.dtype),
                         device=torch.cuda.current_device(),
                     )
                     outputs.append(output)
@@ -274,7 +268,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
                     output = torch.empty(
                         size=shape,
-                        dtype=self.hidden_output_dtypes[i],
+                        dtype=self.hidden_output_dtypes[i].to(torch.dtype),
                         device=torch.cuda.current_device(),
                     )
                     bindings[idx] = output.data_ptr()
