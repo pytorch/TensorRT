@@ -162,6 +162,18 @@ def var_decomposition(
     return variance
 
 
+@register_torch_trt_decomposition(
+    torch.ops.aten.empty_permuted.default, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def empty_permuted_decomposition(*args, **kwargs) -> torch.Tensor:
+    empty_size = args[0]
+    empty_permute = args[1]
+    perm = [0] * len(empty_size)
+    for permute_index, permute_element in enumerate(empty_permute):
+        perm[permute_element] = permute_index
+    return torch.empty([empty_size[l] for l in empty_permute], **kwargs).permute(perm)
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
