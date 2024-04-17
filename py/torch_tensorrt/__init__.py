@@ -103,7 +103,12 @@ def _register_with_torch() -> None:
 _register_with_torch()
 
 from torch_tensorrt._Device import Device  # noqa: F401
-from torch_tensorrt._enums import DeviceType, dtype, memory_format  # noqa: F401
+from torch_tensorrt._enums import (  # noqa: F401
+    DeviceType,
+    EngineCapability,
+    dtype,
+    memory_format,
+)
 from torch_tensorrt._Input import Input  # noqa: F401
 from torch_tensorrt.runtime import *  # noqa: F403
 

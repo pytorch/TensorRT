@@ -125,7 +125,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
     @staticmethod
     def _args_str(args: List[Any]) -> str:
-        def clean_repr(x: Any) -> Any:
+        def clean_repr(x: Any, depth: int = 0) -> Any:
             if isinstance(x, trt.ITensor):
                 return f"{x.name} <tensorrt.ITensor [shape={x.shape}, dtype={x.dtype}]>"
             elif isinstance(x, torch.Tensor):
@@ -134,8 +134,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 return (
                     f"<torch.Tensor as np.ndarray [shape={x.shape}, dtype={x.dtype}]>"
                 )
-            elif isinstance(x, Sequence):
-                return type(x)([clean_repr(i) for i in x])  # type: ignore[call-arg]
+            elif isinstance(x, Sequence) and not isinstance(x, str):
+                if depth < 3:
+                    return type(x)([clean_repr(i, depth=depth + 1) for i in x])  # type: ignore[call-arg]
+                else:
+                    return "(...)"
             else:
                 return x
 

@@ -239,6 +239,7 @@ class DispatchTestCase(TRTTestCase):
         compilation_settings = CompilationSettings(
             enabled_precisions={dtype._from(precision)},
             truncate_long_and_double=True,
+            debug=True,
         )
 
         input_specs = [Input.from_tensor(i) for i in inputs]

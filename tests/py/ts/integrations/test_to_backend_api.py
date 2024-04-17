@@ -29,7 +29,9 @@ class TestToBackendLowering(unittest.TestCase):
                         "dla_core": 0,
                         "allow_gpu_fallback": True,
                     },
-                    "capability": torchtrt.ts.EngineCapability.DEFAULT,
+                    "capability": torchtrt.EngineCapability.STANDARD.to(
+                        torchtrt._C.EngineCapability
+                    ),
                     "num_avg_timing_iters": 1,
                     "disable_tf32": False,
                 }
