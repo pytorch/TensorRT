@@ -128,7 +128,7 @@ def test_bert_base_uncased(ir):
         "enabled_precisions": {torch.float},
         "truncate_long_and_double": True,
         "ir": ir,
-        "min_block_size": 15,
+        "min_block_size": 10,
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
     model_outputs = model(input, input2)
