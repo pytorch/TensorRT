@@ -342,7 +342,7 @@ def load(file_path: str = "") -> Any:
         ts_module = torch.jit.load(file_path)
         return ts_module
     except Exception:
-        logger.debug(
+        logger.info(
             f"Loading the provided file {file_path} via torch.jit.load() failed with the following error",
             exc_info=True,
         )
@@ -353,7 +353,7 @@ def load(file_path: str = "") -> Any:
         exp_program = torch.export.load(file_path)
         return exp_program
     except Exception:
-        logger.debug(
+        logger.info(
             f"Loading the provided file {file_path} via torch.export.load() failed with the following error",
             exc_info=True,
         )
