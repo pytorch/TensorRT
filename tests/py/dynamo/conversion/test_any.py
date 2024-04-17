@@ -26,7 +26,7 @@ class TestAnyConverter(DispatchTestCase):
                 return torch.ops.aten.any.default(x)
 
         inputs = [torch.randn(*input_shape)]
-        self.run_test(Any(), inputs, output_dtypes=[torch.bool])
+        self.run_test(Any(), inputs)
 
     @parameterized.expand(
         [
@@ -43,7 +43,7 @@ class TestAnyConverter(DispatchTestCase):
                 return torch.ops.aten.any.dim(x, dim, keep_dims)
 
         inputs = [torch.randn(*input_shape)]
-        self.run_test(AnyDim(), inputs, output_dtypes=[torch.bool])
+        self.run_test(AnyDim(), inputs)
 
     @parameterized.expand(
         [
@@ -59,7 +59,7 @@ class TestAnyConverter(DispatchTestCase):
                 return torch.ops.aten.any.dims(x, dims, keep_dims)
 
         inputs = [torch.randn(*input_shape)]
-        self.run_test(AnyDims(), inputs, output_dtypes=[torch.bool])
+        self.run_test(AnyDims(), inputs)
 
     @parameterized.expand(
         [
@@ -79,7 +79,6 @@ class TestAnyConverter(DispatchTestCase):
         self.run_test(
             Any(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
     @parameterized.expand(
@@ -100,7 +99,6 @@ class TestAnyConverter(DispatchTestCase):
         self.run_test(
             AnyDim(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
     @parameterized.expand(
@@ -123,7 +121,6 @@ class TestAnyConverter(DispatchTestCase):
         self.run_test(
             AnyDims(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
     @parameterized.expand(
@@ -142,7 +139,6 @@ class TestAnyConverter(DispatchTestCase):
         self.run_test(
             Any(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
     @parameterized.expand(
@@ -163,7 +159,6 @@ class TestAnyConverter(DispatchTestCase):
         self.run_test(
             AnyDim(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
     @parameterized.expand(
@@ -186,7 +181,6 @@ class TestAnyConverter(DispatchTestCase):
         self.run_test(
             AnyDims(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
 

@@ -110,6 +110,7 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         allowed_single_node_partition_ops: Optional[Collection[str]] = None,
         min_block_size: int = MIN_BLOCK_SIZE,
         require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
+        return_tuple: bool = False,
     ):
         """
         Preprocesses graph before splitting:
@@ -149,6 +150,7 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         self.num_trt_accelerated_subgraphs: Optional[int] = None
         self.allowed_single_node_partition_ops = allowed_single_node_partition_ops
         self.require_full_compilation = require_full_compilation
+        self._return_tuple = return_tuple
 
     def remove_small_acc_subgraphs(self, subgraphs: List[Subgraph]) -> List[Subgraph]:
         """

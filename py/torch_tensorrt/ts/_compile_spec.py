@@ -3,14 +3,17 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Set
 
-import tensorrt as trt
 import torch
 import torch_tensorrt._C.ts as _ts_C
-from torch_tensorrt import _C, _enums
+from torch_tensorrt import _C
 from torch_tensorrt._Device import Device
+from torch_tensorrt._enums import DeviceType, EngineCapability, dtype
 from torch_tensorrt._Input import Input
-from torch_tensorrt.logging import Level, log
+from torch_tensorrt.ts._Device import TorchScriptDevice
 from torch_tensorrt.ts._Input import TorchScriptInput
+from torch_tensorrt.ts.logging import Level, log
+
+import tensorrt as trt
 
 
 def _internal_input_to_torch_class_input(i: _C.Input) -> torch.classes.tensorrt._Input:
@@ -40,31 +43,11 @@ def _supported_input_size_type(input_size: Any) -> bool:
         )
 
 
-def _parse_op_precision(precision: Any) -> _enums.dtype:
-    if isinstance(precision, torch.dtype):
-        if precision == torch.int8:
-            return _enums.dtype.int8
-        elif precision == torch.half:
-            return _enums.dtype.half
-        elif precision == torch.float:
-            return _enums.dtype.float
-        else:
-            raise TypeError(
-                "Provided an unsupported dtype as operating precision (support: int8, half, float), got: "
-                + str(precision)
-            )
-
-    elif isinstance(precision, _enums.dtype):
-        return precision
-
-    else:
-        raise TypeError(
-            "Op precision type needs to be specified with a torch.dtype or a torch_tensorrt.dtype, got: "
-            + str(type(precision))
-        )
+def _parse_op_precision(precision: Any) -> _C.dtype:
+    return dtype._from(precision).to(_C.dtype)
 
 
-def _parse_enabled_precisions(precisions: Any) -> Set[_enums.dtype]:
+def _parse_enabled_precisions(precisions: Any) -> Set[_C.dtype]:
     parsed_precisions = set()
     if any(isinstance(precisions, type) for type in [list, tuple, set]):
         for p in precisions:
@@ -74,36 +57,8 @@ def _parse_enabled_precisions(precisions: Any) -> Set[_enums.dtype]:
     return parsed_precisions
 
 
-def _parse_device_type(device: Any) -> _enums.DeviceType:
-    if isinstance(device, torch.device):
-        if device.type == "cuda":
-            return _C.DeviceType.gpu
-        else:
-            ValueError(
-                "Got a device type other than GPU or DLA (type: "
-                + str(device.type)
-                + ")"
-            )
-    elif isinstance(device, _C.DeviceType):
-        return device
-    elif isinstance(device, trt.DeviceType):
-        if device == trt.DeviceType.DLA:
-            return _C.DeviceType.DLA
-        return _C.DeviceType.GPU
-    elif isinstance(device, str):
-        if device == "gpu" or device == "GPU":
-            return _C.DeviceType.GPU
-        elif device == "dla" or device == "DLA":
-            return _C.DeviceType.DLA
-        else:
-            ValueError(
-                "Got a device type other than GPU or DLA (type: " + str(device) + ")"
-            )
-    else:
-        raise TypeError(
-            "Device specification must be of type torch.device, string or torch_tensorrt.DeviceType, but got: "
-            + str(type(device))
-        )
+def _parse_device_type(device: Any) -> _C.DeviceType:
+    return DeviceType._from(device).to(_C.DeviceType)
 
 
 def _parse_device(device_info: Any) -> _C.Device:
@@ -128,9 +83,11 @@ def _parse_device(device_info: Any) -> _C.Device:
 
         return info
     elif isinstance(device_info, Device):
+        return TorchScriptDevice._from(device_info)._to_internal()
+    elif isinstance(device_info, TorchScriptDevice):
         return device_info._to_internal()
     elif isinstance(device_info, torch.device):
-        return (Device._from_torch_device(device_info))._to_internal()
+        return TorchScriptDevice._from(device_info)._to_internal()
     else:
         raise ValueError(
             "Unsupported data for device specification. Expected either a dict, torch_tensorrt.Device or torch.Device"
@@ -184,9 +141,11 @@ def _parse_input_signature(input_signature: Any, depth: int = 0) -> Any:
             else input_signature
         )
 
-        if not i.is_trt_dtype():
+        if not i.dtype.try_to(trt.DataType, use_default=True):
             raise TypeError(
-                "Using non-TRT input types with input_signature is not currently "
+                "Using non-TRT input types ({}) with input_signature is not currently ".format(
+                    i.dtype
+                )
                 + "supported. Please specify inputs individually to use "
                 + "non-TRT types."
             )
@@ -246,7 +205,9 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
             if i.shape_mode == Input._ShapeMode.STATIC:
                 ts_inputs.append(
                     TorchScriptInput(
-                        shape=i.shape, dtype=i.dtype, format=i.format
+                        shape=i.shape,
+                        dtype=i.dtype.to(_C.dtype),
+                        format=i.format.to(_C.TensorFormat),
                     )._to_internal()
                 )
             elif i.shape_mode == Input._ShapeMode.DYNAMIC:
@@ -255,8 +216,8 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
                         min_shape=i.shape["min_shape"],
                         opt_shape=i.shape["opt_shape"],
                         max_shape=i.shape["max_shape"],
-                        dtype=i.dtype,
-                        format=i.format,
+                        dtype=i.dtype.to(_C.dtype),
+                        format=i.format.to(_C.TensorFormat),
                     )._to_internal()
                 )
         info.inputs = ts_inputs
@@ -306,8 +267,10 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
         info.device = _parse_device(compile_spec["device"])
 
     if "capability" in compile_spec:
-        assert isinstance(compile_spec["capability"], _enums.EngineCapability)
-        info.capability = compile_spec["capability"]
+        capability = EngineCapability._from(compile_spec["capability"]).to(
+            _C.EngineCapability
+        )
+        info.capability = capability
 
     if "num_avg_timing_iters" in compile_spec:
         assert type(compile_spec["num_avg_timing_iters"]) is int
@@ -347,10 +310,10 @@ def TensorRTCompileSpec(
     device: torch.device | Device = Device._current_device(),
     disable_tf32: bool = False,
     sparse_weights: bool = False,
-    enabled_precisions: Optional[Set[torch.dtype | _enums.dtype]] = None,
+    enabled_precisions: Optional[Set[torch.dtype | dtype]] = None,
     refit: bool = False,
     debug: bool = False,
-    capability: _enums.EngineCapability = _enums.EngineCapability.default,
+    capability: EngineCapability = EngineCapability.STANDARD,
     num_avg_timing_iters: int = 1,
     workspace_size: int = 0,
     dla_sram_size: int = 1048576,

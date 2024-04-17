@@ -4,22 +4,20 @@ import re
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
-import tensorrt as trt
 import torch
 from torch import SymBool, SymFloat, SymInt
 from torch.fx.node import Argument, Target
+from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
     DynamoConverterImplSignature,
 )
-from torch_tensorrt.fx.converters.converter_utils import (
-    Frameworks,
-    get_axes_for_reduce_op,
-    unified_dtype_converter,
-)
+from torch_tensorrt.fx.converters.converter_utils import get_axes_for_reduce_op
 from torch_tensorrt.fx.types import TRTDataType, TRTTensor
+
+import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -44,7 +42,6 @@ def get_node_name(node: torch.fx.Node) -> str:
         # like the node.meta['source_fn'] attr
         pass
 
-    _LOGGER.debug(f"Node meta name {node_name}")
     return node_name
 
 
@@ -121,7 +118,7 @@ def _dynamic_unsupported(
 def cast_trt_tensor(
     ctx: ConversionContext,
     input_val: TRTTensor,
-    dtype: TRTDataType,
+    dtype: Union[TRTDataType, torch.dtype, np.dtype, _enums.dtype],
     name: str,
     target: Target = "",
     source_ir: Optional[SourceIR] = None,
@@ -142,7 +139,7 @@ def cast_trt_tensor(
     Returns:
         A TensorRT ITensor which has been casted to the specified dtype
     """
-    trt_dtype = unified_dtype_converter(dtype, Frameworks.TRT)
+    trt_dtype = _enums.dtype._from(dtype).to(trt.DataType)
 
     if input_val.dtype != trt_dtype:
         source_ir = source_ir if source_ir is not None else SourceIR.UNKNOWN
@@ -253,7 +250,7 @@ def create_constant(
     ctx: ConversionContext,
     value: Union[int, float, bool, np.ndarray, torch.Tensor],
     name: str,
-    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]],
+    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]],
 ) -> TRTTensor:
     """
     Add a TensorRT constant layer whose value is `value` to `ctx.net`.
@@ -268,7 +265,9 @@ def create_constant(
     Returns:
         A TensorRT ITensor that represents the given value.
     """
-    numpy_value = to_numpy(value, dtype)
+    numpy_value = to_numpy(
+        value, _enums.dtype._from(dtype).to(np.dtype) if dtype is not None else None
+    )
     constant = ctx.net.add_constant(
         (1,) if isinstance(value, (int, float, bool)) else value.shape,
         numpy_value.copy() if isinstance(numpy_value, np.ndarray) else numpy_value,
@@ -281,7 +280,7 @@ def get_trt_tensor(
     ctx: ConversionContext,
     input_val: Any,
     name: str,
-    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]] = None,
+    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]] = None,
 ) -> TRTTensor:
     """
     Given a value of random type, we try to convert it to a TensorRT ITensor.
@@ -466,7 +465,7 @@ def enforce_tensor_types(
 
 def to_numpy(
     value: Optional[Union[torch.Tensor, np.ndarray, int, float, bool]],
-    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]] = None,
+    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]] = None,
 ) -> Optional[np.ndarray]:
     """
     Convert a PyTorch Tensor, Numpy array, or scalar to a Numpy Array. If the tensor is
@@ -503,7 +502,7 @@ def to_numpy(
         return (
             output
             if (dtype is None or output is None)
-            else output.astype(unified_dtype_converter(dtype, Frameworks.NUMPY))
+            else output.astype(_enums.dtype._from(dtype).to(np.dtype))
         )
     else:
         raise AssertionError(

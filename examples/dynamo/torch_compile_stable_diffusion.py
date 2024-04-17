@@ -18,9 +18,8 @@ This interactive script is intended as a sample of the Torch-TensorRT workflow w
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 import torch
-from diffusers import DiffusionPipeline
-
 import torch_tensorrt
+from diffusers import DiffusionPipeline
 
 model_id = "CompVis/stable-diffusion-v1-4"
 device = "cuda:0"
@@ -39,7 +38,7 @@ pipe.unet = torch.compile(
     backend=backend,
     options={
         "truncate_long_and_double": True,
-        "precision": torch.float16,
+        "enabled_precisions": {torch.float32, torch.float16},
     },
     dynamic=False,
 )

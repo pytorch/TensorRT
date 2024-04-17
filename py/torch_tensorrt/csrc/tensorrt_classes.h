@@ -114,9 +114,9 @@ struct TorchFallback : torch::CustomClassHolder {
 };
 
 enum class EngineCapability : int8_t {
-  kDEFAULT,
-  kSAFE_GPU,
-  kSAFE_DLA,
+  kSTANDARD,
+  kSAFETY,
+  kDLA_STANDALONE,
 };
 
 std::string to_str(EngineCapability value);
@@ -160,7 +160,7 @@ struct CompileSpec : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(sparse_weights, bool);
   ADD_FIELD_GET_SET(refit, bool);
   ADD_FIELD_GET_SET(debug, bool);
-  ADD_ENUM_GET_SET(capability, EngineCapability, static_cast<int64_t>(EngineCapability::kSAFE_DLA));
+  ADD_ENUM_GET_SET(capability, EngineCapability, static_cast<int64_t>(EngineCapability::kSTANDARD));
   ADD_FIELD_GET_SET(num_avg_timing_iters, int64_t);
   ADD_FIELD_GET_SET(workspace_size, int64_t);
   ADD_FIELD_GET_SET(dla_sram_size, int64_t);
@@ -184,7 +184,7 @@ struct CompileSpec : torch::CustomClassHolder {
   bool allow_shape_tensors = false;
   Device device;
   TorchFallback torch_fallback;
-  EngineCapability capability = EngineCapability::kDEFAULT;
+  EngineCapability capability = EngineCapability::kSTANDARD;
   int64_t num_avg_timing_iters = 1;
   int64_t workspace_size = 0;
   int64_t dla_sram_size = 1048576;

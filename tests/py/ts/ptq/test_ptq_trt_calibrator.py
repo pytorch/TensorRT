@@ -1,13 +1,15 @@
-import unittest
 import os
-import torch_tensorrt as torchtrt
-from torch_tensorrt.logging import *
+import unittest
+
 import torch
-import tensorrt as trt
 import torch.nn as nn
-from torch.nn import functional as F
+import torch_tensorrt as torchtrt
 import torchvision
 import torchvision.transforms as transforms
+from torch.nn import functional as F
+from torch_tensorrt.ts.logging import *
+
+import tensorrt as trt
 
 
 def find_repo_root(max_depth=10):
@@ -49,6 +51,10 @@ def compute_accuracy(testing_dataloader, model):
     return correct / total
 
 
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available",
+)
 class TRTEntropyCalibrator(trt.IInt8EntropyCalibrator2):
     def __init__(self, dataloader, **kwargs):
         trt.IInt8EntropyCalibrator2.__init__(self)
@@ -94,6 +100,10 @@ class TRTEntropyCalibrator(trt.IInt8EntropyCalibrator2):
                 f.write(cache)
 
 
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available",
+)
 class TestAccuracy(unittest.TestCase):
     def test_compile_script(self):
         self.model = (
