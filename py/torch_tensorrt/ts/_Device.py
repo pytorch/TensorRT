@@ -51,7 +51,6 @@ class TorchScriptDevice(Device):
             - Device(gpu_id=1)
         """
         super().__init__(*args, **kwargs)
-        print(self)
 
     def _to_internal(self) -> _C.Device:
         internal_dev = _C.Device()

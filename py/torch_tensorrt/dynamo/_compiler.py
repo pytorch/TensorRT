@@ -419,9 +419,9 @@ def convert_module_to_trt_engine(
     module: torch.fx.GraphModule,
     method_name: str = "forward",
     inputs: Optional[Sequence[Input | torch.Tensor]] = None,
-    enabled_precisions: Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype] = (
-        dtype.float32,
-    ),
+    enabled_precisions: (
+        Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
+    ) = _defaults.ENABLED_PRECISIONS,
     debug: bool = _defaults.DEBUG,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
     min_block_size: int = _defaults.MIN_BLOCK_SIZE,

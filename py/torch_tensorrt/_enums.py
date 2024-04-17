@@ -299,7 +299,6 @@ class dtype(Enum):
         use_default: bool,
     ) -> Optional[Union[torch.dtype, trt.DataType, np.dtype, dtype]]:
         try:
-            print(self)
             casted_format = self.to(t, use_default)
             return casted_format
         except (ValueError, TypeError) as e:
@@ -689,7 +688,7 @@ class EngineCapability(Enum):
             else:
                 raise ValueError("Provided an unsupported engine capability")
 
-        elif t == DeviceType:
+        elif t == EngineCapability:
             return self
 
         elif ENABLED_FEATURES.torchscript_frontend:
