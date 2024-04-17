@@ -1,11 +1,16 @@
-import torch
-from torch.testing._internal.common_utils import TestCase, run_tests
+import unittest
 
+import torch
 import torch_tensorrt
+from torch.testing._internal.common_utils import TestCase, run_tests
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT
 
 
+@unittest.skipIf(
+    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "Torch-TensorRT runtime is not available",
+)
 class TestSafeMode(TestCase):
     def test_multi_device_safe_mode_on(self):
         torch_tensorrt.runtime.set_multi_device_safe_mode(True)

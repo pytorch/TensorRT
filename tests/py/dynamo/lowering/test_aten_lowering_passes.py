@@ -1,7 +1,8 @@
-import torch
-from torch.testing._internal.common_utils import TestCase, run_tests
+import unittest
 
+import torch
 import torch_tensorrt
+from torch.testing._internal.common_utils import TestCase, run_tests
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
@@ -268,6 +269,10 @@ class TestLowerEfficientAttention(TestCase):
         torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    torch.cuda.get_device_properties(torch.cuda.current_device()).major < 8,
+    "GPU compute capability is too low to run flash attention, need Ampere (8.0) or greater",
+)
 class TestLowerFlashAttention(TestCase):
     def test_lower_flash_attention(self):
         class FlashAttention(torch.nn.Module):
