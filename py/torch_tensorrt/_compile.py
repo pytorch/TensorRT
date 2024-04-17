@@ -358,7 +358,7 @@ def load(file_path: str = "") -> Any:
             exc_info=True,
         )
         raise ValueError(
-            "The file doesn't correspond to a valid Torchscript module or ExportedProgram. Please verify the file path."
+            f"The file {file_path} doesn't correspond to a valid Torchscript module or ExportedProgram. Please verify the file path."
         )
 
 
