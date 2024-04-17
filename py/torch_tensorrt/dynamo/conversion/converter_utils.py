@@ -266,7 +266,7 @@ def create_constant(
         A TensorRT ITensor that represents the given value.
     """
     numpy_value = to_numpy(
-        value, _enums.dtype._from(dtype).to(np.dtype) if dtype else None
+        value, _enums.dtype._from(dtype).to(np.dtype) if dtype is not None else None
     )
     constant = ctx.net.add_constant(
         (1,) if isinstance(value, (int, float, bool)) else value.shape,

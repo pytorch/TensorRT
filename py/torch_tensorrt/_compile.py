@@ -190,9 +190,11 @@ def compile(
     Returns:
         torch.nn.Module: Compiled Module, when run it will execute via TensorRT
     """
-    input_list = inputs if inputs else []
+    input_list = inputs if inputs is not None else []
     enabled_precisions_set: Set[dtype | torch.dtype] = (
-        enabled_precisions if enabled_precisions else _defaults.ENABLED_PRECISIONS
+        enabled_precisions
+        if enabled_precisions is not None
+        else _defaults.ENABLED_PRECISIONS
     )
 
     module_type = _parse_module_type(module)

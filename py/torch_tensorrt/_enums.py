@@ -185,7 +185,9 @@ class dtype(Enum):
             casted_format = dtype._from(t, use_default=use_default)
             return casted_format
         except (ValueError, TypeError) as e:
-            logging.debug(e)
+            logging.debug(
+                f"Conversion from {t} to torch_tensorrt.dtype failed", exc_info=True
+            )
             return None
 
     def to(
@@ -301,7 +303,10 @@ class dtype(Enum):
             casted_format = self.to(t, use_default)
             return casted_format
         except (ValueError, TypeError) as e:
-            logging.debug(e)
+            logging.debug(
+                f"torch_tensorrt.dtype conversion to target type {t} failed",
+                exc_info=True,
+            )
             return None
 
     def __eq__(self, other: Union[torch.dtype, trt.DataType, np.dtype, dtype]) -> bool:
@@ -413,7 +418,10 @@ class memory_format(Enum):
             casted_format = memory_format._from(f)
             return casted_format
         except (ValueError, TypeError) as e:
-            logging.debug(e)
+            logging.debug(
+                f"Conversion from {f} to torch_tensorrt.memory_format failed",
+                exc_info=True,
+            )
             return None
 
     def to(
@@ -492,7 +500,10 @@ class memory_format(Enum):
             casted_format = self.to(t)
             return casted_format
         except (ValueError, TypeError) as e:
-            logging.debug(e)
+            logging.debug(
+                f"torch_tensorrt.memory_format conversion to target type {t} failed",
+                exc_info=True,
+            )
             return None
 
     def __eq__(
@@ -546,7 +557,10 @@ class DeviceType(Enum):
             casted_format = DeviceType._from(d)
             return casted_format
         except (ValueError, TypeError) as e:
-            logging.debug(e)
+            logging.debug(
+                f"Conversion from {d} to torch_tensorrt.DeviceType failed",
+                exc_info=True,
+            )
             return None
 
     def to(
@@ -595,7 +609,10 @@ class DeviceType(Enum):
             casted_format = self.to(t, use_default=use_default)
             return casted_format
         except (ValueError, TypeError) as e:
-            logging.debug(e)
+            logging.debug(
+                f"torch_tensorrt.DeviceType conversion to target type {t} failed",
+                exc_info=True,
+            )
             return None
 
     def __eq__(self, other: Union[trt.DeviceType, DeviceType]) -> bool:
@@ -653,7 +670,10 @@ class EngineCapability(Enum):
             casted_format = EngineCapability._from(c)
             return casted_format
         except (ValueError, TypeError) as e:
-            logging.debug(e)
+            logging.debug(
+                f"Conversion from {c} to torch_tensorrt.EngineCapablity failed",
+                exc_info=True,
+            )
             return None
 
     def to(
@@ -696,7 +716,10 @@ class EngineCapability(Enum):
             casted_format = self.to(t)
             return casted_format
         except (ValueError, TypeError) as e:
-            logging.debug(e)
+            logging.debug(
+                f"torch_tensorrt.EngineCapablity conversion to target type {t} failed",
+                exc_info=True,
+            )
             return None
 
     def __eq__(self, other: Union[trt.EngineCapability, EngineCapability]) -> bool:
