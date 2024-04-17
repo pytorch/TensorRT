@@ -235,23 +235,23 @@ std::string Device::to_str() {
 
 std::string to_str(EngineCapability value) {
   switch (value) {
-    case EngineCapability::kSAFE_GPU:
-      return "Safe GPU";
-    case EngineCapability::kSAFE_DLA:
-      return "Safe DLA";
-    case EngineCapability::kDEFAULT:
+    case EngineCapability::kDLA_STANDALONE:
+      return "DLA Standalone";
+    case EngineCapability::kSAFETY:
+      return "Safety";
+    case EngineCapability::kSTANDARD:
     default:
-      return "Default";
+      return "Standard";
   }
 }
 
 nvinfer1::EngineCapability toTRTEngineCapability(EngineCapability value) {
   switch (value) {
-    case EngineCapability::kSAFE_DLA:
+    case EngineCapability::kDLA_STANDALONE:
       return TRT_ENGINE_CAPABILITY_DLA_STANDALONE;
-    case EngineCapability::kSAFE_GPU:
+    case EngineCapability::kSAFETY:
       return TRT_ENGINE_CAPABILITY_SAFETY;
-    case EngineCapability::kDEFAULT:
+    case EngineCapability::kSTANDARD:
     default:
       return TRT_ENGINE_CAPABILITY_STANDARD;
   }

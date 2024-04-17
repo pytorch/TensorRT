@@ -5,42 +5,12 @@ import logging
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
 
 import torch
-import torch_tensorrt
 from torch.export import ExportedProgram
 from torch.fx.node import Target
-from torch_tensorrt import _enums
 from torch_tensorrt._Device import Device
-from torch_tensorrt._enums import (  # TODO: Should probabably be the TRT EngineCapability Enum
-    EngineCapability,
-)
+from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo import partitioning
-from torch_tensorrt.dynamo._defaults import (
-    DEBUG,
-    DEVICE,
-    DISABLE_TF32,
-    DLA_GLOBAL_DRAM_SIZE,
-    DLA_LOCAL_DRAM_SIZE,
-    DLA_SRAM_SIZE,
-    DRYRUN,
-    ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
-    ENGINE_CAPABILITY,
-    HARDWARE_COMPATIBLE,
-    MAX_AUX_STREAMS,
-    MIN_BLOCK_SIZE,
-    NUM_AVG_TIMING_ITERS,
-    OPTIMIZATION_LEVEL,
-    PASS_THROUGH_BUILD_FAILURES,
-    PRECISION,
-    REFIT,
-    REQUIRE_FULL_COMPILATION,
-    SPARSE_WEIGHTS,
-    TRUNCATE_LONG_AND_DOUBLE,
-    USE_FAST_PARTITIONER,
-    USE_PYTHON_RUNTIME,
-    VERSION_COMPATIBLE,
-    WORKSPACE_SIZE,
-)
+from torch_tensorrt.dynamo import _defaults, partitioning
 from torch_tensorrt.dynamo._DryRunTracker import (
     DryRunTracker,
     PerSubgraphData,
@@ -74,32 +44,34 @@ def compile(
     exported_program: ExportedProgram,
     inputs: Tuple[Any, ...],
     *,
-    device: Optional[Union[Device, torch.device, str]] = DEVICE,
-    disable_tf32: bool = DISABLE_TF32,
-    sparse_weights: bool = SPARSE_WEIGHTS,
-    enabled_precisions: Set[torch.dtype] | Tuple[torch.dtype] = (torch.float32,),
-    engine_capability: EngineCapability = ENGINE_CAPABILITY,
-    refit: bool = REFIT,
-    debug: bool = DEBUG,
-    num_avg_timing_iters: int = NUM_AVG_TIMING_ITERS,
-    workspace_size: int = WORKSPACE_SIZE,
-    dla_sram_size: int = DLA_SRAM_SIZE,
-    dla_local_dram_size: int = DLA_LOCAL_DRAM_SIZE,
-    dla_global_dram_size: int = DLA_GLOBAL_DRAM_SIZE,
-    truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE,
-    require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
-    min_block_size: int = MIN_BLOCK_SIZE,
+    device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
+    disable_tf32: bool = _defaults.DISABLE_TF32,
+    sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
+    enabled_precisions: (
+        Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
+    ) = _defaults.ENABLED_PRECISIONS,
+    engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
+    refit: bool = _defaults.REFIT,
+    debug: bool = _defaults.DEBUG,
+    num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
+    workspace_size: int = _defaults.WORKSPACE_SIZE,
+    dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
+    dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
+    dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
+    truncate_long_and_double: bool = _defaults.TRUNCATE_LONG_AND_DOUBLE,
+    require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
+    min_block_size: int = _defaults.MIN_BLOCK_SIZE,
     torch_executed_ops: Optional[Collection[Target]] = None,
     torch_executed_modules: Optional[List[str]] = None,
-    pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES,
-    max_aux_streams: Optional[int] = MAX_AUX_STREAMS,
-    version_compatible: bool = VERSION_COMPATIBLE,
-    optimization_level: Optional[int] = OPTIMIZATION_LEVEL,
-    use_python_runtime: bool = USE_PYTHON_RUNTIME,
-    use_fast_partitioner: bool = USE_FAST_PARTITIONER,
-    enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
-    dryrun: bool = DRYRUN,
-    hardware_compatible: bool = HARDWARE_COMPATIBLE,
+    pass_through_build_failures: bool = _defaults.PASS_THROUGH_BUILD_FAILURES,
+    max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
+    version_compatible: bool = _defaults.VERSION_COMPATIBLE,
+    optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
+    use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
+    use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
+    enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    dryrun: bool = _defaults.DRYRUN,
+    hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile a TorchScript module for NVIDIA GPUs using TensorRT
@@ -158,7 +130,6 @@ def compile(
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the grap easier to covert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
-        output_format (str): Output format of the result of TRT compilation. Options include "exported_program" (or) "ep" | "torchscript" (or) "ts" | "graph_module" (or) "fx". Default is "exported_program"
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -166,6 +137,8 @@ def compile(
 
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
+
+    engine_capability = EngineCapability._from(engine_capability)
 
     if torch_executed_modules is not None and torch_executed_modules:
         logger.warning(
@@ -179,6 +152,7 @@ def compile(
     # Prepare torch_trt inputs
     inputs = prepare_inputs(inputs)
     device = to_torch_tensorrt_device(device)
+    enabled_precisions = {dtype._from(p) for p in enabled_precisions}
 
     if not isinstance(exported_program, ExportedProgram):
         raise AssertionError(
@@ -195,28 +169,10 @@ def compile(
     gm = apply_lowering_passes(gm, torch_inputs)
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
-    enabled_precisions = set(enabled_precisions)
-
-    if (
-        torch.float16 in enabled_precisions
-        or torch_tensorrt.dtype.half in enabled_precisions
-    ):
-        precision = torch.float16
-    elif (
-        torch.float32 in enabled_precisions
-        or torch_tensorrt.dtype.float in enabled_precisions
-    ):
-        precision = torch.float32
-    elif len(enabled_precisions) == 0:
-        logger.info(f"No precision specified, defaulting to {PRECISION}")
-        precision = PRECISION
-    else:
-        raise ValueError(
-            f"Precision {enabled_precisions} not supported in the Dynamo Path"
-        )
-
     compilation_options = {
-        "precision": precision,
+        "enabled_precisions": (
+            enabled_precisions if enabled_precisions else _defaults.ENABLED_PRECISIONS
+        ),
         "debug": debug,
         "device": device,
         "workspace_size": workspace_size,
@@ -283,7 +239,7 @@ def compile_module(
         sample_inputs, "shape", lambda x: dict(x) if isinstance(x, dict) else tuple(x)
     )
     dryrun_tracker.graph_input_dtypes = parse_complex_tensor_structs(
-        sample_inputs, "torch_dtype"
+        sample_inputs, "dtype", lambda t: t.to(torch.dtype, use_default=True)
     )
     dryrun_tracker.compilation_settings = settings
 
@@ -397,7 +353,7 @@ def compile_module(
             lambda x: dict(x) if isinstance(x, dict) else tuple(x),
         )
         subgraph_data.subgraph_input_dtypes = parse_complex_tensor_structs(
-            submodule_inputs, "torch_dtype"
+            submodule_inputs, "dtype", lambda t: t.to(torch.dtype)
         )
 
         submodule_outputs = submodule(
@@ -458,29 +414,31 @@ def convert_module_to_trt_engine(
     module: torch.fx.GraphModule,
     method_name: str = "forward",
     inputs: Optional[Sequence[Input | torch.Tensor]] = None,
-    enabled_precisions: Optional[Set[torch.dtype | _enums.dtype]] = None,
-    debug: bool = DEBUG,
-    workspace_size: int = WORKSPACE_SIZE,
-    min_block_size: int = MIN_BLOCK_SIZE,
-    torch_executed_ops: Set[str] = set(),
-    pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES,
-    max_aux_streams: Optional[int] = MAX_AUX_STREAMS,
-    version_compatible: bool = VERSION_COMPATIBLE,
-    optimization_level: Optional[int] = OPTIMIZATION_LEVEL,
-    use_python_runtime: Optional[bool] = USE_PYTHON_RUNTIME,
-    truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE,
-    use_fast_partitioner: bool = USE_FAST_PARTITIONER,
-    enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    enabled_precisions: (
+        Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
+    ) = _defaults.ENABLED_PRECISIONS,
+    debug: bool = _defaults.DEBUG,
+    workspace_size: int = _defaults.WORKSPACE_SIZE,
+    min_block_size: int = _defaults.MIN_BLOCK_SIZE,
+    torch_executed_ops: Optional[Set[str]] = None,
+    pass_through_build_failures: bool = _defaults.PASS_THROUGH_BUILD_FAILURES,
+    max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
+    version_compatible: bool = _defaults.VERSION_COMPATIBLE,
+    optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
+    use_python_runtime: Optional[bool] = _defaults.USE_PYTHON_RUNTIME,
+    truncate_long_and_double: bool = _defaults.TRUNCATE_LONG_AND_DOUBLE,
+    use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
+    enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     device: Device = Device._current_device(),
-    require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
-    disable_tf32: bool = DISABLE_TF32,
-    sparse_weights: bool = SPARSE_WEIGHTS,
-    refit: bool = REFIT,
-    engine_capability: EngineCapability = ENGINE_CAPABILITY,
-    num_avg_timing_iters: int = NUM_AVG_TIMING_ITERS,
-    dla_sram_size: int = DLA_SRAM_SIZE,
-    dla_local_dram_size: int = DLA_LOCAL_DRAM_SIZE,
-    dla_global_dram_size: int = DLA_GLOBAL_DRAM_SIZE,
+    require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
+    disable_tf32: bool = _defaults.DISABLE_TF32,
+    sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
+    refit: bool = _defaults.REFIT,
+    engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
+    num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
+    dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
+    dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
+    dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
     calibrator: object = None,
     allow_shape_tensors: bool = False,
 ) -> bytes:
@@ -564,34 +522,15 @@ def convert_module_to_trt_engine(
         set_log_level(logger.parent, logging.DEBUG)
 
     input_list = list(inputs) if inputs is not None else []
+    torch_executed_ops = torch_executed_ops if torch_executed_ops is not None else set()
     # Prepare torch_trt inputs
     input_list = prepare_inputs(input_list)
     device = to_torch_tensorrt_device(device)
 
-    enabled_precisions = (
-        enabled_precisions if enabled_precisions is not None else {torch.float}
-    )
-
-    if (
-        torch.float16 in enabled_precisions
-        or torch_tensorrt.dtype.half in enabled_precisions
-    ):
-        precision = torch.float16
-    elif (
-        torch.float32 in enabled_precisions
-        or torch_tensorrt.dtype.float in enabled_precisions
-    ):
-        precision = torch.float32
-    elif len(enabled_precisions) == 0:
-        logger.info(f"No precision specified, defaulting to {PRECISION}")
-        precision = PRECISION
-    else:
-        raise ValueError(
-            f"Precision {enabled_precisions} not supported in the Dynamo Path"
-        )
+    enabled_precisions = {dtype._from(e) for e in enabled_precisions}
 
     compilation_options = {
-        "precision": precision,
+        "enabled_precisions": enabled_precisions,
         "debug": debug,
         "workspace_size": workspace_size,
         "min_block_size": min_block_size,

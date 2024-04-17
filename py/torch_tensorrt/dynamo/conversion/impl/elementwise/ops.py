@@ -1,10 +1,10 @@
 from typing import Optional, Union
 
 import numpy as np
-import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
+from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
@@ -20,7 +20,8 @@ from torch_tensorrt.dynamo.conversion.impl.unary import atan, sign
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
 from torch_tensorrt.fx.converters.converter_utils import broadcast
 from torch_tensorrt.fx.types import TRTTensor
-from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
+
+import tensorrt as trt
 
 
 def trunc_div(
@@ -73,7 +74,7 @@ def trunc_div(
             ctx,
             other,
             f"{name}_other",
-            dtype=unified_dtype_converter(input.dtype, Frameworks.TORCH),
+            dtype=_enums.dtype._from(input.dtype).to(torch.dtype),
         )
 
     abs_input_output = convert_unary(

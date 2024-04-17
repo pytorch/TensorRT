@@ -1,10 +1,10 @@
+# type: ignore
 from copy import deepcopy
 
 import torch
+import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo.partitioning import fast_partition
-
-import torch_tensorrt
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
