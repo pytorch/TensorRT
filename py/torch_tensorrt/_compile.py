@@ -338,23 +338,23 @@ def load(file_path: str = "") -> Any:
     try, except
     """
     try:
-        logger.debug("Loading the provided file using torch.jit.load()")
+        logger.debug(f"Loading the provided file {file_path} using torch.jit.load()")
         ts_module = torch.jit.load(file_path)
         return ts_module
     except Exception:
         logger.debug(
-            "Loading the provided file via torch.jit.load() failed with the following error",
+            f"Loading the provided file {file_path} via torch.jit.load() failed with the following error",
             exc_info=True,
         )
         pass
 
     try:
-        logger.debug("Loading the provided file using torch.export.load()")
+        logger.debug(f"Loading the provided file {file_path} using torch.export.load()")
         exp_program = torch.export.load(file_path)
         return exp_program
     except Exception:
         logger.debug(
-            "Loading the provided file via torch.export.load() failed with the following error",
+            f"Loading the provided file {file_path} via torch.export.load() failed with the following error",
             exc_info=True,
         )
         raise ValueError(

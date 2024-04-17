@@ -43,8 +43,8 @@ def test_base_full_compile(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, "/tmp/trt.ep", inputs=[input])
-    deser_trt_module = torchtrt.load("/tmp/trt.ep").module()
+    torchtrt.save(trt_module, "./trt.ep", inputs=[input])
+    deser_trt_module = torchtrt.load("./trt.ep").module()
     # Check Pyt and TRT exported program outputs
     cos_sim = cosine_similarity(model(input), trt_module(input)[0])
     assertions.assertTrue(
@@ -93,8 +93,8 @@ def test_base_full_compile_multiple_outputs(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, "/tmp/trt.ep", inputs=[input])
-    deser_trt_module = torchtrt.load("/tmp/trt.ep").module()
+    torchtrt.save(trt_module, "./trt.ep", inputs=[input])
+    deser_trt_module = torchtrt.load("./trt.ep").module()
     # Check Pyt and TRT exported program outputs
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
@@ -148,8 +148,8 @@ def test_no_compile(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, "/tmp/trt.ep", inputs=[input])
-    deser_trt_module = torchtrt.load("/tmp/trt.ep").module()
+    torchtrt.save(trt_module, "./trt.ep", inputs=[input])
+    deser_trt_module = torchtrt.load("./trt.ep").module()
     # Check Pyt and TRT exported program outputs
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
@@ -206,8 +206,8 @@ def test_hybrid_relu_fallback(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, "/tmp/trt.ep", inputs=[input])
-    deser_trt_module = torchtrt.load("/tmp/trt.ep").module()
+    torchtrt.save(trt_module, "./trt.ep", inputs=[input])
+    deser_trt_module = torchtrt.load("./trt.ep").module()
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
     for idx in range(len(outputs_pyt)):
@@ -246,8 +246,8 @@ def test_resnet18(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, "/tmp/trt.ep", inputs=[input])
-    deser_trt_module = torchtrt.load("/tmp/trt.ep").module()
+    torchtrt.save(trt_module, "./trt.ep", inputs=[input])
+    deser_trt_module = torchtrt.load("./trt.ep").module()
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
     cos_sim = cosine_similarity(outputs_pyt, outputs_trt[0])
@@ -301,8 +301,8 @@ def test_hybrid_conv_fallback(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
 
-    torchtrt.save(trt_module, "/tmp/trt.ep", inputs=[input])
-    deser_trt_module = torchtrt.load("/tmp/trt.ep").module()
+    torchtrt.save(trt_module, "./trt.ep", inputs=[input])
+    deser_trt_module = torchtrt.load("./trt.ep").module()
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
 
@@ -350,9 +350,9 @@ def test_save_load_ts(ir):
     )
     outputs_trt = trt_gm(input)
     # Save it as torchscript representation
-    torchtrt.save(trt_gm, "/tmp/trt.ts", output_format="torchscript", inputs=[input])
+    torchtrt.save(trt_gm, "./trt.ts", output_format="torchscript", inputs=[input])
 
-    trt_ts_module = torchtrt.load("/tmp/trt.ts")
+    trt_ts_module = torchtrt.load("./trt.ts")
     outputs_trt_deser = trt_ts_module(input)
 
     cos_sim = cosine_similarity(outputs_trt, outputs_trt_deser)
