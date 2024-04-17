@@ -368,8 +368,7 @@ auto select_registrations TORCHTRT_UNUSED =
                  int rank = inDims.nbDims;
                  LOG_WARNING("If indices include negative values, the exported graph will produce incorrect results.");
                  int adv_idx_count = adv_idx_indices.size();
-                 auto in_shape_itensor = ctx->net->addShape(*in)->getOutput(0);
-
+                 nvinfer1::ITensor* in_shape_itensor = getShapeOutput(ctx, in);
                  std::vector<nvinfer1::ITensor*> dim_tensor_list;
                  for (int i = 0; i < rank; i++) {
                    auto dim_tensor =
@@ -401,7 +400,7 @@ auto select_registrations TORCHTRT_UNUSED =
                  //  t: [x_1, x_2, ..., x_m, y_1, y_2, ..., y_n] -> t: [x_1*x_2* ...*x_m, y_1*y_2* ...*y_n]
                  nvinfer1::ITensor* flatten_tensor = NULL;
                  {
-                   auto shuffle_shape_tensor = ctx->net->addShape(*shuffle_out)->getOutput(0);
+                   nvinfer1::ITensor* shuffle_shape_tensor = getShapeOutput(ctx, shuffle_out);
                    auto d0 = tensor_to_const(ctx, torch::tensor({1}, torch::kInt32));
                    for (int i = 0; i < adv_idx_count; i++) {
                      auto dim_tensor =
@@ -479,7 +478,7 @@ auto select_registrations TORCHTRT_UNUSED =
 
                  nvinfer1::ITensor* reshape_output = NULL;
                  {
-                   auto cum_adv_index_shape_tensor = ctx->net->addShape(*cum_adv_index)->getOutput(0);
+                   nvinfer1::ITensor* cum_adv_index_shape_tensor = getShapeOutput(ctx, cum_adv_index);
                    // check if all advanced indices are consecutive.
                    if (adv_idx_count == (adv_idx_indices[adv_idx_count - 1] - adv_idx_indices[0] + 1)) {
                      // unfold regular index axes
@@ -559,8 +558,7 @@ auto select_registrations TORCHTRT_UNUSED =
                bool dynamic_shape = ctx->input_is_dynamic;
                auto input_dim = in->getDimensions();
                // add Shape Tensor
-               auto ishape_layer = ctx->net->addShape(*in);
-               auto ishape_tensor = ishape_layer->getOutput(0); // input shape
+               nvinfer1::ITensor* ishape_tensor = getShapeOutput(ctx, in);
                std::string node_name = n->outputs()[0]->debugName().c_str();
 
                int startIdx = 0;
@@ -605,6 +603,7 @@ auto select_registrations TORCHTRT_UNUSED =
                    stride_.d[i] = 1;
                  }
                }
+
                if (!dynamic_shape) {
                  auto slice_layer = ctx->net->addSlice(*in, start_, size_, stride_);
                  LOG_DEBUG("start_:" << start_);
@@ -617,7 +616,6 @@ auto select_registrations TORCHTRT_UNUSED =
                  LOG_DEBUG("Using dynamic version of slice");
                  // start tensor
                  at::Tensor start_tensor = torch::zeros({nbdims}).to(torch::kI32);
-                 ;
                  start_tensor[axis] = startIdx;
                  auto start_itensor = tensor_to_const(ctx, start_tensor);
 
@@ -647,7 +645,6 @@ auto select_registrations TORCHTRT_UNUSED =
 
                  // calculate size
                  auto size_itensor = get_slice_size(ctx, out_start, out_end, stride_itensor, nbdims, node_name);
-
                  // update slice layer
                  auto slice_layer = ctx->net->addSlice(*in, start_, size_, stride_);
                  slice_layer->setInput(1, *out_start); // start

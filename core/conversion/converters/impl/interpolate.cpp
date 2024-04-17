@@ -77,7 +77,6 @@ void resize_layer_size(
   TORCHTRT_CHECK((out_shape.size() > 0) ^ (scales.size() > 0), "only one of out_shape or scales should be defined");
   auto resize_layer = ctx->net->addResize(*in);
   TORCHTRT_CHECK(resize_layer, "Unable to create interpolation (resizing) layer from node" << *n);
-
   if (out_shape.size() > 0) {
     auto th_dynamic_shape_mask = torch::zeros(out_shape.size(), torch::kInt32);
     auto th_static_shape_mask = torch::zeros(out_shape.size(), torch::kInt32);
@@ -91,7 +90,7 @@ void resize_layer_size(
 
     auto dynamic_shape_mask = tensor_to_const(ctx, th_dynamic_shape_mask);
     auto static_shape_mask = tensor_to_const(ctx, th_static_shape_mask);
-    auto input_shape = ctx->net->addShape(*in)->getOutput(0);
+    nvinfer1::ITensor* input_shape = getShapeOutput(ctx, in);
     auto dynamic_shape =
         ctx->net->addElementWise(*input_shape, *dynamic_shape_mask, nvinfer1::ElementWiseOperation::kPROD)
             ->getOutput(0);
@@ -108,13 +107,17 @@ void resize_layer_size(
 
   resize_layer->setResizeMode(mode);
   resize_layer->setName(util::node_info(n).c_str());
-#if NV_TENSORRT_MAJOR < 8
-  resize_layer->setAlignCorners(align_corners);
-#else
+
   if (align_corners) {
     resize_layer->setCoordinateTransformation(nvinfer1::ResizeCoordinateTransformation::kALIGN_CORNERS);
+  } else {
+    if (mode == nvinfer1::InterpolationMode::kLINEAR) {
+      resize_layer->setCoordinateTransformation(nvinfer1::ResizeCoordinateTransformation::kHALF_PIXEL);
+    } else {
+      // kASYMMETRIC is the default transformation in TensorRT
+      resize_layer->setCoordinateTransformation(nvinfer1::ResizeCoordinateTransformation::kASYMMETRIC);
+    }
   }
-#endif
   auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
 
   LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());

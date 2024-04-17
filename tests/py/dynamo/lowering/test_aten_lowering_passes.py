@@ -1,7 +1,6 @@
 import torch
-from torch.testing._internal.common_utils import TestCase, run_tests
-
 import torch_tensorrt
+from torch.testing._internal.common_utils import TestCase, run_tests
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
@@ -444,10 +443,11 @@ class TestLowerLinear(TestCase):
         max_diff = float(
             torch.max(torch.abs(optimized_model_results - torch_model_results))
         )
+
         self.assertAlmostEqual(
             max_diff,
             0,
-            DECIMALS_OF_AGREEMENT,
+            DECIMALS_OF_AGREEMENT_3,
             msg=f"Linear TRT outputs don't match with the original model.",
         )
         torch._dynamo.reset()

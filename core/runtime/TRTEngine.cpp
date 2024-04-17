@@ -264,7 +264,7 @@ std::string TRTEngine::to_str() const {
               exec_ctx->getEngine().getTensorDataType(out_binding_names[o].c_str()))
        << std::endl;
   }
-  ss << "  }" << std::endl;
+  ss << "  ]" << std::endl;
   ss << "  Device: " << device_info << std::endl;
   ss << "  Hardware Compatibility: " << (hardware_compatible ? "Enabled" : "Disabled") << std::endl;
   // clang-format on

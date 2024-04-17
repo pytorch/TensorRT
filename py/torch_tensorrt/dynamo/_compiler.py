@@ -30,7 +30,6 @@ from torch_tensorrt.dynamo._defaults import (
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
     OPTIMIZATION_LEVEL,
-    OUTPUT_FORMAT,
     PASS_THROUGH_BUILD_FAILURES,
     PRECISION,
     REFIT,
@@ -48,7 +47,6 @@ from torch_tensorrt.dynamo._DryRunTracker import (
     dryrun_stats_display,
     parse_non_trt_nodes,
 )
-from torch_tensorrt.dynamo._exporter import export
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     UnsupportedOperatorException,
@@ -106,9 +104,8 @@ def compile(
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = DRYRUN,
     hardware_compatible: bool = HARDWARE_COMPATIBLE,
-    output_format: str = OUTPUT_FORMAT,
     **kwargs: Any,
-) -> Union[ExportedProgram, torch.jit.ScriptModule, torch.fx.GraphModule]:
+) -> torch.fx.GraphModule:
     """Compile a TorchScript module for NVIDIA GPUs using TensorRT
 
     Takes a existing TorchScript module and a set of settings to configure the compiler
@@ -199,7 +196,6 @@ def compile(
     )
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
-
     # Apply lowering on the graph module
     gm = post_lowering(gm, torch_inputs)
     logger.debug("Lowered Input graph: " + str(gm.graph))
@@ -253,14 +249,12 @@ def compile(
         "dla_global_dram_size": dla_global_dram_size,
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
-        "output_format": output_format,
     }
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
     trt_gm = compile_module(gm, inputs, settings)
-    trt_result = export(trt_gm, torch_inputs, output_format)
-    return trt_result
+    return trt_gm
 
 
 def compile_module(
@@ -318,6 +312,22 @@ def compile_module(
     else:
         logger.debug(
             f"Detected support for {num_supported_ops} operators out of {total_ops} in subgraph."
+        )
+
+    def contains_metadata(gm: torch.fx.GraphModule) -> bool:
+        for node in gm.graph.nodes:
+            if node.op != "output" and (not node.meta) and "val" not in node.meta:
+                logger.warning(
+                    f"Node {node.name} of op type {node.op} does not have metadata. This could sometimes lead to undefined behavior."
+                )
+                return False
+        return True
+
+    # Check if the module has metadata (shape, dtype).
+    if not contains_metadata(gm):
+        # TODO: For future, explore when nodes don't have metadata and if fake_tensor_prop can resolve this.
+        logger.warning(
+            "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
         )
 
     # Partition module into components that can be TRT-accelerated
@@ -378,12 +388,7 @@ def compile_module(
         )
 
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
-        submodule_inputs = partitioning.get_submod_inputs(
-            partitioned_module,
-            submodule,
-            sample_inputs,
-            to_torch_device(settings.device),
-        )
+        submodule_inputs = partitioning.construct_submodule_inputs(submodule)
 
         logger.debug(
             "Submodule name: %s\n Input shapes: %s\n %s",
@@ -646,7 +651,7 @@ def convert_module_to_trt_engine(
     import io
 
     with io.BytesIO() as engine_bytes:
-        engine_bytes.write(interpreter_result.engine.serialize())
+        engine_bytes.write(interpreter_result.engine)
         engine_bytearray = engine_bytes.getvalue()
 
     return engine_bytearray

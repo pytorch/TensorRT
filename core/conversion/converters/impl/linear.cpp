@@ -40,11 +40,14 @@ auto linear_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pat
          in = in_shuffle->getOutput(0);
        }
 
-       // Convert w_tensor to ITensor
+       // Convert w_tensor to ITensor and broadcast 2d to 4d if needed
        auto weight = args[1].IValue()->toTensor();
        auto weight_tensor = tensor_to_const(ctx, weight, util::node_info(n) + "_weight");
+       auto weight_shape = util::toVec(weight_tensor->getDimensions());
+       weight_tensor = addPadding(ctx, n, weight_tensor, in->getDimensions().nbDims, false, false);
+
        auto mm_layer = ctx->net->addMatrixMultiply(
-           *in, nvinfer1::MatrixOperation::kNONE, *weight_tensor, nvinfer1::MatrixOperation::kNONE);
+           *in, nvinfer1::MatrixOperation::kNONE, *weight_tensor, nvinfer1::MatrixOperation::kTRANSPOSE);
 
        TORCHTRT_CHECK(mm_layer, "Unable to create linear layer from node: " << *n);
        mm_layer->setName(util::node_info(n).c_str());
