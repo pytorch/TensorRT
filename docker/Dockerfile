@@ -8,9 +8,6 @@ ENV BASE_IMG=nvidia/cuda:12.1.1-devel-ubuntu22.04
 ARG TENSORRT_VERSION
 ENV TENSORRT_VERSION=${TENSORRT_VERSION}
 RUN test -n "$TENSORRT_VERSION" || (echo "No tensorrt version specified, please use --build-arg TENSORRT_VERSION=x.y to specify a version." && exit 1)
-ARG CUDNN_VERSION
-ENV CUDNN_VERSION=${CUDNN_VERSION}
-RUN test -n "$CUDNN_VERSION" || (echo "No cudnn version specified, please use --build-arg CUDNN_VERSION=x.y to specify a version." && exit 1)
 
 ARG PYTHON_VERSION=3.10
 ENV PYTHON_VERSION=${PYTHON_VERSION}
@@ -36,18 +33,18 @@ RUN pyenv install -v ${PYTHON_VERSION}
 RUN pyenv global ${PYTHON_VERSION}
 
 # Install CUDNN + TensorRT + dependencies
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-ubuntu2204.pin
-RUN mv cuda-ubuntu2204.pin /etc/apt/preferences.d/cuda-repository-pin-600
-RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/7fa2af80.pub
-RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /"
-RUN apt-get update
-RUN apt-get install -y libcudnn8=${CUDNN_VERSION}* libcudnn8-dev=${CUDNN_VERSION}*
+# RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-ubuntu2204.pin
+# RUN mv cuda-ubuntu2204.pin /etc/apt/preferences.d/cuda-repository-pin-600
+# RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/7fa2af80.pub
+# RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /"
+# RUN apt-get update
+# RUN apt-get install -y libcudnn8=${CUDNN_VERSION}* libcudnn8-dev=${CUDNN_VERSION}*
 
 RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub
 RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /"
 RUN apt-get update
 
-RUN apt-get install -y libnvinfer8=${TENSORRT_VERSION}.* libnvinfer-plugin8=${TENSORRT_VERSION}.* libnvinfer-dev=${TENSORRT_VERSION}.* libnvinfer-plugin-dev=${TENSORRT_VERSION}.* libnvonnxparsers8=${TENSORRT_VERSION}.* libnvonnxparsers-dev=${TENSORRT_VERSION}.* libnvparsers8=${TENSORRT_VERSION}.*  libnvparsers-dev=${TENSORRT_VERSION}.*
+RUN apt-get install -y libnvinfer10=${TENSORRT_VERSION}.* libnvinfer-plugin10=${TENSORRT_VERSION}.* libnvinfer-dev=${TENSORRT_VERSION}.* libnvinfer-plugin-dev=${TENSORRT_VERSION}.* libnvonnxparsers10=${TENSORRT_VERSION}.* libnvonnxparsers-dev=${TENSORRT_VERSION}.*
 
 # Setup Bazel via Bazelisk
 RUN wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -O /usr/bin/bazel &&\
@@ -88,35 +85,35 @@ RUN CUDA_BASE_IMG_VERSION_INTERMEDIATE=`echo ${BASE_IMG#*:}` &&\
 
 ENV CUDA_HOME=/usr/local/cuda
 
-# This script builds both libtorchtrt bin/lib/include tarball and the Python wheel, in dist/
-RUN bash ./docker/dist-build.sh
+# # This script builds both libtorchtrt bin/lib/include tarball and the Python wheel, in dist/
+# RUN bash ./docker/dist-build.sh
 
-# Copy and install Torch-TRT into the main container
-FROM base as torch-tensorrt
+# # Copy and install Torch-TRT into the main container
+# FROM base as torch-tensorrt
 
-COPY . /opt/torch_tensorrt
+# COPY . /opt/torch_tensorrt
 
-# Symlink the path pyenv is using for python with the /opt directory for package sourcing
-RUN mkdir -p "/opt/python3/" &&\
-    ln -s "`pyenv which python | xargs dirname | xargs dirname`/lib/python$PYTHON_VERSION/site-packages" "/opt/python3/"
+# # Symlink the path pyenv is using for python with the /opt directory for package sourcing
+# RUN mkdir -p "/opt/python3/" &&\
+#     ln -s "`pyenv which python | xargs dirname | xargs dirname`/lib/python$PYTHON_VERSION/site-packages" "/opt/python3/"
 
-COPY --from=torch-tensorrt-builder  /workspace/torch_tensorrt/src/dist/ .
+# COPY --from=torch-tensorrt-builder  /workspace/torch_tensorrt/src/dist/ .
 
-RUN cp /opt/torch_tensorrt/docker/WORKSPACE.docker /opt/torch_tensorrt/WORKSPACE &&\
-    pip install -r /opt/torch_tensorrt/py/requirements.txt &&\
-    # Install all dependency wheel files and user-specified TensorRT
-    pip install *.whl &&\
-    pip install tensorrt==${TENSORRT_VERSION}.* &&\
-    # Add the Torch-TensorRT wheel file to the dist directory and delete all other .whl files
-    rm -fr /workspace/torch_tensorrt/dist/* &&\
-    mkdir -p /opt/torch_tensorrt/dist/ && mv torch_tensorrt*.whl /opt/torch_tensorrt/dist/ &&\
-    rm -fr *.whl &&\
-    # Remove other cache files if present
-    pip cache purge && rm -rf /opt/torch_tensorrt/.mypy_cache
+# RUN cp /opt/torch_tensorrt/docker/WORKSPACE.docker /opt/torch_tensorrt/WORKSPACE &&\
+#     pip install -r /opt/torch_tensorrt/py/requirements.txt &&\
+#     # Install all dependency wheel files and user-specified TensorRT
+#     pip install *.whl &&\
+#     pip install tensorrt==${TENSORRT_VERSION}.* &&\
+#     # Add the Torch-TensorRT wheel file to the dist directory and delete all other .whl files
+#     rm -fr /workspace/torch_tensorrt/dist/* &&\
+#     mkdir -p /opt/torch_tensorrt/dist/ && mv torch_tensorrt*.whl /opt/torch_tensorrt/dist/ &&\
+#     rm -fr *.whl &&\
+#     # Remove other cache files if present
+#     pip cache purge && rm -rf /opt/torch_tensorrt/.mypy_cache
 
-WORKDIR /opt/torch_tensorrt
+# WORKDIR /opt/torch_tensorrt
 
-ENV LD_LIBRARY_PATH /opt/python3/site-packages/torch/lib:/opt/python3/site-packages/torch_tensorrt/lib:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
-ENV PATH /opt/python3/site-packages/torch_tensorrt/bin:${PATH}
+# ENV LD_LIBRARY_PATH /opt/python3/site-packages/torch/lib:/opt/python3/site-packages/torch_tensorrt/lib:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
+# ENV PATH /opt/python3/site-packages/torch_tensorrt/bin:${PATH}
 
-CMD /bin/bash
+# CMD /bin/bash
