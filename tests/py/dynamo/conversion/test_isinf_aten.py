@@ -35,7 +35,6 @@ class TestIsInfConverter(DispatchTestCase):
         self.run_test(
             isinf(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
     @parameterized.expand(
@@ -54,7 +53,6 @@ class TestIsInfConverter(DispatchTestCase):
         self.run_test(
             isinf(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
 

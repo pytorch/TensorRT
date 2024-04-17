@@ -6,6 +6,8 @@ namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
+const std::string DEVICE_INFO_DELIM = "%";
+
 struct RTDevice {
   int64_t id; // CUDA device id
   int64_t major; // CUDA compute major version
