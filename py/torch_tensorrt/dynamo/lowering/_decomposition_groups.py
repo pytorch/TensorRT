@@ -47,7 +47,6 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.gelu,
     aten.gelu_backward,
     aten.glu_backward,
-    aten.grid_sampler_2d,
     aten.hardshrink,
     aten.hardshrink_backward,
     aten.hardsigmoid,
