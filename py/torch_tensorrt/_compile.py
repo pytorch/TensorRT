@@ -25,6 +25,9 @@ if ENABLED_FEATURES.torchscript_frontend:
 if ENABLED_FEATURES.dynamo_frontend:
     from torch._export import ExportedProgram
     from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
+    from torch_tensorrt.dynamo._compiler import (
+        convert_module_to_trt_engine as dynamo_convert_module_to_trt_engine,
+    )
     from torch_tensorrt.dynamo._tracer import trace as dynamo_trace
 
 logger = logging.getLogger(__name__)
@@ -132,7 +135,7 @@ def _get_target_fe(module_type: _ModuleType, ir: str) -> _IRType:
                         "Input is a torchscript module but the ir was not specified (default=dynamo), please set ir=torchscript to suppress the warning."
                     )
                 return _IRType.ts
-            elif module_is_exportable:
+            elif ENABLED_FEATURES.dynamo_frontend and module_is_exportable:
                 logger.info("ir was set to default, using dynamo frontend")
                 return _IRType.dynamo
             else:
@@ -281,7 +284,7 @@ def convert_method_to_trt_engine(
     method_name: str = "forward",
     inputs: Optional[Sequence[Input | torch.Tensor]] = None,
     ir: str = "default",
-    enabled_precisions: Optional[Set[torch.dtype]] = None,
+    enabled_precisions: Optional[Set[torch.dtype | dtype]] = None,
     **kwargs: Any,
 ) -> bytes:
     """Convert a TorchScript module method to a serialized TensorRT engine
@@ -340,7 +343,7 @@ def convert_method_to_trt_engine(
             "convert_method_to_trt_engine call is not supported for ir=fx"
         )
     elif target_ir == _IRType.dynamo:
-        return torch_tensorrt.dynamo.convert_module_to_trt_engine(  # type: ignore[no-any-return]
+        return dynamo_convert_module_to_trt_engine(  # type: ignore[no-any-return]
             module,
             inputs=inputs,
             method_name=method_name,
