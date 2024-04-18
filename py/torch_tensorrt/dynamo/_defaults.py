@@ -1,8 +1,8 @@
 import torch
-from tensorrt import EngineCapability
 from torch_tensorrt._Device import Device
+from torch_tensorrt._enums import EngineCapability, dtype
 
-PRECISION = torch.float32
+ENABLED_PRECISIONS = {dtype.f32}
 DEBUG = False
 DEVICE = None
 DISABLE_TF32 = False
@@ -26,6 +26,7 @@ REFIT = False
 REQUIRE_FULL_COMPILATION = False
 DRYRUN = False
 HARDWARE_COMPATIBLE = False
+SUPPORTED_KERNEL_PRECISIONS = {dtype.f32, dtype.f16, dtype.i8}
 
 
 def default_device() -> Device:

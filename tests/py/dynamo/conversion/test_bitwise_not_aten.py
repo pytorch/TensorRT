@@ -25,7 +25,6 @@ class TestBitwiseNotConverter(DispatchTestCase):
             bitwise_not(),
             inputs,
             enable_passes=True,
-            output_dtypes=[torch.bool],
         )
 
 

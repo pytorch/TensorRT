@@ -64,7 +64,7 @@ include-package-data = false
 
 [tool.ruff]
 # NOTE: Synchoronize the ignores with .flake8
-ignore = [
+lint.ignore = [
     # these ignores are from flake8-bugbear; please fix!
     "B007", "B008", "B017",
     "B018", # Useless expression
@@ -97,7 +97,7 @@ ignore = [
     "SIM118",
 ]
 #line-length = 120
-select = [
+lint.select = [
     "B",
     "C4",
     "G",
@@ -112,11 +112,11 @@ select = [
 ]
 
 # Allow unused variables when underscore-prefixed.
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 target-version = "py311"
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
-fixable = [
+lint.fixable = [
     "A","B","C","D","E","F","G",
     "I","N","Q","S","T","W",
     "ANN", "ARG", "BLE", "COM", "DJ",
@@ -125,7 +125,7 @@ fixable = [
     "PGH", "PIE", "PL", "PT", "PTH",
     "PYI", "RET", "RSE", "RUF", "SIM",
     "SLF", "TCH", "TID", "TRY", "UP", "YTT"]
-unfixable = []
+lint.unfixable = []
 
 # Exclude a variety of commonly ignored directories.
 exclude = [
@@ -164,7 +164,7 @@ exclude = [
     "__init__.py"
 ]
 
-[tool.ruff.mccabe]
+[tool.ruff.lint.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
 max-complexity = 10
 

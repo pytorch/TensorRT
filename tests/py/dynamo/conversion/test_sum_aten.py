@@ -85,7 +85,6 @@ class TestSumConverter(DispatchTestCase):
         self.run_test(
             Sum(),
             inputs,
-            output_dtypes=[torch.int32],
         )
 
     @parameterized.expand(
@@ -108,7 +107,6 @@ class TestSumConverter(DispatchTestCase):
         self.run_test(
             Sum(),
             inputs,
-            output_dtypes=[torch.int32],
         )
 
 
