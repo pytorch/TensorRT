@@ -316,7 +316,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         )
         timing_cache = self._create_timing_cache(builder_config, existing_cache)
 
-        engine = self.builder.build_engine(self.ctx.net, builder_config)
+        engine = self.builder.build_serialized_network(self.ctx.net, builder_config)
         assert engine
 
         serialized_cache = (
