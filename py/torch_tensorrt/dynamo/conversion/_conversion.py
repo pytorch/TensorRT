@@ -4,6 +4,7 @@ import io
 import logging
 from typing import List, Sequence
 
+import tensorrt as trt
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
@@ -16,8 +17,6 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import get_torch_inputs
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +38,8 @@ def infer_module_output_dtypes(
     # such as aten.sum - such outputs can be truncated
     output_dtypes = []
     for output in module_outputs:
+        if not isinstance(output, torch.Tensor):
+            output = torch.tensor(output)
         if truncate_long_and_double and output.dtype == dtype.float64:
             output_dtypes.append(dtype.float32)
         elif truncate_long_and_double and output.dtype == dtype.int64:
