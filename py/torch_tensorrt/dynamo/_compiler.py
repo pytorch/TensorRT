@@ -497,6 +497,8 @@ def convert_module_to_trt_engine(
         dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
         dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
+        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
+        allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
 
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
