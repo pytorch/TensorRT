@@ -266,9 +266,9 @@ PYBIND11_MODULE(_C, m) {
       m,
       "EngineCapability",
       "Enum to specify engine capability settings (selections of kernels to meet safety requirements)")
-      .value("safe_gpu", EngineCapability::kSAFE_GPU, "Use safety GPU kernels only")
-      .value("safe_dla", EngineCapability::kSAFE_DLA, "Use safety DLA kernels only")
-      .value("default", EngineCapability::kDEFAULT, "Use default behavior");
+      .value("SAFETY", EngineCapability::kSAFETY, "Use safe kernels only")
+      .value("DLA_STANDALONE", EngineCapability::kDLA_STANDALONE, "Use DLA kernels only")
+      .value("STANDARD", EngineCapability::kSTANDARD, "Use default behavior");
 
   py::enum_<TensorFormat>(m, "TensorFormat", "Enum to specifiy the memory layout of tensors")
       .value("contiguous", TensorFormat::kContiguous, "Contiguous memory layout (NCHW / Linear)")

@@ -87,7 +87,6 @@ class TestScalarTensorConverter(DispatchTestCase):
         self.run_test(
             ScalarTensor(),
             inputs,
-            output_dtypes=None if dtype is None else [dtype],
         )
 
 

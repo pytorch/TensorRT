@@ -25,7 +25,6 @@ class TestLeConverter(DispatchTestCase):
         self.run_test(
             le(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
     @parameterized.expand(
@@ -43,7 +42,6 @@ class TestLeConverter(DispatchTestCase):
         self.run_test(
             le(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
     @parameterized.expand(
@@ -61,7 +59,6 @@ class TestLeConverter(DispatchTestCase):
         self.run_test(
             le(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
 

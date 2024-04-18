@@ -242,3 +242,30 @@ jobs:
         ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_partitioning_test_results.xml partitioning/
         ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_lowering_test_results.xml lowering/
         popd
+
+  tests-py-core:
+    name: Test core [Python]
+    needs: [generate-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+    with:
+      job-name: tests-py-core
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      script: |
+        export USE_HOST_DEPS=1
+        pushd .
+        cd tests/py/core
+        ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
+        ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_core_test_results.xml .
+        popd

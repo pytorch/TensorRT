@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional, cast
+from typing import Optional, Sequence, Union, cast
 
 import numpy as np
 import tensorrt as trt
@@ -82,7 +82,7 @@ def index(
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    index: Any,
+    indices: Sequence[Union[TRTTensor, np.ndarray, torch.Tensor]],
 ) -> TRTTensor:
     adv_indx_indices = []
     tensor_indices = []
@@ -94,12 +94,14 @@ def index(
         "Determining whether aten.index constant-index optimization can be invoked"
     )
     is_numpy = all(
-        isinstance(ind, (torch.Tensor, np.ndarray)) for ind in index if ind is not None
+        isinstance(ind, (torch.Tensor, np.ndarray))
+        for ind in indices
+        if ind is not None
     )
     # here we need to check if all the index are broadcastable
     # if no, then we need to broadcast
     last_index = None
-    for i, ind in enumerate(index):
+    for i, ind in enumerate(indices):
         if ind is not None:
             _LOGGER.debug(f"Shape of {i} index is {ind.shape}")
             adv_indx_indices.append(i)
@@ -376,4 +378,22 @@ def index(
             )
             reshape_output = reshape_layer.get_output(0)
 
-    return reshape_output
+        return reshape_output
+
+
+def index_select(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    dim: int,
+    index: TRTTensor,
+) -> TRTTensor:
+    # The axis parameter specifies the dimension along which to index.
+    dim = get_positive_dim(dim, len(input.shape))
+    gather_layer = ctx.net.add_gather(input, index, axis=dim)
+
+    set_layer_name(gather_layer, target, f"{name}_gather", source_ir)
+
+    return gather_layer.get_output(0)

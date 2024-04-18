@@ -42,7 +42,6 @@ class TestAbsConverter(DispatchTestCase):
         self.run_test(
             abs(),
             inputs,
-            output_dtypes=[torch.int],
         )
 
 

@@ -9,12 +9,12 @@ import torch
 import torch_tensorrt
 from torch.nn import Module
 from torch_tensorrt._Device import Device
+from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo.runtime.tools import (
     _is_switch_required,
     _select_rt_device,
     multi_gpu_device_check,
 )
-from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
 logger = logging.getLogger(__name__)
 
@@ -91,18 +91,14 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         )
 
         self.input_dtypes = [
-            unified_dtype_converter(
-                self.engine.get_tensor_dtype(input_name), Frameworks.TORCH
-            )
+            dtype._from(self.engine.get_tensor_dtype(input_name))
             for input_name in self.input_names
         ]
         self.input_shapes = [
             self.engine.get_tensor_shape(input_name) for input_name in self.input_names
         ]
         self.output_dtypes = [
-            unified_dtype_converter(
-                self.engine.get_tensor_dtype(output_name), Frameworks.TORCH
-            )
+            dtype._from(self.engine.get_tensor_dtype(output_name))
             for output_name in self.output_names
         ]
         self.output_shapes = [
@@ -257,7 +253,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
                     output = torch.empty(
                         size=shape,
-                        dtype=self.output_dtypes[i],
+                        dtype=self.output_dtypes[i].to(torch.dtype),
                         device=torch.cuda.current_device(),
                     )
                     bindings.append(output.data_ptr())
