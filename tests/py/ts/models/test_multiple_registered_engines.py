@@ -1,14 +1,19 @@
-import unittest
-import torch_tensorrt as torchtrt
-import torch
-import torchvision.models as models
 import copy
-import timm
-import custom_models as cm
+import unittest
 from typing import Dict
-from utils import cosine_similarity, COSINE_THRESHOLD
+
+import custom_models as cm
+import timm
+import torch
+import torch_tensorrt as torchtrt
+import torchvision.models as models
+from utils import COSINE_THRESHOLD, cosine_similarity
 
 
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torchscript_frontend,
+    "TorchScript Frontend is not available",
+)
 class TestModelToEngineToModel(unittest.TestCase):
     def test_multiple_engines(self):
         self.resnet18 = models.resnet18(pretrained=True).eval().to("cuda")

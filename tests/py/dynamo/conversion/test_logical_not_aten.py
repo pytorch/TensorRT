@@ -22,7 +22,6 @@ class TestLogicalNotConverter(DispatchTestCase):
         self.run_test(
             logical_not(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
     @parameterized.expand(
@@ -41,7 +40,6 @@ class TestLogicalNotConverter(DispatchTestCase):
         self.run_test(
             logical_not(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
     @parameterized.expand(
@@ -60,7 +58,6 @@ class TestLogicalNotConverter(DispatchTestCase):
         self.run_test(
             logical_not(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
 

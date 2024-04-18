@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import torch
-from torch_tensorrt import _enums
+from torch_tensorrt._enums import dtype, memory_format
 
 
 class Input(object):
@@ -34,18 +34,17 @@ class Input(object):
     shape: Optional[Tuple[int, ...] | Dict[str, Tuple[int, ...]]] = (
         None  #: Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ "min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple }``
     )
-    dtype: _enums.dtype = (
-        _enums.dtype.unknown
+    dtype: dtype = (
+        dtype.unknown
     )  #: The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)
     _explicit_set_dtype: bool = False
-    format: _enums.TensorFormat = (
-        _enums.TensorFormat.contiguous
-    )  #: The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)
+    format: memory_format = (
+        memory_format.linear
+    )  #: The expected format of the input tensor (default: torch_tensorrt.memory_format.linear)
 
     DOMAIN_OFFSET: float = 2.0
     low_tensor_domain_incl: float = 0.0
     high_tensor_domain_excl: float = low_tensor_domain_incl + DOMAIN_OFFSET
-    torch_dtype: torch.dtype = torch.float32
     torch_tensor: torch.Tensor = None
     name: str = ""
 
@@ -151,21 +150,19 @@ class Input(object):
 
         else:
             raise ValueError(
-                "Unexpected number of positional arguments for class Input \n    Found {} arguments, expected either zero or a single positional arguments".format(
-                    len(args)
-                )
+                f"Unexpected number of positional arguments for class Input \n    Found {len(args)} arguments, expected either zero or a single positional arguments"
             )
 
         if "dtype" in kwargs:
-            if isinstance(kwargs["dtype"], torch.dtype):
-                self.torch_dtype = kwargs["dtype"]
+            self.dtype = dtype._from(kwargs["dtype"])
 
-            self.dtype = Input._parse_dtype(kwargs["dtype"])
-            self.torch_dtype = Input._to_torch_dtype(self.dtype)
+        if self.dtype != dtype.unknown:
             self._explicit_set_dtype = True
+        else:
+            self._explicit_set_dtype = False
 
         if "format" in kwargs:
-            self.format = Input._parse_format(kwargs["format"])
+            self.format = memory_format._from(kwargs["format"])
 
         if "tensor_domain" in kwargs:
             domain = kwargs["tensor_domain"]
@@ -212,6 +209,9 @@ class Input(object):
         else:
             raise RuntimeError("Unknown input shape mode")
 
+    def __repr__(self) -> str:
+        return self.__str__()
+
     @staticmethod
     def _supported_input_size_type(input_size: Any) -> bool:
         if isinstance(input_size, torch.Size):
@@ -222,77 +222,6 @@ class Input(object):
             return True
         else:
             return False
-
-    @staticmethod
-    def _parse_dtype(dtype: Any) -> _enums.dtype:
-        if isinstance(dtype, torch.dtype):
-            if dtype == torch.long:
-                return _enums.dtype.long
-            elif dtype == torch.int32:
-                return _enums.dtype.int32
-            elif dtype == torch.half:
-                return _enums.dtype.half
-            elif dtype == torch.float:
-                return _enums.dtype.float
-            elif dtype == torch.float64:
-                return _enums.dtype.double
-            elif dtype == torch.bool:
-                return _enums.dtype.bool
-            else:
-                raise TypeError(
-                    "Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: "
-                    + str(dtype)
-                )
-
-        elif isinstance(dtype, _enums.dtype):
-            return dtype
-
-        else:
-            raise TypeError(
-                "Input data type needs to be specified with a torch.dtype or a torch_tensorrt.dtype, got: "
-                + str(type(dtype))
-            )
-
-    @staticmethod
-    def _to_torch_dtype(dtype: _enums.dtype) -> torch.dtype:
-        if dtype == _enums.dtype.long:
-            return torch.long
-        elif dtype == _enums.dtype.int32:
-            return torch.int32
-        elif dtype == _enums.dtype.half:
-            return torch.half
-        elif dtype == _enums.dtype.float:
-            return torch.float
-        elif dtype == _enums.dtype.bool:
-            return torch.bool
-        elif dtype == _enums.dtype.double:
-            return torch.float64
-        else:
-            # Default torch_dtype used in FX path
-            return torch.float32
-
-    def is_trt_dtype(self) -> bool:
-        return bool(self.dtype != _enums.dtype.long)
-
-    @staticmethod
-    def _parse_format(format: Any) -> _enums.TensorFormat:
-        if isinstance(format, torch.memory_format):
-            if format == torch.contiguous_format:
-                return _enums.TensorFormat.contiguous
-            elif format == torch.channels_last:
-                return _enums.TensorFormat.channels_last
-            else:
-                raise ValueError(
-                    "Provided an unsupported tensor format (support: NCHW/contiguous_format, NHWC/channel_last)"
-                )
-
-        elif isinstance(format, _enums.TensorFormat):
-            return format
-
-        else:
-            raise TypeError(
-                "Tensor format needs to be specified with either torch.memory_format or torch_tensorrt.TensorFormat"
-            )
 
     @staticmethod
     def _parse_tensor_domain(
@@ -415,7 +344,9 @@ class Input(object):
                 )
             else:
                 if isinstance(self.shape, tuple):
-                    return torch.rand(self.shape).to(dtype=self.torch_dtype)
+                    return torch.rand(self.shape).to(
+                        dtype=self.dtype.to(torch.dtype, use_default=True)
+                    )
                 else:
                     RuntimeError(
                         f"Input shape is dynamic but shapes are not provided as sequence (found: {self.shape})"
@@ -434,7 +365,7 @@ class Input(object):
 
                 if isinstance(self.shape, dict):
                     return torch.rand(self.shape[optimization_profile_field]).to(
-                        dtype=self.torch_dtype
+                        dtype=self.dtype.to(torch.dtype, use_default=True)
                     )
                 else:
                     raise RuntimeError(
