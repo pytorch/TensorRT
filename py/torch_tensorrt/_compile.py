@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import collections.abc
 import logging
 from enum import Enum
 from typing import Any, Callable, List, Optional, Sequence, Set
@@ -240,8 +241,6 @@ def compile(
         return compiled_fx_module
     elif target_ir == _IRType.dynamo:
         # Prepare torch and torchtrt inputs
-        import collections.abc
-
         from torch_tensorrt.dynamo.utils import prepare_inputs
 
         if not isinstance(input_list, collections.abc.Sequence):
@@ -345,10 +344,19 @@ def convert_method_to_trt_engine(
             "convert_method_to_trt_engine call is not supported for ir=fx"
         )
     elif target_ir == _IRType.dynamo:
+        # Prepare torch and torchtrt inputs
+        from torch_tensorrt.dynamo.utils import prepare_inputs
+
+        if not isinstance(inputs, collections.abc.Sequence):
+            inputs = [inputs]
+
+        # Export the module
+        torchtrt_inputs = prepare_inputs(inputs)
+        exp_program = torch_tensorrt.dynamo.trace(module, torchtrt_inputs, **kwargs)
+
         return dynamo_convert_module_to_trt_engine(  # type: ignore[no-any-return]
-            module,
+            exp_program,
             inputs=inputs,
-            method_name=method_name,
             enabled_precisions=enabled_precisions_set,
             **kwargs,
         )
