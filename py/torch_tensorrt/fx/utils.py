@@ -1,18 +1,21 @@
 from enum import Enum
-from typing import Dict, List, Optional, Callable, Union
+from typing import Callable, Dict, List, Optional, Union
+
 import numpy as np
-from packaging import version
 
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
 from functorch import make_fx
 from functorch.experimental import functionalize
+from torch_tensorrt._utils import sanitized_torch_version
 from torch_tensorrt.fx.passes.lower_basic_pass import (
     replace_op_with_indices,
     run_const_fold,
 )
-from torch_tensorrt._utils import sanitized_torch_version
+
+from packaging import version
+
 from .types import Shape, TRTDataType
 
 
@@ -47,7 +50,7 @@ DataTypeEquivalence: Dict[
     },
 }
 
-if trt.__version__ >= "7.0":
+if version.parse(trt.__version__) >= version.parse("7.0"):
     DataTypeEquivalence[trt.bool] = {
         Frameworks.NUMPY: np.bool_,
         Frameworks.TORCH: torch.bool,
