@@ -264,6 +264,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
+        export LD_LIBRARY_PATH=/opt/torch-tensorrt-builds/TensorRT-10.0.0.6/lib:$LD_LIBRARY_PATH
         pushd .
         cd tests/py/core
         ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver

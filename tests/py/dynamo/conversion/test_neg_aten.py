@@ -22,7 +22,7 @@ class TestNegConverter(DispatchTestCase):
                 return torch.ops.aten.neg.default(input)
 
         inputs = [torch.randn(x, dtype=type)]
-        self.run_test(neg(), inputs, precision=type, output_dtypes=[type])
+        self.run_test(neg(), inputs, precision=type)
 
     @parameterized.expand(
         [
