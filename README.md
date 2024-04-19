@@ -89,8 +89,7 @@ serialize
 | Platform            | Support                                          |
 | ------------------- | ------------------------------------------------ |
 | Linux AMD64 / GPU   | **Supported**                                    |
-| Windows / GPU       | **Official support coming soon!**                |
-| NGC Containers      | **Included in PyTorch NGC Containers**           |
+| Windows / GPU       | **Official support coming soon**                |
 | Linux aarch64 / GPU | **Native Compilation Supported on JetPack-4.4+ (use v1.0.0 for the time being)** |
 | Linux aarch64 / DLA | **Native Compilation Supported on JetPack-4.4+ (use v1.0.0 for the time being)** |
 | Linux ppc64le / GPU | Not supported                                    |
