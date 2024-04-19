@@ -14,8 +14,6 @@ jobs:
       with-cpu: false
 
   build:
-    env:
-      CHANNEL: test
     needs: generate-matrix
     permissions:
       id-token: write
@@ -30,6 +28,8 @@ jobs:
             package-name: torch_tensorrt
     name: Build torch-tensorrt whl package
     uses: pytorch/test-infra/.github/workflows/build_wheels_windows.yml@main
+    env:
+      CHANNEL: test
     with:
       repository: ${{ matrix.repository }}
       ref: ""
