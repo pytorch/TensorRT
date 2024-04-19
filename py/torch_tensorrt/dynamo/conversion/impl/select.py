@@ -393,7 +393,7 @@ def index_select(
     return gather_layer.get_output(0)
 
 
-def scatter_value(
+def scatter(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
@@ -401,92 +401,30 @@ def scatter_value(
     input: TRTTensor,
     dim: int,
     index: Union[TRTTensor, np.ndarray, torch.Tensor],
-    value: float,
+    src: Union[TRTTensor, int, float],
 ) -> TRTTensor:
-    if not isinstance(input, TRTTensor):
-        raise RuntimeError(
-            f"scatter_tensor received input {input} that is not part "
-            "of the TensorRT region!"
-        )
     input_shape = input.shape
     index_shape = index.shape
     index_shape_list = list(index.shape)
     if not (isinstance(index, TRTTensor)):
         index = get_trt_tensor(ctx, index, f"_index_tensor")
-    if len(input_shape) != len(index_shape):
-        raise RuntimeError(f"The no of dimensions of input and index should be equal")
     dim = get_positive_dim(dim, len(input_shape))
     dynamic_shape = has_dynamic_shape(input.shape)
     if dynamic_shape:
         # Check whether slice target dim is dynamic shape dim
         assert input.shape[dim] != -1, "Can't scatter on negative shape dimension!"
 
-    input_dims = len(input_shape)
-    for i in range(0, input_dims):
-        if i != dim and (index_shape[i] >= input.shape[i]):
-            raise RuntimeError(
-                f"cannot have index size greater than the input size along dimension {dim}"
-            )
-
-    value_tensor = get_trt_tensor(
-        ctx, value * torch.ones(index_shape_list), name + "_value_tensor"
-    )
-    value_tensor = cast_trt_tensor(
-        ctx, value_tensor, input.dtype, name + "_cast_value_tensor"
-    )
-    scatter_layer = ctx.net.add_scatter(
-        input, index, value_tensor, trt.ScatterMode.ELEMENT
-    )
-    scatter_layer.axis = dim
-    set_layer_name(scatter_layer, target, name + "_scatter_layer", source_ir)
-    out = scatter_layer.get_output(0)
-    return out
-
-
-def scatter_src(
-    ctx: ConversionContext,
-    target: Target,
-    source_ir: Optional[SourceIR],
-    name: str,
-    input: TRTTensor,
-    dim: Shape,
-    index: Shape,
-    src: TRTTensor,
-) -> TRTTensor:
-    if not isinstance(input, TRTTensor):
-        raise RuntimeError(
-            f"scatter_tensor received input {input} that is not part "
-            "of the TensorRT region!"
-        )
-    input_shape = input.shape
-    index_shape = index.shape
-    src_shape = src.shape
-    if not (isinstance(index, TRTTensor)):
-        index = get_trt_tensor(ctx, index, f"_index_tensor")
-    if len(input_shape) != len(index_shape):
-        raise RuntimeError(f"The no of dimensions of input and index should be equal")
-    if len(index_shape) != len(src_shape):
-        raise RuntimeError(f"The no of dimensions of src and index should be equal")
-
-    input_dims = len(input_shape)
-    dim = get_positive_dim(cast(int, dim), input_dims)
-    dynamic_shape = has_dynamic_shape(input.shape)
-    if dynamic_shape:
-        # Check whether slice target dim is dynamic shape dim
-        assert input.shape[dim] != -1, "Can't scatter on negative shape dimension!"
-
-    for i in range(0, input_dims):
-        if i != dim and (index_shape[i] >= input.shape[i]):
-            raise RuntimeError(
-                f"cannot have index size greater than the input size along dimension {dim}"
-            )
-    input_dtype = input.dtype
-    # required for cases where src is a constant
-    src_dtype = unified_dtype_converter(src.dtype, Frameworks.TRT)
-    if input_dtype != src_dtype:
-        raise RuntimeError(f"The type of input and src should be made")
     src_tensor = src
-    if not (isinstance(src, TRTTensor)):
+    # scatter.value
+    if isinstance(src, int) or isinstance(src, float):
+        src_tensor = get_trt_tensor(
+            ctx, src * torch.ones(index_shape_list), name + "_value_tensor"
+        )
+        src_tensor = cast_trt_tensor(
+            ctx, src_tensor, input.dtype, name + "_cast_value_tensor"
+        )
+    # scatter.src
+    elif not (isinstance(src, TRTTensor)):
         src_tensor = get_trt_tensor(ctx, src, name + "_src_tensor")
 
     scatter_layer = ctx.net.add_scatter(

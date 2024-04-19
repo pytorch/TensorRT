@@ -1,8 +1,9 @@
 import torch
-from harness import DispatchTestCase
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+
+from .harness import DispatchTestCase
 
 
 class TestScatterValueConverter(DispatchTestCase):
@@ -87,25 +88,25 @@ class TestScatterSrcConverter(DispatchTestCase):
     @parameterized.expand(
         [
             (
-                "scatter_zero_dim_indexOne_constant_src",
+                "scatter_zero_dim_indexOne_src",
                 0,
                 torch.tensor([[0, 1, 2, 0]]),
                 torch.tensor([[1, 2, 3, 4]], dtype=torch.int32),
             ),
             (
-                "scatter_zero_dim_indexTwo_constant_src",
+                "scatter_zero_dim_indexTwo_src",
                 0,
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]),
                 torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32),
             ),
             (
-                "scatter_one_dim_indexOne_constant_src",
+                "scatter_one_dim_indexOne_src",
                 1,
                 torch.tensor([[0, 1, 2, 0]]),
                 torch.tensor([[1, 2, 3, 1]], dtype=torch.int32),
             ),
             (
-                "scatter_one_dim_indexTwo_constant_src",
+                "scatter_one_dim_indexTwo_src",
                 1,
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]),
                 torch.tensor([[1, 2, 3, 1], [5, 6, 5, 5]], dtype=torch.int32),
