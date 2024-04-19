@@ -133,4 +133,8 @@ Take a look at the [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## License
 
+<<<<<<< HEAD
 The Torch-TensorRT license can be found in the [LICENSE](./LICENSE) file. It is licensed with a BSD Style licence
+=======
+The Torch-TensorRT license can be found in the [LICENSE](./LICENSE) file. It is licensed with a BSD Style licence
+>>>>>>> 640115bf6 (remove ngc from list of platforms)
