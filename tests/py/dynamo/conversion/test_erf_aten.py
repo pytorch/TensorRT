@@ -22,7 +22,7 @@ class TestErfConverter(DispatchTestCase):
                 return torch.ops.aten.erf.default(input)
 
         inputs = [torch.randn(x, dtype=type)]
-        self.run_test(erf(), inputs, precision=type, output_dtypes=[type])
+        self.run_test(erf(), inputs, precision=type)
 
     @parameterized.expand(
         [
