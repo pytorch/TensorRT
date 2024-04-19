@@ -33,6 +33,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
+      channel: test
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
