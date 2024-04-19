@@ -59,7 +59,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         runtime = trt.Runtime(logger)
         self.engine = runtime.deserialize_cuda_engine(self.engine)
         self.context = self.engine.create_execution_context()
-        self.stream = torch.cuda.Stream(torch.cuda.current_device())
         # Indices of inputs/outputs in the trt engine bindings, in the order
         # as they are in the original PyTorch model.
 
@@ -282,7 +281,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if self.profiling_enabled
                 else nullcontext()
             ):
-                self.context.execute_async_v3(self.stream.cuda_stream)
+                self.context.execute_async_v3(torch.cuda.current_stream().cuda_stream)
 
             if len(outputs) == 1:
                 return outputs[0]
