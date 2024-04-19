@@ -62,18 +62,28 @@ model = <YOUR  MODEL HERE>
 x = <YOUR INPUT HERE>
 
 optimized_model = torch_tensorrt.compile(model, example_inputs)
-serialize
+serialize # fix me
 ```
 
 #### Step 2: Deploy
 ##### Deployment in PyTorch:
 ```python
+import torch
+import torch_tensorrt
 
+x = <YOUR INPUT HERE>
+
+# fix me
+optimized_model = load_model
+optimized_model(x) 
 ```
 
 ##### Deployment in C++:
 ```cpp
+#include "torch/script.h"
+#include "torch_tensorrt/torch_tensorrt.h"
 
+// to fill
 ```
 
 ## Further resources
