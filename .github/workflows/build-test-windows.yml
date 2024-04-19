@@ -2,6 +2,9 @@ name: Build and test Windows wheels
 
 on: [pull_request]
 
+env:
+  CHANNEL: test
+
 jobs:
   generate-matrix:
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
@@ -28,8 +31,6 @@ jobs:
             package-name: torch_tensorrt
     name: Build torch-tensorrt whl package
     uses: pytorch/test-infra/.github/workflows/build_wheels_windows.yml@main
-    env:
-      CHANNEL: test
     with:
       repository: ${{ matrix.repository }}
       ref: ""
