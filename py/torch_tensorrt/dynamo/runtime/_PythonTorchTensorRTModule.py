@@ -209,11 +209,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
                 contiguous_inputs: List[torch.Tensor] = [i.contiguous() for i in inputs]
                 bindings = []
-                # [None] * (
-                #     len(self.input_names)
-                #     + len(self.output_names)
-                #     # + len(self.hidden_output_names) # TODO: Verify if this is required
-                # )
                 for i, input_name in enumerate(self.input_names):
                     if not contiguous_inputs[i].is_cuda:
                         logger.warning(
