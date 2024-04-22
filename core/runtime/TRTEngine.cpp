@@ -133,6 +133,7 @@ TRTEngine::TRTEngine(
           trt_idx = idx;
           if (cuda_engine->getTensorIOMode(binding_name.c_str()) == nvinfer1::TensorIOMode::kINPUT) {
             is_input = true;
+            break;
           }
         }
       }
@@ -161,6 +162,7 @@ TRTEngine::TRTEngine(
           trt_idx = idx;
           if (cuda_engine->getTensorIOMode(binding_name.c_str()) == nvinfer1::TensorIOMode::kOUTPUT) {
             is_output = true;
+            break;
           }
         }
       }

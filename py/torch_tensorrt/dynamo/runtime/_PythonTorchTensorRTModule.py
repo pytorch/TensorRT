@@ -15,6 +15,7 @@ from torch_tensorrt.dynamo.runtime.tools import (
     _select_rt_device,
     multi_gpu_device_check,
 )
+from torch_tensorrt.logging import TRT_LOGGER
 
 logger = logging.getLogger(__name__)
 
@@ -55,39 +56,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
     def _initialize(self) -> None:
         self.initialized = True
-        logger = trt.Logger()
-        runtime = trt.Runtime(logger)
+        runtime = trt.Runtime(TRT_LOGGER)
         self.engine = runtime.deserialize_cuda_engine(self.engine)
         self.context = self.engine.create_execution_context()
-        # Indices of inputs/outputs in the trt engine bindings, in the order
-        # as they are in the original PyTorch model.
-
-        # TODO: Verify if the following is required especially the hidden outputs
-        # self.input_binding_indices_in_order: Sequence[int] = [
-        #     self.engine.get_binding_index(name) for name in self.input_names
-        # ]
-        # self.output_binding_indices_in_order: Sequence[int] = [
-        #     self.engine.get_binding_index(name) for name in self.output_names
-        # ]
-        # primary_input_outputs = set()
-        # primary_input_outputs.update(self.input_binding_indices_in_order)
-        # primary_input_outputs.update(self.output_binding_indices_in_order)
-        # self.hidden_output_binding_indices_in_order: Sequence[int] = []
-        # self.hidden_output_names: Sequence[str] = []
-        # for i in range(
-        #     self.engine.num_bindings // self.engine.num_optimization_profiles
-        # ):
-        #     if i not in primary_input_outputs:
-        #         self.hidden_output_binding_indices_in_order.append(i)
-        #         self.hidden_output_names.append(self.engine.get_binding_name(i))
 
         assert (
             self.engine.num_io_tensors // self.engine.num_optimization_profiles
-        ) == (
-            len(self.input_names)
-            + len(self.output_names)
-            # + len(self.hidden_output_names) #TODO: Verify if this is required
-        )
+        ) == (len(self.input_names) + len(self.output_names))
 
         self.input_dtypes = [
             dtype._from(self.engine.get_tensor_dtype(input_name))
@@ -104,14 +79,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.engine.get_tensor_shape(output_name)
             for output_name in self.output_names
         ]
-
-        # TODO: Verify what this is for ?
-        # self.hidden_output_dtypes = [
-        #     unified_dtype_converter(
-        #         self.engine.get_binding_dtype(idx), Frameworks.TORCH
-        #     )
-        #     for idx in self.hidden_output_binding_indices_in_order
-        # ]
 
     def _check_initialized(self) -> None:
         if not self.initialized:
@@ -138,8 +105,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         # Run multi-gpu device check to validate engine instantiation
         multi_gpu_device_check()
 
-        logger = trt.Logger()
-        runtime = trt.Runtime(logger)
+        runtime = trt.Runtime(TRT_LOGGER)
         self.engine = runtime.deserialize_cuda_engine(engine_bytes)
 
         self.input_names = state_dict[prefix + "input_names"]
@@ -253,16 +219,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     bindings.append(output.data_ptr())
                     outputs.append(output)
 
-                # TODO: Check what is this for ?
-                # for i, idx in enumerate(self.hidden_output_binding_indices_in_order):
-                #     shape = tuple(self.context.get_binding_shape(idx))
-
-                #     output = torch.empty(
-                #         size=shape,
-                #         dtype=self.hidden_output_dtypes[i],
-                #         device=torch.cuda.current_device(),
-                #     )
-
             # Assign tensor address appropriately
             for idx in range(self.engine.num_io_tensors):
                 self.context.set_tensor_address(
@@ -300,7 +256,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         Disable TensorRT profiling.
         """
         self._check_initialized()
-
         torch.cuda.synchronize()
         del self.context
         self.context = self.engine.create_execution_context()
