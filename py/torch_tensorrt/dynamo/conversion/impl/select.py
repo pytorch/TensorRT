@@ -40,19 +40,12 @@ def select(
             "of the TensorRT region!"
         )
 
-    ranks = len(input.shape) + (1 if ctx.net.has_implicit_batch_dimension else 0)
+    ranks = len(input.shape)
     dim = get_positive_dim(cast(int, dim), ranks)
     dynamic_shape = has_dynamic_shape(input.shape)
-    if ctx.net.has_implicit_batch_dimension:
-        if dim == 0:
-            raise RuntimeError(
-                f"We do not support slice_tensor at batch dim when it's implicit, got {dim}!"
-            )
-        dim = dim - 1
-    else:
-        if dynamic_shape:
-            # Check whether slice target dim is dynamic shape dim
-            assert input.shape[dim] != -1, "Can't select on negative shape dimension!"
+    if dynamic_shape:
+        # Check whether slice target dim is dynamic shape dim
+        assert input.shape[dim] != -1, "Can't select on negative shape dimension!"
     index = index
 
     if index >= input.shape[dim]:
