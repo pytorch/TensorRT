@@ -3,7 +3,6 @@
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAEvent.h>
 #include <cuda_runtime_api.h>
-#include <cudnn.h>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -42,7 +41,7 @@ class NormalizePlugin : public nvinfer1::IPluginV2DynamicExt {
 
   const char* getPluginNamespace() const noexcept override;
 
-  void setPluginNamespace(const char* pluginNamespace) noexcept override{};
+  void setPluginNamespace(const char* pluginNamespace) noexcept override {};
 
   nvinfer1::IPluginV2DynamicExt* clone() const noexcept override;
 
@@ -102,7 +101,7 @@ class NormalizePluginCreator : public nvinfer1::IPluginCreator {
 
   const char* getPluginNamespace() const noexcept override;
 
-  void setPluginNamespace(const char* libNamespace) noexcept override{};
+  void setPluginNamespace(const char* libNamespace) noexcept override {};
 
   const char* getPluginName() const noexcept override;
 

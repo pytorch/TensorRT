@@ -19,11 +19,11 @@ nvinfer1::ITensor* concat(int max_rank, int old_rank, ConversionCtx* ctx, nvinfe
   if (max_rank - old_rank > 0) {
     torch::Tensor thOne = torch::tensor(std::vector<int32_t>(max_rank - old_rank, 1), torch::kInt32);
     auto one_tensor = tensor_to_const(ctx, thOne);
-    auto in_shape_tensor = ctx->net->addShape(*tensor)->getOutput(0);
+    auto in_shape_tensor = getShapeOutput(ctx, tensor);
     nvinfer1::ITensor* const args[2] = {one_tensor, in_shape_tensor};
     return ctx->net->addConcatenation(args, 2)->getOutput(0);
   } else { // max_rank - old_rank == 0
-    return ctx->net->addShape(*tensor)->getOutput(0);
+    return getShapeOutput(ctx, tensor);
   }
 }
 
@@ -44,8 +44,7 @@ bool add_expand(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor
       if (size != targetSize) {
         if (size != 1) {
           TORCHTRT_THROW_ERROR(
-              "The expanded size of tensor (" << targetSize << ")"
-                                              << " must match the existing size (" << size << ")"
+              "The expanded size of tensor (" << targetSize << ")" << " must match the existing size (" << size << ")"
                                               << " at dimension " << i);
         }
       }
@@ -132,8 +131,7 @@ bool add_expand_dynamic(
         // if size == -1, we can't validate the expansion before setBindingDimensions.
         if (!(size == -1 || size == 1)) {
           TORCHTRT_THROW_ERROR(
-              "The expanded size of tensor (" << targetSize << ")"
-                                              << " must match the existing size (" << size << ")"
+              "The expanded size of tensor (" << targetSize << ")" << " must match the existing size (" << size << ")"
                                               << " at dimension " << i);
         }
       }
@@ -221,8 +219,7 @@ auto expand_registrations TORCHTRT_UNUSED =
                auto targetDims = targetTensor->getDimensions();
                LOG_DEBUG("(expand_as layer) Expand input from " << input_dims << " to " << targetDims);
                if (ctx->input_is_dynamic) {
-                 return add_expand_dynamic(
-                     ctx, n, in, ctx->net->addShape(*targetTensor)->getOutput(0), targetDims, false);
+                 return add_expand_dynamic(ctx, n, in, getShapeOutput(ctx, targetTensor), targetDims, false);
                } else {
                  return add_expand(ctx, n, in, targetDims);
                }
@@ -357,7 +354,7 @@ auto expand_registrations TORCHTRT_UNUSED =
                if (ctx->input_is_dynamic) {
                  auto start_tensor = tensor_to_const(ctx, torch::tensor(start_vec, torch::kInt32));
 
-                 auto expand_output_shape = ctx->net->addShape(*expand->getOutput(0))->getOutput(0);
+                 auto expand_output_shape = getShapeOutput(ctx, expand->getOutput(0));
                  std::vector<int64_t> repeat_const_vec(repeat_shape_dims.nbDims, 1);
                  repeat_const_vec[dim + 1] = repeats;
                  auto repeat_const = tensor_to_const(ctx, torch::tensor(repeat_const_vec, torch::kInt32));

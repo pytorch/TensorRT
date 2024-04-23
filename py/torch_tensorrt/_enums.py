@@ -5,10 +5,9 @@ from enum import Enum, auto
 from typing import Any, Optional, Type, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch_tensorrt._features import ENABLED_FEATURES
-
-import tensorrt as trt
 
 
 class dtype(Enum):
@@ -108,7 +107,7 @@ class dtype(Enum):
                 return dtype.f16
             elif t == trt.float32:
                 return dtype.f32
-            elif trt.__version__ >= "7.0" and t == trt.bool:
+            elif t == trt.bool:
                 return dtype.b
             else:
                 raise TypeError(

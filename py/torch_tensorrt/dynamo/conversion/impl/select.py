@@ -2,12 +2,14 @@ import logging
 from typing import Optional, Sequence, Union, cast
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     broadcastable,
+    cast_trt_tensor,
     get_positive_dim,
     get_trt_tensor,
     to_numpy,
@@ -19,8 +21,6 @@ from torch_tensorrt.fx.converters.converter_utils import (
     set_layer_name,
 )
 from torch_tensorrt.fx.types import Shape, TRTTensor
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -258,6 +258,12 @@ def index(
             cum_adv_index_shape_layer, target, name + "_cum_adv_index_shape", source_ir
         )
         cum_adv_index_shape_tensor = cum_adv_index_shape_layer.get_output(0)
+        cum_adv_index_shape_tensor = cast_trt_tensor(
+            ctx,
+            cum_adv_index_shape_tensor,
+            trt.int32,
+            name + "_cum_adv_index_shape_casted",
+        )
         cum_adv_index_shape = cum_adv_index.shape
         _LOGGER.debug(f"The shape for cumulative adv index is {cum_adv_index_shape}")
         # check if all advanced indices are consecutive
