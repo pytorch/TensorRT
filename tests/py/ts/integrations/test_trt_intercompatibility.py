@@ -36,18 +36,19 @@ class TestPyTorchToTRTEngine(unittest.TestCase):
         with trt.Runtime(TRT_LOGGER) as rt:
             engine = rt.deserialize_cuda_engine(trt_engine)
             with engine.create_execution_context() as ctx:
-                out = torch.empty(size=tuple(engine.get_binding_shape(1))).to("cuda:0")
+                out = torch.empty(
+                    size=tuple(engine.get_tensor_shape(engine.get_tensor_name(1)))
+                ).to("cuda:0")
                 bindings = [
                     self.input.contiguous().data_ptr(),
                     out.contiguous().data_ptr(),
                 ]
-                ctx.execute_async(
-                    batch_size=1,
-                    bindings=bindings,
-                    stream_handle=torch.cuda.current_stream(
-                        device="cuda:0"
-                    ).cuda_stream,
-                )
+
+                # Assign tensor address appropriately
+                for idx in range(engine.num_io_tensors):
+                    ctx.set_tensor_address(engine.get_tensor_name(idx), bindings[idx])
+                ctx.execute_async_v3(torch.cuda.current_stream().cuda_stream)
+
                 cos_sim = cosine_similarity(self.model(self.input), out)
                 self.assertTrue(
                     cos_sim > COSINE_THRESHOLD,

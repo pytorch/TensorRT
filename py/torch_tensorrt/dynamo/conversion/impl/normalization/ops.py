@@ -452,6 +452,7 @@ def pdist(
     p: float = 2,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     shape = input.shape
+    # Extend input from shape [N, D] to [N, 1, D]
     extend_input = impl.shuffle.reshape(
         ctx,
         target,
@@ -460,7 +461,18 @@ def pdist(
         input,
         shape=shape[0:1] + (1,) + shape[1:],
     )
-    x = impl.elementwise.sub(ctx, target, source_ir, f"{name}_sub", extend_input, input)
+    # Expand the input from [N, 1, D] to [N, N, D]
+    x = impl.slice.expand(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_sub",
+        extend_input,
+        (shape[0], shape[0]) + shape[1:],
+    )
+    # Subtract the expanded input from original input. Result shape = [N, N, D]
+    # This matrix has the distance of each sample to every other sample and hence the shape is [N, N, D]
+    x = impl.elementwise.sub(ctx, target, source_ir, f"{name}_sub", x, input)
 
     if p == 0:
         # norm = torch.sum(x!=0, dim=2)
