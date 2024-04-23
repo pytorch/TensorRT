@@ -6,15 +6,20 @@ import numpy as np
 import tensorrt as trt
 import torch
 from torch.fx.node import Target
+from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_trt_tensor,
 )
-from torch_tensorrt.fx.converters.converter_utils import broadcast, set_layer_name
+from torch_tensorrt.fx.converters.converter_utils import (
+    broadcast,
+    has_dynamic_shape,
+    set_layer_name,
+)
 from torch_tensorrt.fx.types import TRTElementWiseOp, TRTTensor
-from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
 
 def get_python_op_from_trt_elementwise_op(
@@ -121,46 +126,68 @@ def convert_binary_elementwise(
     # dtype but we don't have a way to detect whether it makes sense for the
     # scalar to be float or half. Hence we go with the lhs dtype.
     if is_lhs_trt_tensor and isinstance(rhs_val, (float, int, bool)):
-        rhs_val = np.array(
-            [rhs_val], dtype=unified_dtype_converter(lhs_dtype, Frameworks.NUMPY)
-        )
+        rhs_val = np.array([rhs_val], dtype=_enums.dtype._from(lhs_dtype).to(np.dtype))
     if is_rhs_trt_tensor and isinstance(lhs_val, (float, int, bool)):
-        lhs_val = np.array(
-            [lhs_val], dtype=unified_dtype_converter(rhs_dtype, Frameworks.NUMPY)
-        )
+        lhs_val = np.array([lhs_val], dtype=_enums.dtype._from(rhs_dtype).to(np.dtype))
 
     lhs_val = get_trt_tensor(ctx, lhs_val, f"{name}_lhs", lhs_dtype)
     rhs_val = get_trt_tensor(ctx, rhs_val, f"{name}_rhs", rhs_dtype)
 
-    promoted_type = torch.promote_types(
-        unified_dtype_converter(lhs_val.dtype, Frameworks.TORCH),
-        unified_dtype_converter(rhs_val.dtype, Frameworks.TORCH),
+    promoted_type = _enums.dtype._from(
+        torch.promote_types(
+            _enums.dtype._from(lhs_val.dtype).to(torch.dtype),
+            _enums.dtype._from(rhs_val.dtype).to(torch.dtype),
+        )
     )
-    trt_promoted_type = unified_dtype_converter(promoted_type, Frameworks.TRT)
+    trt_promoted_type = promoted_type.to(trt.DataType)
 
     if trt_promoted_type != lhs_val.dtype:
         lhs_val = cast_trt_tensor(
-            ctx, lhs_val, trt_promoted_type, name, target, source_ir
+            ctx, lhs_val, trt_promoted_type, f"{name}_cast_lhs_val", target, source_ir
         )
     if trt_promoted_type != rhs_val.dtype:
         rhs_val = cast_trt_tensor(
-            ctx, rhs_val, trt_promoted_type, name, target, source_ir
+            ctx, rhs_val, trt_promoted_type, f"{name}_cast_rhs_val", target, source_ir
         )
 
-    # Check the limitation in the doc string.
-    if ctx.net.has_implicit_batch_dimension:
-        if is_lhs_trt_tensor and not is_rhs_trt_tensor:
-            assert len(lhs_val.shape) >= len(
-                rhs_val.shape
-            ), f"{lhs_val.shape} >= {rhs_val.shape}"
-        elif not is_lhs_trt_tensor and is_rhs_trt_tensor:
-            assert len(rhs_val.shape) >= len(
-                lhs_val.shape
-            ), f"{rhs_val.shape} >= {lhs_val.shape}"
+    if has_dynamic_shape(lhs_val.shape) or has_dynamic_shape(rhs_val.shape):
+        lhs_val, rhs_val = broadcast(
+            ctx.net, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
+        )
+    else:
+        lhs_val_shape = lhs_val.shape
+        rhs_val_shape = rhs_val.shape
+        rank_diff = len(lhs_val_shape) - len(rhs_val_shape)
+        if rank_diff > 0:
+            rhs_val = impl.slice.expand(
+                ctx, target, source_ir, f"{name}_expand_rhs_val", rhs_val, lhs_val_shape
+            )
+        elif rank_diff < 0:
+            lhs_val = impl.slice.expand(
+                ctx, target, source_ir, f"{name}_expand_lhs_val", lhs_val, rhs_val_shape
+            )
+        else:
+            if tuple(lhs_val_shape) != tuple(rhs_val_shape):
+                sum_diff = sum(lhs_val_shape) - sum(rhs_val_shape)
+                if sum_diff > 0:
+                    rhs_val = impl.slice.expand(
+                        ctx,
+                        target,
+                        source_ir,
+                        f"{name}_expand_rhs_val",
+                        rhs_val,
+                        lhs_val_shape,
+                    )
+                elif sum_diff < 0:
+                    lhs_val = impl.slice.expand(
+                        ctx,
+                        target,
+                        source_ir,
+                        f"{name}_expand_lhs_val",
+                        lhs_val,
+                        rhs_val_shape,
+                    )
 
-    lhs_val, rhs_val = broadcast(
-        ctx.net, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
-    )
     layer = ctx.net.add_elementwise(lhs_val, rhs_val, op_type)
     set_layer_name(layer, target, name, source_ir)
     output = layer.get_output(0)

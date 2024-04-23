@@ -55,18 +55,15 @@ auto constant_pad_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns
            util::toDims(c10::IntArrayRef(stride)));
        TORCHTRT_CHECK(slice_layer, "Unable to create slice layer from node: " << *n);
        slice_layer->setName((util::node_info(n) + "_slice").c_str());
-       slice_layer->setMode(nvinfer1::SliceMode::kFILL);
+       slice_layer->setMode(nvinfer1::SampleMode::kFILL);
        slice_layer->setInput(4, *value_itensor);
 
        if (ctx->input_is_dynamic) {
          // build the size using inetwork layers
-         auto shape_layer = ctx->net->addShape(*in);
-         TORCHTRT_CHECK(shape_layer, "Unable to create shape layer from node: " << *n);
-         shape_layer->setName((util::node_info(n) + "_shape").c_str());
          auto total_padding_itensor = tensor_to_const(ctx, torch::tensor(total_padding, torch::kInt32));
-
-         auto add_layer = ctx->net->addElementWise(
-             *shape_layer->getOutput(0), *total_padding_itensor, nvinfer1::ElementWiseOperation::kSUM);
+         nvinfer1::ITensor* shapeOutput = getShapeOutput(ctx, in, (util::node_info(n) + "_shape").c_str());
+         auto add_layer =
+             ctx->net->addElementWise(*shapeOutput, *total_padding_itensor, nvinfer1::ElementWiseOperation::kSUM);
          TORCHTRT_CHECK(add_layer, "Unable to create add layer from node: " << *n);
          add_layer->setName((util::node_info(n) + "_add").c_str());
          slice_layer->setInput(2, *add_layer->getOutput(0));

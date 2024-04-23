@@ -10,7 +10,9 @@ import torch.fx
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch.utils._python_dispatch import _disable_current_modes
+from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -22,7 +24,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
 )
 from torch_tensorrt.fx.observer import Observer
-from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
+from torch_tensorrt.logging import TRT_LOGGER
 
 from packaging import version
 
@@ -50,13 +52,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         module: torch.fx.GraphModule,
         input_specs: Sequence[Input],
         logger_level: trt.ILogger.Severity = trt.ILogger.Severity.WARNING,
-        output_dtypes: Optional[Sequence[torch.dtype]] = None,
+        output_dtypes: Optional[Sequence[dtype]] = None,
         compilation_settings: CompilationSettings = CompilationSettings(),
     ):
         super().__init__(module)
 
-        # TODO: @narendasan replace with Torch-TensorRT Logger
-        self.logger = trt.Logger(logger_level)
+        self.logger = TRT_LOGGER
         self.builder = trt.Builder(self.logger)
 
         flag = 0
@@ -69,9 +70,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self.builder.create_network(flag), compilation_settings
         )
 
+        assert TRTInterpreter._all_precisions_supported(
+            compilation_settings.enabled_precisions
+        ), f"Attempted to enable kernel precisions that are not supported (got: {compilation_settings.enabled_precisions}, support: {_defaults.SUPPORTED_KERNEL_PRECISIONS})"
         missing_ops = self.validate_conversion()
         if missing_ops:
-            # TODO: @narendasan make sure to set logging.captureWarnings(True)
             warnings.warn(
                 "Interpretation will fail due to missing operations \n"
                 + "\n".join(f"{i}" for i in missing_ops)
@@ -98,7 +101,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self.compilation_settings = compilation_settings
 
         # Data types for TRT Module output Tensors
-        self.output_dtypes = output_dtypes
+        self.output_dtypes = (
+            [dtype._from(o) for o in output_dtypes] if output_dtypes else None
+        )
+
+        _LOGGER.debug(f"Graph to be compiled to TensorRT: {self.module.graph}")
 
     def validate_conversion(self) -> Set[str]:
         missing_converters: Set[str] = set()
@@ -116,63 +123,61 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         return missing_converters
 
-    def run(
-        self,
-        force_fp32_output: bool = False,
-        strict_type_constraints: bool = False,
-        algorithm_selector: Optional[trt.IAlgorithmSelector] = None,
-        timing_cache: Optional[trt.ITimingCache] = None,
-        tactic_sources: Optional[int] = None,
-    ) -> TRTInterpreterResult:
-        """
-        Build TensorRT engine with some configs.
-        Args:
-            force_fp32_output: force output to be fp32
-            strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric reasons.
-            algorithm_selector: set up algorithm selection for certain layer
-            timing_cache: enable timing cache for TensorRT
-        Return:
-            TRTInterpreterResult
-        """
-        TRT_INTERPRETER_CALL_PRE_OBSERVER.observe(self.module)
+    @staticmethod
+    def _args_str(args: List[Any]) -> str:
+        def clean_repr(x: Any, depth: int = 0) -> Any:
+            if isinstance(x, trt.ITensor):
+                return f"{x.name} <tensorrt.ITensor [shape={x.shape}, dtype={x.dtype}]>"
+            elif isinstance(x, torch.Tensor):
+                return f"<torch.Tensor [shape={x.shape}, dtype={x.dtype}]>"
+            elif isinstance(x, np.ndarray):
+                return (
+                    f"<torch.Tensor as np.ndarray [shape={x.shape}, dtype={x.dtype}]>"
+                )
+            elif isinstance(x, Sequence) and not isinstance(x, str):
+                if depth < 3:
+                    return type(x)([clean_repr(i, depth=depth + 1) for i in x])  # type: ignore[call-arg]
+                else:
+                    return "(...)"
+            else:
+                return x
 
-        precision = self.compilation_settings.precision
-        # For float outputs, we set their dtype to fp16 only if precision == torch.float16 and
-        # force_fp32_output=False. Overriden by specifying output_dtypes
-        self.output_fp16 = not force_fp32_output and precision == torch.float16
+        str_args = [clean_repr(a) for a in args]
+        return repr(tuple(str_args))
 
-        if precision == torch.int8 and not self.builder.platform_has_fast_int8:
+    @staticmethod
+    def _all_precisions_supported(enabled_precisions: Set[dtype]) -> bool:
+        return enabled_precisions.issubset(_defaults.SUPPORTED_KERNEL_PRECISIONS)
+
+    def validate_compile_settings(self) -> None:
+        if (
+            dtype.i8 in self.compilation_settings.enabled_precisions
+            and not self.builder.platform_has_fast_int8
+        ):
             raise RuntimeError("Current platform doesn't support fast native int8!")
 
-        if precision == torch.float16 and not self.builder.platform_has_fast_fp16:
+        if (
+            dtype.f16 in self.compilation_settings.enabled_precisions
+            and not self.builder.platform_has_fast_fp16
+        ):
             warnings.warn("Current platform doesn't support fast native fp16!")
 
-        self.input_specs_iter = 0
-        run_module_start_time = datetime.now()
-        super().run()
-        _LOGGER.info(
-            f"TRT INetwork construction elapsed time: {datetime.now() - run_module_start_time}"
-        )
-        build_engine_start_time = datetime.now()
+    def _populate_trt_builder_config(
+        self,
+        strict_type_constraints: bool = False,
+        algorithm_selector: Optional[trt.IAlgorithmSelector] = None,
+        tactic_sources: Optional[int] = None,
+    ) -> trt.IBuilderConfig:
 
         builder_config = self.builder.create_builder_config()
-
         if self.compilation_settings.workspace_size != 0:
             builder_config.set_memory_pool_limit(
                 trt.MemoryPoolType.WORKSPACE, self.compilation_settings.workspace_size
             )
 
-        cache = None
-        if timing_cache:
-            cache_file = np.array(timing_cache)
-            cache = builder_config.create_timing_cache(cache_file.tobytes())
-        else:
-            cache = builder_config.create_timing_cache(b"")
-        builder_config.set_timing_cache(cache, False)
-
         if version.parse(trt.__version__) >= version.parse("8.2"):
             builder_config.profiling_verbosity = (
-                trt.ProfilingVerbosity.VERBOSE
+                trt.ProfilingVerbosity.DETAILED
                 if self.compilation_settings.debug
                 else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
             )
@@ -188,6 +193,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             if self.compilation_settings.version_compatible:
                 _LOGGER.info("Using version compatible")
                 builder_config.set_flag(trt.BuilderFlag.VERSION_COMPATIBLE)
+                builder_config.set_flag(trt.BuilderFlag.EXCLUDE_LEAN_RUNTIME)
             if self.compilation_settings.hardware_compatible:
                 _LOGGER.info("Using hardware compatible")
                 builder_config.hardware_compatibility_level = (
@@ -201,12 +207,20 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     self.compilation_settings.optimization_level
                 )
 
-        builder_config.engine_capability = self.compilation_settings.engine_capability
+        builder_config.engine_capability = (
+            self.compilation_settings.engine_capability.to(trt.EngineCapability)
+        )
         builder_config.avg_timing_iterations = (
             self.compilation_settings.num_avg_timing_iters
         )
 
         if self.compilation_settings.device.device_type == trt.DeviceType.DLA:
+            device_info = torch.cuda.get_device_properties(
+                self.compilation_settings.device.gpu_id
+            )
+            assert (device_info.major == 8 and device_info.minor == 7) or (
+                device_info.major == 7 and device_info.minor == 2
+            ), "DLA is not available on non AGX systems"
             builder_config.DLA_core = self.compilation_settings.device.dla_core
             _LOGGER.info(f"Using DLA core {self.compilation_settings.device.dla_core}")
             builder_config.set_memory_pool_limit(
@@ -222,10 +236,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 self.compilation_settings.dla_global_dram_size,
             )
 
-        if precision == torch.float16:
+        if dtype.float16 in self.compilation_settings.enabled_precisions:
             builder_config.set_flag(trt.BuilderFlag.FP16)
 
-        if precision == torch.int8:
+        if dtype.int8 in self.compilation_settings.enabled_precisions:
             builder_config.set_flag(trt.BuilderFlag.INT8)
 
         if self.compilation_settings.sparse_weights:
@@ -252,18 +266,65 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if tactic_sources is not None:
             builder_config.set_tactic_sources(tactic_sources=tactic_sources)
 
-        engine = self.builder.build_engine(self.ctx.net, builder_config)
+        return builder_config
+
+    def _create_timing_cache(
+        self,
+        builder_config: trt.IBuilderConfig,
+        existing_cache: Optional[trt.ITimingCache] = None,
+    ) -> trt.ITimingCache:
+        cache = None
+        if existing_cache:
+            cache_file = np.array(existing_cache)
+            cache = builder_config.create_timing_cache(cache_file.tobytes())
+        else:
+            cache = builder_config.create_timing_cache(b"")
+        builder_config.set_timing_cache(cache, False)
+        return cache
+
+    def run(
+        self,
+        strict_type_constraints: bool = False,
+        algorithm_selector: Optional[trt.IAlgorithmSelector] = None,
+        existing_cache: Optional[trt.ITimingCache] = None,
+        tactic_sources: Optional[int] = None,
+    ) -> TRTInterpreterResult:
+        """
+        Build TensorRT engine with some configs.
+        Args:
+            strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric reasons.
+            algorithm_selector: set up algorithm selection for certain layer
+            existing_cache: enable timing cache for TensorRT
+        Return:
+            TRTInterpreterResult
+        """
+        TRT_INTERPRETER_CALL_PRE_OBSERVER.observe(self.module)
+
+        self.input_specs_iter = 0
+        run_module_start_time = datetime.now()
+        super().run()
+        _LOGGER.info(
+            f"TRT INetwork construction elapsed time: {datetime.now() - run_module_start_time}"
+        )
+        build_engine_start_time = datetime.now()
+
+        builder_config = self._populate_trt_builder_config(
+            strict_type_constraints, algorithm_selector, tactic_sources
+        )
+        timing_cache = self._create_timing_cache(builder_config, existing_cache)
+
+        engine = self.builder.build_serialized_network(self.ctx.net, builder_config)
         assert engine
 
         serialized_cache = (
-            bytearray(cache.serialize())
+            bytearray(timing_cache.serialize())
             if builder_config.get_timing_cache()
             else bytearray()
         )
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
-        _LOGGER.info(f"TRT Engine uses: {engine.device_memory_size} bytes of Memory")
+        _LOGGER.info(f"TRT Engine uses: {engine.nbytes} bytes of Memory")
 
         return TRTInterpreterResult(
             engine, self._input_names, self._output_names, serialized_cache
@@ -285,7 +346,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         del kwargs["_itensor_to_tensor_meta"]
         n.kwargs = kwargs
 
-        if isinstance(trt_node, trt.tensorrt.ITensor):
+        if isinstance(trt_node, trt.ITensor):
             self._itensor_to_tensor_meta[trt_node] = n.meta.get("tensor_meta")
 
         return trt_node
@@ -323,10 +384,14 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 f"Unable to access shape spec for input: {target} (got: {current_input})"
             )
 
+        trt_input_dtype = current_input.dtype.to(trt.DataType, use_default=True)
+        _LOGGER.debug(
+            f"Adding input to in-progress INetwork: {target} [shape={shape}, dtype={trt_input_dtype}]"
+        )
         return self.ctx.net.add_input(
             name=target,
             shape=tuple(shape),
-            dtype=unified_dtype_converter(current_input.torch_dtype, Frameworks.TRT),
+            dtype=trt_input_dtype,
         )
 
     def call_module(
@@ -345,6 +410,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         converter, calling_convention = converter_packet
 
         assert self._cur_node_name is not None
+        _LOGGER.debug(
+            f"Converting node {self._cur_node_name} (kind: {target}, args: {TRTInterpreter._args_str(args)})"
+        )
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, submod, args, kwargs, self._cur_node_name)
         else:
@@ -361,6 +429,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         converter, calling_convention = converter_packet
 
         assert self._cur_node_name is not None
+        _LOGGER.debug(
+            f"Converting node {self._cur_node_name} (kind: {target}, args: {TRTInterpreter._args_str(args)})"
+        )
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
         else:
@@ -392,6 +463,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         converter, calling_convention = converter_packet
 
         assert self._cur_node_name is not None
+        _LOGGER.debug(
+            f"Converting node {self._cur_node_name} (kind: {target}, args: {TRTInterpreter._args_str(args)})"
+        )
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
         else:
@@ -409,13 +483,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         for output_idx in range(len(outputs)):
             output = outputs[output_idx]
 
-            if not isinstance(output, trt.tensorrt.ITensor):
+            if not isinstance(output, trt.ITensor):
                 new_output = get_trt_tensor(self.ctx, output, target)
                 outputs = (
                     outputs[:output_idx] + (new_output,) + outputs[output_idx + 1 :]
                 )
 
-        if not all(isinstance(output, trt.tensorrt.ITensor) for output in outputs):
+        if not all(isinstance(output, trt.ITensor) for output in outputs):
             raise RuntimeError("TensorRT requires all outputs to be Tensor!")
 
         if self.output_dtypes is not None and len(self.output_dtypes) != len(outputs):
@@ -436,6 +510,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     "not",
                     "ne",
                     "isinf",
+                    "isnan",
                     "any",
                 )
             ):
@@ -446,13 +521,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             output.name = name
             self.ctx.net.mark_output(output)
             if output_bool:
-                output.dtype = trt.bool
+                output.dtype = trt.DataType.BOOL
             elif self.output_dtypes is not None:
-                output.dtype = unified_dtype_converter(
-                    self.output_dtypes[i], Frameworks.TRT
-                )
-            elif self.output_fp16 and output.dtype == trt.float32:
-                output.dtype = trt.float16
+                output.dtype = self.output_dtypes[i].to(trt.DataType)
+
             self._output_names.append(name)
+            _LOGGER.debug(
+                f"Marking output {name} [shape={output.shape}, dtype={output.dtype}]"
+            )
 
         return list(outputs)

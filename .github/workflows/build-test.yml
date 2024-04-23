@@ -15,12 +15,13 @@ on:
 
 jobs:
   generate-matrix:
-    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@release/2.3
     with:
       package-type: wheel
       os: linux
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
+      channel: test
       with-rocm: false
       with-cpu: false
 
@@ -36,11 +37,11 @@ jobs:
           - repository: pytorch/tensorrt
             pre-script: packaging/pre_build_script.sh
             env-var-script: packaging/env_vars.txt
-            post-script: ""
-            smoke-test-script: ""
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
             package-name: torch_tensorrt
     name: Build torch-tensorrt whl package
-    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
+    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@release/2.3
     with:
       repository: ${{ matrix.repository }}
       ref: ""
@@ -64,7 +65,8 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+            post-script: packaging/post_build_script.sh
+    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.3
     with:
       job-name: tests-py-torchscript-fe
       repository: "pytorch/tensorrt"
@@ -76,9 +78,11 @@ jobs:
       script: |
         export USE_HOST_DEPS=1
         export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
+        export LD_LIBRARY_PATH=/opt/torch-tensorrt-builds/TensorRT-10.0.0.6/lib:$LD_LIBRARY_PATH
         pushd .
         cd tests/modules
-        ${CONDA_RUN} python -m pip install --pre -r requirements.txt --use-deprecated=legacy-resolver
+        # Don't use requirements.txt here as it contains tensorrt and torch which should have been installed by now.
+        ${CONDA_RUN} python -m pip install numpy packaging pyyaml transformers timm pybind11==2.6.2
         ${CONDA_RUN} python hub.py
         popd
         pushd .
@@ -99,7 +103,8 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+            post-script: packaging/post_build_script.sh
+    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.3
     with:
       job-name: tests-py-dynamo-converters
       repository: "pytorch/tensorrt"
@@ -110,6 +115,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
+        export LD_LIBRARY_PATH=/opt/torch-tensorrt-builds/TensorRT-10.0.0.6/lib:$LD_LIBRARY_PATH
         pushd .
         cd tests/py/dynamo
         ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
@@ -126,7 +132,8 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+            post-script: packaging/post_build_script.sh
+    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.3
     with:
       job-name: tests-py-dynamo-fe
       repository: "pytorch/tensorrt"
@@ -137,6 +144,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
+        export LD_LIBRARY_PATH=/opt/torch-tensorrt-builds/TensorRT-10.0.0.6/lib:$LD_LIBRARY_PATH
         pushd .
         cd tests/py/dynamo
         ${CONDA_RUN} python -m pip install --pre pytest timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
@@ -154,7 +162,8 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+            post-script: packaging/post_build_script.sh
+    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.3
     with:
       job-name: tests-py-dynamo-serde
       repository: "pytorch/tensorrt"
@@ -165,6 +174,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
+        export LD_LIBRARY_PATH=/opt/torch-tensorrt-builds/TensorRT-10.0.0.6/lib:$LD_LIBRARY_PATH
         pushd .
         cd tests/py/dynamo
         ${CONDA_RUN} python -m pip install --pre pytest timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
@@ -181,7 +191,8 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+            post-script: packaging/post_build_script.sh
+    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.3
     with:
       job-name: tests-py-torch-compile-be
       repository: "pytorch/tensorrt"
@@ -192,11 +203,13 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
+        export LD_LIBRARY_PATH=/opt/torch-tensorrt-builds/TensorRT-10.0.0.6/lib:$LD_LIBRARY_PATH
         pushd .
         cd tests/py/dynamo
         ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
         ${CONDA_RUN} python -m pytest -n 10 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_be_test_results.xml backend/
         ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_comple_be_e2e_test_results.xml --ir torch_compile models/test_models.py
+        ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_dyn_models_export.xml --ir torch_compile models/test_dyn_models.py
         popd
 
   tests-py-dynamo-core:
@@ -209,7 +222,8 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+            post-script: packaging/post_build_script.sh
+    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.3
     with:
       job-name: tests-py-dynamo-core
       repository: "pytorch/tensorrt"
@@ -220,10 +234,39 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
+        export LD_LIBRARY_PATH=/opt/torch-tensorrt-builds/TensorRT-10.0.0.6/lib:$LD_LIBRARY_PATH
         pushd .
         cd tests/py/dynamo
         ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
         ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_test_results.xml runtime/
         ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_partitioning_test_results.xml partitioning/
         ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_lowering_test_results.xml lowering/
+        popd
+
+  tests-py-core:
+    name: Test core [Python]
+    needs: [generate-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+    with:
+      job-name: tests-py-core
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      script: |
+        export USE_HOST_DEPS=1
+        export LD_LIBRARY_PATH=/opt/torch-tensorrt-builds/TensorRT-10.0.0.6/lib:$LD_LIBRARY_PATH
+        pushd .
+        cd tests/py/core
+        ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
+        ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_core_test_results.xml .
         popd

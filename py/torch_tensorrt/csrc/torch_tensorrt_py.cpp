@@ -2,6 +2,7 @@
 #include "pybind11/stl.h"
 
 #include "ATen/core/jit_type.h"
+#include "NvInferRuntimeBase.h"
 #include "Python.h"
 #include "core/compiler.h"
 #include "core/conversion/conversion.h"
@@ -76,6 +77,10 @@ class pyIInt8Calibrator : public pyCalibratorTrampoline<nvinfer1::IInt8Calibrato
  public:
   using Derived = pyCalibratorTrampoline<nvinfer1::IInt8Calibrator>;
   using Derived::Derived;
+
+  nvinfer1::InterfaceInfo getInterfaceInfo() const noexcept override {
+    return nvinfer1::InterfaceInfo{"PYTHON CALIBRATOR", 1, 0};
+  }
 
   nvinfer1::CalibrationAlgoType getAlgorithm() noexcept override {
     try {
@@ -261,9 +266,9 @@ PYBIND11_MODULE(_C, m) {
       m,
       "EngineCapability",
       "Enum to specify engine capability settings (selections of kernels to meet safety requirements)")
-      .value("safe_gpu", EngineCapability::kSAFE_GPU, "Use safety GPU kernels only")
-      .value("safe_dla", EngineCapability::kSAFE_DLA, "Use safety DLA kernels only")
-      .value("default", EngineCapability::kDEFAULT, "Use default behavior");
+      .value("SAFETY", EngineCapability::kSAFETY, "Use safe kernels only")
+      .value("DLA_STANDALONE", EngineCapability::kDLA_STANDALONE, "Use DLA kernels only")
+      .value("STANDARD", EngineCapability::kSTANDARD, "Use default behavior");
 
   py::enum_<TensorFormat>(m, "TensorFormat", "Enum to specifiy the memory layout of tensors")
       .value("contiguous", TensorFormat::kContiguous, "Contiguous memory layout (NCHW / Linear)")
