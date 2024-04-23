@@ -82,7 +82,8 @@ dir_path = os.path.join(str(get_root_dir()), "py")
 
 CXX11_ABI = False
 JETPACK_VERSION = None
-PY_ONLY = sys.platform.startswith("win")
+# TODO: Remove once C++ Runtime is integrated in Windows
+PY_ONLY = IS_WINDOWS
 NO_TS = False
 LEGACY = False
 RELEASE = False
