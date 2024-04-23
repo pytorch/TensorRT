@@ -182,6 +182,10 @@ def test_resnet18_half(ir):
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch.cuda.get_device_properties(torch.cuda.current_device()).major < 9,
+    "FP8 compilation in Torch-TRT is not supported on cards older than Hopper",
+)
 @pytest.mark.unit
 def test_base_fp8(ir):
     class SimpleNetwork(nn.Module):
