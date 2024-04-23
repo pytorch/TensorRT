@@ -32,11 +32,8 @@ def squeeze(
     for dim in dims:
         dim = get_positive_dim(
             dim,
-            len(input.shape) + (1 if ctx.net.has_implicit_batch_dimension else 0),
+            len(input.shape),
         )
-        if ctx.net.has_implicit_batch_dimension:
-            assert dim != 0, "We don't support squeeze batch dim when it's implicit."
-            dim -= 1
 
         assert input.shape[dim] != -1, "We don't support squeeze dynamic dim."
         assert (
