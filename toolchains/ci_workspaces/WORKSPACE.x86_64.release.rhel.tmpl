@@ -55,18 +55,16 @@ new_local_repository(
 # Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
 #############################################################################################################
 
-http_archive(
+new_local_repository(
     name = "libtorch",
-    build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
+    path = "/opt/python/cp38-cp38/lib/python3.8/site-packages/torch",
+    build_file = "@//third_party/libtorch:BUILD"
 )
 
-http_archive(
+new_local_repository(
     name = "libtorch_pre_cxx11_abi",
-    build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-shared-with-deps-latest.zip"],
+    path = "/opt/python/cp38-cp38/lib/python3.8/site-packages/torch",
+    build_file = "@//third_party/libtorch:BUILD"
 )
 
 ####################################################################################
