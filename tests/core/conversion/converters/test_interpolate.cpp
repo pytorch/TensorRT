@@ -377,3 +377,99 @@ ATEN_INTERPOLATE_STATIC_ONLY_TEST(
       %7 : Tensor = aten::upsample_trilinear3d(%0, %3, %4, %6)
       return (%7))IR",
     std::vector<int64_t>({10, 2, 2, 2, 2}));
+
+TEST(Converters, GridSampleConvertsCorrectly) {
+  const auto graph = R"IR(
+        graph(%input : Tensor, %grid : Tensor):
+           %5 : int = prim::Constant[value=2]()
+           %6 : int = prim::Constant[value=2]()
+           %7 : bool = prim::Constant[value=1]()
+           %8 : Tensor = aten::grid_sampler(%input, %grid, %5, %6, %7)
+           return (%8))IR";
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto input = at::arange(16).view({1, 1, 4, 4}).to(at::kFloat).to(at::kCUDA);
+  auto d = at::linspace(-1, 1, 8);
+  auto mesh = at::meshgrid({d, d});
+  auto mesh_x = mesh[0];
+  auto mesh_y = mesh[1];
+  auto grid = at::stack({mesh_x, mesh_y}, 2).unsqueeze(0).to(at::kCUDA);
+
+  auto trt_input = input.clone();
+  auto trt_grid = grid.clone();
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {input, grid});
+
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_input, trt_grid});
+
+  for (size_t i = 0; i < jit_results.size(); i++) {
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt_results[i], 2e-6));
+  }
+}
+
+TEST(Converters, GridSampleOptions1ConvertsCorrectly) {
+  const auto graph = R"IR(
+        graph(%input : Tensor, %grid : Tensor):
+           %5 : int = prim::Constant[value=1]()
+           %6 : int = prim::Constant[value=1]()
+           %7 : bool = prim::Constant[value=0]()
+           %8 : Tensor = aten::grid_sampler(%input, %grid, %5, %6, %7)
+           return (%8))IR";
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto input = at::arange(16).view({1, 1, 4, 4}).to(at::kFloat).to(at::kCUDA);
+  auto d = at::linspace(-1, 1, 8);
+  auto mesh = at::meshgrid({d, d});
+  auto mesh_x = mesh[0];
+  auto mesh_y = mesh[1];
+  auto grid = at::stack({mesh_x, mesh_y}, 2).unsqueeze(0).to(at::kCUDA);
+
+  auto trt_input = input.clone();
+  auto trt_grid = grid.clone();
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {input, grid});
+
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_input, trt_grid});
+
+  for (size_t i = 0; i < jit_results.size(); i++) {
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt_results[i], 2e-6));
+  }
+}
+
+TEST(Converters, GridSampleOptions2ConvertsCorrectly) {
+  const auto graph = R"IR(
+        graph(%input : Tensor, %grid : Tensor):
+           %5 : int = prim::Constant[value=0]()
+           %6 : int = prim::Constant[value=0]()
+           %7 : bool = prim::Constant[value=0]()
+           %8 : Tensor = aten::grid_sampler(%input, %grid, %5, %6, %7)
+           return (%8))IR";
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto input = at::arange(16).view({1, 1, 4, 4}).to(at::kFloat).to(at::kCUDA);
+  auto d = at::linspace(-1, 1, 8);
+  auto mesh = at::meshgrid({d, d});
+  auto mesh_x = mesh[0];
+  auto mesh_y = mesh[1];
+  auto grid = at::stack({mesh_x, mesh_y}, 2).unsqueeze(0).to(at::kCUDA);
+
+  auto trt_input = input.clone();
+  auto trt_grid = grid.clone();
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {input, grid});
+
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_input, trt_grid});
+
+  for (size_t i = 0; i < jit_results.size(); i++) {
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt_results[i], 2e-6));
+  }
+}
