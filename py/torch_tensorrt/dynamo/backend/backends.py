@@ -13,6 +13,7 @@ from torch_tensorrt.dynamo._compiler import compile_module
 from torch_tensorrt.dynamo.lowering import (
     apply_lowering_passes,
     get_decompositions,
+    remove_detach,
     repair_input_aliasing,
 )
 from torch_tensorrt.dynamo.utils import (
@@ -74,6 +75,7 @@ def _pretraced_backend(
             fake_mode, "allow_non_fake_inputs", True
         ), fake_mode:
             repair_input_aliasing(gm)
+            remove_detach(gm)
 
             # Invoke AOTAutograd to translate operators to aten
             gm = aot_export_joint_simple(

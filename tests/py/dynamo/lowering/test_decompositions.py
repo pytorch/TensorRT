@@ -485,6 +485,35 @@ class TestLowering(TestCase):
             f"Select_scatter TRT outputs don't match with the original model.",
         )
 
+    def test_lowering_detach_removal(self):
+        class Detach(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+
+            def forward(self, x):
+                y = torch.ops.aten.detach.default(x) + 1
+                return y
+
+        # Operations expected to be removed
+        unexpected_ops = {torch.ops.aten.detach.default}
+
+        inputs = [
+            torch.rand(
+                5,
+            ),
+        ]
+
+        fx_graph = torch.fx.symbolic_trace(Detach())
+        unexpected_ops_seen, _ = lower_graph_testing(
+            fx_graph, inputs, unexpected_ops=unexpected_ops, min_block_size=1
+        )
+
+        self.assertEquals(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
 
 if __name__ == "__main__":
     run_tests()
