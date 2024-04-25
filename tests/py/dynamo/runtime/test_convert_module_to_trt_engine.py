@@ -7,7 +7,7 @@ from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 
-class TestConvertMethodToTrtEngine(unittest.TestCase):
+class TestConvertModuleToTrtEngine(unittest.TestCase):
     def test_convert_module(self):
         class Test(torch.nn.Module):
             def forward(self, a, b):
@@ -18,11 +18,11 @@ class TestConvertMethodToTrtEngine(unittest.TestCase):
 
         # Create a model
         model = Test()
-        symbolic_traced_gm = torch.fx.symbolic_trace(model)
+        exp_program = torch.export.export(model, (input_data_0, input_data_1))
 
         # Convert to TensorRT engine
         trt_engine_str = torch_tensorrt.dynamo.convert_module_to_trt_engine(
-            symbolic_traced_gm, "forward", inputs=[input_data_0, input_data_1]
+            exp_program, inputs=(input_data_0, input_data_1)
         )
 
         # Deserialize the TensorRT engine
@@ -30,7 +30,9 @@ class TestConvertMethodToTrtEngine(unittest.TestCase):
             engine = runtime.deserialize_cuda_engine(trt_engine_str)
 
         # Inference on TRT Engine
-        py_trt_module = PythonTorchTensorRTModule(engine, ["a", "b"], ["output0"])
+        py_trt_module = PythonTorchTensorRTModule(
+            engine, ["arg0_1", "arg1_1"], ["output0"]
+        )
         trt_output = py_trt_module(input_data_0, input_data_1).cpu()
 
         # Inference on PyTorch model
