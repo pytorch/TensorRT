@@ -17,7 +17,6 @@ from torch_tensorrt.dynamo._DryRunTracker import (
     dryrun_stats_display,
     parse_non_trt_nodes,
 )
-from torch_tensorrt.dynamo._exporter import export
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     UnsupportedOperatorException,
@@ -73,9 +72,8 @@ def compile(
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
-    output_format: str = _defaults.OUTPUT_FORMAT,
     **kwargs: Any,
-) -> Union[ExportedProgram, torch.jit.ScriptModule, torch.fx.GraphModule]:
+) -> torch.fx.GraphModule:
     """Compile a TorchScript module for NVIDIA GPUs using TensorRT
 
     Takes a existing TorchScript module and a set of settings to configure the compiler
@@ -132,7 +130,6 @@ def compile(
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the grap easier to covert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
-        output_format (str): Output format of the result of TRT compilation. Options include "exported_program" (or) "ep" | "torchscript" (or) "ts" | "graph_module" (or) "fx". Default is "exported_program"
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -202,14 +199,12 @@ def compile(
         "dla_global_dram_size": dla_global_dram_size,
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
-        "output_format": output_format,
     }
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
     trt_gm = compile_module(gm, inputs, settings)
-    trt_result = export(trt_gm, torch_inputs, output_format)
-    return trt_result
+    return trt_gm
 
 
 def compile_module(
@@ -429,8 +424,7 @@ def compile_module(
 
 
 def convert_module_to_trt_engine(
-    module: torch.fx.GraphModule,
-    method_name: str = "forward",
+    exported_program: ExportedProgram,
     inputs: Optional[Sequence[Input | torch.Tensor]] = None,
     enabled_precisions: (
         Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
@@ -460,15 +454,15 @@ def convert_module_to_trt_engine(
     calibrator: object = None,
     allow_shape_tensors: bool = False,
 ) -> bytes:
-    """Convert a GraphModule module method to a serialized TensorRT engine
+    """Convert an ExportedProgram to a serialized TensorRT engine
 
-    Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings
+    Converts an ExportedProgram to a serialized TensorRT engine given a dictionary of conversion settings
 
     Arguments:
-        module (torch.fx.GraphModule): Source module
+        exported_program (torch.export.ExportedProgram): Source module
 
     Keyword Args:
-        inputs (List[Union(torch_tensorrt.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+        inputs (Optional[Sequence[torch_tensorrt.Input | torch.Tensor]]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
             torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
             to select device type. ::
 
@@ -483,30 +477,11 @@ def convert_module_to_trt_engine(
                     ), # Dynamic input shape for input #2
                     torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
                 ]
-
-        method_name (str): Name of method to convert
-        input_signature Union(List, Tuple, torch_tensorrt.Input, torch.Tensor): A formatted collection of input specifications for the module. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
-            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum to select device type. **This API should be considered beta-level stable and may change in the future** ::
-
-                input_signature=([
-                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
-                    torch_tensorrt.Input(
-                        min_shape=(1, 224, 224, 3),
-                        opt_shape=(1, 512, 512, 3),
-                        max_shape=(1, 1024, 1024, 3),
-                        dtype=torch.int32
-                        format=torch.channel_last
-                    ), # Dynamic input shape for input #2
-                ], torch.randn((1, 3, 224, 244))) # Use an example tensor and let torch_tensorrt infer settings for input #3
-
-        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
-
-            device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
-
+        enabled_precisions (Optional[Set[torch.dtype | _enums.dtype]]): The set of datatypes that TensorRT can use
         debug (bool): Whether to print out verbose debugging information
         workspace_size (int): Workspace TRT is allowed to use for the module (0 is default)
         min_block_size (int): Minimum number of operators per TRT-Engine Block
-        torch_executed_ops (Sequence[str]): Sequence of operations to run in Torch, regardless of converter coverage
+        torch_executed_ops (Set[str]): Set of operations to run in Torch, regardless of converter coverage
         pass_through_build_failures (bool): Whether to fail on TRT engine build errors (True) or not (False)
         max_aux_streams (Optional[int]): Maximum number of allowed auxiliary TRT streams for each engine
         version_compatible (bool): Provide version forward-compatibility for engine plan files
@@ -573,13 +548,25 @@ def convert_module_to_trt_engine(
         "dla_global_dram_size": dla_global_dram_size,
     }
 
+    # Decompose the exported program
+    exported_program = exported_program.run_decompositions(
+        get_decompositions(enable_experimental_decompositions)
+    )
+    gm = exported_program.module()
+    logger.debug("Input graph: " + str(gm.graph))
+
+    # Apply lowering on the graph module
+    torch_inputs = get_torch_inputs(input_list, device)
+    gm = apply_lowering_passes(gm, torch_inputs)
+    logger.debug("Lowered Input graph: " + str(gm.graph))
+
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
     try:
-        interpreter_result = interpret_module_to_result(module, input_list, settings)
+        interpreter_result = interpret_module_to_result(gm, input_list, settings)
     except UnsupportedOperatorException:
         logger.error(
-            f"Conversion of module {module} not currently fully supported or convertible!",
+            f"Conversion of module {gm} not currently fully supported or convertible!",
             exc_info=True,
         )
     except Exception as e:
