@@ -4,6 +4,7 @@ import io
 import logging
 from typing import List, Sequence
 
+import tensorrt as trt
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
@@ -16,8 +17,6 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import get_torch_inputs
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -114,8 +113,9 @@ def convert_module(
         from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
         with io.BytesIO() as engine_bytes:
-            engine_bytes.write(interpreter_result.engine.serialize())
+            engine_bytes.write(interpreter_result.engine)
             engine_str = engine_bytes.getvalue()
+
         return TorchTensorRTModule(
             serialized_engine=engine_str,
             name=name,

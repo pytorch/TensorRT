@@ -74,17 +74,18 @@ class TestHardwareCompatibility(TestCase):
         not torch.cuda.get_device_properties(torch.cuda.current_device()).major >= 8,
         "HW Compatibility is not supported on cards older than Ampere",
     )
+    @unittest.skip(
+        "Skipping this test because the hw_compat.ts can't be generated using torch nightly"
+    )
     def test_hw_compat_3080_build(self):
-        inputs = [torch.randn(5, 7).cuda()]
+        inputs = [torch.randn(1, 3, 224, 224).cuda()]
 
         cwd = os.getcwd()
         os.chdir(os.path.dirname(os.path.realpath(__file__)))
         model = torch.jit.load("../../ts/models/hw_compat.ts").cuda()
         out = model(*inputs)
         self.assertTrue(
-            isinstance(out, tuple)
-            and len(out) == 1
-            and isinstance(out[0], torch.Tensor),
+            len(out) == 1 and isinstance(out, torch.Tensor),
             "Invalid output detected",
         )
         os.chdir(cwd)
