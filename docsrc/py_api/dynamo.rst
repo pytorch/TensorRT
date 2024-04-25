@@ -22,6 +22,8 @@ Functions
 
 .. autofunction:: export
 
+.. autofunction:: convert_module_to_trt_engine
+
 
 
 Classes

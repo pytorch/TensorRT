@@ -26,7 +26,6 @@ REFIT = False
 REQUIRE_FULL_COMPILATION = False
 DRYRUN = False
 HARDWARE_COMPATIBLE = False
-OUTPUT_FORMAT = "exported_program"
 SUPPORTED_KERNEL_PRECISIONS = {dtype.f32, dtype.f16, dtype.i8}
 
 
