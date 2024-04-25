@@ -29,16 +29,8 @@ def unsqueeze(
 
     dim = cast(int, dim)
 
-    input_shape_size = (
-        len(input_val.shape) + 1
-        if ctx.net.has_implicit_batch_dimension
-        else len(input_val.shape)
-    )
+    input_shape_size = len(input_val.shape)
     dim = get_positive_dim(dim, input_shape_size + 1)
-
-    if ctx.net.has_implicit_batch_dimension:
-        assert dim != 0
-        dim -= 1
 
     assert (
         len(get_dynamic_dims(input_val.shape)) <= 1

@@ -15,14 +15,18 @@ class TestArangeConverter(DispatchTestCase):
             (5, 0, -1),
             (5, 1, -2),
             (5, 3, -3),
+            (5, -2, -1),
+            (-5, -2, 2),
+            (-5, -3, 1),
+            (-2, -5, -1),
         ]
     )
     def test_arange(self, start, end, step):
         class Arange(nn.Module):
             def forward(self, x):
-                return torch.ops.aten.arange.start_step(start, x.shape[0], step)
+                return torch.ops.aten.arange.start_step(start, end, step)
 
-        inputs = [torch.randn(end, 1)]
+        inputs = [torch.randn(1, 1)]
         self.run_test(
             Arange(),
             inputs,

@@ -17,7 +17,6 @@ auto cat_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
               auto chunks = args[1].unwrapToInt();
               auto dim = args[2].unwrapToInt();
               bool dynamic_shape = ctx->input_is_dynamic;
-              int size = in->getDimensions().nbDims;
               int maxDim = static_cast<int32_t>(in->getDimensions().d[dim]);
 
               c10::ListTypePtr lt = n->output()->type()->expect<c10::ListType>();
@@ -40,9 +39,6 @@ auto cat_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
               start_.nbDims = nbdims;
               size_.nbDims = nbdims;
               stride_.nbDims = nbdims;
-
-              int startIdx = 0;
-              int endIdx = maxDim;
 
               for (int i = 0; i < nbdims; i++) {
                 start_.d[i] = 0;
