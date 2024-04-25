@@ -39,6 +39,12 @@ nvinfer1::ITensor* addPadding(
   }
 }
 
+nvinfer1::ITensor* getShapeOutput(ConversionCtx* ctx, nvinfer1::ITensor* input_tensor, const std::string& name) {
+  nvinfer1::ITensor* input_shape = ctx->net->addShape(*input_tensor)->getOutput(0);
+  input_shape = castITensor(ctx, input_shape, nvinfer1::DataType::kINT32, name);
+  return input_shape;
+}
+
 nvinfer1::ITensor* addUnpadding(
     ConversionCtx* ctx,
     const torch::jit::Node* n,
@@ -134,7 +140,7 @@ nvinfer1::ILayer* add_elementwise(
       }
       auto otherStaticShapeMask = tensor_to_const(ctx, thOtherStaticShapeMask);
       auto otherDynamicShapeMask = tensor_to_const(ctx, thOtherDynamicShapeMask);
-      auto selfShape = ctx->net->addShape(*self)->getOutput(0);
+      nvinfer1::ITensor* selfShape = getShapeOutput(ctx, self, std::string(name + "_shape_cast").c_str());
       // size of dynamic dimension of other need to the same as that of
       // corresponding dimension of self
       auto otherDynamicShape =
@@ -348,7 +354,6 @@ nvinfer1::ITensor* normalize_indices(
   auto neg_itensor = tensor_to_const(ctx, neg);
   // find the indices that = -1
   auto signs = clamp(ctx, indices, neg_itensor, zero_itensor, "clamp layer for " + name);
-
   // get the inputDim value where indices == -1, else 0
   auto mul = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, signs, input_dim, "prod layer for " + name);
   TORCHTRT_CHECK(mul, "Unable to create mul layer in normalize_indices");
