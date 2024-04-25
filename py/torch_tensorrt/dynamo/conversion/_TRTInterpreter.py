@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
@@ -25,7 +26,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
-import tensorrt as trt
 from packaging import version
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -177,7 +177,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         if version.parse(trt.__version__) >= version.parse("8.2"):
             builder_config.profiling_verbosity = (
-                trt.ProfilingVerbosity.VERBOSE
+                trt.ProfilingVerbosity.DETAILED
                 if self.compilation_settings.debug
                 else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
             )
@@ -193,6 +193,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             if self.compilation_settings.version_compatible:
                 _LOGGER.info("Using version compatible")
                 builder_config.set_flag(trt.BuilderFlag.VERSION_COMPATIBLE)
+                builder_config.set_flag(trt.BuilderFlag.EXCLUDE_LEAN_RUNTIME)
             if self.compilation_settings.hardware_compatible:
                 _LOGGER.info("Using hardware compatible")
                 builder_config.hardware_compatibility_level = (
@@ -312,7 +313,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         )
         timing_cache = self._create_timing_cache(builder_config, existing_cache)
 
-        engine = self.builder.build_engine(self.ctx.net, builder_config)
+        engine = self.builder.build_serialized_network(self.ctx.net, builder_config)
         assert engine
 
         serialized_cache = (
@@ -323,7 +324,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
-        _LOGGER.info(f"TRT Engine uses: {engine.device_memory_size} bytes of Memory")
+        _LOGGER.info(f"TRT Engine uses: {engine.nbytes} bytes of Memory")
 
         return TRTInterpreterResult(
             engine, self._input_names, self._output_names, serialized_cache

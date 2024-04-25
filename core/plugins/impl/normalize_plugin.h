@@ -3,7 +3,6 @@
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAEvent.h>
 #include <cuda_runtime_api.h>
-#include <cudnn.h>
 #include <iostream>
 #include <sstream>
 #include <string>

@@ -151,7 +151,6 @@ c10::optional<at::ScalarType> get_value_first_calc_dtype_opt(torch::jit::Block* 
 
     // If node outputs a Tensor it might be a result of tensor calcuation so check to see
     // if any inputs to the calculation can give us hints
-    c10::optional<torch::jit::Node*> const_tensor_n = {};
 
     // Backtrace to constants which will immediately give us the Tensor type if possible
     for (auto in : ins) {
