@@ -449,6 +449,7 @@ class TestLowerLinear(TestCase):
         max_diff = float(
             torch.max(torch.abs(optimized_model_results - torch_model_results))
         )
+
         self.assertAlmostEqual(
             max_diff,
             0,
