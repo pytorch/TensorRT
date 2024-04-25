@@ -44,7 +44,8 @@ bool add_expand(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor
       if (size != targetSize) {
         if (size != 1) {
           TORCHTRT_THROW_ERROR(
-              "The expanded size of tensor (" << targetSize << ")" << " must match the existing size (" << size << ")"
+              "The expanded size of tensor (" << targetSize << ")"
+                                              << " must match the existing size (" << size << ")"
                                               << " at dimension " << i);
         }
       }
@@ -131,7 +132,8 @@ bool add_expand_dynamic(
         // if size == -1, we can't validate the expansion before setBindingDimensions.
         if (!(size == -1 || size == 1)) {
           TORCHTRT_THROW_ERROR(
-              "The expanded size of tensor (" << targetSize << ")" << " must match the existing size (" << size << ")"
+              "The expanded size of tensor (" << targetSize << ")"
+                                              << " must match the existing size (" << size << ")"
                                               << " at dimension " << i);
         }
       }

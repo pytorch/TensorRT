@@ -165,7 +165,8 @@ c10::optional<torch::jit::IValue> toIValue(const torch::jit::Value* v) {
 void checkListInputType(const c10::TypePtr& elem_type, bool empty_list) {
   if (!elem_type->isSubtypeOf(c10::NumberType::get()) && elem_type != c10::BoolType::get()) {
     std::stringstream error;
-    error << "Input must be of ints, floats, or bools, " << "got " << elem_type->repr_str();
+    error << "Input must be of ints, floats, or bools, "
+          << "got " << elem_type->repr_str();
     // special case empty list torch.tensor([])
     if (elem_type->isSubtypeOf(c10::TensorType::get())) {
       if (empty_list) {
