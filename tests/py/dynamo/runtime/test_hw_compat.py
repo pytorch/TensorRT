@@ -74,6 +74,9 @@ class TestHardwareCompatibility(TestCase):
         not torch.cuda.get_device_properties(torch.cuda.current_device()).major >= 8,
         "HW Compatibility is not supported on cards older than Ampere",
     )
+    @unittest.skip(
+        "Skipping this test because the hw_compat.ts can't be generated using torch nightly"
+    )
     def test_hw_compat_3080_build(self):
         inputs = [torch.randn(1, 3, 224, 224).cuda()]
 
