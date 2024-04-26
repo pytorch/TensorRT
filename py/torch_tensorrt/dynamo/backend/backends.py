@@ -74,7 +74,6 @@ def _pretraced_backend(
             fake_mode, "allow_non_fake_inputs", True
         ), fake_mode:
             repair_input_aliasing(gm)
-
             # Invoke AOTAutograd to translate operators to aten
             gm = aot_export_joint_simple(
                 gm,
