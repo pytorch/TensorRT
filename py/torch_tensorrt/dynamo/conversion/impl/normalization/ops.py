@@ -9,6 +9,7 @@ from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
+    get_axes_for_reduce_op,
     get_positive_dim,
     get_trt_tensor,
     to_numpy,
@@ -105,102 +106,30 @@ def layer_norm(
     cudnn_enable: bool,
     return_mean_rstd: bool,
 ) -> Union[TRTTensor, Tuple[TRTTensor, torch.Tensor, torch.Tensor]]:
-    if weight is None:
-        weight = to_numpy(1.0)
+    dims = list(range(len(input.shape) - len(normalized_shape), len(input.shape)))
+    axes = get_axes_for_reduce_op(dims)
 
-    if bias is None:
-        bias = to_numpy(0.0)
+    weight = get_trt_tensor(ctx, weight, f"{name}_weight")
+    bias = get_trt_tensor(ctx, bias, f"{name}_bias")
+    if tuple(input.shape) != tuple(weight.shape):
+        weight = impl.slice.expand(
+            ctx, target, source_ir, f"{name}_expand_weight", weight, input.shape
+        )
+    if tuple(input.shape) != tuple(bias.shape):
+        bias = impl.slice.expand(
+            ctx, target, source_ir, f"{name}_expand_bias", bias, input.shape
+        )
 
-    shape = weight.shape
-    gamma = to_numpy(weight).reshape(shape)
-    beta = to_numpy(bias).reshape(shape)
-
-    dims = list(range(len(input.shape) - len(shape), len(input.shape)))
-
-    # E[x]
-    mean_expected_trt = impl.reduce.mean(
-        ctx, target, source_ir, f"{name}_mean_expected", input, dims, True
-    )
-
-    # X-E[x]
-    sub_trt = impl.elementwise.sub(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_sub",
-        input,
-        mean_expected_trt,
-    )
-
-    # Variance = mean(pow(x_sub_mean, 2))
-    pow_trt = get_trt_tensor(ctx, 2, f"{name}_power", np.float32)
-    pow_var = impl.elementwise.pow(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_pow_var",
-        sub_trt,
-        pow_trt,
-    )
-    mean_trt = impl.reduce.mean(
-        ctx, target, source_ir, f"{name}_mean", pow_var, dims, True
-    )
-
-    # sqrt((var + eps))
-    eps_trt = get_trt_tensor(ctx, eps, f"{name}_eps", np.float32)
-    add_trt = impl.elementwise.add(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_add",
-        mean_trt,
-        eps_trt,
-    )
-    sqrt_trt = impl.unary.sqrt(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_sqrt",
-        add_trt,
-    )
-
-    # (X - E[X]) / sqrt((var + eps))
-    div_trt = impl.elementwise.div(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_div",
-        sub_trt,
-        sqrt_trt,
-    )
-
-    gamma_trt = get_trt_tensor(ctx, weight, f"{name}_gamma")
-    beta_trt = get_trt_tensor(ctx, bias, f"{name}_beta")
-
-    # y * gamma + beta
-    scaled_y = impl.elementwise.mul(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_mul_gamma",
-        div_trt,
-        gamma_trt,
-    )
-
-    output = impl.elementwise.add(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_add_beta",
-        scaled_y,
-        beta_trt,
-    )
+    layer_norm = ctx.net.add_normalization(input, weight, bias, axes)
+    layer_norm.epsilon = eps
+    layer_norm.compute_precision = input.dtype
+    set_layer_name(layer_norm, target, f"{name}_layer_norm", source_ir)
 
     if return_mean_rstd:
         # return fake mean and rstd for now
-        return output, None, None
+        return layer_norm.get_output(0), None, None
 
-    return output
+    return layer_norm.get_output(0)
 
 
 def native_group_norm(
