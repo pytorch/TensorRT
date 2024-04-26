@@ -3,6 +3,7 @@ import operator
 from typing import Callable, Sequence, Tuple
 
 import torch
+from torch_tensorrt.dynamo.conversion.aten_ops_converters import args_bounds_check
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
@@ -34,6 +35,7 @@ def lower_scaled_dot_product_attention(
 
     if replaced_nodes:
         # Repair instances which use the kwargs field (specifically the "scale" kwarg)
+        # Also repair instances which specified the is_causal or attn_bias fields
         for match in replaced_nodes:
             attention_node_replaced = None
             # Seek the attention operator being replaced
@@ -53,6 +55,39 @@ def lower_scaled_dot_product_attention(
                     == torch.nn.functional.scaled_dot_product_attention
                 )
                 new_attention_node.kwargs = {**attention_node_replaced.kwargs}
+
+            # Set default args in new node:
+            # Tensor? attn_mask=None, float dropout_p=0.0, bool is_causal=False
+            new_attention_node.args = new_attention_node.args + (None, 0.0, False)
+
+            # The `is_causal` argument was specified
+            if (
+                (
+                    attention_node_replaced.target
+                    == torch.ops.aten._scaled_dot_product_flash_attention.default
+                )
+                and args_bounds_check(attention_node_replaced.args, 4, False)
+            ) or (
+                (
+                    attention_node_replaced.target
+                    == torch.ops.aten._scaled_dot_product_efficient_attention.default
+                )
+                and args_bounds_check(attention_node_replaced.args, 6, False)
+            ):
+                new_attention_node.args = (
+                    new_attention_node.args[:5] + (True,) + new_attention_node.args[6:]
+                )
+
+            # The `attn_bias` argument was specified
+            if (
+                attention_node_replaced.target
+                == torch.ops.aten._scaled_dot_product_efficient_attention.default
+            ) and args_bounds_check(attention_node_replaced.args, 3) is not None:
+                new_attention_node.args = (
+                    new_attention_node.args[:3]
+                    + attention_node_replaced.args[3]
+                    + new_attention_node.args[4:]
+                )
 
         gm = clean_up_graph_after_modifications(gm)
         logger.debug(f"Graph after lowering scaled dot product attention:\n{gm.graph}")
