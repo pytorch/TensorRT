@@ -475,14 +475,13 @@ class TestLowering(TestCase):
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()
 
-        max_diff = float(
-            torch.max(torch.abs(optimized_model_results - torch_model_results))
-        )
-        self.assertAlmostEqual(
-            max_diff,
-            0,
-            DECIMALS_OF_AGREEMENT,
-            f"Select_scatter TRT outputs don't match with the original model.",
+        optimized_model_results_shape = optimized_model_results.size()
+        torch_model_results_shape = torch_model_results.size()
+
+        self.assertEquals(
+            optimized_model_results_shape,
+            torch_model_results_shape,
+            f"The optimized model results shape and torch model results shape should be equal in empty_like",
         )
 
 
