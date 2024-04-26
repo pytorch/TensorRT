@@ -69,7 +69,6 @@ def expand(
 ) -> TRTTensor:
     shape_rank = len(shape)
     initial_tensor_rank = len(input_t.shape)
-
     # If the rank of the input tensor is less than the shape's rank, pad with ones
     if initial_tensor_rank < shape_rank:
         input_t = prepend_ones(
@@ -99,6 +98,7 @@ def expand(
     stride = tuple(
         [int(i == o) for i, o in zip(input_tensor_shape, shape)]
     )  # stride == 1 if dimensions match, 0 otherwise
+
     layer = ctx.net.add_slice(input_t, start=start, shape=shape, stride=stride)
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)

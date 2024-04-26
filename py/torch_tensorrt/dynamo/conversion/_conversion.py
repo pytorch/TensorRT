@@ -4,6 +4,7 @@ import io
 import logging
 from typing import List, Sequence
 
+import tensorrt as trt
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
@@ -16,8 +17,6 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import get_torch_inputs
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +38,22 @@ def infer_module_output_dtypes(
     # such as aten.sum - such outputs can be truncated
     output_dtypes = []
     for output in module_outputs:
-        if truncate_long_and_double and output.dtype == dtype.float64:
+        output_ = output
+        # We don't need to check if output is nested here because the input module will be flattened
+        if not isinstance(output, torch.Tensor):
+            if isinstance(output, str):
+                raise ValueError(
+                    f"Receieved an output type {type(output)} that's not in the acceptable datatypes (https://pytorch.org/docs/stable/tensor_attributes.html#torch.dtype)"
+                )
+            else:
+                output_ = torch.tensor(output)
+
+        if truncate_long_and_double and output_.dtype == dtype.float64:
             output_dtypes.append(dtype.float32)
-        elif truncate_long_and_double and output.dtype == dtype.int64:
+        elif truncate_long_and_double and output_.dtype == dtype.int64:
             output_dtypes.append(dtype.int32)
         else:
-            output_dtypes.append(dtype._from(output.dtype))
+            output_dtypes.append(dtype._from(output_.dtype))
 
     return output_dtypes
 
@@ -114,8 +123,9 @@ def convert_module(
         from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
         with io.BytesIO() as engine_bytes:
-            engine_bytes.write(interpreter_result.engine.serialize())
+            engine_bytes.write(interpreter_result.engine)
             engine_str = engine_bytes.getvalue()
+
         return TorchTensorRTModule(
             serialized_engine=engine_str,
             name=name,

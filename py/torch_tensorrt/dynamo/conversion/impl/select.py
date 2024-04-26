@@ -2,12 +2,14 @@ import logging
 from typing import Optional, Sequence, Union, cast
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     broadcastable,
+    cast_trt_tensor,
     get_positive_dim,
     get_trt_tensor,
     to_numpy,
@@ -19,8 +21,6 @@ from torch_tensorrt.fx.converters.converter_utils import (
     set_layer_name,
 )
 from torch_tensorrt.fx.types import Shape, TRTTensor
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -40,19 +40,12 @@ def select(
             "of the TensorRT region!"
         )
 
-    ranks = len(input.shape) + (1 if ctx.net.has_implicit_batch_dimension else 0)
+    ranks = len(input.shape)
     dim = get_positive_dim(cast(int, dim), ranks)
     dynamic_shape = has_dynamic_shape(input.shape)
-    if ctx.net.has_implicit_batch_dimension:
-        if dim == 0:
-            raise RuntimeError(
-                f"We do not support slice_tensor at batch dim when it's implicit, got {dim}!"
-            )
-        dim = dim - 1
-    else:
-        if dynamic_shape:
-            # Check whether slice target dim is dynamic shape dim
-            assert input.shape[dim] != -1, "Can't select on negative shape dimension!"
+    if dynamic_shape:
+        # Check whether slice target dim is dynamic shape dim
+        assert input.shape[dim] != -1, "Can't select on negative shape dimension!"
     index = index
 
     if index >= input.shape[dim]:
@@ -258,6 +251,12 @@ def index(
             cum_adv_index_shape_layer, target, name + "_cum_adv_index_shape", source_ir
         )
         cum_adv_index_shape_tensor = cum_adv_index_shape_layer.get_output(0)
+        cum_adv_index_shape_tensor = cast_trt_tensor(
+            ctx,
+            cum_adv_index_shape_tensor,
+            trt.int32,
+            name + "_cum_adv_index_shape_casted",
+        )
         cum_adv_index_shape = cum_adv_index.shape
         _LOGGER.debug(f"The shape for cumulative adv index is {cum_adv_index_shape}")
         # check if all advanced indices are consecutive

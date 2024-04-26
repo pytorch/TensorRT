@@ -12,12 +12,12 @@ namespace passes {
 // https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
 void UnpackScaledDotProductAttention(std::shared_ptr<torch::jit::Graph>& graph) {
   std::string sdpa_pattern = R"IR(
-    graph(%query, %key, %value, %attn_mask, %dropout_p, %is_causal):
-      %out: Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %attn_mask, %dropout_p, %is_causal)
+    graph(%query, %key, %value, %attn_mask, %dropout_p, %is_causal, %scale):
+      %out: Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %attn_mask, %dropout_p, %is_causal, %scale)
       return (%out))IR";
 
   std::string unpacked_sdpa_pattern = R"IR(
-    graph(%query, %key, %value, %attn_mask, %dropout_p, %is_causal):
+    graph(%query, %key, %value, %attn_mask, %dropout_p, %is_causal, %scale):
       %none : NoneType = prim::Constant()
       %1 : int = prim::Constant[value=-1]()
       %2 : int = prim::Constant[value=-2]()
@@ -33,7 +33,7 @@ void UnpackScaledDotProductAttention(std::shared_ptr<torch::jit::Graph>& graph) 
       return(%out))IR";
 
   std::string unpacked_sdpa_attn_biased_pattern = R"IR(
-    graph(%query, %key, %value, %attn_mask, %dropout_p, %is_causal):
+    graph(%query, %key, %value, %attn_mask, %dropout_p, %is_causal, %scale):
       %none : NoneType = prim::Constant()
       %0 : int = prim::Constant[value=1]()
       %1 : int = prim::Constant[value=-1]()

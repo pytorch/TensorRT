@@ -25,13 +25,9 @@ class TestConvertModuleToTrtEngine(unittest.TestCase):
             exp_program, inputs=(input_data_0, input_data_1)
         )
 
-        # Deserialize the TensorRT engine
-        with trt.Logger() as logger, trt.Runtime(logger) as runtime:
-            engine = runtime.deserialize_cuda_engine(trt_engine_str)
-
         # Inference on TRT Engine
         py_trt_module = PythonTorchTensorRTModule(
-            engine, ["arg0_1", "arg1_1"], ["output0"]
+            trt_engine_str, ["a", "b"], ["output0"]
         )
         trt_output = py_trt_module(input_data_0, input_data_1).cpu()
 
