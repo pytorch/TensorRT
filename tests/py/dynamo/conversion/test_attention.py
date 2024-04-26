@@ -5,6 +5,7 @@ import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 
+from ..testing_utilities import DECIMALS_OF_AGREEMENT
 from .harness import DispatchTestCase
 
 

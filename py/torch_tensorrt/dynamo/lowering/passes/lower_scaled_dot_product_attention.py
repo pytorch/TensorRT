@@ -45,15 +45,17 @@ def lower_scaled_dot_product_attention(
                     break
 
             assert attention_node_replaced is not None
+            assert len(match.replacements) == 1
+
+            new_attention_node = match.replacements[0]
+
+            assert (
+                new_attention_node.target
+                == torch.nn.functional.scaled_dot_product_attention
+            )
 
             # If the attention operator had keyword-args, copy them to the new node
             if attention_node_replaced.kwargs:
-                assert len(match.replacements) == 1
-                new_attention_node = match.replacements[0]
-                assert (
-                    new_attention_node.target
-                    == torch.nn.functional.scaled_dot_product_attention
-                )
                 new_attention_node.kwargs = {**attention_node_replaced.kwargs}
 
             # Set default args in new node:
