@@ -70,9 +70,12 @@ http_archive(
 
 http_archive(
     name = "tensorrt",
-    urls = ["file:////opt/torch-tensorrt-builds/TensorRT-10.0.1.6.Linux.x86_64-gnu.cuda-12.4.tar.gz",],
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.0.1.6"
+    sha256 = "a5cd2863793d69187ce4c73b2fffc1f470ff28cfd91e3640017e53b8916453d5",
+    strip_prefix = "TensorRT-10.0.1.6",
+    urls = [
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.0.1/tars/TensorRT-10.0.1.6.Linux.x86_64-gnu.cuda-12.4.tar.gz",
+    ],
 )
 
 # #########################################################################
