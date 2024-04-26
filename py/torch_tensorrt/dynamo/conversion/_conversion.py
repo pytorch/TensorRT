@@ -42,6 +42,11 @@ def infer_module_output_dtypes(
         # We don't need to check if output is nested here because the input module will be flattened
         if not isinstance(output, torch.Tensor) and not isinstance(output, str):
             output_ = torch.tensor(output)
+        else:
+            raise ValueError(
+                f"Receieved an output type {type(output)} that's not in the acceptable datatypes (https://pytorch.org/docs/stable/tensor_attributes.html#torch.dtype)"
+            )
+
         if truncate_long_and_double and output_.dtype == dtype.float64:
             output_dtypes.append(dtype.float32)
         elif truncate_long_and_double and output_.dtype == dtype.int64:
