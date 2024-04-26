@@ -36,7 +36,6 @@ class TestIsNanConverter(DispatchTestCase):
         self.run_test(
             isnan(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
     @parameterized.expand(
@@ -55,7 +54,6 @@ class TestIsNanConverter(DispatchTestCase):
         self.run_test(
             isnan(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
     @parameterized.expand(
@@ -74,7 +72,6 @@ class TestIsNanConverter(DispatchTestCase):
         self.run_test(
             isnan(),
             inputs,
-            output_dtypes=[torch.bool],
         )
 
 
