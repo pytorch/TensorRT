@@ -140,9 +140,7 @@ class TRTTestCase(TestCase):
             if len(expected_ops):
                 self.assert_has_op(mod, expected_ops)
 
-            interpreter_result = interpreter.run(
-                precision=torch.half if fp16_mode else torch.float
-            )
+            interpreter_result = interpreter.run()
             trt_mod = PythonTorchTensorRTModule(
                 interpreter_result.engine,
                 interpreter_result.input_names,
@@ -288,7 +286,9 @@ class DispatchTestCase(TRTTestCase):
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
         compilation_settings = CompilationSettings(
-            precision=precision, truncate_long_and_double=True
+            enabled_precisions={dtype._from(precision)},
+            truncate_long_and_double=True,
+            debug=True,
         )
 
         interp = TRTInterpreter(
