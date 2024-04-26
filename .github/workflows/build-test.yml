@@ -21,6 +21,7 @@ jobs:
       os: linux
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
+      channel: test
       with-rocm: false
       with-cpu: false
 
@@ -208,6 +209,7 @@ jobs:
         ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
         ${CONDA_RUN} python -m pytest -n 10 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_be_test_results.xml backend/
         ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_comple_be_e2e_test_results.xml --ir torch_compile models/test_models.py
+        ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_dyn_models_export.xml --ir torch_compile models/test_dyn_models.py
         popd
 
   tests-py-dynamo-core:
