@@ -87,7 +87,7 @@ Dependencies for Compilation
     * Specify your CUDA version here if not the version used in the branch being built: https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L46
 
 
-* The correct **LibTorch** version will be pulled down for you by bazel.
+* The correct **LibTorch**, **cuDNN** and **TensorRT** versions will be pulled down for you by bazel.
 
     NOTE: By default bazel will pull the latest nightly from pytorch.org. For building main, this is usually sufficient however if there is a specific PyTorch you are targeting,
     edit these locations with updated URLs/paths:
@@ -95,7 +95,8 @@ Dependencies for Compilation
     * https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L53C1-L53C1
 
 
-* **cuDNN and TensorRT** are not required to be installed on the system to build Torch-TensorRT, in fact this is preferable to ensure reproducable builds. Download the tarballs for cuDNN and TensorRT from https://developer.nvidia.com and update the paths in the WORKSPACE file here https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L71
+* **cuDNN and TensorRT** are not required to be installed on the system to build Torch-TensorRT, in fact this is preferable to ensure reproducable builds. If versions other than the default are needed
+  point the WORKSPACE file to the URL of the tarball or download the tarballs for cuDNN and TensorRT from https://developer.nvidia.com and update the paths in the WORKSPACE file here https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L71
 
     For example:
 
@@ -104,24 +105,28 @@ Dependencies for Compilation
         http_archive(
             name = "cudnn",
             build_file = "@//third_party/cudnn/archive:BUILD",
-            sha256 = "79d77a769c7e7175abc7b5c2ed5c494148c0618a864138722c887f95c623777c",
-            strip_prefix = "cudnn-linux-x86_64-8.8.1.3_cuda12-archive",
+            sha256 = "<CUDNN SHA256>", # Optional but recommended
+            strip_prefix = "cudnn-linux-x86_64-<CUDNN VERSION>_<CUDA VERSION>-archive",
             urls = [
-                #"https://developer.nvidia.com/downloads/compute/cudnn/secure/8.8.1/local_installers/12.0/cudnn-linux-x86_64-8.8.1.3_cuda12-archive.tar.xz",
-                "file:///<ABSOLUTE PATH TO FILE>/cudnn-linux-x86_64-8.8.1.3_cuda12-archive.tar.xz"
+                "https://developer.nvidia.com/downloads/compute/cudnn/<CUDNN DOWNLOAD PATH>",
+                # OR
+                "file:///<ABSOLUTE PATH TO FILE>/cudnn-linux-x86_64-<CUDNN VERSION>_<CUDA VERSION>-archive.tar.xz"
             ],
         )
 
         http_archive(
             name = "tensorrt",
             build_file = "@//third_party/tensorrt/archive:BUILD",
-            sha256 = "0f8157a5fc5329943b338b893591373350afa90ca81239cdadd7580cd1eba254",
-            strip_prefix = "TensorRT-8.6.1.6",
+            sha256 = "<TENSORRT SHA256>", # Optional but recommended
+            strip_prefix = "TensorRT-<TENSORRT VERSION>",
             urls = [
-                #"https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/secure/8.6.1/tars/TensorRT-8.6.1.6.Linux.x86_64-gnu.cuda-12.0.tar.gz",
-                "file:///<ABSOLUTE PATH TO FILE>/TensorRT-8.6.1.6.Linux.x86_64-gnu.cuda-12.0.tar.gz"
+                "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/<TENSORRT DOWNLOAD PATH>",
+                # OR
+                "file:///<ABSOLUTE PATH TO FILE>/TensorRT-<TENSORRT VERSION>.Linux.x86_64-gnu.cuda-<CUDA VERSION>.tar.gz"
             ],
         )
+
+    Remember at runtime, these libraries must be added to your ``LD_LIBRARY_PATH`` explicity
 
 If you have a local version of cuDNN and TensorRT installed, this can be used as well by commenting out the above lines and uncommenting the following lines https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L114C1-L124C3
 
