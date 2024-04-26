@@ -38,12 +38,16 @@ def infer_module_output_dtypes(
     # such as aten.sum - such outputs can be truncated
     output_dtypes = []
     for output in module_outputs:
-        if truncate_long_and_double and output.dtype == dtype.float64:
+        output_ = output
+        # We don't need to check if output is nested here because the input module will be flattened
+        if not isinstance(output, torch.Tensor) and not isinstance(output, str):
+            output_ = torch.tensor(output)
+        if truncate_long_and_double and output_.dtype == dtype.float64:
             output_dtypes.append(dtype.float32)
-        elif truncate_long_and_double and output.dtype == dtype.int64:
+        elif truncate_long_and_double and output_.dtype == dtype.int64:
             output_dtypes.append(dtype.int32)
         else:
-            output_dtypes.append(dtype._from(output.dtype))
+            output_dtypes.append(dtype._from(output_.dtype))
 
     return output_dtypes
 
