@@ -58,7 +58,7 @@ def batch_norm(
 
     # For BatchNorm1d, reshape 1d to 2d
     output_shape = input.shape
-    if not ctx.net.has_implicit_batch_dimension and len(input.shape) < 4:
+    if len(input.shape) < 4:
         assert (
             len(get_dynamic_dims(input.shape)) <= 1
         ), "BatchNorm1D with more than one dynamic dims is not currently supported."
@@ -75,7 +75,7 @@ def batch_norm(
     output = layer.get_output(0)
 
     # For BatchNorm1d, reshape output back to 1d
-    if not ctx.net.has_implicit_batch_dimension and len(output_shape) < 4:
+    if len(output_shape) < 4:
         output = impl.shuffle.reshape(
             ctx,
             target,
@@ -411,7 +411,7 @@ def softmax(
     input: TRTTensor,
     dim: Optional[Any] = None,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_ranks = len(input.shape) + (1 if ctx.net.has_implicit_batch_dimension else 0)
+    input_ranks = len(input.shape)
 
     if not isinstance(input, TRTTensor):
         raise RuntimeError(
@@ -433,9 +433,6 @@ def softmax(
         dim = cast(int, dim)
 
     dim = get_positive_dim(dim, input_ranks)
-    if ctx.net.has_implicit_batch_dimension:
-        assert dim != 0, "Can't apply softmax on batch dimension when it's implicit."
-        dim -= 1
 
     layer = ctx.net.add_softmax(input)
     layer.axes = 1 << dim

@@ -90,13 +90,21 @@ _LOGGER.debug(_enabled_features_str())
 
 def _register_with_torch() -> None:
     trtorch_dir = os.path.dirname(__file__)
-    if os.path.isfile(trtorch_dir + "/lib/libtorchtrt.so"):
+    linked_file = (
+        "/torchtrt.dll" if sys.platform.startswith("win") else "/lib/libtorchtrt.so"
+    )
+    linked_file_runtime = (
+        "/torchtrt_runtime.dll"
+        if sys.platform.startswith("win")
+        else "/lib/libtorchtrt_runtime.so"
+    )
+    if os.path.isfile(trtorch_dir + linked_file):
         assert ENABLED_FEATURES.torchscript_frontend
         assert ENABLED_FEATURES.torch_tensorrt_runtime
-        torch.ops.load_library(trtorch_dir + "/lib/libtorchtrt.so")
-    elif os.path.isfile(trtorch_dir + "/lib/libtorchtrt_runtime.so"):
+        torch.ops.load_library(trtorch_dir + linked_file)
+    elif os.path.isfile(trtorch_dir + linked_file_runtime):
         assert ENABLED_FEATURES.torch_tensorrt_runtime
-        torch.ops.load_library(trtorch_dir + "/lib/libtorchtrt_runtime.so")
+        torch.ops.load_library(trtorch_dir + linked_file_runtime)
 
 
 _register_with_torch()
