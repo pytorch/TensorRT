@@ -394,6 +394,22 @@ def aten_ops_sigmoid(
     )
 
 
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+@dynamo_tensorrt_converter(torch.ops.aten.sym_size.int)
+def aten_ops_symsize_int(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.shape.shape(ctx, target, SourceIR.ATEN, name, args[0], args[1])
+
+
 def index_dtype_validator(node: Node) -> bool:
     index = node.args[1]
     for ind in index:
