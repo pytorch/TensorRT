@@ -273,14 +273,12 @@ def compile_module(
                 return False
         return True
 
-    # Check if the module has metadata (shape, dtype). If not, run symbolic shape propagation.
+    # Check if the module has metadata (shape, dtype).
     if not contains_metadata(gm):
-        from torch._inductor.compile_fx import fake_tensor_prop
-
-        torch_inputs = get_torch_inputs(sample_inputs, settings.device)
-        with torch.no_grad():
-            # This fails if the module has data-dependent shape operators.
-            fake_tensor_prop(gm, torch_inputs)
+        # TODO: For future, explore when nodes don't have metadata and if fake_tensor_prop can resolve this.
+        logger.warning(
+            "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
+        )
 
     # Partition module into components that can be TRT-accelerated
     fast_partitioner_failed = False

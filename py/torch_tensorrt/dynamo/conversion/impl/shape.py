@@ -104,6 +104,7 @@ def get_shape_with_dynamic_shape(
     scale_res = scale_layer.get_output(0)
 
     length = input_shape.shape[0]
+
     zero_layer = ctx.net.add_constant(
         input_shape.shape, np.zeros((length), dtype=np.int32)
     )
