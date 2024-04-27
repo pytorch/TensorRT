@@ -12,6 +12,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     get_trt_tensor,
 )
+from torch_tensorrt.dynamo.conversion.impl.cat import cat
 from torch_tensorrt.dynamo.conversion.impl.elementwise import div, sub
 from torch_tensorrt.dynamo.conversion.impl.slice.base import slice
 from torch_tensorrt.dynamo.conversion.impl.unary import ceil
@@ -151,7 +152,15 @@ def expand(
         [int(i == o) for i, o in zip(input_tensor_shape, shape)]
     )  # stride == 1 if dimensions match, 0 otherwise
 
-    layer = ctx.net.add_slice(input_t, start=start, shape=shape, stride=stride)
+    shape_ = shape
+    # Handle dynamic shapes case where shape has dynamic dimension
+    if any(isinstance(ele, TRTTensor) for ele in shape):
+        shape_ = cat(ctx, target, source_ir, name + "_shape_concat", shape, 0)
+        layer = ctx.net.add_slice(input_t, start=start, shape=trt.Dims(), stride=stride)
+        layer.set_input(2, shape_)
+    else:
+        layer = ctx.net.add_slice(input_t, start=start, shape=shape_, stride=stride)
+
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
 

@@ -27,7 +27,7 @@ def cat(
             each_input = get_trt_tensor(ctx, each_input, f"{name}_tensor_{i}")
         trt_inputs.append(each_input)
     concat_layer = ctx.net.add_concatenation(trt_inputs)
-    dim = get_positive_dim(dim, len(input[0].shape))
+    dim = get_positive_dim(dim, len(trt_inputs[0].shape))
     concat_layer.axis = dim
     set_layer_name(concat_layer, target, f"{name}_gather", source_ir)
     return concat_layer.get_output(0)
