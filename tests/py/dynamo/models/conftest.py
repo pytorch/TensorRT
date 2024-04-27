@@ -7,9 +7,10 @@ def pytest_addoption(parser):
         metavar="Internal Representation",
         nargs=1,
         type=str,
-        required=True,
+        required=False,
         help="IR to compile with",
         choices=["dynamo", "torch_compile"],
+        default="dynamo",
     )
 
 
