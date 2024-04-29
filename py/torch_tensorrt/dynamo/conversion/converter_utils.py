@@ -82,9 +82,18 @@ def _dynamic_unsupported(
 
     def _is_subnode_dynamic(subnode: torch.fx.Node) -> bool:
         """Checks if a node itself has Dynamic properties"""
-        return getattr(
+        _has_symbolic_sizes_strides = getattr(
             subnode.meta["val"], "_has_symbolic_sizes_strides", False
-        ) or isinstance(subnode.meta["val"], (SymFloat, SymInt, SymBool))
+        )
+
+        is_shape_dynamic = False
+        if "val" in subnode.meta:
+            shape = subnode.meta["val"].size()
+            is_shape_dynamic = any(
+                isinstance(dim, (SymFloat, SymInt, SymBool)) for dim in shape
+            )
+
+        return _has_symbolic_sizes_strides or is_shape_dynamic
 
     # Check node value itself
     if arg_positions_to_check is None and _is_subnode_dynamic(node):

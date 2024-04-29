@@ -79,6 +79,7 @@ class ConverterSupport:
 
     converter_implementation: ConverterImplSignature
     capability_validator: Callable[[Node], bool] = field(default=lambda node: True)
+    dynamic: bool = False
 
 
 # Dictionary representing Dynamo aten-only converters
@@ -88,9 +89,11 @@ DYNAMO_ATEN_CONVERTERS: Dict[Target, Sequence[ConverterSupport]] = {}
 
 def dynamo_tensorrt_converter(
     key: Target,
+    *,
     enabled: bool = True,
     capability_validator: Optional[Callable[[Node], bool]] = None,
     priority: ConverterPriority = ConverterPriority.STANDARD,
+    dynamic: bool = False,
 ) -> Callable[[ConverterImplSignature], ConverterImplSignature]:
     """Decorator for Dynamo TensorRT Converter
 
@@ -116,7 +119,9 @@ def dynamo_tensorrt_converter(
 
         # If no capability_validator function is specified, use the default function - always return true
         if capability_validator is None:
-            converter_support = ConverterSupport(converter_implementation=converter)
+            converter_support = ConverterSupport(
+                converter_implementation=converter, dynamic=dynamic
+            )
         else:
             assert callable(
                 capability_validator
@@ -124,6 +129,7 @@ def dynamo_tensorrt_converter(
             converter_support = ConverterSupport(
                 converter_implementation=converter,
                 capability_validator=capability_validator,
+                dynamic=dynamic,
             )
 
         # OpOverloadPackets are only valid if they have a single overload, or
@@ -323,6 +329,18 @@ class ConverterRegistry:
 
                 if isinstance(converters, (list, tuple)):
                     for candidate in converters:
+                        # TODO: Importing this here avoids circular import issue. One potential fix is moving this function into _ConverterRegistry file.
+                        from torch_tensorrt.dynamo.conversion.converter_utils import (
+                            dynamic_unsupported,
+                        )
+
+                        has_static_inputs = dynamic_unsupported(node)
+                        # If there are dynamic inputs but the converter doesn't support it explicitly, throw a warning.
+                        if not has_static_inputs and not candidate.dynamic:
+                            logger.warning(
+                                f"The converter for node {node.target} received dynamic shaped inputs but the static version of the converter is being used. Please report this issue at https://github.com/pytorch/TensorRT/issues"
+                            )
+
                         if candidate.capability_validator(node):
                             return (
                                 candidate.converter_implementation,

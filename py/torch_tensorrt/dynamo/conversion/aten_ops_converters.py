@@ -358,7 +358,7 @@ def aten_ops_grid(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.relu.default)
+@dynamo_tensorrt_converter(torch.ops.aten.relu.default, dynamic=True)
 def aten_ops_relu(
     ctx: ConversionContext,
     target: Target,
@@ -2080,7 +2080,9 @@ def conv_param_validator(conv_node: Node) -> bool:
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.convolution.default, capability_validator=conv_param_validator
+    torch.ops.aten.convolution.default,
+    capability_validator=conv_param_validator,
+    dynamic=True,
 )
 @enforce_tensor_types(
     {
