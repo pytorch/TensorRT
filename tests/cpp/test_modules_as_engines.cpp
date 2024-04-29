@@ -29,7 +29,7 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Values(
         PathAndInput({"tests/modules/resnet18_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}}),
         PathAndInput({"tests/modules/mobilenet_v2_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}}),
-        PathAndInput({"tests/modules/efficientnet_b0_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}}),
+        PathAndInput({"tests/modules/efficientnet_b0_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}})));
 // NOTE: ViT tests are disabled until Python 3.11 issue is resolved
 // https://github.com/huggingface/pytorch-image-models/issues/1946 PathAndInput({"tests/modules/vit_scripted.jit.pt",
 // {{1, 3, 224, 224}}, {at::kFloat}})));

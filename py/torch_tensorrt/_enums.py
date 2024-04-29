@@ -107,7 +107,7 @@ class dtype(Enum):
                 return dtype.f16
             elif t == trt.float32:
                 return dtype.f32
-            elif trt.__version__ >= "7.0" and t == trt.bool:
+            elif t == trt.bool:
                 return dtype.b
             else:
                 raise TypeError(

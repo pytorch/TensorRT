@@ -17,6 +17,7 @@ http_archive(
     name = "rules_pkg",
     sha256 = "8f9ee2dc10c1ae514ee599a8b42ed99fa262b757058f65ad3c384289ff70c4b8",
     urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.9.1/rules_pkg-0.9.1.tar.gz",
         "https://github.com/bazelbuild/rules_pkg/releases/download/0.9.1/rules_pkg-0.9.1.tar.gz",
     ],
 )
@@ -48,7 +49,7 @@ new_local_repository(
 new_local_repository(
     name = "cublas",
     build_file = "@//third_party/cublas:BUILD",
-    path = "/usr",
+    path = "C:/",
 )
 #############################################################################################################
 # Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
@@ -58,21 +59,30 @@ http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu121/libtorch-cxx11-abi-shared-with-deps-2.3.0%2Bcu121.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu121/libtorch-shared-with-deps-2.3.0%2Bcu121.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-shared-with-deps-latest.zip"],
 )
 
-http_archive(
-    name = "tensorrt",
-    urls = ["file:////opt/torch-tensorrt-builds/TensorRT-10.0.1.6.Linux.x86_64-gnu.cuda-12.4.tar.gz",],
-    build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.0.1.6"
+####################################################################################
+# Locally installed dependencies (use in cases of custom dependencies or aarch64)
+####################################################################################
+
+new_local_repository(
+    name = "cudnn",
+    path = "C:/",
+    build_file = "@//third_party/cudnn/local:BUILD"
+)
+
+new_local_repository(
+   name = "tensorrt",
+   path = "C:/",
+   build_file = "@//third_party/tensorrt/local:BUILD"
 )
 
 # #########################################################################
