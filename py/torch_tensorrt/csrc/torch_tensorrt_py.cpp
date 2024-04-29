@@ -2,7 +2,7 @@
 #include "pybind11/stl.h"
 
 #include "ATen/core/jit_type.h"
-#include "NvInferRuntimeBase.h"
+#include "NvInferRuntime.h"
 #include "Python.h"
 #include "core/compiler.h"
 #include "core/conversion/conversion.h"

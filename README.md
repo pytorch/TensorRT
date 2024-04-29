@@ -136,8 +136,7 @@ These are the following dependencies used to verify the testcases. Torch-TensorR
 - Bazel 5.2.0
 - Libtorch 2.4.0.dev (latest nightly) (built with CUDA 12.1)
 - CUDA 12.1
-- cuDNN 8.9.5
-- TensorRT 10.0.0.6
+- TensorRT 10.0.1.6
 
 ## Deprecation Policy
 
