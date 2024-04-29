@@ -1,4 +1,4 @@
 __version__: "2.4.0.dev0"
 __cuda_version__: "12.1"
 __cudnn_version__: "8.9"
-__tensorrt_version__: "10.0.0.6"
+__tensorrt_version__: "10.0.1"
