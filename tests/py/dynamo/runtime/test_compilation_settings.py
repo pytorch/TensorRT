@@ -36,7 +36,7 @@ class TestEnableTRTFlags(TestCase):
             refit=True,
             num_avg_timing_iters=5,
             workspace_size=1 << 10,
-            truncate_long_and_double=True,
+            truncate_double=True,
         )
 
         optimized_model_results = optimized_model(*inputs).detach().cpu()

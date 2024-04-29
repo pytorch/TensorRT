@@ -99,8 +99,6 @@ class TRTTestCase(TestCase):
                 if not isinstance(ref, torch.Tensor):
                     ref = torch.tensor([ref])
                 ref = ref.cpu()  # to_dtype test has cases with gpu output
-                if ref.dtype == torch.int64:
-                    ref = ref.int()  # convert torch.max's index output tensor to int32
                 torch.testing.assert_close(
                     out.cpu(),
                     ref,
@@ -238,7 +236,7 @@ class DispatchTestCase(TRTTestCase):
         # We replicate this behavior here
         compilation_settings = CompilationSettings(
             enabled_precisions={dtype._from(precision)},
-            truncate_long_and_double=True,
+            truncate_double=True,
             debug=True,
         )
 
@@ -250,7 +248,7 @@ class DispatchTestCase(TRTTestCase):
                 mod,
                 input_specs,
                 compilation_settings.device,
-                truncate_long_and_double=compilation_settings.truncate_long_and_double,
+                truncate_double=compilation_settings.truncate_double,
             )
 
         interp = TRTInterpreter(
@@ -289,7 +287,7 @@ class DispatchTestCase(TRTTestCase):
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
-        compilation_settings = CompilationSettings(truncate_long_and_double=True)
+        compilation_settings = CompilationSettings(truncate_double=True)
 
         interp = TRTInterpreter(
             mod,

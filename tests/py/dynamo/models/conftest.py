@@ -1,3 +1,5 @@
+# type: ignore
+
 import pytest
 
 
@@ -10,10 +12,10 @@ def pytest_addoption(parser):
         required=False,
         help="IR to compile with",
         choices=["dynamo", "torch_compile"],
-        default="dynamo",
     )
 
 
 @pytest.fixture
 def ir(request):
-    return request.config.getoption("--ir")[0]
+    ir_opt = request.config.getoption("--ir")
+    return ir_opt[0] if ir_opt else "dynamo"

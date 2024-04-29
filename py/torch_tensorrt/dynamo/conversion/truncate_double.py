@@ -156,7 +156,7 @@ def _repair_64bit_input(
     gm.recompile()
 
 
-def repair_long_or_double_inputs(
+def repair_double_inputs(
     parent_graph: torch.fx.GraphModule,
     submodule: torch.fx.GraphModule,
     submodule_inputs: Sequence[Input],
