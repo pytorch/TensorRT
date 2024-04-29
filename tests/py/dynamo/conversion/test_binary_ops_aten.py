@@ -116,7 +116,7 @@ class TestBinaryOpConverters(DispatchTestCase):
         inputs = [torch.randn(2, 2)]
         self.run_test(m, inputs)
 
-    @parameterized.expand([((lambda x, y: torch.ops.aten.div.Tensor(x, y)))])
+    @parameterized.expand([(lambda x, y: torch.ops.aten.div.Tensor(x, y),)])
     def test_elementwise_op_div_with_two_ints(self, orig_op: Callable):
         class TestModule(nn.Module):
             def __init__(self, orig_op):
@@ -130,7 +130,7 @@ class TestBinaryOpConverters(DispatchTestCase):
         inputs = [torch.randint(1, 10, (5,), dtype=torch.int32)]
         self.run_test(m, inputs)
 
-    @parameterized.expand([(lambda x, y: torch.ops.aten.div.Tensor(x, y))])
+    @parameterized.expand([(lambda x, y: torch.ops.aten.div.Tensor(x, y),)])
     def test_elementwise_op_div_with_one_int_one_constant(self, orig_op: Callable):
         class TestModule(nn.Module):
             def __init__(self, orig_op):
