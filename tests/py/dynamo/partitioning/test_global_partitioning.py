@@ -19,7 +19,7 @@ class TestGlobalPartitioning(TestCase):
 
         fx_graph = torch.fx.symbolic_trace(FullySupportedOneOp())
         partitioned_graph, _ = partitioning.global_partition(deepcopy(fx_graph))
-        self.assertEquals(
+        self.assertEqual(
             len(list(partitioned_graph.named_children())),
             0,
             "Single operators should not be segmented",
@@ -37,7 +37,7 @@ class TestGlobalPartitioning(TestCase):
         partitioned_graph, _ = partitioning.global_partition(
             deepcopy(fx_graph), require_full_compilation=True
         )
-        self.assertEquals(
+        self.assertEqual(
             len(list(partitioned_graph.named_children())),
             1,
             "Single operators can be segmented if full compilation is required",
@@ -59,7 +59,7 @@ class TestGlobalPartitioning(TestCase):
         partitioned_graph, _ = partitioning.global_partition(
             deepcopy(fx_graph), min_block_size=2
         )
-        self.assertEquals(
+        self.assertEqual(
             len(list(partitioned_graph.named_children())),
             1,
             "All operators are supported, there should be one segment",
@@ -82,7 +82,7 @@ class TestGlobalPartitioning(TestCase):
         partitioned_graph, _ = partitioning.global_partition(
             deepcopy(fx_graph), min_block_size=2
         )
-        self.assertEquals(
+        self.assertEqual(
             len(list(partitioned_graph.named_children())),
             2,
             "Unsupported operators interleave supported ones, expected 2 segments",
@@ -131,18 +131,18 @@ class TestGlobalPartitioning(TestCase):
             use_fast_partitioner=False,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(partitioned_graphs),
             1,
             "Without control flow breaks, there should only be a single graph",
         )
-        self.assertEquals(
+        self.assertEqual(
             len(list(partitioned_graphs[0].named_children())),
             1,
             "Certain operators are set to run in Torch, expected 1 segment",
