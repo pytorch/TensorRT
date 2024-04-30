@@ -5,9 +5,10 @@ from enum import Enum, auto
 from typing import Any, Optional, Type, Union
 
 import numpy as np
-import tensorrt as trt
 import torch
 from torch_tensorrt._features import ENABLED_FEATURES
+
+import tensorrt as trt
 
 
 class dtype(Enum):
@@ -103,6 +104,8 @@ class dtype(Enum):
                 return dtype.i8
             elif t == trt.int32:
                 return dtype.i32
+            elif t == trt.int64:
+                return dtype.i64
             elif t == trt.float16:
                 return dtype.f16
             elif t == trt.float32:
@@ -227,6 +230,8 @@ class dtype(Enum):
                 return trt.DataType.INT8
             elif self == dtype.i32:
                 return trt.DataType.INT32
+            elif self == dtype.i64:
+                return trt.DataType.INT64
             elif self == dtype.f16:
                 return trt.DataType.HALF
             elif self == dtype.f32:

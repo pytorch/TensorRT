@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Collection, Optional, Union
+from typing import Collection, Optional, Set, Union
 
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
@@ -23,7 +23,7 @@ from torch_tensorrt.dynamo._defaults import (
     REFIT,
     REQUIRE_FULL_COMPILATION,
     SPARSE_WEIGHTS,
-    TRUNCATE_LONG_AND_DOUBLE,
+    TRUNCATE_DOUBLE,
     USE_FAST_PARTITIONER,
     USE_PYTHON_RUNTIME,
     VERSION_COMPATIBLE,
@@ -50,7 +50,7 @@ class CompilationSettings:
         use_python_runtime (Optional[bool]): Whether to strictly use Python runtime or C++ runtime. To auto-select a runtime
             based on C++ dependency presence (preferentially choosing C++ runtime if available), leave the
             argument as None
-        truncate_long_and_double (bool): Whether to truncate int64/float64 TRT engine inputs or weights to int32/float32
+        truncate_double (bool): Whether to truncate float64 TRT engine inputs or weights to float32
         use_fast_partitioner (bool): Whether to use the fast or global graph partitioning system
         enable_experimental_decompositions (bool): Whether to enable all core aten decompositions
             or only a selected subset of them
@@ -71,7 +71,7 @@ class CompilationSettings:
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
     """
 
-    enabled_precisions: dtype = field(default_factory=lambda: ENABLED_PRECISIONS)
+    enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
     debug: bool = DEBUG
     workspace_size: int = WORKSPACE_SIZE
     min_block_size: int = MIN_BLOCK_SIZE
@@ -81,7 +81,7 @@ class CompilationSettings:
     version_compatible: bool = VERSION_COMPATIBLE
     optimization_level: Optional[int] = OPTIMIZATION_LEVEL
     use_python_runtime: Optional[bool] = USE_PYTHON_RUNTIME
-    truncate_long_and_double: bool = TRUNCATE_LONG_AND_DOUBLE
+    truncate_double: bool = TRUNCATE_DOUBLE
     use_fast_partitioner: bool = USE_FAST_PARTITIONER
     enable_experimental_decompositions: bool = ENABLE_EXPERIMENTAL_DECOMPOSITIONS
     device: Device = field(default_factory=default_device)

@@ -1,8 +1,10 @@
 import logging
 from typing import Any
 
-import tensorrt as trt
+import torch
 from torch_tensorrt._features import ENABLED_FEATURES
+
+import tensorrt as trt
 
 logging.captureWarnings(True)
 _LOGGER = logging.getLogger("torch_tensorrt [TensorRT Conversion Context]")
@@ -50,6 +52,12 @@ class internal_errors:
             self.ts_level = ts_logging.get_reportable_log_level()
             ts_logging.set_reportable_log_level(ts_logging.Level.InternalError)
 
+        elif ENABLED_FEATURES.torch_tensorrt_runtime:
+            self.rt_level = torch.ops.tensorrt.get_logging_level()
+            torch.ops.tensorrt.set_logging_level(
+                int(trt.ILogger.Severity.INTERNAL_ERROR)
+            )
+
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
         _LOGGER.setLevel(self.external_lvl)
 
@@ -57,6 +65,9 @@ class internal_errors:
             from torch_tensorrt.ts import logging as ts_logging
 
             ts_logging.set_reportable_log_level(self.ts_level)
+
+        elif ENABLED_FEATURES.torch_tensorrt_runtime:
+            torch.ops.tensorrt.set_logging_level(self.rt_level)
 
 
 class errors:
@@ -78,6 +89,10 @@ class errors:
             self.ts_level = ts_logging.get_reportable_log_level()
             ts_logging.set_reportable_log_level(ts_logging.Level.Error)
 
+        elif ENABLED_FEATURES.torch_tensorrt_runtime:
+            self.rt_level = torch.ops.tensorrt.get_logging_level()
+            torch.ops.tensorrt.set_logging_level(int(trt.ILogger.Severity.ERROR))
+
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
         _LOGGER.setLevel(self.external_lvl)
 
@@ -85,6 +100,9 @@ class errors:
             from torch_tensorrt.ts import logging as ts_logging
 
             ts_logging.set_reportable_log_level(self.ts_level)
+
+        elif ENABLED_FEATURES.torch_tensorrt_runtime:
+            torch.ops.tensorrt.set_logging_level(self.rt_level)
 
 
 class warnings:
@@ -106,6 +124,10 @@ class warnings:
             self.ts_level = ts_logging.get_reportable_log_level()
             ts_logging.set_reportable_log_level(ts_logging.Level.Warning)
 
+        elif ENABLED_FEATURES.torch_tensorrt_runtime:
+            self.rt_level = torch.ops.tensorrt.get_logging_level()
+            torch.ops.tensorrt.set_logging_level(int(trt.ILogger.Severity.WARNING))
+
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
         _LOGGER.setLevel(self.external_lvl)
 
@@ -113,6 +135,9 @@ class warnings:
             from torch_tensorrt.ts import logging as ts_logging
 
             ts_logging.set_reportable_log_level(self.ts_level)
+
+        elif ENABLED_FEATURES.torch_tensorrt_runtime:
+            torch.ops.tensorrt.set_logging_level(self.rt_level)
 
 
 class info:
@@ -134,6 +159,10 @@ class info:
             self.ts_level = ts_logging.get_reportable_log_level()
             ts_logging.set_reportable_log_level(ts_logging.Level.Info)
 
+        elif ENABLED_FEATURES.torch_tensorrt_runtime:
+            self.rt_level = torch.ops.tensorrt.get_logging_level()
+            torch.ops.tensorrt.set_logging_level(int(trt.ILogger.Severity.INFO))
+
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
         _LOGGER.setLevel(self.external_lvl)
 
@@ -141,6 +170,9 @@ class info:
             from torch_tensorrt.ts import logging as ts_logging
 
             ts_logging.set_reportable_log_level(self.ts_level)
+
+        elif ENABLED_FEATURES.torch_tensorrt_runtime:
+            torch.ops.tensorrt.set_logging_level(self.rt_level)
 
 
 class debug:
@@ -162,6 +194,10 @@ class debug:
             self.ts_level = ts_logging.get_reportable_log_level()
             ts_logging.set_reportable_log_level(ts_logging.Level.Debug)
 
+        elif ENABLED_FEATURES.torch_tensorrt_runtime:
+            self.rt_level = torch.ops.tensorrt.get_logging_level()
+            torch.ops.tensorrt.set_logging_level(int(trt.ILogger.Severity.VERBOSE))
+
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
         _LOGGER.setLevel(self.external_lvl)
 
@@ -169,6 +205,9 @@ class debug:
             from torch_tensorrt.ts import logging as ts_logging
 
             ts_logging.set_reportable_log_level(self.ts_level)
+
+        elif ENABLED_FEATURES.torch_tensorrt_runtime:
+            torch.ops.tensorrt.set_logging_level(self.rt_level)
 
 
 class graphs:
@@ -191,6 +230,10 @@ class graphs:
             self.ts_level = ts_logging.get_reportable_log_level()
             ts_logging.set_reportable_log_level(ts_logging.Level.Graph)
 
+        elif ENABLED_FEATURES.torch_tensorrt_runtime:
+            self.rt_level = torch.ops.tensorrt.get_logging_level()
+            torch.ops.tensorrt.set_logging_level(int(trt.ILogger.Severity.VERBOSE) + 1)
+
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
         _LOGGER.setLevel(self.external_lvl)
 
@@ -198,3 +241,6 @@ class graphs:
             from torch_tensorrt.ts import logging as ts_logging
 
             ts_logging.set_reportable_log_level(self.ts_level)
+
+        elif ENABLED_FEATURES.torch_tensorrt_runtime:
+            torch.ops.tensorrt.set_logging_level(self.rt_level)

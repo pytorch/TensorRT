@@ -4,12 +4,11 @@ import unittest
 import pytest
 import timm
 import torch
+import torch_tensorrt as torchtrt
 import torchvision.models as models
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 from transformers import BertModel
 from transformers.utils.fx import symbolic_trace as transformers_trace
-
-import torch_tensorrt as torchtrt
 
 assertions = unittest.TestCase()
 
@@ -130,7 +129,7 @@ def test_bert_base_uncased(ir):
         ],
         "device": torchtrt.Device("cuda:0"),
         "enabled_precisions": {torch.float},
-        "truncate_long_and_double": True,
+        "truncate_double": True,
         "ir": ir,
         "min_block_size": 15,
     }
