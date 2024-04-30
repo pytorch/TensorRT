@@ -223,7 +223,7 @@ class TestTensorFreezing(TestCase):
             inputs,
             min_block_size=1,
             pass_through_build_failures=True,
-            truncate_long_and_double=True,
+            truncate_double=True,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()

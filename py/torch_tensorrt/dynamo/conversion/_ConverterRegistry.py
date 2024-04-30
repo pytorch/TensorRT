@@ -21,19 +21,20 @@ from torch._ops import OpOverloadPacket
 from torch.fx.node import Argument, Node, Target, _get_qualified_name
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.fx.converter_registry import CONVERTERS as FX_CONVERTERS
-from torch_tensorrt.fx.types import TRTNetwork, TRTTensor
+
+import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
 LegacyConverterImplSignature = Callable[
     [
-        TRTNetwork,
+        trt.INetworkDefinition,
         Target,
         Tuple[Argument, ...],
         Dict[str, Argument],
         str,
     ],
-    Union[TRTTensor, Sequence[TRTTensor]],
+    Union[trt.ITensor, Sequence[trt.ITensor]],
 ]
 
 DynamoConverterImplSignature = Callable[
@@ -44,7 +45,7 @@ DynamoConverterImplSignature = Callable[
         Dict[str, Argument],
         str,
     ],
-    Union[TRTTensor, Sequence[TRTTensor]],
+    Union[trt.ITensor, Sequence[trt.ITensor]],
 ]
 
 ConverterImplSignature = Union[
