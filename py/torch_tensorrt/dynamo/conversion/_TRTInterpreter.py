@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set
 
 import numpy as np
-import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
@@ -26,6 +25,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
+import tensorrt as trt
 from packaging import version
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -498,6 +498,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             )
 
         for i, output in enumerate(outputs):
+            name = f"output{i}"
+
+            output_dtype = dtype.unknown
             if any(
                 op_name in output.name.split("_")
                 for op_name in (
@@ -514,16 +517,20 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     "any",
                 )
             ):
-                output_bool = True
-            else:
-                output_bool = False
-            name = f"output{i}"
-            output.name = name
-            self.ctx.net.mark_output(output)
-            if output_bool:
-                output.dtype = trt.DataType.BOOL
+                output_dtype = dtype.b
             elif self.output_dtypes is not None:
-                output.dtype = self.output_dtypes[i].to(trt.DataType)
+                if self.output_dtypes[i] == dtype.i64:
+                    output = self.ctx.net.add_cast(
+                        output, dtype.i64.to(trt.DataType)
+                    ).get_output(0)
+                    output_dtype = dtype.i64
+                else:
+                    output_dtype = self.output_dtypes[i]
+
+            self.ctx.net.mark_output(output)
+            if output_dtype is not dtype.unknown:
+                output.dtype = output_dtype.to(trt.DataType, use_default=True)
+            output.name = name
 
             self._output_names.append(name)
             _LOGGER.debug(

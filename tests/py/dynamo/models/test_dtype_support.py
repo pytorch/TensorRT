@@ -39,7 +39,6 @@ class Test64BitSupport(TestCase):
             inputs=[in_tensor],
             pass_through_build_failures=True,
             truncate_double=True,
-            output_format="fx",
             min_block_size=1,
             use_python_runtime=False,
         )
@@ -78,7 +77,6 @@ class Test64BitSupport(TestCase):
             inputs=[in_tensor],
             pass_through_build_failures=True,
             truncate_double=True,
-            output_format="fx",
             min_block_size=1,
             use_python_runtime=True,
         )
@@ -123,7 +121,6 @@ class Test64BitSupport(TestCase):
             inputs=[in_tensor],
             pass_through_build_failures=True,
             truncate_double=False,
-            output_format="fx",
             min_block_size=1,
             use_python_runtime=False,
         )
@@ -163,7 +160,6 @@ class Test64BitSupport(TestCase):
             inputs=[in_tensor],
             pass_through_build_failures=True,
             truncate_double=False,
-            output_format="fx",
             min_block_size=1,
             use_python_runtime=True,
         )

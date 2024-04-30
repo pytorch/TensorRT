@@ -251,6 +251,10 @@ class DispatchTestCase(TRTTestCase):
                 truncate_double=compilation_settings.truncate_double,
             )
 
+        _LOGGER.debug(f"Compilation settings: {compilation_settings}")
+        _LOGGER.debug(f"Inputs: {input_specs}")
+        _LOGGER.debug(f"Output types: {output_dtypes}")
+
         interp = TRTInterpreter(
             mod,
             input_specs,
