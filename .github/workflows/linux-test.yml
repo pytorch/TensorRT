@@ -144,8 +144,10 @@ jobs:
         if: always()
         uses: pmeier/pytest-results-action@v0.3.0
         with:
-          path: ${{ env.RUNNER_TEST_RESULTS_DIR }}
-          fail-on-empty: false
+          path: ${{ env.RUNNER_TEST_RESULTS_DIR }}/**/*.xml
+          summary: true
+          display-options: fEs
+          fail-on-empty: True
 
       - name: Prepare artifacts for upload
         working-directory: ${{ inputs.repository }}
