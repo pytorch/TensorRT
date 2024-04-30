@@ -420,6 +420,70 @@ class TestLowering(TestCase):
             f"MaxPool3d TRT outputs don't match with the original model.",
         )
 
+    def test_lowering_empty_like_module(self):
+        class emptyLike(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+
+            def forward(self, x):
+                c = torch.ops.aten.add(x, x)
+                y = torch.ops.aten.empty_like.default(c)
+                d = y + c
+                return d
+
+        # Operations expected to be removed in the traced graph after decompositions
+        expected_ops = {torch.ops.aten.add.Tensor}
+        unexpected_ops = {
+            torch.ops.aten.empty_like.default,
+            torch.ops.aten.empty_permuted.default,
+        }
+
+        inputs = [torch.zeros(3, 2).cuda()]
+
+        fx_graph = torch.fx.symbolic_trace(emptyLike())
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEquals(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEquals(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            truncate_long_and_double=True,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        optimized_model_results_shape = optimized_model_results.size()
+        torch_model_results_shape = torch_model_results.size()
+
+        self.assertEquals(
+            optimized_model_results_shape,
+            torch_model_results_shape,
+            f"The optimized model results shape and torch model results shape should be equal in empty_like",
+        )
+
 
 if __name__ == "__main__":
     run_tests()
