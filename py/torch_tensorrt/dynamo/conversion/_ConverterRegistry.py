@@ -120,11 +120,22 @@ def _has_dynamic_shapes(
             _has_symbolic_sizes_strides = getattr(
                 subnode.meta["val"], "_has_symbolic_sizes_strides", False
             )
-
-            shape = subnode.meta["val"].size()
-            is_shape_dynamic = any(
-                isinstance(dim, (SymFloat, SymInt, SymBool)) for dim in shape
-            )
+            meta_val = subnode.meta["val"]
+            if isinstance(meta_val, (list, tuple)):
+                for val in meta_val:
+                    shape = val.size()
+                    if any(
+                        isinstance(dim, (SymFloat, SymInt, SymBool)) for dim in shape
+                    ):
+                        is_shape_dynamic = True
+                        break
+            elif isinstance(meta_val, (SymFloat, SymInt, SymBool)):
+                is_shape_dynamic = True
+            else:
+                shape = subnode.meta["val"].size()
+                is_shape_dynamic = any(
+                    isinstance(dim, (SymFloat, SymInt, SymBool)) for dim in shape
+                )
 
         return _has_symbolic_sizes_strides or is_shape_dynamic
 
