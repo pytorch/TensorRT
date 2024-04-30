@@ -12,7 +12,6 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     dynamo_tensorrt_converter,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import (
-    dynamic_unsupported_with_args,
     enforce_tensor_types,
     is_only_operator_on_placeholder,
 )
@@ -360,7 +359,7 @@ def aten_ops_grid(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.relu.default)
+@dynamo_tensorrt_converter(torch.ops.aten.relu.default, supports_dynamic_shapes=True)
 def aten_ops_relu(
     ctx: ConversionContext,
     target: Target,
@@ -647,14 +646,11 @@ def aten_ops_softmax(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.split.Tensor, capability_validator=dynamic_unsupported_with_args([1])
+    torch.ops.aten.split.Tensor,
 )
-@dynamo_tensorrt_converter(
-    torch.ops.aten.split.sizes, capability_validator=dynamic_unsupported_with_args([1])
-)
+@dynamo_tensorrt_converter(torch.ops.aten.split.sizes)
 @dynamo_tensorrt_converter(
     torch.ops.aten.split_with_sizes.default,
-    capability_validator=dynamic_unsupported_with_args([1]),
 )
 def aten_ops_split(
     ctx: ConversionContext,
@@ -2140,7 +2136,9 @@ def conv_param_validator(conv_node: Node) -> bool:
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.convolution.default, capability_validator=conv_param_validator
+    torch.ops.aten.convolution.default,
+    capability_validator=conv_param_validator,
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
     {

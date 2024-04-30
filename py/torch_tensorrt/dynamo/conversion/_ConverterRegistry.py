@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import logging
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -17,6 +18,8 @@ from typing import (
     cast,
 )
 
+import torch
+from torch import SymBool, SymFloat, SymInt
 from torch._ops import OpOverloadPacket
 from torch.fx.node import Argument, Node, Target, _get_qualified_name
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -75,10 +78,12 @@ class ConverterSupport:
         capability_validator: Function which takes in a Node and returns a bool indicating
             whether that node can be supported by its companion converter. Note that
             this function must not modify the node or its graph
+        supports_dynamic_shapes: Boolean flag indicating if the converter has support for dynamic inputs.
     """
 
     converter_implementation: ConverterImplSignature
     capability_validator: Callable[[Node], bool] = field(default=lambda node: True)
+    supports_dynamic_shapes: bool = False
 
 
 # Dictionary representing Dynamo aten-only converters
@@ -86,11 +91,89 @@ class ConverterSupport:
 DYNAMO_ATEN_CONVERTERS: Dict[Target, Sequence[ConverterSupport]] = {}
 
 
+def has_dynamic_shapes(node: torch.fx.Node) -> bool:
+    """Returns True if a node has dynamic args, kwargs, or outputs"""
+    return _has_dynamic_shapes(node=node)
+
+
+def has_dynamic_shapes_in_args(
+    arg_positions_to_check: Optional[List[int]] = None,
+) -> Callable[[torch.fx.Node], bool]:
+    """Returns True if a node has dynamic inputs in node.args at specified positions"""
+    return functools.partial(
+        _has_dynamic_shapes, arg_positions_to_check=arg_positions_to_check
+    )
+
+
+def _has_dynamic_shapes(
+    node: torch.fx.Node, arg_positions_to_check: Optional[List[int]] = None
+) -> bool:
+    # Validate that none of the inputs to the node have Dynamic shapes
+    assert isinstance(
+        node, torch.fx.Node
+    ), "Inputs to validator functions must be FX Nodes"
+
+    def _is_subnode_dynamic(subnode: torch.fx.Node) -> bool:
+        """Checks if a node itself has Dynamic properties"""
+        _has_symbolic_sizes_strides, is_shape_dynamic = False, False
+        if "val" in subnode.meta:
+            _has_symbolic_sizes_strides = getattr(
+                subnode.meta["val"], "_has_symbolic_sizes_strides", False
+            )
+            meta_val = subnode.meta["val"]
+            if isinstance(meta_val, (list, tuple)):
+                for val in meta_val:
+                    shape = val.size()
+                    if any(
+                        isinstance(dim, (SymFloat, SymInt, SymBool)) for dim in shape
+                    ):
+                        is_shape_dynamic = True
+                        break
+            elif isinstance(meta_val, (SymFloat, SymInt, SymBool)):
+                is_shape_dynamic = True
+            else:
+                shape = subnode.meta["val"].size()
+                is_shape_dynamic = any(
+                    isinstance(dim, (SymFloat, SymInt, SymBool)) for dim in shape
+                )
+
+        return _has_symbolic_sizes_strides or is_shape_dynamic
+
+    # Check node value itself
+    if arg_positions_to_check is None and _is_subnode_dynamic(node):
+        return True
+
+    # Check node arguments individually
+    if arg_positions_to_check is None and any(
+        _is_subnode_dynamic(arg) for arg in node.args if isinstance(arg, torch.fx.Node)
+    ):
+        return True
+    # Check specific arg positions if the caller has specified positions to check
+    elif arg_positions_to_check is not None and any(
+        _is_subnode_dynamic(node.args[i])
+        for i in arg_positions_to_check
+        if isinstance(node.args[i], torch.fx.Node)
+    ):
+        return True
+
+    # Check node keyword arguments individually
+    if arg_positions_to_check is None and any(
+        _is_subnode_dynamic(kwarg)
+        for kwarg in node.kwargs.values()
+        if isinstance(kwarg, torch.fx.Node)
+    ):
+        return True
+
+    return False
+
+
 def dynamo_tensorrt_converter(
     key: Target,
+    *,
     enabled: bool = True,
     capability_validator: Optional[Callable[[Node], bool]] = None,
     priority: ConverterPriority = ConverterPriority.STANDARD,
+    supports_dynamic_shapes: bool = False,
 ) -> Callable[[ConverterImplSignature], ConverterImplSignature]:
     """Decorator for Dynamo TensorRT Converter
 
@@ -116,7 +199,10 @@ def dynamo_tensorrt_converter(
 
         # If no capability_validator function is specified, use the default function - always return true
         if capability_validator is None:
-            converter_support = ConverterSupport(converter_implementation=converter)
+            converter_support = ConverterSupport(
+                converter_implementation=converter,
+                supports_dynamic_shapes=supports_dynamic_shapes,
+            )
         else:
             assert callable(
                 capability_validator
@@ -124,6 +210,7 @@ def dynamo_tensorrt_converter(
             converter_support = ConverterSupport(
                 converter_implementation=converter,
                 capability_validator=capability_validator,
+                supports_dynamic_shapes=supports_dynamic_shapes,
             )
 
         # OpOverloadPackets are only valid if they have a single overload, or
@@ -323,6 +410,15 @@ class ConverterRegistry:
 
                 if isinstance(converters, (list, tuple)):
                     for candidate in converters:
+                        # If there are dynamic inputs but the converter doesn't support it explicitly, throw a warning.
+                        if (
+                            not candidate.supports_dynamic_shapes
+                            and has_dynamic_shapes(node)
+                        ):
+                            logger.warning(
+                                f"The converter for node {node.target} received dynamic shaped inputs although it was designed for static inputs. This shouldn't likely cause issues unless there are some dimensions which are dynamic (excluding the batch). If you encounter any issues, please post at https://github.com/pytorch/TensorRT/issues"
+                            )
+
                         if candidate.capability_validator(node):
                             return (
                                 candidate.converter_implementation,
