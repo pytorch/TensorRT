@@ -19,7 +19,7 @@ class TestFastPartitioning(TestCase):
 
         fx_graph = torch.fx.symbolic_trace(FullySupportedOneOp())
         partitioned_graph, _ = partitioning.fast_partition(deepcopy(fx_graph))
-        self.assertEquals(
+        self.assertEqual(
             len(
                 [
                     1
@@ -43,7 +43,7 @@ class TestFastPartitioning(TestCase):
         partitioned_graph, _ = partitioning.fast_partition(
             deepcopy(fx_graph), require_full_compilation=True
         )
-        self.assertEquals(
+        self.assertEqual(
             len(
                 [
                     1
@@ -71,7 +71,7 @@ class TestFastPartitioning(TestCase):
         partitioned_graph, _ = partitioning.fast_partition(
             deepcopy(fx_graph), min_block_size=2
         )
-        self.assertEquals(
+        self.assertEqual(
             len(
                 [
                     1
@@ -100,7 +100,7 @@ class TestFastPartitioning(TestCase):
         partitioned_graph, _ = partitioning.fast_partition(
             deepcopy(fx_graph), min_block_size=2
         )
-        self.assertEquals(
+        self.assertEqual(
             len(
                 [
                     1
@@ -155,18 +155,18 @@ class TestFastPartitioning(TestCase):
             use_fast_partitioner=True,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(partitioned_graphs),
             1,
             "Without control flow breaks, there should only be a single graph",
         )
-        self.assertEquals(
+        self.assertEqual(
             len(
                 [
                     1
