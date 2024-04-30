@@ -22,7 +22,7 @@ class TestTRTModuleNextCompilation(TestCase):
         fx_graph = torch.fx.symbolic_trace(FullySupportedMultiOp())
         partitioned_graph, _ = fast_partition(deepcopy(fx_graph), min_block_size=3)
 
-        self.assertEquals(
+        self.assertEqual(
             len(
                 [
                     1
@@ -96,17 +96,17 @@ class TestTRTModuleNextCompilation(TestCase):
             testing_partitioning=True,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
-        self.assertEquals(
+        self.assertEqual(
             len(partitioned_graphs),
             1,
             "Without control flow breaks, there should only be a single graph",
         )
-        self.assertEquals(
+        self.assertEqual(
             len(
                 [
                     1
@@ -201,7 +201,7 @@ class Test64BitInput(TestCase):
         fx_graph = torch.fx.symbolic_trace(FullySupportedMultiOp())
         partitioned_graph, _ = fast_partition(deepcopy(fx_graph), min_block_size=3)
 
-        self.assertEquals(
+        self.assertEqual(
             len(list(partitioned_graph.named_children())),
             1,
             "All operators are supported, there should be one segment",
@@ -265,17 +265,17 @@ class Test64BitInput(TestCase):
             testing_partitioning=True,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
-        self.assertEquals(
+        self.assertEqual(
             len(partitioned_graphs),
             1,
             "Without control flow breaks, there should only be a single graph",
         )
-        self.assertEquals(
+        self.assertEqual(
             len(
                 [
                     1

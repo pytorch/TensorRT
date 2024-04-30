@@ -118,13 +118,13 @@ class TestPrimBroadcastFusion(TestCase):
             min_block_size=1,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
@@ -187,13 +187,13 @@ class TestLowerEfficientAttention(TestCase):
             min_block_size=1,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
@@ -303,13 +303,13 @@ class TestLowerFlashAttention(TestCase):
             min_block_size=1,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
@@ -418,13 +418,13 @@ class TestLowerLinear(TestCase):
             min_block_size=1,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
@@ -524,13 +524,13 @@ class TestLowerViewToReshape(TestCase):
             min_block_size=1,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
