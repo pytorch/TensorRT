@@ -221,7 +221,7 @@ class Test64BitInput(TestCase):
             inputs,
             min_block_size=1,
             pass_through_build_failures=True,
-            truncate_long_and_double=True,
+            truncate_double=True,
             debug=True,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
@@ -240,16 +240,14 @@ class Test64BitInput(TestCase):
     def test_int64_input_partial_support(self):
         class PartiallySupportedMultiOp(torch.nn.Module):
             def forward(self, x, y):
-                return torch.ops.aten.div.Tensor_mode(
-                    x, torch.ops.aten.add.Tensor(y, y), rounding_mode=None
-                )
+                return torch.ops.aten.abs(torch.ops.aten.add.Tensor(x, y))
 
         fx_graph = torch.fx.symbolic_trace(PartiallySupportedMultiOp())
         unexpected_ops = {torch.ops.aten.add.Tensor}
 
         inputs = [
-            torch.randint(-40, 40, (16, 7, 5), dtype=torch.long).cuda(),
-            torch.randint(1, 40, (16, 7, 5), dtype=torch.long).cuda(),
+            torch.randint(-40, 40, (1, 16, 7, 5), dtype=torch.long).cuda(),
+            torch.randint(1, 40, (1, 16, 7, 5), dtype=torch.long).cuda(),
         ]
 
         (
@@ -296,8 +294,9 @@ class Test64BitInput(TestCase):
             inputs,
             min_block_size=1,
             pass_through_build_failures=True,
-            truncate_long_and_double=True,
+            truncate_double=False,
             debug=True,
+            torch_executed_ops={"torch.ops.aten.add.Tensor"},
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()

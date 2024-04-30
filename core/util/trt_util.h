@@ -53,6 +53,8 @@ inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::DataType& 
       return stream << "Int8";
     case nvinfer1::DataType::kINT32:
       return stream << "Int32";
+    case nvinfer1::DataType::kINT64:
+      return stream << "Int64";
     case nvinfer1::DataType::kBOOL:
       return stream << "Bool";
     default:

@@ -1,3 +1,5 @@
+# mypy: disallow-untyped-decorators=False
+
 import logging
 import operator
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
@@ -858,6 +860,7 @@ def to_copy_dtype_validator(placeholder_only: bool) -> Callable[[Node], bool]:
         allowed_casts = {
             torch.float,
             torch.int32,
+            torch.int64,
             torch.bool,
             torch.int8,
             torch.float16,
