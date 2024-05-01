@@ -26,17 +26,16 @@ tar -xvzf libtorch_tensorrt.tar.gz
 unzip libtorch-cxx11-abi-shared-with-deps-[PYTORCH_VERSION].zip
 ```
 
-> If cuDNN and TensorRT are not installed on your system / in your LD_LIBRARY_PATH then do the following as well
+> If TensorRT is not installed on your system / in your LD_LIBRARY_PATH then do the following as well
 
 ```sh
 cd deps
-mkdir cudnn && tar -xvzf <cuDNN TARBALL> --directory cudnn --strip-components=1
 mkdir tensorrt && tar -xvzf <TensorRT TARBALL> --directory tensorrt --strip-components=1
 cd ..
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/deps/torch_tensorrt/lib:$(pwd)/deps/libtorch/lib:$(pwd)/deps/tensorrt/lib:$(pwd)/deps/cudnn/lib64:/usr/local/cuda/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/deps/torch_tensorrt/lib:$(pwd)/deps/libtorch/lib:$(pwd)/deps/tensorrt/lib:/usr/local/cuda/lib
 ```
 
-This gives maximum compatibility with system configurations for running this example but in general you are better off adding `-Wl,-rpath $(DEP_DIR)/tensorrt/lib -Wl,-rpath $(DEP_DIR)/cudnn/lib64` to your linking command for actual applications
+This gives maximum compatibility with system configurations for running this example but in general you are better off adding `-Wl,-rpath $(DEP_DIR)/tensorrt/lib` to your linking command for actual applications
 
  2) Build and run `torchtrt_runtime_example`
 
@@ -48,6 +47,6 @@ To build and run the app
 cd examples/torchtrt_runtime_example
 make
 # If paths are different than the ones below, change as necessary
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/deps/torch_tensorrt/lib:$(pwd)/deps/libtorch/lib:$(pwd)/deps/tensorrt/lib:$(pwd)/deps/cudnn/lib64:/usr/local/cuda/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/deps/torch_tensorrt/lib:$(pwd)/deps/libtorch/lib:$(pwd)/deps/tensorrt/lib:/usr/local/cuda/lib
 ./torchtrt_runtime_example $PWD/examples/torchtrt_runtime_example/norm.jit
 ```

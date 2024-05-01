@@ -101,7 +101,7 @@ libtorchtrt() {
     TORCHTRT_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.torch_tensorrt_version_release()")
     TRT_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.tensorrt_version()")
     TORCH_VERSION=$(${PY_DIR}/bin/python -c "from torch import __version__;print(__version__.split('+')[0])")
-    cp ${PROJECT_DIR}/bazel-bin/libtorchtrt.tar.gz ${PROJECT_DIR}/py/wheelhouse/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
+    cp ${PROJECT_DIR}/bazel-bin/libtorchtrt.tar.gz ${PROJECT_DIR}/py/wheelhouse/libtorchtrt-${TORCHTRT_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
 }
 
 libtorchtrt_pre_cxx11_abi() {
