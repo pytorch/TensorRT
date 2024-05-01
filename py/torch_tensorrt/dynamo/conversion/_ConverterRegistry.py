@@ -18,14 +18,13 @@ from typing import (
     cast,
 )
 
+import tensorrt as trt
 import torch
 from torch import SymBool, SymFloat, SymInt
 from torch._ops import OpOverloadPacket
 from torch.fx.node import Argument, Node, Target, _get_qualified_name
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.fx.converter_registry import CONVERTERS as FX_CONVERTERS
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -411,22 +410,28 @@ class ConverterRegistry:
 
                 if isinstance(converters, (list, tuple)):
                     for candidate in converters:
-                        # If there are dynamic inputs but the converter doesn't support it explicitly, throw a warning.
                         if (
-                            not candidate.supports_dynamic_shapes
+                            candidate.capability_validator(node)
                             and has_dynamic_shapes(node)
+                            and candidate.supports_dynamic_shapes
                         ):
-                            logger.warning(
-                                f"The converter for node {node.target} received dynamic shaped inputs although it was designed for static inputs. This shouldn't likely cause issues unless there are some dimensions which are dynamic (excluding the batch). If you encounter any issues, please post at https://github.com/pytorch/TensorRT/issues"
+                            # If node has dynamic inputs and the converter supports dynamic shapes, it is enabled
+                            return (
+                                candidate.converter_implementation,
+                                calling_convention,
                             )
-
-                        if candidate.capability_validator(node):
+                        elif candidate.capability_validator(
+                            node
+                        ) and not has_dynamic_shapes(node):
+                            # For static shapes all converters are turned on based on capability_validator check
                             return (
                                 candidate.converter_implementation,
                                 calling_convention,
                             )
                 else:
-                    return converters, calling_convention
+                    # Assuming FX converters don't have dynamic shapes supported
+                    if not has_dynamic_shapes(node):
+                        return converters, calling_convention
 
         raise KeyError(
             f"None of the converter registries have a validated entry for {key}, with node {node}"
