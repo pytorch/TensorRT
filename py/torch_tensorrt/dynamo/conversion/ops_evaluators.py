@@ -47,3 +47,74 @@ def aten_ops_arange_start_step(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return np.arange(*args)
+
+
+def rand_validator(rand_node: Node) -> bool:
+    dtype = rand_node.kwargs.get("dtype", None)
+    layout = rand_node.kwargs.get("layout", None)
+    if dtype is not None:
+        _LOGGER.debug(
+            f"Currently we don't support specifying output dtype, got {dtype}."
+        )
+        return False
+    if layout is not None:
+        _LOGGER.debug(f"Currently we don't support specifying layout, got {layout}.")
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.rand.default, capability_validator=rand_validator
+)
+def aten_ops_rand(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return np.random.rand(*args[0])
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.randn.default, capability_validator=rand_validator
+)
+def aten_ops_randn(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return np.random.randn(*args[0])
+
+
+def randperm_validator(randperm_node: Node) -> bool:
+    dtype = randperm_node.kwargs.get("dtype", None)
+    layout = randperm_node.kwargs.get("layout", None)
+    input = randperm_node.args[0]
+    if not isinstance(input, int):
+        _LOGGER.error(f"Input should be of type int.")
+        return False
+    if dtype is not None:
+        _LOGGER.debug(
+            f"Currently we don't support specifying output dtype, got {dtype}."
+        )
+        return False
+    if layout is not None:
+        _LOGGER.debug(f"Currently we don't support specifying layout, got {layout}.")
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.randperm.default, capability_validator=randperm_validator
+)
+def aten_ops_randperm(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return np.random.permutation(args[0])
