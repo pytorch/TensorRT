@@ -4,7 +4,6 @@ import re
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
-import tensorrt as trt
 import torch
 from torch.fx.node import Argument, Target
 from torch_tensorrt import _enums
@@ -16,6 +15,8 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 )
 from torch_tensorrt.fx.converters.converter_utils import get_axes_for_reduce_op
 from torch_tensorrt.fx.types import TRTDataType, TRTTensor
+
+import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -239,21 +240,11 @@ def get_trt_tensor(
         A TensorRT ITensor that represents the given value.
     """
     # If the input is 64-bit, cast it to 32-bit for TRT freezing
-    if (
-        isinstance(input_val, torch.Tensor)
-        and ctx.compilation_settings.truncate_long_and_double
-    ):
-        if input_val.dtype == torch.int64:
-            input_val = input_val.to(torch.int32)
-        elif input_val.dtype == torch.float64:
+    if isinstance(input_val, torch.Tensor) and ctx.compilation_settings.truncate_double:
+        if input_val.dtype == torch.float64:
             input_val = input_val.to(torch.float32)
-    elif (
-        isinstance(input_val, np.ndarray)
-        and ctx.compilation_settings.truncate_long_and_double
-    ):
-        if input_val.dtype == np.int64:
-            input_val = input_val.astype(np.int32)
-        elif input_val.dtype == np.float64:
+    elif isinstance(input_val, np.ndarray) and ctx.compilation_settings.truncate_double:
+        if input_val.dtype == np.float64:
             input_val = input_val.astype(np.float32)
 
     if isinstance(input_val, (torch.Tensor, np.ndarray, int, float, bool)):

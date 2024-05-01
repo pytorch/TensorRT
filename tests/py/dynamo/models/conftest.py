@@ -1,3 +1,5 @@
+# type: ignore
+
 import pytest
 
 
@@ -7,7 +9,7 @@ def pytest_addoption(parser):
         metavar="Internal Representation",
         nargs=1,
         type=str,
-        required=True,
+        required=False,
         help="IR to compile with",
         choices=["dynamo", "torch_compile"],
     )
@@ -15,4 +17,5 @@ def pytest_addoption(parser):
 
 @pytest.fixture
 def ir(request):
-    return request.config.getoption("--ir")[0]
+    ir_opt = request.config.getoption("--ir")
+    return ir_opt[0] if ir_opt else "dynamo"

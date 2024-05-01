@@ -59,13 +59,12 @@ def _repair_64bit_input(
         dtype: Data type of tensor at position in submodule (double/long)
     """
     assert dtype in (
-        torch.int64,
         torch.float64,
-    ), f"dtype argument must be torch.int64 or torch.float64, got {dtype}"
+    ), f"dtype argument must be torch.float64, got {dtype}"
 
     # Determine target data type in 32 and 64 bit forms
     dtype_64bit = dtype
-    dtype_32bit = torch.int32 if (dtype == torch.int64) else torch.float32
+    dtype_32bit = torch.float32
 
     # Find the node representing the submodule in the graph
     module_node = None
@@ -143,7 +142,7 @@ def _repair_64bit_input(
                     cast_node_64bit = gm.graph.call_function(
                         torch.ops.aten._to_copy.default,
                         args=(get_node,),
-                        kwargs={"dtype": torch.int64},
+                        kwargs={"dtype": torch.float64},
                     )
 
                 get_node.replace_all_uses_with(
@@ -157,7 +156,7 @@ def _repair_64bit_input(
     gm.recompile()
 
 
-def repair_long_or_double_inputs(
+def repair_double_inputs(
     parent_graph: torch.fx.GraphModule,
     submodule: torch.fx.GraphModule,
     submodule_inputs: Sequence[Input],
@@ -189,7 +188,7 @@ def repair_long_or_double_inputs(
 
         # If the data type of the input is long/double, insert necessary
         # casts to replace the operation
-        if param.dtype in (torch.int64, torch.float64):
+        if param.dtype == torch.float64:
             # Ensure outputs are only repaired once per submodule to avoid
             # unnecessary ops showing up in the graph
             if not repaired_outputs_once:
@@ -206,7 +205,7 @@ def repair_long_or_double_inputs(
             repaired_outputs_once = True
 
             # Repair submodule inputs in accordance with inserted casts
-            dtype_32bit = torch.int32 if (param.dtype == torch.int64) else torch.float32
+            dtype_32bit = torch.float32
             submodule_torch_inputs = (
                 list(submodule_torch_inputs[:position])
                 + [

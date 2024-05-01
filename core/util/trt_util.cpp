@@ -292,7 +292,7 @@ const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_at_trt_type_ma
       {at::kFloat, nvinfer1::DataType::kFLOAT},
       {at::kHalf, nvinfer1::DataType::kHALF},
       {at::kInt, nvinfer1::DataType::kINT32},
-      {at::kLong, nvinfer1::DataType::kINT32},
+      {at::kLong, nvinfer1::DataType::kINT64},
       {at::kChar, nvinfer1::DataType::kINT8},
       {at::kByte, nvinfer1::DataType::kINT8},
       {at::kBool, nvinfer1::DataType::kBOOL}};
@@ -304,6 +304,7 @@ const std::unordered_map<nvinfer1::DataType, at::ScalarType>& get_trt_at_type_ma
       {nvinfer1::DataType::kFLOAT, at::kFloat},
       {nvinfer1::DataType::kHALF, at::kHalf},
       {nvinfer1::DataType::kINT32, at::kInt},
+      {nvinfer1::DataType::kINT64, at::kLong},
       {nvinfer1::DataType::kINT8, at::kChar},
       {nvinfer1::DataType::kBOOL, at::kBool},
   };
