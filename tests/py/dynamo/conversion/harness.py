@@ -62,7 +62,6 @@ class TRTTestCase(TestCase):
                 cuda_inputs.append(i.cuda())
 
             mod.eval()
-            mod = mod.cuda()
             start = time.perf_counter()
             interpreter_result = interpreter.run()
             sec = time.perf_counter() - start
@@ -73,6 +72,7 @@ class TRTTestCase(TestCase):
                 interpreter_result.output_names,
             )
 
+            mod = mod.cuda()
             ref_outputs = mod(*cuda_inputs)
 
             torch.cuda.synchronize()
@@ -96,11 +96,9 @@ class TRTTestCase(TestCase):
             ):
                 ref_outputs = [ref_outputs]
             for out, ref in zip(outputs, ref_outputs):
-                ref = ref.cpu()  # to_dtype test has cases with gpu output
                 if not isinstance(ref, torch.Tensor):
                     ref = torch.tensor([ref])
-                if ref.dtype == torch.int64:
-                    ref = ref.int()  # convert torch.max's index output tensor to int32
+                ref = ref.cpu()  # to_dtype test has cases with gpu output
                 torch.testing.assert_close(
                     out.cpu(),
                     ref,

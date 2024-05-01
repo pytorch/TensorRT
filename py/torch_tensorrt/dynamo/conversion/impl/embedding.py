@@ -17,8 +17,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     to_numpy,
 )
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
-
-import tensorrt as trt
+from torch_tensorrt.fx.types import TRTTensor
 
 
 def embedding(
@@ -31,6 +30,10 @@ def embedding(
 ) -> TRTTensor:
     indices_tensor = input
     embedding_tensor = weight
+    if isinstance(indices_tensor, torch.Tensor) and indices_tensor.dtype == torch.int64:
+        raise RuntimeError(
+            "The `embedding` op has indices_tensor dtype=int64. This is incorrect since it has to be int32 to run on TRT."
+        )
     indices_tensor = get_trt_tensor(ctx, indices_tensor, f"{name}_indices_tensor")
     embedding_tensor = get_trt_tensor(ctx, embedding_tensor, f"{name}_embedding_tensor")
     # unsupported parameters
