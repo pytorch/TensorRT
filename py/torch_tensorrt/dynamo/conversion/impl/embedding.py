@@ -9,7 +9,8 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor, to_numpy
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
-from torch_tensorrt.fx.types import TRTTensor
+
+import tensorrt as trt
 
 
 def embedding(
@@ -17,17 +18,13 @@ def embedding(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
-    weight: TRTTensor,
+    input: trt.ITensor,
+    weight: trt.ITensor,
     scale_grad_by_freq: bool,
     sparse: bool,
-) -> TRTTensor:
+) -> trt.ITensor:
     indices_tensor = input
     embedding_tensor = weight
-    if isinstance(indices_tensor, torch.Tensor) and indices_tensor.dtype == torch.int64:
-        raise RuntimeError(
-            "The `embedding` op has indices_tensor dtype=int64. This is incorrect since it has to be int32 to run on TRT."
-        )
     indices_tensor = get_trt_tensor(ctx, indices_tensor, f"{name}_indices_tensor")
     embedding_tensor = get_trt_tensor(ctx, embedding_tensor, f"{name}_embedding_tensor")
     # unsupported parameters
@@ -52,15 +49,15 @@ def embedding_bag(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    weight: TRTTensor,
-    indices: TRTTensor,
+    weight: trt.ITensor,
+    indices: trt.ITensor,
     offsets: Union[torch.Tensor, np.ndarray, Sequence[int]],
     scale_grad_by_freq: bool,
     mode: int,
     sparse: bool,
-    per_sample_weights: Optional[TRTTensor],
+    per_sample_weights: Optional[trt.ITensor],
     include_last_offset: bool,
-) -> Tuple[TRTTensor, TRTTensor, TRTTensor, TRTTensor]:
+) -> Tuple[trt.ITensor, trt.ITensor, trt.ITensor, trt.ITensor]:
     """
     This function is for calculating embedding bags.
 
@@ -143,7 +140,7 @@ def embedding_bag(
         # however, pytorch doc says if `include_last_offset` is True, the size of offsets
         # is equal to the number of bags + 1. The last element is the size of the input,
         # or the ending index position of the last bag (sequence).
-        offsets[-1] = indices.shape[0]
+        offsets[-1] = indices.shape[0]  # type: ignore[index]
 
     # separately reduce embeddings for different bags
     reduced_embed = []
