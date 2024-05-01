@@ -34,7 +34,7 @@ class TestLowering(TestCase):
             fx_graph, inputs, expected_ops=expected_ops, min_block_size=2
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
@@ -63,7 +63,7 @@ class TestLowering(TestCase):
             fx_graph, inputs, unexpected_ops=unexpected_ops, min_block_size=1
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
@@ -98,13 +98,13 @@ class TestLowering(TestCase):
             min_block_size=1,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
@@ -138,13 +138,13 @@ class TestLowering(TestCase):
             min_block_size=1,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
@@ -206,13 +206,13 @@ class TestLowering(TestCase):
             min_block_size=1,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
@@ -265,13 +265,13 @@ class TestLowering(TestCase):
             min_block_size=1,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
@@ -325,13 +325,13 @@ class TestLowering(TestCase):
             min_block_size=1,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
@@ -385,13 +385,13 @@ class TestLowering(TestCase):
             min_block_size=1,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
@@ -449,13 +449,13 @@ class TestLowering(TestCase):
             min_block_size=1,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
@@ -469,7 +469,7 @@ class TestLowering(TestCase):
             "torch_compile",
             inputs,
             min_block_size=1,
-            truncate_long_and_double=True,
+            truncate_double=True,
             pass_through_build_failures=True,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
@@ -478,7 +478,7 @@ class TestLowering(TestCase):
         optimized_model_results_shape = optimized_model_results.size()
         torch_model_results_shape = torch_model_results.size()
 
-        self.assertEquals(
+        self.assertEqual(
             optimized_model_results_shape,
             torch_model_results_shape,
             f"The optimized model results shape and torch model results shape should be equal in empty_like",

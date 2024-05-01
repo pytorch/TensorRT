@@ -127,7 +127,7 @@ def test_bert_base_uncased(ir):
         ],
         "device": torchtrt.Device("cuda:0"),
         "enabled_precisions": {torch.float},
-        "truncate_long_and_double": True,
+        "truncate_double": True,
         "ir": ir,
         "min_block_size": 10,
     }
