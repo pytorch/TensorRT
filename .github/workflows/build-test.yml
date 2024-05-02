@@ -15,7 +15,7 @@ on:
 
 jobs:
   generate-matrix:
-    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@release/2.3
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
       package-type: wheel
       os: linux
@@ -41,7 +41,7 @@ jobs:
             smoke-test-script: packaging/smoke_test_script.sh
             package-name: torch_tensorrt
     name: Build torch-tensorrt whl package
-    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@release/2.3
+    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
     with:
       repository: ${{ matrix.repository }}
       ref: ""

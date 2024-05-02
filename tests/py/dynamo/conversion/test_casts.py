@@ -64,7 +64,7 @@ class TestToCopyConverter(DispatchTestCase):
             precision=torch.float,
         )
 
-    def test_to_copy_unsupported(self):
+    def test_to_copy_i64b(self):
         class ToCopy64Bit(nn.Module):
             def forward(self, x):
                 y = torch.ops.aten._to_copy.default(x, dtype=torch.int64)
@@ -72,11 +72,10 @@ class TestToCopyConverter(DispatchTestCase):
 
         inputs = [torch.randn((1, 3, 10)).int()]
 
-        with self.assertRaises(UnsupportedOperatorException):
-            self.run_test(
-                ToCopy64Bit(),
-                inputs,
-            )
+        self.run_test(
+            ToCopy64Bit(),
+            inputs,
+        )
 
     def test_to_copy_multiple_returns(self):
         class ToCopyReturns(nn.Module):

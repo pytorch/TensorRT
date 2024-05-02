@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections.abc
 import logging
+import warnings
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
 
 import torch
@@ -22,7 +23,7 @@ from torch_tensorrt.dynamo.conversion import (
     UnsupportedOperatorException,
     convert_module,
     interpret_module_to_result,
-    repair_long_or_double_inputs,
+    repair_double_inputs,
 )
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
@@ -46,6 +47,7 @@ def compile(
     *,
     device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
     disable_tf32: bool = _defaults.DISABLE_TF32,
+    disable_dynamic_converter_checks: bool = _defaults.DISABLE_DYNAMIC_CONVERTER_CHECKS,
     sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
     enabled_precisions: (
         Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
@@ -58,7 +60,7 @@ def compile(
     dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
     dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
     dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
-    truncate_long_and_double: bool = _defaults.TRUNCATE_LONG_AND_DOUBLE,
+    truncate_double: bool = _defaults.TRUNCATE_DOUBLE,
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     min_block_size: int = _defaults.MIN_BLOCK_SIZE,
     torch_executed_ops: Optional[Collection[Target]] = None,
@@ -74,7 +76,7 @@ def compile(
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
-    """Compile a TorchScript module for NVIDIA GPUs using TensorRT
+    """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
 
     Takes a existing TorchScript module and a set of settings to configure the compiler
     and will convert methods to JIT Graphs which call equivalent TensorRT engines
@@ -105,6 +107,7 @@ def compile(
             device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
 
         disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+        disable_dynamic_converter_checks (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
         refit (bool): Enable refitting
@@ -115,7 +118,7 @@ def compile(
         dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
         dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
-        truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
+        truncate_double (bool): Truncate weights provided in double (float64) to float32
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
         min_block_size (int): The minimum number of contiguous TensorRT convertable operations in order to run a set of operations in TensorRT
@@ -137,6 +140,19 @@ def compile(
 
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
+
+    if "truncate_long_and_double" in kwargs.keys():
+        if truncate_double is not _defaults.TRUNCATE_DOUBLE:
+            raise ValueError(
+                'Provided configuration for "truncate_double" and deprecated API "truncate_long_and_double", please only use "truncate_double"'
+            )
+        else:
+            truncate_double = kwargs["truncate_long_and_double"]
+            warnings.warn(
+                'Compiler option "truncate_long_and_double" is deprecated in favor of "truncate_double" as int64 is now natively supported, this option will be removed in the next version',
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
     engine_capability = EngineCapability._from(engine_capability)
 
@@ -175,6 +191,7 @@ def compile(
         ),
         "debug": debug,
         "device": device,
+        "disable_dynamic_converter_checks": disable_dynamic_converter_checks,
         "workspace_size": workspace_size,
         "min_block_size": min_block_size,
         "torch_executed_ops": (
@@ -185,7 +202,7 @@ def compile(
         "version_compatible": version_compatible,
         "optimization_level": optimization_level,
         "use_python_runtime": use_python_runtime,
-        "truncate_long_and_double": truncate_long_and_double,
+        "truncate_double": truncate_double,
         "use_fast_partitioner": use_fast_partitioner,
         "num_avg_timing_iters": num_avg_timing_iters,
         "enable_experimental_decompositions": enable_experimental_decompositions,
@@ -224,6 +241,9 @@ def compile_module(
         Compiled FX GraphModule
     """
     dryrun_tracker = DryRunTracker()
+
+    # Disable dynamic_shapes support checks for converters
+    CONVERTERS.disable_dynamic_checks(settings.disable_dynamic_converter_checks)
 
     # Set torch-executed ops
     CONVERTERS.set_disallowed_targets(settings.torch_executed_ops)
@@ -349,8 +369,8 @@ def compile_module(
 
         assert submodule_inputs is not None
         # Handle long/double inputs if requested by the user
-        if settings.truncate_long_and_double:
-            submodule_inputs = repair_long_or_double_inputs(
+        if settings.truncate_double:
+            submodule_inputs = repair_double_inputs(
                 partitioned_module,
                 submodule,
                 submodule_inputs,
@@ -423,7 +443,8 @@ def compile_module(
 
 def convert_module_to_trt_engine(
     exported_program: ExportedProgram,
-    inputs: Optional[Sequence[Input | torch.Tensor]] = None,
+    inputs: Tuple[Any, ...],
+    *,
     enabled_precisions: (
         Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
     ) = _defaults.ENABLED_PRECISIONS,
@@ -436,7 +457,7 @@ def convert_module_to_trt_engine(
     version_compatible: bool = _defaults.VERSION_COMPATIBLE,
     optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
     use_python_runtime: Optional[bool] = _defaults.USE_PYTHON_RUNTIME,
-    truncate_long_and_double: bool = _defaults.TRUNCATE_LONG_AND_DOUBLE,
+    truncate_double: bool = _defaults.TRUNCATE_DOUBLE,
     use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     device: Device = Device._current_device(),
@@ -451,6 +472,7 @@ def convert_module_to_trt_engine(
     dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
     calibrator: object = None,
     allow_shape_tensors: bool = False,
+    **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
 
@@ -488,7 +510,7 @@ def convert_module_to_trt_engine(
         use_python_runtime (Optional[bool]): Whether to strictly use Python runtime or C++ runtime. To auto-select a runtime
             based on C++ dependency presence (preferentially choosing C++ runtime if available), leave the
             argument as None
-        truncate_long_and_double (bool): Whether to truncate int64/float64 TRT engine inputs or weights to int32/float32
+        truncate_double (bool): Whether to truncate float64 TRT engine inputs or weights to float32
         use_fast_partitioner (bool): Whether to use the fast or global graph partitioning system
         enable_experimental_decompositions (bool): Whether to enable all core aten decompositions
             or only a selected subset of them
@@ -512,6 +534,19 @@ def convert_module_to_trt_engine(
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
 
+    if "truncate_long_and_double" in kwargs.keys():
+        if truncate_double is not _defaults.TRUNCATE_DOUBLE:
+            raise ValueError(
+                'Provided configuration for "truncate_double" and deprecated API "truncate_long_and_double", please only use "truncate_double"'
+            )
+        else:
+            truncate_double = kwargs["truncate_long_and_double"]
+            warnings.warn(
+                'Compiler option "truncate_long_and_double" is deprecated in favor of "truncate_double" as int64 is now natively supported, this option will be removed in the next version',
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
     input_list = list(inputs) if inputs is not None else []
     torch_executed_ops = torch_executed_ops if torch_executed_ops is not None else set()
     # Prepare torch_trt inputs
@@ -531,7 +566,7 @@ def convert_module_to_trt_engine(
         "version_compatible": version_compatible,
         "optimization_level": optimization_level,
         "use_python_runtime": use_python_runtime,
-        "truncate_long_and_double": truncate_long_and_double,
+        "truncate_double": truncate_double,
         "use_fast_partitioner": use_fast_partitioner,
         "enable_experimental_decompositions": enable_experimental_decompositions,
         "device": device,
