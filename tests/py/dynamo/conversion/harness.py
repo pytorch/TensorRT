@@ -249,7 +249,7 @@ class DispatchTestCase(TRTTestCase):
             input = inputs[num_input]
             if input.dtype in (torch.int64, torch.float64):
                 dtype_32bit = (
-                    torch.int32 if (input.dtype == torch.int64) else torch.int64
+                    torch.int32 if (input.dtype == torch.int64) else torch.float32
                 )
                 # should we modify graph here to insert clone nodes?
                 # ideally not required
@@ -259,7 +259,7 @@ class DispatchTestCase(TRTTestCase):
                         input.to(dtype_32bit),
                     ]
                     + list(trt_inputs[num_input + 1 :])
-                )        
+                )
 
         trt_input_specs = [Input.from_tensor(i) for i in trt_inputs]
         input_specs = [Input.from_tensor(i) for i in inputs]
@@ -270,7 +270,7 @@ class DispatchTestCase(TRTTestCase):
                 mod,
                 input_specs,
                 compilation_settings.device,
-                truncate_long_and_double=compilation_settings.truncate_long_and_double,
+                truncate_double=compilation_settings.truncate_double,
             )
 
         _LOGGER.debug(f"Compilation settings: {compilation_settings}")
