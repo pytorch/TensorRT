@@ -58,7 +58,7 @@ class CompilationSettings:
         device (Device): GPU to compile the model on
         require_full_compilation (bool): Whether to require the graph is fully compiled in TensorRT.
             Only applicable for `ir="dynamo"`; has no effect for `torch.compile` path
-        disable_dynamic_converter_checks (bool): Setting this to true enables the converters work for both dynamic and static shapes.
+        disable_dynamic_converter_checks (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         disable_tf32 (bool): Whether to disable TF32 computation for TRT layers
         sparse_weights (bool): Whether to allow the builder to use sparse weights
         refit (bool): Whether to build a refittable engine
