@@ -79,8 +79,7 @@ dir_path = os.path.join(str(get_root_dir()), "py")
 
 CXX11_ABI = False
 JETPACK_VERSION = None
-# TODO: Remove once C++ Runtime is integrated in Windows
-PY_ONLY = IS_WINDOWS
+PY_ONLY = False
 NO_TS = False
 LEGACY = False
 RELEASE = False
@@ -238,7 +237,7 @@ def copy_libtorchtrt(multilinux=False, rt_only=False):
     if IS_WINDOWS:
         copyfile(
             dir_path + "/../bazel-bin/cpp/lib/torchtrt.dll",
-            dir_path + "/torch_tensorrt/torchtrt.dll",
+            dir_path + "/torch_tensorrt/lib/torchtrt.dll",
         )
         copyfile(
             dir_path + "/../bazel-bin/cpp/lib/torchtrt.dll.if.lib",
@@ -379,7 +378,6 @@ class CleanCommand(Command):
     ]
     PY_CLEAN_FILES = [
         os.path.join(".", "torch_tensorrt", "*.so"),
-        os.path.join(".", "torch_tensorrt", "*.dll"),
         os.path.join(".", "torch_tensorrt", "_version.py"),
         os.path.join(".", "torch_tensorrt", "BUILD"),
         os.path.join(".", "torch_tensorrt", "WORKSPACE"),
@@ -584,7 +582,6 @@ if not (PY_ONLY or NO_TS):
                 "include/torch_tensorrt/core/util/logging/*.h",
                 "bin/*",
                 "lib/*",
-                "*.dll",
             ]
         }
     )

@@ -35,6 +35,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             pre-script: packaging/pre_build_script_windows.sh
+            env-script: packaging/vc_env_helper.bat
             smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
     name: Build torch-tensorrt whl package
@@ -46,9 +47,44 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      env-script: ${{ matrix.env-script }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
       package-name: ${{ matrix.package-name }}
       trigger-event: ${{ github.event_name }}
+
+  tests-py-torchscript-fe:
+    name: Test torchscript frontend [Python]
+    needs: [generate-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+    with:
+      job-name: tests-py-torchscript-fe
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        export USE_HOST_DEPS=1
+        pushd .
+        cd tests/modules
+        # Don't use requirements.txt here as it contains tensorrt and torch which should have been installed by now.
+        ${CONDA_RUN} python -m pip install numpy packaging pyyaml transformers timm pybind11==2.6.2
+        ${CONDA_RUN} python hub.py
+        popd
+        pushd .
+        cd tests/py/ts
+        ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
+        ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_api_test_results.xml api/
+        ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_models_test_results.xml models/
+        ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_integrations_test_results.xml integrations/
+        popd
 
   tests-py-dynamo-converters:
     name: Test dynamo converters [Python]
@@ -59,10 +95,10 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-    uses: ./.github/workflows/windows-test.yml
+    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
     with:
       job-name: tests-py-dynamo-converters
-      repository: "pytorch/tensorrt"
+      repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
@@ -84,10 +120,10 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-    uses: ./.github/workflows/windows-test.yml
+    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
     with:
       job-name: tests-py-dynamo-fe
-      repository: "pytorch/tensorrt"
+      repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
@@ -101,6 +137,32 @@ jobs:
         ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/test_dyn_models.py
         popd
 
+  tests-py-dynamo-serde:
+    name: Test dynamo export serde [Python]
+    needs: [generate-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+    with:
+      job-name: tests-py-dynamo-serde
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        export USE_HOST_DEPS=1
+        pushd .
+        cd tests/py/dynamo
+        ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
+        ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/export_serde_test_results.xml --ir dynamo models/test_export_serde.py
+        popd
+
   tests-py-torch-compile-be:
     name: Test torch compile backend [Python]
     needs: [generate-matrix, build]
@@ -110,15 +172,15 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-    uses: ./.github/workflows/windows-test.yml
+    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
     with:
       job-name: tests-py-torch-compile-be
       repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      pre-script: packaging/driver_upgrade.bat
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
       script: |
         export USE_HOST_DEPS=1
         pushd .
@@ -136,10 +198,10 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-    uses: ./.github/workflows/windows-test.yml
+    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
     with:
       job-name: tests-py-dynamo-core
-      repository: "pytorch/tensorrt"
+      repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
@@ -152,6 +214,32 @@ jobs:
         ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_test_results.xml runtime/
         ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_partitioning_test_results.xml partitioning/
         ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_lowering_test_results.xml lowering/
+        popd
+
+  tests-py-core:
+    name: Test core [Python]
+    needs: [generate-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+    with:
+      job-name: tests-py-core
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        export USE_HOST_DEPS=1
+        pushd .
+        cd tests/py/core
+        ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
+        ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_core_test_results.xml .
         popd
 
 concurrency:
