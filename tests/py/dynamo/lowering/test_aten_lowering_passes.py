@@ -1,3 +1,4 @@
+import sys
 import unittest
 
 import torch
@@ -273,6 +274,10 @@ class TestLowerEfficientAttention(TestCase):
 @unittest.skipIf(
     torch.cuda.get_device_properties(torch.cuda.current_device()).major < 8,
     "GPU compute capability is too low to run flash attention, need Ampere (8.0) or greater",
+)
+@unittest.skipIf(
+    sys.platform.startswith("win"),
+    "Test not supported on Windows",
 )
 class TestLowerFlashAttention(TestCase):
     def test_lower_flash_attention(self):

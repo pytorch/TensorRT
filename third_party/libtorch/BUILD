@@ -23,7 +23,6 @@ cc_library(
             "lib/torch.lib",
             "lib/torch_cpu.lib",
             "lib/torch_cuda.lib",
-            "lib/torch_global_deps.dll",
         ],
         "//conditions:default": [
             "lib/libtorch.so",
