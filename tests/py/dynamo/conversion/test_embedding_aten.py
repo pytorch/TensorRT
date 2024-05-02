@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -14,11 +13,13 @@ class TestEmbeddingConverter(DispatchTestCase):
                 test_name="1d_indices",
                 indices_tensor=torch.tensor([3, 1, 2], dtype=torch.int32),
                 weights_tensor=torch.randn((5, 10), dtype=torch.float32),
+                sparse=False,
             ),
             param(
                 test_name="2d_indices",
                 indices_tensor=torch.tensor([[3, 1, 2], [4, 1, 3]], dtype=torch.int32),
                 weights_tensor=torch.randn((5, 10), dtype=torch.float32),
+                sparse=True,
             ),
             param(
                 test_name="3d_indices",
@@ -26,6 +27,7 @@ class TestEmbeddingConverter(DispatchTestCase):
                     [[[0, 1], [2, 3]], [[3, 4], [4, 0]]], dtype=torch.int32
                 ),
                 weights_tensor=torch.randn((5, 10), dtype=torch.float32),
+                sparse=True,
             ),
         ]
     )
@@ -38,7 +40,7 @@ class TestEmbeddingConverter(DispatchTestCase):
         max_norm=None,
         norm_type=2.0,
         scale_grad_by_freq=None,
-        sparse=None,
+        sparse=False,
     ):
         class TestEmbedding(torch.nn.Module):
             def forward(self, indices, weights):
