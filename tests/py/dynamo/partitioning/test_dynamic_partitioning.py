@@ -59,7 +59,7 @@ class TestDynamicPartitioning(TestCase):
             f"Number of PyTorch segments should be 1 but got {pyt_segments}",
         )
 
-    def test_disable_dynamic_converter_checks(self):
+    def test_assume_dynamic_shape_support_converters(self):
         class Clamp(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:
                 super().__init__(*args, **kwargs)
@@ -82,7 +82,7 @@ class TestDynamicPartitioning(TestCase):
                 )
             ],
             dryrun=True,
-            disable_dynamic_converter_checks=True,
+            assume_dynamic_shape_support=True,
             min_block_size=1,
         )
 

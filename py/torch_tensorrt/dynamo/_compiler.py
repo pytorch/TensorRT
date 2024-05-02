@@ -47,7 +47,7 @@ def compile(
     *,
     device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
     disable_tf32: bool = _defaults.DISABLE_TF32,
-    disable_dynamic_converter_checks: bool = _defaults.DISABLE_DYNAMIC_CONVERTER_CHECKS,
+    assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
     sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
     enabled_precisions: (
         Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
@@ -107,7 +107,7 @@ def compile(
             device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
 
         disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
-        disable_dynamic_converter_checks (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
+        assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
         refit (bool): Enable refitting
@@ -191,7 +191,7 @@ def compile(
         ),
         "debug": debug,
         "device": device,
-        "disable_dynamic_converter_checks": disable_dynamic_converter_checks,
+        "assume_dynamic_shape_support": assume_dynamic_shape_support,
         "workspace_size": workspace_size,
         "min_block_size": min_block_size,
         "torch_executed_ops": (
@@ -242,8 +242,8 @@ def compile_module(
     """
     dryrun_tracker = DryRunTracker()
 
-    # Disable dynamic_shapes support checks for converters
-    CONVERTERS.disable_dynamic_checks(settings.disable_dynamic_converter_checks)
+    # Assume converters support dynamic shapes and disable validation
+    CONVERTERS.set_dynamic_shape_support(settings.assume_dynamic_shape_support)
 
     # Set torch-executed ops
     CONVERTERS.set_disallowed_targets(settings.torch_executed_ops)
@@ -449,6 +449,7 @@ def convert_module_to_trt_engine(
         Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
     ) = _defaults.ENABLED_PRECISIONS,
     debug: bool = _defaults.DEBUG,
+    assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
     min_block_size: int = _defaults.MIN_BLOCK_SIZE,
     torch_executed_ops: Optional[Set[str]] = None,
@@ -556,6 +557,7 @@ def convert_module_to_trt_engine(
     enabled_precisions = {dtype._from(e) for e in enabled_precisions}
 
     compilation_options = {
+        "assume_dynamic_shape_support": assume_dynamic_shape_support,
         "enabled_precisions": enabled_precisions,
         "debug": debug,
         "workspace_size": workspace_size,
@@ -595,6 +597,10 @@ def convert_module_to_trt_engine(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
+
+    # Assume converters support dynamic shapes and disable validation
+    CONVERTERS.set_dynamic_shape_support(settings.assume_dynamic_shape_support)
+
     try:
         interpreter_result = interpret_module_to_result(gm, input_list, settings)
     except UnsupportedOperatorException:

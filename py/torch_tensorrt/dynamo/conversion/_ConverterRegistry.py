@@ -280,7 +280,7 @@ class ConverterRegistry:
         ],
         registry_names: Optional[Sequence[str]] = None,
         registry_calling_conventions: Optional[Sequence[CallingConvention]] = None,
-        disable_dynamic_converter_checks: bool = False,
+        assume_dynamic_shape_support: bool = False,
     ):
         # Copy reference to each dictionary object into attribute list
         self.registries = list(registries)
@@ -302,11 +302,11 @@ class ConverterRegistry:
             ]
 
         self.disallowed_targets: Collection[Target] = set()
-        self.disable_dynamic_converter_checks = disable_dynamic_converter_checks
+        self.assume_dynamic_shape_support = assume_dynamic_shape_support
         self.validate_invariants()
 
-    def disable_dynamic_checks(self, disable_dynamic_converter_checks: bool) -> None:
-        self.disable_dynamic_converter_checks = disable_dynamic_converter_checks
+    def set_dynamic_shape_support(self, assume_dynamic_shape_support: bool) -> None:
+        self.assume_dynamic_shape_support = assume_dynamic_shape_support
 
     def set_disallowed_targets(self, torch_executed_ops: Collection[Target]) -> None:
         self.disallowed_targets = torch_executed_ops
@@ -415,7 +415,7 @@ class ConverterRegistry:
                 if isinstance(converters, (list, tuple)):
                     for candidate in converters:
                         if candidate.capability_validator(node) and (
-                            self.disable_dynamic_converter_checks
+                            self.assume_dynamic_shape_support
                             or (
                                 has_dynamic_shapes(node)
                                 and candidate.supports_dynamic_shapes
