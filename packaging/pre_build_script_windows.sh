@@ -10,7 +10,7 @@ choco install bazelisk -y
 
 if [ ${CU_VERSION} = cu118 ]; then
     TRT_DOWNLOAD_LINK=https://developer.download.nvidia.com/compute/machine-learning/tensorrt/10.0.1/zip/TensorRT-10.0.1.6.Windows10.win10.cuda-11.8.zip
-elif [ ${CU_VERSION} = cu121 ]; then
+elif [ ${CU_VERSION} = cu121 ] || [ ${CU_VERSION} = cu124 ]; then
     TRT_DOWNLOAD_LINK=https://developer.download.nvidia.com/compute/machine-learning/tensorrt/10.0.1/zip/TensorRT-10.0.1.6.Windows10.win10.cuda-12.4.zip
 else
     echo "Unsupported CU_VERSION"
