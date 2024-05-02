@@ -56,7 +56,9 @@ def one_user_validator(node: Node) -> bool:
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.native_batch_norm.default, capability_validator=one_user_validator
+    torch.ops.aten.native_batch_norm.default,
+    capability_validator=one_user_validator,
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
     torch.ops.aten.batch_norm.default, supports_dynamic_shapes=True
