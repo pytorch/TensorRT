@@ -47,6 +47,7 @@ def compile(
     *,
     device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
     disable_tf32: bool = _defaults.DISABLE_TF32,
+    disable_dynamic_converter_checks: bool = _defaults.DISABLE_DYNAMIC_CONVERTER_CHECKS,
     sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
     enabled_precisions: (
         Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
@@ -189,6 +190,7 @@ def compile(
         ),
         "debug": debug,
         "device": device,
+        "disable_dynamic_converter_checks": disable_dynamic_converter_checks,
         "workspace_size": workspace_size,
         "min_block_size": min_block_size,
         "torch_executed_ops": (
@@ -238,6 +240,9 @@ def compile_module(
         Compiled FX GraphModule
     """
     dryrun_tracker = DryRunTracker()
+
+    # Disable dynamic_shapes support checks for converters
+    CONVERTERS.disable_dynamic_checks(settings.disable_dynamic_converter_checks)
 
     # Set torch-executed ops
     CONVERTERS.set_disallowed_targets(settings.torch_executed_ops)
