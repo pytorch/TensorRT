@@ -32,7 +32,7 @@ def getitem_validator(getitem_node: Node) -> bool:
     capability_validator=getitem_validator,
     supports_dynamic_shapes=True,
 )
-@dynamo_tensorrt_converter(torch.ops.aten.detach.default)
+@dynamo_tensorrt_converter(torch.ops.aten.detach.default, supports_dynamic_shapes=True)
 def generic_evaluator(
     ctx: ConversionContext,
     target: Target,
@@ -46,7 +46,9 @@ def generic_evaluator(
     return target(*args)
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.arange.start_step)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.arange.start_step, supports_dynamic_shapes=True
+)
 def aten_ops_arange_start_step(
     ctx: ConversionContext,
     target: Target,
@@ -56,8 +58,14 @@ def aten_ops_arange_start_step(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     # Case where inputs to arange are dynamic
     if np.any([isinstance(tensor, TRTTensor) for tensor in args]):
-        start = get_trt_tensor(ctx, args[0], name + "_start", rank=0)
+        start_rank_0 = get_trt_tensor(ctx, args[0], name + "_start_rank_0", rank=0)
+        start_rank_1 = get_trt_tensor(ctx, args[0], name + "_start_rank_1", rank=1)
         end = get_trt_tensor(ctx, args[1], name + "_end", rank=0)
+        if len(args) > 2:
+            step = args[2]
+        else:
+            step = 1
+        step = get_trt_tensor(ctx, step, name + "_step", rank=1)
         # Calculate shape = (end-start) / 1 (in this case)
         shape = sub(
             ctx,
@@ -65,13 +73,15 @@ def aten_ops_arange_start_step(
             SourceIR.ATEN,
             name + "_shape",
             end,
-            start,
+            start_rank_1,
         )
 
-        fill_layer = ctx.net.add_fill(trt.Dims(), trt.FillOperation.LINSPACE)
+        fill_layer = ctx.net.add_fill(shape.shape, trt.FillOperation.LINSPACE)
         fill_layer.set_input(0, shape)
         # Set start index
-        fill_layer.set_input(1, start)
+        fill_layer.set_input(1, start_rank_0)
+        # Set delta/step
+        fill_layer.set_input(2, step)
         # Set output type to INT32
         fill_layer.set_output_type(0, trt.DataType.INT32)
         return fill_layer.get_output(0)

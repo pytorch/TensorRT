@@ -33,6 +33,19 @@ class TestArangeConverter(DispatchTestCase):
             use_dynamo_tracer=True,
         )
 
+    def test_arange_dynamic(self):
+        class Arange(nn.Module):
+            def forward(self, end_tensor):
+                return torch.ops.aten.arange.start_step(0, end_tensor, 1)
+
+        inputs = [torch.tensor(7, dtype=torch.int32)]
+        self.run_test(
+            Arange(),
+            inputs,
+            check_dtype=False,  # Turned off as end argument doesn't accept tensors
+            # use_dynamo_tracer=True,
+        )
+
 
 if __name__ == "__main__":
     run_tests()
