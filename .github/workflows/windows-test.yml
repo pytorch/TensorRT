@@ -54,7 +54,7 @@ jobs:
       SCRIPT: ${{ inputs.script }}
       PYTHONUTF8: 1
     name: ${{ inputs.job-name }}-${{ matrix.desired_cuda }}
-    runs-on: windows.8xlarge.nvidia.gpu.nonephemeral
+    runs-on: windows.g5.4xlarge.nvidia.gpu
     defaults:
       run:
         shell: bash -l {0}
