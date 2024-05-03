@@ -289,7 +289,7 @@ class DispatchTestCase(TRTTestCase):
         # We replicate this behavior here
         compilation_settings = CompilationSettings(
             enabled_precisions={dtype._from(precision)},
-            truncate_long_and_double=True,
+            truncate_double=True,
             debug=True,
         )
 
