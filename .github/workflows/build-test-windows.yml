@@ -36,6 +36,7 @@ jobs:
           - repository: pytorch/tensorrt
             pre-script: packaging/pre_build_script_windows.sh
             env-script: packaging/vc_env_helper.bat
+            wheel-build-params: "--release"
             smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
     name: Build torch-tensorrt whl package
@@ -48,6 +49,7 @@ jobs:
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       env-script: ${{ matrix.env-script }}
+      wheel-build-params: ${{ matrix.wheel-build-params }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
       package-name: ${{ matrix.package-name }}
       trigger-event: ${{ github.event_name }}
