@@ -40,7 +40,7 @@ jobs:
             smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
     name: Build torch-tensorrt whl package
-    uses: pytorch/test-infra/.github/workflows/build_wheels_windows.yml@main
+    uses: ./.github/workflows/build_wheels_windows.yml
     with:
       repository: ${{ matrix.repository }}
       ref: ""
