@@ -205,7 +205,7 @@ jobs:
 
   upload:
     needs: build
-    uses: ./.github/workflows/_binary_upload.yml
+    uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
     if: always()
     with:
       repository: ${{ inputs.repository }}
