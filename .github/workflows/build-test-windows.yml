@@ -63,7 +63,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+    uses: ./.github/workflows/windows-test.yml
     with:
       job-name: tests-py-torchscript-fe
       repository: ${{ matrix.repository }}
@@ -97,7 +97,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+    uses: ./.github/workflows/windows-test.yml
     with:
       job-name: tests-py-dynamo-converters
       repository: ${{ matrix.repository }}
@@ -122,7 +122,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+    uses: ./.github/workflows/windows-test.yml
     with:
       job-name: tests-py-dynamo-fe
       repository: ${{ matrix.repository }}
@@ -148,7 +148,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+    uses: ./.github/workflows/windows-test.yml
     with:
       job-name: tests-py-dynamo-serde
       repository: ${{ matrix.repository }}
@@ -174,7 +174,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+    uses: ./.github/workflows/windows-test.yml
     with:
       job-name: tests-py-torch-compile-be
       repository: ${{ matrix.repository }}
@@ -200,7 +200,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+    uses: ./.github/workflows/windows-test.yml
     with:
       job-name: tests-py-dynamo-core
       repository: ${{ matrix.repository }}
@@ -227,7 +227,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-    uses: pytorch/tensorrt/.github/workflows/windows-test.yml@main
+    uses: ./.github/workflows/windows-test.yml
     with:
       job-name: tests-py-core
       repository: ${{ matrix.repository }}
