@@ -42,9 +42,9 @@ def test_base_full_compile(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, "/tmp/trt.ep", inputs=[input])
+    torchtrt.save(trt_module, "./trt.ep", inputs=[input])
     # TODO: Enable this serialization issues are fixed
-    # deser_trt_module = torchtrt.load("/tmp/trt.ep").module()
+    # deser_trt_module = torchtrt.load("./trt.ep").module()
     # Check Pyt and TRT exported program outputs
     cos_sim = cosine_similarity(model(input), trt_module(input)[0])
     assertions.assertTrue(
