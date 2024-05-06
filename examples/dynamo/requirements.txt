@@ -1,0 +1,5 @@
+cupy==13.1.0
+tensorrt==10.0.1
+torch>=2.4.0.dev20240503+cu121
+torch-tensorrt>=2.4.0.dev20240503+cu121
+triton==2.3.0
