@@ -61,14 +61,9 @@ import torch_tensorrt
 model = MyModel().eval().cuda() # define your model here
 inputs = [torch.randn((1, 3, 224, 224)).cuda()] # define a list of relevant inputs here
 
-<<<<<<< HEAD
 trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs) 
 torch_tensorrt.save(trt_gm, "trt.ep", inputs=inputs) # PyTorch only supports Python runtime for an ExportedProgram. For C++ deployment, use a TorchScript file
 torch_tensorrt.save(trt_gm, "trt.ts", output_format="torchscript", inputs=inputs)
-=======
-optimized_model = torch_tensorrt.compile(model, example_inputs)
-serialize # fix me
->>>>>>> 871c1ba92 (export instructions need to be fixed)
 ```
 
 #### Step 2: Deploy
@@ -77,20 +72,12 @@ serialize # fix me
 import torch
 import torch_tensorrt
 
-<<<<<<< HEAD
 inputs = [torch.randn((1, 3, 224, 224)).cuda()] # your inputs go here
 
 # You can run this in a new python session!
 model = torch.export.load("trt.ep").module()
-# model = torch_tensorrt.load("trt.ep").module() # this also works
+# model = torch_tensorrt.load("trt.ts").module() # this also works
 model(*inputs)
-=======
-x = <YOUR INPUT HERE>
-
-# fix me
-optimized_model = load_model
-optimized_model(x) 
->>>>>>> 871c1ba92 (export instructions need to be fixed)
 ```
 
 ##### Deployment in C++:
@@ -98,13 +85,9 @@ optimized_model(x)
 #include "torch/script.h"
 #include "torch_tensorrt/torch_tensorrt.h"
 
-<<<<<<< HEAD
 auto trt_mod = torch::jit::load("trt.ts");
 auto input_tensor = [...]; // fill this with your inputs
 auto results = trt_mod.forward({input_tensor});
-=======
-// to fill
->>>>>>> 871c1ba92 (export instructions need to be fixed)
 ```
 
 ## Further resources
