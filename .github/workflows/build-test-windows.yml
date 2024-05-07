@@ -24,8 +24,19 @@ jobs:
       with-rocm: false
       with-cpu: false
 
-  build:
+  substitute-runner:
     needs: generate-matrix
+    outputs:
+      matrix: ${{ steps.substitute.outputs.matrix }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Substitute runner
+        id: substitute
+        run: |
+          echo matrix="$(echo '${{ needs.generate-matrix.outputs.matrix }}' | sed -e 's/windows.8xlarge.nvidia.gpu/windows.g5.4xlarge.nvidia.gpu/g')" >> ${GITHUB_OUTPUT}
+
+  build:
+    needs: substitute-runner
     permissions:
       id-token: write
       contents: read
@@ -40,13 +51,13 @@ jobs:
             smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
     name: Build torch-tensorrt whl package
-    uses: ./.github/workflows/build_wheels_windows.yml
+    uses: pytorch/test-infra/.github/workflows/build_wheels_windows.yml@main
     with:
       repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       env-script: ${{ matrix.env-script }}
       wheel-build-params: ${{ matrix.wheel-build-params }}
