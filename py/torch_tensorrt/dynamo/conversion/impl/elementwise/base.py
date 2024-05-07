@@ -150,43 +150,9 @@ def convert_binary_elementwise(
             ctx, rhs_val, trt_promoted_type, f"{name}_cast_rhs_val", target, source_ir
         )
 
-    if has_dynamic_shape(lhs_val.shape) or has_dynamic_shape(rhs_val.shape):
-        lhs_val, rhs_val = broadcast(
-            ctx.net, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
-        )
-    else:
-        lhs_val_shape = lhs_val.shape
-        rhs_val_shape = rhs_val.shape
-        rank_diff = len(lhs_val_shape) - len(rhs_val_shape)
-        if rank_diff > 0:
-            rhs_val = impl.slice.expand(
-                ctx, target, source_ir, f"{name}_expand_rhs_val", rhs_val, lhs_val_shape
-            )
-        elif rank_diff < 0:
-            lhs_val = impl.slice.expand(
-                ctx, target, source_ir, f"{name}_expand_lhs_val", lhs_val, rhs_val_shape
-            )
-        else:
-            if tuple(lhs_val_shape) != tuple(rhs_val_shape):
-                sum_diff = sum(lhs_val_shape) - sum(rhs_val_shape)
-                if sum_diff > 0:
-                    rhs_val = impl.slice.expand(
-                        ctx,
-                        target,
-                        source_ir,
-                        f"{name}_expand_rhs_val",
-                        rhs_val,
-                        lhs_val_shape,
-                    )
-                elif sum_diff < 0:
-                    lhs_val = impl.slice.expand(
-                        ctx,
-                        target,
-                        source_ir,
-                        f"{name}_expand_lhs_val",
-                        lhs_val,
-                        rhs_val_shape,
-                    )
+    lhs_val, rhs_val = broadcast(
+        ctx.net, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
+    )
 
     layer = ctx.net.add_elementwise(lhs_val, rhs_val, op_type)
     set_layer_name(layer, target, name, source_ir)
