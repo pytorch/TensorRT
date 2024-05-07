@@ -105,6 +105,8 @@ class dtype(Enum):
                 return dtype.f8
             elif t == trt.int32:
                 return dtype.i32
+            elif t == trt.int64:
+                return dtype.i64
             elif t == trt.float16:
                 return dtype.f16
             elif t == trt.float32:
@@ -233,6 +235,8 @@ class dtype(Enum):
                 return trt.DataType.INT32
             elif self == dtype.f8:
                 return trt.DataType.FP8
+            elif self == dtype.i64:
+                return trt.DataType.INT64
             elif self == dtype.f16:
                 return trt.DataType.HALF
             elif self == dtype.f32:

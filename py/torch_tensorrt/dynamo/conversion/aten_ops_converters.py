@@ -1,3 +1,5 @@
+# mypy: disallow-untyped-decorators=False
+
 import logging
 import operator
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
@@ -229,26 +231,7 @@ def aten_ops_cat(
     )
 
 
-def embedding_param_validator(embedding_node: Node) -> bool:
-    scale_grad_by_freq = args_bounds_check(embedding_node.args, 3)
-    sparse = args_bounds_check(embedding_node.args, 4)
-
-    if scale_grad_by_freq is not None:
-        _LOGGER.debug(
-            f"Currently we don't support specifying scale gradient by word frequency, got {scale_grad_by_freq}."
-        )
-        return False
-
-    if sparse is not None:
-        _LOGGER.debug(f"Currently we don't support sparse gradient, got {sparse}.")
-        return False
-
-    return True
-
-
-@dynamo_tensorrt_converter(
-    torch.ops.aten.embedding.default, capability_validator=embedding_param_validator
-)
+@dynamo_tensorrt_converter(torch.ops.aten.embedding.default)
 def aten_ops_embedding(
     ctx: ConversionContext,
     target: Target,
@@ -263,22 +246,19 @@ def aten_ops_embedding(
         name,
         input=args[1],
         weight=args[0],
-        # args[2] is the padding index, which is useful for training only
-        scale_grad_by_freq=args_bounds_check(args, 3),
-        sparse=args_bounds_check(args, 4),
     )
 
 
 def embedding_bag_validator(node: Node) -> bool:
-    mode = args_bounds_check(node.args, 4, 0)
-    indices = node.args[1].meta.get("tensor_meta")
+    if not one_user_validator(node):
+        return False
+    meta = node.args[1].meta
+    indices = meta.get("tensor_meta")
+    if indices is None:
+        indices = meta.get("val")
     if indices is None:
         return False
-    return (
-        bool(node.args[2].op == "get_attr")
-        and (mode == 0 or mode == 1 or mode == 2)
-        and len(indices.shape) == 1
-    )
+    return len(indices.shape) == 1  # currently only support 1D indices
 
 
 @dynamo_tensorrt_converter(
@@ -291,7 +271,6 @@ def embedding_bag_validator(node: Node) -> bool:
     {
         0: (TRTTensor,),
         1: (TRTTensor,),
-        2: (np.ndarray, torch.Tensor),
     }
 )
 def aten_ops_embedding_bag(
@@ -309,12 +288,9 @@ def aten_ops_embedding_bag(
         weight=args[0],
         indices=args[1],
         offsets=args[2],
-        scale_grad_by_freq=args_bounds_check(args, 3, False),
         mode=args_bounds_check(args, 4, 0),
-        sparse=args_bounds_check(args, 5, False),
         per_sample_weights=args_bounds_check(args, 6, None),
         include_last_offset=args_bounds_check(args, 7, False),
-        # padding index is useful for training only
     )
 
 
@@ -332,6 +308,8 @@ def aten_ops_fmod(
 
 @dynamo_tensorrt_converter(torch.ops.aten.grid_sampler)
 @dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_2d)
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler.default)
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_2d.default)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -592,7 +570,7 @@ def aten_ops_neg(
 try:
     assert torch.ops.trt.quantize_fp8.default
 except Exception as e:
-    _LOGGER.warn(
+    _LOGGER.warning(
         f"Unable to import quantize_fp8 op.: {e}. Please install nvidia-ammo library in order to register torch.ops.trt.quantize_fp8 op"
     )
 else:
@@ -882,6 +860,7 @@ def to_copy_dtype_validator(placeholder_only: bool) -> Callable[[Node], bool]:
         allowed_casts = {
             torch.float,
             torch.int32,
+            torch.int64,
             torch.bool,
             torch.int8,
             torch.float16,
@@ -1178,6 +1157,23 @@ def aten_ops_exp(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.expm1.default)
+def aten_ops_expm1(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.expm1(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.log.default)
 def aten_ops_log(
     ctx: ConversionContext,
@@ -1433,6 +1429,30 @@ def aten_ops_atanh(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.atan2.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        1: (TRTTensor,),
+    }
+)
+def aten_ops_atan2(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.atan2(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.ceil.default)
 def aten_ops_ceil(
     ctx: ConversionContext,
@@ -1527,6 +1547,23 @@ def aten_ops_isinf(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.unary.isinf(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.isnan.default)
+def aten_ops_isnan(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.isnan(
         ctx,
         target,
         SourceIR.ATEN,
@@ -2226,6 +2263,55 @@ def aten_ops_avg_pool(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool1d.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_adaptive_avg_pool1d(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.pool.adaptive_avg_pool1d(
+        ctx,
+        target,
+        source_ir=SourceIR.ATEN,
+        name=name,
+        input=args[0],
+        output_size=args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool2d.default)
+@dynamo_tensorrt_converter(torch.ops.aten._adaptive_avg_pool2d.default)
+@dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool3d.default)
+@dynamo_tensorrt_converter(torch.ops.aten._adaptive_avg_pool3d.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_adaptive_avg_poolNd(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.pool.adaptive_avg_poolNd(
+        ctx,
+        target,
+        source_ir=SourceIR.ATEN,
+        name=name,
+        input=args[0],
+        output_size=args[1],
+    )
+
+
 def max_pool_param_validator(pool_node: Node) -> bool:
     dilation = args_bounds_check(pool_node.args, 4, 1)
     ceil_mode = args_bounds_check(pool_node.args, 5, False)
@@ -2334,6 +2420,29 @@ def aten_ops_pixel_shuffle(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.shuffle.pixel_shuffle(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.pixel_unshuffle.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_pixel_unshuffle(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.shuffle.pixel_unshuffle(
         ctx,
         target,
         SourceIR.ATEN,
@@ -2533,6 +2642,7 @@ def aten_ops_pad(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_nearest2d.default)
 @dynamo_tensorrt_converter(torch.ops.aten.upsample_nearest2d.vec)
 def upsample_nearest2d(
     ctx: ConversionContext,
@@ -2554,6 +2664,7 @@ def upsample_nearest2d(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_bilinear2d.default)
 @dynamo_tensorrt_converter(torch.ops.aten.upsample_bilinear2d.vec)
 def upsample_bilinear2d(
     ctx: ConversionContext,
@@ -2805,4 +2916,29 @@ def aten_ops_roll(
         args[0],
         args[1],
         args_bounds_check(args, 2, []),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.index_select.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        2: (TRTTensor,),
+    }
+)
+def aten_ops_index_select(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.select.index_select(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args[2],
     )

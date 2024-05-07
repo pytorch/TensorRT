@@ -108,7 +108,9 @@ def test_efficientnet_b0(ir):
 
 @pytest.mark.unit
 def test_bert_base_uncased(ir):
-    model = BertModel.from_pretrained("bert-base-uncased").cuda().eval()
+    model = (
+        BertModel.from_pretrained("bert-base-uncased", return_dict=False).cuda().eval()
+    )
     input = torch.randint(0, 1, (1, 14), dtype=torch.int32).to("cuda")
     input2 = torch.randint(0, 1, (1, 14), dtype=torch.int32).to("cuda")
 
@@ -127,7 +129,7 @@ def test_bert_base_uncased(ir):
         ],
         "device": torchtrt.Device("cuda:0"),
         "enabled_precisions": {torch.float},
-        "truncate_long_and_double": True,
+        "truncate_double": True,
         "ir": ir,
         "min_block_size": 15,
     }
@@ -139,8 +141,8 @@ def test_bert_base_uncased(ir):
         msg=f"Number of outputs for BERT model compilation is different with Pytorch {len(model_outputs)} and TensorRT {len(trt_model_outputs)}. Please check the compilation.",
     )
 
-    for key, _ in model_outputs.items():
-        out, trt_out = model_outputs[key], trt_model_outputs[key]
+    for index in range(len(model_outputs)):
+        out, trt_out = model_outputs[index], trt_model_outputs[index]
         cos_sim = cosine_similarity(out, trt_out)
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
