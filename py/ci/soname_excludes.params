@@ -30,7 +30,6 @@
 --exclude libcuda.so.515
 --exclude libcublasLt.so.11
 --exclude libnvinfer.so.8
---exclude libcudnn.so.8
 --exclude libcublas.so.12
 --exclude libcublasLt.so.12
 --exclude libcublas.so.12.1.3.1

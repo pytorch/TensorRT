@@ -149,14 +149,13 @@ tar -xvzf libtorch_tensorrt.tar.gz
 unzip libtorch.zip
 ```
 
-> If cuDNN and TensorRT are not installed on your system / in your LD_LIBRARY_PATH then do the following as well
+> If TensorRT is not installed on your system / in your LD_LIBRARY_PATH then do the following as well
 
 ```sh
 cd deps
-mkdir cudnn && tar -xvzf <cuDNN TARBALL> --directory cudnn --strip-components=1
 mkdir tensorrt && tar -xvzf <TensorRT TARBALL> --directory tensorrt --strip-components=1
 cd ..
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/deps/torch_tensorrt/lib:$(pwd)/deps/libtorch/lib:$(pwd)/deps/tensorrt/lib:$(pwd)/deps/cudnn/lib64:/usr/local/cuda/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/deps/torch_tensorrt/lib:$(pwd)/deps/libtorch/lib:$(pwd)/deps/tensorrt/lib:/usr/local/cuda/lib
 ```
 
 2) Build and run `ptq`
