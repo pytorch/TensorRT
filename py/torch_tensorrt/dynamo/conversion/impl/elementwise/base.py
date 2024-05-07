@@ -8,9 +8,9 @@ import torch
 from torch.fx.node import Target
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
-from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    broadcast_to_same_shape,
     cast_trt_tensor,
     get_trt_tensor,
 )
@@ -150,9 +150,14 @@ def convert_binary_elementwise(
             ctx, rhs_val, trt_promoted_type, f"{name}_cast_rhs_val", target, source_ir
         )
 
-    lhs_val, rhs_val = broadcast(
-        ctx.net, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
-    )
+    if has_dynamic_shape(lhs_val.shape) or has_dynamic_shape(rhs_val.shape):
+        lhs_val, rhs_val = broadcast(
+            ctx.net, lhs_val, rhs_val, f"{name}_broadcast_lhs", f"{name}_broadcast_rhs"
+        )
+    else:
+        lhs_val, rhs_val = broadcast_to_same_shape(
+            ctx, target, source_ir, f"{name}_broadcast_to_same_shape", lhs_val, rhs_val
+        )
 
     layer = ctx.net.add_elementwise(lhs_val, rhs_val, op_type)
     set_layer_name(layer, target, name, source_ir)

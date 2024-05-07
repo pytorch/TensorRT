@@ -1,4 +1,3 @@
-import unittest
 from typing import Callable
 
 import torch
@@ -59,7 +58,6 @@ class TestBinaryOpConverters(DispatchTestCase):
         self.run_test(m, inputs)
 
     @parameterized.expand([(op[0].__name__, op[0]) for op in elementwise_ops])
-    @unittest.skip("Pending reimplementation of all binary converters in Dynamo")
     def test_elementwise_ops_mismatched_dtypes(self, name, orig_op: Callable):
         class TestModule(nn.Module):
             def __init__(self, orig_op):
