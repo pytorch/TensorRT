@@ -41,8 +41,8 @@ You can use Torch-TensorRT anywhere you use `torch.compile`:
 import torch
 import torch_tensorrt
 
-model = <YOUR  MODEL HERE>
-x = <YOUR INPUT HERE>
+model = MyModel().eval().cuda() # define your model here
+x = [torch.randn((1, 3, 224, 224)).cuda()] # define a list of relevant inputs here
 
 optimized_model = torch.compile(model, backend="tensorrt")
 optimized_model(x) # compiled on first run
@@ -58,11 +58,11 @@ If you want to optimize your model ahead-of-time and/or deploy in a C++ environm
 import torch
 import torch_tensorrt
 
-model = <YOUR  MODEL HERE>
-x = <YOUR INPUT HERE>
+model = MyModel().eval().cuda() # define your model here
+inputs = [torch.randn((1, 3, 224, 224)).cuda()] # define a list of relevant inputs here
 
-optimized_model = torch_tensorrt.compile(model, example_inputs)
-serialize # fix me
+trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs) 
+torchtrt.save(trt_gm, "trt.ep", inputs=inputs)
 ```
 
 #### Step 2: Deploy
@@ -71,11 +71,12 @@ serialize # fix me
 import torch
 import torch_tensorrt
 
-x = <YOUR INPUT HERE>
+inputs = [torch.randn((1, 3, 224, 224)).cuda()] # your inputs go here
 
-# fix me
-optimized_model = load_model
-optimized_model(x) 
+# You can run this in a new python session!
+model = torch.export.load("trt.ep").module()
+# model = torch_tensorrt.load("trt.ep").module() # this also works
+model(*inputs)
 ```
 
 ##### Deployment in C++:
@@ -87,7 +88,8 @@ optimized_model(x)
 ```
 
 ## Further resources
-- [Optimize models from Hugging Face with Torch-TensorRT]() \[coming soon\]
+- [Up to 50% faster Stable Diffusion inference with one line of code](https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-stable-diffusion-py)
+- [Optimize LLMs from Hugging Face with Torch-TensorRT]() \[coming soon\]
 - [Run your model in FP8 with Torch-TensorRT]() \[coming soon\]
 - [Tools to resolve graph breaks and boost performance]() \[coming soon\]
 - [Tech Talk (GTC '23)](https://www.nvidia.com/en-us/on-demand/session/gtcspring23-s51714/)
