@@ -6,7 +6,6 @@ from typing import Dict, List
 
 from torch_tensorrt._version import (  # noqa: F401
     __cuda_version__,
-    __cudnn_version__,
     __tensorrt_version__,
     __version__,
 )
@@ -40,11 +39,9 @@ try:
     import tensorrt  # noqa: F401
 except ImportError:
     cuda_version = _parse_semver(__cuda_version__)
-    cudnn_version = _parse_semver(__cudnn_version__)
     tensorrt_version = _parse_semver(__tensorrt_version__)
 
     CUDA_MAJOR = cuda_version["major"]
-    CUDNN_MAJOR = cudnn_version["major"]
     TENSORRT_MAJOR = tensorrt_version["major"]
 
     if sys.platform.startswith("win"):

@@ -26,7 +26,6 @@ from wheel.bdist_wheel import bdist_wheel
 
 __version__: str = "0.0.0"
 __cuda_version__: str = "0.0"
-__cudnn_version__: str = "0.0"
 __tensorrt_version__: str = "0.0"
 
 LEGACY_BASE_VERSION_SUFFIX_PATTERN = re.compile("a0$")
@@ -62,7 +61,6 @@ def get_base_version() -> str:
 
 def load_dep_info():
     global __cuda_version__
-    global __cudnn_version__
     global __tensorrt_version__
     with open("dev_dep_versions.yml", "r") as stream:
         versions = yaml.safe_load(stream)
@@ -72,7 +70,6 @@ def load_dep_info():
             )
         else:
             __cuda_version__ = versions["__cuda_version__"]
-        __cudnn_version__ = versions["__cudnn_version__"]
         __tensorrt_version__ = versions["__tensorrt_version__"]
 
 
@@ -230,7 +227,6 @@ def gen_version_file():
         print("creating version file")
         f.write('__version__ = "' + __version__ + '"\n')
         f.write('__cuda_version__ = "' + __cuda_version__ + '"\n')
-        f.write('__cudnn_version__ = "' + __cudnn_version__ + '"\n')
         f.write('__tensorrt_version__ = "' + __tensorrt_version__ + '"\n')
 
 

@@ -87,7 +87,7 @@ Dependencies for Compilation
     * Specify your CUDA version here if not the version used in the branch being built: https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L46
 
 
-* The correct **LibTorch**, **cuDNN** and **TensorRT** versions will be pulled down for you by bazel.
+* The correct **LibTorch** and **TensorRT** versions will be pulled down for you by bazel.
 
     NOTE: By default bazel will pull the latest nightly from pytorch.org. For building main, this is usually sufficient however if there is a specific PyTorch you are targeting,
     edit these locations with updated URLs/paths:
@@ -95,24 +95,12 @@ Dependencies for Compilation
     * https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L53C1-L53C1
 
 
-* **cuDNN and TensorRT** are not required to be installed on the system to build Torch-TensorRT, in fact this is preferable to ensure reproducable builds. If versions other than the default are needed
-  point the WORKSPACE file to the URL of the tarball or download the tarballs for cuDNN and TensorRT from https://developer.nvidia.com and update the paths in the WORKSPACE file here https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L71
+* **TensorRT** is not required to be installed on the system to build Torch-TensorRT, in fact this is preferable to ensure reproducable builds. If versions other than the default are needed
+  point the WORKSPACE file to the URL of the tarball or download the tarball for TensorRT from https://developer.nvidia.com and update the paths in the WORKSPACE file here https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L71
 
     For example:
 
     .. code-block:: python
-
-        http_archive(
-            name = "cudnn",
-            build_file = "@//third_party/cudnn/archive:BUILD",
-            sha256 = "<CUDNN SHA256>", # Optional but recommended
-            strip_prefix = "cudnn-linux-x86_64-<CUDNN VERSION>_<CUDA VERSION>-archive",
-            urls = [
-                "https://developer.nvidia.com/downloads/compute/cudnn/<CUDNN DOWNLOAD PATH>",
-                # OR
-                "file:///<ABSOLUTE PATH TO FILE>/cudnn-linux-x86_64-<CUDNN VERSION>_<CUDA VERSION>-archive.tar.xz"
-            ],
-        )
 
         http_archive(
             name = "tensorrt",
@@ -128,7 +116,7 @@ Dependencies for Compilation
 
     Remember at runtime, these libraries must be added to your ``LD_LIBRARY_PATH`` explicity
 
-If you have a local version of cuDNN and TensorRT installed, this can be used as well by commenting out the above lines and uncommenting the following lines https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L114C1-L124C3
+If you have a local version of TensorRT installed, this can be used as well by commenting out the above lines and uncommenting the following lines https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L114C1-L124C3
 
 
 Building the Package
@@ -228,7 +216,7 @@ Begin by installing CMake.
 
 A few useful CMake options include:
 
-    * CMake finders for TensorRT and cuDNN are provided in `cmake/Modules`. In order for CMake to use them, pass
+    * CMake finders for TensorRT are provided in `cmake/Modules`. In order for CMake to use them, pass
       `-DCMAKE_MODULE_PATH=cmake/Modules` when configuring the project with CMake.
     * Libtorch provides its own CMake finder. In case CMake doesn't find it, pass the path to your install of
       libtorch with `-DTorch_DIR=<path to libtorch>/share/cmake/Torch`

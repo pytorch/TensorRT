@@ -184,7 +184,7 @@ def embedding_bag_with_ITensor_offsets(
     loop1 = ctx.net.add_loop()
     trip_limit1 = ctx.net.add_constant(
         shape=(),
-        weights=trt.Weights(np.array([offsets.shape[0] - 1], dtype=np.dtype("i"))),
+        weights=trt.Weights(np.array([offsets.shape[0] - 1], dtype=np.int32)),
     ).get_output(0)
     loop1.add_trip_limit(trip_limit1, trt.TripLimit.COUNT)
 
@@ -205,7 +205,7 @@ def embedding_bag_with_ITensor_offsets(
     ###### Inner loop: traverse indices ######
     loop2 = ctx.net.add_loop()
     trip_limit2 = ctx.net.add_constant(
-        shape=(), weights=trt.Weights(np.array([len_embed], dtype=np.dtype("i")))
+        shape=(), weights=trt.Weights(np.array([len_embed], dtype=np.int32))
     ).get_output(0)
     loop2.add_trip_limit(trip_limit2, trt.TripLimit.COUNT)
     rec2_j_tensor = loop2.add_recurrence(constant_0)
