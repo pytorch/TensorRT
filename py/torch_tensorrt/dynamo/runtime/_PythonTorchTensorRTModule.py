@@ -10,6 +10,7 @@ import torch_tensorrt
 from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
+from torch_tensorrt.dynamo.runtime import OutputAllocator
 from torch_tensorrt.dynamo.runtime.tools import (
     _is_switch_required,
     _select_rt_device,
@@ -52,6 +53,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.profiling_enabled = (
             profiling_enabled if profiling_enabled is not None else False
         )
+        self.output_allocator = OutputAllocator()
         self._initialize()
 
     def _initialize(self) -> None:
@@ -210,14 +212,18 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
                 for i, output_name in enumerate(self.output_names):
                     shape = tuple(self.context.get_tensor_shape(output_name))
-
-                    output = torch.empty(
-                        size=shape,
-                        dtype=self.output_dtypes[i].to(torch.dtype),
-                        device=torch.cuda.current_device(),
-                    )
-                    bindings.append(output.data_ptr())
-                    outputs.append(output)
+                    if -1 in shape:
+                        self.context.set_output_allocator(
+                            output_name, self.output_allocator
+                        )
+                    else:
+                        output = torch.empty(
+                            size=shape,
+                            dtype=self.output_dtypes[i].to(torch.dtype),
+                            device=torch.cuda.current_device(),
+                        )
+                        bindings.append(output.data_ptr())
+                        outputs.append(output)
 
             # Assign tensor address appropriately
             for idx in range(self.engine.num_io_tensors):
@@ -233,6 +239,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 else nullcontext()
             ):
                 self.context.execute_async_v3(torch.cuda.current_stream().cuda_stream)
+                raw_array = self.output_allocator.buffers[self.output_names[0]]
+                shape = self.output_allocator.shapes[self.output_names[0]]
 
             if len(outputs) == 1:
                 return outputs[0]

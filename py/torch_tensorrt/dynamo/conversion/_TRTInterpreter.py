@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
@@ -25,7 +26,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
-import tensorrt as trt
 from packaging import version
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -365,18 +365,27 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             max_shape = current_input.shape["max_shape"]
             # TODO: Does not support disjoint optimization profiles?
             assert self.optimization_profiles is not None
-            self.optimization_profiles[0].set_shape(
-                target, min_shape, opt_shape, max_shape
-            )
+            if current_input.is_shape_tensor:
+                self.optimization_profiles[0].set_shape_input(
+                    target, min_shape, opt_shape, max_shape
+                )
+                shape.append(1)
+            else:
+                self.optimization_profiles[0].set_shape(
+                    target, min_shape, opt_shape, max_shape
+                )
 
-            assert len(min_shape) == len(opt_shape) == len(max_shape)
-            for i in range(len(min_shape)):
-                if min_shape[i] == opt_shape[i] == max_shape[i]:
-                    shape.append(min_shape[i])
-                else:
-                    # -1 to represent the dynamic dimension
-                    shape.append(-1)
-        elif current_input.shape_mode == Input._ShapeMode.STATIC:
+                assert len(min_shape) == len(opt_shape) == len(max_shape)
+                for i in range(len(min_shape)):
+                    if min_shape[i] == opt_shape[i] == max_shape[i]:
+                        shape.append(min_shape[i])
+                    else:
+                        # -1 to represent the dynamic dimension
+                        shape.append(-1)
+        elif (
+            not current_input.is_shape_tensor
+            and current_input.shape_mode == Input._ShapeMode.STATIC
+        ):
             assert isinstance(current_input.shape, tuple)
             shape = list(current_input.shape)
         else:

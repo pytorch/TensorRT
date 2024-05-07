@@ -156,8 +156,16 @@ def expand(
     # Handle dynamic shapes case where shape has dynamic dimension
     if any(isinstance(ele, TRTTensor) for ele in shape):
         shape_ = cat(ctx, target, source_ir, name + "_shape_concat", shape, 0)
-        layer = ctx.net.add_slice(input_t, start=start, shape=trt.Dims(), stride=stride)
+        start_tensor = cat(ctx, target, source_ir, name + "_start_concat", start, 0)
+        stride_tensor = cat(ctx, target, source_ir, name + "_stride_concat", stride, 0)
+        # start_tensor = get_trt_tensor(ctx, np.array(start, dtype=np.int32), name + "_start")
+        # stride_tensor = get_trt_tensor(ctx, np.array(stride, dtype=np.int32), name + "_stride")
+        layer = ctx.net.add_slice(
+            input_t, start=trt.Dims(), shape=trt.Dims(), stride=trt.Dims()
+        )
+        layer.set_input(1, start_tensor)
         layer.set_input(2, shape_)
+        layer.set_input(3, stride_tensor)
     else:
         layer = ctx.net.add_slice(input_t, start=start, shape=shape_, stride=stride)
 

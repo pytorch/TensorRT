@@ -387,18 +387,23 @@ def compile_module(
             submodule_inputs, "dtype", lambda t: t.to(torch.dtype)
         )
 
-        submodule_outputs = submodule(
-            *get_torch_inputs(submodule_inputs, to_torch_device(settings.device))
-        )
+        # subgraph_output_shapes = [get_node_shape(node) for node in submodule.graph.nodes if node.op=="output"]
+        # try:
+        #     submodule_outputs = submodule(
+        #         *get_torch_inputs(submodule_inputs, to_torch_device(settings.device))
+        #     )
+        # except:
+        #     breakpoint()
+        #     print("done")
 
-        subgraph_data.subgraph_output_shapes = parse_complex_tensor_structs(
-            submodule_outputs,
-            "shape",
-            lambda x: dict(x) if isinstance(x, dict) else tuple(x),
-        )
-        subgraph_data.subgraph_output_dtypes = parse_complex_tensor_structs(
-            submodule_outputs, "dtype"
-        )
+        # subgraph_data.subgraph_output_shapes = parse_complex_tensor_structs(
+        #     submodule_outputs,
+        #     "shape",
+        #     lambda x: dict(x) if isinstance(x, dict) else tuple(x),
+        # )
+        # subgraph_data.subgraph_output_dtypes = parse_complex_tensor_structs(
+        #     submodule_outputs, "dtype"
+        # )
 
         dryrun_tracker.tensorrt_graph_count += 1
         dryrun_tracker.per_subgraph_data.append(subgraph_data)
@@ -414,19 +419,19 @@ def compile_module(
 
             trt_modules[name] = trt_module
 
-    sample_outputs = gm(
-        *get_torch_inputs(sample_inputs, to_torch_device(settings.device))
-    )
+    # sample_outputs = gm(
+    #     *get_torch_inputs(sample_inputs, to_torch_device(settings.device))
+    # )
 
-    if not isinstance(sample_outputs, (list, tuple)):
-        sample_outputs = [sample_outputs]
+    # if not isinstance(sample_outputs, (list, tuple)):
+    #     sample_outputs = [sample_outputs]
 
-    dryrun_tracker.graph_output_shapes = parse_complex_tensor_structs(
-        sample_outputs, "shape", lambda x: dict(x) if isinstance(x, dict) else tuple(x)
-    )
-    dryrun_tracker.graph_output_dtypes = parse_complex_tensor_structs(
-        sample_outputs, "dtype"
-    )
+    # dryrun_tracker.graph_output_shapes = parse_complex_tensor_structs(
+    #     sample_outputs, "shape", lambda x: dict(x) if isinstance(x, dict) else tuple(x)
+    # )
+    # dryrun_tracker.graph_output_dtypes = parse_complex_tensor_structs(
+    #     sample_outputs, "dtype"
+    # )
 
     # Replace all FX Modules with TRT Modules
     for name, trt_module in trt_modules.items():

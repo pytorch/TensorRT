@@ -55,11 +55,12 @@ class TRTTestCase(TestCase):
         rtol,
         atol,
         check_dtype=True,
+        pyt_inputs=None,
     ):
         with torch.no_grad():
             cuda_inputs = []
             for i in inputs:
-                cuda_inputs.append(i.cuda())
+                cuda_inputs.append(i)
 
             mod.eval()
             start = time.perf_counter()
@@ -71,9 +72,11 @@ class TRTTestCase(TestCase):
                 interpreter_result.input_names,
                 interpreter_result.output_names,
             )
-
             mod = mod.cuda()
-            ref_outputs = mod(*cuda_inputs)
+            if pyt_inputs is not None:
+                ref_outputs = mod(*pyt_inputs)
+            else:
+                ref_outputs = mod(*cuda_inputs)
 
             torch.cuda.synchronize()
             start_event = torch.cuda.Event(enable_timing=True)
@@ -279,6 +282,8 @@ class DispatchTestCase(TRTTestCase):
         output_dtypes=None,
         use_dynamo_tracer=False,
         enable_passes=False,
+        use_example_tensors=True,
+        pyt_inputs=None,
     ):
         mod.eval()
         inputs = [spec.example_tensor("opt_shape") for spec in input_specs]
@@ -291,7 +296,7 @@ class DispatchTestCase(TRTTestCase):
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
-        compilation_settings = CompilationSettings(truncate_double=True)
+        compilation_settings = CompilationSettings(truncate_double=True, debug=True)
 
         interp = TRTInterpreter(
             mod,
@@ -302,4 +307,6 @@ class DispatchTestCase(TRTTestCase):
         # Since the lowering is based on optimal shape. We need to test with
         # different shape(for ex. max shape) for testing dynamic shape
         inputs_max = [spec.example_tensor("max_shape") for spec in input_specs]
-        super().run_test(mod, inputs_max, interp, rtol, atol)
+        if not use_example_tensors:
+            inputs_max = [spec.torch_tensor for spec in input_specs]
+        super().run_test(mod, inputs_max, interp, rtol, atol, pyt_inputs=pyt_inputs)
