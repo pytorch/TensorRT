@@ -35,7 +35,7 @@ Here's an example usage
     inputs = [torch.randn((1, 3, 224, 224)).cuda()]
     # trt_ep is a torch.fx.GraphModule object
     trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs) 
-    torchtrt.save(trt_gm, "trt.ep", inputs=inputs)
+    torch_tensorrt.save(trt_gm, "trt.ep", inputs=inputs)
 
     # Later, you can load it and run inference
     model = torch.export.load("trt.ep").module()
