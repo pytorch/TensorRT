@@ -4,6 +4,7 @@ import re
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch import SymBool, SymFloat, SymInt
@@ -15,10 +16,11 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
     DynamoConverterImplSignature,
 )
-from torch_tensorrt.fx.converters.converter_utils import get_axes_for_reduce_op
+from torch_tensorrt.fx.converters.converter_utils import (
+    broadcast,
+    get_axes_for_reduce_op,
+)
 from torch_tensorrt.fx.types import TRTDataType, TRTTensor
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -203,6 +205,72 @@ def broadcastable(
         if not (a_shape[i] == b_shape[i] or a_shape[i] == 1 or b_shape[i] == 1):
             return False
     return True
+
+
+def broadcast_to_same_shape(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: TRTTensor,
+    rhs_val: TRTTensor,
+) -> Tuple[TRTTensor, TRTTensor]:
+    """Broadcast ITensors `lhs_val` and `rhs_val` to the same shape. If the shapes are already the same, return the
+    original tensors. If the shapes are different, broadcast the tensors to the same shape.
+
+    This helper function is different from fx/converter_utils.broadcast.
+    fx/converter_utils.broadcast only broadcasts two ITensors to the same number of dimensions (ranks)
+    by prepending 1s, while this function broadcasts two ITensors to the same shape.
+
+    For example, we have original ITensors: lhs_val.shape: (2, 3) rhs_val.shape: (2, 2, 1, 3)
+    If calling fx/converter_utils.broadcast, lhs_val.shape: (1, 1, 2, 3) lhs_val.shape: (2, 2, 1, 3).
+    If calling this function broadcast_to_same_shape, lhs_val.shape: (2, 2, 2, 3) lhs_val.shape: (2, 2, 2, 3).
+
+    Args:
+        lhs_val (TRTTensor): A TensorRT ITensor.
+        rhs_val (TRTTensor): A TensorRT ITensor.
+
+    Returns:
+        Tuple[TRTTensor, TRTTensor]: Two TensorRT ITensors that are broadcasted to the same shape
+
+    """
+    lhs_val, rhs_val = broadcast(
+        ctx.net, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
+    )
+
+    lhs_val_shape = lhs_val.shape
+    rhs_val_shape = rhs_val.shape
+
+    if tuple(lhs_val_shape) != tuple(rhs_val_shape):
+        rank = len(lhs_val_shape)
+        expanded_dims = [-1] * len(lhs_val_shape)
+
+        for dim in range(rank):
+            expanded_dims[dim] = max(lhs_val_shape[dim], rhs_val_shape[dim])
+
+        expanded_shape = tuple(expanded_dims)
+
+        if lhs_val_shape != expanded_shape:
+            lhs_val = impl.slice.expand(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_expand_lhs_val",
+                lhs_val,
+                expanded_shape,
+            )
+
+        if rhs_val_shape != expanded_shape:
+            rhs_val = impl.slice.expand(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_expand_rhs_val",
+                rhs_val,
+                expanded_shape,
+            )
+
+    return lhs_val, rhs_val
 
 
 get_axes_for_reduce_op = functools.partial(
