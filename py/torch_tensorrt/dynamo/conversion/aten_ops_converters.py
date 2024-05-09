@@ -2202,7 +2202,7 @@ def aten_ops_cdist_forward(
         x1=args[0],
         x2=args[1],
         p=args[2],
-        compute_mode=args[3],
+        compute_mode=args_bounds_check(args, 3, None),
     )
 
 
