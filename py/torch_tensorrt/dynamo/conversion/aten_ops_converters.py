@@ -2186,6 +2186,27 @@ def aten_ops_linear(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten._cdist_forward.default)
+@dynamo_tensorrt_converter(torch.ops.aten._cdist_forward)
+def aten_ops_cdist_forward(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.linear.cdist_forward(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        x1=args[0],
+        x2=args[1],
+        p=args[2],
+        compute_mode=args_bounds_check(args, 3, None),
+    )
+
+
 def avg_pool_param_validator(pool_node: Node) -> bool:
     ceil_mode = args_bounds_check(pool_node.args, 4, False)
     divisor_override = args_bounds_check(pool_node.args, 6)
