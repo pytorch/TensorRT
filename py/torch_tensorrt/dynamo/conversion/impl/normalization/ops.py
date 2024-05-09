@@ -489,8 +489,9 @@ def cdist_forward(
     - For x1.shape = [10, 5] (10 vectors, each of 5 features) and x2.shape = [20, 5] (20 vectors, each of 5 features),
       since there are no batch dimensions to match, the output shape is simply [10, 20], comparing all vectors from x1 against all vectors from x2.
 
-    Note: The `compute_mode` parameter is designed to optimize the performance of the Euclidean distance calculation, especially useful when working with large datasets. 
-    This parameter allows you to control how the distances are computed, with different modes available to leverage matrix multiplication for speed improvements.
+    Note: The `compute_mode` parameter is designed to optimize the performance of the Euclidean distance calculation,
+    especially useful when working with large datasets. This parameter allows you to control how the distances are computed,
+    with different modes available to leverage matrix multiplication for speed improvements.
     """
     if compute_mode is None:
         compute_mode = 0
