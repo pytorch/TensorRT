@@ -45,10 +45,7 @@ class TestScatterValueConverter(DispatchTestCase):
 
         input = torch.zeros(3, 5, dtype=torch.int32)
         inputs = [input]
-        self.run_test(
-            TestModule(),
-            inputs,
-        )
+        self.run_test(TestModule(), inputs, int32_reqd=True)
 
     @parameterized.expand(
         [
@@ -78,10 +75,7 @@ class TestScatterValueConverter(DispatchTestCase):
 
         input = torch.zeros(3, 5, dtype=torch.int32)
         inputs = [input, index]
-        self.run_test(
-            TestModule(),
-            inputs,
-        )
+        self.run_test(TestModule(), inputs, int32_reqd=True)
 
 
 class TestScatterSrcConverter(DispatchTestCase):
@@ -113,8 +107,18 @@ class TestScatterSrcConverter(DispatchTestCase):
             ),
             # These are special cases where in the harness.py code might need to be changed to input cuda_inputs
             # In that case below two test cases would also require index and src to be on cuda
-            # ("scatter_one_dim_indexOne_constant_src", 1, torch.tensor([[0, 1, 2, 0]]), torch.tensor([[1, 2, 3, 4]], dtype=torch.int32)),
-            # ("scatter_one_dim_indexTwo_constant_src", 1, torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]), torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32)),
+            (
+                "scatter_one_dim_indexOne_constant_src",
+                1,
+                torch.tensor([[0, 1, 2, 0]]),
+                torch.tensor([[1, 2, 3, 4]], dtype=torch.int32),
+            ),
+            (
+                "scatter_one_dim_indexTwo_constant_src",
+                1,
+                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]),
+                torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32),
+            ),
         ]
     )
     def test_scatter_index_constant(self, _, dim, index, src):
@@ -128,10 +132,7 @@ class TestScatterSrcConverter(DispatchTestCase):
         input = torch.zeros(3, 5, dtype=torch.int32)
         inputs = [input]
         scatter = TestModule()
-        self.run_test(
-            TestModule(),
-            inputs,
-        )
+        self.run_test(TestModule(), inputs, int32_reqd=True)
 
     @parameterized.expand(
         [
@@ -171,10 +172,7 @@ class TestScatterSrcConverter(DispatchTestCase):
 
         input = torch.zeros(3, 5, dtype=torch.int32)
         inputs = [input, index]
-        self.run_test(
-            TestModule(),
-            inputs,
-        )
+        self.run_test(TestModule(), inputs, int32_reqd=True)
 
 
 if __name__ == "__main__":

@@ -226,6 +226,7 @@ class DispatchTestCase(TRTTestCase):
         check_dtype=True,
         use_dynamo_tracer=False,
         enable_passes=False,
+        int32_reqd=False,
     ):
         mod.eval()
         mod = self.generate_graph(
@@ -245,10 +246,19 @@ class DispatchTestCase(TRTTestCase):
 
         num_inputs = len(inputs)
         trt_inputs = inputs
+        dtype_to_change = []
+        if int32_reqd:
+            dtype_to_change = [torch.int64, torch.float64]
+        else:
+            dtype_to_change = [
+                torch.float64,
+            ]
         for num_input in range(num_inputs):
             input = inputs[num_input]
-            if input.dtype is torch.float64:
-                dtype_32bit = torch.float32
+            if input.dtype in dtype_to_change:
+                dtype_32bit = (
+                    torch.float32 if (input.dtype == torch.float64) else torch.int32
+                )
                 # should we modify graph here to insert clone nodes?
                 # ideally not required
                 trt_inputs = (
@@ -360,4 +370,4 @@ class DispatchTestCase(TRTTestCase):
         # Since the lowering is based on optimal shape. We need to test with
         # different shape(for ex. max shape) for testing dynamic shape
         inputs_max = [spec.example_tensor("max_shape") for spec in input_specs]
-        super().run_test(mod, inputs_max, interp, rtol, atol)
+        super().run_test(mod, inputs_max, inputs_max, interp, rtol, atol)

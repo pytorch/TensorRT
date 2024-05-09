@@ -407,6 +407,12 @@ def scatter(
     index_shape = index.shape
     index_shape_list = list(index.shape)
     if not (isinstance(index, TRTTensor)):
+        if isinstance(index, torch.Tensor):
+            if index.dtype == torch.int64:
+                index = index.to(torch.int32)
+        elif isinstance(index, np.ndarray):
+            if index.dtype == np.int64:
+                index = index.astype(np.int32)
         index = get_trt_tensor(ctx, index, f"_index_tensor")
     dim = get_positive_dim(dim, len(input_shape))
     dynamic_shape = has_dynamic_shape(input.shape)
