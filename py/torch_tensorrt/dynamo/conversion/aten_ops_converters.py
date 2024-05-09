@@ -2187,7 +2187,6 @@ def aten_ops_linear(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten._cdist_forward.default)
-@dynamo_tensorrt_converter(torch.ops.aten._cdist_forward)
 def aten_ops_cdist_forward(
     ctx: ConversionContext,
     target: Target,
@@ -2195,7 +2194,7 @@ def aten_ops_cdist_forward(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.linear.cdist_forward(
+    return impl.normalization.cdist_forward(
         ctx,
         target,
         SourceIR.ATEN,
@@ -2203,7 +2202,7 @@ def aten_ops_cdist_forward(
         x1=args[0],
         x2=args[1],
         p=args[2],
-        compute_mode=args_bounds_check(args, 3, None),
+        compute_mode=args[3],
     )
 
 
