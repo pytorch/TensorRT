@@ -13,9 +13,6 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
 from torch_tensorrt.dynamo.conversion._conversion import infer_module_output_dtypes
-from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
-    DYNAMO_CONVERTERS as CONVERTERS,
-)
 from torch_tensorrt.dynamo.lowering import apply_lowering_passes
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 

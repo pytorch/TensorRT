@@ -105,8 +105,6 @@ class TestScatterSrcConverter(DispatchTestCase):
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]),
                 torch.tensor([[1, 2, 3, 1], [5, 6, 5, 5]], dtype=torch.int32),
             ),
-            # These are special cases where in the harness.py code might need to be changed to input cuda_inputs
-            # In that case below two test cases would also require index and src to be on cuda
             (
                 "scatter_one_dim_indexOne_constant_src",
                 1,
