@@ -78,8 +78,8 @@ class TestCdistConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
-            ("p_2_matmul", (150, 100, 50, 50), (150, 100, 30, 50), 2, 1),
-            ("p_2_elementwise_pow", (150, 100, 50, 50), (150, 100, 30, 50), 2, 2),
+            ("p_2_matmul", (50, 40, 30, 30), (50, 40, 35, 30), 2, 1),
+            ("p_2_elementwise_pow", (50, 40, 30, 50), (50, 40, 35, 50), 2, 2),
         ]
     )
     def test_cdist_efficiency_p_2_compute_mode(
