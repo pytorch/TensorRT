@@ -1546,6 +1546,23 @@ def aten_ops_isnan(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.nonzero.default)
+def aten_ops_nonzero(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.nonzero(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.add.Tensor)
 @dynamo_tensorrt_converter(torch.ops.aten.add.Scalar)
 def aten_ops_add(

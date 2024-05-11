@@ -554,3 +554,18 @@ def isnan(
     )
 
     return nan_values_mask
+
+
+def nonzero(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+) -> TRTTensor:
+    layer = ctx.net.add_non_zero(input_val)
+    set_layer_name(layer, target, name, source_ir)
+    # output = layer.get_output(0)
+    # kind: str = str(target.__name__) if callable(target) else target
+    # output.name = output.name + "_" + kind
+    return layer.get_output(0)
