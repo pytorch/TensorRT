@@ -1427,6 +1427,22 @@ def aten_ops_atan2(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.atan2.out)
+def aten_ops_atan2_out(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> TRTTensor:
+    input, other = args[0], args[1]
+    # out = kwargs.get("out"),
+
+    out_return = impl.elementwise.atan2(ctx, target, SourceIR.ATEN, name, input, other)
+
+    return out_return
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.ceil.default)
 def aten_ops_ceil(
     ctx: ConversionContext,
