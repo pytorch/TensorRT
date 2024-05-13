@@ -69,3 +69,8 @@ bazel-tensorrt
 bazel-project
 build/
 wheelhouse/
+*_status.json
+tests/py/dynamo/models/*.ts
+tests/py/dynamo/models/*.ep
+*.deb
+*.tar.xz
