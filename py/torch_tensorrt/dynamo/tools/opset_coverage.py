@@ -206,6 +206,15 @@ def opset_coverage(
     )
 
 
+def get_coverage_status(opset: List[Tuple[str, str]], name: str) -> OpsetCoverage:
+    coverage = opset_coverage(opset)
+    return coverage
+
+
+ATEN_COVERAGE = get_coverage_status(ATEN_OPS, "ATen")
+PRIMS_COVERAGE = get_coverage_status(PRIM_OPS, "prim")
+PY_OVERLOAD_COVERAGE = get_coverage_status(OVERLOADED_PY_OPS, "py_overload")
+
 if __name__ == "__main__":
 
     def find_coverage_status(opset: List[Tuple[str, str]], name: str) -> None:
