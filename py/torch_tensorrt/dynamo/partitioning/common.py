@@ -95,8 +95,9 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
                         input_shape = input_meta.size()
                         torchtrt_inputs.append(get_input(input_shape, input_meta.dtype))
                     elif isinstance(input_meta, torch.SymInt):
+                        # Assuming sym_integers | shape inputs always have torch.int64 dtype
                         torchtrt_inputs.append(
-                            get_input([input_meta], torch.int32, is_shape_tensor=True)
+                            get_input([input_meta], torch.int64, is_shape_tensor=True)
                         )
                     else:
                         raise ValueError(

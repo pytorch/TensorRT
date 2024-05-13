@@ -60,13 +60,13 @@ def aten_ops_arange_start_step(
     if np.any([isinstance(tensor, TRTTensor) for tensor in args]):
         start_rank_0 = get_trt_tensor(ctx, args[0], name + "_start_rank_0", rank=0)
         start_rank_1 = get_trt_tensor(ctx, args[0], name + "_start_rank_1", rank=1)
-        end = get_trt_tensor(ctx, args[1], name + "_end", rank=0)
+        end = get_trt_tensor(ctx, args[1], name + "_end", rank=1)
         if len(args) > 2:
             step = args[2]
         else:
             step = 1
         step = get_trt_tensor(ctx, step, name + "_step", rank=1)
-        # Calculate shape = (end-start) / 1 (in this case)
+        # Calculate shape = (end-start) / step
         shape = sub(
             ctx,
             target,
@@ -75,14 +75,13 @@ def aten_ops_arange_start_step(
             end,
             start_rank_1,
         )
-
-        fill_layer = ctx.net.add_fill(shape.shape, trt.FillOperation.LINSPACE)
+        fill_layer = ctx.net.add_fill(
+            shape.shape, trt.FillOperation.LINSPACE, shape.dtype
+        )
         fill_layer.set_input(0, shape)
         # Set start index
         fill_layer.set_input(1, start_rank_0)
         # Set delta/step
         fill_layer.set_input(2, step)
-        # Set output type to INT32
-        fill_layer.set_output_type(0, trt.DataType.INT32)
         return fill_layer.get_output(0)
     return np.arange(*args)

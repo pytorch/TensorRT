@@ -39,14 +39,14 @@ class TestArangeConverter(DispatchTestCase):
             def forward(self, end_tensor):
                 return torch.ops.aten.arange.start_step(0, end_tensor, 1)
 
-        pyt_input = [7]
+        pyt_input = 7
         inputs = [
             torch_tensorrt.Input(
                 min_shape=(5,),
                 opt_shape=(7,),
                 max_shape=(10,),
-                dtype=torch.int32,
-                torch_tensor=torch.tensor(pyt_input, dtype=torch.int32).cuda(),
+                dtype=torch.int64,
+                torch_tensor=torch.tensor(pyt_input, dtype=torch.int64).cuda(),
                 is_shape_tensor=True,
             )
         ]
@@ -54,7 +54,7 @@ class TestArangeConverter(DispatchTestCase):
             Arange(),
             inputs,
             use_example_tensors=False,
-            pyt_inputs=pyt_input,
+            pyt_inputs=[pyt_input],
         )
 
 

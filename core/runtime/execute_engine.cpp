@@ -142,12 +142,22 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       auto dims = core::util::toDims(inputs[i].sizes());
       auto shape = core::util::toVec(dims);
       LOG_DEBUG("Input Name: " << name << " Shape: " << dims);
-      compiled_engine->exec_ctx->setInputShape(name.c_str(), dims);
-      compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputs[i].view(shape).contiguous().data_ptr());
+      if (compiled_engine->cuda_engine->isShapeInferenceIO(name.c_str())) {
+        compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputs[i].view(shape).contiguous().cpu().data_ptr());
+      } else {
+        compiled_engine->exec_ctx->setInputShape(name.c_str(), dims);
+        compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputs[i].view(shape).contiguous().data_ptr());
+      }
     }
 
-    TORCHTRT_CHECK(
-        compiled_engine->exec_ctx->allInputShapesSpecified(), "Not enough inputs provided (runtime.RunCudaEngine)");
+    // Check if input shapes can be inferred.
+    char const** unInferredInputNames;
+    if (compiled_engine->exec_ctx->inferShapes(inputs.size(), unInferredInputNames)) {
+      LOG_WARNING(
+          "The shapes of the inputs: "
+          << unInferredInputNames
+          << " cannot be inferred and could lead to undefined behavior. This could happen if the input tensor addresses/shapes haven't been configured correctly");
+    }
   }
 
   std::vector<at::Tensor> outputs(compiled_engine->num_io.second);

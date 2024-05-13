@@ -24,7 +24,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
 )
 from torch_tensorrt.fx.observer import Observer
-from torch_tensorrt.logging import TRT_LOGGER
 
 from packaging import version
 
@@ -57,7 +56,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     ):
         super().__init__(module)
 
-        self.logger = TRT_LOGGER
+        self.logger = trt.Logger(trt.Logger.VERBOSE)
         self.builder = trt.Builder(self.logger)
 
         flag = 0
@@ -366,6 +365,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             # TODO: Does not support disjoint optimization profiles?
             assert self.optimization_profiles is not None
             if current_input.is_shape_tensor:
+                # For shape_tensors, min/opt/max_shapes correspond to actual values
+                # of the shapes provided during runtime
                 self.optimization_profiles[0].set_shape_input(
                     target, min_shape, opt_shape, max_shape
                 )
@@ -397,6 +398,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.debug(
             f"Adding input to in-progress INetwork: {target} [shape={shape}, dtype={trt_input_dtype}]"
         )
+
         return self.ctx.net.add_input(
             name=target,
             shape=tuple(shape),
