@@ -8,8 +8,8 @@ from torch._dynamo.utils import detect_fake_mode
 from torch._functorch.aot_autograd import aot_export_joint_simple
 from torch_tensorrt.dynamo import partitioning
 from torch_tensorrt.dynamo.lowering import (
-    apply_lowering_passes,
     get_decompositions,
+    post_lowering,
     repair_input_aliasing,
 )
 
@@ -50,7 +50,7 @@ def fx_dynamo_testing_backend(
             decompositions=get_decompositions(),
         )
 
-        gm = apply_lowering_passes(gm, sample_inputs)
+        gm = post_lowering(gm, sample_inputs)
 
         trt_compiled = custom_backend(
             gm,

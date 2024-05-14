@@ -193,8 +193,8 @@ def test_base_fp8(ir):
     class SimpleNetwork(nn.Module):
         def __init__(self):
             super(SimpleNetwork, self).__init__()
-            self.linear1 = nn.Linear(in_features=10, out_features=5)
-            self.linear2 = nn.Linear(in_features=5, out_features=1)
+            self.linear1 = torch.nn.Linear(in_features=10, out_features=5)
+            self.linear2 = torch.nn.Linear(in_features=5, out_features=1)
 
         def forward(self, x):
             x = self.linear1(x)
