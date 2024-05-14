@@ -202,8 +202,8 @@ def test_base_fp8(ir):
             x = self.linear2(x)
             return x
 
-    import ammo.torch.quantization as atq
-    from ammo.torch.quantization.torch_export import export_torch_mode
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.quantization.utils import export_torch_mode
 
     def calibrate_loop(model):
         """Simple calibration function for testing."""
@@ -212,12 +212,12 @@ def test_base_fp8(ir):
     input_tensor = torch.randn(1, 10).cuda()
     model = SimpleNetwork().eval().cuda()
 
-    with torch.no_grad():
-        quant_cfg = atq.FP8_DEFAULT_CFG
-        atq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
-        # model has FP8 qdq nodes at this point
-        output_pyt = model(input_tensor)
+    quant_cfg = mtq.FP8_DEFAULT_CFG
+    mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
+    # model has FP8 qdq nodes at this point
+    output_pyt = model(input_tensor)
 
+    with torch.no_grad():
         with export_torch_mode():
             exp_program = torch.export.export(model, (input_tensor,))
             trt_model = torch_tensorrt.dynamo.compile(
