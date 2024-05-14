@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
@@ -25,7 +26,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
-import tensorrt as trt
 from packaging import version
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -313,8 +313,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         )
         timing_cache = self._create_timing_cache(builder_config, existing_cache)
 
-        engine = self.builder.build_serialized_network(self.ctx.net, builder_config)
-        assert engine
+        serialized_engine = self.builder.build_serialized_network(
+            self.ctx.net, builder_config
+        )
+        assert serialized_engine
 
         serialized_cache = (
             bytearray(timing_cache.serialize())
@@ -324,10 +326,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
-        _LOGGER.info(f"TRT Engine uses: {engine.nbytes} bytes of Memory")
+        _LOGGER.info(f"TRT Engine uses: {serialized_engine.nbytes} bytes of Memory")
 
         return TRTInterpreterResult(
-            engine, self._input_names, self._output_names, serialized_cache
+            serialized_engine, self._input_names, self._output_names, serialized_cache
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
