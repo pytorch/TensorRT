@@ -1,4 +1,3 @@
-import copy
 import logging
 import time
 import unittest
@@ -256,8 +255,6 @@ class DispatchTestCase(TRTTestCase):
                 dtype_32bit = (
                     torch.float32 if (input.dtype == torch.float64) else torch.int32
                 )
-                # should we modify graph here to insert clone nodes?
-                # ideally not required
                 trt_inputs = (
                     list(trt_inputs[:num_input])
                     + [

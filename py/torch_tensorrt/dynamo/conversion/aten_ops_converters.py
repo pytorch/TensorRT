@@ -691,13 +691,14 @@ def aten_ops_clamp(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.scatter.src)
+@dynamo_tensorrt_converter(torch.ops.aten.scatter.value)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
+        2: (TRTTensor,),
     }
 )
-@dynamo_tensorrt_converter(torch.ops.aten.scatter.src)
-@dynamo_tensorrt_converter(torch.ops.aten.scatter.value)
 def aten_ops_scatter(
     ctx: ConversionContext,
     target: Target,

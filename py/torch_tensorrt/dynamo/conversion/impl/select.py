@@ -21,7 +21,6 @@ from torch_tensorrt.fx.converters.converter_utils import (
     set_layer_name,
 )
 from torch_tensorrt.fx.types import Shape, TRTTensor
-from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -405,26 +404,15 @@ def scatter(
 ) -> TRTTensor:
     input_shape = input.shape
     index_shape = index.shape
-    index_shape_list = list(index.shape)
-    if not (isinstance(index, TRTTensor)):
-        if isinstance(index, torch.Tensor):
-            if index.dtype == torch.int64:
-                index = index.to(torch.int32)
-        elif isinstance(index, np.ndarray):
-            if index.dtype == np.int64:
-                index = index.astype(np.int32)
-        index = get_trt_tensor(ctx, index, f"_index_tensor")
+    index_shape_list = list(index_shape)
+    if index.dtype == trt.int64:
+        index = cast_trt_tensor(ctx, index, trt.int32, name + "_cast_index_tensor")
     dim = get_positive_dim(dim, len(input_shape))
-    dynamic_shape = has_dynamic_shape(input.shape)
-    if dynamic_shape:
-        # Check whether slice target dim is dynamic shape dim
-        assert input.shape[dim] != -1, "Can't scatter on negative shape dimension!"
-
     src_tensor = src
     # scatter.value
     if isinstance(src, int) or isinstance(src, float):
         src_tensor = get_trt_tensor(
-            ctx, src * torch.ones(index_shape_list), name + "_value_tensor"
+            ctx, src * np.ones(index_shape_list), name + "_value_tensor"
         )
         src_tensor = cast_trt_tensor(
             ctx, src_tensor, input.dtype, name + "_cast_value_tensor"
