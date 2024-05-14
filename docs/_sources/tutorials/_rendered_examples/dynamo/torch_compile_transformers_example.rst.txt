@@ -86,7 +86,7 @@ Optional Input Arguments to `torch_tensorrt.compile`
 Compilation with `torch.compile`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 50-68
+.. GENERATED FROM PYTHON SOURCE LINES 50-69
 
 .. code-block:: python
 
@@ -104,22 +104,23 @@ Compilation with `torch.compile`
     optimized_model = torch.compile(
         model,
         backend="torch_tensorrt",
+        dynamic=False,
         options=compilation_kwargs,
     )
     optimized_model(*inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 69-71
+.. GENERATED FROM PYTHON SOURCE LINES 70-72
 
 Equivalently, we could have run the above via the convenience frontend, as so:
 `torch_tensorrt.compile(model, ir="torch_compile", inputs=inputs, **compilation_kwargs)`
 
-.. GENERATED FROM PYTHON SOURCE LINES 73-75
+.. GENERATED FROM PYTHON SOURCE LINES 74-76
 
 Inference
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 75-83
+.. GENERATED FROM PYTHON SOURCE LINES 76-84
 
 .. code-block:: python
 
@@ -132,7 +133,7 @@ Inference
     new_outputs = optimized_model(*new_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 84-92
+.. GENERATED FROM PYTHON SOURCE LINES 85-93
 
 .. code-block:: python
 
@@ -145,12 +146,12 @@ Inference
     new_outputs = optimized_model(*new_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 93-95
+.. GENERATED FROM PYTHON SOURCE LINES 94-96
 
 Cleanup
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 95-99
+.. GENERATED FROM PYTHON SOURCE LINES 96-100
 
 .. code-block:: python
 
@@ -159,7 +160,7 @@ Cleanup
     torch._dynamo.reset()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 100-109
+.. GENERATED FROM PYTHON SOURCE LINES 101-110
 
 Cuda Driver Error Note
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

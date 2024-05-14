@@ -1,0 +1,1432 @@
+
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Using Custom Kernels within TensorRT Engines with Torch-TensorRT &mdash; Torch-TensorRT v2.4.0.dev0+7cf3e46 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!-- <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" /> -->
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/sg_gallery.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/sg_gallery-binder.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/sg_gallery-dataframe.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/sg_gallery-rendered-html.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/collapsible-lists/css/tree_view.css" type="text/css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/css/custom.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="torch_tensorrt" href="../../../py_api/torch_tensorrt.html" />
+    <link rel="prev" title="Torch Compile Stable Diffusion" href="torch_compile_stable_diffusion.html" />
+  <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','');</script>
+    <!-- End Google Tag Manager -->
+  
+
+  
+  <script src="../../../_static/js/modernizr.min.js"></script>
+
+  <!-- Preload the theme fonts -->
+
+<link rel="preload" href="../../../_static/fonts/FreightSans/freight-sans-book.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/FreightSans/freight-sans-medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/IBMPlexMono/IBMPlexMono-Medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/FreightSans/freight-sans-bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/FreightSans/freight-sans-medium-italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/IBMPlexMono/IBMPlexMono-SemiBold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+
+<!-- Preload the katex fonts -->
+
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Math-Italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size1-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size4-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size2-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size3-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Caligraphic-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css" integrity="sha384-vSIIfh2YWi9wW0r9iZe7RJPrKwp6bG+s9QZMoITbCckVJqGCCRhc+ccxNcdpHuYu" crossorigin="anonymous">
+</head>
+
+<div class="container-fluid header-holder tutorials-header" id="header-holder">
+  <div class="container">
+    <div class="header-container">
+      <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+
+      <div class="main-menu">
+        <ul>
+
+          <li class="main-menu-item">
+          <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Learn
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/get-started">
+                  <span class=dropdown-title>Get Started</span>
+                  <p>Run PyTorch locally or get started quickly with one of the supported cloud platforms</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials">
+                  <span class="dropdown-title">Tutorials</span>
+                  <p>Whats new in PyTorch tutorials</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials/beginner/basics/intro.html">
+                  <span class="dropdown-title">Learn the Basics</span>
+                  <p>Familiarize yourself with PyTorch concepts and modules</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials/recipes/recipes_index.html">
+                  <span class="dropdown-title">PyTorch Recipes</span>
+                  <p>Bite-size, ready-to-deploy PyTorch code examples</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials/beginner/introyt.html">
+                  <span class="dropdown-title">Intro to PyTorch - YouTube Series</span>
+                  <p>Master PyTorch basics with our engaging YouTube tutorial series</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+          <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Ecosystem
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem">
+                  <span class="dropdown-title">Tools</span>
+                  <p>Learn about the tools and frameworks in the PyTorch Ecosystem</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/#community-module">
+                  <span class=dropdown-title>Community</span>
+                  <p>Join the PyTorch developer community to contribute, learn, and get your questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://discuss.pytorch.org/" target="_blank">
+                  <span class=dropdown-title>Forums</span>
+                  <p>A place to discuss PyTorch code, issues, install, research</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/resources">
+                  <span class=dropdown-title>Developer Resources</span>
+                  <p>Find resources and get questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2023">
+                  <span class="dropdown-title">Contributor Awards - 2023</span>
+                  <p>Award winners announced at this year's PyTorch Conference</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+          <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Edge
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/edge">
+                  <span class="dropdown-title">About PyTorch Edge</span>
+                  <p>Build innovative and privacy-aware AI experiences for edge devices</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch-overview">
+                  <span class="dropdown-title">ExecuTorch</span>
+                  <p>End-to-end solution for enabling on-device inference capabilities across mobile and edge devices</p>
+                </a>
+              </div>
+            </div>  
+          </li>
+
+          <li class="main-menu-item">
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Docs
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/docs/stable/index.html">
+                  <span class="dropdown-title">PyTorch</span>
+                  <p>Explore the documentation for comprehensive guidance on how to use PyTorch</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/pytorch-domains">
+                  <span class="dropdown-title">PyTorch Domains</span>
+                  <p>Read the PyTorch Domains documentation to learn more about domain-specific libraries</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Blogs & News 
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/blog/">
+                  <span class="dropdown-title">PyTorch Blog</span>
+                  <p>Catch up on the latest technical news and happenings</p>
+                </a>
+                 <a class="nav-dropdown-item" href="https://pytorch.org/community-blog">
+                  <span class="dropdown-title">Community Blog</span>
+                  <p>Stories from the PyTorch ecosystem</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/videos">
+                  <span class="dropdown-title">Videos</span>
+                  <p>Learn about the latest PyTorch tutorials, new, and more </p>
+                <a class="nav-dropdown-item" href="https://pytorch.org/community-stories">
+                  <span class="dropdown-title">Community Stories</span>
+                  <p>Learn how our community solves real, everyday machine learning problems with PyTorch</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/events">
+                  <span class="dropdown-title">Events</span>
+                  <p>Find events, webinars, and podcasts</p>
+                </a>
+            </div>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                About
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/foundation">
+                  <span class="dropdown-title">PyTorch Foundation</span>
+                  <p>Learn more about the PyTorch Foundation</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/governing-board">
+                  <span class="dropdown-title">Governing Board</span>
+                  <p></p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li class="main-menu-item">
+            <div class="no-dropdown">
+              <a href="https://pytorch.org/join" data-cta="join">
+                Become a Member
+              </a>
+            </div>
+          </li>
+          <li>
+           <div class="main-menu-item">
+             <a href="https://github.com/pytorch/pytorch" class="github-icon">
+             </a>
+           </div>
+          </li>
+          <!--- TODO: This block adds the search icon to the nav bar. We will enable it later. 
+          <li>
+            <div class="main-menu-item">
+             <a href="https://github.com/pytorch/pytorch" class="search-icon">
+             </a>
+            </div>
+          </li>
+          --->
+        </ul>
+      </div>
+
+      <a class="main-menu-open-button" href="#" data-behavior="open-mobile-menu"></a>
+    </div>
+  </div>
+</div>
+
+<body class="pytorch-body">
+
+   
+
+    
+
+    <div class="table-of-contents-link-wrapper">
+      <span>Table of Contents</span>
+      <a href="#" class="toggle-table-of-contents" data-behavior="toggle-table-of-contents"></a>
+    </div>
+
+    <nav data-toggle="wy-nav-shift" class="pytorch-left-menu" id="pytorch-left-menu">
+      <div class="pytorch-side-scroll">
+        <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          <div class="pytorch-left-menu-search">
+            
+
+            
+              
+              
+                <div class="version">
+                  v2.4.0.dev0+7cf3e46
+                </div>
+              
+            
+
+            
+
+
+  
+
+
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search Docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+            
+          </div>
+
+          
+            
+            
+              
+            
+            
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/getting_started_with_windows.html#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../dynamo/torch_compile.html">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../dynamo/dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">TorchScript Frontend</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../ts/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ts/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ts/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ts/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ts/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">FX Frontend</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../fx/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/using_dla.html">DLA</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notebooks.html">Example notebooks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#wrapping-custom-kernels-to-use-in-tensorrt">Wrapping Custom Kernels to use in TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#using-torch-tensorrt-to-insert-the-kernel">Using Torch-TensorRT to Insert the Kernel</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/logging.html">torch_tensorrt.logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/ptq.html">torch_tensorrt.ptq</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/dynamo.html">torch_tensorrt.dynamo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/fx.html">torch_tensorrt.fx</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../cli/torchtrtc.html">torchtrtc</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/system_overview.html">System Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/dynamo_converters.html">Writing Dynamo Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/ts_converters.html">Writing TorchScript Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Indices</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <div class="pytorch-container">
+      <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
+        <div class="pytorch-breadcrumbs-wrapper">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="pytorch-breadcrumbs">
+    
+      <li>
+        <a href="../../../index.html">
+          
+            Docs
+          
+        </a> &gt;
+      </li>
+
+        
+      <li>Using Custom Kernels within TensorRT Engines with Torch-TensorRT</li>
+    
+    
+      <li class="pytorch-breadcrumbs-aside">
+        
+            
+            <a href="../../../_sources/tutorials/_rendered_examples/dynamo/custom_kernel_plugins.rst.txt" rel="nofollow"><img src="../../../_static/images/view-page-source-icon.svg"></a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+</div>
+        </div>
+
+        <div class="pytorch-shortcuts-wrapper" id="pytorch-shortcuts-wrapper">
+          Shortcuts
+        </div>
+      </div>
+
+      <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
+        <div class="pytorch-content-left">
+
+        
+          <!-- Google Tag Manager (noscript) -->
+          <noscript><iframe src="https://www.googletagmanager.com/ns.html?id="
+          height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+          <!-- End Google Tag Manager (noscript) -->
+          
+          <div class="rst-content">
+          
+            <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
+             <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
+              
+  <div class="sphx-glr-download-link-note admonition note">
+<p class="admonition-title">Note</p>
+<p><a class="reference internal" href="#sphx-glr-download-tutorials-rendered-examples-dynamo-custom-kernel-plugins-py"><span class="std std-ref">Go to the end</span></a>
+to download the full example code</p>
+</div>
+<section class="sphx-glr-example-title" id="using-custom-kernels-within-tensorrt-engines-with-torch-tensorrt">
+<span id="custom-kernel-plugins"></span><span id="sphx-glr-tutorials-rendered-examples-dynamo-custom-kernel-plugins-py"></span><h1>Using Custom Kernels within TensorRT Engines with Torch-TensorRT<a class="headerlink" href="#using-custom-kernels-within-tensorrt-engines-with-torch-tensorrt" title="Permalink to this heading">¶</a></h1>
+<p>We are going to demonstrate how a developer could include a custom kernel in a TensorRT engine using Torch-TensorRT</p>
+<p>Torch-TensorRT supports falling back to PyTorch implementations of operations in the case that Torch-TensorRT
+does not know how to compile them in TensorRT. However, this comes at the cost of a graph break and will reduce the performance of the model.
+The easiest way to fix lack of support for ops is by adding a decomposition (see:
+<a class="reference external" href="https://pytorch.org/TensorRT/contributors/writing_dynamo_aten_lowering_passes.html">Writing lowering passes for the Dynamo frontend</a>) - which defines the operator
+in terms of PyTorch ops that are supported in Torch-TensorRT or a converter (see:
+<a class="reference external" href="https://pytorch.org/TensorRT/contributors/dynamo_converters.html">Writing converters for the Dynamo frontend</a>) - which defines the operator in terms of TensorRT operators.</p>
+<p>In some cases there isnt a great way to do either of these, perhaps because the operator is a custom kernel that is not part of standard PyTorch or
+TensorRT cannot support it natively.</p>
+<p>For these cases, it is possible to use a TensorRT plugin to replace the operator <strong>inside</strong> the TensorRT engine, thereby avoiding
+the performance and resource overhead from a graph break.
+For the sake of demonstration, consider the operation circular padding. Circular padding is useful for ops like circular convolution in deep learning.
+The following image denotes how the original image (red) is circular padded once (green) and twice (blue):</p>
+<a class="reference internal image-reference" href="../../../_images/circ_pad_example.png"><img alt="../../../_images/circ_pad_example.png" class="align-right" src="../../../_images/circ_pad_example.png" style="width: 256.0px; height: 256.0px;" /></a>
+<section id="writing-custom-operators-in-pytorch">
+<h2>Writing Custom Operators in PyTorch<a class="headerlink" href="#writing-custom-operators-in-pytorch" title="Permalink to this heading">¶</a></h2>
+<p>Assume for whatever reason we would like to use a custom implementation of circular padding. In this case as implemented using a kernel written in <a class="reference external" href="https://openai.com/index/triton">OpenAI Triton</a></p>
+<p>When using custom kernels with PyTorch, it is recommended to take the additional step of registering them as formal operators in PyTorch. This will both make it easier to handle
+the operation in Torch-TensorRT and simplify its use in PyTorch. This could either be done as part of a C++ library or in Python. (see: <a class="reference external" href="https://pytorch.org/tutorials/advanced/torch_script_custom_ops.html">Custom ops in C++</a> and <a class="reference external" href="https://pytorch.org/docs/stable/library.html">Python custom ops</a> for more details )</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Sequence</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">triton</span>
+<span class="kn">import</span> <span class="nn">triton.language</span> <span class="k">as</span> <span class="nn">tl</span>
+<span class="kn">from</span> <span class="nn">torch.library</span> <span class="kn">import</span> <span class="n">custom_op</span>
+
+
+<span class="c1"># Defining the kernel to be run on the GPU</span>
+<span class="nd">@triton</span><span class="o">.</span><span class="n">jit</span>  <span class="c1"># type: ignore</span>
+<span class="k">def</span> <span class="nf">circ_pad_kernel</span><span class="p">(</span>
+    <span class="n">X</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">all_pads_0</span><span class="p">:</span> <span class="n">tl</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="n">all_pads_2</span><span class="p">:</span> <span class="n">tl</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="n">all_pads_4</span><span class="p">:</span> <span class="n">tl</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="n">all_pads_6</span><span class="p">:</span> <span class="n">tl</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="n">orig_dims_0</span><span class="p">:</span> <span class="n">tl</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="n">orig_dims_1</span><span class="p">:</span> <span class="n">tl</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="n">orig_dims_2</span><span class="p">:</span> <span class="n">tl</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="n">orig_dims_3</span><span class="p">:</span> <span class="n">tl</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="n">Y</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">Y_shape_1</span><span class="p">:</span> <span class="n">tl</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="n">Y_shape_2</span><span class="p">:</span> <span class="n">tl</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="n">Y_shape_3</span><span class="p">:</span> <span class="n">tl</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="n">X_len</span><span class="p">:</span> <span class="n">tl</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="n">Y_len</span><span class="p">:</span> <span class="n">tl</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+    <span class="n">BLOCK_SIZE</span><span class="p">:</span> <span class="n">tl</span><span class="o">.</span><span class="n">constexpr</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">pid</span> <span class="o">=</span> <span class="n">tl</span><span class="o">.</span><span class="n">program_id</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="n">pid</span> <span class="o">*</span> <span class="n">BLOCK_SIZE</span> <span class="o">+</span> <span class="n">tl</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">BLOCK_SIZE</span><span class="p">)</span>
+
+    <span class="n">mask_y</span> <span class="o">=</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">Y_len</span>
+
+    <span class="n">i3</span> <span class="o">=</span> <span class="n">i</span> <span class="o">%</span> <span class="n">Y_shape_3</span>
+    <span class="n">i2</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span> <span class="o">//</span> <span class="n">Y_shape_3</span><span class="p">)</span> <span class="o">%</span> <span class="n">Y_shape_2</span>
+    <span class="n">i1</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span> <span class="o">//</span> <span class="n">Y_shape_3</span> <span class="o">//</span> <span class="n">Y_shape_2</span><span class="p">)</span> <span class="o">%</span> <span class="n">Y_shape_1</span>
+    <span class="n">i0</span> <span class="o">=</span> <span class="n">i</span> <span class="o">//</span> <span class="n">Y_shape_3</span> <span class="o">//</span> <span class="n">Y_shape_2</span> <span class="o">//</span> <span class="n">Y_shape_1</span>
+
+    <span class="n">j0</span> <span class="o">=</span> <span class="p">(</span><span class="n">i0</span> <span class="o">-</span> <span class="n">all_pads_0</span> <span class="o">+</span> <span class="n">orig_dims_0</span><span class="p">)</span> <span class="o">%</span> <span class="n">orig_dims_0</span>
+    <span class="n">j1</span> <span class="o">=</span> <span class="p">(</span><span class="n">i1</span> <span class="o">-</span> <span class="n">all_pads_2</span> <span class="o">+</span> <span class="n">orig_dims_1</span><span class="p">)</span> <span class="o">%</span> <span class="n">orig_dims_1</span>
+    <span class="n">j2</span> <span class="o">=</span> <span class="p">(</span><span class="n">i2</span> <span class="o">-</span> <span class="n">all_pads_4</span> <span class="o">+</span> <span class="n">orig_dims_2</span><span class="p">)</span> <span class="o">%</span> <span class="n">orig_dims_2</span>
+    <span class="n">j3</span> <span class="o">=</span> <span class="p">(</span><span class="n">i3</span> <span class="o">-</span> <span class="n">all_pads_6</span> <span class="o">+</span> <span class="n">orig_dims_3</span><span class="p">)</span> <span class="o">%</span> <span class="n">orig_dims_3</span>
+
+    <span class="n">load_idx</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">orig_dims_3</span> <span class="o">*</span> <span class="n">orig_dims_2</span> <span class="o">*</span> <span class="n">orig_dims_1</span> <span class="o">*</span> <span class="n">j0</span>
+        <span class="o">+</span> <span class="n">orig_dims_3</span> <span class="o">*</span> <span class="n">orig_dims_2</span> <span class="o">*</span> <span class="n">j1</span>
+        <span class="o">+</span> <span class="n">orig_dims_3</span> <span class="o">*</span> <span class="n">j2</span>
+        <span class="o">+</span> <span class="n">j3</span>
+    <span class="p">)</span>
+    <span class="n">mask_x</span> <span class="o">=</span> <span class="n">load_idx</span> <span class="o">&lt;</span> <span class="n">X_len</span>
+
+    <span class="n">x</span> <span class="o">=</span> <span class="n">tl</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">X</span> <span class="o">+</span> <span class="n">load_idx</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="n">mask_x</span><span class="p">)</span>
+
+    <span class="n">tl</span><span class="o">.</span><span class="n">store</span><span class="p">(</span><span class="n">Y</span> <span class="o">+</span> <span class="n">i</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="n">mask_y</span><span class="p">)</span>
+
+
+<span class="c1"># The launch code wrapped to expose it as a custom operator in our namespace</span>
+<span class="nd">@custom_op</span><span class="p">(</span><span class="s2">&quot;torchtrt_ex::triton_circular_pad&quot;</span><span class="p">,</span> <span class="n">mutates_args</span><span class="o">=</span><span class="p">())</span>  <span class="c1"># type: ignore[misc]</span>
+<span class="k">def</span> <span class="nf">triton_circular_pad</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">padding</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+    <span class="n">out_dims</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">padding</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span><span class="p">):</span>
+        <span class="n">out_dims</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">out_dims</span><span class="p">)</span> <span class="o">-</span> <span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">out_dims</span><span class="p">)</span> <span class="o">-</span> <span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">padding</span><span class="p">[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="n">padding</span><span class="p">[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="p">)</span>
+
+    <span class="n">y</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">out_dims</span><span class="o">.</span><span class="n">tolist</span><span class="p">()),</span> <span class="n">device</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="n">N</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+    <span class="n">all_pads</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">N</span> <span class="o">*</span> <span class="mi">2</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+    <span class="n">orig_dims</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+    <span class="n">out_dims</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">padding</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span><span class="p">):</span>
+        <span class="n">out_dims</span><span class="p">[</span><span class="n">N</span> <span class="o">-</span> <span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">padding</span><span class="p">[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="n">padding</span><span class="p">[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">all_pads</span><span class="p">[</span><span class="n">N</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">i</span> <span class="o">-</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">padding</span><span class="p">[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2</span><span class="p">]</span>
+        <span class="n">all_pads</span><span class="p">[</span><span class="n">N</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">padding</span><span class="p">[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">blockSize</span> <span class="o">=</span> <span class="mi">256</span>
+    <span class="n">numBlocks</span> <span class="o">=</span> <span class="p">(</span><span class="nb">int</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">out_dims</span><span class="p">)</span> <span class="o">+</span> <span class="n">blockSize</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="n">blockSize</span><span class="p">),)</span>
+
+    <span class="n">circ_pad_kernel</span><span class="p">[</span><span class="n">numBlocks</span><span class="p">](</span>
+        <span class="n">x</span><span class="p">,</span>
+        <span class="n">all_pads</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">all_pads</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+        <span class="n">all_pads</span><span class="p">[</span><span class="mi">4</span><span class="p">],</span>
+        <span class="n">all_pads</span><span class="p">[</span><span class="mi">6</span><span class="p">],</span>
+        <span class="n">orig_dims</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">orig_dims</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+        <span class="n">orig_dims</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+        <span class="n">orig_dims</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span>
+        <span class="n">y</span><span class="p">,</span>
+        <span class="n">out_dims</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+        <span class="n">out_dims</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+        <span class="n">out_dims</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">orig_dims</span><span class="p">)),</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">out_dims</span><span class="p">)),</span>
+        <span class="n">BLOCK_SIZE</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">y</span>
+</pre></div>
+</div>
+<p>Above is all that is required to create a custom operator for PyTorch. We can now call it directly as <code class="docutils literal notranslate"><span class="pre">torch.ops.torchtrt_ex.triton_circular_pad</span></code></p>
+<section id="testing-our-custom-op">
+<h3>Testing our custom op<a class="headerlink" href="#testing-our-custom-op" title="Permalink to this heading">¶</a></h3>
+<p>The native PyTorch implementation</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">ex_input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+<span class="n">padding</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">ex_input</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="s2">&quot;circular&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tensor([[[[5., 3., 4., 5., 3.],
+          [8., 6., 7., 8., 6.],
+          [2., 0., 1., 2., 0.],
+          [5., 3., 4., 5., 3.],
+          [8., 6., 7., 8., 6.]]]], device=&#39;cuda:0&#39;)
+</pre></div>
+</div>
+<p>Our custom implementation</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">torchtrt_ex</span><span class="o">.</span><span class="n">triton_circular_pad</span><span class="p">(</span><span class="n">ex_input</span><span class="p">,</span> <span class="n">padding</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tensor([[[[5., 3., 4., 5., 3.],
+          [8., 6., 7., 8., 6.],
+          [2., 0., 1., 2., 0.],
+          [5., 3., 4., 5., 3.],
+          [8., 6., 7., 8., 6.]]]], device=&#39;cuda:0&#39;)
+</pre></div>
+</div>
+<p>We have defined the minimum to start using our custom op in PyTorch, but to take the extra step of making this operator tracable by Dynamo (a prerequisite for being supported in Torch-TensorRT),
+we need to define a “Fake Tensor” implementation of the op. This function defines the effect that our kernel would have on input tensors in terms of native PyTorch ops.
+It allows Dynamo to calculate tensor properties like sizes, stride, device etc. without needing to use real data (More information <a class="reference external" href="https://pytorch.org/docs/main/library.html#torch.library.register_fake">here</a>).
+In our case we can just use the native circular pad operation as our FakeTensor implementation.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@torch</span><span class="o">.</span><span class="n">library</span><span class="o">.</span><span class="n">register_fake</span><span class="p">(</span><span class="s2">&quot;torchtrt_ex::triton_circular_pad&quot;</span><span class="p">)</span>  <span class="c1"># type: ignore[misc]</span>
+<span class="k">def</span> <span class="nf">_</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">padding</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="s2">&quot;circular&quot;</span><span class="p">)</span>
+
+
+<span class="c1"># Additionally one may want to define an autograd implementation for the backwards pass to round out the custom op implmentation but that is beyond the scope of this tutorial (see https://pytorch.org/docs/main/library.html#torch.library.register_autograd for more)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="using-the-custom-operator-in-a-model">
+<h2>Using the Custom Operator in a Model<a class="headerlink" href="#using-the-custom-operator-in-a-model" title="Permalink to this heading">¶</a></h2>
+<p>We can now create models using our custom op. Here is a small example one that uses both natively supported operators (Convolution) and our custom op.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Sequence</span>
+
+<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">nn</span>
+
+
+<span class="k">class</span> <span class="nc">MyModel</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>  <span class="c1"># type: ignore[misc]</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">padding</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">padding</span> <span class="o">=</span> <span class="n">padding</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+        <span class="n">padded_x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">torchtrt_ex</span><span class="o">.</span><span class="n">triton_circular_pad</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">padding</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">padded_x</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">y</span>
+
+
+<span class="n">my_model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+<span class="n">my_model</span><span class="p">(</span><span class="n">ex_input</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tensor([[[[-0.2604, -0.4232, -0.3041],
+          [-3.0833, -3.2461, -3.1270],
+          [-0.2450, -0.4079, -0.2887]],
+
+         [[ 0.2828, -0.0373,  1.0332],
+          [-2.3143, -2.6344, -1.5638],
+          [-1.1867, -1.5068, -0.4363]],
+
+         [[ 1.7937,  1.3488,  2.1350],
+          [ 0.7966,  0.3517,  1.1379],
+          [ 3.5537,  3.1088,  3.8950]],
+
+         [[-1.0550, -0.6163, -1.0109],
+          [ 0.5245,  0.9632,  0.5686],
+          [ 0.3775,  0.8162,  0.4216]],
+
+         [[-0.4311, -0.1649, -1.2091],
+          [-4.3668, -4.1006, -5.1447],
+          [-5.0352, -4.7689, -5.8131]]]], device=&#39;cuda:0&#39;)
+</pre></div>
+</div>
+<p>If we try to compile this model with Torch-TensorRT, we can see that (as of Torch-TensorRT 2.4.0) a number of subgraphs are created to run the custom op in PyTorch and the convolution in TensorRT</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch_tensorrt</span> <span class="k">as</span> <span class="nn">torchtrt</span>
+
+<span class="n">torchtrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">my_model</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">ex_input</span><span class="p">],</span>
+    <span class="n">dryrun</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># Check the support of the model without having to build the engines</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>GraphModule(
+    (_run_on_gpu_0): GraphModule()
+    (_run_on_acc_1): GraphModule(
+        (conv): Module()
+    )
+)
+
+++++++++++++++ Dry-Run Results for Graph +++++++++++++++++
+
+The graph consists of 2 Total Operators, of which 1 operators are supported, 50.0% coverage
+
+The following ops are currently unsupported or excluded from conversion, and are listed with their op-count in the graph:
+ torch.ops.torchtrt_ex.triton_circular_pad.default: 1
+
+The following nodes are currently set to run in Torch:
+Node: torch.ops.torchtrt_ex.triton_circular_pad.default, with layer location: __/triton_circular_pad
+Note: Some of the above nodes may be supported, but were not included in a TRT graph by the partitioner
+
+Compiled with: CompilationSettings(enabled_precisions={&lt;dtype.f32: 7&gt;}, debug=False, workspace_size=0, min_block_size=1, torch_executed_ops=set(), pass_through_build_failures=False, max_aux_streams=None, version_compatible=False, optimization_level=None, use_python_runtime=False, truncate_double=False, use_fast_partitioner=True, enable_experimental_decompositions=False, device=Device(type=DeviceType.GPU, gpu_id=0), require_full_compilation=False, disable_tf32=False, sparse_weights=False, refit=False, engine_capability=&lt;EngineCapability.STANDARD: 1&gt;, num_avg_timing_iters=1, dla_sram_size=1048576, dla_local_dram_size=1073741824, dla_global_dram_size=536870912, dryrun=True, hardware_compatible=False)
+
+  Graph Structure:
+
+   Inputs: List[Tensor: (1, 1, 3, 3)@float32]
+    ...
+    TRT Engine #1 - Submodule name: _run_on_acc_1
+     Engine Inputs: List[Tensor: (1, 1, 5, 5)@float32]
+     Number of Operators in Engine: 1
+     Engine Outputs: Tensor: (1, 5, 3, 3)@float32
+    ...
+   Outputs: List[Tensor: (1, 5, 3, 3)@float32]
+
+  --------- Aggregate Stats ---------
+
+   Average Number of Operators per TRT Engine: 1.0
+   Most Operators in a TRT Engine: 1
+
+  ********** Recommendations **********
+
+   - For minimal graph segmentation, select min_block_size=1 which would generate 1 TRT engine(s)
+   - The current level of graph segmentation is equivalent to selecting min_block_size=1 which generates 1 TRT engine(s)
+</pre></div>
+</div>
+<p>We see that there is going to be 2 subgraphs, one that will run through PyTorch for our custom op and one through TensorRT for the convolution. This graph break is going to be a significant portion of the latency of this model.</p>
+</section>
+</section>
+<section id="wrapping-custom-kernels-to-use-in-tensorrt">
+<h1>Wrapping Custom Kernels to use in TensorRT<a class="headerlink" href="#wrapping-custom-kernels-to-use-in-tensorrt" title="Permalink to this heading">¶</a></h1>
+<p>To address this graph break, the first step is to make our kernel implementation available in TensorRT. Again this can be done in either C++ or Python. For the actual details on how to implement
+TensorRT plugins refer <a class="reference external" href="https://github.com/NVIDIA/TensorRT/tree/release/10.0/samples/python/python_plugin">here</a>. From a high level, similar to PyTorch you will need to
+define systems to handle setting up the operator, calculating the effect of the operation abstractly, serializing the op and the actual mechanics of calling the implementation of the op in the engine.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pickle</span> <span class="k">as</span> <span class="nn">pkl</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Self</span>
+
+<span class="kn">import</span> <span class="nn">cupy</span> <span class="k">as</span> <span class="nn">cp</span>  <span class="c1"># Needed to work around API gaps in PyTorch to build torch.Tensors around preallocated CUDA memory</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
+
+
+<span class="k">class</span> <span class="nc">CircularPaddingPlugin</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">IPluginV2DynamicExt</span><span class="p">):</span>  <span class="c1"># type: ignore[misc]</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">field_collection</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">PluginFieldCollection</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pads</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">X_shape</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_outputs</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plugin_namespace</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plugin_type</span> <span class="o">=</span> <span class="s2">&quot;CircularPaddingPlugin&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plugin_version</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
+
+        <span class="k">if</span> <span class="n">field_collection</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">field_collection</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;pads&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pads</span> <span class="o">=</span> <span class="n">field_collection</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">data</span>
+
+    <span class="k">def</span> <span class="nf">get_output_datatype</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">input_types</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">input_types</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">get_output_dimensions</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">output_index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">inputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DimsExprs</span><span class="p">],</span>
+        <span class="n">exprBuilder</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">IExprBuilder</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">trt</span><span class="o">.</span><span class="n">DimsExprs</span><span class="p">:</span>
+
+        <span class="n">output_dims</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">DimsExprs</span><span class="p">(</span><span class="n">inputs</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pads</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span><span class="p">):</span>
+            <span class="n">output_dims</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">output_dims</span><span class="p">)</span> <span class="o">-</span> <span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">exprBuilder</span><span class="o">.</span><span class="n">operation</span><span class="p">(</span>
+                <span class="n">trt</span><span class="o">.</span><span class="n">DimensionOperation</span><span class="o">.</span><span class="n">SUM</span><span class="p">,</span>
+                <span class="n">inputs</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="nb">len</span><span class="p">(</span><span class="n">output_dims</span><span class="p">)</span> <span class="o">-</span> <span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">],</span>
+                <span class="n">exprBuilder</span><span class="o">.</span><span class="n">constant</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pads</span><span class="p">[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">pads</span><span class="p">[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]),</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">output_dims</span>
+
+    <span class="k">def</span> <span class="nf">configure_plugin</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">inp</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DynamicPluginTensorDesc</span><span class="p">],</span>
+        <span class="n">out</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DynamicPluginTensorDesc</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">X_dims</span> <span class="o">=</span> <span class="n">inp</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">desc</span><span class="o">.</span><span class="n">dims</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">X_shape</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">X_dims</span><span class="p">),))</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">X_dims</span><span class="p">)):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">X_shape</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">X_dims</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">serialize</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">pkl</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;pads&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">pads</span><span class="p">})</span>
+
+    <span class="k">def</span> <span class="nf">supports_format_combination</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">in_out</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">PluginTensorDesc</span><span class="p">],</span> <span class="n">num_inputs</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">num_inputs</span> <span class="o">==</span> <span class="mi">1</span>
+        <span class="k">assert</span> <span class="n">pos</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">in_out</span><span class="p">)</span>
+
+        <span class="n">desc</span> <span class="o">=</span> <span class="n">in_out</span><span class="p">[</span><span class="n">pos</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">desc</span><span class="o">.</span><span class="n">format</span> <span class="o">!=</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">LINEAR</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="c1"># first input should be float16 or float32</span>
+        <span class="k">if</span> <span class="n">pos</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">desc</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FLOAT</span><span class="p">)</span> <span class="ow">or</span> <span class="n">desc</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">HALF</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="c1"># output should have the same type as the input</span>
+        <span class="k">if</span> <span class="n">pos</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">bool</span><span class="p">((</span><span class="n">in_out</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">desc</span><span class="o">.</span><span class="n">type</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">enqueue</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">input_desc</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">PluginTensorDesc</span><span class="p">],</span>
+        <span class="n">output_desc</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">PluginTensorDesc</span><span class="p">],</span>
+        <span class="n">inputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+        <span class="n">outputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+        <span class="n">workspace</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">stream</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+
+        <span class="c1"># Host code is slightly different as this will be run as part of the TRT execution</span>
+        <span class="n">in_dtype</span> <span class="o">=</span> <span class="n">torchtrt</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">input_desc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">type</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+
+        <span class="n">a_mem</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">UnownedMemory</span><span class="p">(</span>
+            <span class="n">inputs</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">input_desc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dims</span><span class="p">)</span> <span class="o">*</span> <span class="n">cp</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="n">in_dtype</span><span class="p">)</span><span class="o">.</span><span class="n">itemsize</span><span class="p">,</span> <span class="bp">self</span>
+        <span class="p">)</span>
+        <span class="n">c_mem</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">UnownedMemory</span><span class="p">(</span>
+            <span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">output_desc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dims</span><span class="p">)</span> <span class="o">*</span> <span class="n">cp</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="n">in_dtype</span><span class="p">)</span><span class="o">.</span><span class="n">itemsize</span><span class="p">,</span>
+            <span class="bp">self</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">a_ptr</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">MemoryPointer</span><span class="p">(</span><span class="n">a_mem</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">c_ptr</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">MemoryPointer</span><span class="p">(</span><span class="n">c_mem</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="n">a_d</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">input_desc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dims</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">in_dtype</span><span class="p">,</span> <span class="n">memptr</span><span class="o">=</span><span class="n">a_ptr</span><span class="p">)</span>
+        <span class="n">c_d</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">output_desc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dims</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">in_dtype</span><span class="p">,</span> <span class="n">memptr</span><span class="o">=</span><span class="n">c_ptr</span><span class="p">)</span>
+
+        <span class="n">a_t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">a_d</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+        <span class="n">c_t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">c_d</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+
+        <span class="n">N</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_shape</span><span class="p">)</span>
+        <span class="n">all_pads</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">N</span> <span class="o">*</span> <span class="mi">2</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+        <span class="n">orig_dims</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+        <span class="n">out_dims</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pads</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span><span class="p">):</span>
+            <span class="n">out_dims</span><span class="p">[</span><span class="n">N</span> <span class="o">-</span> <span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pads</span><span class="p">[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">pads</span><span class="p">[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+            <span class="n">all_pads</span><span class="p">[</span><span class="n">N</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">i</span> <span class="o">-</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pads</span><span class="p">[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2</span><span class="p">]</span>
+            <span class="n">all_pads</span><span class="p">[</span><span class="n">N</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pads</span><span class="p">[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+
+        <span class="n">all_pads</span> <span class="o">=</span> <span class="n">all_pads</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+        <span class="n">orig_dims</span> <span class="o">=</span> <span class="n">orig_dims</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+        <span class="n">out_dims</span> <span class="o">=</span> <span class="n">out_dims</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+
+        <span class="n">blockSize</span> <span class="o">=</span> <span class="mi">256</span>
+        <span class="n">numBlocks</span> <span class="o">=</span> <span class="p">(</span><span class="nb">int</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">out_dims</span><span class="p">)</span> <span class="o">+</span> <span class="n">blockSize</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="n">blockSize</span><span class="p">),)</span>
+
+        <span class="c1"># Call the same kernel implementation we use in PyTorch</span>
+        <span class="n">circ_pad_kernel</span><span class="p">[</span><span class="n">numBlocks</span><span class="p">](</span>
+            <span class="n">a_t</span><span class="p">,</span>
+            <span class="n">all_pads</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">all_pads</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+            <span class="n">all_pads</span><span class="p">[</span><span class="mi">4</span><span class="p">],</span>
+            <span class="n">all_pads</span><span class="p">[</span><span class="mi">6</span><span class="p">],</span>
+            <span class="n">orig_dims</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">orig_dims</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+            <span class="n">orig_dims</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+            <span class="n">orig_dims</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span>
+            <span class="n">c_t</span><span class="p">,</span>
+            <span class="n">out_dims</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+            <span class="n">out_dims</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+            <span class="n">out_dims</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">orig_dims</span><span class="p">)),</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">out_dims</span><span class="p">)),</span>
+            <span class="n">BLOCK_SIZE</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">clone</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+        <span class="n">cloned_plugin</span> <span class="o">=</span> <span class="n">CircularPaddingPlugin</span><span class="p">()</span>
+        <span class="n">cloned_plugin</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cloned_plugin</span>
+
+
+<span class="k">class</span> <span class="nc">CircularPaddingPluginCreator</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">IPluginCreator</span><span class="p">):</span>  <span class="c1"># type: ignore[misc]</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;CircularPaddingPlugin&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plugin_namespace</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plugin_version</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field_names</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">PluginFieldCollection</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">PluginField</span><span class="p">(</span><span class="s2">&quot;pads&quot;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([]),</span> <span class="n">trt</span><span class="o">.</span><span class="n">PluginFieldType</span><span class="o">.</span><span class="n">INT32</span><span class="p">)]</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">create_plugin</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">field_collection</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">PluginFieldCollection_</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CircularPaddingPlugin</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">CircularPaddingPlugin</span><span class="p">(</span><span class="n">field_collection</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">deserialize_plugin</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CircularPaddingPlugin</span><span class="p">:</span>
+        <span class="n">pads_dict</span> <span class="o">=</span> <span class="n">pkl</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">pads_dict</span><span class="p">)</span>
+        <span class="n">deserialized</span> <span class="o">=</span> <span class="n">CircularPaddingPlugin</span><span class="p">()</span>
+        <span class="n">deserialized</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">pads_dict</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">deserialized</span><span class="o">.</span><span class="n">pads</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">deserialized</span>
+
+
+<span class="c1"># Register the plugin creator in the TensorRT Plugin Registry</span>
+<span class="n">TRT_PLUGIN_REGISTRY</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">get_plugin_registry</span><span class="p">()</span>
+<span class="n">TRT_PLUGIN_REGISTRY</span><span class="o">.</span><span class="n">register_creator</span><span class="p">(</span><span class="n">CircularPaddingPluginCreator</span><span class="p">(),</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>  <span class="c1"># type: ignore[no-untyped-call]</span>
+</pre></div>
+</div>
+</section>
+<section id="using-torch-tensorrt-to-insert-the-kernel">
+<h1>Using Torch-TensorRT to Insert the Kernel<a class="headerlink" href="#using-torch-tensorrt-to-insert-the-kernel" title="Permalink to this heading">¶</a></h1>
+<p>Now with our TensorRT plugin, we can create a converter so that Torch-TensorRT knows to insert our plugin in place of our custom circular padding operator.
+More information on writing converters can be found <a class="reference external" href="https://pytorch.org/TensorRT/contributors/dynamo_converters.html">here</a></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">from</span> <span class="nn">torch.fx.node</span> <span class="kn">import</span> <span class="n">Argument</span><span class="p">,</span> <span class="n">Target</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.conversion</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ConversionContext</span><span class="p">,</span>
+    <span class="n">dynamo_tensorrt_converter</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.conversion.converter_utils</span> <span class="kn">import</span> <span class="n">get_trt_tensor</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt.fx.converters.converter_utils</span> <span class="kn">import</span> <span class="n">set_layer_name</span>
+
+
+<span class="nd">@dynamo_tensorrt_converter</span><span class="p">(</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">torchtrt_ex</span><span class="o">.</span><span class="n">triton_circular_pad</span><span class="o">.</span><span class="n">default</span>
+<span class="p">)</span>  <span class="c1"># type: ignore</span>
+<span class="c1"># Recall the schema defined above:</span>
+<span class="c1"># torch.ops.torchtrt_ex.triton_circular_pad.default(Tensor x, IntList padding) -&gt; Tensor</span>
+<span class="k">def</span> <span class="nf">circular_padding_converter</span><span class="p">(</span>
+    <span class="n">ctx</span><span class="p">:</span> <span class="n">ConversionContext</span><span class="p">,</span>
+    <span class="n">target</span><span class="p">:</span> <span class="n">Target</span><span class="p">,</span>
+    <span class="n">args</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Argument</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Argument</span><span class="p">],</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">):</span>
+
+    <span class="c1"># How to retrieve a plugin if it is defined elsewhere (e.g. linked library)</span>
+    <span class="n">plugin_registry</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">get_plugin_registry</span><span class="p">()</span>
+    <span class="n">plugin_creator</span> <span class="o">=</span> <span class="n">plugin_registry</span><span class="o">.</span><span class="n">get_plugin_creator</span><span class="p">(</span>
+        <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;CircularPaddingPlugin&quot;</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="n">plugin_namespace</span><span class="o">=</span><span class="s2">&quot;&quot;</span>
+    <span class="p">)</span>
+    <span class="k">assert</span> <span class="n">plugin_creator</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Unabled to find CircularPaddingPlugin creator&quot;</span>
+
+    <span class="c1"># Pass configurations to the plugin implementation</span>
+    <span class="n">field_configs</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">PluginFieldCollection</span><span class="p">(</span>
+        <span class="p">[</span>
+            <span class="n">trt</span><span class="o">.</span><span class="n">PluginField</span><span class="p">(</span>
+                <span class="s2">&quot;pads&quot;</span><span class="p">,</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+                    <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span>
+                <span class="p">),</span>  <span class="c1"># Arg 1 of `torch.ops.torchtrt_ex.triton_circular_pad` is the int list containing the padding settings. Note: the dtype matters as you are eventually passing this as a c-like buffer</span>
+                <span class="n">trt</span><span class="o">.</span><span class="n">PluginFieldType</span><span class="o">.</span><span class="n">INT32</span><span class="p">,</span>
+            <span class="p">),</span>
+        <span class="p">]</span>
+    <span class="p">)</span>
+
+    <span class="n">plugin</span> <span class="o">=</span> <span class="n">plugin_creator</span><span class="o">.</span><span class="n">create_plugin</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">field_collection</span><span class="o">=</span><span class="n">field_configs</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">plugin</span><span class="p">,</span> <span class="s2">&quot;Unable to create CircularPaddingPlugin&quot;</span>
+
+    <span class="n">input_tensor</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span>
+        <span class="mi">0</span>
+    <span class="p">]</span>  <span class="c1"># Arg 0 `torch.ops.torchtrt_ex.triton_circular_pad` is the input tensor</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">ITensor</span><span class="p">):</span>
+        <span class="c1"># Freeze input tensor if not TensorRT Tensor already</span>
+        <span class="n">input_tensor</span> <span class="o">=</span> <span class="n">get_trt_tensor</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">input_tensor</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_input&quot;</span><span class="p">)</span>
+
+    <span class="n">layer</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">add_plugin_v2</span><span class="p">(</span>
+        <span class="p">[</span><span class="n">input_tensor</span><span class="p">],</span> <span class="n">plugin</span>
+    <span class="p">)</span>  <span class="c1"># Add the plugin to the network being constructed</span>
+    <span class="n">layer</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;circular_padding_plugin-</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">return</span> <span class="n">layer</span><span class="o">.</span><span class="n">get_output</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Finally, we are now able to fully compile our model</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torchtrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">my_model</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">ex_input</span><span class="p">],</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>GraphModule(
+    (_run_on_acc_0): TorchTensorRTModule()
+)
+
++++++++++++++++ Dry-Run Results for Graph ++++++++++++++++
+
+The graph consists of 2 Total Operators, of which 2 operators are supported, 100.0% coverage
+
+Compiled with: CompilationSettings(enabled_precisions={&lt;dtype.f32: 7&gt;}, debug=True, workspace_size=0, min_block_size=1, torch_executed_ops=set(), pass_through_build_failures=False, max_aux_streams=None, version_compatible=False, optimization_level=None, use_python_runtime=False, truncate_double=False, use_fast_partitioner=True, enable_experimental_decompositions=False, device=Device(type=DeviceType.GPU, gpu_id=0), require_full_compilation=False, disable_tf32=False, sparse_weights=False, refit=False, engine_capability=&lt;EngineCapability.STANDARD: 1&gt;, num_avg_timing_iters=1, dla_sram_size=1048576, dla_local_dram_size=1073741824, dla_global_dram_size=536870912, dryrun=False, hardware_compatible=False)
+
+  Graph Structure:
+
+   Inputs: List[Tensor: (1, 1, 3, 3)@float32]
+    ...
+    TRT Engine #1 - Submodule name: _run_on_acc_0
+     Engine Inputs: List[Tensor: (1, 1, 3, 3)@float32]
+     Number of Operators in Engine: 2
+     Engine Outputs: Tensor: (1, 5, 3, 3)@float32
+    ...
+   Outputs: List[Tensor: (1, 5, 3, 3)@float32]
+
+  ---------- Aggregate Stats -------------
+
+   Average Number of Operators per TRT Engine: 2.0
+   Most Operators in a TRT Engine: 2
+
+  ********** Recommendations **********
+
+   - For minimal graph segmentation, select min_block_size=2 which would generate 1 TRT engine(s)
+   - The current level of graph segmentation is equivalent to selecting min_block_size=2 which generates 1 TRT engine(s)
+</pre></div>
+</div>
+<p>As you can see, now there is only one subgraph created for the TensorRT engine that contains both our custom kernel and the native convolution operator.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">trt_model</span><span class="p">(</span><span class="n">ex_input</span><span class="p">))</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tensor([[[[-0.2604, -0.4232, -0.3041],
+      [-3.0833, -3.2461, -3.1270],
+      [-0.2450, -0.4079, -0.2887]],
+
+     [[ 0.2828, -0.0373,  1.0332],
+      [-2.3143, -2.6344, -1.5638],
+      [-1.1867, -1.5068, -0.4363]],
+
+     [[ 1.7937,  1.3488,  2.1350],
+      [ 0.7966,  0.3517,  1.1379],
+      [ 3.5537,  3.1088,  3.8950]],
+
+     [[-1.0550, -0.6163, -1.0109],
+      [ 0.5245,  0.9632,  0.5686],
+      [ 0.3775,  0.8162,  0.4216]],
+
+     [[-0.4311, -0.1649, -1.2091],
+      [-4.3668, -4.1006, -5.1447],
+      [-5.0352, -4.7689, -5.8131]]]], device=&#39;cuda:0&#39;)
+</pre></div>
+</div>
+<p>We can verify our implementation is run correctly by both TensorRT and PyTorch</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">my_model</span><span class="p">(</span><span class="n">ex_input</span><span class="p">)</span> <span class="o">-</span> <span class="n">trt_model</span><span class="p">(</span><span class="n">ex_input</span><span class="p">))</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tensor([[[[0., 0., 0.],
+        [0., 0., 0.],
+        [0., 0., 0.]],
+
+       [[0., 0., 0.],
+        [0., 0., 0.],
+        [0., 0., 0.]],
+
+       [[0., 0., 0.],
+        [0., 0., 0.],
+        [0., 0., 0.]],
+
+       [[0., 0., 0.],
+        [0., 0., 0.],
+        [0., 0., 0.]],
+
+       [[0., 0., 0.],
+        [0., 0., 0.],
+        [0., 0., 0.]]]], device=&#39;cuda:0&#39;, grad_fn=&lt;SubBackward0&gt;)
+</pre></div>
+</div>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> ( 0 minutes  0.000 seconds)</p>
+<div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-tutorials-rendered-examples-dynamo-custom-kernel-plugins-py">
+<div class="sphx-glr-download sphx-glr-download-python docutils container">
+<p><a class="reference download internal" download="" href="../../../_downloads/c0341280f3b022df00c4241c42d9ee8b/custom_kernel_plugins.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Python</span> <span class="pre">source</span> <span class="pre">code:</span> <span class="pre">custom_kernel_plugins.py</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
+<p><a class="reference download internal" download="" href="../../../_downloads/79b11f38b95116a32190bdd045626574/custom_kernel_plugins.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">custom_kernel_plugins.ipynb</span></code></a></p>
+</div>
+</div>
+<p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
+</section>
+
+
+             </article>
+             
+            </div>
+            <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../../../py_api/torch_tensorrt.html" class="btn btn-neutral float-right" title="torch_tensorrt" accesskey="n" rel="next">Next <img src="../../../_static/images/chevron-right-orange.svg" class="next-page"></a>
+      
+      
+        <a href="torch_compile_stable_diffusion.html" class="btn btn-neutral" title="Torch Compile Stable Diffusion" accesskey="p" rel="prev"><img src="../../../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+      
+    </div>
+  
+
+  
+
+    <hr>
+
+  
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2022, NVIDIA Corporation.
+
+    </p>
+  </div>
+    
+      <div>
+        Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+      </div>
+     
+
+</footer>
+
+          </div>
+        </div>
+
+        <div class="pytorch-content-right" id="pytorch-content-right">
+          <div class="pytorch-right-menu" id="pytorch-right-menu">
+            <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
+              <ul>
+<li><a class="reference internal" href="#">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a><ul>
+<li><a class="reference internal" href="#writing-custom-operators-in-pytorch">Writing Custom Operators in PyTorch</a><ul>
+<li><a class="reference internal" href="#testing-our-custom-op">Testing our custom op</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#using-the-custom-operator-in-a-model">Using the Custom Operator in a Model</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#wrapping-custom-kernels-to-use-in-tensorrt">Wrapping Custom Kernels to use in TensorRT</a></li>
+<li><a class="reference internal" href="#using-torch-tensorrt-to-insert-the-kernel">Using Torch-TensorRT to Insert the Kernel</a></li>
+</ul>
+
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+  
+
+
+  
+
+     
+       <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+         <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+         <script src="../../../_static/jquery.js"></script>
+         <script src="../../../_static/underscore.js"></script>
+         <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+         <script src="../../../_static/doctools.js"></script>
+         <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
+         <script src="../../../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
+         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+     
+
+  
+
+  <script type="text/javascript" src="../../../_static/js/vendor/popper.min.js"></script>
+  <script type="text/javascript" src="../../../_static/js/vendor/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/1.5.0/list.min.js"></script>
+  <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+  <!-- Begin Footer -->
+
+  <div class="container-fluid docs-tutorials-resources" id="docs-tutorials-resources">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-4 text-center">
+          <h2>Docs</h2>
+          <p>Access comprehensive developer documentation for PyTorch</p>
+          <a class="with-right-arrow" href="https://pytorch.org/docs/stable/index.html">View Docs</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Tutorials</h2>
+          <p>Get in-depth tutorials for beginners and advanced developers</p>
+          <a class="with-right-arrow" href="https://pytorch.org/tutorials">View Tutorials</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Resources</h2>
+          <p>Find development resources and get your questions answered</p>
+          <a class="with-right-arrow" href="https://pytorch.org/resources">View Resources</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container footer-container">
+      <div class="footer-logo-wrapper">
+        <a href="https://pytorch.org/" class="footer-logo"></a>
+      </div>
+
+      <div class="footer-links-wrapper">
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/">PyTorch</a></li>
+            <li><a href="https://pytorch.org/get-started">Get Started</a></li>
+            <li><a href="https://pytorch.org/features">Features</a></li>
+            <li><a href="https://pytorch.org/ecosystem">Ecosystem</a></li>
+            <li><a href="https://pytorch.org/blog/">Blog</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/blob/master/CONTRIBUTING.md">Contributing</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/resources">Resources</a></li>
+            <li><a href="https://pytorch.org/tutorials">Tutorials</a></li>
+            <li><a href="https://pytorch.org/docs/stable/index.html">Docs</a></li>
+            <li><a href="https://discuss.pytorch.org" target="_blank">Discuss</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/issues" target="_blank">Github Issues</a></li>
+            <li><a href="https://pytorch.org/assets/brand-guidelines/PyTorch-Brand-Guidelines.pdf" target="_blank">Brand Guidelines</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title">Stay up to date</li>
+            <li><a href="https://www.facebook.com/pytorch" target="_blank">Facebook</a></li>
+            <li><a href="https://twitter.com/pytorch" target="_blank">Twitter</a></li>
+            <li><a href="https://www.youtube.com/pytorch" target="_blank">YouTube</a></li>
+            <li><a href="https://www.linkedin.com/company/pytorch" target="_blank">LinkedIn</a></li>
+          </ul>  
+          </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title">PyTorch Podcasts</li>
+            <li><a href="https://open.spotify.com/show/6UzHKeiy368jKfQMKKvJY5" target="_blank">Spotify</a></li>
+            <li><a href="https://podcasts.apple.com/us/podcast/pytorch-developer-podcast/id1566080008" target="_blank">Apple</a></li>
+            <li><a href="https://www.google.com/podcasts?feed=aHR0cHM6Ly9mZWVkcy5zaW1wbGVjYXN0LmNvbS9PQjVGa0lsOA%3D%3D" target="_blank">Google</a></li>
+            <li><a href="https://music.amazon.com/podcasts/7a4e6f0e-26c2-49e9-a478-41bd244197d0/PyTorch-Developer-Podcast?" target="_blank">Amazon</a></li>
+          </ul>
+         </div>
+        </div>
+        
+        <div class="privacy-policy">
+          <ul>
+            <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/terms/" target="_blank">Terms</a></li>
+            <li class="privacy-policy-links">|</li>
+            <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/privacy-policy/" target="_blank">Privacy</a></li>
+          </ul>
+        </div>
+        <div class="copyright">
+        <p>© Copyright The Linux Foundation. The PyTorch Foundation is a project of The Linux Foundation.
+          For web site terms of use, trademark policy and other policies applicable to The PyTorch Foundation please see
+          <a href="https://www.linuxfoundation.org/policies/">www.linuxfoundation.org/policies/</a>. The PyTorch Foundation supports the PyTorch open source
+          project, which has been established as PyTorch Project a Series of LF Projects, LLC. For policies applicable to the PyTorch Project a Series of LF Projects, LLC,
+          please see <a href="https://www.lfprojects.org/policies/">www.lfprojects.org/policies/</a>.</p>
+      </div>
+     </div>
+
+  </footer>
+
+  <div class="cookie-banner-wrapper">
+  <div class="container">
+    <p class="gdpr-notice">To analyze traffic and optimize your experience, we serve cookies on this site. By clicking or navigating, you agree to allow our usage of cookies. As the current maintainers of this site, Facebook’s Cookies Policy applies. Learn more, including about available controls: <a href="https://www.facebook.com/policies/cookies/">Cookies Policy</a>.</p>
+    <img class="close-button" src="../../../_static/images/pytorch-x.svg">
+  </div>
+</div>
+
+  <!-- End Footer -->
+
+  <!-- Begin Mobile Menu -->
+
+  <div class="mobile-main-menu">
+    <div class="container-fluid">
+      <div class="container">
+        <div class="mobile-main-menu-header-container">
+          <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+          <a class="main-menu-close-button" href="#" data-behavior="close-mobile-menu"></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-main-menu-links-container">
+      <div class="main-menu">
+        <ul>
+           <li class="resources-mobile-menu-title">
+             <a>Learn</a>
+           </li>
+           <ul class="resources-mobile-menu-items">
+             <li>
+               <a href="https://pytorch.org/get-started">Get Started</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials">Tutorials</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials/beginner/basics/intro.html">Learn the Basics</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials/recipes/recipes_index.html">PyTorch Recipes</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials/beginner/introyt.html">Introduction to PyTorch - YouTube Series</a>
+             </li>
+           </ul>
+           <li class="resources-mobile-menu-title">
+             <a>Ecosystem</a>
+           </li>
+           <ul class="resources-mobile-menu-items">
+             <li>
+               <a href="https://pytorch.org/ecosystem">Tools</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/#community-module">Community</a>
+             </li>
+             <li>
+               <a href="https://discuss.pytorch.org/">Forums</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/resources">Developer Resources</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2023</a>
+             </li>
+           </ul>
+
+           <li class="resources-mobile-menu-title">
+             <a>Edge</a>
+           </li>
+
+           <ul class="resources-mobile-menu-items">
+             <li>
+               <a href="https://pytorch.org/edge">About PyTorch Edge</a>
+             </li>
+             
+             <li>
+               <a href="https://pytorch.org/executorch-overview">ExecuTorch</a>
+             </li>
+           </ul>
+
+           <li class="resources-mobile-menu-title">
+             <a>Docs</a>
+           </li>
+
+           <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/docs/stable/index.html">PyTorch</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/pytorch-domains">PyTorch Domains</a>
+            </li>
+          </ul>
+
+          <li class="resources-mobile-menu-title">
+            <a>Blog & News</a>
+          </li>
+            
+           <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/blog/">PyTorch Blog</a>
+            </li>
+            <li>
+              <a href="https://pytorch.org/community-blog">Community Blog</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/videos">Videos</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/community-stories">Community Stories</a>
+            </li>
+            <li>
+              <a href="https://pytorch.org/events">Events</a>
+            </li>
+          </ul>
+          
+          <li class="resources-mobile-menu-title">
+            <a>About</a>
+          </li>
+
+          <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/foundation">PyTorch Foundation</a>
+            </li>
+            <li>
+              <a href="https://pytorch.org/governing-board">Governing Board</a>
+            </li>
+          </ul>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- End Mobile Menu -->
+
+  <script type="text/javascript" src="../../../_static/js/vendor/anchor.min.js"></script>
+
+  <script type="text/javascript">
+    $(document).ready(function() {
+      mobileMenu.bind();
+      mobileTOC.bind();
+      pytorchAnchors.bind();
+      sideMenus.bind();
+      scrollToAnchor.bind();
+      highlightNavigation.bind();
+      mainMenuDropdown.bind();
+      filterTags.bind();
+
+      // Add class to links that have code blocks, since we cannot create links in code blocks
+      $("article.pytorch-article a span.pre").each(function(e) {
+        $(this).closest("a").addClass("has-code");
+      });
+    })
+  </script>
+</body>
+</html>

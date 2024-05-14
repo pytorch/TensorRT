@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Lowering Phase &mdash; Torch-TensorRT v2.3.0.dev0+85971ff documentation</title>
+  <title>Lowering Phase &mdash; Torch-TensorRT v2.4.0.dev0+7cf3e46 documentation</title>
   
 
   
@@ -82,132 +82,170 @@
 
       <div class="main-menu">
         <ul>
-          <li>
-            <a href="https://pytorch.org/get-started">Get Started</a>
-          </li>
 
-          <li>
-            <a href="https://pytorch.org/ecosystem">Ecosystem</a>
+          <li class="main-menu-item">
+          <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Learn
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/get-started">
+                  <span class=dropdown-title>Get Started</span>
+                  <p>Run PyTorch locally or get started quickly with one of the supported cloud platforms</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials">
+                  <span class="dropdown-title">Tutorials</span>
+                  <p>Whats new in PyTorch tutorials</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials/beginner/basics/intro.html">
+                  <span class="dropdown-title">Learn the Basics</span>
+                  <p>Familiarize yourself with PyTorch concepts and modules</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials/recipes/recipes_index.html">
+                  <span class="dropdown-title">PyTorch Recipes</span>
+                  <p>Bite-size, ready-to-deploy PyTorch code examples</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials/beginner/introyt.html">
+                  <span class="dropdown-title">Intro to PyTorch - YouTube Series</span>
+                  <p>Master PyTorch basics with our engaging YouTube tutorial series</p>
+                </a>
+              </div>
+            </div>
           </li>
 
           <li>
           <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
-              <a class="resource-option with-down-arrow">
+              <a class="with-down-arrow">
+                Ecosystem
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem">
+                  <span class="dropdown-title">Tools</span>
+                  <p>Learn about the tools and frameworks in the PyTorch Ecosystem</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/#community-module">
+                  <span class=dropdown-title>Community</span>
+                  <p>Join the PyTorch developer community to contribute, learn, and get your questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://discuss.pytorch.org/" target="_blank">
+                  <span class=dropdown-title>Forums</span>
+                  <p>A place to discuss PyTorch code, issues, install, research</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/resources">
+                  <span class=dropdown-title>Developer Resources</span>
+                  <p>Find resources and get questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2023">
+                  <span class="dropdown-title">Contributor Awards - 2023</span>
+                  <p>Award winners announced at this year's PyTorch Conference</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+          <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
                 Edge
               </a>
               <div class="resources-dropdown-menu">
                 <a class="nav-dropdown-item" href="https://pytorch.org/edge">
                   <span class="dropdown-title">About PyTorch Edge</span>
+                  <p>Build innovative and privacy-aware AI experiences for edge devices</p>
                 </a>
-                <a class="nav-dropdown-item" href="https://pytorch.org/executorch">
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch-overview">
                   <span class="dropdown-title">ExecuTorch</span>
+                  <p>End-to-end solution for enabling on-device inference capabilities across mobile and edge devices</p>
                 </a>
               </div>
             </div>  
           </li>
 
-          <li>
-            <a href="https://pytorch.org/blog/">Blog</a>
-          </li>
-
-          <li>
-            <a href="https://pytorch.org/tutorials">Tutorials</a>
-          </li>
-
-          <li>
+          <li class="main-menu-item">
             <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
-              <a class="resource-option with-down-orange-arrow">
+              <a class="with-down-arrow">
                 Docs
               </a>
               <div class="resources-dropdown-menu">
-                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/docs/stable/index.html">
+                <a class="nav-dropdown-item" href="https://pytorch.org/docs/stable/index.html">
                   <span class="dropdown-title">PyTorch</span>
-                  <p></p>
+                  <p>Explore the documentation for comprehensive guidance on how to use PyTorch</p>
                 </a>
-                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/audio/stable/index.html">
-                  <span class="dropdown-title">torchaudio</span>
-                  <p></p>
-                </a>
-                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/text/stable/index.html">
-                  <span class="dropdown-title">torchtext</span>
-                  <p></p>
-                </a>
-                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/vision/stable/index.html">
-                  <span class="dropdown-title">torchvision</span>
-                  <p></p>
-                </a>
-                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torcharrow">
-                  <span class="dropdown-title">torcharrow</span>
-                  <p></p>
-                </a>
-                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/data">
-                  <span class="dropdown-title">TorchData</span>
-                  <p></p>
-                </a>
-                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchrec">
-                  <span class="dropdown-title">TorchRec</span>
-                  <p></p>
-                </a>
-                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/serve/">
-                  <span class="dropdown-title">TorchServe</span>
-                  <p></p>
-                </a>
-                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchx/">
-                  <span class="dropdown-title">TorchX</span>
-                  <p></p>
-                </a>
-                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/xla">
-                  <span class="dropdown-title">PyTorch on XLA Devices</span>
-                  <p></p>
-                </a>
-            </div>
-          </li>
-
-          <li>
-            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
-              <a class="resource-option with-down-arrow">
-                Resources
-              </a>
-              <div class="resources-dropdown-menu">
-                <a class="nav-dropdown-item" href="https://pytorch.org/features">
-                  <span class="dropdown-title">About</span>
-                  <p>Learn about PyTorch’s features and capabilities</p>
-                </a>
-                <a class="nav-dropdown-item" href="https://pytorch.org/foundation">
-                  <span class="dropdown-title">PyTorch Foundation</span>
-                  <p>Learn about the PyTorch foundation</p>
-                </a>
-                <a class="nav-dropdown-item" href="https://pytorch.org/#community-module">
-                  <span class="dropdown-title">Community</span>
-                  <p>Join the PyTorch developer community to contribute, learn, and get your questions answered.</p>
-                </a>
-                <a class="nav-dropdown-item" href="https://pytorch.org/community-stories">
-                  <span class="dropdown-title">Community Stories</span>
-                  <p>Learn how our community solves real, everyday machine learning problems with PyTorch.</p>
-                </a>
-                <a class="nav-dropdown-item" href="https://pytorch.org/resources">
-                  <span class="dropdown-title">Developer Resources</span>
-                  <p>Find resources and get questions answered</p>
-                </a>
-                <a class="nav-dropdown-item" href="https://pytorch.org/events">
-                  <span class="dropdown-title">Events</span>
-                  <p>Find events, webinars, and podcasts</p>
-                </a>
-                <a class="nav-dropdown-item" href="https://discuss.pytorch.org/" target="_blank">
-                  <span class="dropdown-title">Forums</span>
-                  <p>A place to discuss PyTorch code, issues, install, research</p>
-                </a>
-                <a class="nav-dropdown-item" href="https://pytorch.org/hub">
-                  <span class="dropdown-title">Models (Beta)</span>
-                  <p>Discover, publish, and reuse pre-trained models</p>
+                <a class="nav-dropdown-item" href="https://pytorch.org/pytorch-domains">
+                  <span class="dropdown-title">PyTorch Domains</span>
+                  <p>Read the PyTorch Domains documentation to learn more about domain-specific libraries</p>
                 </a>
               </div>
             </div>
           </li>
 
           <li>
-            <a href="https://github.com/pytorch/pytorch">GitHub</a>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Blogs & News 
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/blog/">
+                  <span class="dropdown-title">PyTorch Blog</span>
+                  <p>Catch up on the latest technical news and happenings</p>
+                </a>
+                 <a class="nav-dropdown-item" href="https://pytorch.org/community-blog">
+                  <span class="dropdown-title">Community Blog</span>
+                  <p>Stories from the PyTorch ecosystem</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/videos">
+                  <span class="dropdown-title">Videos</span>
+                  <p>Learn about the latest PyTorch tutorials, new, and more </p>
+                <a class="nav-dropdown-item" href="https://pytorch.org/community-stories">
+                  <span class="dropdown-title">Community Stories</span>
+                  <p>Learn how our community solves real, everyday machine learning problems with PyTorch</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/events">
+                  <span class="dropdown-title">Events</span>
+                  <p>Find events, webinars, and podcasts</p>
+                </a>
+            </div>
           </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                About
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/foundation">
+                  <span class="dropdown-title">PyTorch Foundation</span>
+                  <p>Learn more about the PyTorch Foundation</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/governing-board">
+                  <span class="dropdown-title">Governing Board</span>
+                  <p></p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li class="main-menu-item">
+            <div class="no-dropdown">
+              <a href="https://pytorch.org/join" data-cta="join">
+                Become a Member
+              </a>
+            </div>
+          </li>
+          <li>
+           <div class="main-menu-item">
+             <a href="https://github.com/pytorch/pytorch" class="github-icon">
+             </a>
+           </div>
+          </li>
+          <!--- TODO: This block adds the search icon to the nav bar. We will enable it later. 
+          <li>
+            <div class="main-menu-item">
+             <a href="https://github.com/pytorch/pytorch" class="search-icon">
+             </a>
+            </div>
+          </li>
+          --->
         </ul>
       </div>
 
@@ -237,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.3.0.dev0+85971ff
+                  v2.4.0.dev0+7cf3e46
                 </div>
               
             
@@ -304,6 +342,9 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#wrapping-custom-kernels-to-use-in-tensorrt">Wrapping Custom Kernels to use in TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#using-torch-tensorrt-to-insert-the-kernel">Using Torch-TensorRT to Insert the Kernel</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
 <ul>
@@ -416,7 +457,7 @@
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
   <section id="lowering-phase">
-<span id="lowering"></span><h1>Lowering Phase<a class="headerlink" href="#lowering-phase" title="Permalink to this headline">¶</a></h1>
+<span id="lowering"></span><h1>Lowering Phase<a class="headerlink" href="#lowering-phase" title="Permalink to this heading">¶</a></h1>
 <p>The lowering phase is made up out of passes which are operations which map a graph from a high level representation
 to a lower level one. Each pass does something specific for instance inlining method calls. The idea is to
 significantly reduce what the conversion phase needs to be able to handle when actually mapping to TensorRT.
@@ -424,23 +465,23 @@ We aim for closer to 1-&gt;1 op conversion vs looking for applicable subgraphs, 
 reduce the scope of each converter.</p>
 <p>You can see the effects of each pass by setting the log level to <code class="docutils literal notranslate"><span class="pre">Level::kGraph</span></code></p>
 <section id="passes-used">
-<h2>Passes Used<a class="headerlink" href="#passes-used" title="Permalink to this headline">¶</a></h2>
+<h2>Passes Used<a class="headerlink" href="#passes-used" title="Permalink to this heading">¶</a></h2>
 <section id="eliminatecommonsubexpression">
-<h3>EliminateCommonSubexpression<a class="headerlink" href="#eliminatecommonsubexpression" title="Permalink to this headline">¶</a></h3>
+<h3>EliminateCommonSubexpression<a class="headerlink" href="#eliminatecommonsubexpression" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/common_subexpression_elimination.h">torch/csrc/jit/passes/common_subexpression_elimination.h</a></p>
 </div></blockquote>
 <p>Removes common subexpressions in the graph</p>
 </section>
 <section id="eliminate-dead-code">
-<h3>Eliminate Dead Code<a class="headerlink" href="#eliminate-dead-code" title="Permalink to this headline">¶</a></h3>
+<h3>Eliminate Dead Code<a class="headerlink" href="#eliminate-dead-code" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/dead_code_elimination.h">torch/csrc/jit/passes/dead_code_elimination.h</a></p>
 </div></blockquote>
 <p>Dead code elimination will check if a node has side effects and not delete it if it does.</p>
 </section>
 <section id="eliminate-exeception-or-pass-pattern">
-<h3>Eliminate Exeception Or Pass Pattern<a class="headerlink" href="#eliminate-exeception-or-pass-pattern" title="Permalink to this headline">¶</a></h3>
+<h3>Eliminate Exeception Or Pass Pattern<a class="headerlink" href="#eliminate-exeception-or-pass-pattern" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/exception_elimination.cpp">Torch-TensorRT/core/lowering/passes/exception_elimination.cpp</a></p>
 </div></blockquote>
@@ -458,7 +499,7 @@ the input dimension is not what was expected.</p>
 <p>Since we are resolving all of this at compile time and there are no execptions in the TensorRT graph, we just remove it.</p>
 </section>
 <section id="eliminate-redundant-gaurds">
-<h3>Eliminate Redundant Gaurds<a class="headerlink" href="#eliminate-redundant-gaurds" title="Permalink to this headline">¶</a></h3>
+<h3>Eliminate Redundant Gaurds<a class="headerlink" href="#eliminate-redundant-gaurds" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/guard_elimination.h">torch/csrc/jit/passes/guard_elimination.h</a></p>
 </div></blockquote>
@@ -466,14 +507,14 @@ the input dimension is not what was expected.</p>
 guarded we are allowed to remove a guard on ops’ outputs</p>
 </section>
 <section id="freeze-module">
-<h3>Freeze Module<a class="headerlink" href="#freeze-module" title="Permalink to this headline">¶</a></h3>
+<h3>Freeze Module<a class="headerlink" href="#freeze-module" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/freeze_module.h">torch/csrc/jit/passes/freeze_module.h</a></p>
 </div></blockquote>
 <p>Freeze attributes and inline constants and modules. Propogates constants in the graph.</p>
 </section>
 <section id="fuse-addmm-branches">
-<h3>Fuse AddMM Branches<a class="headerlink" href="#fuse-addmm-branches" title="Permalink to this headline">¶</a></h3>
+<h3>Fuse AddMM Branches<a class="headerlink" href="#fuse-addmm-branches" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/fuse_addmm_branches.cpp">Torch-TensorRT/core/lowering/passes/fuse_addmm_branches.cpp</a></p>
 </div></blockquote>
@@ -495,7 +536,7 @@ block1():
 </div>
 </section>
 <section id="fuse-linear">
-<h3>Fuse Linear<a class="headerlink" href="#fuse-linear" title="Permalink to this headline">¶</a></h3>
+<h3>Fuse Linear<a class="headerlink" href="#fuse-linear" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/fuse_linear.h">torch/csrc/jit/passes/fuse_linear.h</a></p>
 </div></blockquote>
@@ -503,7 +544,7 @@ block1():
 This pass fuse the addmm or matmul + add generated by JIT back to linear</p>
 </section>
 <section id="fuse-flatten-linear">
-<h3>Fuse Flatten Linear<a class="headerlink" href="#fuse-flatten-linear" title="Permalink to this headline">¶</a></h3>
+<h3>Fuse Flatten Linear<a class="headerlink" href="#fuse-flatten-linear" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/fuse_flatten_linear.cpp">Torch-TensorRT/core/lowering/passes/fuse_flatten_linear.cpp</a></p>
 </div></blockquote>
@@ -511,7 +552,7 @@ This pass fuse the addmm or matmul + add generated by JIT back to linear</p>
 <code class="docutils literal notranslate"><span class="pre">aten::flatten</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">aten::linear</span></code> pattern we remove the <code class="docutils literal notranslate"><span class="pre">aten::flatten</span></code>.</p>
 </section>
 <section id="lower-graph">
-<h3>Lower Graph<a class="headerlink" href="#lower-graph" title="Permalink to this headline">¶</a></h3>
+<h3>Lower Graph<a class="headerlink" href="#lower-graph" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/lower_graph.h">torch/csrc/jit/passes/lower_graph.h</a></p>
 </div></blockquote>
@@ -523,7 +564,7 @@ graph are the trainable parameters used in this method. The remaining inputs
 are the true inputs to the function.</p>
 </section>
 <section id="lower-tuples">
-<h3>Lower Tuples<a class="headerlink" href="#lower-tuples" title="Permalink to this headline">¶</a></h3>
+<h3>Lower Tuples<a class="headerlink" href="#lower-tuples" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/lower_tuples.h">torch/csrc/jit/passes/lower_tuples.h</a></p>
 </div></blockquote>
@@ -537,7 +578,7 @@ are the true inputs to the function.</p>
 <p>Removes _all_ tuples and raises an error if some cannot be removed, this is used by ONNX to ensure there are not tuples before conversion, but will not work on graphs whose inputs contain tuples.</p>
 </section>
 <section id="module-fallback">
-<h3>Module Fallback<a class="headerlink" href="#module-fallback" title="Permalink to this headline">¶</a></h3>
+<h3>Module Fallback<a class="headerlink" href="#module-fallback" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/module_fallback.cpp">Torch-TensorRT/core/lowering/passes/module_fallback.cpp</a></p>
 </div></blockquote>
@@ -553,7 +594,7 @@ that should run in PyTorch. The second pass marks nodes between these delimiters
 <p>Looks for delimiters then marks all nodes between the delimiters to tell partitioning to run them in PyTorch</p>
 </section>
 <section id="peephole-optimze">
-<h3>Peephole Optimze<a class="headerlink" href="#peephole-optimze" title="Permalink to this headline">¶</a></h3>
+<h3>Peephole Optimze<a class="headerlink" href="#peephole-optimze" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/ppeephole_optimze.h">torch/csrc/jit/passes/peephole_optimze.h</a></p>
 </div></blockquote>
@@ -567,21 +608,21 @@ that should run in PyTorch. The second pass marks nodes between these delimiters
 </dl>
 </section>
 <section id="remove-contiguous">
-<h3>Remove Contiguous<a class="headerlink" href="#remove-contiguous" title="Permalink to this headline">¶</a></h3>
+<h3>Remove Contiguous<a class="headerlink" href="#remove-contiguous" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/remove_contiguous.cpp">Torch-TensorRT/core/lowering/passes/remove_contiguous.cpp</a></p>
 </div></blockquote>
 <p>Removes contiguous operators since we are doing TensorRT memory is already contiguous.</p>
 </section>
 <section id="remove-dropout">
-<h3>Remove Dropout<a class="headerlink" href="#remove-dropout" title="Permalink to this headline">¶</a></h3>
+<h3>Remove Dropout<a class="headerlink" href="#remove-dropout" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/remove_dropout.cpp">Torch-TensorRT/core/lowering/passes/remove_dropout.cpp</a></p>
 </div></blockquote>
 <p>Removes dropout operators since we are doing inference.</p>
 </section>
 <section id="remove-to">
-<h3>Remove To<a class="headerlink" href="#remove-to" title="Permalink to this headline">¶</a></h3>
+<h3>Remove To<a class="headerlink" href="#remove-to" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/remove_to.cpp">Torch-TensorRT/core/lowering/passes/remove_to.cpp</a></p>
 </div></blockquote>
@@ -589,7 +630,7 @@ that should run in PyTorch. The second pass marks nodes between these delimiters
 other passes have a change to move required cast operators out of the main namespace.</p>
 </section>
 <section id="unpack-addmm">
-<h3>Unpack AddMM<a class="headerlink" href="#unpack-addmm" title="Permalink to this headline">¶</a></h3>
+<h3>Unpack AddMM<a class="headerlink" href="#unpack-addmm" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/unpack_addmm.cpp">Torch-TensorRT/core/lowering/passes/unpack_addmm.cpp</a></p>
 </div></blockquote>
@@ -598,7 +639,7 @@ op to freeze the bias in the TensorRT graph). This lets us reuse the <code class
 converters instead of needing a dedicated converter.</p>
 </section>
 <section id="unpack-logsoftmax">
-<h3>Unpack LogSoftmax<a class="headerlink" href="#unpack-logsoftmax" title="Permalink to this headline">¶</a></h3>
+<h3>Unpack LogSoftmax<a class="headerlink" href="#unpack-logsoftmax" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/unpack_log_softmax.cpp">Torch-TensorRT/core/lowering/passes/unpack_log_softmax.cpp</a></p>
 </div></blockquote>
@@ -606,14 +647,14 @@ converters instead of needing a dedicated converter.</p>
 <code class="docutils literal notranslate"><span class="pre">aten::softmax</span></code> and <code class="docutils literal notranslate"><span class="pre">aten::log</span></code> converters instead of needing a dedicated converter.</p>
 </section>
 <section id="unroll-loops">
-<h3>Unroll Loops<a class="headerlink" href="#unroll-loops" title="Permalink to this headline">¶</a></h3>
+<h3>Unroll Loops<a class="headerlink" href="#unroll-loops" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/loop_unrolling.h">torch/csrc/jit/passes/loop_unrolling.h</a></p>
 </div></blockquote>
 <p>Unrolls the operations of compatable loops (e.g. sufficently short) so that you only have to go through the loop once.</p>
 </section>
 <section id="replace-tile-with-repeat">
-<h3>Replace Tile with Repeat<a class="headerlink" href="#replace-tile-with-repeat" title="Permalink to this headline">¶</a></h3>
+<h3>Replace Tile with Repeat<a class="headerlink" href="#replace-tile-with-repeat" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/tile_to_repeat.cpp">Torch-TensorRT/core/lowering/passes/tile_to_repeat.cpp</a></p>
 </div></blockquote>
@@ -708,6 +749,7 @@ converters instead of needing a dedicated converter.</p>
          <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
          <script src="../_static/jquery.js"></script>
          <script src="../_static/underscore.js"></script>
+         <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
          <script src="../_static/doctools.js"></script>
          <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
          <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
@@ -845,114 +887,111 @@ converters instead of needing a dedicated converter.</p>
     <div class="mobile-main-menu-links-container">
       <div class="main-menu">
         <ul>
-          <li>
-            <a href="https://pytorch.org/get-started">Get Started</a>
-          </li>
+           <li class="resources-mobile-menu-title">
+             <a>Learn</a>
+           </li>
+           <ul class="resources-mobile-menu-items">
+             <li>
+               <a href="https://pytorch.org/get-started">Get Started</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials">Tutorials</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials/beginner/basics/intro.html">Learn the Basics</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials/recipes/recipes_index.html">PyTorch Recipes</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials/beginner/introyt.html">Introduction to PyTorch - YouTube Series</a>
+             </li>
+           </ul>
+           <li class="resources-mobile-menu-title">
+             <a>Ecosystem</a>
+           </li>
+           <ul class="resources-mobile-menu-items">
+             <li>
+               <a href="https://pytorch.org/ecosystem">Tools</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/#community-module">Community</a>
+             </li>
+             <li>
+               <a href="https://discuss.pytorch.org/">Forums</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/resources">Developer Resources</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2023</a>
+             </li>
+           </ul>
 
-          <li>
-            <a href="https://pytorch.org/ecosystem">Ecosystem</a>
-          </li>
-            
-          <li>
-            <a href="">Mobile</a>
-          </li>
+           <li class="resources-mobile-menu-title">
+             <a>Edge</a>
+           </li>
 
-          <li>
-            <a href="https://pytorch.org/blog/">Blog</a>
-          </li>
+           <ul class="resources-mobile-menu-items">
+             <li>
+               <a href="https://pytorch.org/edge">About PyTorch Edge</a>
+             </li>
+             
+             <li>
+               <a href="https://pytorch.org/executorch-overview">ExecuTorch</a>
+             </li>
+           </ul>
 
-          <li>
-            <a href="https://pytorch.org/tutorials">Tutorials</a>
-          </li>
+           <li class="resources-mobile-menu-title">
+             <a>Docs</a>
+           </li>
 
-          <li class="resources-mobile-menu-title">
-            Docs
-          </li>
-
-          <ul class="resources-mobile-menu-items">
+           <ul class="resources-mobile-menu-items">
             <li>
               <a href="https://pytorch.org/docs/stable/index.html">PyTorch</a>
             </li>
 
             <li>
-              <a href="https://pytorch.org/audio/stable/index.html">torchaudio</a>
-            </li>
-
-            <li>
-              <a href="https://pytorch.org/text/stable/index.html">torchtext</a>
-            </li>
-
-            <li>
-              <a href="https://pytorch.org/vision/stable/index.html">torchvision</a>
-            </li>
-
-            <li>
-              <a href="https://pytorch.org/torcharrow">torcharrow</a>
-            </li>
-
-            <li>
-              <a href="https://pytorch.org/data">TorchData</a>
-            </li>
-
-            <li>
-              <a href="https://pytorch.org/torchrec">TorchRec</a>
-            </li>
-
-            <li>
-              <a href="https://pytorch.org/serve/">TorchServe</a>
-            </li>
-
-            <li>
-              <a href="https://pytorch.org/torchx/">TorchX</a>
-            </li>
-
-            <li>
-              <a href="https://pytorch.org/xla">PyTorch on XLA Devices</a>
+              <a href="https://pytorch.org/pytorch-domains">PyTorch Domains</a>
             </li>
           </ul>
 
           <li class="resources-mobile-menu-title">
-            Resources
+            <a>Blog & News</a>
           </li>
             
            <ul class="resources-mobile-menu-items">
-
             <li>
-              <a href="https://pytorch.org/features">About</a>
+              <a href="https://pytorch.org/blog/">PyTorch Blog</a>
+            </li>
+            <li>
+              <a href="https://pytorch.org/community-blog">Community Blog</a>
             </li>
 
             <li>
-              <a href="https://pytorch.org/foundation">PyTorch Foundation</a>
-            </li>
-
-            <li>
-              <a href="https://pytorch.org/#community-module">Community</a>
+              <a href="https://pytorch.org/videos">Videos</a>
             </li>
 
             <li>
               <a href="https://pytorch.org/community-stories">Community Stories</a>
             </li>
-
-            <li>
-              <a href="https://pytorch.org/resources">Developer Resources</a>
-            </li>
-
             <li>
               <a href="https://pytorch.org/events">Events</a>
             </li>
+          </ul>
+          
+          <li class="resources-mobile-menu-title">
+            <a>About</a>
+          </li>
 
+          <ul class="resources-mobile-menu-items">
             <li>
-              <a href="https://discuss.pytorch.org/">Forums</a>
+              <a href="https://pytorch.org/foundation">PyTorch Foundation</a>
             </li>
-
             <li>
-              <a href="https://pytorch.org/hub">Models (Beta)</a>
+              <a href="https://pytorch.org/governing-board">Governing Board</a>
             </li>
           </ul>
-
-          <li>
-            <a href="https://github.com/pytorch/pytorch">Github</a>
-          </li>
         </ul>
       </div>
     </div>
