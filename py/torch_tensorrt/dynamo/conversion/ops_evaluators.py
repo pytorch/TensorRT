@@ -12,8 +12,11 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
     dynamo_tensorrt_converter,
 )
-from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
-from torch_tensorrt.dynamo.conversion.impl.elementwise import div, sub
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_trt_tensor,
+    get_trt_tensor,
+)
+from torch_tensorrt.dynamo.conversion.impl.elementwise import sub, trunc_div
 from torch_tensorrt.fx.types import TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -72,14 +75,15 @@ def aten_ops_arange_start_step(
             end,
             start_rank_1,
         )
-        shape = div(
+        shape = trunc_div(
             ctx,
             target,
             SourceIR.ATEN,
-            name + "_sub",
+            name + "_shape",
             shape,
             step,
         )
+        shape = cast_trt_tensor(ctx, shape, trt.int32, name + "_shape_casted")
         fill_layer = ctx.net.add_fill(
             shape.shape, trt.FillOperation.LINSPACE, shape.dtype
         )
