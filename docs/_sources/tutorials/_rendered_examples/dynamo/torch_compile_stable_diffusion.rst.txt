@@ -36,15 +36,14 @@ This interactive script is intended as a sample of the Torch-TensorRT workflow w
 Imports and Model Definition
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 19-47
+.. GENERATED FROM PYTHON SOURCE LINES 19-46
 
 .. code-block:: python
 
 
     import torch
-    from diffusers import DiffusionPipeline
-
     import torch_tensorrt
+    from diffusers import DiffusionPipeline
 
     model_id = "CompVis/stable-diffusion-v1-4"
     device = "cuda:0"
@@ -63,18 +62,18 @@ Imports and Model Definition
         backend=backend,
         options={
             "truncate_long_and_double": True,
-            "precision": torch.float16,
+            "enabled_precisions": {torch.float32, torch.float16},
         },
         dynamic=False,
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 48-50
+.. GENERATED FROM PYTHON SOURCE LINES 47-49
 
 Inference
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 50-56
+.. GENERATED FROM PYTHON SOURCE LINES 49-55
 
 .. code-block:: python
 
