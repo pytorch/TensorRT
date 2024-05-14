@@ -8,3 +8,5 @@ python -m pip install tensorrt==${TRT_VERSION} tensorrt-${CU_VERSION::4}==${TRT_
 choco install bazelisk -y
 
 cat toolchains/ci_workspaces/WORKSPACE.win.release.tmpl | envsubst > WORKSPACE
+
+echo "RELEASE=1" >> ${GITHUB_ENV}
