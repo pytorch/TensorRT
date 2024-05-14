@@ -664,12 +664,10 @@ def aten_ops_softmax(
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.split.Tensor,
-    supports_dynamic_shapes=True,
 )
-@dynamo_tensorrt_converter(torch.ops.aten.split.sizes, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.split.sizes)
 @dynamo_tensorrt_converter(
     torch.ops.aten.split_with_sizes.default,
-    supports_dynamic_shapes=True,
 )
 def aten_ops_split(
     ctx: ConversionContext,
