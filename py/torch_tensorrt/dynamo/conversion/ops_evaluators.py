@@ -13,7 +13,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     dynamo_tensorrt_converter,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
-from torch_tensorrt.dynamo.conversion.impl.elementwise import sub
+from torch_tensorrt.dynamo.conversion.impl.elementwise import div, sub
 from torch_tensorrt.fx.types import TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -61,19 +61,24 @@ def aten_ops_arange_start_step(
         start_rank_0 = get_trt_tensor(ctx, args[0], name + "_start_rank_0", rank=0)
         start_rank_1 = get_trt_tensor(ctx, args[0], name + "_start_rank_1", rank=1)
         end = get_trt_tensor(ctx, args[1], name + "_end", rank=1)
-        if len(args) > 2:
-            step = args[2]
-        else:
-            step = 1
+        step = args[2] if len(args) > 2 else 1
         step = get_trt_tensor(ctx, step, name + "_step", rank=1)
         # Calculate shape = (end-start) / step
         shape = sub(
             ctx,
             target,
             SourceIR.ATEN,
-            name + "_shape",
+            name + "_sub",
             end,
             start_rank_1,
+        )
+        shape = div(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name + "_sub",
+            shape,
+            step,
         )
         fill_layer = ctx.net.add_fill(
             shape.shape, trt.FillOperation.LINSPACE, shape.dtype

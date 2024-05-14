@@ -60,7 +60,7 @@ class TRTTestCase(TestCase):
         with torch.no_grad():
             cuda_inputs = []
             for i in inputs:
-                cuda_inputs.append(i)
+                cuda_inputs.append(i.cuda())
 
             mod.eval()
             start = time.perf_counter()
@@ -296,7 +296,7 @@ class DispatchTestCase(TRTTestCase):
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
-        compilation_settings = CompilationSettings(truncate_double=True, debug=True)
+        compilation_settings = CompilationSettings(truncate_double=True)
 
         interp = TRTInterpreter(
             mod,

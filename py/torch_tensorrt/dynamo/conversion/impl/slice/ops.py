@@ -158,8 +158,6 @@ def expand(
         shape_ = cat(ctx, target, source_ir, name + "_shape_concat", shape, 0)
         start_tensor = cat(ctx, target, source_ir, name + "_start_concat", start, 0)
         stride_tensor = cat(ctx, target, source_ir, name + "_stride_concat", stride, 0)
-        # start_tensor = get_trt_tensor(ctx, np.array(start, dtype=np.int32), name + "_start")
-        # stride_tensor = get_trt_tensor(ctx, np.array(stride, dtype=np.int32), name + "_stride")
         layer = ctx.net.add_slice(
             input_t, start=trt.Dims(), shape=trt.Dims(), stride=trt.Dims()
         )

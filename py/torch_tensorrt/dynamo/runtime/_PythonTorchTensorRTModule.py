@@ -10,7 +10,6 @@ import torch_tensorrt
 from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
-from torch_tensorrt.dynamo.runtime import OutputAllocator
 from torch_tensorrt.dynamo.runtime.tools import (
     _is_switch_required,
     _select_rt_device,
@@ -54,7 +53,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.profiling_enabled = (
             profiling_enabled if profiling_enabled is not None else False
         )
-        self.output_allocator = OutputAllocator()
         self._initialize()
 
     def _initialize(self) -> None:

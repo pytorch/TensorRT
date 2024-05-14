@@ -18,16 +18,6 @@ def fuse_prims_broadcast(
     """Fuses prim nodes which are effectively the ATen equivalents with keep_dim=True"""
     modified_graph = False
 
-    # # Propagate shapes through the graph to determine if broadcast can be resolved
-    # try:
-    #     ShapeProp(gm).propagate(*sample_inputs)
-    # except (RuntimeError, AssertionError):
-    #     logger.warning(
-    #         "Shape Propagation Failed on Graph, skipping fuse_prims_broadcast lowering pass",
-    #         exc_info=True,
-    #     )
-    #     return gm
-
     for node in gm.graph.nodes:
         # If the node is a sum prims operator, with broadcast_in_dim being the only consumer
         # it is a candidate for fusing

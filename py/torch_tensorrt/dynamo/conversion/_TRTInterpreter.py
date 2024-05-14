@@ -24,6 +24,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
 )
 from torch_tensorrt.fx.observer import Observer
+from torch_tensorrt.logging import TRT_LOGGER
 
 from packaging import version
 
@@ -56,7 +57,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     ):
         super().__init__(module)
 
-        self.logger = trt.Logger(trt.Logger.VERBOSE)
+        self.logger = TRT_LOGGER
         self.builder = trt.Builder(self.logger)
 
         flag = 0
