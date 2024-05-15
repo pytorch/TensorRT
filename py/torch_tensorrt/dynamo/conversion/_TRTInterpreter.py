@@ -105,8 +105,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             [dtype._from(o) for o in output_dtypes] if output_dtypes else None
         )
 
-        _LOGGER.debug(f"Graph to be compiled to TensorRT: {self.module.graph}")
-
     def validate_conversion(self) -> Set[str]:
         missing_converters: Set[str] = set()
 

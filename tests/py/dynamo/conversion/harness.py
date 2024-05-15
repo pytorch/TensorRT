@@ -6,6 +6,7 @@ import unittest
 from typing import Callable, List, Optional, Set, Tuple
 
 import torch
+import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt import Input
 from torch_tensorrt._enums import dtype
@@ -204,8 +205,7 @@ class DispatchTestCase(TRTTestCase):
     ):
         mod = mod.eval()
         if use_dynamo_tracer:
-            exported_program = torch.export.export(mod, tuple(original_inputs))
-            exported_program = pre_export_lowering(exported_program, original_inputs)
+            exported_program = torch_tensorrt.dynamo.trace(mod, tuple(original_inputs))
             exported_program = exported_program.run_decompositions(
                 get_decompositions(False)
             )
@@ -286,10 +286,9 @@ class DispatchTestCase(TRTTestCase):
         enable_passes=False,
     ):
         mod.eval()
-        inputs = [spec.example_tensor("opt_shape") for spec in input_specs]
         mod = self.generate_graph(
             mod,
-            inputs,
+            input_specs,
             use_dynamo_tracer=use_dynamo_tracer,
             enable_passes=enable_passes,
         )
