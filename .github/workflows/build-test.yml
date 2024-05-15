@@ -77,6 +77,8 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
+        export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
+        export LD_LIBRARY_PATH=/opt/torch-tensorrt-builds/TensorRT-10.0.1.6/lib:$LD_LIBRARY_PATH
         pushd .
         cd tests/modules
         # Don't use requirements.txt here as it contains tensorrt and torch which should have been installed by now.
@@ -85,7 +87,7 @@ jobs:
         popd
         pushd .
         cd tests/py/ts
-        ${CONDA_RUN} python -m pip install pytest parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
+        ${CONDA_RUN} python -m pip install --pre pytest timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
         ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_api_test_results.xml api/
         ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_models_test_results.xml models/
         ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_integrations_test_results.xml integrations/
@@ -113,6 +115,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
+        export LD_LIBRARY_PATH=/opt/torch-tensorrt-builds/TensorRT-10.0.1.6/lib:$LD_LIBRARY_PATH
         pushd .
         cd tests/py/dynamo
         ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
@@ -141,6 +144,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
+        export LD_LIBRARY_PATH=/opt/torch-tensorrt-builds/TensorRT-10.0.1.6/lib:$LD_LIBRARY_PATH
         pushd .
         cd tests/py/dynamo
         ${CONDA_RUN} python -m pip install --pre pytest timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
@@ -170,6 +174,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
+        export LD_LIBRARY_PATH=/opt/torch-tensorrt-builds/TensorRT-10.0.1.6/lib:$LD_LIBRARY_PATH
         pushd .
         cd tests/py/dynamo
         ${CONDA_RUN} python -m pip install --pre pytest timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
@@ -198,6 +203,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
+        export LD_LIBRARY_PATH=/opt/torch-tensorrt-builds/TensorRT-10.0.1.6/lib:$LD_LIBRARY_PATH
         pushd .
         cd tests/py/dynamo
         ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
@@ -228,6 +234,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
+        export LD_LIBRARY_PATH=/opt/torch-tensorrt-builds/TensorRT-10.0.1.6/lib:$LD_LIBRARY_PATH
         pushd .
         cd tests/py/dynamo
         ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
@@ -257,6 +264,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
+        export LD_LIBRARY_PATH=/opt/torch-tensorrt-builds/TensorRT-10.0.1.6/lib:$LD_LIBRARY_PATH
         pushd .
         cd tests/py/core
         ${CONDA_RUN} python -m pip install --pre pytest-xdist timm transformers parameterized expecttest==0.1.6 --use-deprecated=legacy-resolver
