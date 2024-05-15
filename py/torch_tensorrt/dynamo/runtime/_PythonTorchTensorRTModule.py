@@ -195,9 +195,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
                     if self.engine.is_shape_inference_io(input_name):
                         # TODO: Sometimes addresses are getting corrupted
-                        input_clone = contiguous_inputs[i].cpu()
+                        inputs_cpu = contiguous_inputs[i].cpu()
                         self.context.set_tensor_address(
-                            input_name, input_clone.data_ptr()
+                            input_name, inputs_cpu.data_ptr()
                         )
                     else:
                         self.context.set_input_shape(
