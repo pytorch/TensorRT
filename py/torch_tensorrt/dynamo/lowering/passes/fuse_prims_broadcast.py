@@ -2,8 +2,6 @@ import logging
 from typing import Sequence
 
 import torch
-
-# from torch.fx.passes.shape_prop import ShapeProp
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
