@@ -65,7 +65,6 @@ class TRTTestCase(TestCase):
             for i in inputs:
                 cuda_inputs.append(i.cuda())
 
-            mod.eval()
             start = time.perf_counter()
             interpreter_result = interpreter.run()
             sec = time.perf_counter() - start
@@ -203,6 +202,7 @@ class DispatchTestCase(TRTTestCase):
         use_dynamo_tracer: bool,
         enable_passes: bool,
     ):
+        mod = mod.eval()
         if use_dynamo_tracer:
             exported_program = torch.export.export(mod, tuple(original_inputs))
             exported_program = pre_export_lowering(exported_program, original_inputs)

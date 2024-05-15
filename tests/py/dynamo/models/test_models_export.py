@@ -190,7 +190,7 @@ def test_resnet18_half(ir):
 )
 @pytest.mark.unit
 def test_base_fp8(ir):
-    class SimpleNetwork(nn.Module):
+    class SimpleNetwork(torch.nn.Module):
         def __init__(self):
             super(SimpleNetwork, self).__init__()
             self.linear1 = torch.nn.Linear(in_features=10, out_features=5)
