@@ -29,7 +29,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
     def __init__(
         self,
-        engine: trt.tensorrt.IHostMemory,
+        engine: bytes,
         input_names: Optional[List[str]] = None,
         output_names: Optional[List[str]] = None,
         target_device: Device = Device._current_device(),
