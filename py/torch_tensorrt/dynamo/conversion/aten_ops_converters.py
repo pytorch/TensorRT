@@ -2667,6 +2667,32 @@ def upsample_bilinear2d(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.topk.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_topk(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.topk.topk(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        k=args[1],
+        dim=args_bounds_check(args, 2, -1),
+        largest=args_bounds_check(args, 3, True),
+        sorted=args_bounds_check(args, 4, True),
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.sort.default)
 @enforce_tensor_types(
     {
