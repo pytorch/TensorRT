@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>TensorRT Backend for torch.compile &mdash; Torch-TensorRT v2.4.0.dev0+0f3a998 documentation</title>
+  <title>TensorRT Backend for torch.compile &mdash; Torch-TensorRT v2.4.0.dev0+42b49f1 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.4.0.dev0+0f3a998
+                  v2.4.0.dev0+42b49f1
                 </div>
               
             
@@ -523,7 +523,7 @@ ouptut to a file if a string path is specified</p></li>
 <span class="o">...</span>
 <span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                                 <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;truncate_long_and_double&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-                                         <span class="s2">&quot;precision&quot;</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span>
+                                         <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span>
                                          <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
                                          <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
                                          <span class="s2">&quot;torch_executed_ops&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;torch.ops.aten.sub.Tensor&quot;</span><span class="p">},</span>

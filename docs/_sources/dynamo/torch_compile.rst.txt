@@ -32,13 +32,14 @@ Customizeable Settings
 
 Custom Setting Usage
 ^^^^^^^^^^^^^^^^^
+
 .. code-block:: python
 
     import torch_tensorrt
     ...
     optimized_model = torch.compile(model, backend="torch_tensorrt", dynamic=False,
                                     options={"truncate_long_and_double": True,
-                                             "precision": torch.half,
+                                             "enabled_precisions": {torch.float, torch.half},
                                              "debug": True,
                                              "min_block_size": 2,
                                              "torch_executed_ops": {"torch.ops.aten.sub.Tensor"},
