@@ -5,7 +5,6 @@ from dataclasses import fields, replace
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import torch
-from torch._subclasses.fake_tensor import FakeTensor
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
@@ -71,28 +70,6 @@ def input_is_dynamic(inputs: Sequence[Union[Input, torch.Tensor]]) -> bool:
     return not any(isinstance(input, torch.Tensor) for input in inputs) and any(
         input.shape_mode == Input._ShapeMode.DYNAMIC for input in inputs
     )
-
-
-def get_node_shape(node: torch.fx.Node) -> Sequence[int]:
-    """
-    Return the shape of the output of this node as recorded in the node.meta["val"]
-    """
-    shapes = []
-    if node.meta and "val" in node.meta:
-        metadata = node.meta["val"]
-        if isinstance(metadata, (list, tuple)):
-            for output in metadata:
-                shapes.append(output.size())
-        elif isinstance(metadata, (torch.Tensor, FakeTensor)):
-            shapes.append(metadata.size())
-        elif isinstance(metadata, torch.SymInt):
-            shapes.append(metadata)
-    else:
-        logger.warning(
-            f"Requested output shape for node {node.target} but it is missing metadata"
-        )
-
-    return shapes
 
 
 def get_torch_inputs(
