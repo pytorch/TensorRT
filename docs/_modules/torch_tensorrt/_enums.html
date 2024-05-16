@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._enums &mdash; Torch-TensorRT v2.4.0.dev0+e6d5390 documentation</title>
+  <title>torch_tensorrt._enums &mdash; Torch-TensorRT v2.4.0.dev0+2887c4d documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.4.0.dev0+e6d5390
+                  v2.4.0.dev0+2887c4d
                 </div>
               
             
@@ -476,9 +476,9 @@
     <span class="n">f32</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
     <span class="n">f64</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
     <span class="n">b</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
-    <span class="c1"># TODO: Enable FP8 and BF16</span>
+    <span class="n">bf16</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+    <span class="c1"># TODO: Enable FP8</span>
     <span class="c1"># f8 = auto()</span>
-    <span class="c1"># bf16 = auto()</span>
 
     <span class="n">uint8</span> <span class="o">=</span> <span class="n">u8</span>
     <span class="n">int8</span> <span class="o">=</span> <span class="n">i8</span>
@@ -504,8 +504,7 @@
     <span class="c1"># float8 = f8</span>
     <span class="c1"># fp8 = f8</span>
 
-    <span class="c1"># TODO: Enable when BF16 is enabled</span>
-    <span class="c1"># bfloat16 = bf16</span>
+    <span class="n">bfloat16</span> <span class="o">=</span> <span class="n">bf16</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">_is_np_obj</span><span class="p">(</span><span class="n">t</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
@@ -540,6 +539,8 @@
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f64</span>
             <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">bool</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">b</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">bf16</span>
             <span class="k">elif</span> <span class="n">use_default</span><span class="p">:</span>
                 <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                     <span class="sa">f</span><span class="s2">&quot;Given dtype that does not have direct mapping to Torch-TensorRT supported types (</span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">), defaulting to torch_tensorrt.dtype.float&quot;</span>
@@ -547,7 +548,7 @@
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">float</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Provided an unsupported data type as a data type for translation (support: bool, int, long, half, float, bfloat16), got: </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">&quot;</span>
                 <span class="p">)</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">uint8</span><span class="p">:</span>
@@ -564,9 +565,11 @@
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f32</span>
             <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">bool</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">b</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">bf16</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">bf16</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Provided an unsupported data type as an input data type (support: bool, int32, half, float), got: </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Provided an unsupported data type as a data type for translation (support: bool, int, half, float, bfloat16), got: </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">&quot;</span>
                 <span class="p">)</span>
 
         <span class="k">elif</span> <span class="n">dtype</span><span class="o">.</span><span class="n">_is_np_obj</span><span class="p">(</span><span class="n">t</span><span class="p">):</span>
@@ -593,7 +596,7 @@
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">float</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                    <span class="s2">&quot;Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: &quot;</span>
+                    <span class="s2">&quot;Provided an unsupported data type as an input data type (support: bool, int, long, half, float, bfloat16), got: &quot;</span>
                     <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
                 <span class="p">)</span>
 
@@ -667,6 +670,8 @@
                 <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">double</span>
             <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">b</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">bool</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">bf16</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span>
             <span class="k">elif</span> <span class="n">use_default</span><span class="p">:</span>
                 <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                     <span class="sa">f</span><span class="s2">&quot;Given dtype that does not have direct mapping to torch (</span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2">), defaulting to torch.float&quot;</span>
@@ -690,6 +695,8 @@
                 <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FLOAT</span>
             <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">b</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">BOOL</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">bf16</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">BF16</span>
             <span class="k">elif</span> <span class="n">use_default</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FLOAT</span>
             <span class="k">else</span><span class="p">:</span>
