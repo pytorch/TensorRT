@@ -204,8 +204,10 @@ class DispatchTestCase(TRTTestCase):
         propagate_shapes: bool = False,
     ):
         mod = mod.eval()
+        torch_inputs = get_torch_inputs(original_inputs, _defaults.DEVICE)
         if use_dynamo_tracer:
             exported_program = torch_tensorrt.dynamo.trace(mod, tuple(original_inputs))
+            exported_program = pre_export_lowering(exported_program, torch_inputs)
             exported_program = exported_program.run_decompositions(
                 get_decompositions(False)
             )
@@ -218,7 +220,6 @@ class DispatchTestCase(TRTTestCase):
 
         if propagate_shapes:
             # TODO: This is currently being used to test embedding_bag_aten due to https://github.com/pytorch/TensorRT/issues/2843
-            torch_inputs = get_torch_inputs(original_inputs, _defaults.DEVICE)
             try:
                 ShapeProp(fx_module).propagate(*torch_inputs)
             except (RuntimeError, AssertionError):
