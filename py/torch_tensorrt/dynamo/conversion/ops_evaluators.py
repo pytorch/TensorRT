@@ -83,7 +83,7 @@ def aten_ops_arange_start_step(
             shape,
             step,
         )
-        shape = cast_trt_tensor(ctx, shape, trt.int32, name + "_shape_casted")
+        shape = cast_trt_tensor(ctx, shape, end.dtype, name + "_shape_casted")
         fill_layer = ctx.net.add_fill(
             shape.shape, trt.FillOperation.LINSPACE, shape.dtype
         )
