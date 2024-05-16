@@ -103,9 +103,8 @@ def pre_export_lowering(
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_PRE_LOWERING_PASSES}"
     )
-    gm = ep._graph_module
+    gm = ep.graph_module
     gm = ATEN_PRE_LOWERING_PASSES(gm, sample_inputs)
-    ep._graph_module = gm
     return ep
 
 

@@ -220,11 +220,12 @@ def test_base_fp8(ir):
     with torch.no_grad():
         with export_torch_mode():
             exp_program = torch.export.export(model, (input_tensor,))
-            trt_model = torch_tensorrt.dynamo.compile(
+            trt_model = torchtrt.dynamo.compile(
                 exp_program,
                 inputs=[input_tensor],
                 enabled_precisions={torch.float8_e4m3fn},
                 min_block_size=1,
+                debug=True,
             )
             outputs_trt = trt_model(input_tensor)
             assert torch.allclose(output_pyt, outputs_trt, rtol=1e-3, atol=1e-2)
