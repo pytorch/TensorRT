@@ -134,3 +134,38 @@ def sort(
         return topk_layer.get_output(0), topk_layer.get_output(1)
     else:
         return topk_layer.get_output(0)
+
+
+def topk(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    k: int,
+    dim: int,
+    largest: bool,
+    sorted: bool,
+    return_indices: bool = True,
+) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
+    if largest:
+        topk_layer = ctx.net.add_topk(
+            input,
+            trt.TopKOperation.MAX,
+            k,
+            get_axes_for_reduce_op(get_positive_dim(dim, len(input.shape))),
+        )
+    else:
+        topk_layer = ctx.net.add_topk(
+            input,
+            trt.TopKOperation.MIN,
+            k,
+            get_axes_for_reduce_op(get_positive_dim(dim, len(input.shape))),
+        )
+
+    set_layer_name(topk_layer, target, name, source_ir)
+
+    if return_indices:
+        return topk_layer.get_output(0), topk_layer.get_output(1)
+    else:
+        return topk_layer.get_output(0)
