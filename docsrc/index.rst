@@ -111,7 +111,13 @@ Tutorials
    tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
    tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
    tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
+<<<<<<< HEAD
    tutorials/_rendered_examples/dynamo/custom_kernel_plugins
+=======
+   tutorials/_rendered_examples/distributed_inference/data_parallel_gpt2
+   tutorials/_rendered_examples/distributed_inference/data_parallel_stable_diffusion
+
+>>>>>>> dfbf6ea84 (feat: data parallel inference sample)
 
 Python API Documenation
 ------------------------
