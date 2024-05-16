@@ -12,6 +12,7 @@ from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     dynamo_tensorrt_converter,
+    has_static_shapes_in_args,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     enforce_tensor_types,
@@ -275,22 +276,19 @@ def aten_ops_embedding(
         name,
         input=args[1],
         weight=args[0],
-        # args[2] is the padding index, which is useful for training only
-        scale_grad_by_freq=args_bounds_check(args, 3),
-        sparse=args_bounds_check(args, 4),
     )
 
 
 def embedding_bag_validator(node: Node) -> bool:
-    mode = args_bounds_check(node.args, 4, 0)
-    indices = node.args[1].meta.get("tensor_meta")
+    if not one_user_validator(node):
+        return False
+    meta = node.args[1].meta
+    indices = meta.get("tensor_meta")
+    if indices is None:
+        indices = meta.get("val")
     if indices is None:
         return False
-    return (
-        bool(node.args[2].op == "get_attr")
-        and (mode == 0 or mode == 1 or mode == 2)
-        and len(indices.shape) == 1
-    )
+    return len(indices.shape) == 1  # currently only support 1D indices
 
 
 @dynamo_tensorrt_converter(
@@ -303,7 +301,6 @@ def embedding_bag_validator(node: Node) -> bool:
     {
         0: (TRTTensor,),
         1: (TRTTensor,),
-        2: (np.ndarray, torch.Tensor),
     }
 )
 def aten_ops_embedding_bag(
@@ -321,12 +318,9 @@ def aten_ops_embedding_bag(
         weight=args[0],
         indices=args[1],
         offsets=args[2],
-        scale_grad_by_freq=args_bounds_check(args, 3, False),
         mode=args_bounds_check(args, 4, 0),
-        sparse=args_bounds_check(args, 5, False),
         per_sample_weights=args_bounds_check(args, 6, None),
         include_last_offset=args_bounds_check(args, 7, False),
-        # padding index is useful for training only
     )
 
 
@@ -662,10 +656,15 @@ def aten_ops_softmax(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.split.Tensor, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.split.sizes, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(
-    torch.ops.aten.split_with_sizes.default, supports_dynamic_shapes=True
+    torch.ops.aten.split.Tensor, capability_validator=has_static_shapes_in_args([1])
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.split.sizes, capability_validator=has_static_shapes_in_args([1])
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.split_with_sizes.default,
+    capability_validator=has_static_shapes_in_args([1]),
 )
 def aten_ops_split(
     ctx: ConversionContext,

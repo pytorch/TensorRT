@@ -91,6 +91,11 @@ class ConverterSupport:
 DYNAMO_ATEN_CONVERTERS: Dict[Target, Sequence[ConverterSupport]] = {}
 
 
+def has_static_shapes(node: torch.fx.Node) -> bool:
+    """Returns True if a node has static args, kwargs, or outputs"""
+    return not _has_dynamic_shapes(node=node)
+
+
 def has_dynamic_shapes(node: torch.fx.Node) -> bool:
     """Returns True if a node has dynamic args, kwargs, or outputs"""
     return _has_dynamic_shapes(node=node)
@@ -102,6 +107,18 @@ def has_dynamic_shapes_in_args(
     """Returns True if a node has dynamic inputs in node.args at specified positions"""
     return functools.partial(
         _has_dynamic_shapes, arg_positions_to_check=arg_positions_to_check
+    )
+
+
+def has_static_shapes_in_args(
+    arg_positions_to_check: Optional[List[int]] = None,
+) -> Callable[[torch.fx.Node], bool]:
+    """Returns True if a node has static inputs in node.args at specified positions"""
+    _has_static_shapes = lambda node, arg_positions_to_check: not _has_dynamic_shapes(
+        node, arg_positions_to_check
+    )
+    return functools.partial(
+        _has_static_shapes, arg_positions_to_check=arg_positions_to_check
     )
 
 
@@ -280,7 +297,7 @@ class ConverterRegistry:
         ],
         registry_names: Optional[Sequence[str]] = None,
         registry_calling_conventions: Optional[Sequence[CallingConvention]] = None,
-        disable_dynamic_converter_checks: bool = False,
+        assume_dynamic_shape_support: bool = False,
     ):
         # Copy reference to each dictionary object into attribute list
         self.registries = list(registries)
@@ -302,11 +319,11 @@ class ConverterRegistry:
             ]
 
         self.disallowed_targets: Collection[Target] = set()
-        self.disable_dynamic_converter_checks = disable_dynamic_converter_checks
+        self.assume_dynamic_shape_support = assume_dynamic_shape_support
         self.validate_invariants()
 
-    def disable_dynamic_checks(self, disable_dynamic_converter_checks: bool) -> None:
-        self.disable_dynamic_converter_checks = disable_dynamic_converter_checks
+    def set_dynamic_shape_support(self, assume_dynamic_shape_support: bool) -> None:
+        self.assume_dynamic_shape_support = assume_dynamic_shape_support
 
     def set_disallowed_targets(self, torch_executed_ops: Collection[Target]) -> None:
         self.disallowed_targets = torch_executed_ops
@@ -414,22 +431,16 @@ class ConverterRegistry:
 
                 if isinstance(converters, (list, tuple)):
                     for candidate in converters:
+                        # We enable the converter under 4 conditions
+                        # 1) capability validator is True
+                        # 2) Assume dynamic_shape support is True
+                        # 3) Node only has static shaped inputs
+                        # 4) Node has dynamic inputs and the converter has supports_dynamic_shapes=True
                         if candidate.capability_validator(node) and (
-                            self.disable_dynamic_converter_checks
-                            or (
-                                has_dynamic_shapes(node)
-                                and candidate.supports_dynamic_shapes
-                            )
+                            self.assume_dynamic_shape_support
+                            or not has_dynamic_shapes(node)
+                            or candidate.supports_dynamic_shapes
                         ):
-                            # If node has dynamic inputs and the converter supports dynamic shapes, it is enabled
-                            return (
-                                candidate.converter_implementation,
-                                calling_convention,
-                            )
-                        elif candidate.capability_validator(
-                            node
-                        ) and not has_dynamic_shapes(node):
-                            # For static shapes all converters are turned on based on capability_validator check
                             return (
                                 candidate.converter_implementation,
                                 calling_convention,

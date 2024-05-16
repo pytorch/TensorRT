@@ -4,7 +4,9 @@ import re
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
+import tensorrt as trt
 import torch
+import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Argument, Target
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -15,8 +17,6 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 )
 from torch_tensorrt.fx.converters.converter_utils import get_axes_for_reduce_op
 from torch_tensorrt.fx.types import TRTDataType, TRTTensor
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -479,3 +479,111 @@ def flatten_dims(
     new_shape = tuple(shape[:start_dim]) + (num_elements,) + tuple(shape[end_dim + 1 :])
 
     return new_shape
+
+
+def append(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    original_tensor: TRTTensor,
+    new_value: Union[TRTTensor, int, float, torch.Tensor, np.ndarray],
+    dim: int = 0,
+) -> TRTTensor:
+    """
+    Append a new value to the last of the original tensor along the specified dimension (default 0).
+    For example, if the original tensor is [1, 2, 3], the new value is 4, and the dim is 0,
+    the new tensor will be [1, 2, 3, 4].
+
+    Args:
+        ctx (ConversionContext): A ConversionContext containing the TensorRT network
+        target (Target): Target of calling node
+        source_ir (Optional[SourceIR]): SourceIR of calling converter
+        name (str): Name of the calling layer
+        original_tensor (TRTTensor): A TRTTensor to append the new value to
+        new_value (Union[TRTTensor, int, float, torch.Tensor, np.ndarray]): A new value to append
+        dim (int, optional): Dimention to append the new value. Defaults to 0.
+
+    Returns:
+        TRTTensor: A new TRTTensor that is the result of appending the new value to the original tensor
+    """
+    if isinstance(new_value, (int, float)):
+        new_value = np.array([new_value])
+    new_value = get_trt_tensor(ctx, new_value, name, original_tensor.dtype)
+
+    return impl.cat.cat(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_concat",
+        [original_tensor, new_value],
+        get_positive_dim(dim, len(original_tensor.shape)),
+    )
+
+
+def set_item(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    original_tensor: TRTTensor,
+    index: int,
+    new_value: Union[TRTTensor, int, float, torch.Tensor, np.ndarray],
+) -> TRTTensor:
+    """
+    Set a new value to the original tensor at the specified index. For example,
+    if the original tensor is [1, 2, 3], the new value is 4, and the index is 1,
+    the new tensor will be [1, 4, 3].
+    If the index is out of bound, the new value will be appended to the end.
+
+    Args:
+        ctx (ConversionContext): A ConversionContext containing the TensorRT network
+        target (Target): Target of calling node
+        source_ir (Optional[SourceIR]): SourceIR of calling converter
+        name (str): Name of the calling layer
+        original_tensor (TRTTensor): A TRTTensor to set the new value to
+        index (int): The index to set the new value
+        new_value (Union[TRTTensor, int, float, torch.Tensor, np.ndarray]): A new value to set
+
+    Returns:
+        TRTTensor: A new TRTTensor that is the result of setting the new value to the original tensor
+    """
+    if isinstance(new_value, (int, float)):
+        new_value = np.array([new_value])
+    new_value = get_trt_tensor(ctx, new_value, name, original_tensor.dtype)
+
+    len_original_tensor = original_tensor.shape[0]
+    index = get_positive_dim(index, len_original_tensor)
+
+    front_tensor = impl.slice.slice_op(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_slice_front",
+        original_tensor,
+        dim=0,
+        start=0,
+        stop=index,
+        step=1,
+    )
+    rear_tensor = impl.slice.slice_op(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_slice_rear",
+        original_tensor,
+        dim=0,
+        start=index + 1,
+        stop=len_original_tensor,
+        step=1,
+    )
+
+    ans = impl.cat.cat(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_concat",
+        [front_tensor, new_value, rear_tensor],
+        0,
+    )
+    return ans
