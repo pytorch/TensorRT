@@ -201,7 +201,7 @@ class DispatchTestCase(TRTTestCase):
         original_inputs: List[torch.Tensor],
         use_dynamo_tracer: bool,
         enable_passes: bool,
-        propagate_shapes: bool,
+        propagate_shapes: bool = False,
     ):
         mod = mod.eval()
         if use_dynamo_tracer:
@@ -297,6 +297,7 @@ class DispatchTestCase(TRTTestCase):
         output_dtypes=None,
         use_dynamo_tracer=False,
         enable_passes=False,
+        propagate_shapes=False,
     ):
         mod.eval()
         mod = self.generate_graph(
@@ -304,6 +305,7 @@ class DispatchTestCase(TRTTestCase):
             input_specs,
             use_dynamo_tracer=use_dynamo_tracer,
             enable_passes=enable_passes,
+            propagate_shapes=propagate_shapes,
         )
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
