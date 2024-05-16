@@ -177,7 +177,7 @@ def compile(
         raise AssertionError(
             f"Input graph should be an ExportedProgram but got type {type(exported_program)}"
         )
-
+    exported_program = pre_export_lowering(exported_program, torch_inputs)
     exported_program = exported_program.run_decompositions(
         get_decompositions(enable_experimental_decompositions)
     )

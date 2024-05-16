@@ -571,7 +571,7 @@ try:
     assert torch.ops.trt.quantize_fp8.default
 except Exception as e:
     _LOGGER.warning(
-        f"Unable to import quantize_fp8 op.: {e}. Please install nvidia-ammo library in order to register torch.ops.trt.quantize_fp8 op"
+        "Unable to import torch.ops.trt.quantize_fp8 op. Please install modelopt library (https://github.com/NVIDIA/TensorRT-Model-Optimizer?tab=readme-ov-file#installation) to register torch.ops.trt.quantize_fp8 op"
     )
 else:
 

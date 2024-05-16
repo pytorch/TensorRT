@@ -103,11 +103,10 @@ def pre_export_lowering(
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_PRE_LOWERING_PASSES}"
     )
-    gm = ep.module()
+    gm = ep._graph_module
     gm = ATEN_PRE_LOWERING_PASSES(gm, sample_inputs)
-    # TODO: Check if re-exporting changes the metadata
-    transformed_ep = torch.export.export(gm, tuple(sample_inputs), strict=False)
-    return transformed_ep
+    ep._graph_module = gm
+    return ep
 
 
 def dump_lowering_passes() -> str:
