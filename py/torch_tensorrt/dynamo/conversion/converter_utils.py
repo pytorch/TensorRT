@@ -477,6 +477,9 @@ def to_numpy(
     elif isinstance(value, torch.Tensor):
         if value.is_quantized:
             value = value.dequantize()
+        elif value.dtype == torch.bfloat16:
+            # TODO: Remove when numpy has a BF16 type
+            value = value.to(torch.float)
 
         output = value.cpu().detach().contiguous().numpy()
 

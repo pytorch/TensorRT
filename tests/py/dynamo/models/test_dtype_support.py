@@ -176,3 +176,85 @@ class Test64BitSupport(TestCase):
             DECIMALS_OF_AGREEMENT,
             msg=f"Torch outputs and TRT outputs don't match close enough.",
         )
+
+
+class TestBF16Support(TestCase):
+    @unittest.skipIf(
+        not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+        "Torch-TensorRT Runtime is not available",
+    )
+    def test_bf16_cpp(self):
+        class MyModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv = torch.nn.Conv2d(3, 16, 3, stride=1, bias=True)
+                self.relu = torch.nn.ReLU()
+
+            def forward(self, x):
+                out = self.conv(x)
+                out = self.relu(out)
+                return out
+
+        in_tensor = torch.randn((1, 3, 224, 224), device="cuda", dtype=torch.bfloat16)
+        mod = MyModule().to(torch.device("cuda")).to(torch.bfloat16)
+
+        exp_mod = torch.export.export(mod, (in_tensor,))
+        trt_mod = torch_tensorrt.dynamo.compile(
+            exp_mod,
+            inputs=[in_tensor],
+            pass_through_build_failures=True,
+            enabled_precisions={torch.float, torch.bfloat16, torch.half},
+            min_block_size=1,
+            use_python_runtime=False,
+        )
+
+        torch_model_results = mod(in_tensor)
+        optimized_model_results = trt_mod(in_tensor)
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            msg=f"Torch outputs and TRT outputs don't match close enough.",
+        )
+
+    def test_bf16_py(self):
+        class MyModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv = torch.nn.Conv2d(3, 16, 3, stride=1, bias=True)
+                self.relu = torch.nn.ReLU()
+
+            def forward(self, x):
+                out = self.conv(x)
+                out = self.relu(out)
+                return out
+
+        in_tensor = torch.randn((1, 3, 224, 224), device="cuda", dtype=torch.bfloat16)
+        mod = MyModule().to(torch.device("cuda")).to(torch.bfloat16)
+
+        exp_mod = torch.export.export(mod, (in_tensor,))
+        trt_mod = torch_tensorrt.dynamo.compile(
+            exp_mod,
+            inputs=[in_tensor],
+            pass_through_build_failures=True,
+            enabled_precisions={torch.float, torch.bfloat16, torch.half},
+            min_block_size=1,
+            use_python_runtime=True,
+        )
+
+        torch_model_results = mod(in_tensor)
+        optimized_model_results = trt_mod(in_tensor)
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            msg=f"Torch outputs and TRT outputs don't match close enough.",
+        )
