@@ -103,31 +103,38 @@ def argmin(
     )
 
 
-def sort(
+def topk(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
+    k: Optional[int],
     dim: int,
-    descending: bool,
+    largest: bool,
+    sorted: Optional[bool],
     return_indices: bool = True,
 ) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
-    if descending:
+    # if k is provided then it is returning the topk elements
+    # if k is None, it is returning the sorted elements
+    if k is None:
+        k = input.shape[dim]
+    if largest:
         topk_layer = ctx.net.add_topk(
             input,
             trt.TopKOperation.MAX,
-            input.shape[dim],
+            k,
             get_axes_for_reduce_op(get_positive_dim(dim, len(input.shape))),
         )
     else:
         topk_layer = ctx.net.add_topk(
             input,
             trt.TopKOperation.MIN,
-            input.shape[dim],
+            k,
             get_axes_for_reduce_op(get_positive_dim(dim, len(input.shape))),
         )
-
+    # TensorRT ITopKLayer does not have a sorted flag, it is always returning the sorted topk elements
+    # so here no matter sorted is True or False the returned the topk Tensor object is always sorted
     set_layer_name(topk_layer, target, name, source_ir)
 
     if return_indices:
