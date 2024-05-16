@@ -12,6 +12,7 @@ from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     dynamo_tensorrt_converter,
+    has_static_shapes_in_args,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     enforce_tensor_types,
@@ -627,11 +628,14 @@ def aten_ops_softmax(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.split.Tensor,
+    torch.ops.aten.split.Tensor, capability_validator=has_static_shapes_in_args([1])
 )
-@dynamo_tensorrt_converter(torch.ops.aten.split.sizes)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.split.sizes, capability_validator=has_static_shapes_in_args([1])
+)
 @dynamo_tensorrt_converter(
     torch.ops.aten.split_with_sizes.default,
+    capability_validator=has_static_shapes_in_args([1]),
 )
 def aten_ops_split(
     ctx: ConversionContext,

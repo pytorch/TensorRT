@@ -91,6 +91,11 @@ class ConverterSupport:
 DYNAMO_ATEN_CONVERTERS: Dict[Target, Sequence[ConverterSupport]] = {}
 
 
+def has_static_shapes(node: torch.fx.Node) -> bool:
+    """Returns True if a node has static args, kwargs, or outputs"""
+    return not _has_dynamic_shapes(node=node)
+
+
 def has_dynamic_shapes(node: torch.fx.Node) -> bool:
     """Returns True if a node has dynamic args, kwargs, or outputs"""
     return _has_dynamic_shapes(node=node)
@@ -102,6 +107,18 @@ def has_dynamic_shapes_in_args(
     """Returns True if a node has dynamic inputs in node.args at specified positions"""
     return functools.partial(
         _has_dynamic_shapes, arg_positions_to_check=arg_positions_to_check
+    )
+
+
+def has_static_shapes_in_args(
+    arg_positions_to_check: Optional[List[int]] = None,
+) -> Callable[[torch.fx.Node], bool]:
+    """Returns True if a node has static inputs in node.args at specified positions"""
+    _has_static_shapes = lambda node, arg_positions_to_check: not _has_dynamic_shapes(
+        node, arg_positions_to_check
+    )
+    return functools.partial(
+        _has_static_shapes, arg_positions_to_check=arg_positions_to_check
     )
 
 
@@ -414,22 +431,16 @@ class ConverterRegistry:
 
                 if isinstance(converters, (list, tuple)):
                     for candidate in converters:
+                        # We enable the converter under 4 conditions
+                        # 1) capability validator is True
+                        # 2) Assume dynamic_shape support is True
+                        # 3) Node only has static shaped inputs
+                        # 4) Node has dynamic inputs and the converter has supports_dynamic_shapes=True
                         if candidate.capability_validator(node) and (
                             self.assume_dynamic_shape_support
-                            or (
-                                has_dynamic_shapes(node)
-                                and candidate.supports_dynamic_shapes
-                            )
+                            or not has_dynamic_shapes(node)
+                            or candidate.supports_dynamic_shapes
                         ):
-                            # If node has dynamic inputs and the converter supports dynamic shapes, it is enabled
-                            return (
-                                candidate.converter_implementation,
-                                calling_convention,
-                            )
-                        elif candidate.capability_validator(
-                            node
-                        ) and not has_dynamic_shapes(node):
-                            # For static shapes all converters are turned on based on capability_validator check
                             return (
                                 candidate.converter_implementation,
                                 calling_convention,
