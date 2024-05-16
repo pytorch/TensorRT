@@ -7,20 +7,19 @@ from typing import Callable, List, Optional, Set, Tuple
 
 import torch
 import torch_tensorrt
+from torch.fx.passes.shape_prop import ShapeProp
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt import Input
 from torch_tensorrt._enums import dtype
+from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
 from torch_tensorrt.dynamo.conversion._conversion import infer_module_output_dtypes
-from torch_tensorrt.dynamo.lowering import (
-    get_decompositions,
-    post_lowering,
-    pre_export_lowering,
-)
+from torch_tensorrt.dynamo.lowering import get_decompositions, post_lowering
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
+from torch_tensorrt.dynamo.utils import get_torch_inputs
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -202,6 +201,7 @@ class DispatchTestCase(TRTTestCase):
         original_inputs: List[torch.Tensor],
         use_dynamo_tracer: bool,
         enable_passes: bool,
+        propagate_shapes: bool,
     ):
         mod = mod.eval()
         if use_dynamo_tracer:
@@ -216,6 +216,17 @@ class DispatchTestCase(TRTTestCase):
         if enable_passes:
             fx_module = post_lowering(fx_module, original_inputs)
 
+        if propagate_shapes:
+            # TODO: This is currently being used to test embedding_bag_aten due to https://github.com/pytorch/TensorRT/issues/2843
+            torch_inputs = get_torch_inputs(original_inputs, _defaults.DEVICE)
+            try:
+                ShapeProp(fx_module).propagate(*torch_inputs)
+            except (RuntimeError, AssertionError):
+                logger.warning(
+                    "Shape Propagation failed on Graph, skipping it",
+                    exc_info=False,
+                )
+
         return fx_module
 
     def run_test(
@@ -228,6 +239,7 @@ class DispatchTestCase(TRTTestCase):
         check_dtype=True,
         use_dynamo_tracer=False,
         enable_passes=False,
+        propagate_shapes=False,
     ):
         mod.eval()
         mod = self.generate_graph(
@@ -235,6 +247,7 @@ class DispatchTestCase(TRTTestCase):
             inputs,
             use_dynamo_tracer=use_dynamo_tracer,
             enable_passes=enable_passes,
+            propagate_shapes=propagate_shapes,
         )
 
         # Previous instance of the interpreter auto-casted 64-bit inputs

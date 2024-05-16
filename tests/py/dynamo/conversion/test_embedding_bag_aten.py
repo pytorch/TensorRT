@@ -144,7 +144,7 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             inputs=[weight, indices],
             precision=weight.dtype,
             enable_passes=True,
-            use_dynamo_tracer=True,
+            propagate_shapes=True,
         )
 
     @parameterized.expand(
@@ -341,7 +341,7 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             inputs=[weight, indices, offsets],
             precision=weight.dtype,
             enable_passes=True,
-            use_dynamo_tracer=True,
+            propagate_shapes=True,
         )
 
     @parameterized.expand(
@@ -405,7 +405,7 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             inputs=[weight, indices, offsets],
             precision=weight.dtype,
             enable_passes=True,
-            use_dynamo_tracer=True,
+            propagate_shapes=True,
         )
 
 
