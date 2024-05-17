@@ -26,7 +26,7 @@ REFIT = False
 REQUIRE_FULL_COMPILATION = False
 DRYRUN = False
 HARDWARE_COMPATIBLE = False
-SUPPORTED_KERNEL_PRECISIONS = {dtype.f32, dtype.f16, dtype.i8}
+SUPPORTED_KERNEL_PRECISIONS = {dtype.f32, dtype.f16, dtype.i8, dtype.bf16}
 
 
 def default_device() -> Device:
