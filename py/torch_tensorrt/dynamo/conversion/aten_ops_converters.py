@@ -2706,16 +2706,14 @@ def aten_ops_sort(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.topk.topk(
+    return impl.topk.sort(
         ctx,
         target,
         SourceIR.ATEN,
         name,
         args[0],
-        k=None,
         dim=args_bounds_check(args, 1, -1),
-        largest=args_bounds_check(args, 2, False),
-        sorted=None,
+        descending=args_bounds_check(args, 2, False),
     )
 
 

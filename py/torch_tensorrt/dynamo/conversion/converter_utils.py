@@ -4,7 +4,6 @@ import re
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
-import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch import SymBool, SymFloat, SymInt
@@ -21,6 +20,8 @@ from torch_tensorrt.fx.converters.converter_utils import (
     get_axes_for_reduce_op,
 )
 from torch_tensorrt.fx.types import TRTDataType, TRTTensor
+
+import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -545,6 +546,9 @@ def to_numpy(
     elif isinstance(value, torch.Tensor):
         if value.is_quantized:
             value = value.dequantize()
+        elif value.dtype == torch.bfloat16:
+            # TODO: Remove when numpy has a BF16 type
+            value = value.to(torch.float)
 
         output = value.cpu().detach().contiguous().numpy()
 

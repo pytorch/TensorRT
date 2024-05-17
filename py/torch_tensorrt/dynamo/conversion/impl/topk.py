@@ -103,22 +103,43 @@ def argmin(
     )
 
 
+def sort(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    dim: int,
+    descending: bool,
+    return_indices: bool = True,
+) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
+    k = input.shape[dim]
+    return topk(
+        ctx,
+        target,
+        source_ir,
+        name,
+        input,
+        k,
+        dim,
+        descending,
+        sorted=None,
+        return_indices=return_indices,
+    )
+
+
 def topk(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    k: Optional[int],
+    k: int,
     dim: int,
     largest: bool,
     sorted: Optional[bool],
     return_indices: bool = True,
 ) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
-    # if k is provided then it is returning the topk elements
-    # if k is None, it is returning the sorted elements
-    if k is None:
-        k = input.shape[dim]
     if largest:
         topk_layer = ctx.net.add_topk(
             input,
