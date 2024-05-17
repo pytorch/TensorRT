@@ -26,6 +26,7 @@ class TestBitwiseOrConverter(DispatchTestCase):
             bitwise_or(),
             inputs,
             enable_passes=True,
+            use_dynamo_tracer=True,
         )
 
     @parameterized.expand(
@@ -46,6 +47,7 @@ class TestBitwiseOrConverter(DispatchTestCase):
             bitwise_or(),
             inputs,
             enable_passes=True,
+            use_dynamo_tracer=True,
         )
 
     @parameterized.expand(
@@ -66,6 +68,7 @@ class TestBitwiseOrConverter(DispatchTestCase):
             bitwise_or(),
             inputs,
             enable_passes=True,
+            use_dynamo_tracer=True,
         )
 
 

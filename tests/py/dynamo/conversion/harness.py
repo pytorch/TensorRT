@@ -6,16 +6,20 @@ import unittest
 from typing import Callable, List, Optional, Set, Tuple
 
 import torch
+import torch_tensorrt
+from torch.fx.passes.shape_prop import ShapeProp
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt import Input
 from torch_tensorrt._enums import dtype
+from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
 from torch_tensorrt.dynamo.conversion._conversion import infer_module_output_dtypes
-from torch_tensorrt.dynamo.lowering import apply_lowering_passes
+from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decompositions
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
+from torch_tensorrt.dynamo.utils import get_torch_inputs
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -62,7 +66,6 @@ class TRTTestCase(TestCase):
             for i in inputs:
                 cuda_inputs.append(i.cuda())
 
-            mod.eval()
             start = time.perf_counter()
             interpreter_result = interpreter.run()
             sec = time.perf_counter() - start
@@ -201,19 +204,30 @@ class DispatchTestCase(TRTTestCase):
         original_inputs: List[torch.Tensor],
         use_dynamo_tracer: bool,
         enable_passes: bool,
+        propagate_shapes: bool = False,
     ):
+        mod = mod.eval()
+        torch_inputs = get_torch_inputs(original_inputs, _defaults.DEVICE)
         if use_dynamo_tracer:
-            fx_module = torch._dynamo.export(
-                mod,
-                *original_inputs,
-                aten_graph=True,
-                assume_static_by_default=True,
-                tracing_mode="real",
-            ).graph_module
+            exported_program = torch_tensorrt.dynamo.trace(mod, tuple(original_inputs))
+            exported_program = exported_program.run_decompositions(
+                get_decompositions(False)
+            )
+            fx_module = exported_program.module()
         else:
             fx_module = torch.fx.symbolic_trace(mod)
         if enable_passes:
-            fx_module = apply_lowering_passes(fx_module, original_inputs)
+            fx_module = apply_lowering_passes(fx_module, torch_inputs)
+
+        if propagate_shapes:
+            # TODO: This is currently being used to test embedding_bag_aten due to https://github.com/pytorch/TensorRT/issues/2843
+            try:
+                ShapeProp(fx_module).propagate(*torch_inputs)
+            except (RuntimeError, AssertionError):
+                logger.warning(
+                    "Shape Propagation failed on Graph, skipping it",
+                    exc_info=False,
+                )
         return fx_module
 
     def run_test(
@@ -226,6 +240,7 @@ class DispatchTestCase(TRTTestCase):
         check_dtype=True,
         use_dynamo_tracer=False,
         enable_passes=False,
+        propagate_shapes=False,
     ):
         mod.eval()
         mod = self.generate_graph(
@@ -233,6 +248,7 @@ class DispatchTestCase(TRTTestCase):
             inputs,
             use_dynamo_tracer=use_dynamo_tracer,
             enable_passes=enable_passes,
+            propagate_shapes=propagate_shapes,
         )
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
@@ -284,14 +300,15 @@ class DispatchTestCase(TRTTestCase):
         enable_passes=False,
         use_example_tensors=True,
         pyt_inputs=None,
+        propagate_shapes=False,
     ):
         mod.eval()
-        inputs = [spec.example_tensor("opt_shape") for spec in input_specs]
         mod = self.generate_graph(
             mod,
-            inputs,
+            input_specs,
             use_dynamo_tracer=use_dynamo_tracer,
             enable_passes=enable_passes,
+            propagate_shapes=propagate_shapes,
         )
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
