@@ -194,8 +194,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     ), f"Dtype mismatch for {i}th input({input_name}). Expect {self.input_dtypes[i]}, got {contiguous_inputs[i].dtype}."
 
                     if self.engine.is_shape_inference_io(input_name):
-                        # TODO: Sometimes addresses are getting corrupted
-                        inputs_cpu = contiguous_inputs[i].cpu()
+                        # Shape tensor inputs are casted to int32 explicitly.
+                        # Refer to https://github.com/NVIDIA/TensorRT/blob/d2f4ef789a9a6ffdf37b55c3f81b486225f6b380/samples/common/sampleInference.cpp#L435
+                        inputs_cpu = contiguous_inputs[i].cpu().to(torch.int32)
                         self.context.set_tensor_address(
                             input_name, inputs_cpu.data_ptr()
                         )

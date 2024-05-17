@@ -125,7 +125,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   }
 
   // this is a buffer to store shape tensor input addresses throughout the runtime scope
-  std::list<std::vector<int64_t>> inputShapeTensorValues;
+  std::list<std::vector<int32_t>> inputShapeTensorValues;
   {
     std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
     if (compiled_engine->profile_execution) {
@@ -145,9 +145,12 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       auto shape = core::util::toVec(dims);
       LOG_DEBUG("Input Name: " << name << " Shape: " << dims);
       if (compiled_engine->cuda_engine->isShapeInferenceIO(name.c_str())) {
-        auto input_cpu = inputs[i].clone().contiguous().cpu();
-        std::vector<int64_t> inputs_cpu_vec(
-            input_cpu.data_ptr<int64_t>(), input_cpu.data_ptr<int64_t>() + input_cpu.numel());
+        // Shape tensor inputs are casted to int32 explicitly.
+        // Refer to
+        // https://github.com/NVIDIA/TensorRT/blob/d2f4ef789a9a6ffdf37b55c3f81b486225f6b380/samples/common/sampleInference.cpp#L435
+        auto input_cpu = inputs[i].clone().contiguous().cpu().to(torch::kInt32);
+        std::vector<int32_t> inputs_cpu_vec(
+            input_cpu.data_ptr<int32_t>(), input_cpu.data_ptr<int32_t>() + input_cpu.numel());
         inputShapeTensorValues.emplace_back(inputs_cpu_vec);
         compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputShapeTensorValues.back().data());
       } else {
