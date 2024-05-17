@@ -371,7 +371,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 self.optimization_profiles[0].set_shape_input(
                     target, min_shape, opt_shape, max_shape
                 )
-                shape.append(1)
+                shape.append(len(opt_shape))
             else:
                 self.optimization_profiles[0].set_shape(
                     target, min_shape, opt_shape, max_shape

@@ -8,14 +8,10 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
-    cast_trt_tensor,
     get_positive_dim,
     get_trt_tensor,
 )
-from torch_tensorrt.dynamo.conversion.impl.cat import cat
-from torch_tensorrt.dynamo.conversion.impl.elementwise import div, sub
 from torch_tensorrt.dynamo.conversion.impl.slice.base import slice
-from torch_tensorrt.dynamo.conversion.impl.unary import ceil
 from torch_tensorrt.fx.converters.converter_utils import (
     has_dynamic_shape,
     prepend_ones,
@@ -35,7 +31,6 @@ def slice_op(  # TODO: This should be slice not whatever is in base
     stop: Optional[int],
     step: int,
 ) -> TRTTensor:
-
     # Special case for start being None
     if start is None:
         start = 0
@@ -44,72 +39,24 @@ def slice_op(  # TODO: This should be slice not whatever is in base
     if stop is None:
         stop = input.shape[dim]
 
-    is_slice_dynamic = False
-    if (
-        isinstance(start, TRTTensor)
-        or isinstance(step, TRTTensor)
-        or isinstance(stop, TRTTensor)
-    ):
-        is_slice_dynamic = True
+    dim = get_positive_dim(dim, len(input.shape))
+    start = get_positive_dim(start, input.shape[dim])
+    stop = get_positive_dim(stop, input.shape[dim])
 
-    if not is_slice_dynamic:
-        dim = get_positive_dim(dim, len(input.shape))
-        start = get_positive_dim(start, input.shape[dim])
-        stop = get_positive_dim(stop, input.shape[dim])
+    if has_dynamic_shape(input.shape):
+        # Check whether slice target dim is dynamic shape dim
+        assert input.shape[dim] != -1, "Can't slice on dynamic shape dimension!"
 
-        if has_dynamic_shape(input.shape):
-            # Check whether slice target dim is dynamic shape dim
-            assert input.shape[dim] != -1, "Can't slice on dynamic shape dimension!"
+    start_slice = [0] * len(input.shape)
+    start_slice[dim] = start
+    stride_slice = [1] * len(input.shape)
+    stride_slice[dim] = step
+    output_shape = list(input.shape)
+    output_shape[dim] = math.ceil((stop - start) / step)
 
-        start_slice = [0] * len(input.shape)
-        start_slice[dim] = start
-        stride_slice = [1] * len(input.shape)
-        stride_slice[dim] = step
-        output_shape = list(input.shape)
-        output_shape[dim] = math.ceil((stop - start) / step)
-
-        return slice(
-            ctx, target, source_ir, name, input, start_slice, output_shape, stride_slice
-        )
-    else:
-        dim = get_positive_dim(dim, len(input.shape))
-        # Make start, stop, step an ITensor
-        start = get_trt_tensor(ctx, start, name + "_start")
-        stop = get_trt_tensor(ctx, stop, name + "_stop")
-        stop_casted = cast_trt_tensor(ctx, stop, trt.float32, name + "_casted")
-        step = get_trt_tensor(ctx, step, name + "_step")
-        # Calculate size for ISlice Layer = ceil((stop-start)/step)
-        shape = sub(
-            ctx,
-            target,
-            SourceIR.ATEN,
-            name + "_sub",
-            stop_casted,
-            start,
-        )
-        shape = div(
-            ctx,
-            target,
-            SourceIR.ATEN,
-            name + "_div",
-            shape,
-            step,
-        )
-        shape = ceil(
-            ctx,
-            target,
-            SourceIR.ATEN,
-            name + "_shape",
-            shape,
-        )
-        shape = cast_trt_tensor(ctx, shape, trt.int32, name + "_shape_casted")
-        slice_layer = ctx.net.add_slice(
-            input, start=trt.Dims(), shape=trt.Dims(), stride=trt.Dims()
-        )
-        slice_layer.set_input(1, start)
-        slice_layer.set_input(2, shape)
-        slice_layer.set_input(3, step)
-        return slice_layer.get_output(0)
+    return slice(
+        ctx, target, source_ir, name, input, start_slice, output_shape, stride_slice
+    )
 
 
 def expand(
@@ -152,45 +99,7 @@ def expand(
         [int(i == o) for i, o in zip(input_tensor_shape, shape)]
     )  # stride == 1 if dimensions match, 0 otherwise
 
-    shape_ = shape
-    # Handle dynamic shapes case where shape has dynamic dimension
-    if any(isinstance(ele, TRTTensor) for ele in shape):
-        shape_ = cat(
-            ctx,
-            target,
-            source_ir,
-            name + "_shape_concat",
-            shape,
-            0,
-            cast_dtype=trt.int32,
-        )
-        start_tensor = cat(
-            ctx,
-            target,
-            source_ir,
-            name + "_start_concat",
-            start,
-            0,
-            cast_dtype=trt.int32,
-        )
-        stride_tensor = cat(
-            ctx,
-            target,
-            source_ir,
-            name + "_stride_concat",
-            stride,
-            0,
-            cast_dtype=trt.int32,
-        )
-        layer = ctx.net.add_slice(
-            input_t, start=trt.Dims(), shape=trt.Dims(), stride=trt.Dims()
-        )
-        layer.set_input(1, start_tensor)
-        layer.set_input(2, shape_)
-        layer.set_input(3, stride_tensor)
-    else:
-        layer = ctx.net.add_slice(input_t, start=start, shape=shape_, stride=stride)
-
+    layer = ctx.net.add_slice(input_t, start=start, shape=shape, stride=stride)
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
 
