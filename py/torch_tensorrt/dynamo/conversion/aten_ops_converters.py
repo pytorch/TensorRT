@@ -240,26 +240,8 @@ def aten_ops_cat(
     )
 
 
-def embedding_param_validator(embedding_node: Node) -> bool:
-    scale_grad_by_freq = args_bounds_check(embedding_node.args, 3)
-    sparse = args_bounds_check(embedding_node.args, 4)
-
-    if scale_grad_by_freq is not None:
-        _LOGGER.debug(
-            f"Currently we don't support specifying scale gradient by word frequency, got {scale_grad_by_freq}."
-        )
-        return False
-
-    if sparse is not None:
-        _LOGGER.debug(f"Currently we don't support sparse gradient, got {sparse}.")
-        return False
-
-    return True
-
-
 @dynamo_tensorrt_converter(
     torch.ops.aten.embedding.default,
-    capability_validator=embedding_param_validator,
     supports_dynamic_shapes=True,
 )
 def aten_ops_embedding(
