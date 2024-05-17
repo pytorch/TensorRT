@@ -113,6 +113,7 @@ def sort(
     descending: bool,
     return_indices: bool = True,
 ) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
+    dim = get_positive_dim(dim, len(input.shape))
     k = input.shape[dim]
     return topk(
         ctx,

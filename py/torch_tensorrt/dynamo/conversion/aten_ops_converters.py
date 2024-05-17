@@ -2286,6 +2286,16 @@ def aten_ops_adaptive_avg_poolNd(
     )
 
 
+def topk_validator(node: Node) -> bool:
+    k = node.args[1]
+    if k > 3840:
+        _LOGGER.debug(
+            f"Currently only topk values up to 3840 are supported, got k={k}."
+        )
+        return False
+    return True
+
+
 def max_pool_param_validator(pool_node: Node) -> bool:
     dilation = args_bounds_check(pool_node.args, 4, 1)
     ceil_mode = args_bounds_check(pool_node.args, 5, False)
@@ -2667,7 +2677,9 @@ def upsample_bilinear2d(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.topk.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.topk.default, capability_validator=topk_validator
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
