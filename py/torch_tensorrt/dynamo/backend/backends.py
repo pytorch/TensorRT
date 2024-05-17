@@ -13,6 +13,7 @@ from torch_tensorrt.dynamo._compiler import compile_module
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     post_lowering,
+    remove_detach,
     remove_sym_nodes,
     repair_input_aliasing,
 )
@@ -81,6 +82,9 @@ def _pretraced_backend(
             torch_inputs = [
                 input for input in sample_inputs if isinstance(input, torch.Tensor)
             ]
+
+            # Remove detach nodes
+            remove_detach(gm, torch_inputs)
 
             # Invoke AOTAutograd to translate operators to aten
             gm = aot_export_joint_simple(
