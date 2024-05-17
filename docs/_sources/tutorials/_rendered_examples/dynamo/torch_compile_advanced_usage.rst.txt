@@ -83,7 +83,7 @@ Compilation with `torch.compile` Using Default Settings
     # For the default settings, we can simply call torch.compile
     # with the backend "torch_tensorrt", and run the model on an
     # input to cause compilation, as so:
-    optimized_model = torch.compile(model, backend="torch_tensorrt")
+    optimized_model = torch.compile(model, backend="torch_tensorrt", dynamic=False)
     optimized_model(*sample_inputs)
 
 
@@ -109,7 +109,7 @@ Compilation with `torch.compile` Using Custom Settings
     model_half = Model().eval().cuda()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 65-88
+.. GENERATED FROM PYTHON SOURCE LINES 65-91
 
 .. code-block:: python
 
@@ -132,17 +132,20 @@ Compilation with `torch.compile` Using Custom Settings
 
     # Run the model on an input to cause compilation, as so:
     optimized_model_custom = torch.compile(
-        model_half, backend="torch_tensorrt", options=backend_kwargs
+        model_half,
+        backend="torch_tensorrt",
+        options=backend_kwargs,
+        dynamic=False,
     )
     optimized_model_custom(*sample_inputs_half)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 89-91
+.. GENERATED FROM PYTHON SOURCE LINES 92-94
 
 Cleanup
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 91-95
+.. GENERATED FROM PYTHON SOURCE LINES 94-98
 
 .. code-block:: python
 
@@ -151,7 +154,7 @@ Cleanup
     torch._dynamo.reset()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 96-105
+.. GENERATED FROM PYTHON SOURCE LINES 99-108
 
 Cuda Driver Error Note
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

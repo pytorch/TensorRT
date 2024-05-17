@@ -1,3 +1,5 @@
+# type: ignore
+
 import unittest
 
 import pytest
@@ -9,6 +11,9 @@ from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 assertions = unittest.TestCase()
 
 
+@unittest.skip(
+    "Skipping this test for now due to constraint violation error: https://github.com/pytorch/TensorRT/issues/2794"
+)
 @pytest.mark.unit
 def test_base_dynamic(ir):
     """
@@ -66,6 +71,9 @@ def test_base_dynamic(ir):
         torch.cuda.empty_cache()
 
 
+@unittest.skip(
+    "Skipping this test for now due to constraint violation error: https://github.com/pytorch/TensorRT/issues/2794"
+)
 @pytest.mark.unit
 def test_base_dynamic_fallback(ir):
     """

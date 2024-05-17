@@ -122,6 +122,11 @@ TORCH_LIBRARY(tensorrt, m) {
   m.def("set_multi_device_safe_mode", [](bool multi_device_safe_mode) -> void {
     MULTI_DEVICE_SAFE_MODE = multi_device_safe_mode;
   });
+  m.def("set_logging_level", [](int64_t level) -> void {
+    util::logging::get_logger().set_reportable_log_level(util::logging::LogLevel(level));
+  });
+  m.def(
+      "get_logging_level", []() -> int64_t { return int64_t(util::logging::get_logger().get_reportable_log_level()); });
 }
 
 } // namespace

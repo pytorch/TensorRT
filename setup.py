@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from distutils.cmd import Command
 from pathlib import Path
-from shutil import copyfile, rmtree
+from shutil import copyfile, rmtree, which
 from typing import List
 
 import setuptools
@@ -21,12 +21,11 @@ from setuptools.command.build_ext import build_ext
 from setuptools.command.develop import develop
 from setuptools.command.editable_wheel import editable_wheel
 from setuptools.command.install import install
-from torch.utils import cpp_extension
+from torch.utils.cpp_extension import IS_WINDOWS, BuildExtension, CUDAExtension
 from wheel.bdist_wheel import bdist_wheel
 
 __version__: str = "0.0.0"
 __cuda_version__: str = "0.0"
-__cudnn_version__: str = "0.0"
 __tensorrt_version__: str = "0.0"
 
 LEGACY_BASE_VERSION_SUFFIX_PATTERN = re.compile("a0$")
@@ -62,7 +61,6 @@ def get_base_version() -> str:
 
 def load_dep_info():
     global __cuda_version__
-    global __cudnn_version__
     global __tensorrt_version__
     with open("dev_dep_versions.yml", "r") as stream:
         versions = yaml.safe_load(stream)
@@ -72,17 +70,17 @@ def load_dep_info():
             )
         else:
             __cuda_version__ = versions["__cuda_version__"]
-        __cudnn_version__ = versions["__cudnn_version__"]
         __tensorrt_version__ = versions["__tensorrt_version__"]
 
 
 load_dep_info()
 
-dir_path = str(get_root_dir()) + "/py"
+dir_path = os.path.join(str(get_root_dir()), "py")
 
 CXX11_ABI = False
 JETPACK_VERSION = None
-PY_ONLY = False
+# TODO: Remove once C++ Runtime is integrated in Windows
+PY_ONLY = IS_WINDOWS
 NO_TS = False
 LEGACY = False
 RELEASE = False
@@ -167,25 +165,6 @@ if platform.uname().processor == "aarch64":
         )
 
 
-def which(program):
-    import os
-
-    def is_exe(fpath):
-        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
-
-    fpath, fname = os.path.split(program)
-    if fpath:
-        if is_exe(program):
-            return program
-    else:
-        for path in os.environ["PATH"].split(os.pathsep):
-            exe_file = os.path.join(path, program)
-            if is_exe(exe_file):
-                return exe_file
-
-    return None
-
-
 BAZEL_EXE = None
 if not PY_ONLY:
     BAZEL_EXE = which("bazelisk")
@@ -216,6 +195,9 @@ def build_libtorchtrt_pre_cxx11_abi(
     else:
         print("using CXX11 ABI build")
 
+    if IS_WINDOWS:
+        cmd.append("--config=windows")
+
     if JETPACK_VERSION == "4.5":
         cmd.append("--platforms=//toolchains:jetpack_4.5")
         print("Jetpack version: 4.5")
@@ -238,14 +220,13 @@ def build_libtorchtrt_pre_cxx11_abi(
 
 
 def gen_version_file():
-    if not os.path.exists(dir_path + "/torch_tensorrt/_version.py"):
+    if not (IS_WINDOWS or os.path.exists(dir_path + "/torch_tensorrt/_version.py")):
         os.mknod(dir_path + "/torch_tensorrt/_version.py")
 
     with open(dir_path + "/torch_tensorrt/_version.py", "w") as f:
         print("creating version file")
         f.write('__version__ = "' + __version__ + '"\n')
         f.write('__cuda_version__ = "' + __cuda_version__ + '"\n')
-        f.write('__cudnn_version__ = "' + __cudnn_version__ + '"\n')
         f.write('__tensorrt_version__ = "' + __tensorrt_version__ + '"\n')
 
 
@@ -254,7 +235,16 @@ def copy_libtorchtrt(multilinux=False, rt_only=False):
         os.makedirs(dir_path + "/torch_tensorrt/lib")
 
     print("copying library into module")
-    if multilinux:
+    if IS_WINDOWS:
+        copyfile(
+            dir_path + "/../bazel-bin/cpp/lib/torchtrt.dll",
+            dir_path + "/torch_tensorrt/torchtrt.dll",
+        )
+        copyfile(
+            dir_path + "/../bazel-bin/cpp/lib/torchtrt.dll.if.lib",
+            dir_path + "/torch_tensorrt/lib/torchtrt.lib",
+        )
+    elif multilinux:
         copyfile(
             dir_path + "/build/libtrtorch_build/libtrtorch.so",
             dir_path + "/trtorch/lib/libtrtorch.so",
@@ -377,22 +367,23 @@ class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
 
     PY_CLEAN_DIRS = [
-        "./build",
-        "./dist",
-        "./torch_tensorrt/__pycache__",
-        "./torch_tensorrt/lib",
-        "./torch_tensorrt/include",
-        "./torch_tensorrt/bin",
-        "./*.pyc",
-        "./*.tgz",
-        "./*.egg-info",
+        os.path.join(".", "build"),
+        os.path.join(".", "dist"),
+        os.path.join(".", "torch_tensorrt", "__pycache__"),
+        os.path.join(".", "torch_tensorrt", "lib"),
+        os.path.join(".", "torch_tensorrt", "include"),
+        os.path.join(".", "torch_tensorrt", "bin"),
+        os.path.join(".", "*.pyc"),
+        os.path.join(".", "*.tgz"),
+        os.path.join(".", "*.egg-info"),
     ]
     PY_CLEAN_FILES = [
-        "./torch_tensorrt/*.so",
-        "./torch_tensorrt/_version.py",
-        "./torch_tensorrt/BUILD",
-        "./torch_tensorrt/WORKSPACE",
-        "./torch_tensorrt/LICENSE",
+        os.path.join(".", "torch_tensorrt", "*.so"),
+        os.path.join(".", "torch_tensorrt", "*.dll"),
+        os.path.join(".", "torch_tensorrt", "_version.py"),
+        os.path.join(".", "torch_tensorrt", "BUILD"),
+        os.path.join(".", "torch_tensorrt", "WORKSPACE"),
+        os.path.join(".", "torch_tensorrt", "LICENSE"),
     ]
     description = "Command to tidy up the project root"
     user_options = []
@@ -487,7 +478,7 @@ package_data = {}
 
 if not (PY_ONLY or NO_TS):
     ext_modules += [
-        cpp_extension.CUDAExtension(
+        CUDAExtension(
             "torch_tensorrt._C",
             [
                 "py/" + f
@@ -513,33 +504,44 @@ if not (PY_ONLY or NO_TS):
                 dir_path + "/../",
                 "/usr/local/cuda",
             ],
-            extra_compile_args=[
-                "-Wno-deprecated",
-                "-Wno-deprecated-declarations",
-            ]
-            + (
-                ["-D_GLIBCXX_USE_CXX11_ABI=1"]
-                if CXX11_ABI
-                else ["-D_GLIBCXX_USE_CXX11_ABI=0"]
+            extra_compile_args=(
+                [
+                    "/GS-",
+                    "/permissive-",
+                ]
+                if IS_WINDOWS
+                else [
+                    "-Wno-deprecated",
+                    "-Wno-deprecated-declarations",
+                ]
+                + (
+                    ["-D_GLIBCXX_USE_CXX11_ABI=1"]
+                    if CXX11_ABI
+                    else ["-D_GLIBCXX_USE_CXX11_ABI=0"]
+                )
             ),
-            extra_link_args=[
-                "-Wno-deprecated",
-                "-Wno-deprecated-declarations",
-                "-Wl,--no-as-needed",
-                "-ltorchtrt",
-                "-Wl,-rpath,$ORIGIN/lib",
-                "-lpthread",
-                "-ldl",
-                "-lutil",
-                "-lrt",
-                "-lm",
-                "-Xlinker",
-                "-export-dynamic",
-            ]
-            + (
-                ["-D_GLIBCXX_USE_CXX11_ABI=1"]
-                if CXX11_ABI
-                else ["-D_GLIBCXX_USE_CXX11_ABI=0"]
+            extra_link_args=(
+                []
+                if IS_WINDOWS
+                else [
+                    "-Wno-deprecated",
+                    "-Wno-deprecated-declarations",
+                    "-Wl,--no-as-needed",
+                    "-ltorchtrt",
+                    "-Wl,-rpath,$ORIGIN/lib",
+                    "-lpthread",
+                    "-ldl",
+                    "-lutil",
+                    "-lrt",
+                    "-lm",
+                    "-Xlinker",
+                    "-export-dynamic",
+                ]
+                + (
+                    ["-D_GLIBCXX_USE_CXX11_ABI=1"]
+                    if CXX11_ABI
+                    else ["-D_GLIBCXX_USE_CXX11_ABI=0"]
+                )
             ),
             undef_macros=["NDEBUG"],
         )
@@ -582,6 +584,7 @@ if not (PY_ONLY or NO_TS):
                 "include/torch_tensorrt/core/util/logging/*.h",
                 "bin/*",
                 "lib/*",
+                "*.dll",
             ]
         }
     )
@@ -610,7 +613,7 @@ setup(
         "install": InstallCommand,
         "clean": CleanCommand,
         "develop": DevelopCommand,
-        "build_ext": cpp_extension.BuildExtension,
+        "build_ext": BuildExtension,
         "bdist_wheel": BdistCommand,
         "editable_wheel": EditableWheelCommand,
     },

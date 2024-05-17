@@ -11,6 +11,7 @@ on:
 jobs:
   build-docs:
     runs-on: linux.g5.4xlarge.nvidia.gpu
+    environment: pytorchbot-env
     container:
       image: docker.io/pytorch/manylinux-builder:cuda12.1
       options: --gpus all
@@ -22,6 +23,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           ref: ${{github.head_ref}}
+          token: ${{ secrets.GH_PYTORCHBOT_TOKEN }}
       - name: Select Python / CUDA
         run: |
           git config --global --add safe.directory /__w/TensorRT/TensorRT

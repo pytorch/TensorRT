@@ -6,7 +6,6 @@ from typing import Dict, List
 
 from torch_tensorrt._version import (  # noqa: F401
     __cuda_version__,
-    __cudnn_version__,
     __tensorrt_version__,
     __version__,
 )
@@ -40,11 +39,9 @@ try:
     import tensorrt  # noqa: F401
 except ImportError:
     cuda_version = _parse_semver(__cuda_version__)
-    cudnn_version = _parse_semver(__cudnn_version__)
     tensorrt_version = _parse_semver(__tensorrt_version__)
 
     CUDA_MAJOR = cuda_version["major"]
-    CUDNN_MAJOR = cudnn_version["major"]
     TENSORRT_MAJOR = tensorrt_version["major"]
 
     if sys.platform.startswith("win"):
@@ -90,13 +87,28 @@ _LOGGER.debug(_enabled_features_str())
 
 def _register_with_torch() -> None:
     trtorch_dir = os.path.dirname(__file__)
-    if os.path.isfile(trtorch_dir + "/lib/libtorchtrt.so"):
+    linked_file = os.path.join(
+        "lib", ("torchtrt.dll" if sys.platform.startswith("win") else "libtorchtrt.so")
+    )
+    linked_file_runtime = os.path.join(
+        "lib",
+        (
+            "torchtrt_runtime.dll"
+            if sys.platform.startswith("win")
+            else "libtorchtrt_runtime.so"
+        ),
+    )
+    linked_file_full_path = os.path.join(trtorch_dir, linked_file)
+    linked_file_runtime_full_path = os.path.join(trtorch_dir, linked_file_runtime)
+
+    if os.path.isfile(linked_file_full_path):
         assert ENABLED_FEATURES.torchscript_frontend
         assert ENABLED_FEATURES.torch_tensorrt_runtime
-        torch.ops.load_library(trtorch_dir + "/lib/libtorchtrt.so")
-    elif os.path.isfile(trtorch_dir + "/lib/libtorchtrt_runtime.so"):
+        torch.ops.load_library(linked_file_full_path)
+
+    elif os.path.isfile(linked_file_runtime_full_path):
         assert ENABLED_FEATURES.torch_tensorrt_runtime
-        torch.ops.load_library(trtorch_dir + "/lib/libtorchtrt_runtime.so")
+        torch.ops.load_library(linked_file_runtime_full_path)
 
 
 _register_with_torch()

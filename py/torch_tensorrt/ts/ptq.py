@@ -11,7 +11,7 @@ from enum import Enum
 
 import torch
 from torch_tensorrt import _C
-from py.torch_tensorrt.ts.logging import Level, log
+from torch_tensorrt.ts.logging import Level, log
 
 
 class CalibrationAlgo(Enum):

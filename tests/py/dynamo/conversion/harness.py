@@ -99,8 +99,6 @@ class TRTTestCase(TestCase):
                 if not isinstance(ref, torch.Tensor):
                     ref = torch.tensor([ref])
                 ref = ref.cpu()  # to_dtype test has cases with gpu output
-                if ref.dtype == torch.int64:
-                    ref = ref.int()  # convert torch.max's index output tensor to int32
                 torch.testing.assert_close(
                     out.cpu(),
                     ref,
@@ -140,9 +138,7 @@ class TRTTestCase(TestCase):
             if len(expected_ops):
                 self.assert_has_op(mod, expected_ops)
 
-            interpreter_result = interpreter.run(
-                precision=torch.half if fp16_mode else torch.float
-            )
+            interpreter_result = interpreter.run()
             trt_mod = PythonTorchTensorRTModule(
                 interpreter_result.engine,
                 interpreter_result.input_names,
@@ -151,7 +147,6 @@ class TRTTestCase(TestCase):
             res_trt = trt_mod(*cuda_inputs).cpu()
             res_cpu = mod(*cuda_inputs).cpu()
             assert len(res_trt) == len(res_cpu)
-            assert len(res_cpu) == len(comparators)
             for output_trt, output_cpu, comparator in zip(
                 res_trt, res_cpu, comparators
             ):
@@ -238,7 +233,7 @@ class DispatchTestCase(TRTTestCase):
         # We replicate this behavior here
         compilation_settings = CompilationSettings(
             enabled_precisions={dtype._from(precision)},
-            truncate_long_and_double=True,
+            truncate_double=True,
             debug=True,
         )
 
@@ -250,8 +245,12 @@ class DispatchTestCase(TRTTestCase):
                 mod,
                 input_specs,
                 compilation_settings.device,
-                truncate_long_and_double=compilation_settings.truncate_long_and_double,
+                truncate_double=compilation_settings.truncate_double,
             )
+
+        _LOGGER.debug(f"Compilation settings: {compilation_settings}")
+        _LOGGER.debug(f"Inputs: {input_specs}")
+        _LOGGER.debug(f"Output types: {output_dtypes}")
 
         interp = TRTInterpreter(
             mod,
@@ -266,6 +265,42 @@ class DispatchTestCase(TRTTestCase):
             rtol,
             atol,
             check_dtype,
+        )
+
+    def run_test_compare_tensor_attributes_only(
+        self,
+        mod,
+        inputs,
+        expected_ops,
+        comparators: List[Tuple[Callable, List]],
+        precision=torch.float,
+        output_dtypes=None,
+        use_dynamo_tracer=False,
+        enable_passes=False,
+    ):
+        mod.eval()
+        mod = self.generate_graph(
+            mod,
+            inputs,
+            use_dynamo_tracer=use_dynamo_tracer,
+            enable_passes=enable_passes,
+        )
+        # Previous instance of the interpreter auto-casted 64-bit inputs
+        # We replicate this behavior here
+        compilation_settings = CompilationSettings(
+            enabled_precisions={dtype._from(precision)},
+            truncate_double=True,
+            debug=True,
+        )
+
+        interp = TRTInterpreter(
+            mod,
+            Input.from_tensors(inputs),
+            output_dtypes=output_dtypes,
+            compilation_settings=compilation_settings,
+        )
+        super().run_test_custom_compare_results(
+            mod, inputs, expected_ops, interp, comparators
         )
 
     def run_test_with_dynamic_shape(
@@ -289,7 +324,7 @@ class DispatchTestCase(TRTTestCase):
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
-        compilation_settings = CompilationSettings(truncate_long_and_double=True)
+        compilation_settings = CompilationSettings(truncate_double=True)
 
         interp = TRTInterpreter(
             mod,

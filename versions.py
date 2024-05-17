@@ -8,7 +8,6 @@ import yaml
 
 __version__ = "0.0.0"
 __cuda_version__ = "0.0"
-__cudnn_version__ = "0.0"
 __tensorrt_version__ = "0.0"
 
 
@@ -104,7 +103,6 @@ class PytorchVersion:
 
 def load_dep_info():
     global __cuda_version__
-    global __cudnn_version__
     global __tensorrt_version__
     with open("dev_dep_versions.yml", "r") as stream:
         versions = yaml.safe_load(stream)
@@ -115,7 +113,6 @@ def load_dep_info():
             )
         else:
             __cuda_version__ = versions["__cuda_version__"]
-        __cudnn_version__ = versions["__cudnn_version__"]
         __tensorrt_version__ = versions["__tensorrt_version__"]
 
 
@@ -139,10 +136,6 @@ def torch_tensorrt_version_release():
 
 def cuda_version():
     print(__cuda_version__)
-
-
-def cudnn_version():
-    print(__cudnn_version__)
 
 
 def tensorrt_version():

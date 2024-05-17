@@ -33,7 +33,7 @@ class TestFakeTensors(TestCase):
             min_block_size=1,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
@@ -90,7 +90,7 @@ class TestFakeTensors(TestCase):
             min_block_size=1,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
@@ -223,7 +223,7 @@ class TestTensorFreezing(TestCase):
             inputs,
             min_block_size=1,
             pass_through_build_failures=True,
-            truncate_long_and_double=True,
+            truncate_double=True,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()
@@ -263,13 +263,13 @@ class TestPacketOperator(TestCase):
             min_block_size=1,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",

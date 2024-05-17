@@ -7,11 +7,9 @@ endif()
 
 # If the custom finders are needed at this point, there are good chances that they will be needed when consuming the library as well
 install(FILES "${CMAKE_SOURCE_DIR}/cmake/Modules/FindTensorRT.cmake" DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/torchtrt/Modules")
-install(FILES "${CMAKE_SOURCE_DIR}/cmake/Modules/FindcuDNN.cmake" DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/torchtrt/Modules")
 
 # CUDA
 find_package(CUDAToolkit REQUIRED)
-find_package(cuDNN REQUIRED) # Headers are needed somewhere
 
 # libtorch
 find_package(Torch REQUIRED)

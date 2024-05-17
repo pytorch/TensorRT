@@ -63,8 +63,9 @@ class TestHardwareCompatibility(TestCase):
         self.assertIn("Hardware Compatibility: Disabled", cpp_repr)
 
     @unittest.skipIf(
-        torch.ops.tensorrt.ABI_VERSION() != "5",
-        "Detected incorrect ABI version, please update this test case",
+        not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime
+        or torch.ops.tensorrt.ABI_VERSION() != "5",
+        "Torch-TensorRT runtime is not available or ABI Version is compatible",
     )
     @unittest.skipIf(
         not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
