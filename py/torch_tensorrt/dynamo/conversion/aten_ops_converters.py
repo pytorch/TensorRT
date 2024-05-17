@@ -568,6 +568,8 @@ def aten_ops_neg(
 
 
 try:
+    import modelopt.torch.quantization as mtq
+
     assert torch.ops.trt.quantize_fp8.default
 except Exception as e:
     _LOGGER.warning(
