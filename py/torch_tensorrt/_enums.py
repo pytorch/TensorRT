@@ -24,9 +24,9 @@ class dtype(Enum):
     f32 = auto()
     f64 = auto()
     b = auto()
-    # TODO: Enable FP8 and BF16
+    bf16 = auto()
+    # TODO: Enable FP8
     # f8 = auto()
-    # bf16 = auto()
 
     uint8 = u8
     int8 = i8
@@ -52,8 +52,7 @@ class dtype(Enum):
     # float8 = f8
     # fp8 = f8
 
-    # TODO: Enable when BF16 is enabled
-    # bfloat16 = bf16
+    bfloat16 = bf16
 
     @staticmethod
     def _is_np_obj(t: Any) -> bool:
@@ -88,6 +87,8 @@ class dtype(Enum):
                 return dtype.f64
             elif t == torch.bool:
                 return dtype.b
+            elif t == torch.bfloat16:
+                return dtype.bf16
             elif use_default:
                 logging.warning(
                     f"Given dtype that does not have direct mapping to Torch-TensorRT supported types ({t}), defaulting to torch_tensorrt.dtype.float"
@@ -95,7 +96,7 @@ class dtype(Enum):
                 return dtype.float
             else:
                 raise TypeError(
-                    f"Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: {t}"
+                    f"Provided an unsupported data type as a data type for translation (support: bool, int, long, half, float, bfloat16), got: {t}"
                 )
         elif isinstance(t, trt.DataType):
             if t == trt.uint8:
@@ -112,9 +113,11 @@ class dtype(Enum):
                 return dtype.f32
             elif t == trt.bool:
                 return dtype.b
+            elif t == trt.bf16:
+                return dtype.bf16
             else:
                 raise TypeError(
-                    f"Provided an unsupported data type as an input data type (support: bool, int32, half, float), got: {t}"
+                    f"Provided an unsupported data type as a data type for translation (support: bool, int, half, float, bfloat16), got: {t}"
                 )
 
         elif dtype._is_np_obj(t):
@@ -141,7 +144,7 @@ class dtype(Enum):
                 return dtype.float
             else:
                 raise TypeError(
-                    "Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: "
+                    "Provided an unsupported data type as an input data type (support: bool, int, long, half, float, bfloat16), got: "
                     + str(t)
                 )
 
@@ -215,6 +218,8 @@ class dtype(Enum):
                 return torch.double
             elif self == dtype.b:
                 return torch.bool
+            elif self == dtype.bf16:
+                return torch.bfloat16
             elif use_default:
                 logging.warning(
                     f"Given dtype that does not have direct mapping to torch ({self}), defaulting to torch.float"
@@ -238,6 +243,8 @@ class dtype(Enum):
                 return trt.DataType.FLOAT
             elif self == dtype.b:
                 return trt.DataType.BOOL
+            elif self == dtype.bf16:
+                return trt.DataType.BF16
             elif use_default:
                 return trt.DataType.FLOAT
             else:
