@@ -18,7 +18,7 @@ else
 fi
 
 curl -Lo TensorRT.zip ${TRT_DOWNLOAD_LINK}
-unzip TensorRT.zip -d C:/
+unzip -o TensorRT.zip -d C:/
 
 export CUDA_HOME="$(echo ${CUDA_PATH} | sed -e 's#\\#\/#g')"
 
