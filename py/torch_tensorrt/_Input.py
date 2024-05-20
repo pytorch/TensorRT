@@ -372,9 +372,13 @@ class Input(object):
                     )
 
                 if isinstance(self.shape, dict):
-                    return torch.rand(self.shape[optimization_profile_field]).to(
-                        dtype=self.dtype.to(torch.dtype, use_default=True)
-                    )
+                    if self.dtype == dtype.b:
+                        return torch.rand(self.shape[optimization_profile_field]) < 0.5
+                    else:
+                        return torch.rand(self.shape[optimization_profile_field]).to(
+                            dtype=self.dtype.to(torch.dtype, use_default=True)
+                        )
+
                 else:
                     raise RuntimeError(
                         f"Input shape is dynamic but shapes are not provided as dictionary (found: {self.shape})"
