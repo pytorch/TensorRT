@@ -38,6 +38,10 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
 void multi_gpu_device_check();
 
+bool get_multi_device_safe_mode();
+
+void set_multi_device_safe_mode(bool multi_device_safe_mode);
+
 class DeviceList {
   using DeviceMap = std::unordered_map<int, RTDevice>;
   DeviceMap device_list;
