@@ -60,12 +60,12 @@ def aten_ops_arange_start_step(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     # Case where inputs to arange are dynamic
-    if np.any([isinstance(tensor, TRTTensor) for tensor in args]):
-        start_rank_0 = get_trt_tensor(ctx, args[0], name + "_start_rank_0", rank=0)
-        start_rank_1 = get_trt_tensor(ctx, args[0], name + "_start_rank_1", rank=1)
-        end = get_trt_tensor(ctx, args[1], name + "_end", rank=1)
+    if any(isinstance(tensor, TRTTensor) for tensor in args):
+        start_rank_0 = get_trt_tensor(ctx, args[0], name + "_start_rank_0", min_rank=0)
+        start_rank_1 = get_trt_tensor(ctx, args[0], name + "_start_rank_1", min_rank=1)
+        end = get_trt_tensor(ctx, args[1], name + "_end", min_rank=1)
         step = args[2] if len(args) > 2 else 1
-        step = get_trt_tensor(ctx, step, name + "_step", rank=1)
+        step = get_trt_tensor(ctx, step, name + "_step", min_rank=1)
         # Calculate shape = (end-start) / step
         shape = sub(
             ctx,

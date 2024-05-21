@@ -15,10 +15,10 @@ from torch_tensorrt.dynamo.runtime.tools import (
     _select_rt_device,
     multi_gpu_device_check,
 )
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
 
 logger = logging.getLogger(__name__)
-DYNAMIC_DIM = -1
 
 
 class PythonTorchTensorRTModule(Module):  # type: ignore[misc]

@@ -16,6 +16,7 @@ from packaging import version
 logger = logging.getLogger(__name__)
 
 COSINE_THRESHOLD = 0.99
+DYNAMIC_DIM = -1
 
 
 def use_python_runtime_parser(use_python_runtime: Optional[bool] = None) -> bool:

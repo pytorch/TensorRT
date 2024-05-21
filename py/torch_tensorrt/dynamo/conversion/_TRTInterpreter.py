@@ -23,6 +23,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_node_name,
     get_trt_tensor,
 )
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
@@ -365,6 +366,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             max_shape = current_input.shape["max_shape"]
             # TODO: Does not support disjoint optimization profiles?
             assert self.optimization_profiles is not None
+            assert len(min_shape) == len(opt_shape) == len(max_shape)
             if current_input.is_shape_tensor:
                 # For shape_tensors, min/opt/max_shapes correspond to actual values
                 # of the shapes provided during runtime
@@ -377,13 +379,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     target, min_shape, opt_shape, max_shape
                 )
 
-                assert len(min_shape) == len(opt_shape) == len(max_shape)
                 for i in range(len(min_shape)):
                     if min_shape[i] == opt_shape[i] == max_shape[i]:
                         shape.append(min_shape[i])
                     else:
                         # -1 to represent the dynamic dimension
-                        shape.append(-1)
+                        shape.append(DYNAMIC_DIM)
         elif (
             not current_input.is_shape_tensor
             and current_input.shape_mode == Input._ShapeMode.STATIC

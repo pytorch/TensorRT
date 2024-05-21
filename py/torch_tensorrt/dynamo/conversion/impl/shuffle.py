@@ -34,7 +34,7 @@ def reshape(
                     ctx,
                     s,
                     _enums.dtype.int32,
-                    name + "_int32_casted",
+                    name + f"_int32_casted_{i}",
                 )
                 trt_shape.append(dim_int32)
             else:

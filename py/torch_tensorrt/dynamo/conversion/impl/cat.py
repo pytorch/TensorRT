@@ -31,7 +31,7 @@ def cat(
             each_input = get_trt_tensor(ctx, each_input, f"{name}_tensor_{i}")
         if cast_dtype:
             each_input = cast_trt_tensor(
-                ctx, each_input, cast_dtype, f"{name}_tensor_int32_cast{i}"
+                ctx, each_input, cast_dtype, f"{name}_tensor_int32_cast_{i}"
             )
         trt_inputs.append(each_input)
     concat_layer = ctx.net.add_concatenation(trt_inputs)
