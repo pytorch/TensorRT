@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     dynamic_unsupported_with_args,
     enforce_tensor_types,
+    get_positive_dim,
     is_only_operator_on_placeholder,
 )
 from torch_tensorrt.fx.types import TRTTensor
@@ -2288,6 +2289,18 @@ def aten_ops_adaptive_avg_poolNd(
 
 def topk_validator(node: Node) -> bool:
     k = node.args[1]
+    return topk_sort_validator(k)
+
+
+def sort_validator(node: Node) -> bool:
+    shape = node.args[0].meta.get("tensor_meta").shape
+    dim = node.args[1]
+    dim = get_positive_dim(dim, len(shape))
+    k = shape[dim]
+    return topk_sort_validator(k)
+
+
+def topk_sort_validator(k: int) -> bool:
     if k > 3840:
         _LOGGER.debug(
             f"Currently only topk values up to 3840 are supported, got k={k}."
@@ -2705,7 +2718,9 @@ def aten_ops_topk(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sort.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.sort.default, capability_validator=sort_validator
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),

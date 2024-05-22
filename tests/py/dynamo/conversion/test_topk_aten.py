@@ -30,6 +30,7 @@ class TestSortConverter(DispatchTestCase):
         self.run_test(
             Topk(),
             inputs,
+            enable_passes=True,
         )
 
 
