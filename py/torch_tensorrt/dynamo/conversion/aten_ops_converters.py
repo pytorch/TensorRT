@@ -800,6 +800,40 @@ def aten_ops_tile(
     )
 
 
+def zero_output_validator(node: Node) -> bool:
+    if 0 in node.args[1]:
+        _LOGGER.debug(
+            f"We do not support output tensor {node.args[1]} tensors with zero-sized dimensions for this operation."
+        )
+        return False
+    else:
+        return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.as_strided.default,
+    capability_validator=zero_output_validator,
+)
+@dynamo_tensorrt_converter(torch.ops.aten.as_strided.default)
+def aten_ops_as_strided(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.slice.as_strided(
+        ctx,
+        target,
+        source_ir=SourceIR.ATEN,
+        name=name,
+        input=args[0],
+        size=args[1],
+        stride=args[2],
+        storage_offset=args_bounds_check(args, 3, None),
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.permute.default)
 @enforce_tensor_types(
     {
@@ -2185,7 +2219,6 @@ def aten_ops_linear(
         bias=args_bounds_check(args, 2, None),
     )
 
-
 @dynamo_tensorrt_converter(torch.ops.aten._cdist_forward.default)
 def aten_ops_cdist_forward(
     ctx: ConversionContext,
@@ -2203,39 +2236,6 @@ def aten_ops_cdist_forward(
         x2=args[1],
         p=args[2],
         compute_mode=args_bounds_check(args, 3, None),
-    )
-
-
-def zero_output_validator(node: Node) -> bool:
-    if 0 in node.args[1]:
-        _LOGGER.debug(
-            f"We do not support output tensor {node.args[1]} tensors with zero-sized dimensions for this operation."
-        )
-        return False
-    else:
-        return True
-
-
-@dynamo_tensorrt_converter(
-    torch.ops.aten.as_strided.default,
-    capability_validator=zero_output_validator,
-)
-def aten_ops_as_strided(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.slice.as_strided(
-        ctx,
-        target,
-        source_ir=SourceIR.ATEN,
-        name=name,
-        input=args[0],
-        size=args[1],
-        stride=args[2],
-        storage_offset=args_bounds_check(args, 3, None),
     )
 
 
