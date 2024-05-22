@@ -3,7 +3,6 @@ from typing import Optional, Sequence
 
 import numpy as np
 import tensorrt as trt
-import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -271,13 +270,15 @@ def as_strided(
     input: TRTTensor,
     size: Sequence[int],
     stride: Sequence[int],
-    storage_offset: int,
+    storage_offset: Optional[int],
 ) -> TRTTensor:
-    assert len(size) == len(stride), "size and stride shapes must be the same"
+    # Ensure storage_offset is an integer before passing to nested
+    if storage_offset is None:
+        storage_offset = 0
 
     flatten_shape = flatten_dims(input, 0, -1)
     flatten_output = impl.shuffle.reshape(
-        ctx, target, source_ir, f"{name}_reshape", input, flatten_shape
+        ctx, target, source_ir, f"{name}_reshape_flatten_output", input, flatten_shape
     )
 
     indices = []
@@ -298,9 +299,9 @@ def as_strided(
 
     nested(len(size), size, stride, storage_offset, 0)
 
-    indices = torch.tensor(indices, dtype=torch.int)
+    indices = np.array(indices, dtype=np.int32)
 
-    indices_tensor = get_trt_tensor(ctx, (indices), f"{name}_indices")
+    indices_tensor = get_trt_tensor(ctx, indices, f"{name}_indices")
 
     # Use gather to reorder elements based on computed indices
     gather_layer = ctx.net.add_gather(flatten_output, indices_tensor, axis=0)
@@ -311,7 +312,7 @@ def as_strided(
         ctx,
         target,
         source_ir,
-        f"{name}_reshape",
+        f"{name}_reshape_gather_output",
         gather_output,
         tuple(size),
     )

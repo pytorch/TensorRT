@@ -2206,7 +2206,20 @@ def aten_ops_cdist_forward(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.as_strided.default)
+def zero_output_validator(node: Node) -> bool:
+    if 0 in node.args[1]:
+        _LOGGER.debug(
+            f"We do not support output tensor {node.args[1]} tensors with zero-sized dimensions for this operation."
+        )
+        return False
+    else:
+        return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.as_strided.default,
+    capability_validator=zero_output_validator,
+)
 def aten_ops_as_strided(
     ctx: ConversionContext,
     target: Target,
