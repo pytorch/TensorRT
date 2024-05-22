@@ -1165,6 +1165,57 @@ def aten_ops_log(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.log2.default)
+def aten_ops_log2(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.log2(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.log10.default)
+def aten_ops_log10(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.log10(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.log1p.default)
+def aten_ops_log1p(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.log1p(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.sqrt.default)
 def aten_ops_sqrt(
     ctx: ConversionContext,
@@ -2849,23 +2900,6 @@ def aten_ops_flip(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.log2.default)
-def log2(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.unary.log2(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-    )
-
-
 @dynamo_tensorrt_converter(torch.ops.aten.scalar_tensor.default)
 def aten_ops_scalar_tensor(
     ctx: ConversionContext,
@@ -2876,23 +2910,6 @@ def aten_ops_scalar_tensor(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.unary.scalar_tensor(
         ctx, target, SourceIR.ATEN, name, args[0], dtype=kwargs.get("dtype")
-    )
-
-
-@dynamo_tensorrt_converter(torch.ops.aten.log10.default)
-def log10(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.unary.log10(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
     )
 
 
