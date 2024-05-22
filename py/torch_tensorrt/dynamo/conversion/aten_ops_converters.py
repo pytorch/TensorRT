@@ -12,9 +12,9 @@ from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     dynamo_tensorrt_converter,
+    has_static_shapes_in_args,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import (
-    dynamic_unsupported_with_args,
     enforce_tensor_types,
     is_only_operator_on_placeholder,
 )
@@ -57,10 +57,14 @@ def one_user_validator(node: Node) -> bool:
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.native_batch_norm.default, capability_validator=one_user_validator
+    torch.ops.aten.native_batch_norm.default,
+    capability_validator=one_user_validator,
+    supports_dynamic_shapes=True,
 )
-@dynamo_tensorrt_converter(torch.ops.aten.batch_norm.default)
-@dynamo_tensorrt_converter(torch.ops.aten.batch_norm)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.batch_norm.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(torch.ops.aten.batch_norm, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -94,6 +98,7 @@ def aten_ops_batch_norm(
 @dynamo_tensorrt_converter(
     torch.ops.aten._native_batch_norm_legit_no_training.default,
     capability_validator=one_user_validator,
+    supports_dynamic_shapes=True,
 )
 def aten_ops_batch_norm_legit_no_training(
     ctx: ConversionContext,
@@ -123,10 +128,14 @@ def aten_ops_batch_norm_legit_no_training(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.native_layer_norm.default, capability_validator=one_user_validator
+    torch.ops.aten.native_layer_norm.default,
+    capability_validator=one_user_validator,
+    supports_dynamic_shapes=True,
 )
-@dynamo_tensorrt_converter(torch.ops.aten.layer_norm.default)
-@dynamo_tensorrt_converter(torch.ops.aten.layer_norm)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.layer_norm.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(torch.ops.aten.layer_norm, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -231,7 +240,10 @@ def aten_ops_cat(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.embedding.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.embedding.default,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_embedding(
     ctx: ConversionContext,
     target: Target,
@@ -336,7 +348,7 @@ def aten_ops_grid(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.relu.default)
+@dynamo_tensorrt_converter(torch.ops.aten.relu.default, supports_dynamic_shapes=True)
 def aten_ops_relu(
     ctx: ConversionContext,
     target: Target,
@@ -353,7 +365,7 @@ def aten_ops_relu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sigmoid.default)
+@dynamo_tensorrt_converter(torch.ops.aten.sigmoid.default, supports_dynamic_shapes=True)
 def aten_ops_sigmoid(
     ctx: ConversionContext,
     target: Target,
@@ -375,7 +387,7 @@ def aten_ops_sigmoid(
         0: (TRTTensor,),
     }
 )
-@dynamo_tensorrt_converter(torch.ops.aten.sym_size.int)
+@dynamo_tensorrt_converter(torch.ops.aten.sym_size.int, supports_dynamic_shapes=True)
 def aten_ops_symsize_int(
     ctx: ConversionContext,
     target: Target,
@@ -421,7 +433,7 @@ def aten_ops_index(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.tanh.default)
+@dynamo_tensorrt_converter(torch.ops.aten.tanh.default, supports_dynamic_shapes=True)
 def aten_ops_tanh(
     ctx: ConversionContext,
     target: Target,
@@ -512,10 +524,10 @@ def aten_ops_hard_sigmoid(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.matmul)
-@dynamo_tensorrt_converter(torch.ops.aten.mm.default)
-@dynamo_tensorrt_converter(torch.ops.aten.mv.default)
-@dynamo_tensorrt_converter(torch.ops.aten.bmm.default)
+@dynamo_tensorrt_converter(torch.ops.aten.matmul, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.mm.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.mv.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.bmm.default, supports_dynamic_shapes=True)
 def aten_ops_matmul(
     ctx: ConversionContext,
     target: Target,
@@ -624,7 +636,9 @@ def aten_ops_erf(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.unsqueeze.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.unsqueeze.default, supports_dynamic_shapes=True
+)
 def aten_ops_unsqueeze(
     ctx: ConversionContext,
     target: Target,
@@ -637,7 +651,9 @@ def aten_ops_unsqueeze(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten._softmax.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten._softmax.default, supports_dynamic_shapes=True
+)
 def aten_ops_softmax(
     ctx: ConversionContext,
     target: Target,
@@ -651,14 +667,14 @@ def aten_ops_softmax(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.split.Tensor, capability_validator=dynamic_unsupported_with_args([1])
+    torch.ops.aten.split.Tensor, capability_validator=has_static_shapes_in_args([1])
 )
 @dynamo_tensorrt_converter(
-    torch.ops.aten.split.sizes, capability_validator=dynamic_unsupported_with_args([1])
+    torch.ops.aten.split.sizes, capability_validator=has_static_shapes_in_args([1])
 )
 @dynamo_tensorrt_converter(
     torch.ops.aten.split_with_sizes.default,
-    capability_validator=dynamic_unsupported_with_args([1]),
+    capability_validator=has_static_shapes_in_args([1]),
 )
 def aten_ops_split(
     ctx: ConversionContext,
@@ -732,7 +748,7 @@ def aten_ops_select(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.slice.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.slice.Tensor, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -828,7 +844,7 @@ def aten_ops_tile(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.permute.default)
+@dynamo_tensorrt_converter(torch.ops.aten.permute.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -899,10 +915,12 @@ def to_copy_dtype_validator(placeholder_only: bool) -> Callable[[Node], bool]:
 @dynamo_tensorrt_converter(
     torch.ops.aten.clone.default,
     capability_validator=lambda node: not is_only_operator_on_placeholder(node),
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
     torch.ops.aten._to_copy.default,
     capability_validator=to_copy_dtype_validator(placeholder_only=False),
+    supports_dynamic_shapes=True,
 )
 def aten_ops_clone_copy_dtype(
     ctx: ConversionContext,
@@ -951,7 +969,7 @@ def aten_ops_clone_copy_placeholder(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.expand.default)
+@dynamo_tensorrt_converter(torch.ops.aten.expand.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -1122,8 +1140,8 @@ def aten_ops_min(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.mean.default)
-@dynamo_tensorrt_converter(torch.ops.aten.mean.dim)
+@dynamo_tensorrt_converter(torch.ops.aten.mean.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.mean.dim, supports_dynamic_shapes=True)
 def aten_ops_mean(
     ctx: ConversionContext,
     target: Target,
@@ -1227,7 +1245,7 @@ def aten_ops_recip(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.abs.default)
+@dynamo_tensorrt_converter(torch.ops.aten.abs.default, supports_dynamic_shapes=True)
 def aten_ops_abs(
     ctx: ConversionContext,
     target: Target,
@@ -1574,8 +1592,9 @@ def aten_ops_isnan(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.add.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.add.Scalar)
+@dynamo_tensorrt_converter(operator.add, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.add.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.add.Scalar, supports_dynamic_shapes=True)
 def aten_ops_add(
     ctx: ConversionContext,
     target: Target,
@@ -1606,8 +1625,8 @@ def aten_ops_add(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.mul.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.mul.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.mul.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.mul.Scalar, supports_dynamic_shapes=True)
 def aten_ops_mul(
     ctx: ConversionContext,
     target: Target,
@@ -1693,11 +1712,11 @@ def aten_ops_sub(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode)
-@dynamo_tensorrt_converter(torch.ops.aten.div.Scalar)
-@dynamo_tensorrt_converter(torch.ops.aten.div.Scalar_mode)
-@dynamo_tensorrt_converter(torch.ops.prims.div.default)
+@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.div.Scalar, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.div.Scalar_mode, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.prims.div.default, supports_dynamic_shapes=True)
 def aten_ops_div(
     ctx: ConversionContext,
     target: Target,
@@ -1740,9 +1759,13 @@ def aten_ops_div(
         )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.pow.Tensor_Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.pow.Scalar)
-@dynamo_tensorrt_converter(torch.ops.aten.pow.Tensor_Scalar)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.pow.Tensor_Tensor, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(torch.ops.aten.pow.Scalar, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.pow.Tensor_Scalar, supports_dynamic_shapes=True
+)
 def aten_ops_pow(
     ctx: ConversionContext,
     target: Target,
@@ -2145,7 +2168,9 @@ def conv_param_validator(conv_node: Node) -> bool:
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.convolution.default, capability_validator=conv_param_validator
+    torch.ops.aten.convolution.default,
+    capability_validator=conv_param_validator,
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
     {
@@ -2333,13 +2358,19 @@ def max_pool_param_validator(pool_node: Node) -> bool:
 
 # Note: MaxPool1d uses max_pool2d as it converts to 2D first.
 @dynamo_tensorrt_converter(
-    torch.ops.aten.max_pool1d.default, capability_validator=max_pool_param_validator
+    torch.ops.aten.max_pool1d.default,
+    capability_validator=max_pool_param_validator,
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
-    torch.ops.aten.max_pool2d.default, capability_validator=max_pool_param_validator
+    torch.ops.aten.max_pool2d.default,
+    capability_validator=max_pool_param_validator,
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
-    torch.ops.aten.max_pool3d.default, capability_validator=max_pool_param_validator
+    torch.ops.aten.max_pool3d.default,
+    capability_validator=max_pool_param_validator,
+    supports_dynamic_shapes=True,
 )
 def aten_ops_max_pool(
     ctx: ConversionContext,
@@ -2384,8 +2415,8 @@ def tensorrt_scaled_dot_product_attention(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.reshape.default)
-@dynamo_tensorrt_converter(torch.ops.aten.view.default)
+@dynamo_tensorrt_converter(torch.ops.aten.reshape.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.view.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2494,7 +2525,7 @@ def aten_ops_argmin(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.addmm.default)
+@dynamo_tensorrt_converter(torch.ops.aten.addmm.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
