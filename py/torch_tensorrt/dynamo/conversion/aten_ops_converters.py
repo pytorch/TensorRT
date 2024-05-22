@@ -1166,7 +1166,7 @@ def aten_ops_log(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.log2.default)
-def log2(
+def aten_ops_log2(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
@@ -1183,7 +1183,7 @@ def log2(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.log10.default)
-def log10(
+def aten_ops_log10(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
