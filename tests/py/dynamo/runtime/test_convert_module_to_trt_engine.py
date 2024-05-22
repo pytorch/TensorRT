@@ -27,7 +27,7 @@ class TestConvertModuleToTrtEngine(unittest.TestCase):
 
         # Inference on TRT Engine
         py_trt_module = PythonTorchTensorRTModule(
-            trt_engine_str, ["a", "b"], ["output0"]
+            trt_engine_str, ["arg0_1", "arg1_1"], ["output0"]
         )
         trt_output = py_trt_module(input_data_0, input_data_1).cpu()
 

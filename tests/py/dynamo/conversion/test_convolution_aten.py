@@ -1,7 +1,6 @@
 import torch
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
-
 from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
@@ -138,7 +137,7 @@ class TestConvolutionConverter(DispatchTestCase):
             Input(
                 shape=(-1, 3, -1, -1),
                 dtype=torch.float32,
-                shape_ranges=[((1, 3, 1, 1), (1, 3, 4, 4), (32, 3, 128, 128))],
+                shape_ranges=[((1, 3, 1, 1), (2, 3, 4, 4), (32, 3, 128, 128))],
             ),
         ]
         self.run_test_with_dynamic_shape(
@@ -201,7 +200,7 @@ class TestConvolutionConverter(DispatchTestCase):
             Input(
                 shape=(-1, 3, -1, -1, -1),
                 dtype=torch.float32,
-                shape_ranges=[((1, 3, 1, 1, 1), (1, 3, 4, 4, 4), (8, 3, 32, 32, 32))],
+                shape_ranges=[((1, 3, 1, 1, 1), (2, 3, 4, 4, 4), (8, 3, 32, 32, 32))],
             ),
         ]
         self.run_test_with_dynamic_shape(

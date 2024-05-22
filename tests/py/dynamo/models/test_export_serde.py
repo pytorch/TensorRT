@@ -1,7 +1,6 @@
 import unittest
 
 import pytest
-import timm
 import torch
 import torch_tensorrt as torchtrt
 import torchvision.models as models

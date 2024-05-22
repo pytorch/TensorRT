@@ -4,6 +4,7 @@ import re
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch import SymBool, SymFloat, SymInt
@@ -20,8 +21,6 @@ from torch_tensorrt.fx.converters.converter_utils import (
     get_axes_for_reduce_op,
 )
 from torch_tensorrt.fx.types import TRTDataType, TRTTensor
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -321,6 +320,7 @@ def create_constant(
     value: Union[int, float, bool, np.ndarray, torch.Tensor],
     name: str,
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]],
+    min_rank: Optional[int] = 1,
 ) -> TRTTensor:
     """
     Add a TensorRT constant layer whose value is `value` to `ctx.net`.
@@ -332,14 +332,19 @@ def create_constant(
         name (str): Name of the added TensorRT Constant layer.
         dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
             If a dtype is given, we will convert the type of the given `value` to this dtype.
+        min_rank (int): minimum rank of the constant tensor.
     Returns:
         A TensorRT ITensor that represents the given value.
     """
+    shape = (1,)
+    # Rank 0 constant is required in IFillLayer inputs.
+    if min_rank == 0:
+        shape = trt.Dims()
     numpy_value = to_numpy(
         value, _enums.dtype._from(dtype).to(np.dtype) if dtype is not None else None
     )
     constant = ctx.net.add_constant(
-        (1,) if isinstance(value, (int, float, bool)) else value.shape,
+        shape if isinstance(value, (int, float, bool)) else value.shape,
         numpy_value.copy() if isinstance(numpy_value, np.ndarray) else numpy_value,
     )
     constant.name = name
@@ -351,6 +356,7 @@ def get_trt_tensor(
     input_val: Any,
     name: str,
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]] = None,
+    min_rank: int = 1,
 ) -> TRTTensor:
     """
     Given a value of random type, we try to convert it to a TensorRT ITensor.
@@ -363,6 +369,7 @@ def get_trt_tensor(
             one.
         dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
             If dtype is provided, the given value will be converted to this dtype.
+        min_rank (int): minimum rank of the constant tensor.
     Returns:
         A TensorRT ITensor that represents the given value.
     """
@@ -375,7 +382,7 @@ def get_trt_tensor(
             input_val = input_val.astype(np.float32)
 
     if isinstance(input_val, (torch.Tensor, np.ndarray, int, float, bool)):
-        return create_constant(ctx, input_val, name, dtype)
+        return create_constant(ctx, input_val, name, dtype, min_rank)
     elif isinstance(input_val, TRTTensor):
         return input_val
     else:
