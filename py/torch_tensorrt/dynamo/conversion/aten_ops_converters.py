@@ -2206,6 +2206,26 @@ def aten_ops_cdist_forward(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.as_strided.default)
+def aten_ops_as_strided(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.slice.as_strided(
+        ctx,
+        target,
+        source_ir=SourceIR.ATEN,
+        name=name,
+        input=args[0],
+        size=args[1],
+        stride=args[2],
+        storage_offset=args_bounds_check(args, 3, None),
+    )
+
+
 def avg_pool_param_validator(pool_node: Node) -> bool:
     ceil_mode = args_bounds_check(pool_node.args, 4, False)
     divisor_override = args_bounds_check(pool_node.args, 6)
