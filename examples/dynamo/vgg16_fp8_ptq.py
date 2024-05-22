@@ -102,18 +102,14 @@ def vgg16(num_classes=1000, init_weights=False):
 PARSER = argparse.ArgumentParser(
     description="Load pre-trained VGG model and then tune with FP8 and PTQ"
 )
-PARSER.add_argument("--ckpt", type=str, help="Path to the pre-trained checkpoint")
+PARSER.add_argument(
+    "--ckpt", type=str, required=True, help="Path to the pre-trained checkpoint"
+)
 PARSER.add_argument(
     "--batch-size",
     default=128,
     type=int,
-    help="Batch size for tuning the model with PTQ",
-)
-PARSER.add_argument(
-    "--fp8-epochs",
-    default=10,
-    type=int,
-    help="The number of epochs to quantize the model to FP8",
+    help="Batch size for tuning the model with PTQ and FP8",
 )
 
 args = PARSER.parse_args()
@@ -173,25 +169,19 @@ crit = nn.CrossEntropyLoss()
 
 
 def calibrate_loop(model):
-    # calibrate on a small number of batches
-    for fp8_ep in range(args.fp8_epochs):
-        print("Epoch: [%5d / %5d]" % (fp8_ep + 1, args.fp8_epochs))
-        total = 0
-        correct = 0
-        loss = 0.0
-        for data, labels in training_dataloader:
-            data, labels = data.cuda(), labels.cuda(non_blocking=True)
-            out = model(data)
-            loss += crit(out, labels)
-            preds = torch.max(out, 1)[1]
-            total += labels.size(0)
-            correct += (preds == labels).sum().item()
+    # calibrate over the training dataset
+    total = 0
+    correct = 0
+    loss = 0.0
+    for data, labels in training_dataloader:
+        data, labels = data.cuda(), labels.cuda(non_blocking=True)
+        out = model(data)
+        loss += crit(out, labels)
+        preds = torch.max(out, 1)[1]
+        total += labels.size(0)
+        correct += (preds == labels).sum().item()
 
-        print(
-            "PTQ Training Loss: {:.5f} Acc: {:.2f}%".format(
-                loss / total, 100 * correct / total
-            )
-        )
+    print("PTQ Loss: {:.5f} Acc: {:.2f}%".format(loss / total, 100 * correct / total))
 
 
 # %%
