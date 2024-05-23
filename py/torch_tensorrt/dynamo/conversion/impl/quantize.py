@@ -29,8 +29,7 @@ def quantize_fp8(
             f"quantize_fp8 converter received an input of {input_tensor.dtype} type. Supported types: float32 | float16"
         )
 
-    if isinstance(scale, np.ndarray):
-        scale = get_trt_tensor(ctx, scale, name + "_scale")
+    scale = get_trt_tensor(ctx, scale, name + "_scale")
     # Add Q node
     quantize_layer = ctx.net.add_quantize(input_tensor, scale)
     quantize_layer.set_output_type(0, trt.DataType.FP8)

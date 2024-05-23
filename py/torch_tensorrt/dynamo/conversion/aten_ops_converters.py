@@ -585,7 +585,7 @@ try:
     assert torch.ops.trt.quantize_fp8.default
 except Exception as e:
     _LOGGER.warning(
-        "Unable to import torch.ops.trt.quantize_fp8 op. Please install modelopt library (https://github.com/NVIDIA/TensorRT-Model-Optimizer?tab=readme-ov-file#installation) to register torch.ops.trt.quantize_fp8 op"
+        "Unable to import quantization op. Please install modelopt library (https://github.com/NVIDIA/TensorRT-Model-Optimizer?tab=readme-ov-file#installation) to add support for compiling quantized models"
     )
 else:
 
