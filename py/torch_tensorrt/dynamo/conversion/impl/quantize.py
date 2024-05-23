@@ -23,7 +23,7 @@ def quantize_fp8(
     on the output_type set and dequantizes them back.
     """
     if (isinstance(input_tensor, TRTTensor)) and not (
-        input_tensor.dtype != trt.float32 or input_tensor.dtype != trt.float16
+        input_tensor.dtype == trt.float32 or input_tensor.dtype == trt.float16
     ):
         raise ValueError(
             f"quantize_fp8 converter received an input of {input_tensor.dtype} type. Supported types: float32 | float16"
