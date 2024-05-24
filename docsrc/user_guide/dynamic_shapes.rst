@@ -6,9 +6,9 @@ Dynamic shapes with Torch-TensorRT
 By default, you can run a pytorch model with varied input shapes and the output shapes are determined eagerly.
 However, Torch-TensorRT is an AOT compiler which requires some prior information about the input shapes to compile and optimize the model.
 In the case of dynamic input shapes, we must provide the (min_shape, opt_shape, max_shape) arguments so that the model can be optimized for
-these range of input shapes. An example usage of static and dynamic shapes is as follows.
+this range of input shapes. An example usage of static and dynamic shapes is as follows.
 
-NOTE: The following code uses Dynamo Frontend. Incase of Torchscript Frontend, please swap out ``ir=dynamo`` with ``ir=ts`` and the behavior is exactly the same.
+NOTE: The following code uses Dynamo Frontend. In case of Torchscript Frontend, please swap out ``ir=dynamo`` with ``ir=ts`` and the behavior is exactly the same.
 
 .. code-block:: python
 
