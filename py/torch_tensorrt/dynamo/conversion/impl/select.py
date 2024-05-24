@@ -390,3 +390,41 @@ def index_select(
     set_layer_name(gather_layer, target, f"{name}_gather", source_ir)
 
     return gather_layer.get_output(0)
+
+
+def scatter(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    dim: int,
+    index: Union[TRTTensor, np.ndarray, torch.Tensor],
+    src: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    input_shape = input.shape
+    index_shape = index.shape
+    index_shape_list = list(index_shape)
+    if index.dtype == trt.int64:
+        index = cast_trt_tensor(ctx, index, trt.int32, name + "_cast_index_tensor")
+    dim = get_positive_dim(dim, len(input_shape))
+    src_tensor = src
+    # scatter.value
+    if isinstance(src, int) or isinstance(src, float):
+        src_tensor = get_trt_tensor(
+            ctx, src * np.ones(index_shape_list), name + "_value_tensor"
+        )
+        src_tensor = cast_trt_tensor(
+            ctx, src_tensor, input.dtype, name + "_cast_value_tensor"
+        )
+    # scatter.src
+    elif not (isinstance(src, TRTTensor)):
+        src_tensor = get_trt_tensor(ctx, src, name + "_src_tensor")
+
+    scatter_layer = ctx.net.add_scatter(
+        input, index, src_tensor, trt.ScatterMode.ELEMENT
+    )
+    scatter_layer.axis = dim
+    set_layer_name(scatter_layer, target, name + "_scatter_layer", source_ir)
+    out = scatter_layer.get_output(0)
+    return out

@@ -696,6 +696,26 @@ def aten_ops_clamp(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.scatter.src)
+@dynamo_tensorrt_converter(torch.ops.aten.scatter.value)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        2: (TRTTensor,),
+    }
+)
+def aten_ops_scatter(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.select.scatter(
+        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2], args[3]
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.select.int)
 def aten_ops_select(
     ctx: ConversionContext,
@@ -802,6 +822,40 @@ def aten_ops_tile(
         name,
         args[0],
         args[1],
+    )
+
+
+def zero_output_validator(node: Node) -> bool:
+    if 0 in node.args[1]:
+        _LOGGER.debug(
+            f"We do not support output tensor {node.args[1]} tensors with zero-sized dimensions for this operation."
+        )
+        return False
+    else:
+        return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.as_strided.default,
+    capability_validator=zero_output_validator,
+)
+@dynamo_tensorrt_converter(torch.ops.aten.as_strided.default)
+def aten_ops_as_strided(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.slice.as_strided(
+        ctx,
+        target,
+        source_ir=SourceIR.ATEN,
+        name=name,
+        input=args[0],
+        size=args[1],
+        stride=args[2],
+        storage_offset=args_bounds_check(args, 3, None),
     )
 
 
@@ -1162,6 +1216,57 @@ def aten_ops_log(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.unary.log(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.log2.default)
+def aten_ops_log2(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.log2(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.log10.default)
+def aten_ops_log10(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.log10(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.log1p.default)
+def aten_ops_log1p(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.log1p(
         ctx,
         target,
         SourceIR.ATEN,
@@ -2193,6 +2298,26 @@ def aten_ops_linear(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten._cdist_forward.default)
+def aten_ops_cdist_forward(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.normalization.cdist_forward(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        x1=args[0],
+        x2=args[1],
+        p=args[2],
+        compute_mode=args_bounds_check(args, 3, None),
+    )
+
+
 def avg_pool_param_validator(pool_node: Node) -> bool:
     ceil_mode = args_bounds_check(pool_node.args, 4, False)
     divisor_override = args_bounds_check(pool_node.args, 6)
@@ -2842,23 +2967,6 @@ def aten_ops_flip(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.log2.default)
-def log2(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.unary.log2(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-    )
-
-
 @dynamo_tensorrt_converter(torch.ops.aten.scalar_tensor.default)
 def aten_ops_scalar_tensor(
     ctx: ConversionContext,
@@ -2869,23 +2977,6 @@ def aten_ops_scalar_tensor(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.unary.scalar_tensor(
         ctx, target, SourceIR.ATEN, name, args[0], dtype=kwargs.get("dtype")
-    )
-
-
-@dynamo_tensorrt_converter(torch.ops.aten.log10.default)
-def log10(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.unary.log10(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
     )
 
 

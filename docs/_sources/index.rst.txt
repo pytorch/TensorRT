@@ -112,6 +112,9 @@ Tutorials
    tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
    tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
    tutorials/_rendered_examples/dynamo/custom_kernel_plugins
+   tutorials/_rendered_examples/distributed_inference/data_parallel_gpt2
+   tutorials/_rendered_examples/distributed_inference/data_parallel_stable_diffusion
+
 
 Python API Documenation
 ------------------------

@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Example notebooks &mdash; Torch-TensorRT v2.4.0.dev0+de9a063 documentation</title>
+  <title>Example notebooks &mdash; Torch-TensorRT v2.4.0.dev0+7e08872 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.4.0.dev0+de9a063
+                  v2.4.0.dev0+7e08872
                 </div>
               
             
@@ -472,11 +472,11 @@ and running it to test the speedup obtained.</p>
 <li><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/notebooks/CitriNet-example.ipynb">Torch-TensorRT Getting Started - CitriNet</a></p></li>
 </ul>
 </section>
-<section id="compiling-efficentnet-with-torch-tensorrt">
-<h3>Compiling EfficentNet with Torch-TensorRT<a class="headerlink" href="#compiling-efficentnet-with-torch-tensorrt" title="Permalink to this heading">¶</a></h3>
-<p>EfficentNet is a feedforward CNN designed to achieve better performance and accuracy than alternative architectures
+<section id="compiling-efficientnet-with-torch-tensorrt">
+<h3>Compiling EfficientNet with Torch-TensorRT<a class="headerlink" href="#compiling-efficientnet-with-torch-tensorrt" title="Permalink to this heading">¶</a></h3>
+<p>EfficientNet is a feedforward CNN designed to achieve better performance and accuracy than alternative architectures
 by using a “scaling method that uniformly scales all dimensions of depth/width/resolution using a simple yet highly effective compound coefficient”.</p>
-<p>This notebook demonstrates the steps for optimizing a pretrained EfficentNet model with Torch-TensorRT,
+<p>This notebook demonstrates the steps for optimizing a pretrained EfficientNet model with Torch-TensorRT,
 and running it to test the speedup obtained.</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/notebooks/EfficientNet-example.ipynb">Torch-TensorRT Getting Started - EfficientNet-B0</a></p></li>
@@ -488,7 +488,7 @@ and running it to test the speedup obtained.</p>
 This way, the model learns an inner representation of the English language that can then be used to extract
 features useful for downstream tasks: if you have a dataset of labeled sentences for instance, you can train
 a standard classifier using the features produced by the BERT model as inputs.” (<a class="reference external" href="https://huggingface.co/bert-base-uncased">https://huggingface.co/bert-base-uncased</a>)</p>
-<p>This notebook demonstrates the steps for optimizing a pretrained EfficentNet model with Torch-TensorRT,
+<p>This notebook demonstrates the steps for optimizing a pretrained EfficientNet model with Torch-TensorRT,
 and running it to test the speedup obtained.</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/notebooks/Hugging-Face-BERT.ipynb">Masked Language Modeling (MLM) with Hugging Face BERT Transformer</a></p></li>
@@ -515,7 +515,7 @@ pretrained ResNet-50 network, and running it to test the speedup obtained.</p>
 <h3>Using Dynamic Shapes with Torch-TensorRT<a class="headerlink" href="#using-dynamic-shapes-with-torch-tensorrt" title="Permalink to this heading">¶</a></h3>
 <p>Making use of Dynamic Shaped Tensors in Torch TensorRT is quite simple. Let’s say you are
 using the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile(...)</span></code> function  to compile a torchscript module. One
-of the args in this function in this function is <code class="docutils literal notranslate"><span class="pre">input</span></code>: which defines an input to a
+of the args in this function is <code class="docutils literal notranslate"><span class="pre">input</span></code>: which defines an input to a
 module in terms of expected shape, data type and tensor format: <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.Input.</span></code></p>
 <p>For the purposes of this walkthrough we just need three kwargs: <cite>min_shape</cite>, <cite>opt_shape`</cite> and <cite>max_shape</cite>.</p>
 <div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
@@ -535,8 +535,8 @@ module in terms of expected shape, data type and tensor format: <code class="doc
 </section>
 <section id="using-the-fx-frontend-with-torch-tensorrt">
 <h3>Using the FX Frontend with Torch-TensorRT<a class="headerlink" href="#using-the-fx-frontend-with-torch-tensorrt" title="Permalink to this heading">¶</a></h3>
-<p>The purpose of this example is to demostrate the overall flow of lowering a PyTorch model to TensorRT
-conveniently with using FX.</p>
+<p>The purpose of this example is to demonstrate the overall flow of lowering a PyTorch model to TensorRT
+conveniently using FX.</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/notebooks/getting_started_with_fx_path_lower_to_trt.ipynb">Using the FX Frontend with Torch-TensorRT</a></p></li>
 </ul>
@@ -639,7 +639,7 @@ steps from training to inference of a QAT model in Torch-TensorRT.</p>
 <li><a class="reference internal" href="#">Example notebooks</a><ul>
 <li><a class="reference internal" href="#id1">Notebooks</a><ul>
 <li><a class="reference internal" href="#compiling-citrinet-with-torch-tensorrt">Compiling CitriNet with Torch-TensorRT</a></li>
-<li><a class="reference internal" href="#compiling-efficentnet-with-torch-tensorrt">Compiling EfficentNet with Torch-TensorRT</a></li>
+<li><a class="reference internal" href="#compiling-efficientnet-with-torch-tensorrt">Compiling EfficientNet with Torch-TensorRT</a></li>
 <li><a class="reference internal" href="#masked-language-modeling-mlm-with-hugging-face-bert-transformer-accelerated-by-torch-tensorrt">Masked Language Modeling (MLM) with Hugging Face BERT Transformer accelerated by Torch-TensorRT</a></li>
 <li><a class="reference internal" href="#serving-a-model-in-c-using-torch-tensorrt">Serving a model in C++ using Torch-TensorRT</a></li>
 <li><a class="reference internal" href="#compiling-resnet50-with-torch-tensorrt">Compiling ResNet50 with Torch-TensorRT</a></li>

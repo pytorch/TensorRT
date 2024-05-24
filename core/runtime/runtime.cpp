@@ -121,6 +121,14 @@ void multi_gpu_device_check() {
   }
 }
 
+bool get_multi_device_safe_mode() {
+  return MULTI_DEVICE_SAFE_MODE;
+}
+
+void set_multi_device_safe_mode(bool multi_device_safe_mode) {
+  MULTI_DEVICE_SAFE_MODE = multi_device_safe_mode;
+}
+
 namespace {
 static DeviceList cuda_device_list;
 }

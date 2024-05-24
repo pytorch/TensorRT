@@ -29,7 +29,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
     def __init__(
         self,
-        engine: trt.ICudaEngine,
+        engine: bytes,
         input_names: Optional[List[str]] = None,
         output_names: Optional[List[str]] = None,
         target_device: Device = Device._current_device(),
@@ -60,9 +60,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.engine = runtime.deserialize_cuda_engine(self.engine)
         self.context = self.engine.create_execution_context()
 
-        assert (
-            self.engine.num_io_tensors // self.engine.num_optimization_profiles
-        ) == (len(self.input_names) + len(self.output_names))
+        assert self.engine.num_io_tensors == (
+            len(self.input_names) + len(self.output_names)
+        )
 
         self.input_dtypes = [
             dtype._from(self.engine.get_tensor_dtype(input_name))

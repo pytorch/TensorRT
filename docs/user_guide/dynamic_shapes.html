@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Dynamic shapes with Torch-TensorRT &mdash; Torch-TensorRT v2.4.0.dev0+de9a063 documentation</title>
+  <title>Dynamic shapes with Torch-TensorRT &mdash; Torch-TensorRT v2.4.0.dev0+7e08872 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.4.0.dev0+de9a063
+                  v2.4.0.dev0+7e08872
                 </div>
               
             
@@ -459,8 +459,8 @@
 <p>By default, you can run a pytorch model with varied input shapes and the output shapes are determined eagerly.
 However, Torch-TensorRT is an AOT compiler which requires some prior information about the input shapes to compile and optimize the model.
 In the case of dynamic input shapes, we must provide the (min_shape, opt_shape, max_shape) arguments so that the model can be optimized for
-these range of input shapes. An example usage of static and dynamic shapes is as follows.</p>
-<p>NOTE: The following code uses Dynamo Frontend. Incase of Torchscript Frontend, please swap out <code class="docutils literal notranslate"><span class="pre">ir=dynamo</span></code> with <code class="docutils literal notranslate"><span class="pre">ir=ts</span></code> and the behavior is exactly the same.</p>
+this range of input shapes. An example usage of static and dynamic shapes is as follows.</p>
+<p>NOTE: The following code uses Dynamo Frontend. In case of Torchscript Frontend, please swap out <code class="docutils literal notranslate"><span class="pre">ir=dynamo</span></code> with <code class="docutils literal notranslate"><span class="pre">ir=ts</span></code> and the behavior is exactly the same.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torch_tensorrt</span>
 
