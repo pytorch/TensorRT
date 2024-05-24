@@ -116,7 +116,7 @@ auto results = trt_mod.forward({input_tensor});
 These are the following dependencies used to verify the testcases. Torch-TensorRT can work with other versions, but the tests are not guaranteed to pass.
 
 - Bazel 5.2.0
-- Libtorch 2.3.0.dev (latest nightly) (built with CUDA 12.1)
+- Libtorch 2.4.0.dev (latest nightly) (built with CUDA 12.1)
 - CUDA 12.1
 - TensorRT 10.0.1.6
 
