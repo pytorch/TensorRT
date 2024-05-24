@@ -174,6 +174,57 @@ def empty_permuted_decomposition(*args, **kwargs) -> torch.Tensor:
     return torch.empty([empty_size[l] for l in empty_permute], **kwargs).permute(perm)
 
 
+@register_torch_trt_decomposition(
+    torch.ops.aten.scatter_reduce.default, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def scatter_reduce_decomposition(
+    input_tensor: torch.Tensor,
+    dim: int,
+    index: torch.Tensor,
+    src_tensor: torch.Tensor,
+    reduce_operation: str,
+) -> torch.Tensor:
+    reduce_ops = {
+        "sum": torch.ops.aten.add.Tensor,
+        "prod": torch.ops.aten.mul.Tensor,
+        "mean": torch.ops.aten.mean.default,
+        "amax": torch.ops.aten.argmax,
+        "amin": torch.ops.aten.argmin,
+    }
+    index_tensor_shape = index.shape
+    scatter_reduce_tensor = input_tensor
+    # check if there is index collision cases
+    if len(torch.unique(index, dim=dim)) == index_tensor_shape[dim]:
+        scatter_tensor = torch.scatter(
+            torch.empty_like(input_tensor), dim, index, src_tensor
+        )
+        scatter_reduce_tensor = lambda reduce_operation: reduce_ops[reduce_operation](
+            input_tensor, scatter_tensor.cuda()
+        )
+    else:
+        # index collision cases
+        index_copy = index
+        index_shape_squeezed = index.squeeze(dim).shape
+        select_index_dim = index.shape[dim]
+        to_stack_dummy_index = tuple(
+            torch.empty_like(index_shape_squeezed) for _ in range(select_index_dim)
+        )
+        for index_index_dim in range(0, select_index_dim, 1):
+            select_tensor_dim = torch.select(index, dim, index)
+            to_stack_index = (
+                to_stack_dummy_index[:index_index_dim]
+                + (select_tensor_dim,)
+                + to_stack_dummy_index[index_index_dim + 1 :]
+            )
+            scatter_tensor = torch.scatter(
+                torch.empty_like(input_tensor), dim, to_stack_index, src_tensor
+            )
+            scatter_reduce_tensor = lambda reduce_operation: reduce_ops[
+                reduce_operation
+            ](input_tensor, scatter_tensor.cuda())
+    return scatter_reduce_tensor
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
