@@ -99,21 +99,21 @@ class dtype(Enum):
                     f"Provided an unsupported data type as a data type for translation (support: bool, int, long, half, float, bfloat16), got: {t}"
                 )
         elif isinstance(t, trt.DataType):
-            if t == trt.uint8:
+            if t == trt.DataType.UINT8:
                 return dtype.u8
-            elif t == trt.int8:
+            elif t == trt.DataType.INT8:
                 return dtype.i8
-            elif t == trt.int32:
+            elif t == trt.DataType.INT32:
                 return dtype.i32
-            elif t == trt.int64:
+            elif t == trt.DataType.INT64:
                 return dtype.i64
-            elif t == trt.float16:
+            elif t == trt.DataType.HALF:
                 return dtype.f16
-            elif t == trt.float32:
+            elif t == trt.DataType.FLOAT:
                 return dtype.f32
-            elif t == trt.bool:
+            elif t == trt.DataType.BOOL:
                 return dtype.b
-            elif t == trt.bf16:
+            elif t == trt.DataType.BF16:
                 return dtype.bf16
             else:
                 raise TypeError(

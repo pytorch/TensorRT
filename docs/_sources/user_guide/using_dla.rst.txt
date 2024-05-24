@@ -7,7 +7,7 @@ DLA
 
 NOTE: DLA supports fp16 and int8 precision only.
 
-Using DLA with torchtrtc
+Using DLA with `torchtrtc`
 
 .. code-block:: shell
 
@@ -41,7 +41,7 @@ Using DLA in a python application
     compile_spec = {
         "inputs": [torch_tensorrt.Input(self.input.shape)],
         "device": torch_tensorrt.Device("dla:0", allow_gpu_fallback=True),
-        "enalbed_precisions": {torch.half},
+        "enabled_precisions": {torch.half},
     }
 
     trt_mod = torch_tensorrt.compile(self.scripted_model, compile_spec)
