@@ -1,0 +1,6 @@
+pytest>=8.2.1
+pytest-xdist>=3.6.1
+timm>=1.0.3
+transformers==4.39.3
+parameterized>=0.2.0
+expecttest==0.1.6
