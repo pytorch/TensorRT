@@ -127,6 +127,7 @@ class TestAtan2Converter(DispatchTestCase):
             inputs,
         )
 
+
 class TestAtan2OutConverter(DispatchTestCase):
     @parameterized.expand(
         [
@@ -151,6 +152,7 @@ class TestAtan2OutConverter(DispatchTestCase):
             atan2_out(),
             inputs,
         )
+
 
 if __name__ == "__main__":
     run_tests()
