@@ -80,13 +80,11 @@ jobs:
         export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
         pushd .
         cd tests/modules
-        # Don't use requirements.txt here as it contains tensorrt and torch which should have been installed by now.
-        ${CONDA_RUN} python -m pip install numpy packaging pyyaml transformers==4.39.3 timm==0.9.16 pybind11==2.6.2
+        ${CONDA_RUN} python -m pip install --pre -r ../py/requirements.txt
         ${CONDA_RUN} python hub.py
         popd
         pushd .
         cd tests/py/ts
-        ${CONDA_RUN} python -m pip install --pre -r ../requirements.txt
         ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_api_test_results.xml api/
         ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_models_test_results.xml models/
         ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_integrations_test_results.xml integrations/
