@@ -8,6 +8,7 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    calculate_strides,
     flatten_dims,
     get_positive_dim,
     get_trt_tensor,
@@ -260,13 +261,6 @@ def flip(
     )
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
-
-
-def calculate_strides(shape: Sequence[int]) -> Sequence[int]:
-    strides = [1] * len(shape)
-    for i in range(len(shape) - 2, -1, -1):
-        strides[i] = strides[i + 1] * shape[i + 1]
-    return strides
 
 
 def diagonal(

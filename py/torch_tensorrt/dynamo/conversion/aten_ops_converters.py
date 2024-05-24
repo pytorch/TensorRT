@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     dynamic_unsupported_with_args,
     enforce_tensor_types,
+    get_positive_dim,
     is_only_operator_on_placeholder,
 )
 from torch_tensorrt.fx.types import TRTTensor
@@ -2935,12 +2936,26 @@ def aten_ops_flip(
 
 
 def zero_diag_size_validator(node: Node) -> bool:
-    input_shape, offset, dim1, dim2 = (
-        node.args[0].meta["tensor_meta"][0],
+    meta = node.args[0].meta.get("tensor_meta")
+    if meta:
+        input_shape = meta.shape
+    else:
+        _LOGGER.warning(
+            "Meta information of input is missing, unable to validate diagonal size."
+        )
+        return True
+
+    offset, dim1, dim2 = (
         node.args[1],
         node.args[2],
         node.args[3],
     )
+
+    num_dims = len(input_shape)
+
+    # Adjust dimensions to be positive and canonicalize
+    dim1 = get_positive_dim(dim1, num_dims)
+    dim2 = get_positive_dim(dim2, num_dims)
 
     if offset >= 0:
         diag_size = max(min(input_shape[dim1], input_shape[dim2] - offset), 0)
