@@ -8,6 +8,7 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    flatten_dims,
     get_positive_dim,
     get_trt_tensor,
 )
@@ -259,3 +260,61 @@ def flip(
     )
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
+
+
+def as_strided(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    size: Sequence[int],
+    stride: Sequence[int],
+    storage_offset: Optional[int],
+) -> TRTTensor:
+    # Ensure storage_offset is an integer before passing to nested
+    if storage_offset is None:
+        storage_offset = 0
+
+    flatten_shape = flatten_dims(input, 0, -1)
+    flatten_output = impl.shuffle.reshape(
+        ctx, target, source_ir, f"{name}_reshape_flatten_output", input, flatten_shape
+    )
+
+    indices = []
+
+    # Recursive function to compute indices for as_strided operation
+    def nested(
+        rank: int, size: Sequence[int], stride: Sequence[int], current: int, dim: int
+    ) -> None:
+        if (
+            dim == rank
+        ):  # If the current dimension equals the rank, append the computed index
+            indices.append(current)
+            return
+        for i in range(size[dim]):  # Recursively compute indices across dimensions
+            nested(
+                rank, size, stride, current + stride[dim] * i, dim + 1
+            )  # Calculate the index for the current dimension and recursively explore further dimensions
+
+    nested(len(size), size, stride, storage_offset, 0)
+
+    indices = np.array(indices, dtype=np.int32)
+
+    indices_tensor = get_trt_tensor(ctx, indices, f"{name}_indices")
+
+    # Use gather to reorder elements based on computed indices
+    gather_layer = ctx.net.add_gather(flatten_output, indices_tensor, axis=0)
+    gather_output = gather_layer.get_output(0)
+
+    # Reshape the gathered tensor to the desired size
+    reshape_output = impl.shuffle.reshape(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_reshape_gather_output",
+        gather_output,
+        tuple(size),
+    )
+
+    return reshape_output

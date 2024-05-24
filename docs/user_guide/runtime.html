@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Deploying Torch-TensorRT Programs &mdash; Torch-TensorRT v2.4.0.dev0+de9a063 documentation</title>
+  <title>Deploying Torch-TensorRT Programs &mdash; Torch-TensorRT v2.4.0.dev0+7e08872 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.4.0.dev0+de9a063
+                  v2.4.0.dev0+7e08872
                 </div>
               
             
@@ -457,7 +457,7 @@
   <section id="deploying-torch-tensorrt-programs">
 <span id="runtime"></span><h1>Deploying Torch-TensorRT Programs<a class="headerlink" href="#deploying-torch-tensorrt-programs" title="Permalink to this heading">¶</a></h1>
 <p>After compiling and saving Torch-TensorRT programs there is no longer a strict dependency on the full
-Torch-TensorRT library. All that is required to run a compiled program is the runtime. There are therfore a couple
+Torch-TensorRT library. All that is required to run a compiled program is the runtime. There are therefore a couple
 options to deploy your programs other than shipping the full Torch-TensorRT compiler with your applications.</p>
 <section id="torch-tensorrt-package-libtorchtrt-so">
 <h2>Torch-TensorRT package / libtorchtrt.so<a class="headerlink" href="#torch-tensorrt-package-libtorchtrt-so" title="Permalink to this heading">¶</a></h2>
@@ -477,7 +477,7 @@ programs just as you would otherwise via PyTorch API.</p>
 </div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>If you are linking <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code>, likely using the following flags will help <code class="docutils literal notranslate"><span class="pre">-Wl,--no-as-needed</span> <span class="pre">-ltorchtrt</span> <span class="pre">-Wl,--as-needed</span></code> as theres no direct symbol dependency to anything in the Torch-TensorRT runtime for most Torch-TensorRT runtime applications</p>
+<p>If you are linking <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code>, likely using the following flags will help <code class="docutils literal notranslate"><span class="pre">-Wl,--no-as-needed</span> <span class="pre">-ltorchtrt</span> <span class="pre">-Wl,--as-needed</span></code> as there’s no direct symbol dependency to anything in the Torch-TensorRT runtime for most Torch-TensorRT runtime applications</p>
 </div>
 <p>An example of how to use <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code> can be found here: <a class="reference external" href="https://github.com/pytorch/TensorRT/tree/master/examples/torchtrt_runtime_example">https://github.com/pytorch/TensorRT/tree/master/examples/torchtrt_runtime_example</a></p>
 </section>
@@ -485,7 +485,7 @@ programs just as you would otherwise via PyTorch API.</p>
 <h2>Plugin Library<a class="headerlink" href="#plugin-library" title="Permalink to this heading">¶</a></h2>
 <p>In the case you use Torch-TensorRT as a converter to a TensorRT engine and your engine uses plugins provided by Torch-TensorRT, Torch-TensorRT
 ships the library <code class="docutils literal notranslate"><span class="pre">libtorchtrt_plugins.so</span></code> which contains the implementation of the TensorRT plugins used by Torch-TensorRT during
-compilation. This library can be <code class="docutils literal notranslate"><span class="pre">DL_OPEN</span></code> or <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD</span></code> similar to other TensorRT plugin libraries.</p>
+compilation. This library can be <code class="docutils literal notranslate"><span class="pre">DL_OPEN</span></code> or <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD</span></code> similarly to other TensorRT plugin libraries.</p>
 </section>
 <section id="multi-device-safe-mode">
 <h2>Multi Device Safe Mode<a class="headerlink" href="#multi-device-safe-mode" title="Permalink to this heading">¶</a></h2>
@@ -508,7 +508,7 @@ doubles as a context manager.</p>
 <p>TensorRT requires that each engine be associated with the CUDA context in the active thread from which it is invoked.
 Therefore, if the device were to change in the active thread, which may be the case when invoking
 engines on multiple GPUs from the same Python process, safe mode will cause Torch-TensorRT to display
-an alert and switch GPUs accordingly. If safe mode were not enabled, there could be a mismatch in the engine
+an alert and switch GPUs accordingly. If safe mode is not enabled, there could be a mismatch in the engine
 device and CUDA context device, which could lead the program to crash.</p>
 <p>One technique for managing multiple TRT engines on different GPUs while not sacrificing performance for
 multi-device safe mode is to use Python threads. Each thread is responsible for all of the TRT engines

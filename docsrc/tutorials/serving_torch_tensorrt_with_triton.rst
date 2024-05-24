@@ -4,11 +4,11 @@ Serving a Torch-TensorRT model with Triton
 ==========================================
 
 Optimization and deployment go hand in hand in a discussion about Machine
-Learning infrastructure. Once network level optimzation are done
+Learning infrastructure. Once network level optimization are done
 to get the maximum performance, the next step would be to deploy it.
 
-However, serving this optimized model comes with it's own set of considerations
-and challenges like: building an infrastructure to support concorrent model
+However, serving this optimized model comes with its own set of considerations
+and challenges like: building an infrastructure to support concurrent model
 executions, supporting clients over HTTP or gRPC and more.
 
 The `Triton Inference Server <https://github.com/triton-inference-server/server>`__
@@ -67,7 +67,7 @@ highly recommend to checking our `Github
 Repository <https://github.com/triton-inference-server>`__.
 
 To use Triton, we need to make a model repository. A model repository, as the
-name suggested, is a repository of the models the Inference server hosts. While
+name suggests, is a repository of the models the Inference server hosts. While
 Triton can serve models from multiple repositories, in this example, we will
 discuss the simplest possible form of the model repository.
 
@@ -204,7 +204,7 @@ Lastly, we send an inference request to the Triton Inference Server.
    inference_output = results.as_numpy('output__0')
    print(inference_output[:5])
 
-The output of the same should look like below:
+The output should look like below:
 
 ::
 

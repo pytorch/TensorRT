@@ -139,7 +139,12 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     filter_dim.nbDims = nbSpatialDims;
     filter_dim.d[0] = kernel_dims.d[2];
     filter_dim.d[1] = kernel_dims.d[3];
+    // For Conv2d layer, weights are in the shape of (out_channels, in_channels/groups,...)
     int32_t num_output_maps = kernel_dims.d[0];
+    if (transposed) {
+      // For ConvTranspose layer, weights are in the shape of (in_channels, out_channel/groups,...)
+      num_output_maps = kernel_dims.d[1];
+    }
     bool expand_dims = nbSpatialDims == 1;
     if (expand_dims) {
       // In case of Conv1D -> map it to 2D version
@@ -150,9 +155,6 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
       LOG_DEBUG("Reshaping input dimensions to: " << in->getDimensions());
       kernel = addPadding(ctx, n, kernel, 4, true, true, std::string(util::node_info(n) + "_kernel_shuffle"));
       LOG_DEBUG("Reshaping kernel dimensions to: " << kernel->getDimensions());
-      if (transposed) {
-        num_output_maps = kernel_dims.d[1];
-      }
     }
 
     // Initialize a dummy constant kernel to pass it to INetwork->addConvolutionNd/addDeconvolutionNd API.
