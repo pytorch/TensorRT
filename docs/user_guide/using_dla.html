@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>DLA &mdash; Torch-TensorRT v2.4.0.dev0+839f173 documentation</title>
+  <title>DLA &mdash; Torch-TensorRT v2.4.0.dev0+7e08872 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.4.0.dev0+839f173
+                  v2.4.0.dev0+7e08872
                 </div>
               
             
@@ -458,7 +458,7 @@
 <span id="using-dla"></span><h1>DLA<a class="headerlink" href="#dla" title="Permalink to this heading">¶</a></h1>
 <p><code class="docutils literal notranslate"><span class="pre">DLA</span></code> NVIDIA Deep Learning Accelerator is a fixed-function accelerator engine targeted for deep learning operations. DLA is designed to do full hardware acceleration of convolutional neural networks. DLA supports various layers such as convolution, deconvolution, fully-connected, activation, pooling, batch normalization, etc. <code class="docutils literal notranslate"><span class="pre">torch_tensorrt</span></code> supports compilation of TorchScript Module and deployment pipeline on the DLA hardware available on NVIDIA embedded platforms.</p>
 <p>NOTE: DLA supports fp16 and int8 precision only.</p>
-<p>Using DLA with torchtrtc</p>
+<p>Using DLA with <cite>torchtrtc</cite></p>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>torchtrtc<span class="w"> </span><span class="o">[</span>input_file_path<span class="o">]</span><span class="w"> </span><span class="o">[</span>output_file_path<span class="o">]</span><span class="w"> </span><span class="o">[</span>input_shapes...<span class="o">]</span><span class="w"> </span>-p<span class="w"> </span>f16<span class="w"> </span>-d<span class="w"> </span>dla<span class="w"> </span><span class="o">{</span>OPTIONS<span class="o">}</span>
 </pre></div>
 </div>
@@ -484,7 +484,7 @@
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">compile_spec</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">&quot;inputs&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input</span><span class="o">.</span><span class="n">shape</span><span class="p">)],</span>
     <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Device</span><span class="p">(</span><span class="s2">&quot;dla:0&quot;</span><span class="p">,</span> <span class="n">allow_gpu_fallback</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
-    <span class="s2">&quot;enalbed_precisions&quot;</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span>
+    <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span>
 <span class="p">}</span>
 
 <span class="n">trt_mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">scripted_model</span><span class="p">,</span> <span class="n">compile_spec</span><span class="p">)</span>

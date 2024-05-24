@@ -1,5 +1,3 @@
-# type: ignore
-
 import logging
 import time
 import unittest
@@ -54,7 +52,8 @@ class TRTTestCase(TestCase):
     def run_test(
         self,
         mod,
-        inputs,
+        fx_inputs,
+        trt_interpreter_inputs,
         interpreter,
         rtol,
         atol,
@@ -62,9 +61,12 @@ class TRTTestCase(TestCase):
         pyt_inputs=None,
     ):
         with torch.no_grad():
-            cuda_inputs = []
-            for i in inputs:
-                cuda_inputs.append(i.cuda())
+            cuda_fx_inputs = []
+            cuda_trt_inputs = []
+            for i in trt_interpreter_inputs:
+                cuda_trt_inputs.append(i.cuda())
+            for i in fx_inputs:
+                cuda_fx_inputs.append(i.cuda())
 
             start = time.perf_counter()
             interpreter_result = interpreter.run()
@@ -79,13 +81,13 @@ class TRTTestCase(TestCase):
             if pyt_inputs is not None:
                 ref_outputs = mod(*pyt_inputs)
             else:
-                ref_outputs = mod(*cuda_inputs)
+                ref_outputs = mod(*cuda_fx_inputs)
 
             torch.cuda.synchronize()
             start_event = torch.cuda.Event(enable_timing=True)
             end_event = torch.cuda.Event(enable_timing=True)
             start_event.record()
-            outputs = trt_mod(*cuda_inputs)
+            outputs = trt_mod(*cuda_trt_inputs)
             end_event.record()
             torch.cuda.synchronize()
             _LOGGER.info(
@@ -238,6 +240,7 @@ class DispatchTestCase(TRTTestCase):
         use_dynamo_tracer=False,
         enable_passes=False,
         propagate_shapes=False,
+        int32_reqd=False,
     ):
         mod.eval()
         mod = self.generate_graph(
@@ -256,6 +259,30 @@ class DispatchTestCase(TRTTestCase):
             debug=True,
         )
 
+        num_inputs = len(inputs)
+        trt_inputs = inputs
+        dtype_to_change = []
+        if int32_reqd:
+            dtype_to_change = [torch.int64, torch.float64]
+        else:
+            dtype_to_change = [
+                torch.float64,
+            ]
+        for num_input in range(num_inputs):
+            input = inputs[num_input]
+            if input.dtype in dtype_to_change:
+                dtype_32bit = (
+                    torch.float32 if (input.dtype == torch.float64) else torch.int32
+                )
+                trt_inputs = (
+                    list(trt_inputs[:num_input])
+                    + [
+                        input.to(dtype_32bit),
+                    ]
+                    + list(trt_inputs[num_input + 1 :])
+                )
+
+        trt_input_specs = [Input.from_tensor(i) for i in trt_inputs]
         input_specs = [Input.from_tensor(i) for i in inputs]
 
         output_dtypes = None
@@ -273,13 +300,15 @@ class DispatchTestCase(TRTTestCase):
 
         interp = TRTInterpreter(
             mod,
-            input_specs,
+            trt_input_specs,
             output_dtypes=output_dtypes,
             compilation_settings=compilation_settings,
         )
+
         super().run_test(
             mod,
             inputs,
+            trt_inputs,
             interp,
             rtol,
             atol,
