@@ -23,13 +23,13 @@ and running it to test the speedup obtained.
 * `Torch-TensorRT Getting Started - CitriNet <https://github.com/pytorch/TensorRT/blob/master/notebooks/CitriNet-example.ipynb>`_
 
 
-Compiling EfficentNet with Torch-TensorRT
+Compiling EfficientNet with Torch-TensorRT
 ********************************************
 
-EfficentNet is a feedforward CNN designed to achieve better performance and accuracy than alternative architectures
+EfficientNet is a feedforward CNN designed to achieve better performance and accuracy than alternative architectures
 by using a "scaling method that uniformly scales all dimensions of depth/width/resolution using a simple yet highly effective compound coefficient".
 
-This notebook demonstrates the steps for optimizing a pretrained EfficentNet model with Torch-TensorRT,
+This notebook demonstrates the steps for optimizing a pretrained EfficientNet model with Torch-TensorRT,
 and running it to test the speedup obtained.
 
 * `Torch-TensorRT Getting Started - EfficientNet-B0 <https://github.com/pytorch/TensorRT/blob/master/notebooks/EfficientNet-example.ipynb>`_
@@ -43,7 +43,7 @@ This way, the model learns an inner representation of the English language that 
 features useful for downstream tasks: if you have a dataset of labeled sentences for instance, you can train
 a standard classifier using the features produced by the BERT model as inputs." (https://huggingface.co/bert-base-uncased)
 
-This notebook demonstrates the steps for optimizing a pretrained EfficentNet model with Torch-TensorRT,
+This notebook demonstrates the steps for optimizing a pretrained EfficientNet model with Torch-TensorRT,
 and running it to test the speedup obtained.
 
 * `Masked Language Modeling (MLM) with Hugging Face BERT Transformer <https://github.com/pytorch/TensorRT/blob/master/notebooks/Hugging-Face-BERT.ipynb>`_
@@ -73,7 +73,7 @@ Using Dynamic Shapes with Torch-TensorRT
 
 Making use of Dynamic Shaped Tensors in Torch TensorRT is quite simple. Let's say you are
 using the ``torch_tensorrt.compile(...)`` function  to compile a torchscript module. One
-of the args in this function in this function is ``input``: which defines an input to a
+of the args in this function is ``input``: which defines an input to a
 module in terms of expected shape, data type and tensor format: ``torch_tensorrt.Input.``
 
 For the purposes of this walkthrough we just need three kwargs: `min_shape`, `opt_shape`` and `max_shape`.
@@ -96,8 +96,8 @@ In this example, we are going to use a simple ResNet model to demonstrate the us
 Using the FX Frontend with Torch-TensorRT
 ********************************************
 
-The purpose of this example is to demostrate the overall flow of lowering a PyTorch model to TensorRT
-conveniently with using FX.
+The purpose of this example is to demonstrate the overall flow of lowering a PyTorch model to TensorRT
+conveniently using FX.
 
 * `Using the FX Frontend with Torch-TensorRT <https://github.com/pytorch/TensorRT/blob/master/notebooks/getting_started_with_fx_path_lower_to_trt.ipynb>`_
 
