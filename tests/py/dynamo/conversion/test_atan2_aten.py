@@ -108,7 +108,7 @@ class TestAtan2Converter(DispatchTestCase):
         ]
     )
     def test_atan2_zero(self, dtype, x_val, y_val):
-        class Atan2(nn.Module):
+        class atan2(nn.Module):
             def forward(self, lhs_val, rhs_val):
                 return torch.ops.aten.atan2.default(lhs_val, rhs_val)
 
@@ -123,7 +123,33 @@ class TestAtan2Converter(DispatchTestCase):
         ]
 
         self.run_test(
-            Atan2(),
+            atan2(),
+            inputs,
+        )
+
+
+class TestAtan2OutConverter(DispatchTestCase):
+    @parameterized.expand(
+        [
+            ((10,), (5,), torch.float),
+            ((10,), (10,), torch.float),
+        ]
+    )
+    def test_atan2_float(self, input_shape, out_shape, dtype):
+        class atan2_out(nn.Module):
+            def forward(self, lhs_val, rhs_val, out):
+                return torch.ops.aten.atan2.out(lhs_val, rhs_val, out=out)
+
+        out = torch.empty(out_shape)
+
+        inputs = [
+            torch.randn(input_shape, dtype=dtype),
+            torch.randn(input_shape, dtype=dtype),
+            out,
+        ]
+
+        self.run_test(
+            atan2_out(),
             inputs,
         )
 
