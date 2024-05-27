@@ -13,7 +13,7 @@ export TENSORRT_VERSION_CI=$(${CONDA_RUN} python -c "import versions; versions.t
 export INDEX_URL_CI=$(${CONDA_RUN} python -c "import versions; versions.index_url()")
 
 # Install appropriate torch and torchvision versions for the platform
-${CONDA_RUN} pip install torch==${TORCH_VERSION_CI} torchvision==${TORCHVISION_VERSION_CI} --index-url ${INDEX_URL}
+${CONDA_RUN} pip install torch==${TORCH_VERSION_CI} torchvision==${TORCHVISION_VERSION_CI} --index-url ${INDEX_URL_CI}
 
 # Install TRT 10 from PyPi
 ${CONDA_RUN} pip install tensorrt==${TENSORRT_VERSION_CI}
