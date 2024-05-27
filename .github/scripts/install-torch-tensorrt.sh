@@ -4,7 +4,7 @@ set -eou pipefail
 source ${BUILD_ENV_FILE}
 
 # Install pyyaml first to parse dev_dep_versions.yml in versions.py
-${CONDA_RUN} python -m pip install pyyaml mpmath==1.3.0
+${CONDA_RUN} python -m pip install pyyaml
 
 # Install stable versions of Torch and Torchvision since this is a release branch.
 # For main branches, the INDEX_URL will always point to nightly and for RC releases,
