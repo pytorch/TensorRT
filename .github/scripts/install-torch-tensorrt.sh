@@ -21,5 +21,9 @@ ${CONDA_RUN} pip install torch==${TORCH_VERSION_CI} torchvision==${TORCHVISION_V
 ${CONDA_RUN} pip install tensorrt==${TENSORRT_VERSION_CI}
 
 # Install Torch-TensorRT
-${CONDA_RUN} python -m pip install /opt/torch-tensorrt-builds/torch_tensorrt*+${CU_VERSION}*.whl
+${CONDA_RUN} pip install /opt/torch-tensorrt-builds/torch_tensorrt*+${CU_VERSION}*.whl
+
+# Install additional libraries like timm/transformers which are used during testing
+${CONDA_RUN} pip install --pre -r tests/py/requirements.txt --use-deprecated=legacy-resolver
+
 echo -e "Running test script";
