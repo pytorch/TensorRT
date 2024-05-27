@@ -2,3 +2,7 @@ __version__: "2.3.0"
 __cuda_version__: "12.1"
 __cudnn_version__: "8.9"
 __tensorrt_version__: "10.0.1"
+__torch_version__: "2.3.0"
+# torchvision version here is not a direct dependency but the one used during testing
+__torchvision_version__: "0.18.0"
+__index_url__: "https://download.pytorch.org/whl/test/"
