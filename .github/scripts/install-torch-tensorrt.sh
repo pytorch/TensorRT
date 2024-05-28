@@ -8,6 +8,6 @@ export EXTRA_INDEX_URL="https://download.pytorch.org/whl/test/${CU_VERSION}"
 ${CONDA_RUN} pip install --pre -r ${PWD}/tests/py/requirements.txt --use-deprecated=legacy-resolver --extra-index-url=${EXTRA_INDEX_URL}
 
 # Install Torch-TensorRT
-${CONDA_RUN} pip install /opt/torch-tensorrt-builds/torch_tensorrt*+${CU_VERSION}*.whl
+${CONDA_RUN} pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl
 
 echo -e "Running test script";
