@@ -2941,9 +2941,9 @@ def zero_diag_size_validator(node: Node) -> bool:
         input_shape = meta.shape
     else:
         _LOGGER.warning(
-            "Meta information of input is missing, unable to validate diagonal size."
+            "Meta information of input is missing. Unable to validate diagonal size, falling back to PyTorch operation."
         )
-        return True
+        return False
 
     offset, dim1, dim2 = (
         node.args[1],
