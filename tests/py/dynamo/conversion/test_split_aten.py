@@ -132,9 +132,11 @@ class TestSplitConverterNoDim(DispatchTestCase):
 
         input_specs = [
             Input(
-                shape=(1, 10, -1),
                 dtype=torch.float32,
-                shape_ranges=[((1, 10, 1), (1, 10, 10), (1, 10, 10))],
+                min_shape=[1, 3, 224, 224],
+                opt_shape=[4, 3, 224, 224],
+                max_shape=[8, 3, 224, 224],
+                name = "input",
             ),
         ]
         self.run_test_with_dynamic_shape(
