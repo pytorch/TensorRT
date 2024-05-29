@@ -10,12 +10,6 @@ __version__ = "0.0.0"
 __cuda_version__ = "0.0"
 __cudnn_version__ = "0.0"
 __tensorrt_version__ = "0.0"
-# The following variables are used to install the correct versions of torch & torchvision in CI
-__torch_version__ = "0.0"
-__torchvision_version__ = "0.0"
-# / is necessary at the end
-__index_url__ = "https://download.pytorch.org/whl/test/"
-DEFAULT_CUDA_INDEX = "cu121"
 
 LEADING_V_PATTERN = re.compile("^v")
 TRAILING_RC_PATTERN = re.compile("-rc[0-9]*$")
@@ -111,9 +105,6 @@ def load_dep_info():
     global __cuda_version__
     global __cudnn_version__
     global __tensorrt_version__
-    global __torch_version__
-    global __torchvision_version__
-    global __index_url__
     with open("dev_dep_versions.yml", "r") as stream:
         versions = yaml.safe_load(stream)
         gpu_arch_version = os.environ.get("CU_VERSION")
@@ -121,14 +112,10 @@ def load_dep_info():
             __cuda_version__ = (
                 (gpu_arch_version[2:])[:-1] + "." + (gpu_arch_version[2:])[-1:]
             )
-            __index_url__ = versions["__index_url__"] + gpu_arch_version
         else:
             __cuda_version__ = versions["__cuda_version__"]
-            __index_url__ = versions["__index_url__"] + DEFAULT_CUDA_INDEX
         __cudnn_version__ = versions["__cudnn_version__"]
         __tensorrt_version__ = versions["__tensorrt_version__"]
-        __torch_version__ = versions["__torch_version__"]
-        __torchvision_version__ = versions["__torchvision_version__"]
 
 
 load_dep_info()
@@ -158,15 +145,3 @@ def cudnn_version():
 
 def tensorrt_version():
     print(__tensorrt_version__)
-
-
-def torch_version():
-    print(__torch_version__)
-
-
-def torchvision_version():
-    print(__torchvision_version__)
-
-
-def index_url():
-    print(__index_url__)

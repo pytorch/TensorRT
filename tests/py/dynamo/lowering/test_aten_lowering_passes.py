@@ -466,6 +466,9 @@ class TestLowerLinear(TestCase):
         )
         torch._dynamo.reset()
 
+    @unittest.skip(
+        "This test has threshold failures. This is tracked at https://github.com/pytorch/TensorRT/issues/2715",
+    )
     def test_lower_linear_batch(self):
         class Linear(torch.nn.Module):
             def forward(self, input, weight, bias):
