@@ -9,7 +9,7 @@ export PLATFORM=$(${CONDA_RUN} python -c "import sys; print(sys.platform)")
 ${CONDA_RUN} pip install --pre -r ${PWD}/tests/py/requirements.txt --use-deprecated=legacy-resolver --extra-index-url=${EXTRA_INDEX_URL}
 
 # Install Torch-TensorRT
-if ${PLATFORM} == "win32"; then
+if [[ "$PLATFORM" == "win32" ]]; then
     ${CONDA_RUN} pip install ${RUNNER_ARTIFACT_DIR}/torch_tensorrt*.whl
 else
     ${CONDA_RUN} pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl
