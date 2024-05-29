@@ -73,7 +73,7 @@ class TestSplitConverterNoDim(DispatchTestCase):
 
     @parameterized.expand(
         [
-            ("split_size_or_sections_list_dims", [1, 1], 1),
+            ("`split_size_or_sections_list_dims`", [1, 1], 1),
         ]
     )
     def test_split_dim_list(self, _, split_size_or_tensor, dim):
@@ -119,6 +119,7 @@ class TestSplitConverterNoDim(DispatchTestCase):
     @parameterized.expand(
         [
             ("select_split_size_or_sections_dim_dynamic_shape", 2, 1),
+            ("select_split_size_or_sections_dim_dynamic_shape_non_divisible", 3, 1),
         ]
     )
     def test_split_dynamic(self, _, split_size_or_tensor, dim):
@@ -133,9 +134,9 @@ class TestSplitConverterNoDim(DispatchTestCase):
         input_specs = [
             Input(
                 dtype=torch.float32,
-                min_shape=[1, 3, 224, 224],
-                opt_shape=[4, 3, 224, 224],
-                max_shape=[8, 3, 224, 224],
+                min_shape=[1, 10, 1],
+                opt_shape=[1, 10, 10],
+                max_shape=[1, 10, 10],
                 name = "input",
             ),
         ]
@@ -143,6 +144,35 @@ class TestSplitConverterNoDim(DispatchTestCase):
             TestModule(),
             input_specs,
         )
+
+    @parameterized.expand(
+        [
+            ("select_split_size_or_sections_dim_dynamic_shape_first_axis_dynamic", 2, 1),
+        ]
+    )
+    def test_split_dynamic_first_axis_dynamic(self, _, split_size_or_tensor, dim):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, input):
+                out = torch.ops.aten.split.Tensor(input, split_size_or_tensor, dim)
+                return out
+
+        input_specs = [
+            Input(
+                dtype=torch.float32,
+                min_shape=[1, 10, 10],
+                opt_shape=[3, 10, 10],
+                max_shape=[5, 10, 10],
+                name = "input",
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            TestModule(),
+            input_specs,
+        )
+
 
     @parameterized.expand(
         [
