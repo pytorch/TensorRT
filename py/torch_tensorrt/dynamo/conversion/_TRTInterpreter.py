@@ -317,8 +317,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         )
         timing_cache = self._create_timing_cache(builder_config, existing_cache)
 
-        engine = self.builder.build_serialized_network(self.ctx.net, builder_config)
-        assert engine
+        serialized_engine = self.builder.build_serialized_network(
+            self.ctx.net, builder_config
+        )
+        assert serialized_engine
 
         serialized_cache = (
             bytearray(timing_cache.serialize())
@@ -328,10 +330,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
-        _LOGGER.info(f"TRT Engine uses: {engine.nbytes} bytes of Memory")
+        _LOGGER.info(f"TRT Engine uses: {serialized_engine.nbytes} bytes of Memory")
 
         return TRTInterpreterResult(
-            engine, self._input_names, self._output_names, serialized_cache
+            serialized_engine, self._input_names, self._output_names, serialized_cache
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
