@@ -4,9 +4,9 @@ import re
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
-from torch import SymBool, SymFloat, SymInt
 from torch.fx.node import Argument, Target
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -20,8 +20,6 @@ from torch_tensorrt.fx.converters.converter_utils import (
     get_axes_for_reduce_op,
 )
 from torch_tensorrt.fx.types import TRTDataType, TRTTensor
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -61,62 +59,6 @@ def is_only_operator_on_placeholder(node: torch.fx.Node) -> bool:
         )
         and any(user.op == "output" for user in list(node.users.keys()))
     )
-
-
-def dynamic_unsupported(node: torch.fx.Node) -> bool:
-    """Validates that a node has no dynamic args, kwargs, or outputs"""
-    return _dynamic_unsupported(node=node)
-
-
-def dynamic_unsupported_with_args(
-    arg_positions_to_check: Optional[List[int]] = None,
-) -> Callable[[torch.fx.Node], bool]:
-    """Returns a validator that a node has no dynamic args at specific positions"""
-    return functools.partial(
-        _dynamic_unsupported, arg_positions_to_check=arg_positions_to_check
-    )
-
-
-def _dynamic_unsupported(
-    node: torch.fx.Node, arg_positions_to_check: Optional[List[int]] = None
-) -> bool:
-    # Validate that none of the inputs to the node have Dynamic shapes
-    assert isinstance(
-        node, torch.fx.Node
-    ), "Inputs to validator functions must be FX Nodes"
-
-    def _is_subnode_dynamic(subnode: torch.fx.Node) -> bool:
-        """Checks if a node itself has Dynamic properties"""
-        return getattr(
-            subnode.meta["val"], "_has_symbolic_sizes_strides", False
-        ) or isinstance(subnode.meta["val"], (SymFloat, SymInt, SymBool))
-
-    # Check node value itself
-    if arg_positions_to_check is None and _is_subnode_dynamic(node):
-        return False
-
-    # Check node arguments individually
-    if arg_positions_to_check is None and any(
-        _is_subnode_dynamic(arg) for arg in node.args if isinstance(arg, torch.fx.Node)
-    ):
-        return False
-    # Check specific arg positions if the caller has specified positions to check
-    elif arg_positions_to_check is not None and any(
-        _is_subnode_dynamic(node.args[i])
-        for i in arg_positions_to_check
-        if isinstance(node.args[i], torch.fx.Node)
-    ):
-        return False
-
-    # Check node keyword arguments individually
-    if arg_positions_to_check is None and any(
-        _is_subnode_dynamic(kwarg)
-        for kwarg in node.kwargs.values()
-        if isinstance(kwarg, torch.fx.Node)
-    ):
-        return False
-
-    return True
 
 
 def cast_trt_tensor(
@@ -711,3 +653,34 @@ def set_item(
         0,
     )
     return ans
+
+
+def calculate_strides(shape: Sequence[int]) -> Sequence[int]:
+    """
+    Calculate the strides for a given shape of a multi-dimensional array.
+
+    The output stride for each dimension indicates the number of elements to skip in
+    memory to move to the next element along that dimension. The last dimension always
+    has a stride of 1 because elements are stored contiguously along this dimension.
+
+    Example:
+        For a 3-dimensional array with shape [2, 3, 4]:
+        - shape = [2, 3, 4]
+        - The function will calculate the strides as follows:
+            1. Initialize strides: [1, 1, 1]
+            2. Calculate strides for each dimension from right to left:
+               - For i = 1: strides[1] = strides[2] * shape[2] = 1 * 4 = 4
+               - For i = 0: strides[0] = strides[1] * shape[1] = 4 * 3 = 12
+            - Final strides: [12, 4, 1]
+
+        Therefore, the output will be [12, 4, 1].
+
+        This means:
+        - To move along the first dimension, skip 12 elements.
+        - To move along the second dimension, skip 4 elements.
+        - To move along the third dimension, skip 1 element.
+    """
+    strides = [1] * len(shape)
+    for i in range(len(shape) - 2, -1, -1):
+        strides[i] = strides[i + 1] * shape[i + 1]
+    return strides
