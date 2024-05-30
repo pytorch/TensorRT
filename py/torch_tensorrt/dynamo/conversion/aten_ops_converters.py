@@ -629,10 +629,10 @@ def aten_ops_softmax(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.split.Tensor, capability_validator=has_static_shapes_in_args([1]),supports_dynamic_shapes=True,
+    torch.ops.aten.split.Tensor, capability_validator=has_static_shapes_in_args([1]), supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
-    torch.ops.aten.split.sizes, capability_validator=has_static_shapes_in_args([1]),supports_dynamic_shapes=True,
+    torch.ops.aten.split.sizes, capability_validator=has_static_shapes_in_args([1]), supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
     torch.ops.aten.split_with_sizes.default,
