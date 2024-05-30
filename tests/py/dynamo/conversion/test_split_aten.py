@@ -137,7 +137,6 @@ class TestSplitConverterNoDim(DispatchTestCase):
                 min_shape=[1, 10, 1],
                 opt_shape=[1, 10, 10],
                 max_shape=[1, 10, 10],
-                name = "input",
             ),
         ]
         self.run_test_with_dynamic_shape(
@@ -165,14 +164,12 @@ class TestSplitConverterNoDim(DispatchTestCase):
                 min_shape=[1, 10, 10],
                 opt_shape=[3, 10, 10],
                 max_shape=[5, 10, 10],
-                name = "input",
             ),
         ]
         self.run_test_with_dynamic_shape(
             TestModule(),
             input_specs,
         )
-
 
     @parameterized.expand(
         [
