@@ -74,3 +74,4 @@ tests/py/dynamo/models/*.ts
 tests/py/dynamo/models/*.ep
 *.deb
 *.tar.xz
+/third_party
