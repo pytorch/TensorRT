@@ -5,6 +5,7 @@ from torch.fx.node import Target
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
+    ASSUME_DYNAMIC_SHAPE_SUPPORT,
     DEBUG,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
@@ -57,6 +58,7 @@ class CompilationSettings:
         device (Device): GPU to compile the model on
         require_full_compilation (bool): Whether to require the graph is fully compiled in TensorRT.
             Only applicable for `ir="dynamo"`; has no effect for `torch.compile` path
+        assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         disable_tf32 (bool): Whether to disable TF32 computation for TRT layers
         sparse_weights (bool): Whether to allow the builder to use sparse weights
         refit (bool): Whether to build a refittable engine
@@ -87,6 +89,7 @@ class CompilationSettings:
     device: Device = field(default_factory=default_device)
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION
     disable_tf32: bool = DISABLE_TF32
+    assume_dynamic_shape_support: bool = ASSUME_DYNAMIC_SHAPE_SUPPORT
     sparse_weights: bool = SPARSE_WEIGHTS
     refit: bool = REFIT
     engine_capability: EngineCapability = field(
