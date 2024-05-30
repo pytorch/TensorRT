@@ -1,14 +1,12 @@
+#!/usr/bin/env bash
 set -eou pipefail
-source "${BUILD_ENV_FILE}"
+# Source conda so it's available to the script environment
+source ${BUILD_ENV_FILE}
+export EXTRA_INDEX_URL="https://download.pytorch.org/whl/test/${CU_VERSION}"
+# Install all the dependencies required for Torch-TensorRT
+${CONDA_RUN} pip install --pre -r ${PWD}/tests/py/requirements.txt --use-deprecated=legacy-resolver --extra-index-url=${EXTRA_INDEX_URL}
 
-# Install test index version of Torch and Torchvision
-${CONDA_RUN} ${PIP_INSTALL_TORCH} torchvision
-${CONDA_RUN} pip install pyyaml mpmath==1.3.0
-
-# Install TRT 10 from PyPi
-${CONDA_RUN} pip install tensorrt==10.0.0b6 tensorrt-${CU_VERSION::4}-bindings==10.0.0b6 tensorrt-${CU_VERSION::4}-libs==10.0.0b6 --extra-index-url https://pypi.nvidia.com
-
-# Install pre-built Torch-TRT
+# Install Torch-TensorRT via pre-built wheels. On windows, the location of wheels is not fixed.
 ${CONDA_RUN} pip install ${RUNNER_ARTIFACT_DIR}/torch_tensorrt*.whl
 
 echo -e "Running test script";

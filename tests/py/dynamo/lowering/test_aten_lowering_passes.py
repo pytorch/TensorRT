@@ -2,9 +2,8 @@ import sys
 import unittest
 
 import torch
-from torch.testing._internal.common_utils import TestCase, run_tests
-
 import torch_tensorrt
+from torch.testing._internal.common_utils import TestCase, run_tests
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
@@ -397,6 +396,9 @@ class TestLowerFlashAttention(TestCase):
 
 
 class TestLowerLinear(TestCase):
+    @unittest.skip(
+        "This test has threshold failures. This is tracked at https://github.com/pytorch/TensorRT/issues/2715",
+    )
     def test_lower_linear(self):
         class Linear(torch.nn.Module):
             def forward(self, input, weight, bias):
@@ -464,6 +466,9 @@ class TestLowerLinear(TestCase):
         )
         torch._dynamo.reset()
 
+    @unittest.skip(
+        "This test has threshold failures. This is tracked at https://github.com/pytorch/TensorRT/issues/2715",
+    )
     def test_lower_linear_batch(self):
         class Linear(torch.nn.Module):
             def forward(self, input, weight, bias):

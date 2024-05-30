@@ -111,6 +111,7 @@ Tutorials
    tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
    tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
    tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
+   tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq
 
 Python API Documenation
 ------------------------
