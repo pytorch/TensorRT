@@ -3036,6 +3036,64 @@ def aten_ops_flip(
     )
 
 
+def zero_diag_size_validator(node: Node) -> bool:
+    meta = node.args[0].meta.get("tensor_meta")
+    if meta:
+        input_shape = meta.shape
+    else:
+        _LOGGER.warning(
+            "Meta information of input is missing. Unable to validate diagonal size, falling back to PyTorch operation."
+        )
+        return False
+
+    offset, dim1, dim2 = (
+        node.args[1],
+        node.args[2],
+        node.args[3],
+    )
+
+    num_dims = len(input_shape)
+
+    # Adjust dimensions to be positive and canonicalize
+    dim1 = get_positive_dim(dim1, num_dims)
+    dim2 = get_positive_dim(dim2, num_dims)
+
+    if offset >= 0:
+        diag_size = max(min(input_shape[dim1], input_shape[dim2] - offset), 0)
+    else:
+        diag_size = max(min(input_shape[dim1] + offset, input_shape[dim2]), 0)
+
+    if diag_size == 0:
+        _LOGGER.debug(
+            "Diagonal size is zero, resulting in an empty tensor which is not supported for this operation."
+        )
+        return False
+    else:
+        return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.diagonal.default, capability_validator=zero_diag_size_validator
+)
+def aten_ops_diagonal(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.slice.diagonal(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, replacement=0),
+        args_bounds_check(args, 2, replacement=0),
+        args_bounds_check(args, 3, replacement=1),
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.scalar_tensor.default)
 def aten_ops_scalar_tensor(
     ctx: ConversionContext,
