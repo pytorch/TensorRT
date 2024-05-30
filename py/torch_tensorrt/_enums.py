@@ -23,9 +23,9 @@ class dtype(Enum):
     f32 = auto()
     f64 = auto()
     b = auto()
+
+    f8 = auto()
     bf16 = auto()
-    # TODO: Enable FP8
-    # f8 = auto()
 
     uint8 = u8
     int8 = i8
@@ -34,6 +34,9 @@ class dtype(Enum):
 
     long = i64
     int64 = i64
+
+    float8 = f8
+    fp8 = f8
 
     half = f16
     fp16 = f16
@@ -46,10 +49,6 @@ class dtype(Enum):
     double = f64
     fp64 = f64
     float64 = f64
-
-    # TODO: Enable when FP8 is enabled
-    # float8 = f8
-    # fp8 = f8
 
     bfloat16 = bf16
 
@@ -78,6 +77,8 @@ class dtype(Enum):
                 return dtype.i64
             elif t == torch.int32:
                 return dtype.i32
+            elif t == torch.float8_e4m3fn:
+                return dtype.f8
             elif t == torch.half:
                 return dtype.f16
             elif t == torch.float:
@@ -102,6 +103,8 @@ class dtype(Enum):
                 return dtype.u8
             elif t == trt.DataType.INT8:
                 return dtype.i8
+            elif t == trt.DataType.FP8:
+                return dtype.f8
             elif t == trt.DataType.INT32:
                 return dtype.i32
             elif t == trt.DataType.INT64:
@@ -209,6 +212,8 @@ class dtype(Enum):
                 return torch.int
             elif self == dtype.i64:
                 return torch.long
+            elif self == dtype.f8:
+                return torch.float8_e4m3fn
             elif self == dtype.f16:
                 return torch.half
             elif self == dtype.f32:
@@ -234,6 +239,8 @@ class dtype(Enum):
                 return trt.DataType.INT8
             elif self == dtype.i32:
                 return trt.DataType.INT32
+            elif self == dtype.f8:
+                return trt.DataType.FP8
             elif self == dtype.i64:
                 return trt.DataType.INT64
             elif self == dtype.f16:

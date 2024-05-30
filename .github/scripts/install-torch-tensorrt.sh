@@ -9,10 +9,6 @@ export PLATFORM=$(${CONDA_RUN} python -c "import sys; print(sys.platform)")
 ${CONDA_RUN} pip install --pre -r ${PWD}/tests/py/requirements.txt --use-deprecated=legacy-resolver
 
 # Install Torch-TensorRT via pre-built wheels. On windows, the location of wheels is not fixed.
-if [[ "$PLATFORM" == "win32" ]]; then
-    ${CONDA_RUN} pip install ${RUNNER_ARTIFACT_DIR}/torch_tensorrt*.whl
-else
-    ${CONDA_RUN} pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl
-fi
+${CONDA_RUN} pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl
 
 echo -e "Running test script";

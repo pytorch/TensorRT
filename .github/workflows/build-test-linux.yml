@@ -66,6 +66,7 @@ jobs:
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
     uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.3
     with:
       job-name: tests-py-torchscript-fe
@@ -80,7 +81,6 @@ jobs:
         export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
         pushd .
         cd tests/modules
-        ${CONDA_RUN} python -m pip install --pre -r ../py/requirements.txt --use-deprecated=legacy-resolver
         ${CONDA_RUN} python hub.py
         popd
         pushd .
@@ -101,6 +101,7 @@ jobs:
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
     uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.3
     with:
       job-name: tests-py-dynamo-converters
@@ -114,7 +115,6 @@ jobs:
         export USE_HOST_DEPS=1
         pushd .
         cd tests/py/dynamo
-        ${CONDA_RUN} python -m pip install --pre -r ../requirements.txt --use-deprecated=legacy-resolver
         ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 10 conversion/
         popd
 
@@ -129,6 +129,7 @@ jobs:
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
     uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.3
     with:
       job-name: tests-py-dynamo-fe
@@ -142,7 +143,6 @@ jobs:
         export USE_HOST_DEPS=1
         pushd .
         cd tests/py/dynamo
-        ${CONDA_RUN} python -m pip install --pre -r ../requirements.txt --use-deprecated=legacy-resolver
         ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_fe_test_results.xml --ir dynamo models/test_models_export.py
         ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/test_dyn_models.py
         popd
@@ -158,6 +158,7 @@ jobs:
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
     uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.3
     with:
       job-name: tests-py-dynamo-serde
@@ -171,7 +172,6 @@ jobs:
         export USE_HOST_DEPS=1
         pushd .
         cd tests/py/dynamo
-        ${CONDA_RUN} python -m pip install --pre -r ../requirements.txt --use-deprecated=legacy-resolver
         ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/export_serde_test_results.xml --ir dynamo models/test_export_serde.py
         popd
 
@@ -186,6 +186,7 @@ jobs:
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
     uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.3
     with:
       job-name: tests-py-torch-compile-be
@@ -199,7 +200,6 @@ jobs:
         export USE_HOST_DEPS=1
         pushd .
         cd tests/py/dynamo
-        ${CONDA_RUN} python -m pip install --pre  -r ../requirements.txt --use-deprecated=legacy-resolver
         ${CONDA_RUN} python -m pytest -n 10 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_be_test_results.xml backend/
         ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_comple_be_e2e_test_results.xml --ir torch_compile models/test_models.py
         ${CONDA_RUN} python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_dyn_models_export.xml --ir torch_compile models/test_dyn_models.py
@@ -216,6 +216,7 @@ jobs:
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
     uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.3
     with:
       job-name: tests-py-dynamo-core
@@ -229,7 +230,6 @@ jobs:
         export USE_HOST_DEPS=1
         pushd .
         cd tests/py/dynamo
-        ${CONDA_RUN} python -m pip install --pre -r ../requirements.txt --use-deprecated=legacy-resolver
         ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_test_results.xml runtime/
         ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_partitioning_test_results.xml partitioning/
         ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_lowering_test_results.xml lowering/
@@ -245,7 +245,9 @@ jobs:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
             pre-script: packaging/pre_build_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.3
     with:
       job-name: tests-py-core
       repository: "pytorch/tensorrt"
@@ -258,6 +260,5 @@ jobs:
         export USE_HOST_DEPS=1
         pushd .
         cd tests/py/core
-        ${CONDA_RUN} python -m pip install --pre -r ../requirements.txt --use-deprecated=legacy-resolver
         ${CONDA_RUN} python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_core_test_results.xml .
         popd

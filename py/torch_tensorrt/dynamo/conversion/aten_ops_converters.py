@@ -579,6 +579,34 @@ def aten_ops_neg(
     )
 
 
+try:
+    import modelopt.torch.quantization as mtq
+
+    assert torch.ops.trt.quantize_fp8.default
+except Exception as e:
+    _LOGGER.warning(
+        "Unable to import quantization op. Please install modelopt library (https://github.com/NVIDIA/TensorRT-Model-Optimizer?tab=readme-ov-file#installation) to add support for compiling quantized models"
+    )
+else:
+
+    @dynamo_tensorrt_converter(torch.ops.trt.quantize_fp8.default)
+    def aten_ops_quantize_fp8(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        return impl.quantize.quantize_fp8(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+            args[1],
+        )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim)
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims)
 def aten_ops_squeeze(
