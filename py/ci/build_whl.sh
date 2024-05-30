@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Example usage: docker run -it -v$(pwd)/..:/workspace/TRTorch build_trtorch_wheel /bin/bash /workspace/TRTorch/py/build_whl.sh
+# Example usage: docker run -it -v$(pwd):/workspace/TensorRT build_torch_tensorrt_wheel /bin/bash /workspace/TensorRT/py/ci/build_whl.sh
 
 export CXX=g++
 export CUDA_HOME=/usr/local/cuda-12.1
-export PROJECT_DIR=/workspace/project
+export PROJECT_DIR=/workspace/TensorRT
 
 rm -rf /usr/local/cuda
 
@@ -19,6 +19,8 @@ fi
 
 build_wheel() {
     $1/bin/python -m pip install --upgrade pip setuptools
+    $1/bin/python -m pip install /TensorRT-10.0.1.6/python/tensorrt-10.0.1-${2}-none-linux_x86_64.whl
+
     $1/bin/python -m pip install -r py/requirements.txt
     #$1/bin/python -m pip wheel . -w dist
     export BUILD_VERSION=$(cd ${PROJECT_DIR} && $1/bin/python3 -c "import versions; versions.torch_tensorrt_version_release()")
@@ -27,17 +29,18 @@ build_wheel() {
 
 patch_wheel() {
     $2/bin/python -m pip install auditwheel
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$1/torch/lib:$1/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs $2/bin/python -m auditwheel repair  $(cat ${PROJECT_DIR}/py/ci/soname_excludes.params) --plat manylinux_2_34_x86_64 dist/torch_tensorrt-*-$3-linux_x86_64.whl
+    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/TensorRT-10.0.1.6/lib:$1/torch/lib:$1/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs $2/bin/python -m auditwheel repair  $(cat ${PROJECT_DIR}/py/ci/soname_excludes.params) --plat manylinux_2_34_x86_64 dist/torch_tensorrt-*-$3-linux_x86_64.whl
 }
 
 py38() {
-    cd /workspace/project
+    cd ${PROJECT_DIR}
     PY_BUILD_CODE=cp38-cp38
+    PY_SINGLE_BUILD_CODE=cp38
     PY_VERSION=3.8
     PY_NAME=python${PY_VERSION}
     PY_DIR=/opt/python/${PY_BUILD_CODE}
     PY_PKG_DIR=${PY_DIR}/lib/${PY_NAME}/site-packages/
-    build_wheel ${PY_DIR}
+    build_wheel ${PY_DIR} ${PY_SINGLE_BUILD_CODE}
     patch_wheel ${PY_PKG_DIR} ${PY_DIR} ${PY_BUILD_CODE}
 }
 
