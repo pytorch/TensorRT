@@ -30,7 +30,7 @@ pip install --pre torch-tensorrt --index-url https://download.pytorch.org/whl/ni
 
 Torch-TensorRT is also distributed in the ready-to-run [NVIDIA NGC PyTorch Container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch) which has all dependencies with the proper versions and example notebooks included.
 
-For more advanced installation  methods, please see [here](https://github.com/pytorch/tensorrt/INSTALLATION.md).
+For more advanced installation  methods, please see [here](https://pytorch.org/TensorRT/getting_started/installation.html)
 
 ## Quickstart
 
