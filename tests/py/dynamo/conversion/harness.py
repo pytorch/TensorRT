@@ -12,7 +12,11 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
 from torch_tensorrt.dynamo.conversion._conversion import infer_module_output_dtypes
-from torch_tensorrt.dynamo.lowering import apply_lowering_passes
+from torch_tensorrt.dynamo.lowering import (
+    get_decompositions,
+    post_lowering,
+    pre_export_lowering,
+)
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -199,17 +203,27 @@ class DispatchTestCase(TRTTestCase):
         enable_passes: bool,
     ):
         if use_dynamo_tracer:
-            fx_module = torch._dynamo.export(
-                mod,
-                *original_inputs,
-                aten_graph=True,
-                assume_static_by_default=True,
-                tracing_mode="real",
-            ).graph_module
+            exported_program = torch_tensorrt.dynamo.trace(mod, tuple(original_inputs))
+            exported_program = pre_export_lowering(exported_program, torch_inputs)
+            exported_program = exported_program.run_decompositions(
+                get_decompositions(False)
+            )
+            fx_module = exported_program.module()
         else:
             fx_module = torch.fx.symbolic_trace(mod)
+
         if enable_passes:
-            fx_module = apply_lowering_passes(fx_module, original_inputs)
+            fx_module = post_lowering(fx_module, original_inputs)
+
+        if propagate_shapes:
+            # TODO: This is currently being used to test embedding_bag_aten due to https://github.com/pytorch/TensorRT/issues/2843
+            try:
+                ShapeProp(fx_module).propagate(*torch_inputs)
+            except (RuntimeError, AssertionError):
+                logger.warning(
+                    "Shape Propagation failed on Graph, skipping it",
+                    exc_info=False,
+                )
         return fx_module
 
     def run_test(
