@@ -104,7 +104,7 @@ auto results = trt_mod.forward({input_tensor});
 | Platform            | Support                                          |
 | ------------------- | ------------------------------------------------ |
 | Linux AMD64 / GPU   | **Supported**                                    |
-| Windows / GPU       | **Official support coming soon**                |
+| Windows / GPU       | **Supported (Dynamo only)**                      |
 | Linux aarch64 / GPU | **Native Compilation Supported on JetPack-4.4+ (use v1.0.0 for the time being)** |
 | Linux aarch64 / DLA | **Native Compilation Supported on JetPack-4.4+ (use v1.0.0 for the time being)** |
 | Linux ppc64le / GPU | Not supported                                    |
