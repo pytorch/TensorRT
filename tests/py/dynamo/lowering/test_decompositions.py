@@ -1,5 +1,6 @@
 import torch
 import torch_tensorrt
+from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
@@ -482,6 +483,61 @@ class TestLowering(TestCase):
             optimized_model_results_shape,
             torch_model_results_shape,
             f"The optimized model results shape and torch model results shape should be equal in empty_like",
+        )
+
+
+class TestScatterAdd(TestCase):
+    @parameterized.expand(
+        [
+            (
+                "scatter_add_zero_dim_indexOne_constant",
+                0,
+                torch.tensor([[0, 1, 2, 0]]),
+                torch.tensor([[1, 2, 3, 4]], dtype=torch.int32),
+            ),
+            (
+                "scatter_add_zero_dim_indexTwo_constant",
+                0,
+                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]),
+                torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32),
+            ),
+            (
+                "scatter_add_one_dim_indexOne_constant",
+                1,
+                torch.tensor([[0, 1, 2, 0]]),
+                torch.tensor([[1, 2, 3, 1]], dtype=torch.int32),
+            ),
+            (
+                "scatter_add_one_dim_indexTwo_costant",
+                1,
+                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]),
+                torch.tensor([[1, 2, 3, 1], [5, 6, 5, 5]], dtype=torch.int32),
+            ),
+        ]
+    )
+    def test_scatter_add(self, _, dim, index, src):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, input):
+                return torch.ops.aten.scatter_add.default(input, dim, index, src)
+
+        # Operations expected to be included in the traced graph after decompositions
+        expected_ops = {torch.ops.aten.scatter.src}
+
+        input = torch.zeros(3, 5, dtype=torch.int32)
+        inputs = [input]
+
+        fx_graph = torch.fx.symbolic_trace(TestModule())
+        _, expected_ops_unseen = lower_graph_testing(
+            fx_graph, inputs, expected_ops=expected_ops, min_block_size=2
+        )
+
+        self.assertEquals(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
         )
 
 
