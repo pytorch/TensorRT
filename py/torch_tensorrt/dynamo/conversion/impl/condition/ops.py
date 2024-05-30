@@ -8,8 +8,9 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     broadcastable,
     get_trt_tensor,
+    prepend_ones,
+    set_layer_name,
 )
-from torch_tensorrt.fx.converters.converter_utils import prepend_ones, set_layer_name
 from torch_tensorrt.fx.types import TRTTensor
 
 

@@ -15,9 +15,11 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
     DynamoConverterImplSignature,
 )
-from torch_tensorrt.fx.converters.converter_utils import (
+from torch_tensorrt.fx.converters.converter_utils import (  # noqa: F401
     broadcast,
     get_axes_for_reduce_op,
+    prepend_ones,
+    set_layer_name,
 )
 from torch_tensorrt.fx.types import TRTDataType, TRTTensor
 
