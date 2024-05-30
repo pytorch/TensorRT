@@ -19,7 +19,7 @@ fi
 
 build_wheel() {
     $1/bin/python -m pip install --upgrade pip setuptools
-    $1/bin/python -m pip install /TensorRT-10.0.1.6/python/tensorrt-10.0.1-${2}-none-linux_x86_64.whl
+    $1/bin/python -m pip install ${TENSORRT_DIR}/python/tensorrt-${TENSORRT_VERSION}-${2}-none-linux_x86_64.whl
 
     $1/bin/python -m pip install -r py/requirements.txt
     #$1/bin/python -m pip wheel . -w dist
@@ -29,7 +29,7 @@ build_wheel() {
 
 patch_wheel() {
     $2/bin/python -m pip install auditwheel
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/TensorRT-10.0.1.6/lib:$1/torch/lib:$1/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs $2/bin/python -m auditwheel repair  $(cat ${PROJECT_DIR}/py/ci/soname_excludes.params) --plat manylinux_2_34_x86_64 dist/torch_tensorrt-*-$3-linux_x86_64.whl
+    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${TENSERRT_DIR}/lib:$1/torch/lib:$1/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs $2/bin/python -m auditwheel repair  $(cat ${PROJECT_DIR}/py/ci/soname_excludes.params) --plat manylinux_2_34_x86_64 dist/torch_tensorrt-*-$3-linux_x86_64.whl
 }
 
 py38() {
