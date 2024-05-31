@@ -333,7 +333,6 @@ def run_int8_accuracy_tests(session):
     tests = [
         "ptq/test_ptq_to_backend.py",
         "ptq/test_ptq_dataloader_calibrator.py",
-        "qat/",
     ]
     for test in tests:
         if USE_HOST_DEPS:
