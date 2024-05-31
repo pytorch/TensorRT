@@ -41,7 +41,7 @@ readme = {file = "py/README.md", content-type = "text/markdown"}
 requires-python = ">=3.8"
 keywords = ["pytorch", "torch", "tensorrt", "trt", "ai", "artificial intelligence", "ml", "machine learning", "dl", "deep learning", "compiler", "dynamo", "torchscript", "inference"]
 dependencies = [
-    "torch==2.3.0",
+    "torch==2.3.1",
     "tensorrt",
     "packaging>=23",
     "numpy",
@@ -50,7 +50,7 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-torchvision = ["torchvision >=0.18.dev,<0.19.0"]
+torchvision = ["torchvision==0.18.1"]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"
