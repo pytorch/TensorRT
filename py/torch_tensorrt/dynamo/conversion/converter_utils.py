@@ -661,3 +661,34 @@ def set_item(
         0,
     )
     return ans
+
+
+def calculate_strides(shape: Sequence[int]) -> Sequence[int]:
+    """
+    Calculate the strides for a given shape of a multi-dimensional array.
+
+    The output stride for each dimension indicates the number of elements to skip in
+    memory to move to the next element along that dimension. The last dimension always
+    has a stride of 1 because elements are stored contiguously along this dimension.
+
+    Example:
+        For a 3-dimensional array with shape [2, 3, 4]:
+        - shape = [2, 3, 4]
+        - The function will calculate the strides as follows:
+            1. Initialize strides: [1, 1, 1]
+            2. Calculate strides for each dimension from right to left:
+               - For i = 1: strides[1] = strides[2] * shape[2] = 1 * 4 = 4
+               - For i = 0: strides[0] = strides[1] * shape[1] = 4 * 3 = 12
+            - Final strides: [12, 4, 1]
+
+        Therefore, the output will be [12, 4, 1].
+
+        This means:
+        - To move along the first dimension, skip 12 elements.
+        - To move along the second dimension, skip 4 elements.
+        - To move along the third dimension, skip 1 element.
+    """
+    strides = [1] * len(shape)
+    for i in range(len(shape) - 2, -1, -1):
+        strides[i] = strides[i + 1] * shape[i + 1]
+    return strides

@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.4.0.dev0+7ec1060 documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.4.0.dev0+2eb1267 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.4.0.dev0+7ec1060
+                  v2.4.0.dev0+2eb1267
                 </div>
               
             
@@ -499,6 +499,7 @@
     <span class="o">*</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Device</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DEVICE</span><span class="p">,</span>
     <span class="n">disable_tf32</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DISABLE_TF32</span><span class="p">,</span>
+    <span class="n">assume_dynamic_shape_support</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ASSUME_DYNAMIC_SHAPE_SUPPORT</span><span class="p">,</span>
     <span class="n">sparse_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">SPARSE_WEIGHTS</span><span class="p">,</span>
     <span class="n">enabled_precisions</span><span class="p">:</span> <span class="p">(</span>
         <span class="n">Set</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">dtype</span><span class="p">]</span> <span class="o">|</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">dtype</span><span class="p">]</span>
@@ -558,6 +559,7 @@
 <span class="sd">            device=torch_tensorrt.Device(&quot;dla:1&quot;, allow_gpu_fallback=True)</span>
 
 <span class="sd">        disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
+<span class="sd">        assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False</span>
 <span class="sd">        sparse_weights (bool): Enable sparsity for convolution and fully connected layers.</span>
 <span class="sd">        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels</span>
 <span class="sd">        refit (bool): Enable refitting</span>
@@ -641,6 +643,7 @@
         <span class="p">),</span>
         <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="n">debug</span><span class="p">,</span>
         <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="n">device</span><span class="p">,</span>
+        <span class="s2">&quot;assume_dynamic_shape_support&quot;</span><span class="p">:</span> <span class="n">assume_dynamic_shape_support</span><span class="p">,</span>
         <span class="s2">&quot;workspace_size&quot;</span><span class="p">:</span> <span class="n">workspace_size</span><span class="p">,</span>
         <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="n">min_block_size</span><span class="p">,</span>
         <span class="s2">&quot;torch_executed_ops&quot;</span><span class="p">:</span> <span class="p">(</span>
@@ -690,6 +693,9 @@
 <span class="sd">        Compiled FX GraphModule</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">dryrun_tracker</span> <span class="o">=</span> <span class="n">DryRunTracker</span><span class="p">()</span>
+
+    <span class="c1"># Assume converters support dynamic shapes and disable validation</span>
+    <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">set_dynamic_shape_support</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">assume_dynamic_shape_support</span><span class="p">)</span>
 
     <span class="c1"># Set torch-executed ops</span>
     <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">set_disallowed_targets</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">torch_executed_ops</span><span class="p">)</span>
@@ -895,6 +901,7 @@
         <span class="n">Set</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">dtype</span><span class="p">]</span> <span class="o">|</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">dtype</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLED_PRECISIONS</span><span class="p">,</span>
     <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">,</span>
+    <span class="n">assume_dynamic_shape_support</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ASSUME_DYNAMIC_SHAPE_SUPPORT</span><span class="p">,</span>
     <span class="n">workspace_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">WORKSPACE_SIZE</span><span class="p">,</span>
     <span class="n">min_block_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">MIN_BLOCK_SIZE</span><span class="p">,</span>
     <span class="n">torch_executed_ops</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1002,6 +1009,7 @@
     <span class="n">enabled_precisions</span> <span class="o">=</span> <span class="p">{</span><span class="n">dtype</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">enabled_precisions</span><span class="p">}</span>
 
     <span class="n">compilation_options</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;assume_dynamic_shape_support&quot;</span><span class="p">:</span> <span class="n">assume_dynamic_shape_support</span><span class="p">,</span>
         <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="n">enabled_precisions</span><span class="p">,</span>
         <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="n">debug</span><span class="p">,</span>
         <span class="s2">&quot;workspace_size&quot;</span><span class="p">:</span> <span class="n">workspace_size</span><span class="p">,</span>
@@ -1041,6 +1049,10 @@
 
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+
+    <span class="c1"># Assume converters support dynamic shapes and disable validation</span>
+    <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">set_dynamic_shape_support</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">assume_dynamic_shape_support</span><span class="p">)</span>
+
     <span class="k">try</span><span class="p">:</span>
         <span class="n">interpreter_result</span> <span class="o">=</span> <span class="n">interpret_module_to_result</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">input_list</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="k">except</span> <span class="n">UnsupportedOperatorException</span><span class="p">:</span>
