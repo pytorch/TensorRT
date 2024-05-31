@@ -8,6 +8,7 @@ import torchvision
 import torchvision.transforms as transforms
 from torch.nn import functional as F
 from torch_tensorrt.ts.logging import *
+import torch_tensorrt.ts.ptq as PTQ
 
 
 def find_repo_root(max_depth=10):
@@ -76,11 +77,11 @@ class TestAccuracy(unittest.TestCase):
         self.testing_dataloader = torch.utils.data.DataLoader(
             self.testing_dataset, batch_size=1, shuffle=False, num_workers=1
         )
-        self.calibrator = torchtrt.ptq.DataLoaderCalibrator(
+        self.calibrator = PTQ.DataLoaderCalibrator(
             self.testing_dataloader,
             cache_file="./calibration.cache",
             use_cache=False,
-            algo_type=torchtrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2,
+            algo_type=PTQ.CalibrationAlgo.ENTROPY_CALIBRATION_2,
             device=torch.device("cuda:0"),
         )
 
