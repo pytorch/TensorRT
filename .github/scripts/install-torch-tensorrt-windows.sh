@@ -4,7 +4,7 @@ set -eou pipefail
 source ${BUILD_ENV_FILE}
 # Install PyTorch and torchvision from index
 ${CONDA_RUN} ${PIP_INSTALL_TORCH} torchvision
-export PLATFORM=$(${CONDA_RUN} python -c "import sys; print(sys.platform)")
+
 # Install all the dependencies required for Torch-TensorRT
 ${CONDA_RUN} pip install --pre -r ${PWD}/tests/py/requirements.txt --use-deprecated=legacy-resolver
 
