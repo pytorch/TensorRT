@@ -52,8 +52,7 @@ class TRTTestCase(TestCase):
     def run_test(
         self,
         mod,
-        fx_inputs,
-        trt_interpreter_inputs,
+        inputs,
         interpreter,
         rtol,
         atol,
@@ -61,12 +60,9 @@ class TRTTestCase(TestCase):
         pyt_inputs=None,
     ):
         with torch.no_grad():
-            cuda_fx_inputs = []
-            cuda_trt_inputs = []
-            for i in trt_interpreter_inputs:
-                cuda_trt_inputs.append(i.cuda())
-            for i in fx_inputs:
-                cuda_fx_inputs.append(i.cuda())
+            cuda_inputs = []
+            for i in inputs:
+                cuda_inputs.append(i.cuda())
 
             start = time.perf_counter()
             interpreter_result = interpreter.run()
@@ -79,15 +75,18 @@ class TRTTestCase(TestCase):
             )
             mod = mod.cuda()
             if pyt_inputs is not None:
-                ref_outputs = mod(*pyt_inputs)
+                pyt_inputs_cuda = [
+                    i.cuda() if isinstance(i, torch.Tensor) else i for i in pyt_inputs
+                ]
+                ref_outputs = mod(*pyt_inputs_cuda)
             else:
-                ref_outputs = mod(*cuda_fx_inputs)
+                ref_outputs = mod(*cuda_inputs)
 
             torch.cuda.synchronize()
             start_event = torch.cuda.Event(enable_timing=True)
             end_event = torch.cuda.Event(enable_timing=True)
             start_event.record()
-            outputs = trt_mod(*cuda_trt_inputs)
+            outputs = trt_mod(*cuda_inputs)
             end_event.record()
             torch.cuda.synchronize()
             _LOGGER.info(
@@ -307,12 +306,12 @@ class DispatchTestCase(TRTTestCase):
 
         super().run_test(
             mod,
-            inputs,
             trt_inputs,
             interp,
             rtol,
             atol,
             check_dtype,
+            pyt_inputs=inputs,
         )
 
     def run_test_compare_tensor_attributes_only(
