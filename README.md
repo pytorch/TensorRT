@@ -243,7 +243,12 @@ To build wheel files for different python versions, first build the Dockerfile i
 command
 
 ```
-docker run -it -v$(pwd)/..:/workspace/Torch-TensorRT build_torch_tensorrt_wheel /bin/bash /workspace/Torch-TensorRT/py/build_whl.sh
+# build the build_torch_tensorrt_wheel docker image
+docker build --no-cache -t build_torch_tensorrt_wheel -f py/ci/Dockerfile.ci .
+
+# build the wheel files for different python versions
+docker run -it -v$(pwd):/workspace/TensorRT build_torch_tensorrt_wheel /bin/bash /workspace/TensorRT/py/ci/build_whl.sh
+
 ```
 
 Python compilation expects using the tarball based compilation strategy from above.
