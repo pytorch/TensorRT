@@ -141,7 +141,6 @@ class TRTTestCase(TestCase):
             for i in inputs:
                 cuda_inputs.append(i.cuda())
 
-            mod.eval()
             if len(expected_ops):
                 self.assert_has_op(mod, expected_ops)
 
@@ -241,7 +240,6 @@ class DispatchTestCase(TRTTestCase):
         propagate_shapes=False,
         int32_reqd=False,
     ):
-        mod.eval()
         mod = self.generate_graph(
             mod,
             inputs,
@@ -325,7 +323,6 @@ class DispatchTestCase(TRTTestCase):
         use_dynamo_tracer=False,
         enable_passes=False,
     ):
-        mod.eval()
         mod = self.generate_graph(
             mod,
             inputs,
@@ -363,7 +360,6 @@ class DispatchTestCase(TRTTestCase):
         pyt_inputs=None,
         propagate_shapes=False,
     ):
-        mod.eval()
         mod = self.generate_graph(
             mod,
             input_specs,

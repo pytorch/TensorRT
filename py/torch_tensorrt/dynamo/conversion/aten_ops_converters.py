@@ -3064,12 +3064,16 @@ def zero_diag_size_validator(node: Node) -> bool:
         )
         return False
 
-    offset, dim1, dim2 = (
-        node.args[1],
-        node.args[2],
-        node.args[3],
-    )
-
+    if len(node.args) == 1:
+        offset, dim1, dim2 = 0, 0, 1
+    elif len(node.args) == 2:
+        offset, dim1, dim2 = node.args[1], 0, 1
+    else:
+        offset, dim1, dim2 = (
+            node.args[1],
+            node.args[2],
+            node.args[3],
+        )
     num_dims = len(input_shape)
 
     # Adjust dimensions to be positive and canonicalize
