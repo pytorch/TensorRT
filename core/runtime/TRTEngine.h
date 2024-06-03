@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "ATen/core/function_schema.h"
+#include "ATen/cuda/CUDAGraph.h"
 #include "NvInfer.h"
 #include "torch/custom_class.h"
 
@@ -65,6 +66,13 @@ struct TRTEngine : torch::CustomClassHolder {
   void dump_engine_layer_info();
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
   static const char BINDING_DELIM = '%';
+
+  // CUDAGraph-Related Functionality
+  at::cuda::CUDAGraph cudagraph = {};
+  std::vector<at::Tensor> input_buffers = {};
+  std::vector<at::Tensor> output_buffers = {};
+  std::string shape_key;
+
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);
 

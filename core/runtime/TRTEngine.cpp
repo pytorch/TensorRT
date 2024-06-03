@@ -124,6 +124,7 @@ TRTEngine::TRTEngine(
   } else {
     uint64_t inputs_size = _in_binding_names.size();
     in_binding_names.resize(inputs_size);
+    input_buffers.resize(inputs_size);
     for (uint64_t pyt_idx = 0; pyt_idx < inputs_size; pyt_idx++) {
       auto binding_name = _in_binding_names[pyt_idx];
       // Check if the binding name provided is in the list of engine's bindings
@@ -153,6 +154,7 @@ TRTEngine::TRTEngine(
 
     uint64_t outputs = _out_binding_names.size();
     out_binding_names.resize(outputs);
+    output_buffers.resize(outputs);
     for (size_t pyt_idx = 0; pyt_idx < outputs; pyt_idx++) {
       auto binding_name = _out_binding_names[pyt_idx];
       // Check if the binding name provided is in the list of engine's bindings

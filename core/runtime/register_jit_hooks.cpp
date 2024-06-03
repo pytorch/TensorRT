@@ -122,6 +122,8 @@ TORCH_LIBRARY(tensorrt, m) {
   m.def("set_multi_device_safe_mode", [](bool multi_device_safe_mode) -> void {
     MULTI_DEVICE_SAFE_MODE = multi_device_safe_mode;
   });
+  m.def("get_cudagraphs_mode", []() -> bool { return CUDAGRAPHS_MODE; });
+  m.def("set_cudagraphs_mode", [](bool cudagraphs_mode) -> void { CUDAGRAPHS_MODE = cudagraphs_mode; });
   m.def("set_logging_level", [](int64_t level) -> void {
     util::logging::get_logger().set_reportable_log_level(util::logging::LogLevel(level));
   });
