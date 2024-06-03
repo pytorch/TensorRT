@@ -99,7 +99,7 @@ def embedding_bag_with_traversable_offsets(
         if len(offsets.shape) != 1:
             raise TypeError(
                 f"The offsets should be in 1d array, here offset shape is {offsets.shape}."
-        )
+            )
         offsets[-1] = len_embed
     else:
         # add the end index to offsets
