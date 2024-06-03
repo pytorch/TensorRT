@@ -352,9 +352,20 @@ class Input(object):
                 )
             else:
                 if isinstance(self.shape, tuple):
-                    return torch.rand(self.shape).to(
-                        dtype=self.dtype.to(torch.dtype, use_default=True)
-                    )
+                    if self.dtype in [dtype.u8, dtype.i8, dtype.i32, dtype.i64]:
+                        type = self.dtype.to(torch.dtype, use_default=True)
+                        return torch.randint(
+                            torch.iinfo(type).min,
+                            torch.iinfo(type).max,
+                            self.shape,
+                            dtype=type,
+                        )
+                    elif self.dtype == dtype.b:
+                        return torch.rand(self.shape) < 0.5
+                    else:
+                        return torch.rand(self.shape).to(
+                            dtype=self.dtype.to(torch.dtype, use_default=True)
+                        )
                 else:
                     RuntimeError(
                         f"Input shape is dynamic but shapes are not provided as sequence (found: {self.shape})"
@@ -372,9 +383,20 @@ class Input(object):
                     )
 
                 if isinstance(self.shape, dict):
-                    return torch.rand(self.shape[optimization_profile_field]).to(
-                        dtype=self.dtype.to(torch.dtype, use_default=True)
-                    )
+                    if self.dtype in [dtype.u8, dtype.i8, dtype.i32, dtype.i64]:
+                        type = self.dtype.to(torch.dtype, use_default=True)
+                        return torch.randint(
+                            torch.iinfo(type).min,
+                            torch.iinfo(type).max,
+                            self.shape[optimization_profile_field],
+                            dtype=type,
+                        )
+                    elif self.dtype == dtype.b:
+                        return torch.rand(self.shape[optimization_profile_field]) < 0.5
+                    else:
+                        return torch.rand(self.shape[optimization_profile_field]).to(
+                            dtype=self.dtype.to(torch.dtype, use_default=True)
+                        )
                 else:
                     raise RuntimeError(
                         f"Input shape is dynamic but shapes are not provided as dictionary (found: {self.shape})"
