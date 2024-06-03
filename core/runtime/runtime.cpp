@@ -8,6 +8,7 @@ namespace core {
 namespace runtime {
 
 bool MULTI_DEVICE_SAFE_MODE = false;
+bool CUDAGRAPHS_MODE = false;
 
 c10::optional<RTDevice> get_most_compatible_device(
     const RTDevice& target_device,
@@ -127,6 +128,14 @@ bool get_multi_device_safe_mode() {
 
 void set_multi_device_safe_mode(bool multi_device_safe_mode) {
   MULTI_DEVICE_SAFE_MODE = multi_device_safe_mode;
+}
+
+bool get_cudagraphs_mode() {
+  return CUDAGRAPHS_MODE;
+}
+
+void set_cudagraphs_mode(bool cudagraphs_mode) {
+  CUDAGRAPHS_MODE = cudagraphs_mode;
 }
 
 namespace {
