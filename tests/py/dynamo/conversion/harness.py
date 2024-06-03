@@ -335,7 +335,7 @@ class DispatchTestCase(TRTTestCase):
         expected_ops,
         comparators: List[Tuple[Callable, List]],
         precision=torch.float,
-        output_dtypes=None,
+        check_dtype=True,
         use_dynamo_tracer=False,
         enable_passes=False,
     ):
@@ -353,6 +353,15 @@ class DispatchTestCase(TRTTestCase):
             debug=True,
         )
 
+        output_dtypes = None
+        if check_dtype:
+            output_dtypes = infer_module_output_dtypes(
+                mod,
+                [Input.from_tensor(i) for i in inputs],
+                compilation_settings.device,
+                truncate_double=compilation_settings.truncate_double,
+            )
+
         interp = TRTInterpreter(
             mod,
             Input.from_tensors(inputs),
@@ -369,7 +378,7 @@ class DispatchTestCase(TRTTestCase):
         input_specs,
         rtol=1e-03,
         atol=1e-03,
-        output_dtypes=None,
+        check_dtype=True,
         use_dynamo_tracer=False,
         enable_passes=False,
         use_example_tensors=True,
@@ -388,15 +397,33 @@ class DispatchTestCase(TRTTestCase):
         # We replicate this behavior here
         compilation_settings = CompilationSettings(truncate_double=True)
 
+        output_dtypes = None
+        if check_dtype:
+            output_dtypes = infer_module_output_dtypes(
+                mod,
+                input_specs,
+                compilation_settings.device,
+                truncate_double=compilation_settings.truncate_double,
+            )
+
         interp = TRTInterpreter(
             mod,
             input_specs,
             output_dtypes=output_dtypes,
             compilation_settings=compilation_settings,
         )
+
         # Since the lowering is based on optimal shape. We need to test with
         # different shape(for ex. max shape) for testing dynamic shape
         inputs_max = [spec.example_tensor("max_shape") for spec in input_specs]
         if not use_example_tensors:
             inputs_max = [spec.torch_tensor for spec in input_specs]
-        super().run_test(mod, inputs_max, interp, rtol, atol, pyt_inputs=pyt_inputs)
+        super().run_test(
+            mod,
+            inputs_max,
+            interp,
+            rtol,
+            atol,
+            check_dtype=check_dtype,
+            pyt_inputs=pyt_inputs,
+        )

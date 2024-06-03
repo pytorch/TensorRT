@@ -53,7 +53,7 @@ class TestCosConverter(DispatchTestCase):
                 (3, 2, 3),
                 (3, 3, 4),
                 torch.int32,
-                torch.float32,
+                torch.randint(-128, 127, (3, 3, 4), dtype=torch.int32),
             ),
             (
                 "2d_dim_dtype_float16",
@@ -61,7 +61,7 @@ class TestCosConverter(DispatchTestCase):
                 (2, 2),
                 (4, 4),
                 torch.float16,
-                torch.float16,
+                torch.randn((4, 4), dtype=torch.float16),
             ),
             (
                 "3d_dim_dtype_float",
@@ -69,13 +69,11 @@ class TestCosConverter(DispatchTestCase):
                 (1, 2, 3),
                 (3, 3, 3),
                 torch.float,
-                torch.float,
+                torch.randn((3, 3, 3), dtype=torch.float32),
             ),
         ]
     )
-    def test_dynamic_shape_cos(
-        self, _, min_shape, opt_shape, max_shape, type, output_type
-    ):
+    def test_dynamic_shape_cos(self, _, min_shape, opt_shape, max_shape, type, tensor):
         class cos(nn.Module):
             def forward(self, input):
                 return torch.ops.aten.cos.default(input)
@@ -86,11 +84,14 @@ class TestCosConverter(DispatchTestCase):
                 opt_shape=opt_shape,
                 max_shape=max_shape,
                 dtype=type,
+                torch_tensor=tensor,
             ),
         ]
 
         self.run_test_with_dynamic_shape(
-            cos(), input_specs, output_dtypes=[output_type]
+            cos(),
+            input_specs,
+            use_example_tensors=False,
         )
 
 
