@@ -1327,7 +1327,7 @@ def aten_ops_abs(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sin.default)
+@dynamo_tensorrt_converter(torch.ops.aten.sin.default, supports_dynamic_shapes=True)
 def aten_ops_sin(
     ctx: ConversionContext,
     target: Target,
@@ -1344,7 +1344,7 @@ def aten_ops_sin(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.cos.default)
+@dynamo_tensorrt_converter(torch.ops.aten.cos.default, supports_dynamic_shapes=True)
 def aten_ops_cos(
     ctx: ConversionContext,
     target: Target,
