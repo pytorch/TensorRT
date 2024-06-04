@@ -285,6 +285,19 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         builder_config.set_timing_cache(cache, False)
         return cache
 
+    def _construct_trt_network_def(self) -> None:
+        """
+        Run the interpreter on each node to get TRT INetwork
+        """
+        TRT_INTERPRETER_CALL_PRE_OBSERVER.observe(self.module)
+
+        self.input_specs_iter = 0
+        run_module_start_time = datetime.now()
+        super().run()
+        _LOGGER.info(
+            f"TRT INetwork construction elapsed time: {datetime.now() - run_module_start_time}"
+        )
+
     def run(
         self,
         strict_type_constraints: bool = False,
@@ -301,14 +314,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         Return:
             TRTInterpreterResult
         """
-        TRT_INTERPRETER_CALL_PRE_OBSERVER.observe(self.module)
-
-        self.input_specs_iter = 0
-        run_module_start_time = datetime.now()
-        super().run()
-        _LOGGER.info(
-            f"TRT INetwork construction elapsed time: {datetime.now() - run_module_start_time}"
-        )
+        self._construct_trt_network_def()
         build_engine_start_time = datetime.now()
 
         builder_config = self._populate_trt_builder_config(
