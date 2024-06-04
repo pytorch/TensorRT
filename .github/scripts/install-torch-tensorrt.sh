@@ -1,10 +1,11 @@
 set -eou pipefail
 
+TORCH_TORCHVISION=$(grep "^torch" ${PWD}/py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 PLATFORM=$(python -c "import sys; print(sys.platform)")
 
 # Install all the dependencies required for Torch-TensorRT
-pip install --pre "torch>=2.4.0.dev,<2.5.0" "torchvision>=0.19.0.dev,<0.20.0" --index-url ${INDEX_URL}
+pip install --pre ${TORCH_TORCHVISION} --index-url ${INDEX_URL}
 pip install --pre -r ${PWD}/tests/py/requirements.txt --use-deprecated legacy-resolver
 
 # Install Torch-TensorRT
