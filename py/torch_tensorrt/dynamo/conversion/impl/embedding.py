@@ -94,7 +94,13 @@ def embedding_bag_with_traversable_offsets(
         # however, pytorch doc says if `include_last_offset` is True, the size of offsets
         # is equal to the number of bags + 1. The last element is the size of the input,
         # or the ending index position of the last bag (sequence).
-        offsets.itemset(-1, len_embed)
+
+        # Notes: here offsets should always be 1d array
+        if len(offsets.shape) != 1:
+            raise TypeError(
+                f"The offsets should be in 1d array, here offset shape is {offsets.shape}."
+            )
+        offsets[-1] = len_embed
     else:
         # add the end index to offsets
         offsets = np.append(offsets, len_embed)
