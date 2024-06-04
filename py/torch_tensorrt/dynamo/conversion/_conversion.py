@@ -2,22 +2,23 @@ from __future__ import annotations
 
 import io
 import logging
+import warnings
 from typing import List, Sequence
 
+import numpy as np
+import tensorrt as trt
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
+from torch_tensorrt.dynamo.conversion._TRTRefittingInterpreter import (
     TRTInterpreter,
     TRTInterpreterResult,
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import get_torch_inputs
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,61 @@ def interpret_module_to_result(
     )
     interpreter_result = interpreter.run()
     return interpreter_result
+
+
+def get_refit_mapping(
+    module: torch.fx.GraphModule,
+    inputs: Sequence[Input],
+    settings: CompilationSettings = CompilationSettings(),
+) -> dict[str, np.ndarray]:
+    """Interpret an FX module to a TRTInterpreterResult
+    Args:
+        module: FX GraphModule to interpret
+        inputs: Sequence of Tensors representing inputs to the module
+        settings: Compilation settings
+    Returns:
+        TRTInterpreterResult
+    """
+    output_dtypes = infer_module_output_dtypes(
+        module,
+        inputs,
+        settings.device,
+        truncate_double=settings.truncate_double,
+    )
+
+    # Use Interpreter
+    module_map = {
+        "SCALE": (trt.IScaleLayer, [("scale", "SCALE"), ("shift", "SHIFT")]),
+        "CONVOLUTION": (
+            trt.IConvolutionLayer,
+            [("kernel", "KERNEL"), ("bias", "BIAS")],
+        ),
+        "CONSTANT": (trt.IConstantLayer, [("weights", "CONSTANT")]),
+    }
+    weight_map = {}
+    interpreter = TRTInterpreter(
+        module,
+        inputs,
+        logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
+        output_dtypes=output_dtypes,
+        compilation_settings=settings,
+    )
+
+    net = interpreter.get_network_to_refit()
+    for i in range(net.num_layers):
+        layer = net[i]
+        layer_type: str = layer.type.name
+        if layer_type in module_map:
+            layer.__class__ = module_map[layer_type][0]
+            for weight_type, weight_name in module_map[layer_type][1]:
+                weight_map[f"{layer.name} {weight_name}"] = layer.__getattribute__(
+                    weight_type
+                ).copy()
+
+        else:
+            warnings.warn(f"{layer_type} is not supported yet")
+
+    return weight_map
 
 
 def convert_module(
