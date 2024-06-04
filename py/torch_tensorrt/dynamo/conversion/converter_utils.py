@@ -16,7 +16,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DynamoConverterImplSignature,
 )
 
-from ..types import Shape, TRTDataType, TRTLayer, TRTNetwork, TRTTensor
+from ..types import Shape, TRTDataType, TRTLayer, TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -174,9 +174,7 @@ def broadcast_to_same_shape(
         Tuple[TRTTensor, TRTTensor]: Two TensorRT ITensors that are broadcasted to the same shape
 
     """
-    lhs_val, rhs_val = broadcast(
-        ctx.net, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
-    )
+    lhs_val, rhs_val = broadcast(ctx, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs")
 
     lhs_val_shape = lhs_val.shape
     rhs_val_shape = rhs_val.shape
@@ -687,7 +685,7 @@ def calculate_strides(shape: Sequence[int]) -> Sequence[int]:
 
 
 def broadcast(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     a: TRTTensor,
     b: TRTTensor,
     a_name: str,
@@ -699,7 +697,7 @@ def broadcast(
     prepending 1s to the tensor with less number of dimensions.
 
     Args:
-        network (TRTNetwork): TensorRT network object.
+        ctx (ConversionContext): A ConversionContext containing the TensorRT network
         a (TRTTensor): A TensorRT ITensor.
         b (TRTTensor): A TensorRT ITensor.
         a_name (str): Name of tensor a.
@@ -719,9 +717,9 @@ def broadcast(
 
     diff = len(a_shape) - len(b_shape) - preset_diff
     if diff > 0:
-        b = prepend_ones(network, b, f"{b_name}_broadcast", diff)
+        b = prepend_ones(ctx, b, f"{b_name}_broadcast", diff)
     elif diff < 0:
-        a = prepend_ones(network, a, f"{a_name}_broadcast", -diff)
+        a = prepend_ones(ctx, a, f"{a_name}_broadcast", -diff)
 
     return a, b
 
@@ -774,24 +772,8 @@ def has_dynamic_shape(shape: Shape) -> bool:
     return count > 0
 
 
-def type_cast(
-    network: TRTNetwork,
-    target: Target,
-    name: str,
-    input: TRTTensor,
-    cast_type: TRTDataType,
-) -> TRTTensor:
-    """
-    This function helps to cast the input type to cast_type
-    """
-    layer_i = network.add_identity(input)
-    layer_i.set_output_type(0, cast_type)
-    set_layer_name(layer_i, target, f"{name}_dtype_change")
-    return layer_i.get_output(0)
-
-
 def prepend_ones(
-    network: TRTNetwork,
+    ctx: ConversionContext,
     tensor: TRTTensor,
     name: str,
     num_prepend_ones: int,
@@ -800,8 +782,7 @@ def prepend_ones(
     Prepend 1s to the shape of TensorRT ITensor `tensor`.
 
     Args:
-        network (TRTNetwork): The TensorRT network that `tensor`
-            belongs to.
+        ctx (ConversionContext): A ConversionContext containing the TensorRT network
         tensor (TRTTensor): A TensorRT tensor.
         name (str): Name of the TensorRT Shuffle layer which is used to prepend
             1s.
@@ -811,22 +792,22 @@ def prepend_ones(
         A Tensorrt ITensor which contains the same value as `tensor` but with
         more 1s prepended to the beginning of `tensor` shape.
     """
-    layer = network.add_shuffle(tensor)
+    layer = ctx.net.add_shuffle(tensor)
 
     # If there're dynamic dim in tensor's shape, we need to use shape layer to
     # compute the final shape.
     if has_dynamic_shape(tensor.shape):
-        tensor_shape_layer = network.add_shape(tensor)
+        tensor_shape_layer = ctx.net.add_shape(tensor)
         tensor_shape = tensor_shape_layer.get_output(0)
-        tensor_shape = type_cast(
-            network, "shape", name + "shape_casted", tensor_shape, trt.int32
+        tensor_shape = cast_trt_tensor(
+            ctx, tensor_shape, trt.int32, name + "shape_casted", "shape"
         )
         tensor_shape_layer.name = f"{name}_broadcast_orig_shape"
-        prepend_shape_layer = network.add_constant(
+        prepend_shape_layer = ctx.net.add_constant(
             (num_prepend_ones,), np.ones((num_prepend_ones,), dtype=np.int32)
         )
         prepend_shape_layer.name = f"{name}_broadcast_prepend_ones"
-        reshape_dim_layer = network.add_concatenation(
+        reshape_dim_layer = ctx.net.add_concatenation(
             [prepend_shape_layer.get_output(0), tensor_shape]
         )
         reshape_dim_layer.axis = 0

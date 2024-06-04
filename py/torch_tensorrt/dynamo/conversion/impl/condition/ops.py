@@ -36,21 +36,19 @@ def where(
         condition = get_trt_tensor(ctx, condition, f"{name}_condition")
     diff = max_shape_len - len(condition_shape)
     if diff > 0:
-        condition = prepend_ones(
-            ctx.net, condition, f"{name}_condition_broadcast", diff
-        )
+        condition = prepend_ones(ctx, condition, f"{name}_condition_broadcast", diff)
 
     if not isinstance(input, TRTTensor):
         input = get_trt_tensor(ctx, input, f"{name}_x")
     diff = max_shape_len - len(x_shape)
     if diff > 0:
-        input = prepend_ones(ctx.net, input, f"{name}_input_broadcast", diff)
+        input = prepend_ones(ctx, input, f"{name}_input_broadcast", diff)
 
     if not isinstance(other, TRTTensor):
         other = get_trt_tensor(ctx, other, f"{name}_y")
     diff = max_shape_len - len(y_shape)
     if diff > 0:
-        other = prepend_ones(ctx.net, other, f"{name}_other_broadcast", diff)
+        other = prepend_ones(ctx, other, f"{name}_other_broadcast", diff)
 
     return select(ctx, target, source_ir, name, input, other, condition)
 
