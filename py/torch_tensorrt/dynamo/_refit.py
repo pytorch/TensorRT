@@ -26,7 +26,7 @@ from torch_tensorrt.logging import TRT_LOGGER
 logger = logging.getLogger(__name__)
 
 
-def get_refit_mapping(
+def construct_refit_mapping(
     module: torch.fx.GraphModule,
     inputs: Sequence[Input],
     settings: CompilationSettings = CompilationSettings(),
@@ -81,7 +81,7 @@ def get_refit_mapping(
     return weight_map
 
 
-def refit_trt_engine_from_module(
+def refit_single_trt_engine_with_ep(
     exported_program: ExportedProgram,
     inputs: Tuple[Any, ...],
     engine: object,
@@ -178,7 +178,7 @@ def refit_trt_engine_from_module(
     logger.info("Compilation Settings: %s\n", settings)
 
     # Get the refitting mapping
-    mapping = get_refit_mapping(gm, input_list, settings)
+    mapping = construct_refit_mapping(gm, input_list, settings)
 
     trt_wt_location = trt.TensorLocation.HOST
     refitter = trt.Refitter(engine, TRT_LOGGER)

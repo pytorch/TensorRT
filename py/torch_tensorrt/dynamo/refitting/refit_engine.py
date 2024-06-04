@@ -3,7 +3,7 @@ import torch
 import torchvision.models as models
 from torch_tensorrt._Device import Device
 from torch_tensorrt.dynamo._compiler import convert_module_to_trt_engine
-from torch_tensorrt.dynamo._refit import refit_trt_engine_from_module
+from torch_tensorrt.dynamo._refit import refit_single_trt_engine_with_ep
 from torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule import (
     PythonTorchTensorRTModule,
 )
@@ -82,7 +82,7 @@ print(model(*inputs)[0].sum().cpu().item())
 # }
 
 
-refit_trt_engine_from_module(
+refit_single_trt_engine_with_ep(
     exported_program=exp_program2,  # New
     inputs=tuple(inputs),
     engine=engine,  # Old
