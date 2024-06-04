@@ -87,7 +87,10 @@ def precision_to_dtype(pr):
         return torch.float32
 
 
-def parse_inputs(user_inputs, dtype):
+def parse_inputs(user_inputs, dtype, is_hf=False):
+    if is_hf:
+        return user_inputs.split(";")
+
     parsed_inputs = user_inputs.split(";")
     torchtrt_inputs = []
     for input in parsed_inputs:
