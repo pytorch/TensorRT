@@ -1,16 +1,19 @@
 from typing import Optional, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     broadcastable,
+    cast_trt_tensor,
     get_trt_tensor,
     prepend_ones,
     set_layer_name,
 )
+from torch_tensorrt.dynamo.conversion.impl.elementwise import ne
 from torch_tensorrt.fx.types import TRTTensor
 
 
@@ -32,8 +35,12 @@ def where(
     max_shape_len = max(len(x_shape), len(y_shape), len(condition_shape))
 
     if not isinstance(condition, TRTTensor):
-        assert condition.dtype in (torch.bool, np.bool_), "condition dtype is not bool"
         condition = get_trt_tensor(ctx, condition, f"{name}_condition")
+
+    if condition.dtype != trt.bool:
+        condition = cast_trt_tensor(ctx, condition, trt.float32, f"{name}_cast")
+        condition = ne(ctx, target, source_ir, f"{name}_cond_zero", condition, 0)
+
     diff = max_shape_len - len(condition_shape)
     if diff > 0:
         condition = prepend_ones(ctx, condition, f"{name}_condition_broadcast", diff)
