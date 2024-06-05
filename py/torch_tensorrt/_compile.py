@@ -3,7 +3,7 @@ from __future__ import annotations
 import collections.abc
 import logging
 from enum import Enum
-from typing import Any, Callable, List, Optional, Sequence, Set
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set
 
 import torch
 import torch.fx
@@ -351,9 +351,9 @@ def convert_method_to_trt_engine(
         torchtrt_inputs = prepare_inputs(inputs)
         exp_program = torch_tensorrt.dynamo.trace(module, torchtrt_inputs, **kwargs)
 
-        return dynamo_convert_module_to_trt_engine(  # type: ignore[no-any-return]
+        return dynamo_convert_module_to_trt_engine(
             exp_program,
-            inputs=inputs,
+            inputs=tuple(inputs),
             enabled_precisions=enabled_precisions_set,
             **kwargs,
         )
@@ -398,6 +398,7 @@ def load(file_path: str = "") -> Any:
 def save(
     module: Any,
     file_path: str = "",
+    extra_files: Optional[Dict[str, Any]] = None,
     *,
     output_format: str = "exported_program",
     inputs: Optional[Sequence[torch.Tensor]] = None,
@@ -459,7 +460,7 @@ def save(
                 from torch_tensorrt.dynamo._exporter import export
 
                 exp_program = export(module, inputs)
-                torch.export.save(exp_program, file_path)
+                torch.export.save(exp_program, file_path, extra_files=extra_files)
             else:
                 from torch._higher_order_ops.torchbind import enable_torchbind_tracing
 
@@ -467,4 +468,4 @@ def save(
                     exp_program = torch.export.export(
                         module, tuple(inputs), strict=False
                     )
-                    torch.export.save(exp_program, file_path)
+                    torch.export.save(exp_program, file_path, extra_files=extra_files)

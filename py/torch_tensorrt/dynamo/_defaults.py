@@ -1,3 +1,5 @@
+import os
+
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
@@ -27,6 +29,7 @@ REQUIRE_FULL_COMPILATION = False
 DRYRUN = False
 HARDWARE_COMPATIBLE = False
 SUPPORTED_KERNEL_PRECISIONS = {dtype.f32, dtype.f16, dtype.i8, dtype.bf16}
+MODULE_SAVE_PATH = os.path.abspath(os.getcwd())
 
 
 def default_device() -> Device:

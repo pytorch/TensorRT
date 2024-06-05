@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import base64
 import collections.abc
 import logging
+import os
+import pickle
 import warnings
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
 
 import torch
+import torch_tensorrt
 from torch.export import ExportedProgram
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
@@ -73,6 +77,7 @@ def compile(
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
+    module_save_path: str = _defaults.MODULE_SAVE_PATH,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -162,7 +167,7 @@ def compile(
 
     if not isinstance(inputs, collections.abc.Sequence):
         inputs = [inputs]
-
+    raw_inputs = inputs
     # Prepare torch_trt inputs
     inputs = prepare_inputs(inputs)
     device = to_torch_tensorrt_device(device)
@@ -213,11 +218,30 @@ def compile(
         "dla_global_dram_size": dla_global_dram_size,
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
+        "module_save_path": module_save_path,
     }
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
     trt_gm = compile_module(gm, inputs, settings)
+
+    if settings.refit and not settings.use_python_runtime:
+        logger.info(
+            f"Compiled graph module and setting files will be save to {settings.module_save_path}"
+        )
+        save_path = (
+            os.path.join(settings.module_save_path, "trt_compiled_module.ep")
+            if settings.module_save_path[-3:] != ".ep"
+            else settings.module_save_path
+        )
+
+        dumped = pickle.dumps(settings)
+        dumped_string = base64.b64encode(dumped).decode("utf-8")
+        extra_files = {"settings": dumped_string}
+        torch_tensorrt.save(
+            trt_gm, save_path, inputs=raw_inputs, extra_files=extra_files, retrace=False
+        )
+
     return trt_gm
 
 
