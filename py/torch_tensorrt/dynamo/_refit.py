@@ -26,7 +26,6 @@ from torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule import (
 )
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import (
-    copy_cuda_engine,
     get_torch_inputs,
     prepare_inputs,
     set_log_level,
@@ -172,7 +171,7 @@ def _refit_module_weights(
     # Prepare torch_trt inputs
     inputs = prepare_inputs(inputs)
     device = to_torch_tensorrt_device(settings.device)
-
+    runtime = trt.Runtime(TRT_LOGGER)
     if not isinstance(new_weight_module, ExportedProgram):
         raise AssertionError(
             f"Input graph should be an ExportedProgram but got type {type(new_weight_module)}"
@@ -229,18 +228,18 @@ def _refit_module_weights(
         try:
             compiled_submodule = getattr(compiled_module, name)
             if isinstance(compiled_submodule, PythonTorchTensorRTModule):
-                engine = copy_cuda_engine(compiled_submodule.engine)
+                engine = copy_cuda_engine(compiled_submodule.engine, runtime)
             elif isinstance(compiled_submodule, TorchTensorRTModule):
                 engine_state = compiled_submodule.get_extra_state()
                 encoded_engine = engine_state[1][0][3]
-                engine = get_engine_from_encoded_engine(encoded_engine)
+                engine = get_engine_from_encoded_engine(encoded_engine, runtime)
             else:
                 raise AssertionError("The type of graph module is not supported.")
         except AttributeError:
             inline_module = True
             inline_engine = getattr(compiled_module, f"{name}_engine")
             engine_info = inline_engine.__getstate__()[0]
-            engine = get_engine_from_encoded_engine(engine_info[3])
+            engine = get_engine_from_encoded_engine(engine_info[3], runtime)
 
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
         submodule_inputs = partitioning.construct_submodule_inputs(new_submodule)
@@ -297,9 +296,10 @@ def _refit_module_weights(
 import base64
 
 
-def get_engine_from_encoded_engine(encoded_engine: bytes) -> trt.ICudaEngine:
+def get_engine_from_encoded_engine(
+    encoded_engine: bytes, runtime: trt.Runtime
+) -> trt.ICudaEngine:
     serialized_engine = base64.b64decode(encoded_engine)
-    runtime = trt.Runtime(TRT_LOGGER)
     engine = runtime.deserialize_cuda_engine(serialized_engine)
     return engine
 
@@ -327,3 +327,9 @@ def create_new_PythonTorchTensorRTModule(
         target_device=settings.device,
         profiling_enabled=module.profiling_enabled,
     )
+
+
+def copy_cuda_engine(engine: trt.ICudaEngine, runtime: trt.Runtime) -> trt.ICudaEngine:
+    serialized_engine = engine.serialize()
+    engine = runtime.deserialize_cuda_engine(serialized_engine)
+    return engine
