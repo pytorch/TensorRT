@@ -10,6 +10,6 @@ torchvision>=0.19.0.dev,<0.20.0
 pyyaml
 tensorrt==10.0.1
 timm>=1.0.3
-transformers==4.39.3
+transformers==4.40.2
 parameterized>=0.2.0
 expecttest==0.1.6
