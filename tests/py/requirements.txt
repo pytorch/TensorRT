@@ -12,7 +12,7 @@ tensorrt==10.0.1
 tensorrt-cu12-bindings==10.0.1
 tensorrt-cu12-libs==10.0.1
 timm>=1.0.3
-transformers==4.39.3
+transformers==4.40.2
 parameterized>=0.2.0
 expecttest==0.1.6
 numpy==1.24.1
