@@ -1276,7 +1276,7 @@ def aten_ops_log1p(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sqrt.default)
+@dynamo_tensorrt_converter(torch.ops.aten.sqrt.default, supports_dynamic_shapes=True)
 def aten_ops_sqrt(
     ctx: ConversionContext,
     target: Target,
@@ -2920,7 +2920,7 @@ def aten_ops_trunc(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.copy.default)
+@dynamo_tensorrt_converter(torch.ops.aten.copy.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         1: (TRTTensor,),
