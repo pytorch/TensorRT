@@ -3,18 +3,16 @@ from __future__ import annotations
 import collections.abc
 import copy
 import logging
+import pickle
 import warnings
-from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Sequence, Tuple
 
 import numpy as np
 import tensorrt as trt
 import torch
 from torch.export import ExportedProgram
-from torch.fx.node import Target
-from torch_tensorrt._Device import Device
-from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo import _defaults, partitioning
+from torch_tensorrt.dynamo import partitioning
 from torch_tensorrt.dynamo.conversion import CompilationSettings
 from torch_tensorrt.dynamo.conversion._conversion import infer_module_output_dtypes
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -28,6 +26,7 @@ from torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule import (
 )
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import (
+    copy_cuda_engine,
     get_torch_inputs,
     prepare_inputs,
     set_log_level,
@@ -127,94 +126,59 @@ def _refit_single_trt_engine_with_gm(
     print("Refit Successful")
 
 
-# def refit_module_weights(
-#     compiled_module: ExportedProgram,
-#     new_weight_module: ExportedProgram
-# ) -> torch.fx.GraphModule:
-#     pass
-
-
 def refit_module_weights(
+    compiled_module_file_path: str, new_weight_module: ExportedProgram, inputs: Any
+) -> torch.fx.GraphModule:
+    """
+    Return a copy of compiled_module with refitted weight
+    """
+    settings_wrapper = {"settings": None}
+
+    compiled_exp_program = torch.export.load(
+        compiled_module_file_path, extra_files=settings_wrapper
+    )
+
+    decoded_settings = base64.b64decode(settings_wrapper["settings"].encode("utf-8"))
+    restored_settings = pickle.loads(decoded_settings)
+
+    new_trt_gm = _refit_module_weights(
+        compiled_module=compiled_exp_program,
+        new_weight_module=new_weight_module,
+        inputs=inputs,
+        settings=restored_settings,
+    )
+    return new_trt_gm
+
+
+def _refit_module_weights(
     compiled_module: torch.fx.GraphModule | ExportedProgram,
     new_weight_module: ExportedProgram,
     inputs: Tuple[Any, ...],
-    *,
-    device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
-    disable_tf32: bool = _defaults.DISABLE_TF32,
-    sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
-    enabled_precisions: (
-        Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
-    ) = _defaults.ENABLED_PRECISIONS,
-    engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-    refit: bool = _defaults.REFIT,
-    debug: bool = _defaults.DEBUG,
-    num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
-    workspace_size: int = _defaults.WORKSPACE_SIZE,
-    dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
-    dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
-    dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
-    truncate_double: bool = _defaults.TRUNCATE_DOUBLE,
-    require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
-    min_block_size: int = _defaults.MIN_BLOCK_SIZE,
-    torch_executed_ops: Optional[Collection[Target]] = None,
-    torch_executed_modules: Optional[List[str]] = None,
-    pass_through_build_failures: bool = _defaults.PASS_THROUGH_BUILD_FAILURES,
-    max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
-    version_compatible: bool = _defaults.VERSION_COMPATIBLE,
-    optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
-    use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
-    use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
-    enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
-    dryrun: bool = _defaults.DRYRUN,
-    hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
-    **kwargs: Any,
+    settings: Any,
 ) -> torch.fx.GraphModule:
     """
     Refit a compiled graph module with ExportedProgram
     """
 
-    if debug:
+    if settings.debug:
         set_log_level(logger.parent, logging.DEBUG)
-
-    # TODO: Copy the submodule and return a new one
-    if type(compiled_module) == ExportedProgram:
-        compiled_module = compiled_module.module()
-
-    if "truncate_long_and_double" in kwargs.keys():
-        if truncate_double is not _defaults.TRUNCATE_DOUBLE:
-            raise ValueError(
-                'Provided configuration for "truncate_double" and deprecated API "truncate_long_and_double", please only use "truncate_double"'
-            )
-        else:
-            truncate_double = kwargs["truncate_long_and_double"]
-            warnings.warn(
-                'Compiler option "truncate_long_and_double" is deprecated in favor of "truncate_double" as int64 is now natively supported, this option will be removed in the next version',
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-    engine_capability = EngineCapability._from(engine_capability)
-
-    if torch_executed_modules is not None and torch_executed_modules:
-        logger.warning(
-            f"Detected torch_executed_modules was non-empty: {torch_executed_modules}"
-            "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
-        )
 
     if not isinstance(inputs, collections.abc.Sequence):
         inputs = [inputs]
 
+    if isinstance(compiled_module, ExportedProgram):
+        compiled_module = compiled_module.module()
+
     # Prepare torch_trt inputs
     inputs = prepare_inputs(inputs)
-    device = to_torch_tensorrt_device(device)
-    enabled_precisions = {dtype._from(p) for p in enabled_precisions}
+    device = to_torch_tensorrt_device(settings.device)
 
     if not isinstance(new_weight_module, ExportedProgram):
         raise AssertionError(
             f"Input graph should be an ExportedProgram but got type {type(new_weight_module)}"
         )
     new_weight_module = new_weight_module.run_decompositions(
-        get_decompositions(enable_experimental_decompositions)
+        get_decompositions(settings.enable_experimental_decompositions)
     )
     gm = new_weight_module.module()
     logger.debug("Input graph: " + str(gm.graph))
@@ -222,41 +186,6 @@ def refit_module_weights(
     torch_inputs = get_torch_inputs(inputs, device)
     gm = apply_lowering_passes(gm, torch_inputs)
 
-    logger.debug("Lowered Input graph: " + str(gm.graph))
-
-    compilation_options = {
-        "enabled_precisions": (
-            enabled_precisions if enabled_precisions else _defaults.ENABLED_PRECISIONS
-        ),
-        "debug": debug,
-        "device": device,
-        "workspace_size": workspace_size,
-        "min_block_size": min_block_size,
-        "torch_executed_ops": (
-            torch_executed_ops if torch_executed_ops is not None else set()
-        ),
-        "pass_through_build_failures": pass_through_build_failures,
-        "max_aux_streams": max_aux_streams,
-        "version_compatible": version_compatible,
-        "optimization_level": optimization_level,
-        "use_python_runtime": use_python_runtime,
-        "truncate_double": truncate_double,
-        "use_fast_partitioner": use_fast_partitioner,
-        "num_avg_timing_iters": num_avg_timing_iters,
-        "enable_experimental_decompositions": enable_experimental_decompositions,
-        "require_full_compilation": require_full_compilation,
-        "disable_tf32": disable_tf32,
-        "sparse_weights": sparse_weights,
-        "refit": refit,
-        "engine_capability": engine_capability,
-        "dla_sram_size": dla_sram_size,
-        "dla_local_dram_size": dla_local_dram_size,
-        "dla_global_dram_size": dla_global_dram_size,
-        "dryrun": dryrun,
-        "hardware_compatible": hardware_compatible,
-    }
-
-    settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
 
     # Set torch-executed ops
@@ -296,13 +225,23 @@ def refit_module_weights(
     for name, _ in partitioned_module.named_children():
         new_submodule = getattr(partitioned_module, name)
         # TODO: Copy the submodule and return a new one
-        compiled_submodule = getattr(compiled_module, name)
-        if isinstance(compiled_submodule, PythonTorchTensorRTModule):
-            engine = copy_cuda_engine(compiled_submodule.engine)
-        elif isinstance(compiled_submodule, TorchTensorRTModule):
-            engine = get_engine_from_TorchTensorRTModule(compiled_submodule)
-        else:
-            raise AssertionError("The type of graph module is not supported.")
+        inline_module = False
+        try:
+            compiled_submodule = getattr(compiled_module, name)
+            if isinstance(compiled_submodule, PythonTorchTensorRTModule):
+                engine = copy_cuda_engine(compiled_submodule.engine)
+            elif isinstance(compiled_submodule, TorchTensorRTModule):
+                engine_state = compiled_submodule.get_extra_state()
+                encoded_engine = engine_state[1][0][3]
+                engine = get_engine_from_encoded_engine(encoded_engine)
+            else:
+                raise AssertionError("The type of graph module is not supported.")
+        except AttributeError:
+            inline_module = True
+            inline_engine = getattr(compiled_module, f"{name}_engine")
+            engine_info = inline_engine.__getstate__()[0]
+            engine = get_engine_from_encoded_engine(engine_info[3])
+
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
         submodule_inputs = partitioning.construct_submodule_inputs(new_submodule)
 
@@ -328,17 +267,29 @@ def refit_module_weights(
             input_list=submodule_inputs,
             settings=settings,
         )
-
-        # In TorchTensorRTModule, the original module is intact. Create a new module and assign to the fx.Graph
-        if isinstance(compiled_submodule, TorchTensorRTModule):
-            refitteded_submodule = create_new_TorchTensorRTModule(
-                compiled_submodule, engine=engine, settings=settings
+        serialized_engine = bytes(engine.serialize())
+        if inline_module:
+            new_engine_info = list(engine_info)
+            new_engine_info[3] = serialized_engine
+            refitted_inline_engine = torch.classes.tensorrt.Engine(
+                tuple(new_engine_info)
             )
+            setattr(compiled_module, f"{name}_engine", refitted_inline_engine)
         else:
-            refitteded_submodule = create_new_PythonTorchTensorRTModule(
-                compiled_submodule, engine=engine, settings=settings
-            )
-        setattr(compiled_module, name, refitteded_submodule)
+            # In TorchTensorRTModule, the original module is intact. Create a new module and assign to the fx.Graph
+            if isinstance(compiled_submodule, TorchTensorRTModule):
+                refitteded_submodule = create_new_TorchTensorRTModule(
+                    compiled_submodule,
+                    serialized_engine=serialized_engine,
+                    settings=settings,
+                )
+            else:
+                refitteded_submodule = create_new_PythonTorchTensorRTModule(
+                    compiled_submodule,
+                    serialized_engine=serialized_engine,
+                    settings=settings,
+                )
+            setattr(compiled_module, name, refitteded_submodule)
         return compiled_module
 
 
@@ -346,20 +297,18 @@ def refit_module_weights(
 import base64
 
 
-def get_engine_from_TorchTensorRTModule(module: TorchTensorRTModule) -> trt.ICudaEngine:
-    engine_state = module.get_extra_state()
-    serialized_engine = base64.b64decode(engine_state[1][0][3])
+def get_engine_from_encoded_engine(encoded_engine: bytes) -> trt.ICudaEngine:
+    serialized_engine = base64.b64decode(encoded_engine)
     runtime = trt.Runtime(TRT_LOGGER)
     engine = runtime.deserialize_cuda_engine(serialized_engine)
     return engine
 
 
 def create_new_TorchTensorRTModule(
-    module: TorchTensorRTModule, engine: trt.ICudaEngine, settings: object
+    module: TorchTensorRTModule, serialized_engine: trt.ICudaEngine, settings: object
 ) -> TorchTensorRTModule:
-    serialized_engine = engine.serialize()
     return TorchTensorRTModule(
-        serialized_engine=bytes(serialized_engine),
+        serialized_engine=serialized_engine,
         name=module.name,
         input_binding_names=module.input_binding_names,
         output_binding_names=module.output_binding_names,
@@ -369,20 +318,12 @@ def create_new_TorchTensorRTModule(
 
 
 def create_new_PythonTorchTensorRTModule(
-    module: PythonTorchTensorRTModule, engine: trt.ICudaEngine, settings: object
+    module: PythonTorchTensorRTModule, serialized_engine: bytes, settings: object
 ) -> PythonTorchTensorRTModule:
-    serialized_engine = engine.serialize()
     return PythonTorchTensorRTModule(
-        engine=bytes(serialized_engine),
+        engine=serialized_engine,
         input_names=module.input_names,
         output_names=module.output_names,
         target_device=settings.device,
         profiling_enabled=module.profiling_enabled,
     )
-
-
-def copy_cuda_engine(engine: trt.ICudaEngine) -> trt.ICudaEngine:
-    runtime = trt.Runtime(TRT_LOGGER)
-    serialized_engine = engine.serialize()
-    engine = runtime.deserialize_cuda_engine(serialized_engine)
-    return engine
