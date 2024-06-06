@@ -105,6 +105,7 @@ class TRTTestCase(TestCase):
                 torch.return_types.min,
             ):
                 ref_outputs = [ref_outputs]
+            breakpoint()
             for out, ref in zip(outputs, ref_outputs):
                 if not isinstance(ref, torch.Tensor):
                     ref = torch.tensor([ref])

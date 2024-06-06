@@ -34,27 +34,54 @@ class TestArangeConverter(DispatchTestCase):
             use_dynamo_tracer=True,
         )
 
-    def test_arange_dynamic(self):
+    @parameterized.expand(
+        [
+            (0, (5, 7, 10), (1, 1, 2)),
+            # (0, (3, 9, 11), (1, 1, 3)),
+        ]
+    )
+    def test_arange_dynamic(self, start_t, end_t, stride_t):
         class Arange(nn.Module):
-            def forward(self, end_tensor):
-                return torch.ops.aten.arange.start_step(0, end_tensor, 1)
+            def forward(self, end, stride):
+                # Pick the opt values for inference
+                return torch.ops.aten.arange.start_step(start_t, end, stride)
 
-        pyt_input = 7
+        # breakpoint()
+        # pyt_input = 7
         inputs = [
+            # # start input
+            # torch_tensorrt.Input(
+            #     min_shape=(start_t[0],),
+            #     opt_shape=(start_t[1],),
+            #     max_shape=(start_t[2],),
+            #     dtype=torch.int64,
+            #     torch_tensor=torch.tensor(start_t[1], dtype=torch.int64).cuda(),
+            #     is_shape_tensor=True,
+            # ),
+            # end input
             torch_tensorrt.Input(
-                min_shape=(5,),
-                opt_shape=(7,),
-                max_shape=(10,),
+                min_shape=(end_t[0],),
+                opt_shape=(end_t[1],),
+                max_shape=(end_t[2],),
                 dtype=torch.int64,
-                torch_tensor=torch.tensor(pyt_input, dtype=torch.int64).cuda(),
+                torch_tensor=torch.tensor(end_t[1], dtype=torch.int64).cuda(),
                 is_shape_tensor=True,
-            )
+            ),
+            # stride input
+            torch_tensorrt.Input(
+                min_shape=(stride_t[0],),
+                opt_shape=(stride_t[1],),
+                max_shape=(stride_t[2],),
+                dtype=torch.int64,
+                torch_tensor=torch.tensor(stride_t[1], dtype=torch.int64).cuda(),
+                is_shape_tensor=True,
+            ),
         ]
         self.run_test_with_dynamic_shape(
             Arange(),
             inputs,
             use_example_tensors=False,
-            pyt_inputs=[pyt_input],
+            pyt_inputs=[end_t[1], stride_t[1]],
         )
 
 
