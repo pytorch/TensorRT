@@ -117,6 +117,7 @@ class TestAsStridedConverter(DispatchTestCase):
             TestModule(),
             inputs,
             enable_passes=True,
+            use_dynamo_tracer=True,
         )
 
 

@@ -16,6 +16,7 @@ from packaging import version
 logger = logging.getLogger(__name__)
 
 COSINE_THRESHOLD = 0.99
+DYNAMIC_DIM = -1
 
 
 def use_python_runtime_parser(use_python_runtime: Optional[bool] = None) -> bool:
@@ -158,6 +159,10 @@ def parse_complex_tensor_structs(
     """
     if isinstance(inputs, (torch.Tensor, Input)):
         return apply_fn(getattr(inputs, attribute_to_extract, None))
+    elif isinstance(inputs, (int, float, bool)):
+        # inputs is a python scalar value
+        inputs_torch = torch.tensor(inputs)
+        return apply_fn(getattr(inputs_torch, attribute_to_extract, None))
 
     elif isinstance(inputs, (list, tuple)):
         torchtrt_input_list = []

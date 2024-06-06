@@ -96,6 +96,8 @@ def _pretraced_backend(
 
             gm = apply_lowering_passes(gm, torch_inputs)
 
+            logger.debug("Lowered Input graph:\n " + str(gm.graph))
+
             torchtrt_inputs = prepare_inputs(
                 torch_inputs, disable_memory_format_check=True
             )
