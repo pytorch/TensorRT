@@ -17,7 +17,6 @@ from torch_tensorrt.dynamo._defaults import (
     HARDWARE_COMPATIBLE,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
-    MODULE_SAVE_PATH,
     NUM_AVG_TIMING_ITERS,
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
@@ -99,4 +98,3 @@ class CompilationSettings:
     dla_global_dram_size: int = DLA_GLOBAL_DRAM_SIZE
     dryrun: Union[bool, str] = DRYRUN
     hardware_compatible: bool = HARDWARE_COMPATIBLE
-    module_save_path: str = MODULE_SAVE_PATH
