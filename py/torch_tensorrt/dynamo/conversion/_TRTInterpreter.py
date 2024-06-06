@@ -243,6 +243,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         if dtype.fp8 in self.compilation_settings.enabled_precisions:
             builder_config.set_flag(trt.BuilderFlag.FP8)
+
         if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
             builder_config.set_flag(trt.BuilderFlag.BF16)
 

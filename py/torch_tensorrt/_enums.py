@@ -24,8 +24,8 @@ class dtype(Enum):
     f64 = auto()
     b = auto()
 
-    f8 = auto()
     bf16 = auto()
+    f8 = auto()
 
     uint8 = u8
     int8 = i8
