@@ -3,7 +3,7 @@ from __future__ import annotations
 import collections.abc
 import logging
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set
+from typing import Any, Callable, List, Optional, Sequence, Set
 
 import torch
 import torch.fx
@@ -398,7 +398,6 @@ def load(file_path: str = "") -> Any:
 def save(
     module: Any,
     file_path: str = "",
-    extra_files: Optional[Dict[str, Any]] = None,
     *,
     output_format: str = "exported_program",
     inputs: Optional[Sequence[torch.Tensor]] = None,
@@ -460,7 +459,7 @@ def save(
                 from torch_tensorrt.dynamo._exporter import export
 
                 exp_program = export(module, inputs)
-                torch.export.save(exp_program, file_path, extra_files=extra_files)
+                torch.export.save(exp_program, file_path)
             else:
                 from torch._higher_order_ops.torchbind import enable_torchbind_tracing
 
@@ -468,4 +467,4 @@ def save(
                     exp_program = torch.export.export(
                         module, tuple(inputs), strict=False
                     )
-                    torch.export.save(exp_program, file_path, extra_files=extra_files)
+                    torch.export.save(exp_program, file_path)
