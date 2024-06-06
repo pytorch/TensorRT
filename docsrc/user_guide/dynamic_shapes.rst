@@ -63,7 +63,7 @@ Please refer to this `documentation <https://pytorch.org/tutorials/intermediate/
     inputs = torch.randn((1, 3, 224, 224), dtype=float32)
     # User can provide dynamic shapes based on Torchdynamo feedback
     exp_program = torch.export.export(model, (inputs,), dynamic_shapes=<user_provided_dynamic_shapes>)
-    trt_gm = torch_tensorrt.dynamo.compile(model, inputs)
+    trt_gm = torch_tensorrt.dynamo.compile(exp_program, [inputs])
     # Run inference
     trt_gm(inputs)
 
@@ -84,7 +84,7 @@ to avoid recompilation of TensorRT engines.
     inputs = torch.randn((1, 3, 224, 224), dtype=float32)
     # This indicates the dimension 0 is dynamic and the range is [1, 8]
     torch._dynamo.mark_dynamic(inputs, 0, min=1, max=8)
-    trt_gm = torch_tensorrt.compile(model, ir="torch_compile", inputs)
+    trt_gm = torch_tensorrt.compile(model, ir="torch_compile", [inputs])
     # Compilation happens when you call the model
     trt_gm(inputs)
 
