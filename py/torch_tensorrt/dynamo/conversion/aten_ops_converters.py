@@ -129,10 +129,14 @@ def aten_ops_batch_norm_legit_no_training(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.native_layer_norm.default, capability_validator=one_user_validator
+    torch.ops.aten.native_layer_norm.default,
+    capability_validator=one_user_validator,
+    supports_dynamic_shapes=True,
 )
-@dynamo_tensorrt_converter(torch.ops.aten.layer_norm.default)
-@dynamo_tensorrt_converter(torch.ops.aten.layer_norm)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.layer_norm.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(torch.ops.aten.layer_norm, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -237,7 +241,10 @@ def aten_ops_cat(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.embedding.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.embedding.default,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_embedding(
     ctx: ConversionContext,
     target: Target,
@@ -427,7 +434,7 @@ def aten_ops_index(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.tanh.default)
+@dynamo_tensorrt_converter(torch.ops.aten.tanh.default, supports_dynamic_shapes=True)
 def aten_ops_tanh(
     ctx: ConversionContext,
     target: Target,
@@ -518,10 +525,10 @@ def aten_ops_hard_sigmoid(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.matmul)
-@dynamo_tensorrt_converter(torch.ops.aten.mm.default)
-@dynamo_tensorrt_converter(torch.ops.aten.mv.default)
-@dynamo_tensorrt_converter(torch.ops.aten.bmm.default)
+@dynamo_tensorrt_converter(torch.ops.aten.matmul, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.mm.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.mv.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.bmm.default, supports_dynamic_shapes=True)
 def aten_ops_matmul(
     ctx: ConversionContext,
     target: Target,
@@ -602,7 +609,9 @@ def aten_ops_erf(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.unsqueeze.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.unsqueeze.default, supports_dynamic_shapes=True
+)
 def aten_ops_unsqueeze(
     ctx: ConversionContext,
     target: Target,
@@ -615,7 +624,9 @@ def aten_ops_unsqueeze(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten._softmax.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten._softmax.default, supports_dynamic_shapes=True
+)
 def aten_ops_softmax(
     ctx: ConversionContext,
     target: Target,
@@ -730,7 +741,7 @@ def aten_ops_select(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.slice.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.slice.Tensor, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -860,7 +871,7 @@ def aten_ops_as_strided(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.permute.default)
+@dynamo_tensorrt_converter(torch.ops.aten.permute.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -931,10 +942,12 @@ def to_copy_dtype_validator(placeholder_only: bool) -> Callable[[Node], bool]:
 @dynamo_tensorrt_converter(
     torch.ops.aten.clone.default,
     capability_validator=lambda node: not is_only_operator_on_placeholder(node),
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
     torch.ops.aten._to_copy.default,
     capability_validator=to_copy_dtype_validator(placeholder_only=False),
+    supports_dynamic_shapes=True,
 )
 def aten_ops_clone_copy_dtype(
     ctx: ConversionContext,
@@ -983,7 +996,7 @@ def aten_ops_clone_copy_placeholder(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.expand.default)
+@dynamo_tensorrt_converter(torch.ops.aten.expand.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -1673,6 +1686,7 @@ def aten_ops_isnan(
     )
 
 
+@dynamo_tensorrt_converter(operator.add, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.add.Tensor, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.add.Scalar, supports_dynamic_shapes=True)
 def aten_ops_add(
@@ -1705,8 +1719,8 @@ def aten_ops_add(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.mul.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.mul.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.mul.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.mul.Scalar, supports_dynamic_shapes=True)
 def aten_ops_mul(
     ctx: ConversionContext,
     target: Target,
@@ -1792,11 +1806,11 @@ def aten_ops_sub(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode)
-@dynamo_tensorrt_converter(torch.ops.aten.div.Scalar)
-@dynamo_tensorrt_converter(torch.ops.aten.div.Scalar_mode)
-@dynamo_tensorrt_converter(torch.ops.prims.div.default)
+@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.div.Scalar, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.div.Scalar_mode, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.prims.div.default, supports_dynamic_shapes=True)
 def aten_ops_div(
     ctx: ConversionContext,
     target: Target,
@@ -1839,9 +1853,13 @@ def aten_ops_div(
         )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.pow.Tensor_Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.pow.Scalar)
-@dynamo_tensorrt_converter(torch.ops.aten.pow.Tensor_Scalar)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.pow.Tensor_Tensor, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(torch.ops.aten.pow.Scalar, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.pow.Tensor_Scalar, supports_dynamic_shapes=True
+)
 def aten_ops_pow(
     ctx: ConversionContext,
     target: Target,
@@ -3046,12 +3064,16 @@ def zero_diag_size_validator(node: Node) -> bool:
         )
         return False
 
-    offset, dim1, dim2 = (
-        node.args[1],
-        node.args[2],
-        node.args[3],
-    )
-
+    if len(node.args) == 1:
+        offset, dim1, dim2 = 0, 0, 1
+    elif len(node.args) == 2:
+        offset, dim1, dim2 = node.args[1], 0, 1
+    else:
+        offset, dim1, dim2 = (
+            node.args[1],
+            node.args[2],
+            node.args[3],
+        )
     num_dims = len(input_shape)
 
     # Adjust dimensions to be positive and canonicalize

@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._tracer &mdash; Torch-TensorRT v2.4.0.dev0+4a6eec9 documentation</title>
+  <title>torch_tensorrt.dynamo._tracer &mdash; Torch-TensorRT v2.4.0.dev0+839ac04 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.4.0.dev0+4a6eec9
+                  v2.4.0.dev0+839ac04
                 </div>
               
             
@@ -510,13 +510,9 @@
 
     <span class="n">device</span> <span class="o">=</span> <span class="n">to_torch_device</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;device&quot;</span><span class="p">,</span> <span class="n">default_device</span><span class="p">()))</span>
     <span class="n">torch_inputs</span> <span class="o">=</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
-    <span class="n">dynamic_shapes</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">dynamic_shapes</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="nb">input</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">:</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">Input</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">input</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span><span class="p">:</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="nb">input</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Expected a name for a dynamic input with shape </span><span class="si">{</span><span class="nb">input</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2"> but found none&quot;</span>
-                <span class="p">)</span>
             <span class="n">min_shape</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;min_shape&quot;</span><span class="p">]</span>
             <span class="n">opt_shape</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;opt_shape&quot;</span><span class="p">]</span>
             <span class="n">max_shape</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">&quot;max_shape&quot;</span><span class="p">]</span>
@@ -532,9 +528,9 @@
                         <span class="nb">max</span><span class="o">=</span><span class="n">max_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">],</span>
                     <span class="p">)</span>
 
-            <span class="n">dynamic_shapes</span><span class="p">[</span><span class="nb">input</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">dynamic_dims</span>
+            <span class="n">dynamic_shapes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dynamic_dims</span><span class="p">)</span>
 
-    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">torch_inputs</span><span class="p">),</span> <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">)</span>
+    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">torch_inputs</span><span class="p">),</span> <span class="n">dynamic_shapes</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">dynamic_shapes</span><span class="p">))</span>
 
     <span class="k">return</span> <span class="n">exp_program</span></div>
 </pre></div>
