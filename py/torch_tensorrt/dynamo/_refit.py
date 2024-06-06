@@ -83,9 +83,11 @@ def construct_refit_mapping(
         if layer_type in MODULE_MAP:
             layer.__class__ = MODULE_MAP[layer_type][0]
             for weight_type, weight_name in MODULE_MAP[layer_type][1]:
-                weight_map[f"{layer.name} {weight_name}"] = layer.__getattribute__(
-                    weight_type
-                ).copy()
+                weight = layer.__getattribute__(weight_type).copy()
+                weight_map[f"{layer.name} {weight_name}"] = (
+                    weight,
+                    layer.get_output_type(0),
+                )
 
         else:
             warnings.warn(f"{layer_type} is not supported yet")
@@ -104,6 +106,7 @@ def _refit_single_trt_engine_with_gm(
     """
     # Get the refitting mapping
     mapping = construct_refit_mapping(new_gm, input_list, settings)
+    refitted = set()
 
     trt_wt_location = trt.TensorLocation.HOST
     refitter = trt.Refitter(old_engine, TRT_LOGGER)
@@ -111,12 +114,17 @@ def _refit_single_trt_engine_with_gm(
 
     for layer_name in weight_list:
         if layer_name not in mapping:
-            print(f"{layer_name} is not found in weight mapping")
-
+            raise AssertionError(f"{layer_name} is not found in weight mapping")
         # Use Numpy to create weights
-        weight = mapping[layer_name]
-        trt_wt_tensor = trt.Weights(trt.DataType.FLOAT, weight.ctypes.data, weight.size)
+        weight, datatype = mapping[layer_name]
+        trt_wt_tensor = trt.Weights(
+            datatype, weight.ctypes.data, weight.size
+        )  # TODO: Support different types of dtype
         refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
+        refitted.add(layer_name)
+
+    if len(refitted) != len(weight_list):
+        raise AssertionError("Not all weights have been refitted")
 
     if not refitter.refit_cuda_engine():
         print("Error: failed to refit new weights.")
@@ -158,6 +166,7 @@ def _refit_module_weights(
     """
     Refit a compiled graph module with ExportedProgram
     """
+    # Check the setting to be uniform
 
     if settings.debug:
         set_log_level(logger.parent, logging.DEBUG)
@@ -216,8 +225,13 @@ def _refit_module_weights(
             min_block_size=settings.min_block_size,
             torch_executed_ops=settings.torch_executed_ops,
         )
+
+    # TODO: Check whether two modules have the same subcomponents
+    # 1. Check the number of partitions and name
+    # 2. (future) Check the hash of source fx.Graph and new fx.Graph
+
     # PytorchTensorRTModule does not support deepcopy
-    # Create a shallow copy. Replace the TRTModule after
+    # Create a shallow copy. Replace the TRTModule after. TODO: Rethin the copy
     compiled_module = copy.copy(compiled_module)
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
