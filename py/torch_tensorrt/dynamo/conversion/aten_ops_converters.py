@@ -2119,8 +2119,8 @@ def aten_ops_ne(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.gt.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.gt.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.gt.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.gt.Scalar, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2143,8 +2143,8 @@ def aten_ops_gt(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.ge.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.ge.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.ge.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.ge.Scalar, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
