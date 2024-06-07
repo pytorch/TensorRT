@@ -34,6 +34,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         output_names: Optional[List[str]] = None,
         target_device: Device = Device._current_device(),
         profiling_enabled: Optional[bool] = None,
+        settings: Any = None,
     ):
         super(PythonTorchTensorRTModule, self).__init__()
         self._register_state_dict_hook(PythonTorchTensorRTModule._on_state_dict)
@@ -52,6 +53,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.profiling_enabled = (
             profiling_enabled if profiling_enabled is not None else False
         )
+        self.settings = settings
         self._initialize()
 
     def _initialize(self) -> None:
@@ -125,6 +127,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.__dict__.update(state)
         if self.engine:
             self.context = self.engine.create_execution_context()
+
+    def __deepcopy__(self, memo: Any) -> PythonTorchTensorRTModule:
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        result.__setstate__(self.__getstate__())
+        return result
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
         with (

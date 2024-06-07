@@ -56,6 +56,10 @@ def construct_refit_mapping(
             trt.IConvolutionLayer,
             [("kernel", "KERNEL"), ("bias", "BIAS")],
         ),
+        "DECONVOLUTION": (
+            trt.IDeconvolutionLayer,
+            [("kernel", "KERNEL"), ("bias", "BIAS")],
+        ),
         "CONSTANT": (trt.IConstantLayer, [("weights", "CONSTANT")]),
     }
 
@@ -117,9 +121,7 @@ def _refit_single_trt_engine_with_gm(
             raise AssertionError(f"{layer_name} is not found in weight mapping")
         # Use Numpy to create weights
         weight, datatype = mapping[layer_name]
-        trt_wt_tensor = trt.Weights(
-            datatype, weight.ctypes.data, weight.size
-        )  # TODO: Support different types of dtype
+        trt_wt_tensor = trt.Weights(datatype, weight.ctypes.data, weight.size)
         refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
         refitted.add(layer_name)
 
@@ -161,21 +163,28 @@ def _refit_module_weights(
     compiled_module: torch.fx.GraphModule | ExportedProgram,
     new_weight_module: ExportedProgram,
     inputs: Tuple[Any, ...],
-    settings: Any,
+    settings: Any = None,
 ) -> torch.fx.GraphModule:
     """
     Refit a compiled graph module with ExportedProgram
     """
-    # Check the setting to be uniform
-
-    if settings.debug:
-        set_log_level(logger.parent, logging.DEBUG)
-
-    if not isinstance(inputs, collections.abc.Sequence):
-        inputs = [inputs]
-
     if isinstance(compiled_module, ExportedProgram):
         compiled_module = compiled_module.module()
+
+    compiled_module = copy.deepcopy(compiled_module)
+
+    # Get the settings and check the setting to be uniform
+    if not settings:
+        for name, submodule in compiled_module.named_children():
+            if settings is not None:
+                assert settings == submodule.settings
+            settings = submodule.settings
+
+        if settings.debug:
+            set_log_level(logger.parent, logging.DEBUG)
+
+        if not isinstance(inputs, collections.abc.Sequence):
+            inputs = [inputs]
 
     # Prepare torch_trt inputs
     inputs = prepare_inputs(inputs)
@@ -226,43 +235,45 @@ def _refit_module_weights(
             torch_executed_ops=settings.torch_executed_ops,
         )
 
-    # TODO: Check whether two modules have the same subcomponents
+    # Check whether two modules have the same subcomponents
     # 1. Check the number of partitions and name
-    # 2. (future) Check the hash of source fx.Graph and new fx.Graph
+    assert [sm[0] for sm in partitioned_module.named_children()] == [
+        sm[0] for sm in compiled_module.named_children()
+    ]
+    # 2. TODO: Check the hash of source fx.Graph and new fx.Graph
 
-    # PytorchTensorRTModule does not support deepcopy
-    # Create a shallow copy. Replace the TRTModule after. TODO: Rethin the copy
-    compiled_module = copy.copy(compiled_module)
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
     for name, _ in partitioned_module.named_children():
         new_submodule = getattr(partitioned_module, name)
-        # TODO: Copy the submodule and return a new one
+        # Extract engine from the submodule
         inline_module = False
         try:
             compiled_submodule = getattr(compiled_module, name)
             if isinstance(compiled_submodule, PythonTorchTensorRTModule):
-                engine = copy_cuda_engine(compiled_submodule.engine, runtime)
+                engine = compiled_submodule.engine
             elif isinstance(compiled_submodule, TorchTensorRTModule):
-                engine_state = compiled_submodule.get_extra_state()
-                encoded_engine = engine_state[1][0][3]
-                engine = get_engine_from_encoded_engine(encoded_engine, runtime)
-            else:
-                raise AssertionError("The type of graph module is not supported.")
+                engine_info = compiled_submodule.engine.__getstate__()[0]
+                engine = get_engine_from_encoded_engine(engine_info[3], runtime)
+
         except AttributeError:
-            inline_module = True
-            inline_engine = getattr(compiled_module, f"{name}_engine")
-            engine_info = inline_engine.__getstate__()[0]
-            engine = get_engine_from_encoded_engine(engine_info[3], runtime)
+            try:
+                inline_module = True
+                inline_engine = getattr(compiled_module, f"{name}_engine")
+                engine_info = inline_engine.__getstate__()[0]
+                engine = get_engine_from_encoded_engine(engine_info[3], runtime)
+
+            except AttributeError:
+                raise AssertionError(
+                    "The type of graph module is not supported for refitting or two compiled modules do not match."
+                )
 
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
         submodule_inputs = partitioning.construct_submodule_inputs(new_submodule)
-
         logger.debug(
             "Refitting Submodule name: %s\n",
             str(name),
         )
-
         assert submodule_inputs is not None
         # Handle long/double inputs if requested by the user
         if settings.truncate_double:
@@ -280,29 +291,23 @@ def _refit_module_weights(
             input_list=submodule_inputs,
             settings=settings,
         )
-        serialized_engine = bytes(engine.serialize())
+
         if inline_module:
+            serialized_engine = bytes(engine.serialize())
             new_engine_info = list(engine_info)
             new_engine_info[3] = serialized_engine
             refitted_inline_engine = torch.classes.tensorrt.Engine(
                 tuple(new_engine_info)
             )
             setattr(compiled_module, f"{name}_engine", refitted_inline_engine)
-        else:
-            # In TorchTensorRTModule, the original module is intact. Create a new module and assign to the fx.Graph
-            if isinstance(compiled_submodule, TorchTensorRTModule):
-                refitteded_submodule = create_new_TorchTensorRTModule(
-                    compiled_submodule,
-                    serialized_engine=serialized_engine,
-                    settings=settings,
-                )
-            else:
-                refitteded_submodule = create_new_PythonTorchTensorRTModule(
-                    compiled_submodule,
-                    serialized_engine=serialized_engine,
-                    settings=settings,
-                )
-            setattr(compiled_module, name, refitteded_submodule)
+
+        elif isinstance(compiled_submodule, TorchTensorRTModule):
+            serialized_engine = bytes(engine.serialize())
+            new_engine_info = list(engine_info)
+            new_engine_info[3] = serialized_engine
+            refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
+            compiled_submodule.engine = refitted_engine
+
         return compiled_module
 
 
@@ -314,36 +319,5 @@ def get_engine_from_encoded_engine(
     encoded_engine: bytes, runtime: trt.Runtime
 ) -> trt.ICudaEngine:
     serialized_engine = base64.b64decode(encoded_engine)
-    engine = runtime.deserialize_cuda_engine(serialized_engine)
-    return engine
-
-
-def create_new_TorchTensorRTModule(
-    module: TorchTensorRTModule, serialized_engine: trt.ICudaEngine, settings: object
-) -> TorchTensorRTModule:
-    return TorchTensorRTModule(
-        serialized_engine=serialized_engine,
-        name=module.name,
-        input_binding_names=module.input_binding_names,
-        output_binding_names=module.output_binding_names,
-        target_device=settings.device,
-        hardware_compatible=module.hardware_compatible,
-    )
-
-
-def create_new_PythonTorchTensorRTModule(
-    module: PythonTorchTensorRTModule, serialized_engine: bytes, settings: object
-) -> PythonTorchTensorRTModule:
-    return PythonTorchTensorRTModule(
-        engine=serialized_engine,
-        input_names=module.input_names,
-        output_names=module.output_names,
-        target_device=settings.device,
-        profiling_enabled=module.profiling_enabled,
-    )
-
-
-def copy_cuda_engine(engine: trt.ICudaEngine, runtime: trt.Runtime) -> trt.ICudaEngine:
-    serialized_engine = engine.serialize()
     engine = runtime.deserialize_cuda_engine(serialized_engine)
     return engine

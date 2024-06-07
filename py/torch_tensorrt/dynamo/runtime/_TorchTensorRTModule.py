@@ -44,6 +44,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         output_binding_names: Optional[List[str]] = None,
         target_device: Device = Device._current_device(),
         hardware_compatible: bool = False,
+        settings: Any = None,
     ):
         """__init__ method for torch_tensorrt.dynamo.runtime._TorchTensorRTModule.TorchTensorRTModule
 
@@ -91,7 +92,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         )
         self.name = name
         self.hardware_compatible = hardware_compatible
-
+        self.settings = settings
         if serialized_engine is not None:
             self.engine = torch.classes.tensorrt.Engine(
                 [
