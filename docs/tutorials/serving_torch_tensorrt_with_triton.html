@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Serving a Torch-TensorRT model with Triton &mdash; Torch-TensorRT v2.4.0.dev0+de9a063 documentation</title>
+  <title>Serving a Torch-TensorRT model with Triton &mdash; Torch-TensorRT v2.4.0.dev0+6d8dbfd documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.4.0.dev0+de9a063
+                  v2.4.0.dev0+6d8dbfd
                 </div>
               
             
@@ -457,10 +457,10 @@
   <section id="serving-a-torch-tensorrt-model-with-triton">
 <span id="serving-torch-tensorrt-with-triton"></span><h1>Serving a Torch-TensorRT model with Triton<a class="headerlink" href="#serving-a-torch-tensorrt-model-with-triton" title="Permalink to this heading">¶</a></h1>
 <p>Optimization and deployment go hand in hand in a discussion about Machine
-Learning infrastructure. Once network level optimzation are done
+Learning infrastructure. Once network level optimization are done
 to get the maximum performance, the next step would be to deploy it.</p>
-<p>However, serving this optimized model comes with it’s own set of considerations
-and challenges like: building an infrastructure to support concorrent model
+<p>However, serving this optimized model comes with its own set of considerations
+and challenges like: building an infrastructure to support concurrent model
 executions, supporting clients over HTTP or gRPC and more.</p>
 <p>The <a class="reference external" href="https://github.com/triton-inference-server/server">Triton Inference Server</a>
 solves the aforementioned and more. Let’s discuss step-by-step, the process of
@@ -509,7 +509,7 @@ is to set up a Triton Inference Server.</p>
 highly recommend to checking our <a class="reference external" href="https://github.com/triton-inference-server">Github
 Repository</a>.</p>
 <p>To use Triton, we need to make a model repository. A model repository, as the
-name suggested, is a repository of the models the Inference server hosts. While
+name suggests, is a repository of the models the Inference server hosts. While
 Triton can serve models from multiple repositories, in this example, we will
 discuss the simplest possible form of the model repository.</p>
 <p>The structure of this repository should look something like this:</p>
@@ -625,7 +625,7 @@ inference_output = results.as_numpy(&#39;output__0&#39;)
 print(inference_output[:5])
 </pre></div>
 </div>
-<p>The output of the same should look like below:</p>
+<p>The output should look like below:</p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span>[b&#39;12.468750:90&#39; b&#39;11.523438:92&#39; b&#39;9.664062:14&#39; b&#39;8.429688:136&#39;
  b&#39;8.234375:11&#39;]
 </pre></div>

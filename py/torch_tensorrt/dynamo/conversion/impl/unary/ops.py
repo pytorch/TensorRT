@@ -119,6 +119,23 @@ def log2(
     )
 
 
+def log1p(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+) -> TRTTensor:
+    """
+    Computes log(1 + x) for each element of the input tensor.
+    """
+    one_plus_x = impl.elementwise.add(
+        ctx, target, source_ir, f"{name}_add", input_val, 1
+    )
+
+    return log(ctx, target, source_ir, f"{name}_log", one_plus_x)
+
+
 def sqrt(
     ctx: ConversionContext,
     target: Target,

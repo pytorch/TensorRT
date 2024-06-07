@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.4.0.dev0+de9a063 documentation</title>
+  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.4.0.dev0+6d8dbfd documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.4.0.dev0+de9a063
+                  v2.4.0.dev0+6d8dbfd
                 </div>
               
             
@@ -457,6 +457,7 @@
 <span class="kn">from</span> <span class="nn">torch_tensorrt._Device</span> <span class="kn">import</span> <span class="n">Device</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt._enums</span> <span class="kn">import</span> <span class="n">EngineCapability</span><span class="p">,</span> <span class="n">dtype</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._defaults</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ASSUME_DYNAMIC_SHAPE_SUPPORT</span><span class="p">,</span>
     <span class="n">DEBUG</span><span class="p">,</span>
     <span class="n">DISABLE_TF32</span><span class="p">,</span>
     <span class="n">DLA_GLOBAL_DRAM_SIZE</span><span class="p">,</span>
@@ -509,6 +510,7 @@
 <span class="sd">        device (Device): GPU to compile the model on</span>
 <span class="sd">        require_full_compilation (bool): Whether to require the graph is fully compiled in TensorRT.</span>
 <span class="sd">            Only applicable for `ir=&quot;dynamo&quot;`; has no effect for `torch.compile` path</span>
+<span class="sd">        assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False</span>
 <span class="sd">        disable_tf32 (bool): Whether to disable TF32 computation for TRT layers</span>
 <span class="sd">        sparse_weights (bool): Whether to allow the builder to use sparse weights</span>
 <span class="sd">        refit (bool): Whether to build a refittable engine</span>
@@ -539,6 +541,7 @@
     <span class="n">device</span><span class="p">:</span> <span class="n">Device</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">default_device</span><span class="p">)</span>
     <span class="n">require_full_compilation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">REQUIRE_FULL_COMPILATION</span>
     <span class="n">disable_tf32</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DISABLE_TF32</span>
+    <span class="n">assume_dynamic_shape_support</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ASSUME_DYNAMIC_SHAPE_SUPPORT</span>
     <span class="n">sparse_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">SPARSE_WEIGHTS</span>
     <span class="n">refit</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">REFIT</span>
     <span class="n">engine_capability</span><span class="p">:</span> <span class="n">EngineCapability</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>

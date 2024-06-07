@@ -484,6 +484,390 @@ class TestLowering(TestCase):
             f"The optimized model results shape and torch model results shape should be equal in empty_like",
         )
 
+    def test_lowering_slice_scatter_dimOne_module(self):
+        class sliceScatter(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+
+            def forward(self, x, src, dim, start=None, end=None, step=1):
+                y = torch.ops.aten.slice_scatter(x, src, dim, start, end, step)
+                return y
+
+        # Operations expected to be removed in the traced graph after decompositions
+        expected_ops = {
+            torch.ops.aten.scatter.src,
+        }
+        unexpected_ops = {torch.ops.aten.select_scatter}
+
+        inputs = [torch.zeros(8, 8).cuda(), torch.ones(8, 2).cuda(), 1, 6, None, 1]
+
+        fx_graph = torch.fx.symbolic_trace(sliceScatter())
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            truncate_double=True,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            f"Slice_scatter TRT outputs don't match with the original model.",
+        )
+
+    def test_lowering_slice_scatter_dimZero_StepTwo_module(self):
+        class sliceScatter(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+
+            def forward(self, x, src, dim, start, end, step):
+                y = torch.ops.aten.slice_scatter.default(x, src, dim, start, end, step)
+                return y
+
+        # Operations expected to be removed in the traced graph after decompositions
+        expected_ops = {
+            torch.ops.aten.scatter.src,
+        }
+        unexpected_ops = {torch.ops.aten.slice_scatter}
+
+        inputs = [torch.zeros(8, 8).cuda(), torch.ones(2, 8).cuda(), 0, 2, 6, 2]
+
+        fx_graph = torch.fx.symbolic_trace(sliceScatter())
+
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            truncate_double=True,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            f"Slice_scatter TRT outputs don't match with the original model.",
+        )
+
+    def test_lowering_slice_scatter_dimOne_3d_module(self):
+        class sliceScatter(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+
+            def forward(self, x, src, dim, start, end, step):
+                y = torch.ops.aten.slice_scatter.default(x, src, dim, start, end, step)
+                return y
+
+        # Operations expected to be removed in the traced graph after decompositions
+        expected_ops = {
+            torch.ops.aten.scatter.src,
+        }
+        unexpected_ops = {torch.ops.aten.slice_scatter}
+
+        inputs = [
+            torch.zeros(8, 8, 8).cuda(),
+            torch.ones(8, 2, 8).cuda(),
+            1,
+            6,
+            None,
+            1,
+        ]
+
+        fx_graph = torch.fx.symbolic_trace(sliceScatter())
+
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            truncate_double=True,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            f"Slice_scatter TRT outputs don't match with the original model.",
+        )
+
+    def test_lowering_select_scatter_dimZero_module(self):
+        class selectScatter(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+
+            def forward(self, x, src, dim, index):
+                y = torch.ops.aten.select_scatter.default(x, src, dim, index)
+                return y
+
+        # Operations expected to be removed in the traced graph after decompositions
+        expected_ops = {torch.ops.aten.scatter.src, torch.ops.aten.unsqueeze.default}
+        unexpected_ops = {
+            torch.ops.aten.select_scatter.default,
+            torch.ops.aten.slice_scatter.default,
+        }
+
+        inputs = [torch.zeros(2, 2).cuda(), torch.ones(2).cuda(), 0, 0]
+
+        fx_graph = torch.fx.symbolic_trace(selectScatter())
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            truncate_and_double=True,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            f"Select_scatter TRT outputs don't match with the original model.",
+        )
+
+    def test_lowering_select_scatter_dimOne_module(self):
+        class selectScatter(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+
+            def forward(self, x, src, dim, index):
+                y = torch.ops.aten.select_scatter.default(x, src, dim, index)
+                return y
+
+        # Operations expected to be removed in the traced graph after decompositions
+        expected_ops = {torch.ops.aten.scatter.src, torch.ops.aten.unsqueeze.default}
+        unexpected_ops = {
+            torch.ops.aten.select_scatter.default,
+            torch.ops.aten.slice_scatter.default,
+        }
+
+        inputs = [torch.zeros(2, 2).cuda(), torch.ones(2).cuda(), 1, 0]
+
+        fx_graph = torch.fx.symbolic_trace(selectScatter())
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            truncate_double=True,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            f"Select_scatter TRT outputs don't match with the original model.",
+        )
+
+    def test_lowering_select_scatter_multidimension_module(self):
+        class selectScatter(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+
+            def forward(self, x, src, dim, index):
+                y = torch.ops.aten.select_scatter.default(x, src, dim, index)
+                return y
+
+        # Operations expected to be removed in the traced graph after decompositions
+        expected_ops = {torch.ops.aten.scatter.src, torch.ops.aten.unsqueeze.default}
+        unexpected_ops = {
+            torch.ops.aten.select_scatter.default,
+            torch.ops.aten.slice_scatter.default,
+        }
+
+        inputs = [torch.zeros(2, 3, 4).cuda(), torch.ones(2, 4).cuda(), 1, 0]
+
+        fx_graph = torch.fx.symbolic_trace(selectScatter())
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            truncate_double=True,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            f"Select_scatter TRT outputs don't match with the original model.",
+        )
+
 
 if __name__ == "__main__":
     run_tests()

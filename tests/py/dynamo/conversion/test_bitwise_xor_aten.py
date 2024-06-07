@@ -29,6 +29,7 @@ class TestBitwiseXorConverter(DispatchTestCase):
             bitwise_xor(),
             inputs,
             enable_passes=True,
+            use_dynamo_tracer=True,
         )
 
     @parameterized.expand(
@@ -49,6 +50,7 @@ class TestBitwiseXorConverter(DispatchTestCase):
             bitwise_xor(),
             inputs,
             enable_passes=True,
+            use_dynamo_tracer=True,
         )
 
     @parameterized.expand(
@@ -69,6 +71,7 @@ class TestBitwiseXorConverter(DispatchTestCase):
             bitwise_xor(),
             inputs,
             enable_passes=True,
+            use_dynamo_tracer=True,
         )
 
 

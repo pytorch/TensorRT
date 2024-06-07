@@ -13,14 +13,14 @@ Users writing TensorRT applications are required to setup a calibrator class whi
 the TensorRT calibrator. With Torch-TensorRT we look to leverage existing infrastructure in PyTorch to make implementing
 calibrators easier.
 
-LibTorch provides a ``DataLoader`` and ``Dataset`` API which steamlines preprocessing and batching input data.
+LibTorch provides a ``DataLoader`` and ``Dataset`` API which streamlines preprocessing and batching input data.
 These APIs are exposed via both C++ and Python interface which makes it easier for the end user.
 For C++ interface, we use ``torch::Dataset`` and ``torch::data::make_data_loader`` objects to construct and perform pre-processing on datasets.
 The equivalent functionality in python interface uses ``torch.utils.data.Dataset`` and ``torch.utils.data.DataLoader``.
 This section of the PyTorch documentation has more information https://pytorch.org/tutorials/advanced/cpp_frontend.html#loading-data and https://pytorch.org/tutorials/recipes/recipes/loading_data_recipe.html.
 Torch-TensorRT uses Dataloaders as the base of a generic calibrator implementation. So you will be able to reuse or quickly
-implement a ``torch::Dataset`` for your target domain, place it in a DataLoader and create a INT8 Calibrator
-which you can provide to Torch-TensorRT to run INT8 Calibration during compliation of your module.
+implement a ``torch::Dataset`` for your target domain, place it in a DataLoader and create an INT8 Calibrator
+which you can provide to Torch-TensorRT to run INT8 Calibration during compilation of your module.
 
 .. _writing_ptq_cpp:
 
@@ -108,7 +108,7 @@ Next we create a calibrator from the ``calibration_dataloader`` using the calibr
 
 Here we also define a location to write a calibration cache file to which we can use to reuse the calibration data without needing the dataset and whether or not
 we should use the cache file if it exists. There also exists a ``torch_tensorrt::ptq::make_int8_cache_calibrator`` factory which creates a calibrator that uses the cache
-only for cases where you may do engine building on a machine that has limited storage (i.e. no space for a full dataset) or to have a simpiler deployment application.
+only for cases where you may do engine building on a machine that has limited storage (i.e. no space for a full dataset) or to have a simpler deployment application.
 
 The calibrator factories create a calibrator that inherits from a ``nvinfer1::IInt8Calibrator`` virtual class (``nvinfer1::IInt8EntropyCalibrator2`` by default) which
 defines the calibration algorithm used when calibrating. You can explicitly make the selection of calibration algorithm like this:
@@ -118,7 +118,7 @@ defines the calibration algorithm used when calibrating. You can explicitly make
     // MinMax Calibrator is geared more towards NLP tasks
     auto calibrator = torch_tensorrt::ptq::make_int8_calibrator<nvinfer1::IInt8MinMaxCalibrator>(std::move(calibration_dataloader), calibration_cache_file, true);
 
-Then all thats required to setup the module for INT8 calibration is to set the following compile settings in the `torch_tensorrt::CompileSpec` struct and compiling the module:
+Then all that's required to setup the module for INT8 calibration is to set the following compile settings in the `torch_tensorrt::CompileSpec` struct and compiling the module:
 
 .. code-block:: c++
 

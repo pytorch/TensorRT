@@ -27,6 +27,8 @@ class TestSortConverter(DispatchTestCase):
         self.run_test(
             Sort(),
             inputs,
+            enable_passes=True,
+            use_dynamo_tracer=True,
         )
 
 

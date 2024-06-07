@@ -1,0 +1,15 @@
+# This file is specifically to install correct version of libraries during CI testing.
+# The index url for torch & torchvision libs is configured in install-torch-tensorrt.sh based on CUDA version
+# networkx library issue: https://discuss.pytorch.org/t/installing-pytorch-under-python-3-8-question-about-networkx-version/196740
+pytest>=8.2.1
+pytest-xdist>=3.6.1
+networkx==2.8.8
+torch>=2.4.0.dev,<2.5.0
+torchvision>=0.19.0.dev,<0.20.0
+--extra-index-url https://pypi.ngc.nvidia.com
+pyyaml
+tensorrt==10.0.1
+timm>=1.0.3
+transformers==4.39.3
+parameterized>=0.2.0
+expecttest==0.1.6
