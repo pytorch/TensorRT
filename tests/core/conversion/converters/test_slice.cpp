@@ -330,3 +330,31 @@ TEST(Converters, ATenSliceDynamic2ConvertsCorrectly) {
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
+
+TEST(Converters, ATenFlipConvertsCorrectly) {
+  const auto graph = R"IR(
+        graph(%x.1 : Tensor):
+              %2 : int[] = prim::Constant[value=[0]]()
+              %3 : int[] = prim::Constant[value=[1]]()
+              %4 : int[] = prim::Constant[value=[0, 1]]()
+              %5 : Tensor = aten::flip(%x.1, %2)
+              %6 : Tensor = aten::flip(%x.1, %3)
+              %7 : Tensor = aten::flip(%x.1, %4)
+              return (%5, %6, %7))IR";
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::arange(8, {at::kCUDA}).to(at::kInt).reshape({2, 2, 2});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {trt_in}, true);
+
+  for (size_t i = 0; i < jit_results.size(); i++) {
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt_results[i], 2e-6));
+  }
+}

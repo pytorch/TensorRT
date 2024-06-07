@@ -76,6 +76,101 @@ class TestSubConverter(DispatchTestCase):
             inputs,
         )
 
+    @parameterized.expand(
+        [
+            (
+                "3d_2d_alpha_float32",
+                torch.float32,
+                (1, 1, 1),
+                (3, 2, 2),
+                (3, 2, 4),
+                (1, 1),
+                (2, 2),
+                (2, 4),
+                1.5,
+            ),
+            (
+                "2d_2d_alpha_int32",
+                torch.int32,
+                (3, 2),
+                (3, 2),
+                (3, 3),
+                (3, 2),
+                (3, 2),
+                (3, 3),
+                2,
+            ),
+        ]
+    )
+    def test_dynamic_shape_sub(self, *args):
+        class sub(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return torch.ops.aten.sub.Tensor(lhs_val, rhs_val, alpha=args[8])
+
+        input_specs = [
+            Input(
+                min_shape=args[2],
+                opt_shape=args[3],
+                max_shape=args[4],
+                dtype=args[1],
+            ),
+            Input(
+                min_shape=args[5],
+                opt_shape=args[6],
+                max_shape=args[7],
+                dtype=args[1],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(sub(), input_specs)
+
+    @parameterized.expand(
+        [
+            (
+                "3d_scalar_float32",
+                torch.float32,
+                (1, 1, 1),
+                (3, 2, 2),
+                (3, 2, 4),
+                0.3,
+            )
+        ]
+    )
+    def test_dynamic_shape_sub_scalar(self, *args):
+        class sub(nn.Module):
+            def forward(self, lhs_val):
+                return torch.ops.aten.sub.Tensor(lhs_val, args[5])
+
+        input_specs = [
+            Input(
+                min_shape=args[2],
+                opt_shape=args[3],
+                max_shape=args[4],
+                dtype=args[1],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(sub(), input_specs)
+
+    @parameterized.expand(
+        [("scalar_2d_alpha_float32", torch.float32, (1, 1), (2, 2), (3, 4), 0.3, 1.5)]
+    )
+    def test_dynamic_shape_sub_scalar_alpha(self, *args):
+        class sub(nn.Module):
+            def forward(self, rhs_val):
+                return torch.ops.aten.sub.Tensor(args[5], rhs_val, alpha=args[6])
+
+        input_specs = [
+            Input(
+                min_shape=args[2],
+                opt_shape=args[3],
+                max_shape=args[4],
+                dtype=args[1],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(sub(), input_specs)
+
 
 if __name__ == "__main__":
     run_tests()
