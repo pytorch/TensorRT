@@ -1289,7 +1289,7 @@ def aten_ops_log1p(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sqrt.default)
+@dynamo_tensorrt_converter(torch.ops.aten.sqrt.default, supports_dynamic_shapes=True)
 def aten_ops_sqrt(
     ctx: ConversionContext,
     target: Target,
@@ -1774,8 +1774,8 @@ def aten_ops_minimum(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sub.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.sub.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.sub.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.sub.Scalar, supports_dynamic_shapes=True)
 def aten_ops_sub(
     ctx: ConversionContext,
     target: Target,
@@ -1791,7 +1791,7 @@ def aten_ops_sub(
             ctx,
             target,
             SourceIR.ATEN,
-            name,
+            name + "_alpha",
             other,
             alpha,
         )
@@ -2938,7 +2938,7 @@ def aten_ops_trunc(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.copy.default)
+@dynamo_tensorrt_converter(torch.ops.aten.copy.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         1: (TRTTensor,),
