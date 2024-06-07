@@ -3,7 +3,6 @@ from __future__ import annotations
 import collections.abc
 import copy
 import logging
-import warnings
 from typing import Any, Sequence, Tuple
 
 import numpy as np
@@ -92,9 +91,6 @@ def construct_refit_mapping(
                     layer.get_output_type(0),
                 )
 
-        else:
-            warnings.warn(f"{layer_type} is not supported yet")
-
     return weight_map
 
 
@@ -149,17 +145,21 @@ def refit_module_weights(
     compiled_module = copy.deepcopy(compiled_module)
 
     # Get the settings and check the setting to be uniform
-    if not settings:
+    if settings is None:
         for name, submodule in compiled_module.named_children():
+            if not isinstance(
+                submodule, (PythonTorchTensorRTModule, TorchTensorRTModule)
+            ):
+                continue
             if settings is not None:
                 assert settings == submodule.settings
             settings = submodule.settings
 
-        if settings.debug:
-            set_log_level(logger.parent, logging.DEBUG)
+    if settings.debug:
+        set_log_level(logger.parent, logging.DEBUG)
 
-        if not isinstance(inputs, collections.abc.Sequence):
-            inputs = [inputs]
+    if not isinstance(inputs, collections.abc.Sequence):
+        inputs = [inputs]
 
     # Prepare torch_trt inputs
     inputs = prepare_inputs(inputs)
@@ -219,10 +219,9 @@ def refit_module_weights(
 
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
-    for name, _ in partitioned_module.named_children():
-        new_submodule = getattr(partitioned_module, name)
+    for name, new_submodule in partitioned_module.named_children():
+
         # Extract engine from the submodule
-        inline_module = False
         try:
             compiled_submodule = getattr(compiled_module, name)
             if isinstance(compiled_submodule, PythonTorchTensorRTModule):
@@ -230,18 +229,17 @@ def refit_module_weights(
             elif isinstance(compiled_submodule, TorchTensorRTModule):
                 engine_info = compiled_submodule.engine.__getstate__()[0]
                 engine = get_engine_from_encoded_engine(engine_info[3], runtime)
-
-        except AttributeError:
-            try:
-                inline_module = True
-                inline_engine = getattr(compiled_module, f"{name}_engine")
-                engine_info = inline_engine.__getstate__()[0]
-                engine = get_engine_from_encoded_engine(engine_info[3], runtime)
-
-            except AttributeError:
+            elif isinstance(compiled_submodule, torch.fx.graph_module.GraphModule):
+                # This is graph break resulted by unsupported ops
+                continue
+            else:
                 raise AssertionError(
-                    "The type of graph module is not supported for refitting or two compiled modules do not match."
+                    "The type of graph module is not supported for refitting."
                 )
+        except AttributeError:
+            raise AssertionError(
+                "The type of graph module is not supported for refitting or two compiled modules do not match."
+            )
 
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
         submodule_inputs = partitioning.construct_submodule_inputs(new_submodule)
@@ -267,23 +265,14 @@ def refit_module_weights(
             settings=settings,
         )
 
-        if inline_module:
-            serialized_engine = bytes(engine.serialize())
-            new_engine_info = list(engine_info)
-            new_engine_info[3] = serialized_engine
-            refitted_inline_engine = torch.classes.tensorrt.Engine(
-                tuple(new_engine_info)
-            )
-            setattr(compiled_module, f"{name}_engine", refitted_inline_engine)
-
-        elif isinstance(compiled_submodule, TorchTensorRTModule):
+        if isinstance(compiled_submodule, TorchTensorRTModule):
             serialized_engine = bytes(engine.serialize())
             new_engine_info = list(engine_info)
             new_engine_info[3] = serialized_engine
             refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
             compiled_submodule.engine = refitted_engine
 
-        return compiled_module
+    return compiled_module
 
 
 # Util functions -----------
