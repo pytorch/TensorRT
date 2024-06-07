@@ -114,7 +114,7 @@ Tutorials
    tutorials/_rendered_examples/dynamo/custom_kernel_plugins
    tutorials/_rendered_examples/distributed_inference/data_parallel_gpt2
    tutorials/_rendered_examples/distributed_inference/data_parallel_stable_diffusion
-
+   tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq
 
 Python API Documenation
 ------------------------
