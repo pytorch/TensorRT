@@ -15,7 +15,11 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
 from torch_tensorrt.dynamo.conversion._conversion import infer_module_output_dtypes
-from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decompositions
+from torch_tensorrt.dynamo.lowering import (
+    get_decompositions,
+    post_lowering,
+    pre_export_lowering,
+)
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 from torch_tensorrt.dynamo.utils import get_torch_inputs
 
@@ -207,14 +211,16 @@ class DispatchTestCase(TRTTestCase):
         torch_inputs = get_torch_inputs(original_inputs, _defaults.DEVICE)
         if use_dynamo_tracer:
             exported_program = torch_tensorrt.dynamo.trace(mod, tuple(original_inputs))
+            exported_program = pre_export_lowering(exported_program, torch_inputs)
             exported_program = exported_program.run_decompositions(
                 get_decompositions(False)
             )
             fx_module = exported_program.module()
         else:
             fx_module = torch.fx.symbolic_trace(mod)
+
         if enable_passes:
-            fx_module = apply_lowering_passes(fx_module, torch_inputs)
+            fx_module = post_lowering(fx_module, original_inputs)
 
         if propagate_shapes:
             # TODO: This is currently being used to test embedding_bag_aten due to https://github.com/pytorch/TensorRT/issues/2843

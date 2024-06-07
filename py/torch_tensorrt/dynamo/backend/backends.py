@@ -11,8 +11,9 @@ from torch._functorch.aot_autograd import aot_export_joint_simple
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo._compiler import compile_module
 from torch_tensorrt.dynamo.lowering import (
-    apply_lowering_passes,
     get_decompositions,
+    post_lowering,
+    remove_detach,
     remove_sym_nodes,
     repair_input_aliasing,
 )
@@ -82,6 +83,9 @@ def _pretraced_backend(
                 input for input in sample_inputs if isinstance(input, torch.Tensor)
             ]
 
+            # Remove detach nodes
+            remove_detach(gm, torch_inputs)
+
             # Invoke AOTAutograd to translate operators to aten
             gm = aot_export_joint_simple(
                 gm,
@@ -94,7 +98,7 @@ def _pretraced_backend(
 
             logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
 
-            gm = apply_lowering_passes(gm, torch_inputs)
+            gm = post_lowering(gm, sample_inputs)
 
             logger.debug("Lowered Input graph:\n " + str(gm.graph))
 

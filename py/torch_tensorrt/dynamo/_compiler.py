@@ -28,7 +28,11 @@ from torch_tensorrt.dynamo.conversion import (
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
-from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decompositions
+from torch_tensorrt.dynamo.lowering import (
+    get_decompositions,
+    post_lowering,
+    pre_export_lowering,
+)
 from torch_tensorrt.dynamo.utils import (
     get_torch_inputs,
     parse_complex_tensor_structs,
@@ -167,6 +171,7 @@ def compile(
 
     # Prepare torch_trt inputs
     inputs = prepare_inputs(inputs)
+    torch_inputs = get_torch_inputs(inputs, device)
     device = to_torch_tensorrt_device(device)
     enabled_precisions = {dtype._from(p) for p in enabled_precisions}
 
@@ -174,15 +179,14 @@ def compile(
         raise AssertionError(
             f"Input graph should be an ExportedProgram but got type {type(exported_program)}"
         )
+    exported_program = pre_export_lowering(exported_program, torch_inputs)
     exported_program = exported_program.run_decompositions(
         get_decompositions(enable_experimental_decompositions)
     )
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
     # Apply lowering on the graph module
-    torch_inputs = get_torch_inputs(inputs, device)
-    gm = apply_lowering_passes(gm, torch_inputs)
-
+    gm = post_lowering(gm, torch_inputs)
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     compilation_options = {
@@ -553,7 +557,7 @@ def convert_module_to_trt_engine(
     # Prepare torch_trt inputs
     input_list = prepare_inputs(input_list)
     device = to_torch_tensorrt_device(device)
-
+    torch_inputs = get_torch_inputs(input_list, device)
     enabled_precisions = {dtype._from(e) for e in enabled_precisions}
 
     compilation_options = {
@@ -583,6 +587,7 @@ def convert_module_to_trt_engine(
         "dla_global_dram_size": dla_global_dram_size,
     }
 
+    exported_program = pre_export_lowering(exported_program, torch_inputs)
     # Decompose the exported program
     exported_program = exported_program.run_decompositions(
         get_decompositions(enable_experimental_decompositions)
@@ -591,8 +596,7 @@ def convert_module_to_trt_engine(
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module
-    torch_inputs = get_torch_inputs(input_list, device)
-    gm = apply_lowering_passes(gm, torch_inputs)
+    gm = post_lowering(gm, torch_inputs)
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     settings = CompilationSettings(**compilation_options)

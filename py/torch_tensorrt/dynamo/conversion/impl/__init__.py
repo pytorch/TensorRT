@@ -18,6 +18,7 @@ from . import (
     pad,
     permutation,
     pool,
+    quantize,
     reduce,
     select,
     shape,
