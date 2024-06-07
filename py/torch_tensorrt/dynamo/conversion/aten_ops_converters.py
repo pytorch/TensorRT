@@ -1732,8 +1732,8 @@ def aten_ops_minimum(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sub.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.sub.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.sub.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.sub.Scalar, supports_dynamic_shapes=True)
 def aten_ops_sub(
     ctx: ConversionContext,
     target: Target,
@@ -1749,7 +1749,7 @@ def aten_ops_sub(
             ctx,
             target,
             SourceIR.ATEN,
-            name,
+            name + "_alpha",
             other,
             alpha,
         )
