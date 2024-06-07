@@ -3,7 +3,6 @@ from __future__ import annotations
 import collections.abc
 import copy
 import logging
-import pickle
 import warnings
 from typing import Any, Sequence, Tuple
 
@@ -136,30 +135,6 @@ def _refit_single_trt_engine_with_gm(
 
 
 def refit_module_weights(
-    compiled_module_file_path: str, new_weight_module: ExportedProgram, inputs: Any
-) -> torch.fx.GraphModule:
-    """
-    Return a copy of compiled_module with refitted weight
-    """
-    settings_wrapper = {"settings": None}
-
-    compiled_exp_program = torch.export.load(
-        compiled_module_file_path, extra_files=settings_wrapper
-    )
-
-    decoded_settings = base64.b64decode(settings_wrapper["settings"].encode("utf-8"))
-    restored_settings = pickle.loads(decoded_settings)
-
-    new_trt_gm = _refit_module_weights(
-        compiled_module=compiled_exp_program,
-        new_weight_module=new_weight_module,
-        inputs=inputs,
-        settings=restored_settings,
-    )
-    return new_trt_gm
-
-
-def _refit_module_weights(
     compiled_module: torch.fx.GraphModule | ExportedProgram,
     new_weight_module: ExportedProgram,
     inputs: Tuple[Any, ...],
