@@ -726,7 +726,6 @@ def broadcast(
 
 def get_axes_for_reduce_op(
     dim: Union[int, Sequence[int]],
-    has_implicit_batch_dimension: bool = False,
 ) -> int:
     """
     TensorRT reduce layer relies on the binary representation of axes to
@@ -736,8 +735,6 @@ def get_axes_for_reduce_op(
     Args:
         dim (Union[int, Sequence[int]]): An integer or a sequence of integers
             that will be used to generate axes for TensorRT.
-        has_implicit_batch_dimension (bool): Whether the TensorRT network is
-            using implicit batch dimension.
 
     Returns:
         An integer which binary form can be used as axes for TensorRT reduce
@@ -746,12 +743,9 @@ def get_axes_for_reduce_op(
     if isinstance(dim, int):
         dim = (dim,)
 
-    if has_implicit_batch_dimension:
-        assert 0 not in dim, "Can't reduce over batch dimension when it's implicit."
-
     axes = 0
     for d in dim:
-        axes |= 1 << (d - (1 if has_implicit_batch_dimension else 0))
+        axes |= 1 << d
 
     return axes
 
