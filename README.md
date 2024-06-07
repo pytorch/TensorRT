@@ -9,7 +9,8 @@ Torch-TensorRT
 [![cuda](https://img.shields.io/badge/cuda-12.1-green)](https://developer.nvidia.com/cuda-downloads)
 [![trt](https://img.shields.io/badge/TensorRT-8.6.1-green)](https://github.com/nvidia/tensorrt-llm)
 [![license](https://img.shields.io/badge/license-BSD--3--Clause-blue)](./LICENSE)
-[![CircleCI](https://circleci.com/gh/pytorch/TensorRT.svg?style=svg)](https://app.circleci.com/pipelines/github/pytorch/TensorRT)
+[![linux_tests](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux.yml/badge.svg)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux.yml)
+[![windows_tests](https://github.com/pytorch/TensorRT/actions/workflows/build-test-windows.yml/badge.svg)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-windows.yml)
 
 ---
 <div align="left">
