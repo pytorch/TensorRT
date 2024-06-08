@@ -6,87 +6,263 @@ from .harness import DispatchTestCase
 
 
 class TestUpsampleConverter(DispatchTestCase):
-    # test case for nearest upsample, using output_size, scale_factors is disabled here
     @parameterized.expand(
         [
-            ("upsample_nearest2d.vec_outshape_0", (2, 2), (4, 4)),
-            ("upsample_nearest2d.vec_outshape_1", (2, 2), (5, 5)),
+            ((2,), (4,)),
+            ((2,), (5,)),
         ]
     )
-    def test_upsample_nearest_output_shape(self, _, input_shape, output_shape):
+    def test_nearest1d_default(self, input_shape, output_size):
         class Upsample(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-
             def forward(self, input):
-                return torch.ops.aten.upsample_nearest2d.vec(input, output_shape, None)
+                return torch.ops.aten.upsample_nearest1d.default(input, output_size)
 
         input = [torch.randn([1, 1] + list(input_shape))]
         self.run_test(Upsample(), input)
 
-    # test case for nearest upsample, using scale_factors, output_size is disabled here
     @parameterized.expand(
         [
-            ("upsample_nearest2d.vec_scale_0", (2, 2), (2, 2)),
-            ("upsample_nearest2d.vec_scale_1", (2, 2), (1.5, 1.5)),
+            ((2,), (4,), None),
+            ((2,), (5,), None),
+            ((2,), None, (2,)),
+            ((2,), None, (1.5,)),
         ]
     )
-    def test_upsample_nearest_scale_factor(self, _, input_shape, scale_factor):
+    def test_nearest1d_vec(self, input_shape, output_size, scale_factors):
         class Upsample(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-
             def forward(self, input):
-                return torch.ops.aten.upsample_nearest2d.vec(input, None, scale_factor)
-
-        input = [torch.randn([1, 1] + list(input_shape))]
-        self.run_test(Upsample(), input)
-
-    # test case for bilinear upsample, using output_size, scale_factors is disabled here
-    @parameterized.expand(
-        [
-            ("upsample_bilinear2d.vec_outshape_0", (2, 2), (4, 4), True),
-            ("upsample_bilinear2d.vec_outshape_1", (2, 2), (5, 5), True),
-        ]
-    )
-    def test_upsample_bilinear_output_shape(
-        self, _, input_shape, output_shape, align_corners
-    ):
-        class Upsample(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-
-            def forward(self, input):
-                return torch.ops.aten.upsample_bilinear2d.vec(
-                    input,
-                    output_shape,
-                    align_corners,
-                    None,
+                return torch.ops.aten.upsample_nearest1d.vec(
+                    input, output_size, scale_factors
                 )
 
         input = [torch.randn([1, 1] + list(input_shape))]
         self.run_test(Upsample(), input)
 
-    # test case for bilinear upsample, using scale_factors, output_shape is disabled here
     @parameterized.expand(
         [
-            ("upsample_bilinear2d.vec_scale_0", (2, 2), (2, 2), True),
-            ("upsample_bilinear2d.vec_scale_1", (2, 2), (1.5, 1.5), True),
+            ((2, 2), (4, 4)),
+            ((2, 2), (5, 5)),
         ]
     )
-    def test_upsample_bilinear_scale_factors(
-        self, _, input_shape, scale_factors, align_corners
+    def test_nearest2d_default(self, input_shape, output_size):
+        class Upsample(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.upsample_nearest2d.default(input, output_size)
+
+        input = [torch.randn([1, 1] + list(input_shape))]
+        self.run_test(Upsample(), input)
+
+    @parameterized.expand(
+        [
+            ((2, 2), (4, 4), None),
+            ((2, 2), (5, 5), None),
+            ((2, 2), None, (2, 2)),
+            ((2, 2), None, (1.5, 1.5)),
+        ]
+    )
+    def test_nearest2d_vec(self, input_shape, output_size, scale_factors):
+        class Upsample(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.upsample_nearest2d.vec(
+                    input, output_size, scale_factors
+                )
+
+        input = [torch.randn([1, 1] + list(input_shape))]
+        self.run_test(Upsample(), input)
+
+    @parameterized.expand(
+        [
+            ((2, 2, 2), (4, 4, 4)),
+            ((2, 2, 2), (5, 5, 5)),
+        ]
+    )
+    def test_nearest3d_default(self, input_shape, output_size):
+        class Upsample(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.upsample_nearest3d.default(input, output_size)
+
+        input = [torch.randn([1, 1] + list(input_shape))]
+        self.run_test(Upsample(), input)
+
+    @parameterized.expand(
+        [
+            ((2, 2, 2), (4, 4, 4), None),
+            ((2, 2, 2), (5, 5, 5), None),
+            ((2, 2, 2), None, (2, 2, 2)),
+            ((2, 2, 2), None, (1.5, 1.5, 1.5)),
+        ]
+    )
+    def test_nearest3d_vec(self, input_shape, output_size, scale_factors):
+        class Upsample(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.upsample_nearest3d.vec(
+                    input, output_size, scale_factors
+                )
+
+        input = [torch.randn([1, 1] + list(input_shape))]
+        self.run_test(Upsample(), input)
+
+    @parameterized.expand(
+        [
+            ((2,), (4,), True),
+            ((2,), (4,), False),
+            ((2,), (5,), True),
+            ((2,), (5,), False),
+        ]
+    )
+    def test_linear1d_default(self, input_shape, output_size, align_corners):
+        class Upsample(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.upsample_linear1d.default(
+                    input, output_size, align_corners
+                )
+
+        input = [torch.randn([1, 1] + list(input_shape))]
+        self.run_test(Upsample(), input)
+
+    @parameterized.expand(
+        [
+            ((2,), (4,), True, None),
+            ((2,), (4,), False, None),
+            ((2,), (5,), True, None),
+            ((2,), (5,), False, None),
+            ((2,), None, True, (2,)),
+            ((2,), None, False, (2,)),
+            ((2,), None, True, (1.5,)),
+            ((2,), None, False, (1.5,)),
+        ]
+    )
+    def test_linear1d_vec(self, input_shape, output_size, align_corners, scale_factors):
+        class Upsample(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.upsample_linear1d.vec(
+                    input, output_size, align_corners, scale_factors
+                )
+
+        input = [torch.randn([1, 1] + list(input_shape))]
+        self.run_test(Upsample(), input)
+
+    @parameterized.expand(
+        [
+            ((2, 2), (4, 4), True),
+            ((2, 2), (4, 4), False),
+            ((2, 2), (5, 5), True),
+            ((2, 2), (5, 5), False),
+        ]
+    )
+    def test_bilinear2d_default(self, input_shape, output_size, align_corners):
+        class Upsample(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.upsample_bilinear2d.default(
+                    input, output_size, align_corners
+                )
+
+        input = [torch.randn([1, 1] + list(input_shape))]
+        self.run_test(Upsample(), input)
+
+    @parameterized.expand(
+        [
+            ((2, 2), (4, 4), True, None),
+            ((2, 2), (4, 4), False, None),
+            ((2, 2), (5, 5), True, None),
+            ((2, 2), (5, 5), False, None),
+            ((2, 2), None, True, (2, 2)),
+            ((2, 2), None, False, (2, 2)),
+            ((2, 2), None, True, (1.5, 1.5)),
+            ((2, 2), None, False, (1.5, 1.5)),
+        ]
+    )
+    def test_bilinear2d_vec(
+        self, input_shape, output_size, align_corners, scale_factors
     ):
         class Upsample(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-
             def forward(self, input):
                 return torch.ops.aten.upsample_bilinear2d.vec(
-                    input,
-                    None,
-                    align_corners,
-                    scale_factors,
+                    input, output_size, align_corners, scale_factors
+                )
+
+        input = [torch.randn([1, 1] + list(input_shape))]
+        self.run_test(Upsample(), input)
+
+    @parameterized.expand(
+        [
+            ((2, 2, 2), (4, 4, 4), True),
+            ((2, 2, 2), (4, 4, 4), False),
+            ((2, 2, 2), (5, 5, 5), True),
+            ((2, 2, 2), (5, 5, 5), False),
+        ]
+    )
+    def test_trilinear3d_default(self, input_shape, output_size, align_corners):
+        class Upsample(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.upsample_trilinear3d.default(
+                    input, output_size, align_corners
+                )
+
+        input = [torch.randn([1, 1] + list(input_shape))]
+        self.run_test(Upsample(), input)
+
+    @parameterized.expand(
+        [
+            ((2, 2, 2), (4, 4, 4), True, None),
+            ((2, 2, 2), (4, 4, 4), False, None),
+            ((2, 2, 2), (5, 5, 5), True, None),
+            ((2, 2, 2), (5, 5, 5), False, None),
+            ((2, 2, 2), None, True, (2, 2, 2)),
+            ((2, 2, 2), None, False, (2, 2, 2)),
+            ((2, 2, 2), None, True, (1.5, 1.5, 1.5)),
+            ((2, 2, 2), None, False, (1.5, 1.5, 1.5)),
+        ]
+    )
+    def test_trilinear3d_vec(
+        self, input_shape, output_size, align_corners, scale_factors
+    ):
+        class Upsample(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.upsample_trilinear3d.vec(
+                    input, output_size, align_corners, scale_factors
+                )
+
+        input = [torch.randn([1, 1] + list(input_shape))]
+        self.run_test(Upsample(), input)
+
+    @parameterized.expand(
+        [
+            ((2, 2), (4, 4), True),
+            ((2, 2), (4, 4), False),
+            ((2, 2), (5, 5), True),
+            ((2, 2), (5, 5), False),
+        ]
+    )
+    def test_bicubic2d_default(self, input_shape, output_size, align_corners):
+        class Upsample(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.upsample_bicubic2d.default(
+                    input, output_size, align_corners
+                )
+
+        input = [torch.randn([1, 1] + list(input_shape))]
+        self.run_test(Upsample(), input)
+
+    @parameterized.expand(
+        [
+            ((2, 2), (4, 4), True, None),
+            ((2, 2), (4, 4), False, None),
+            ((2, 2), (5, 5), True, None),
+            ((2, 2), (5, 5), False, None),
+            ((2, 2), None, True, (2, 2)),
+            ((2, 2), None, False, (2, 2)),
+            ((2, 2), None, True, (1.5, 1.5)),
+            ((2, 2), None, False, (1.5, 1.5)),
+        ]
+    )
+    def test_bicubic2d_vec(
+        self, input_shape, output_size, align_corners, scale_factors
+    ):
+        class Upsample(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.upsample_bicubic2d.vec(
+                    input, output_size, align_corners, scale_factors
                 )
 
         input = [torch.randn([1, 1] + list(input_shape))]

@@ -2846,9 +2846,15 @@ def aten_ops_pad(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_nearest1d.default)
 @dynamo_tensorrt_converter(torch.ops.aten.upsample_nearest2d.default)
-@dynamo_tensorrt_converter(torch.ops.aten.upsample_nearest2d.vec)
-def upsample_nearest2d(
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_nearest3d.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_upsample_nearest_default(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
@@ -2860,17 +2866,23 @@ def upsample_nearest2d(
         target,
         SourceIR.ATEN,
         name,
-        input=args[0],
-        out_shape=args_bounds_check(args, 1),
-        scale_factors=args_bounds_check(args, 2),
-        resize_mode="nearest",
+        args[0],
+        size=args[1],
+        scale_factor=None,
+        mode="nearest",
         align_corners=False,
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.upsample_bilinear2d.default)
-@dynamo_tensorrt_converter(torch.ops.aten.upsample_bilinear2d.vec)
-def upsample_bilinear2d(
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_nearest1d.vec)
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_nearest2d.vec)
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_nearest3d.vec)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_upsample_nearest_vec(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
@@ -2882,11 +2894,119 @@ def upsample_bilinear2d(
         target,
         SourceIR.ATEN,
         name,
-        input=args[0],
-        out_shape=args_bounds_check(args, 1),
-        scale_factors=args_bounds_check(args, 3),
-        resize_mode="bilinear",
-        align_corners=args_bounds_check(args, 2),
+        args[0],
+        size=args_bounds_check(args, 1),
+        scale_factor=args_bounds_check(args, 2),
+        mode="nearest",
+        align_corners=False,
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_linear1d.default)
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_bilinear2d.default)
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_trilinear3d.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_upsample_linear_default(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.upsample.upsample(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        size=args[1],
+        scale_factor=None,
+        mode="linear",
+        align_corners=args[2],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_linear1d.vec)
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_bilinear2d.vec)
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_trilinear3d.vec)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_upsample_linear_vec(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.upsample.upsample(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        size=args_bounds_check(args, 1),
+        scale_factor=args_bounds_check(args, 3),
+        mode="linear",
+        align_corners=args[2],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_bicubic2d.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_upsample_bicubic_default(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.upsample.upsample(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        size=args[1],
+        scale_factor=None,
+        mode="bicubic",
+        align_corners=args[2],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.upsample_bicubic2d.vec)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_upsample_bicubic_vec(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.upsample.upsample(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        size=args_bounds_check(args, 1),
+        scale_factor=args_bounds_check(args, 3),
+        mode="bicubic",
+        align_corners=args[2],
     )
 
 
