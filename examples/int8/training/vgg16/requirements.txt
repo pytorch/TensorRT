@@ -4,3 +4,5 @@ nvidia-pyindex
 --extra-index-url https://pypi.nvidia.com
 pytorch-quantization
 tqdm
+nvidia-modelopt
+--extra-index-url https://pypi.nvidia.com

@@ -10,17 +10,18 @@ def remove_sym_nodes(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     dynamic=True behavior
     """
     # Extract SymInt placeholder Tensors
-    placeholders = [
+    placeholder_sym_ints = [
         node
         for node in gm.graph.nodes
         if (
             node.op == "placeholder"
             and isinstance(node.type, type)
             and issubclass(node.type, torch.SymInt)
+            and not node.users
         )
     ]
 
-    for node in placeholders:
+    for node in placeholder_sym_ints:
         gm.graph.erase_node(node)
 
     gm.graph.lint()

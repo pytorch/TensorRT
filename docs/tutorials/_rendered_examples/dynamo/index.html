@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Dynamo / torch.compile &mdash; Torch-TensorRT v2.4.0.dev0+f40b73a documentation</title>
+  <title>Dynamo / torch.compile &mdash; Torch-TensorRT v2.4.0.dev0+0f1db57 documentation</title>
   
 
   
@@ -273,7 +273,7 @@
               
               
                 <div class="version">
-                  v2.4.0.dev0+f40b73a
+                  v2.4.0.dev0+0f1db57
                 </div>
               
             
@@ -343,6 +343,7 @@
 <li class="toctree-l1"><a class="reference internal" href="custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="custom_kernel_plugins.html#wrapping-custom-kernels-to-use-in-tensorrt">Wrapping Custom Kernels to use in TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="custom_kernel_plugins.html#using-torch-tensorrt-to-insert-the-kernel">Using Torch-TensorRT to Insert the Kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="vgg16_fp8_ptq.html">Torch Compile VGG16 with FP8 and PTQ</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
 <ul>
@@ -462,6 +463,7 @@ a number of ways you can leverage this backend to accelerate inference.</p>
 <li><p><a class="reference internal" href="torch_compile_advanced_usage.html#torch-compile-advanced-usage"><span class="std std-ref">Torch Compile Advanced Usage</span></a>: Advanced usage including making a custom backend to use directly with the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> API</p></li>
 <li><p><a class="reference internal" href="torch_compile_stable_diffusion.html#torch-compile-stable-diffusion"><span class="std std-ref">Torch Compile Stable Diffusion</span></a>: Compiling a Stable Diffusion model using <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></p></li>
 <li><p><a class="reference internal" href="custom_kernel_plugins.html#custom-kernel-plugins"><span class="std std-ref">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</span></a>: Creating a plugin to use a custom kernel inside TensorRT engines</p></li>
+<li><p><a class="reference internal" href="vgg16_fp8_ptq.html#vgg16-fp8-ptq"><span class="std std-ref">Torch Compile VGG16 with FP8 and PTQ</span></a>: Compiling a VGG16 model with FP8 and PTQ using <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></p></li>
 </ul>
 <div class="sphx-glr-thumbnails"><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi..."><img alt="" src="../../../_images/sphx_glr_torch_compile_stable_diffusion_thumb.png" />
 <p><a class="reference internal" href="torch_compile_stable_diffusion.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-stable-diffusion-py"><span class="std std-ref">Torch Compile Stable Diffusion</span></a></p>
@@ -475,6 +477,9 @@ a number of ways you can leverage this backend to accelerate inference.</p>
 </div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as an overview of the process by which torch_tensorrt.compi..."><img alt="" src="../../../_images/sphx_glr_torch_compile_advanced_usage_thumb.png" />
 <p><a class="reference internal" href="torch_compile_advanced_usage.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-advanced-usage-py"><span class="std std-ref">Torch Compile Advanced Usage</span></a></p>
   <div class="sphx-glr-thumbnail-title">Torch Compile Advanced Usage</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This script is intended as a sample of the Torch-TensorRT workflow with torch.compile on a VGG1..."><img alt="" src="../../../_images/sphx_glr_vgg16_fp8_ptq_thumb.png" />
+<p><a class="reference internal" href="vgg16_fp8_ptq.html#sphx-glr-tutorials-rendered-examples-dynamo-vgg16-fp8-ptq-py"><span class="std std-ref">Torch Compile VGG16 with FP8 and PTQ</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Torch Compile VGG16 with FP8 and PTQ</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how a developer could include a custom kernel in a TensorRT engine ..."><img alt="" src="../../../_images/sphx_glr_custom_kernel_plugins_thumb.png" />
 <p><a class="reference internal" href="custom_kernel_plugins.html#sphx-glr-tutorials-rendered-examples-dynamo-custom-kernel-plugins-py"><span class="std std-ref">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</span></a></p>
   <div class="sphx-glr-thumbnail-title">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</div>
