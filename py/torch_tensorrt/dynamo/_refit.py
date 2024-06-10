@@ -40,13 +40,13 @@ def construct_refit_mapping(
     inputs: Sequence[Input],
     settings: CompilationSettings = CompilationSettings(),
 ) -> dict[str, np.ndarray]:
-    """Interpret an FX module to a TRTInterpreterResult
+    """Find out the weight mapping between weight in exported program and TensorRT engine
     Args:
         module: FX GraphModule to interpret
         inputs: Sequence of Tensors representing inputs to the module
         settings: Compilation settings
     Returns:
-        TRTInterpreterResult
+        Mapping from weight name in TensorRT to actual weight value in np.ndarray
     """
     MODULE_MAP = {
         "SCALE": (trt.IScaleLayer, [("scale", "SCALE"), ("shift", "SHIFT")]),
@@ -86,9 +86,14 @@ def construct_refit_mapping(
             layer.__class__ = MODULE_MAP[layer_type][0]
             for weight_type, weight_name in MODULE_MAP[layer_type][1]:
                 weight = layer.__getattribute__(weight_type).copy()
+                weight_dtype = (
+                    layer.precision
+                    if layer.precision_is_set
+                    else convert_numpy_to_tensorrt_dtype(weight.dtype)
+                )
                 weight_map[f"{layer.name} {weight_name}"] = (
                     weight,
-                    layer.get_output_type(0),
+                    weight_dtype,
                 )
 
     return weight_map
@@ -285,3 +290,24 @@ def get_engine_from_encoded_engine(
     serialized_engine = base64.b64decode(encoded_engine)
     engine = runtime.deserialize_cuda_engine(serialized_engine)
     return engine
+
+
+def convert_numpy_to_tensorrt_dtype(np_dtype: np.dtypes) -> trt.DataType:
+    # Define a mapping from numpy dtype to TensorRT dtype
+    numpy_to_tensorrt_dtype = {
+        np.dtype("float32"): trt.DataType.FLOAT,
+        np.float32: trt.DataType.FLOAT,
+        np.dtype("float16"): trt.DataType.HALF,
+        np.float16: trt.DataType.HALF,
+        np.dtype("int32"): trt.DataType.INT32,
+        np.int32: trt.DataType.INT32,
+        np.dtype("int64"): trt.DataType.INT64,
+        np.int64: trt.DataType.INT64,
+        np.dtype("int8"): trt.DataType.INT8,
+        np.int8: trt.DataType.INT8,
+    }
+
+    if np_dtype in numpy_to_tensorrt_dtype:
+        return numpy_to_tensorrt_dtype[np_dtype]
+    else:
+        raise TypeError(f"Unsupported NumPy data type: {np_dtype}")
