@@ -59,6 +59,7 @@ def construct_refit_mapping(
             [("kernel", "KERNEL"), ("bias", "BIAS")],
         ),
         "CONSTANT": (trt.IConstantLayer, [("weights", "CONSTANT")]),
+        # TODO: Add INormalizationLayer
     }
 
     output_dtypes = infer_module_output_dtypes(
