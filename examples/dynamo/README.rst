@@ -22,3 +22,4 @@ Model Zoo
 * :ref:`_torch_export_llama2`: Compiling a Llama2 model using AOT workflow (`ir=dynamo`)
 * :ref:`_torch_export_sam2`: Compiling SAM2 model using AOT workflow (`ir=dynamo`)
 * :ref:`_torch_export_flux_dev`: Compiling FLUX.1-dev model using AOT workflow (`ir=dynamo`)
+* :ref:`_torch_compile_phi3_vision`: Compiling a Phi 3 vision model from Hugging Face using ``torch.compile``
