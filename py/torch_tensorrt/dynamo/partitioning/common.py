@@ -38,6 +38,7 @@ def construct_dynamic_input(
             var_range = shape_env.var_to_range.get(expr, None)
             var_val = shape_env.var_to_val.get(expr, None)
             assert var_range, var_val
+
             # Torchdynamo 0/1 specialization outlier
             if var_range.lower == 2:
                 min_shape.append(1)
@@ -87,6 +88,7 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
         module_inputs = [
             node for node in module.graph.nodes if node.op == "placeholder"
         ]
+
         for input in module_inputs:
             if input.meta:
                 if "val" in input.meta:
