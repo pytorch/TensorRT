@@ -43,7 +43,7 @@ import torch
 import torch_tensorrt
 
 model = MyModel().eval().cuda() # define your model here
-x = [torch.randn((1, 3, 224, 224)).cuda()] # define a list of relevant inputs here
+x = torch.randn((1, 3, 224, 224)).cuda() # define what the inputs to the model will look like
 
 optimized_model = torch.compile(model, backend="tensorrt")
 optimized_model(x) # compiled on first run
@@ -60,7 +60,7 @@ import torch
 import torch_tensorrt
 
 model = MyModel().eval().cuda() # define your model here
-inputs = [torch.randn((1, 3, 224, 224)).cuda()] # define a list of relevant inputs here
+inputs = [torch.randn((1, 3, 224, 224)).cuda()] # define a list of representative inputs here
 
 trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs) 
 torch_tensorrt.save(trt_gm, "trt.ep", inputs=inputs) # PyTorch only supports Python runtime for an ExportedProgram. For C++ deployment, use a TorchScript file
@@ -94,7 +94,7 @@ auto results = trt_mod.forward({input_tensor});
 ## Further resources
 - [Up to 50% faster Stable Diffusion inference with one line of code](https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-stable-diffusion-py)
 - [Optimize LLMs from Hugging Face with Torch-TensorRT]() \[coming soon\]
-- [Run your model in FP8 with Torch-TensorRT]() \[coming soon\]
+- [Run your model in FP8 with Torch-TensorRT](https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html)
 - [Tools to resolve graph breaks and boost performance]() \[coming soon\]
 - [Tech Talk (GTC '23)](https://www.nvidia.com/en-us/on-demand/session/gtcspring23-s51714/)
 - [Documentation](https://nvidia.github.io/Torch-TensorRT/)
