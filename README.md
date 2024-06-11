@@ -6,7 +6,7 @@ Torch-TensorRT
 
 [![Documentation](https://img.shields.io/badge/docs-master-brightgreen)](https://nvidia.github.io/Torch-TensorRT/)
 [![pytorch](https://img.shields.io/badge/PyTorch-2.4-green)](https://www.python.org/downloads/release/python-31013/)
-[![cuda](https://img.shields.io/badge/CUDA-12.1-green)](https://developer.nvidia.com/cuda-downloads)
+[![cuda](https://img.shields.io/badge/CUDA-12.4-green)](https://developer.nvidia.com/cuda-downloads)
 [![trt](https://img.shields.io/badge/TensorRT-10.0.1-green)](https://github.com/nvidia/tensorrt-llm)
 [![license](https://img.shields.io/badge/license-BSD--3--Clause-blue)](./LICENSE)
 [![linux_tests](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux.yml/badge.svg)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux.yml)
