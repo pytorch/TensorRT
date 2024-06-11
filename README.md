@@ -26,7 +26,7 @@ pip install torch-tensorrt
 
 Nightly versions of Torch-TensorRT are published on the PyTorch package index
 ```bash
-pip install --pre torch-tensorrt --index-url https://download.pytorch.org/whl/nightly/cu121
+pip install --pre torch-tensorrt --index-url https://download.pytorch.org/whl/nightly/cu124
 ```
 
 Torch-TensorRT is also distributed in the ready-to-run [NVIDIA NGC PyTorch Container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch) which has all dependencies with the proper versions and example notebooks included.
@@ -117,7 +117,7 @@ auto results = trt_mod.forward({input_tensor});
 These are the following dependencies used to verify the testcases. Torch-TensorRT can work with other versions, but the tests are not guaranteed to pass.
 
 - Bazel 5.2.0
-- Libtorch 2.4.0.dev (latest nightly) (built with CUDA 12.1)
+- Libtorch 2.4.0.dev (latest nightly) (built with CUDA 12.4)
 - CUDA 12.1
 - TensorRT 10.0.1.6
 
