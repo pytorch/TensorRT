@@ -237,6 +237,7 @@ def refit_module_weights(
                 engine = get_engine_from_encoded_engine(engine_info[3], runtime)
             elif isinstance(compiled_submodule, torch.fx.graph_module.GraphModule):
                 # This is graph break resulted by unsupported ops
+                compiled_submodule.load_state_dict(new_submodule.state_dict())
                 continue
             else:
                 raise AssertionError(
