@@ -387,7 +387,7 @@ def index_select(
     dim = get_positive_dim(dim, len(input.shape))
     gather_layer = ctx.net.add_gather(input, index, axis=dim)
 
-    set_layer_name(gather_layer, target, f"{name}_gather", source_ir)
+    set_layer_name(gather_layer, target, f"{name}_gather_layer_default", source_ir)
 
     return gather_layer.get_output(0)
 
@@ -427,4 +427,22 @@ def scatter(
     scatter_layer.axis = dim
     set_layer_name(scatter_layer, target, name + "_scatter_layer", source_ir)
     out = scatter_layer.get_output(0)
+    return out
+
+
+def gather(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    dim: int,
+    index: Union[TRTTensor, np.ndarray, torch.Tensor],
+) -> TRTTensor:
+    input_shape = input.shape
+    dim = get_positive_dim(dim, len(input_shape))
+    gather_layer = ctx.net.add_gather(input, index, axis=dim)
+    gather_layer.mode = trt.GatherMode.ELEMENT
+    set_layer_name(gather_layer, target, name + "_gather_layer_element", source_ir)
+    out = gather_layer.get_output(0)
     return out
