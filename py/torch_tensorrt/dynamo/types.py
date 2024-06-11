@@ -21,4 +21,3 @@ else:
     TRTElementWiseOp = "trt.ElementWiseOperation"
 
 Shape = Sequence[int]
-ShapeRange = Tuple[Shape, Shape, Shape]
