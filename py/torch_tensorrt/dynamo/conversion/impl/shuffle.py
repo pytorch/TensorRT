@@ -2,8 +2,13 @@ from typing import Optional, Sequence, Union
 
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
+from torch_tensorrt import _enums
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.converter_utils import SourceIR, get_trt_tensor
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    SourceIR,
+    cast_trt_tensor,
+    get_trt_tensor,
+)
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 from torch_tensorrt.fx.types import TRTTensor
 
@@ -25,7 +30,13 @@ def reshape(
 
         for i, s in enumerate(shape):
             if isinstance(s, TRTTensor):
-                trt_shape.append(s)
+                dim_int32 = cast_trt_tensor(
+                    ctx,
+                    s,
+                    _enums.dtype.int32,
+                    name + f"_int32_casted_{i}",
+                )
+                trt_shape.append(dim_int32)
             else:
                 a = get_trt_tensor(ctx, s, f"{name}_{i}")
                 trt_shape.append(a)

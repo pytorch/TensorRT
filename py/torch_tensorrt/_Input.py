@@ -47,6 +47,7 @@ class Input(object):
     high_tensor_domain_excl: float = low_tensor_domain_incl + DOMAIN_OFFSET
     torch_tensor: torch.Tensor = None
     name: str = ""
+    is_shape_tensor: bool = False
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """__init__ Method for torch_tensorrt.Input
@@ -161,6 +162,9 @@ class Input(object):
         else:
             self._explicit_set_dtype = False
 
+        if "is_shape_tensor" in kwargs:
+            self.is_shape_tensor = kwargs["is_shape_tensor"]
+
         if "format" in kwargs:
             self.format = memory_format._from(kwargs["format"])
 
@@ -174,7 +178,11 @@ class Input(object):
         if "torch_tensor" in kwargs:
             self.torch_tensor = kwargs["torch_tensor"]
         else:
-            if self.shape_mode == Input._ShapeMode.DYNAMIC:
+            if self.is_shape_tensor:
+                self.torch_tensor = torch.tensor(
+                    kwargs["opt_shape"], dtype=kwargs["dtype"]
+                )
+            elif self.shape_mode == Input._ShapeMode.DYNAMIC:
                 self.torch_tensor = self.example_tensor("opt_shape")
             else:
                 self.torch_tensor = self.example_tensor()

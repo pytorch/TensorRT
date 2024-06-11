@@ -124,6 +124,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     }
   }
 
+  // this is a buffer to store shape tensor input addresses throughout the runtime scope
+  std::list<std::vector<int32_t>> inputShapeTensorValues;
   {
     std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
     if (compiled_engine->profile_execution) {
@@ -142,12 +144,30 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       auto dims = core::util::toDims(inputs[i].sizes());
       auto shape = core::util::toVec(dims);
       LOG_DEBUG("Input Name: " << name << " Shape: " << dims);
-      compiled_engine->exec_ctx->setInputShape(name.c_str(), dims);
-      compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputs[i].view(shape).contiguous().data_ptr());
+      if (compiled_engine->cuda_engine->isShapeInferenceIO(name.c_str())) {
+        // Shape tensor inputs are casted to int32 explicitly.
+        // Refer to
+        // https://github.com/NVIDIA/TensorRT/blob/d2f4ef789a9a6ffdf37b55c3f81b486225f6b380/samples/common/sampleInference.cpp#L435
+        auto input_cpu = inputs[i].clone().contiguous().cpu().to(torch::kInt32);
+        std::vector<int32_t> inputs_cpu_vec(
+            input_cpu.data_ptr<int32_t>(), input_cpu.data_ptr<int32_t>() + input_cpu.numel());
+        inputShapeTensorValues.emplace_back(inputs_cpu_vec);
+        compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputShapeTensorValues.back().data());
+      } else {
+        compiled_engine->exec_ctx->setInputShape(name.c_str(), dims);
+        compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputs[i].view(shape).contiguous().data_ptr());
+      }
     }
 
+    // Check if input shapes can be inferred.
+    int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
+    std::vector<char const*> names(io_size);
+    int32_t const nbNames = compiled_engine->exec_ctx->inferShapes(names.size(), names.data());
     TORCHTRT_CHECK(
-        compiled_engine->exec_ctx->allInputShapesSpecified(), "Not enough inputs provided (runtime.RunCudaEngine)");
+        nbNames == 0,
+        "The shapes of the inputs: "
+            << names
+            << " cannot be inferred. This could happen if the input tensor addresses/shapes haven't been configured correctly");
   }
 
   std::vector<at::Tensor> outputs(compiled_engine->num_io.second);

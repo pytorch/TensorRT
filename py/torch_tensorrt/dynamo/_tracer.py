@@ -58,13 +58,9 @@ def trace(
 
     device = to_torch_device(kwargs.get("device", default_device()))
     torch_inputs = get_torch_inputs(inputs, device)
-    dynamic_shapes = {}
+    dynamic_shapes = []
     for input in inputs:
         if isinstance(input, Input) and input.shape_mode == Input._ShapeMode.DYNAMIC:
-            if not input.name:
-                raise AssertionError(
-                    f"Expected a name for a dynamic input with shape {input.shape} but found none"
-                )
             min_shape = input.shape["min_shape"]
             opt_shape = input.shape["opt_shape"]
             max_shape = input.shape["max_shape"]
@@ -80,8 +76,8 @@ def trace(
                         max=max_shape[dim],
                     )
 
-            dynamic_shapes[input.name] = dynamic_dims
+            dynamic_shapes.append(dynamic_dims)
 
-    exp_program = export(mod, tuple(torch_inputs), dynamic_shapes=dynamic_shapes)
+    exp_program = export(mod, tuple(torch_inputs), dynamic_shapes=tuple(dynamic_shapes))
 
     return exp_program

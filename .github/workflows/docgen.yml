@@ -57,3 +57,7 @@ jobs:
           commit_user_name: Torch-TensorRT Github Bot
           commit_user_email: torch-tensorrt.github.bot@nvidia.com
           commit_author: Torch-TensorRT Github Bot <torch-tensorrt.github.bot@nvidia.com>
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true

@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, List, Optional
 import torch
 from torch._decomp import register_decomposition
 from torch._ops import OpOverload
+from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
 
 from ._decomposition_groups import (
     ENABLED_TORCH_DECOMPOSITIONS,
@@ -172,6 +173,57 @@ def empty_permuted_decomposition(*args, **kwargs) -> torch.Tensor:
     for permute_index, permute_element in enumerate(empty_permute):
         perm[permute_element] = permute_index
     return torch.empty([empty_size[l] for l in empty_permute], **kwargs).permute(perm)
+
+
+@register_torch_trt_decomposition(
+    torch.ops.aten.slice_scatter.default, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def slice_scatter_decomposition(
+    input_tensor: torch.Tensor,
+    src_tensor: torch.Tensor,
+    dim: int,
+    start: Optional[int] = None,
+    end: Optional[int] = None,
+    step: Optional[int] = None,
+):
+    dim_size = input_tensor.shape[dim]
+    start = get_positive_dim(start, input_tensor.shape[dim])
+    if end is None:
+        end = dim_size
+    end = get_positive_dim(end, input_tensor.shape[dim])
+    if step is None:
+        step = 1
+
+    src_dim = src_tensor.shape
+    # step == 0 is not a valid torch case
+    # also src_dim should be equal to slice dimension
+
+    if start == 0 and end == dim_size and step == 1:
+        return src_tensor
+
+    cat_tensors = []
+    index_tensor_shape = []
+    for i, src_each_dim in enumerate(list(src_dim)):
+        if i != dim:
+            index_tensor_shape.append(src_each_dim)
+    for index in range(start, end, step):
+        cat_tensors.append(index * torch.ones(index_tensor_shape, dtype=torch.long))
+    index_tensor = torch.stack(cat_tensors, dim).cuda()
+    output_tensor = torch.scatter(input_tensor, dim, index_tensor, src_tensor)
+    return output_tensor
+
+
+@register_torch_trt_decomposition(
+    torch.ops.aten.select_scatter.default, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def select_scatter_decomposition(
+    input_tensor: torch.Tensor,
+    src_tensor: torch.Tensor,
+    dim: int,
+    index: int,
+) -> torch.Tensor:
+    src_tensor = torch.unsqueeze(src_tensor, dim)
+    return torch.slice_scatter(input_tensor, src_tensor, dim, index, index + 1, 1)
 
 
 def get_decompositions(

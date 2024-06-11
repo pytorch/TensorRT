@@ -8,10 +8,12 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    calculate_strides,
     flatten_dims,
     get_positive_dim,
     get_trt_tensor,
 )
+from torch_tensorrt.dynamo.conversion.impl.cat import cat
 from torch_tensorrt.dynamo.conversion.impl.slice.base import slice
 from torch_tensorrt.fx.converters.converter_utils import (
     has_dynamic_shape,
@@ -100,7 +102,45 @@ def expand(
         [int(i == o) for i, o in zip(input_tensor_shape, shape)]
     )  # stride == 1 if dimensions match, 0 otherwise
 
-    layer = ctx.net.add_slice(input_t, start=start, shape=shape, stride=stride)
+    shape_ = shape
+    # Handle dynamic shapes case where shape has dynamic dimension
+    if any(isinstance(ele, TRTTensor) for ele in shape):
+        shape_ = cat(
+            ctx,
+            target,
+            source_ir,
+            name + "_shape_concat",
+            shape,
+            0,
+            cast_dtype=trt.int32,
+        )
+        start_tensor = cat(
+            ctx,
+            target,
+            source_ir,
+            name + "_start_concat",
+            start,
+            0,
+            cast_dtype=trt.int32,
+        )
+        stride_tensor = cat(
+            ctx,
+            target,
+            source_ir,
+            name + "_stride_concat",
+            stride,
+            0,
+            cast_dtype=trt.int32,
+        )
+        layer = ctx.net.add_slice(
+            input_t, start=trt.Dims(), shape=trt.Dims(), stride=trt.Dims()
+        )
+        layer.set_input(1, start_tensor)
+        layer.set_input(2, shape_)
+        layer.set_input(3, stride_tensor)
+    else:
+        layer = ctx.net.add_slice(input_t, start=start, shape=shape_, stride=stride)
+
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
 
@@ -260,6 +300,68 @@ def flip(
     )
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
+
+
+def diagonal(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    offset: int,
+    dim1: int,
+    dim2: int,
+) -> TRTTensor:
+    """
+    This implementation is inspired by the reference implementation in PyTorch:
+    https://github.com/pytorch/pytorch/blob/082251e76b93b277ff2791d0e2b64934add34644/torch/_refs/__init__.py#L4255
+    """
+    input_shape = input.shape
+    num_dims = len(input_shape)
+
+    # Adjust dimensions to be positive and canonicalize
+    dim1 = get_positive_dim(dim1, num_dims)
+    dim2 = get_positive_dim(dim2, num_dims)
+
+    # Calculate the size of the diagonal
+    if offset >= 0:
+        diag_size = max(min(input_shape[dim1], input_shape[dim2] - offset), 0)
+    else:
+        diag_size = max(min(input_shape[dim1] + offset, input_shape[dim2]), 0)
+
+    if diag_size == 0:
+        raise ValueError("The size of the diagonal is non-positive.")
+
+    strides = calculate_strides(input_shape)
+
+    # Compute the storage offset
+    storage_offset = 0
+    if offset >= 0:
+        storage_offset += offset * strides[dim2]
+    else:
+        storage_offset -= offset * strides[dim1]
+
+    # Calculate new sizes and strides for as_strided
+    sizes = [s for i, s in enumerate(input_shape) if i not in (dim1, dim2)]
+    sizes.append(diag_size)
+
+    input_strides = [s for i, s in enumerate(strides) if i not in (dim1, dim2)]
+    new_stride = strides[dim1] + strides[dim2]
+    input_strides.append(new_stride)
+
+    # Use as_strided to get the diagonal elements
+    diagonal_output = as_strided(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_as_strided",
+        input,
+        sizes,
+        input_strides,
+        storage_offset,
+    )
+
+    return diagonal_output
 
 
 def as_strided(
