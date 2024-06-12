@@ -1714,6 +1714,23 @@ def aten_ops_isnan(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten._local_scalar_dense.default)
+def aten_ops_local_scalar_dense(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.local_scalar_dense(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
 @dynamo_tensorrt_converter(operator.add, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.add.Tensor, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.add.Scalar, supports_dynamic_shapes=True)

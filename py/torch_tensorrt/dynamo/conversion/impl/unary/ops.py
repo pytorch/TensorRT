@@ -571,3 +571,26 @@ def isnan(
     )
 
     return nan_values_mask
+
+
+def local_scalar_dense(
+    ctx: ConversionContext,
+    target: Union[Target, str],
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+) -> TRTTensor:
+    start = [0] * len(input.shape)
+    shape = [1] * len(input.shape)  # Get one element from each dimension
+    stride = [1] * len(input.shape)  # Step through each dimension by 1
+
+    layer = ctx.net.add_slice(input=input, start=start, shape=shape, stride=stride)
+    set_layer_name(layer, target, f"{name}_slice", source_ir)
+
+    reshape_layer = ctx.net.add_shuffle(layer.get_output(0))
+    reshape_layer.reshape_dims = [
+        1,
+    ]  # Reshape to a single-element tensor
+    set_layer_name(reshape_layer, target, f"{name}_reshape", source_ir)
+
+    return reshape_layer.get_output(0)
