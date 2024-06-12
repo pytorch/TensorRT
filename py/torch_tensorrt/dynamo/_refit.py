@@ -25,6 +25,7 @@ from torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule import (
 )
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import (
+    check_output,
     get_torch_inputs,
     prepare_inputs,
     set_log_level,
@@ -138,7 +139,7 @@ def refit_module_weights(
     compiled_module: torch.fx.GraphModule | ExportedProgram,
     new_weight_module: ExportedProgram,
     inputs: Tuple[Any, ...],
-    settings: Any = None,
+    verify_output: bool = True,
 ) -> torch.fx.GraphModule:
     """
     Refit a compiled graph module with ExportedProgram
@@ -150,15 +151,13 @@ def refit_module_weights(
     compiled_module = copy.deepcopy(compiled_module)
 
     # Get the settings and check the setting to be uniform
-    if settings is None:
-        for name, submodule in compiled_module.named_children():
-            if not isinstance(
-                submodule, (PythonTorchTensorRTModule, TorchTensorRTModule)
-            ):
-                continue
-            if settings is not None:
-                assert settings == submodule.settings
-            settings = submodule.settings
+    settings: Any = None
+    for name, submodule in compiled_module.named_children():
+        if not isinstance(submodule, (PythonTorchTensorRTModule, TorchTensorRTModule)):
+            continue
+        if settings is not None:
+            assert settings == submodule.settings
+        settings = submodule.settings
 
     if settings.debug:
         set_log_level(logger.parent, logging.DEBUG)
@@ -280,26 +279,16 @@ def refit_module_weights(
             refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
             compiled_submodule.engine = refitted_engine
 
-        check_output(
-            new_submodule=new_submodule,
-            compiled_submodule=compiled_submodule,
-            inputs=raw_inputs,
-        )
-        logger.info("Refit Successful!")
+        if verify_output:
+            check_output(
+                new_submodule=new_submodule,
+                compiled_submodule=compiled_submodule,
+                inputs=raw_inputs,
+            )
+            logger.info("Refit Successful!")
+        else:
+            logger.info("Refit Completed! Output verification skipped.")
     return compiled_module
-
-
-def check_output(
-    new_submodule: torch.fx.GraphModule,
-    compiled_submodule: torch.fx.GraphModule,
-    inputs: Tuple[Any, ...],
-) -> None:
-    # inputs = [t.contiguous() for t in inputs]
-    old_outputs, new_outputs = compiled_submodule(*inputs), new_submodule(*inputs)
-    for old_output, new_output in zip(old_outputs, new_outputs):
-        assert torch.allclose(
-            old_output, new_output, 1e-2, 1e-2
-        ), "Refit Result is not correct. Refit failed"
 
 
 # Util functions -----------

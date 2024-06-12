@@ -312,3 +312,16 @@ def req_torch_version(min_torch_version: str = "2.dev") -> Callable[..., Any]:
         return function_wrapper
 
     return nested_decorator
+
+
+def check_output(
+    new_submodule: torch.fx.GraphModule,
+    compiled_submodule: torch.fx.GraphModule,
+    inputs: tuple[Any, ...],
+) -> None:
+    # inputs = [t.contiguous() for t in inputs]
+    old_outputs, new_outputs = compiled_submodule(*inputs), new_submodule(*inputs)
+    for old_output, new_output in zip(old_outputs, new_outputs):
+        assert torch.allclose(
+            old_output, new_output, 1e-2, 1e-2
+        ), "Refit Result is not correct. Refit failed"
