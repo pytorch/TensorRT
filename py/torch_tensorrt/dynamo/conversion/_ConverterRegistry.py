@@ -96,7 +96,7 @@ def has_static_shapes(node: torch.fx.Node) -> bool:
     return not _has_dynamic_shapes(node=node)
 
 
-def has_dynamic_shapes(node: torch.fx.Node) -> bool:
+def node_has_dynamic_shapes(node: torch.fx.Node) -> bool:
     """Returns True if a node has dynamic args, kwargs, or outputs"""
     return _has_dynamic_shapes(node=node)
 
@@ -438,7 +438,7 @@ class ConverterRegistry:
                         # 4) Node has dynamic inputs and the converter has supports_dynamic_shapes=True
                         if candidate.capability_validator(node) and (
                             self.assume_dynamic_shape_support
-                            or not has_dynamic_shapes(node)
+                            or not node_has_dynamic_shapes(node)
                             or candidate.supports_dynamic_shapes
                         ):
                             return (
@@ -447,7 +447,7 @@ class ConverterRegistry:
                             )
                 else:
                     # Assuming FX converters don't have dynamic shapes supported
-                    if not has_dynamic_shapes(node):
+                    if not node_has_dynamic_shapes(node):
                         return converters, calling_convention
 
         raise KeyError(

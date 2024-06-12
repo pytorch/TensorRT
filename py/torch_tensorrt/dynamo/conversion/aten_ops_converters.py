@@ -695,7 +695,7 @@ def aten_ops_split(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.where.self)
+@dynamo_tensorrt_converter(torch.ops.aten.where.self, supports_dynamic_shapes=True)
 def aten_ops_where(
     ctx: ConversionContext,
     target: Target,
