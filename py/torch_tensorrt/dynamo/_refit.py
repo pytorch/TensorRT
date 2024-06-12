@@ -9,6 +9,7 @@ import numpy as np
 import tensorrt as trt
 import torch
 from torch.export import ExportedProgram
+from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import partitioning
 from torch_tensorrt.dynamo.conversion import CompilationSettings
@@ -89,7 +90,7 @@ def construct_refit_mapping(
                 weight_dtype = (
                     layer.precision
                     if layer.precision_is_set
-                    else convert_numpy_to_tensorrt_dtype(weight.dtype)
+                    else dtype.try_from(weight.dtype).to(trt.DataType)
                 )
                 weight_map[f"{layer.name} {weight_name}"] = (
                     weight,
@@ -311,24 +312,3 @@ def get_engine_from_encoded_engine(
     serialized_engine = base64.b64decode(encoded_engine)
     engine = runtime.deserialize_cuda_engine(serialized_engine)
     return engine
-
-
-def convert_numpy_to_tensorrt_dtype(np_dtype: np.dtypes) -> trt.DataType:
-    # Define a mapping from numpy dtype to TensorRT dtype
-    numpy_to_tensorrt_dtype = {
-        np.dtype("float32"): trt.DataType.FLOAT,
-        np.float32: trt.DataType.FLOAT,
-        np.dtype("float16"): trt.DataType.HALF,
-        np.float16: trt.DataType.HALF,
-        np.dtype("int32"): trt.DataType.INT32,
-        np.int32: trt.DataType.INT32,
-        np.dtype("int64"): trt.DataType.INT64,
-        np.int64: trt.DataType.INT64,
-        np.dtype("int8"): trt.DataType.INT8,
-        np.int8: trt.DataType.INT8,
-    }
-
-    if np_dtype in numpy_to_tensorrt_dtype:
-        return numpy_to_tensorrt_dtype[np_dtype]
-    else:
-        raise TypeError(f"Unsupported NumPy data type: {np_dtype}")
