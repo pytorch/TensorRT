@@ -15,7 +15,6 @@ on:
 
 jobs:
   generate-matrix:
-    if: ${{ ! contains(github.actor, 'lanluo') }}
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
       package-type: wheel
