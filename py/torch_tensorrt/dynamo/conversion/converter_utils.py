@@ -15,8 +15,8 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
     DynamoConverterImplSignature,
 )
-from torch_tensorrt.fx.converters.converter_utils import get_axes_for_reduce_op
-from torch_tensorrt.fx.types import TRTDataType, TRTTensor
+
+from ..types import Shape, TRTDataType, TRTLayer, TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -147,9 +147,68 @@ def broadcastable(
     return True
 
 
-get_axes_for_reduce_op = functools.partial(
-    get_axes_for_reduce_op, has_implicit_batch_dimension=False
-)
+def broadcast_to_same_shape(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: TRTTensor,
+    rhs_val: TRTTensor,
+) -> Tuple[TRTTensor, TRTTensor]:
+    """Broadcast ITensors `lhs_val` and `rhs_val` to the same shape. If the shapes are already the same, return the
+    original tensors. If the shapes are different, broadcast the tensors to the same shape.
+
+    This helper function is different from fx/converter_utils.broadcast.
+    fx/converter_utils.broadcast only broadcasts two ITensors to the same number of dimensions (ranks)
+    by prepending 1s, while this function broadcasts two ITensors to the same shape.
+
+    For example, we have original ITensors: lhs_val.shape: (2, 3) rhs_val.shape: (2, 2, 1, 3)
+    If calling fx/converter_utils.broadcast, lhs_val.shape: (1, 1, 2, 3) lhs_val.shape: (2, 2, 1, 3).
+    If calling this function broadcast_to_same_shape, lhs_val.shape: (2, 2, 2, 3) lhs_val.shape: (2, 2, 2, 3).
+
+    Args:
+        lhs_val (TRTTensor): A TensorRT ITensor.
+        rhs_val (TRTTensor): A TensorRT ITensor.
+
+    Returns:
+        Tuple[TRTTensor, TRTTensor]: Two TensorRT ITensors that are broadcasted to the same shape
+
+    """
+    lhs_val, rhs_val = broadcast(ctx, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs")
+
+    lhs_val_shape = lhs_val.shape
+    rhs_val_shape = rhs_val.shape
+
+    if tuple(lhs_val_shape) != tuple(rhs_val_shape):
+        rank = len(lhs_val_shape)
+        expanded_dims = [-1] * len(lhs_val_shape)
+
+        for dim in range(rank):
+            expanded_dims[dim] = max(lhs_val_shape[dim], rhs_val_shape[dim])
+
+        expanded_shape = tuple(expanded_dims)
+
+        if lhs_val_shape != expanded_shape:
+            lhs_val = impl.slice.expand(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_expand_lhs_val",
+                lhs_val,
+                expanded_shape,
+            )
+
+        if rhs_val_shape != expanded_shape:
+            rhs_val = impl.slice.expand(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_expand_rhs_val",
+                rhs_val,
+                expanded_shape,
+            )
+
+    return lhs_val, rhs_val
 
 
 def extend_attr_to_tuple(
@@ -592,3 +651,191 @@ def set_item(
         0,
     )
     return ans
+
+
+def calculate_strides(shape: Sequence[int]) -> Sequence[int]:
+    """
+    Calculate the strides for a given shape of a multi-dimensional array.
+
+    The output stride for each dimension indicates the number of elements to skip in
+    memory to move to the next element along that dimension. The last dimension always
+    has a stride of 1 because elements are stored contiguously along this dimension.
+
+    Example:
+        For a 3-dimensional array with shape [2, 3, 4]:
+        - shape = [2, 3, 4]
+        - The function will calculate the strides as follows:
+            1. Initialize strides: [1, 1, 1]
+            2. Calculate strides for each dimension from right to left:
+               - For i = 1: strides[1] = strides[2] * shape[2] = 1 * 4 = 4
+               - For i = 0: strides[0] = strides[1] * shape[1] = 4 * 3 = 12
+            - Final strides: [12, 4, 1]
+
+        Therefore, the output will be [12, 4, 1].
+
+        This means:
+        - To move along the first dimension, skip 12 elements.
+        - To move along the second dimension, skip 4 elements.
+        - To move along the third dimension, skip 1 element.
+    """
+    strides = [1] * len(shape)
+    for i in range(len(shape) - 2, -1, -1):
+        strides[i] = strides[i + 1] * shape[i + 1]
+    return strides
+
+
+def broadcast(
+    ctx: ConversionContext,
+    a: TRTTensor,
+    b: TRTTensor,
+    a_name: str,
+    b_name: str,
+    preset_diff: int = 0,
+) -> Tuple[TRTTensor, TRTTensor]:
+    """
+    Broadcast two TensorRT tensors to the same number of dimensions by
+    prepending 1s to the tensor with less number of dimensions.
+
+    Args:
+        ctx (ConversionContext): A ConversionContext containing the TensorRT network
+        a (TRTTensor): A TensorRT ITensor.
+        b (TRTTensor): A TensorRT ITensor.
+        a_name (str): Name of tensor a.
+        b_name (str): Name of tensor b.
+        preset_diff (int): The difference of number of dimensions after broadcast.
+            A positive number means after broadcast, tensor `a` would have `preset_diff`
+            more dimensions than `b`. This is used in matmul, since we need to broadcast
+            tensors but not always to the same number of dimension. The reason is that
+            matmul supports Matrix x Vector and in this case broadcasted vector should
+            have 1 less number of dimensions than the matrix tensor.
+
+    Returns:
+        Two TensorRT ITensors that are broadcasted to the same number of dimensions.
+    """
+    a_shape = tuple(a.shape)
+    b_shape = tuple(b.shape)
+
+    diff = len(a_shape) - len(b_shape) - preset_diff
+    if diff > 0:
+        b = prepend_ones(ctx, b, f"{b_name}_broadcast", diff)
+    elif diff < 0:
+        a = prepend_ones(ctx, a, f"{a_name}_broadcast", -diff)
+
+    return a, b
+
+
+def get_axes_for_reduce_op(
+    dim: Union[int, Sequence[int]],
+) -> int:
+    """
+    TensorRT reduce layer relies on the binary representation of axes to
+    determine which dims to reduce. For example, if we want to reduce on
+    dim 1 and 2 then axes should be 6(110).
+
+    Args:
+        dim (Union[int, Sequence[int]]): An integer or a sequence of integers
+            that will be used to generate axes for TensorRT.
+
+    Returns:
+        An integer which binary form can be used as axes for TensorRT reduce
+        layer.
+    """
+    if isinstance(dim, int):
+        dim = (dim,)
+
+    axes = 0
+    for d in dim:
+        axes |= 1 << d
+
+    return axes
+
+
+def has_dynamic_shape(shape: Shape) -> bool:
+    """
+    Determine if the given shape has dynamic dim. i.e. if there're -1 in shape.
+
+    Args:
+        shape (Shape): Shape of a tensor. Essentially is a sequence of integers.
+
+    Returns:
+        A boolean value indicates whether there's dynamic dim in the shape.
+    """
+    count = 0
+    for s in shape:
+        count += 1 if s == -1 else 0
+    return count > 0
+
+
+def prepend_ones(
+    ctx: ConversionContext,
+    tensor: TRTTensor,
+    name: str,
+    num_prepend_ones: int,
+) -> TRTTensor:
+    """
+    Prepend 1s to the shape of TensorRT ITensor `tensor`.
+
+    Args:
+        ctx (ConversionContext): A ConversionContext containing the TensorRT network
+        tensor (TRTTensor): A TensorRT tensor.
+        name (str): Name of the TensorRT Shuffle layer which is used to prepend
+            1s.
+        num_prepend_ones (int): Number of 1s that will be prepend.
+
+    Returns:
+        A Tensorrt ITensor which contains the same value as `tensor` but with
+        more 1s prepended to the beginning of `tensor` shape.
+    """
+    layer = ctx.net.add_shuffle(tensor)
+
+    # If there're dynamic dim in tensor's shape, we need to use shape layer to
+    # compute the final shape.
+    if has_dynamic_shape(tensor.shape):
+        tensor_shape_layer = ctx.net.add_shape(tensor)
+        tensor_shape = tensor_shape_layer.get_output(0)
+        tensor_shape = cast_trt_tensor(
+            ctx, tensor_shape, trt.int32, name + "shape_casted", "shape"
+        )
+        tensor_shape_layer.name = f"{name}_broadcast_orig_shape"
+        prepend_shape_layer = ctx.net.add_constant(
+            (num_prepend_ones,), np.ones((num_prepend_ones,), dtype=np.int32)
+        )
+        prepend_shape_layer.name = f"{name}_broadcast_prepend_ones"
+        reshape_dim_layer = ctx.net.add_concatenation(
+            [prepend_shape_layer.get_output(0), tensor_shape]
+        )
+        reshape_dim_layer.axis = 0
+        reshape_dim_layer.name = f"{name}_broadcast_final_shape"
+        layer.set_input(1, reshape_dim_layer.get_output(0))
+    else:
+        layer.reshape_dims = (1,) * num_prepend_ones + tuple(tensor.shape)
+
+    layer.name = name
+    return layer.get_output(0)
+
+
+def set_layer_name(
+    layer: TRTLayer,
+    target: Union[Target, torch.nn.Module, str],
+    name: str,
+    source_ir: Optional[SourceIR] = None,
+) -> None:
+    """
+    Set the TensorRT layer name to "[TensorRT Layer Type]_[Original Op Name]_[FX Node Name with Suffix]"
+
+    Args:
+        layer (TRTLayer): A TensorRT layer of which we want to set the name.
+        target (Target): A fx node.target or submodule. For call_function node, it's the function that
+            the node represents.
+        name (str): Consists of fx node.name with optional suffix.
+        source_ir: (Optional[SourceIR]): The IR producing the op.
+    """
+
+    source_ir = source_ir if source_ir is not None else SourceIR.UNKNOWN
+
+    target_name = (
+        f"{source_ir}_ops.{target}"
+        if isinstance(target, str)
+        else f"{source_ir}_ops.{target.__name__}"
+    )
+    layer.name = f"[{layer.type.name}]-[{target_name}]-[{name}]"
