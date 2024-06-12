@@ -8,24 +8,12 @@ from torch.testing._internal.common_utils import run_tests
 class TestLocalScalarDenseConverter(DispatchTestCase):
     @parameterized.expand(
         [
-            (
-                torch.randn((5, 10, 5), dtype=torch.float32),
-            ),
-            (
-                torch.randint(-10, 10, (5, 1, 15), dtype=torch.int32),
-            ),
-            (
-                torch.randn((1), dtype=torch.float32),
-            ),
-            (
-                (torch.tensor([-2.4])),
-            ),
-            (
-                (torch.tensor([5.5, 3.5, 3.6])),
-            ),
-            (
-                (torch.tensor([True])),
-            ),
+            (torch.randn((5, 10, 5), dtype=torch.float32),),
+            (torch.randint(-10, 10, (5, 1, 15), dtype=torch.int32),),
+            (torch.randn((1), dtype=torch.float32),),
+            ((torch.tensor([-2.4])),),
+            ((torch.tensor([5.5, 3.5, 3.6])),),
+            ((torch.tensor([True])),),
             (
                 torch.tensor(
                     [
@@ -44,9 +32,7 @@ class TestLocalScalarDenseConverter(DispatchTestCase):
                     ]
                 ),
             ),
-            (
-                (torch.tensor([float("inf")])),
-            ),
+            ((torch.tensor([float("inf")])),),
         ]
     )
     def test_local_scalar_dense(self, data):
