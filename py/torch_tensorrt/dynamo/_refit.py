@@ -59,7 +59,6 @@ def construct_refit_mapping(
             [("kernel", "KERNEL"), ("bias", "BIAS")],
         ),
         "CONSTANT": (trt.IConstantLayer, [("weights", "CONSTANT")]),
-        # TODO: Add INormalizationLayer
     }
 
     output_dtypes = infer_module_output_dtypes(
@@ -127,13 +126,11 @@ def _refit_single_trt_engine_with_gm(
         refitted.add(layer_name)
 
     if len(refitted) != len(weight_list):
-        raise AssertionError("Not all weights have been refitted")
+        logger.warning("Not all weights have been refitted!!!")
 
     if not refitter.refit_cuda_engine():
-        print("Error: failed to refit new weights.")
+        logger.error("Error: failed to refit new weights.")
         exit(0)
-
-    print("Refit Successful")
 
 
 def refit_module_weights(
@@ -145,6 +142,7 @@ def refit_module_weights(
     """
     Refit a compiled graph module with ExportedProgram
     """
+    raw_inputs = copy.deepcopy(inputs)
     if isinstance(compiled_module, ExportedProgram):
         compiled_module = compiled_module.module()
 
@@ -227,6 +225,8 @@ def refit_module_weights(
     # Generate the corresponding TRT Module for those
     for name, new_submodule in partitioned_module.named_children():
 
+        # Refit each submodule
+
         # Extract engine from the submodule
         try:
             compiled_submodule = getattr(compiled_module, name)
@@ -279,7 +279,26 @@ def refit_module_weights(
             refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
             compiled_submodule.engine = refitted_engine
 
+        check_output(
+            new_submodule=new_submodule,
+            compiled_submodule=compiled_submodule,
+            inputs=raw_inputs,
+        )
+        logger.info("Refit Successful!")
     return compiled_module
+
+
+def check_output(
+    new_submodule: torch.fx.GraphModule,
+    compiled_submodule: torch.fx.GraphModule,
+    inputs: Tuple[Any, ...],
+) -> None:
+    # inputs = [t.contiguous() for t in inputs]
+    old_outputs, new_outputs = compiled_submodule(*inputs), new_submodule(*inputs)
+    for old_output, new_output in zip(old_outputs, new_outputs):
+        assert torch.allclose(
+            old_output, new_output, 1e-2, 1e-2
+        ), "Refit Result is not correct. Refit failed"
 
 
 # Util functions -----------
