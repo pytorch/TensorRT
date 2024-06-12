@@ -46,6 +46,12 @@ new_local_repository(
     path = "/usr/local/cuda-12.1/",
 )
 
+new_local_repository(
+    name = "cuda_win",
+    build_file = "@//third_party/cuda:BUILD",
+    path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.1/",
+)
+
 #############################################################################################################
 # Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
 #############################################################################################################
@@ -64,6 +70,13 @@ http_archive(
     urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-shared-with-deps-latest.zip"],
 )
 
+http_archive(
+    name = "libtorch_win",
+    build_file = "@//third_party/libtorch:BUILD",
+    strip_prefix = "libtorch",
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-win-shared-with-deps-latest.zip"],
+)
+
 # Download these tarballs manually from the NVIDIA website
 # Either place them in the distdir directory in third_party and use the --distdir flag
 # or modify the urls to "file:///<PATH TO TARBALL>/<TARBALL NAME>.tar.gz
@@ -77,6 +90,18 @@ http_archive(
         "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.0.1/tars/TensorRT-10.0.1.6.Linux.x86_64-gnu.cuda-12.4.tar.gz",
     ],
 )
+
+http_archive(
+    name = "tensorrt_win",
+    build_file = "@//third_party/tensorrt/archive:BUILD",
+    sha256 = "d667bd10b178e239b621a8929008ef3e27967d181bf07a39845a0f99edeec47a",
+    strip_prefix = "TensorRT-10.0.1.6",
+    urls = [
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.0.1/zip/TensorRT-10.0.1.6.Windows10.win10.cuda-12.4.zip",
+    ],
+)
+
+
 
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)

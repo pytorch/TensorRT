@@ -17,6 +17,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
+
 cc_library(
     name = "core",
     srcs = [
@@ -31,8 +38,11 @@ cc_library(
         "//core/partitioning",
         "//core/runtime",
         "//core/util/logging",
-        "@tensorrt//:nvinfer",
     ] + select({
+        ":windows": ["@tensorrt_win//:nvinfer"],
+        "//conditions:default": ["@tensorrt//:nvinfer"],
+    }) + select({
+        ":windows": ["@libtorch_win//:libtorch"],
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),

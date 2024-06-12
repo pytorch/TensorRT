@@ -10,6 +10,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
+
 cc_library(
     name = "passes",
     srcs = [
@@ -49,6 +56,7 @@ cc_library(
     deps = [
         "//core/util:prelude",
     ] + select({
+        ":windows": ["@libtorch_win//:libtorch"],
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),

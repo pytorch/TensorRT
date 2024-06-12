@@ -34,7 +34,19 @@ cc_library(
 
 cc_import(
     name = "nvinfer_lib",
-    shared_library = "lib/libnvinfer.so",
+    shared_library = select({
+        ":windows": "lib/nvinfer_10.dll",
+        "//conditions:default": "lib/libnvinfer.so",
+    }),
+    visibility = ["//visibility:private"],
+)
+
+cc_import(
+    name = "nvinfer_static_lib",
+    static_library = select({
+        ":windows": "lib/nvinfer_10.lib",
+        "//conditions:default": "lib/libnvinfer_static.a",
+    }),
     visibility = ["//visibility:private"],
 )
 
@@ -44,15 +56,23 @@ cc_library(
     deps = [
         "nvinfer_headers",
         "nvinfer_lib",
-        "@cuda//:cudart",
-    ],
+    ] + select({
+        ":windows": ["@cuda_win//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
+    }) + select({
+        ":windows": ["nvinfer_static_lib"],
+        "//conditions:default": [],
+    }),
 )
 
 ####################################################################################
 
 cc_import(
     name = "nvparsers_lib",
-    shared_library = "lib/libnvparsers.so",
+    shared_library = select({
+        ":windows": "lib/nvparsers.dll",
+        "//conditions:default": "lib/libnvparsers.so",
+    }),
     visibility = ["//visibility:private"],
 )
 
@@ -83,7 +103,10 @@ cc_library(
 
 cc_import(
     name = "nvonnxparser_lib",
-    shared_library = "lib/libnvonnxparser.so",
+    shared_library = select({
+        ":windows": "lib/nvonnxparser*.dll",
+        "//conditions:default": "lib/libnvonnxparser*.so",
+    }),
     visibility = ["//visibility:private"],
 )
 
@@ -112,7 +135,10 @@ cc_library(
 
 cc_import(
     name = "nvonnxparser_runtime_lib",
-    shared_library = "lib/libnvonnxparser_runtime.so",
+    shared_library = select({
+        ":windows": "lib/nvonnxparser_runtime.dll",
+        "//conditions:default": "lib/libnvonnxparser_runtime.so",
+    }),
     visibility = ["//visibility:public"],
 )
 
@@ -137,7 +163,10 @@ cc_library(
 
 cc_import(
     name = "nvcaffeparser_lib",
-    shared_library = "lib/libnvcaffe_parsers.so",
+    shared_library = select({
+        ":windows": "lib/nvcaffe_parsers.dll",
+        "//conditions:default": "lib/libnvcaffe_parsers.so",
+    }),
     visibility = ["//visibility:private"],
 )
 
@@ -160,26 +189,21 @@ cc_library(
 
 ####################################################################################
 
-cc_import(
-    name = "nvinferplugin_lib",
-    shared_library = "lib/libnvinfer_plugin.so",
-    visibility = ["//visibility:private"],
-)
-
-cc_library(
-    name = "nvinferplugin_headers",
-    hdrs = glob(["include/NvInferPlugin*.h"]),
-    includes = ["include/"],
-    visibility = ["//visibility:private"],
-)
-
 cc_library(
     name = "nvinferplugin",
-    visibility = ["//visibility:public"],
+    srcs = select({
+        ":windows": ["lib/nvinfer_plugin_10.lib"],
+        "//conditions:default": ["lib/libnvinfer_plugin.so"],
+    }),
+    hdrs = glob(["include/NvInferPlugin*.h"]),
+    copts = ["-pthread",],
+    includes = ["include/"],
+    linkopts = ["-lpthread"],
     deps = [
         "nvinfer",
-        "nvinferplugin_headers",
-        "nvinferplugin_lib",
-        "@cuda//:cudart",
-    ],
+        ] + select({
+            ":windows": ["@cuda_win//:cudart"],
+            "//conditions:default": ["@cuda//:cudart"],
+        }),
+    alwayslink = True,
 )

@@ -10,6 +10,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
+
 cc_library(
     name = "prelude",
     hdrs = [
@@ -33,6 +40,7 @@ cc_library(
     deps = [
         ":macros",
     ] + select({
+        ":windows": ["@libtorch_win//:libtorch"],
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
@@ -65,9 +73,11 @@ cc_library(
     hdrs = [
         "build_info.h",
     ],
-    deps = [
-        "@tensorrt//:nvinfer",
-    ] + select({
+    deps = select({
+        ":windows": ["@tensorrt_win//:nvinfer"],
+        "//conditions:default": ["@tensorrt//:nvinfer"],
+    }) + select({
+        ":windows": ["@libtorch_win//:libtorch"],
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
@@ -84,8 +94,11 @@ cc_library(
     deps = [
         ":macros",
         "//core/util/logging",
-        "@tensorrt//:nvinfer",
     ] + select({
+        ":windows": ["@tensorrt_win//:nvinfer"],
+        "//conditions:default": ["@tensorrt//:nvinfer"],
+    }) + select({
+        ":windows": ["@libtorch_win//:libtorch"],
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),

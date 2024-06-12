@@ -78,7 +78,7 @@ load_dep_info()
 
 dir_path = os.path.join(str(get_root_dir()), "py")
 
-CXX11_ABI = False
+CXX11_ABI = sys.platform.startswith("win")
 JETPACK_VERSION = None
 PY_ONLY = False
 NO_TS = False
