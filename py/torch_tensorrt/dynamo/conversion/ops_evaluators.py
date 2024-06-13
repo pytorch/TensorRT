@@ -18,6 +18,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise import sub, trunc_div
 from torch_tensorrt.fx.types import TRTTensor
+from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -165,3 +166,49 @@ def aten_ops_randperm(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return np.random.permutation(args[0])
+
+
+def full_validator(full_like_node: Node) -> bool:
+    device = full_like_node.kwargs.get("device", None)
+    if device is not None:
+        _LOGGER.debug(f"Currently we don't support specifying device, got {device}.")
+        return False
+    layout = full_like_node.kwargs.get("layout", None)
+    if layout is not None:
+        _LOGGER.debug(f"Currently we don't support specifying layout, got {layout}.")
+        return False
+    memory_format = full_like_node.kwargs.get("memory_format", None)
+    if memory_format is not None:
+        _LOGGER.debug(
+            f"Currently we don't support specifying memory_format, got {memory_format}."
+        )
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.full_like.default, capability_validator=full_validator
+)
+def aten_ops_full_like(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    full_like_np_tensor = None
+    tensor_shape = args[0].shape
+    if kwargs.get("dtype") is not None:
+        full_like_np_tensor = np.full(
+            tensor_shape,
+            args[1],
+            dtype=unified_dtype_converter(kwargs.get("dtype"), Frameworks.NUMPY),
+        )
+    else:
+        # default returns np.float64. Verify the correctness of this
+        full_like_np_tensor = np.full(
+            tensor_shape,
+            args[1],
+            dtype=unified_dtype_converter(args[0].dtype, Frameworks.NUMPY),
+        )
+    return full_like_np_tensor
