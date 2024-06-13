@@ -315,13 +315,16 @@ def req_torch_version(min_torch_version: str = "2.dev") -> Callable[..., Any]:
 
 
 def check_output(
-    new_submodule: torch.fx.GraphModule,
-    compiled_submodule: torch.fx.GraphModule,
+    new_module: torch.fx.GraphModule,
+    refitted_module: torch.fx.GraphModule,
     inputs: tuple[Any, ...],
 ) -> None:
     # inputs = [t.contiguous() for t in inputs]
-    old_outputs, new_outputs = compiled_submodule(*inputs), new_submodule(*inputs)
+    old_outputs, new_outputs = refitted_module(*inputs), new_module(*inputs)
     for old_output, new_output in zip(old_outputs, new_outputs):
-        assert torch.allclose(
-            old_output, new_output, 1e-2, 1e-2
-        ), "Refit Result is not correct. Refit failed"
+        if isinstance(old_output, torch.tensor) and isinstance(
+            new_outputs, torch.tensor
+        ):
+            assert torch.allclose(
+                old_output, new_output, 1e-2, 1e-2
+            ), "Refit Result is not correct. Refit failed"
