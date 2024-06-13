@@ -322,8 +322,8 @@ def check_output(
     # inputs = [t.contiguous() for t in inputs]
     old_outputs, new_outputs = refitted_module(*inputs), new_module(*inputs)
     for old_output, new_output in zip(old_outputs, new_outputs):
-        if isinstance(old_output, torch.tensor) and isinstance(
-            new_outputs, torch.tensor
+        if isinstance(old_output, torch.Tensor) and isinstance(
+            new_outputs, torch.Tensor
         ):
             assert torch.allclose(
                 old_output, new_output, 1e-2, 1e-2
