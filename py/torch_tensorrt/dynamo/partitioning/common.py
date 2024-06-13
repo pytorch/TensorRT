@@ -35,8 +35,12 @@ def construct_dynamic_input(
             node = dim.node
             expr = node.expr
             shape_env = node.shape_env
-            var_range = shape_env.var_to_range.get(expr, None)
-            var_val = shape_env.var_to_val.get(expr, None)
+            var_range = shape_env.var_to_range.get(expr, None) or shape_env.bound_sympy(
+                expr
+            )
+            var_val = shape_env.var_to_val.get(expr, None) or expr.xreplace(
+                shape_env.var_to_val
+            )
             assert var_range, var_val
             # Torchdynamo 0/1 specialization outlier
             if var_range.lower == 2:

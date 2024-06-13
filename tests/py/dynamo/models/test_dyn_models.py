@@ -11,9 +11,9 @@ from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 assertions = unittest.TestCase()
 
 
-@unittest.skip(
-    "Skipping this test for now due to constraint violation error: https://github.com/pytorch/TensorRT/issues/2794"
-)
+# @unittest.skip(
+#     "Skipping this test for now due to constraint violation error: https://github.com/pytorch/TensorRT/issues/2794"
+# )
 @pytest.mark.unit
 def test_base_dynamic(ir):
     """
@@ -71,9 +71,9 @@ def test_base_dynamic(ir):
         torch.cuda.empty_cache()
 
 
-@unittest.skip(
-    "Skipping this test for now due to constraint violation error: https://github.com/pytorch/TensorRT/issues/2794"
-)
+# @unittest.skip(
+#     "Skipping this test for now due to constraint violation error: https://github.com/pytorch/TensorRT/issues/2794"
+# )
 @pytest.mark.unit
 def test_base_dynamic_fallback(ir):
     """
@@ -289,3 +289,53 @@ def test_view(ir):
 
     with torch.no_grad():
         torch.cuda.empty_cache()
+
+
+@pytest.mark.unit
+def test_linear(ir):
+    """
+    Tests the model with linear op and operator.mul (added internally by PyTorch)
+    with dynamic shapes
+    """
+
+    class MyModule(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear1 = torch.nn.Linear(10, 10)
+
+        def forward(self, x):
+            return self.linear1(x)
+
+    model = MyModule().eval().cuda()
+
+    compile_spec = {
+        "device": torchtrt.Device("cuda:0"),
+        "enabled_precisions": {torch.float},
+        "ir": ir,
+        "min_block_size": 1,
+    }
+    inputs_bs2 = torch.randn(2, 2, 10).to("cuda")
+    if ir == "torch_compile":
+        torch._dynamo.mark_dynamic(inputs_bs2, 0, min=1, max=10)
+        torch._dynamo.mark_dynamic(inputs_bs2, 1, min=1, max=10)
+        # Compile the model
+        trt_model = torch.compile(model, backend="tensorrt", options=compile_spec)
+        trt_model(inputs_bs2)
+    elif ir == "dynamo":
+        dynamic_shapes = (
+            {
+                0: torch.export.Dim("batch_size", min=1, max=10),
+                1: torch.export.Dim("seq_len", max=10),
+            },
+        )
+        exp_program = torch.export.export(
+            model, (inputs_bs2,), dynamic_shapes=dynamic_shapes
+        )
+        trt_model = torchtrt.dynamo.compile(exp_program, [inputs_bs2], **compile_spec)
+
+    input_bs6_s3 = torch.randn((6, 3, 10)).to("cuda")
+    cos_sim = cosine_similarity(model(input_bs6_s3), trt_model(input_bs6_s3))
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_linear model TRT outputs don't match with the pytorch model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
