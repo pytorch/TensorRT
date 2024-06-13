@@ -102,7 +102,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
               serialize_info[INPUT_BINDING_NAMES_IDX] = serialize_bindings(self->in_binding_names);
               serialize_info[OUTPUT_BINDING_NAMES_IDX] = serialize_bindings(self->out_binding_names);
               serialize_info[HW_COMPATIBLE_IDX] = self->hardware_compatible ? "1" : "0";
-
+              serialize_info[SETTING_IDX] = self->serialized_settings;
               LOG_DEBUG("Serialized Hardware Compatibility: " << (self->hardware_compatible ? "Enabled" : "Disabled"));
 
               return serialize_info;

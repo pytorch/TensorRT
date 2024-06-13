@@ -35,13 +35,14 @@ struct TRTEngine : torch::CustomClassHolder {
   std::vector<std::string> out_binding_names = {}; // ITO: PYT IDX
 
   bool hardware_compatible = false; // Whether the engine was compiled in hardware compatible mode
-
+  std::string serialized_settings;
   ~TRTEngine();
   TRTEngine(
       const std::string& serialized_engine,
       const RTDevice& cuda_device,
       const std::vector<std::string>& in_binding_names,
       const std::vector<std::string>& out_binding_names,
+      const std::string& serialized_settings,
       bool hardware_compatible = false);
   TRTEngine(std::vector<std::string> serialized_info);
   TRTEngine(
@@ -50,6 +51,7 @@ struct TRTEngine : torch::CustomClassHolder {
       const RTDevice& cuda_device,
       const std::vector<std::string>& in_binding_names,
       const std::vector<std::string>& out_binding_names,
+      const std::string& serialized_settings,
       bool hardware_compatible = false);
   TRTEngine& operator=(const TRTEngine& other);
   std::string to_str() const;

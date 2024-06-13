@@ -33,6 +33,7 @@ TRTEngine::TRTEngine(
     const RTDevice& cuda_device,
     const std::vector<std::string>& _in_binding_names,
     const std::vector<std::string>& _out_binding_names,
+    const std::string& serialized_settings,
     bool hardware_compatible)
     : TRTEngine(
           "deserialized_trt",
@@ -40,6 +41,7 @@ TRTEngine::TRTEngine(
           cuda_device,
           _in_binding_names,
           _out_binding_names,
+          serialized_settings,
           hardware_compatible) {}
 
 TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
@@ -49,6 +51,7 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           RTDevice(serialized_info[DEVICE_IDX]),
           split(serialized_info[INPUT_BINDING_NAMES_IDX], BINDING_DELIM),
           split(serialized_info[OUTPUT_BINDING_NAMES_IDX], BINDING_DELIM),
+          serialized_info[SETTING_IDX],
           static_cast<bool>(std::stoi(serialized_info[HW_COMPATIBLE_IDX]))) {}
 
 TRTEngine::TRTEngine(
@@ -57,9 +60,10 @@ TRTEngine::TRTEngine(
     const RTDevice& cuda_device,
     const std::vector<std::string>& _in_binding_names,
     const std::vector<std::string>& _out_binding_names,
+    const std::string& serialized_settings,
     bool hardware_compatible) {
   this->hardware_compatible = hardware_compatible;
-
+  this->serialized_settings = serialized_settings;
   auto most_compatible_device = get_most_compatible_device(cuda_device, RTDevice(), hardware_compatible);
   TORCHTRT_CHECK(most_compatible_device, "No compatible device was found for instantiating TensorRT engine");
   device_info = most_compatible_device.value();
