@@ -11,6 +11,7 @@ on:
 jobs:
   build-docs:
     runs-on: linux.g5.4xlarge.nvidia.gpu
+    if: ${{ ! contains(github.actor, 'pytorchbot') }}
     environment: pytorchbot-env
     container:
       image: docker.io/pytorch/manylinux-builder:cuda12.1
@@ -57,3 +58,7 @@ jobs:
           commit_user_name: Torch-TensorRT Github Bot
           commit_user_email: torch-tensorrt.github.bot@nvidia.com
           commit_author: Torch-TensorRT Github Bot <torch-tensorrt.github.bot@nvidia.com>
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true

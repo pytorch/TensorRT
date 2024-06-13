@@ -223,7 +223,7 @@ def aten_ops_group_norm(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.cat.default)
+@dynamo_tensorrt_converter(torch.ops.aten.cat.default, supports_dynamic_shapes=True)
 def aten_ops_cat(
     ctx: ConversionContext,
     target: Target,
@@ -668,14 +668,19 @@ def aten_ops_softmax(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.split.Tensor, capability_validator=has_static_shapes_in_args([1])
+    torch.ops.aten.split.Tensor,
+    capability_validator=has_static_shapes_in_args([1]),
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
-    torch.ops.aten.split.sizes, capability_validator=has_static_shapes_in_args([1])
+    torch.ops.aten.split.sizes,
+    capability_validator=has_static_shapes_in_args([1]),
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
     torch.ops.aten.split_with_sizes.default,
     capability_validator=has_static_shapes_in_args([1]),
+    supports_dynamic_shapes=True,
 )
 def aten_ops_split(
     ctx: ConversionContext,
@@ -695,7 +700,7 @@ def aten_ops_split(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.where.self)
+@dynamo_tensorrt_converter(torch.ops.aten.where.self, supports_dynamic_shapes=True)
 def aten_ops_where(
     ctx: ConversionContext,
     target: Target,
@@ -1368,7 +1373,7 @@ def aten_ops_abs(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sin.default)
+@dynamo_tensorrt_converter(torch.ops.aten.sin.default, supports_dynamic_shapes=True)
 def aten_ops_sin(
     ctx: ConversionContext,
     target: Target,
@@ -1385,7 +1390,7 @@ def aten_ops_sin(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.cos.default)
+@dynamo_tensorrt_converter(torch.ops.aten.cos.default, supports_dynamic_shapes=True)
 def aten_ops_cos(
     ctx: ConversionContext,
     target: Target,

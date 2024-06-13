@@ -38,14 +38,16 @@ class TestCatConverter(DispatchTestCase):
 
         input_specs = [
             Input(
-                shape=(16, -1, 3),
                 dtype=torch.float32,
-                shape_ranges=[((16, 2, 3), (16, 3, 3), (16, 32, 3))],
+                min_shape=(16, 2, 3),
+                opt_shape=(16, 3, 3),
+                max_shape=(16, 32, 3),
             ),
             Input(
-                shape=(16, -1, 3),
                 dtype=torch.float32,
-                shape_ranges=[((16, 2, 3), (16, 16, 3), (16, 32, 3))],
+                min_shape=(16, 2, 3),
+                opt_shape=(16, 16, 3),
+                max_shape=(16, 32, 3),
             ),
         ]
         self.run_test_with_dynamic_shape(
@@ -71,14 +73,46 @@ class TestCatConverter(DispatchTestCase):
 
         input_specs = [
             Input(
-                shape=(-1, 16, 3),
                 dtype=torch.float32,
-                shape_ranges=[((2, 16, 3), (3, 16, 3), (32, 16, 3))],
+                min_shape=(2, 16, 3),
+                opt_shape=(3, 16, 3),
+                max_shape=(32, 16, 3),
             ),
             Input(
-                shape=(-1, 16, 3),
                 dtype=torch.float32,
-                shape_ranges=[((2, 16, 3), (3, 16, 3), (32, 16, 3))],
+                min_shape=(2, 16, 3),
+                opt_shape=(3, 16, 3),
+                max_shape=(32, 16, 3),
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            Cat(),
+            input_specs,
+        )
+
+    @parameterized.expand(
+        [
+            ("pos", 1),
+            ("neg", -2),
+        ]
+    )
+    def test_cat_dynamic_shape_dim(self, _, dim):
+        class Cat(nn.Module):
+            def forward(self, x, y):
+                return torch.ops.aten.cat.default((x, y), dim)
+
+        input_specs = [
+            Input(
+                dtype=torch.float32,
+                min_shape=(2, 1, 1),
+                opt_shape=(3, 1, 2),
+                max_shape=(4, 1, 3),
+            ),
+            Input(
+                dtype=torch.float32,
+                min_shape=(2, 2, 1),
+                opt_shape=(3, 3, 2),
+                max_shape=(4, 4, 3),
             ),
         ]
         self.run_test_with_dynamic_shape(
