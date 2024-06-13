@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import logging
+import pickle
 from typing import Any, List, Optional, Tuple
 
 import torch
@@ -9,7 +11,7 @@ from torch_tensorrt._Device import Device
 logger = logging.getLogger(__name__)
 
 SerializedTensorRTEngineFmt = Tuple[
-    str, str, str, bytes, str, str, str
+    str, str, str, bytes, str, str, bytes, str
 ]  # Defined in //core/runtime/register_jit_hooks.cpp
 SerializedTorchTensorRTModuleFmt = Tuple[
     str, Optional[SerializedTensorRTEngineFmt], List[str], List[str]
@@ -103,10 +105,16 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     TorchTensorRTModule._pack_binding_names(self.input_binding_names),
                     TorchTensorRTModule._pack_binding_names(self.output_binding_names),
                     str(int(hardware_compatible)),
+                    self.encode_settings(settings),
                 ]
             )
         else:
             self.engine = None
+
+    def encode_settings(self, settings: Any) -> str:
+        dumped_settings = pickle.dumps(settings)
+        encoded_settings = base64.b64encode(dumped_settings).decode("utf-8")
+        return encoded_settings
 
     def get_extra_state(self) -> SerializedTorchTensorRTModuleFmt:
         return (
@@ -120,7 +128,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.name = state[0]
         if state[1] is not None:
             serialized_engine_info: SerializedTensorRTEngineFmt = state[1]
-            import base64
 
             serialized_engine = base64.b64decode(serialized_engine_info[3])
             self.engine = torch.classes.tensorrt.Engine(
@@ -132,6 +139,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     serialized_engine_info[4],
                     serialized_engine_info[5],
                     serialized_engine_info[6],
+                    serialized_engine_info[7],
                 ]
             )
         else:

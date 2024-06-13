@@ -339,14 +339,14 @@ import base64
 
 
 def get_engine_from_encoded_engine(
-    encoded_engine: bytes, runtime: trt.Runtime
+    encoded_engine: str, runtime: trt.Runtime
 ) -> trt.ICudaEngine:
     serialized_engine = base64.b64decode(encoded_engine)
     engine = runtime.deserialize_cuda_engine(serialized_engine)
     return engine
 
 
-def get_settings(encoded_settings: bytes) -> Any:
+def get_settings(encoded_settings: str) -> Any:
     dumped_settings = base64.b64decode(encoded_settings.encode("utf-8"))
     settings = pickle.loads(dumped_settings)
     return settings
