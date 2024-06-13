@@ -38,12 +38,9 @@ cc_library(
     deps = [
         "//core/util:prelude",
     ] + select({
-        ":windows": ["@tensorrt_win//:nvinfer", "@tensorrt_win//:nvinferplugin"],
-        "//conditions:default": ["@tensorrt//:nvinfer", "@tensorrt//:nvinferplugin"],
-    }) + select({
-        ":windows": ["@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch"],
+        ":windows": ["@tensorrt_win//:nvinfer", "@tensorrt_win//:nvinferplugin", "@libtorch_win//:libtorch"],
+        ":use_pre_cxx11_abi": ["@tensorrt//:nvinfer", "@tensorrt//:nvinferplugin", "@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@tensorrt//:nvinfer", "@tensorrt//:nvinferplugin", "@libtorch"],
     }),
     alwayslink = True,
 )

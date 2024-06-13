@@ -43,13 +43,13 @@ local_repository(
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",
-    path = "/usr/local/cuda-12.1/",
+    path = "/usr/local/cuda-12.4/",
 )
 
 new_local_repository(
     name = "cuda_win",
     build_file = "@//third_party/cuda:BUILD",
-    path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.1/",
+    path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.4/",
 )
 
 #############################################################################################################
@@ -60,21 +60,21 @@ http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu124/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-shared-with-deps-latest.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu124/libtorch-shared-with-deps-latest.zip"],
 )
 
 http_archive(
     name = "libtorch_win",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-win-shared-with-deps-latest.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu124/libtorch-win-shared-with-deps-latest.zip"],
 )
 
 # Download these tarballs manually from the NVIDIA website

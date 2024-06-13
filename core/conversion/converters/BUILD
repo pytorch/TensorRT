@@ -29,12 +29,9 @@ cc_library(
         "//core/conversion/conversionctx",
         "//core/util:prelude",
     ] + select({
-        ":windows": ["@tensorrt_win//:nvinfer"],
-        "//conditions:default": ["@tensorrt//:nvinfer"],
-    }) + select({
-        ":windows": ["@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch"],
+        ":windows": ["@tensorrt_win//:nvinfer", "@libtorch_win//:libtorch"],
+        ":use_pre_cxx11_abi": ["@tensorrt//:nvinfer", "@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@tensorrt//:nvinfer", "@libtorch"],
     }),
     alwayslink = True,
 )
@@ -52,12 +49,9 @@ cc_library(
         "//core/conversion/conversionctx",
         "//core/util:prelude",
     ] + select({
-        ":windows": ["@tensorrt_win//:nvinfer"],
-        "//conditions:default": ["@tensorrt//:nvinfer"],
-    }) + select({
-        ":windows": ["@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch"],
+        ":windows": ["@tensorrt_win//:nvinfer", "@libtorch_win//:libtorch"],
+        ":use_pre_cxx11_abi": ["@tensorrt//:nvinfer", "@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@tensorrt//:nvinfer", "@libtorch"],
     }),
     alwayslink = True,
 )
@@ -112,12 +106,9 @@ cc_library(
         "//core/plugins:torch_tensorrt_plugins",
         "//core/util:prelude",
     ] + select({
-        ":windows": ["@tensorrt_win//:nvinfer"],
-        "//conditions:default": ["@tensorrt//:nvinfer"],
-    }) + select({
-        ":windows": ["@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch"],
+        ":windows": ["@tensorrt_win//:nvinfer", "@libtorch_win//:libtorch"],
+        ":use_pre_cxx11_abi": ["@tensorrt//:nvinfer", "@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@tensorrt//:nvinfer", "@libtorch"],
     }),
     alwayslink = True,
 )
