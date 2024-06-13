@@ -8,8 +8,6 @@ pytest>=8.2.1
 pytest-xdist>=3.6.1
 pyyaml
 tensorrt==10.0.1
-tensorrt-cu12-bindings==10.0.1
-tensorrt-cu12-libs==10.0.1
 timm>=1.0.3
 transformers==4.39.3
 --extra-index-url https://pypi.nvidia.com
