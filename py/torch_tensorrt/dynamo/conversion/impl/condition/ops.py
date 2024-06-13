@@ -8,10 +8,12 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     broadcastable,
+    cast_trt_tensor,
     get_trt_tensor,
+    prepend_ones,
+    set_layer_name,
 )
-from torch_tensorrt.dynamo.conversion.impl.slice import expand
-from torch_tensorrt.fx.converters.converter_utils import set_layer_name
+from torch_tensorrt.dynamo.conversion.impl.elementwise import ne
 from torch_tensorrt.fx.types import TRTTensor
 
 
@@ -30,73 +32,32 @@ def where(
     x_shape = list(input.shape)
     y_shape = list(other.shape)
     condition_shape = list(condition.shape)
+    max_shape_len = max(len(x_shape), len(y_shape), len(condition_shape))
 
-    output_shape = list(torch.broadcast_shapes(condition_shape, x_shape, y_shape))
-
-    # expand shape
     if not isinstance(condition, TRTTensor):
-        assert condition.dtype in (torch.bool, np.bool_), "condition dtype is not bool"
-        if condition_shape != output_shape:
-            condition = (
-                condition.expand(output_shape)
-                if isinstance(condition, torch.Tensor)
-                else np.broadcast_to(condition, output_shape)
-            )
-        condition_val = get_trt_tensor(ctx, condition, f"{name}_condition")
-    else:
-        assert condition.dtype == trt.bool, "mask dtype is not bool!"
-        if condition_shape != output_shape:
-            condition_val = expand(
-                ctx, target, source_ir, f"{name}_expand", condition, output_shape
-            )
-        else:
-            condition_val = condition
+        condition = get_trt_tensor(ctx, condition, f"{name}_condition")
+
+    if condition.dtype != trt.bool:
+        condition = cast_trt_tensor(ctx, condition, trt.float32, f"{name}_cast")
+        condition = ne(ctx, target, source_ir, f"{name}_cond_zero", condition, 0)
+
+    diff = max_shape_len - len(condition_shape)
+    if diff > 0:
+        condition = prepend_ones(ctx, condition, f"{name}_condition_broadcast", diff)
 
     if not isinstance(input, TRTTensor):
-        if x_shape != output_shape:
-            # special case where 1 element in input
-            if len(input.shape) == 0:
-                input = (
-                    input.unsqueeze(0)
-                    if isinstance(input, torch.Tensor)
-                    else np.expand_dims(input, axis=0)
-                )
-            input = (
-                input.expand(output_shape)
-                if isinstance(input, torch.Tensor)
-                else np.broadcast_to(input, output_shape)
-            )
-        x_val = get_trt_tensor(ctx, input, f"{name}_x")
-    else:
-        x_val = input
-        if x_shape != output_shape:
-            x_val = expand(
-                ctx, target, source_ir, f"{name}_x_expand", input, output_shape
-            )
+        input = get_trt_tensor(ctx, input, f"{name}_x")
+    diff = max_shape_len - len(x_shape)
+    if diff > 0:
+        input = prepend_ones(ctx, input, f"{name}_input_broadcast", diff)
 
     if not isinstance(other, TRTTensor):
-        if y_shape != output_shape:
-            # special case where 1 element in other
-            if len(other.shape) == 0:
-                other = (
-                    other.unsqueeze(0)
-                    if isinstance(other, torch.Tensor)
-                    else np.expand_dims(other, axis=0)
-                )
-            other = (
-                other.expand(output_shape)
-                if isinstance(other, torch.Tensor)
-                else np.broadcast_to(other, output_shape)
-            )
-        y_val = get_trt_tensor(ctx, other, f"{name}_y")
-    else:
-        y_val = other
-        if y_shape != output_shape:
-            y_val = expand(
-                ctx, target, source_ir, f"{name}_y_expand", y_val, output_shape
-            )
+        other = get_trt_tensor(ctx, other, f"{name}_y")
+    diff = max_shape_len - len(y_shape)
+    if diff > 0:
+        other = prepend_ones(ctx, other, f"{name}_other_broadcast", diff)
 
-    return select(ctx, target, source_ir, name, x_val, y_val, condition_val)
+    return select(ctx, target, source_ir, name, input, other, condition)
 
 
 def select(
