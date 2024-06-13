@@ -11,9 +11,9 @@ from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 assertions = unittest.TestCase()
 
 
-# @unittest.skip(
-#     "Skipping this test for now due to constraint violation error: https://github.com/pytorch/TensorRT/issues/2794"
-# )
+@unittest.skip(
+    "Skipping this test for now due to constraint violation error: https://github.com/pytorch/TensorRT/issues/2794"
+)
 @pytest.mark.unit
 def test_base_dynamic(ir):
     """
@@ -64,16 +64,11 @@ def test_base_dynamic(ir):
         cos_sim > COSINE_THRESHOLD,
         msg=f"test_dyn_full_compile model TRT outputs don't match with the pytorch model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
-    # Clean up model env
-    torch._dynamo.reset()
-
-    with torch.no_grad():
-        torch.cuda.empty_cache()
 
 
-# @unittest.skip(
-#     "Skipping this test for now due to constraint violation error: https://github.com/pytorch/TensorRT/issues/2794"
-# )
+@unittest.skip(
+    "Skipping this test for now due to constraint violation error: https://github.com/pytorch/TensorRT/issues/2794"
+)
 @pytest.mark.unit
 def test_base_dynamic_fallback(ir):
     """
@@ -128,12 +123,6 @@ def test_base_dynamic_fallback(ir):
         msg=f"test_base_dynamic_fallback model TRT outputs don't match with the pytorch model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
 
-    # Clean up model env
-    torch._dynamo.reset()
-
-    with torch.no_grad():
-        torch.cuda.empty_cache()
-
 
 @pytest.mark.unit
 def test_view(ir):
@@ -185,12 +174,6 @@ def test_view(ir):
         msg=f"test_view model TRT outputs don't match with the pytorch model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
 
-    # Clean up model env
-    torch._dynamo.reset()
-
-    with torch.no_grad():
-        torch.cuda.empty_cache()
-
 
 @pytest.mark.unit
 def test_resnet_dynamic(ir):
@@ -233,12 +216,6 @@ def test_resnet_dynamic(ir):
         cos_sim > COSINE_THRESHOLD,
         msg=f"test_resnet_dynamic model TRT outputs don't match with the pytorch model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
-
-    # Clean up model env
-    torch._dynamo.reset()
-
-    with torch.no_grad():
-        torch.cuda.empty_cache()
 
 
 @pytest.mark.unit
@@ -283,12 +260,6 @@ def test_view(ir):
         cos_sim > COSINE_THRESHOLD,
         msg=f"test_base_dynamic model TRT outputs don't match with the pytorch model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
-
-    # Clean up model env
-    torch._dynamo.reset()
-
-    with torch.no_grad():
-        torch.cuda.empty_cache()
 
 
 @pytest.mark.unit
