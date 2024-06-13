@@ -3,6 +3,7 @@ from __future__ import annotations
 import collections.abc
 import copy
 import logging
+import pickle
 from typing import Any, Sequence, Tuple
 
 import numpy as np
@@ -12,6 +13,7 @@ from torch.export import ExportedProgram
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import partitioning
+from torch_tensorrt.dynamo._exporter import inline_torch_modules
 from torch_tensorrt.dynamo.conversion import CompilationSettings
 from torch_tensorrt.dynamo.conversion._conversion import infer_module_output_dtypes
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -144,20 +146,40 @@ def refit_module_weights(
     """
     Refit a compiled graph module with ExportedProgram
     """
+    inline_module = False
     raw_inputs = copy.deepcopy(inputs)
     if isinstance(compiled_module, ExportedProgram):
+        inline_module = True
         compiled_module = compiled_module.module()
 
     compiled_module = copy.deepcopy(compiled_module)
 
     # Get the settings and check the setting to be uniform
     settings: Any = None
-    for name, submodule in compiled_module.named_children():
-        if not isinstance(submodule, (PythonTorchTensorRTModule, TorchTensorRTModule)):
-            continue
-        if settings is not None:
-            assert settings == submodule.settings
-        settings = submodule.settings
+    if inline_module:
+
+        # Obtain the settings
+        compiled_submodules = [
+            (name.replace("_engine", ""), engine)
+            for name, engine in compiled_module.__dict__.items()
+            if "engine" in name
+        ]
+        encoded_settings = compiled_submodules[0][1].__getstate__()[0][7]
+        settings = get_settings(encoded_settings)
+        # Handle torch modules
+        compiled_submodules_map = dict(compiled_submodules)
+        for name, submodule in compiled_module.named_children():
+            compiled_submodules_map[name] = submodule
+
+    else:
+        for name, submodule in compiled_module.named_children():
+            if not isinstance(
+                submodule, (PythonTorchTensorRTModule, TorchTensorRTModule)
+            ):
+                continue
+            if settings is not None:
+                assert settings == submodule.settings
+            settings = submodule.settings
 
     if settings.debug:
         set_log_level(logger.parent, logging.DEBUG)
@@ -176,11 +198,11 @@ def refit_module_weights(
     new_weight_module = new_weight_module.run_decompositions(
         get_decompositions(settings.enable_experimental_decompositions)
     )
-    gm = new_weight_module.module()
-    logger.debug("Input graph: " + str(gm.graph))
+    new_gm = new_weight_module.module()
+    logger.debug("Input graph: " + str(new_gm.graph))
     # Apply lowering on the graph module
     torch_inputs = get_torch_inputs(inputs, device)
-    gm = apply_lowering_passes(gm, torch_inputs)
+    new_gm = apply_lowering_passes(new_gm, torch_inputs)
 
     logger.info("Compilation Settings: %s\n", settings)
 
@@ -190,8 +212,8 @@ def refit_module_weights(
     # If specified, try using the fast partitioner and fall back to the global one on failure
     if settings.use_fast_partitioner:
         try:
-            partitioned_module, supported_ops = partitioning.fast_partition(
-                gm,
+            new_partitioned_module, supported_ops = partitioning.fast_partition(
+                new_gm,
                 verbose=settings.debug,
                 min_block_size=settings.min_block_size,
                 torch_executed_ops=settings.torch_executed_ops,
@@ -207,42 +229,62 @@ def refit_module_weights(
             settings.use_fast_partitioner = False
 
     if not settings.use_fast_partitioner:
-        partitioned_module, supported_ops = partitioning.global_partition(
-            gm,
+        new_partitioned_module, supported_ops = partitioning.global_partition(
+            new_gm,
             verbose=settings.debug,
             min_block_size=settings.min_block_size,
             torch_executed_ops=settings.torch_executed_ops,
         )
 
+    if inline_module:
+        # Preprocess the partitioned module to be in the same format as the inline module
+        inline_torch_modules(new_partitioned_module)
+        new_partitioned_module.delete_all_unused_submodules()
+
     # Check whether two modules have the same subcomponents
     # 1. Check the number of partitions and name
-    assert [sm[0] for sm in partitioned_module.named_children()] == [
-        sm[0] for sm in compiled_module.named_children()
-    ]
+    if inline_module:
+        assert {sm[0] for sm in new_partitioned_module.named_children()} == set(
+            compiled_submodules_map.keys()
+        ), "The compiled module is incompatible with the new module!"
+    else:
+        assert {sm[0] for sm in new_partitioned_module.named_children()} == {
+            sm[0] for sm in compiled_module.named_children()
+        }, "The compiled module is incompatible with the new module!"
     # 2. TODO: Check the hash of source fx.Graph and new fx.Graph
 
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
-    for name, new_submodule in partitioned_module.named_children():
+
+    for name, new_submodule in new_partitioned_module.named_children():
 
         # Refit each submodule
-
         # Extract engine from the submodule
         try:
-            compiled_submodule = getattr(compiled_module, name)
-            if isinstance(compiled_submodule, PythonTorchTensorRTModule):
-                engine = compiled_submodule.engine
-            elif isinstance(compiled_submodule, TorchTensorRTModule):
-                engine_info = compiled_submodule.engine.__getstate__()[0]
-                engine = get_engine_from_encoded_engine(engine_info[3], runtime)
-            elif isinstance(compiled_submodule, torch.fx.graph_module.GraphModule):
-                # This is graph break resulted by unsupported ops
-                compiled_submodule.load_state_dict(new_submodule.state_dict())
-                continue
+            if inline_module:
+                compiled_submodule = compiled_submodules_map[name]
+                # If this is a torch module, load the old state_dict
+                if "_run_on_acc" not in name:
+                    compiled_submodule.load_state_dict(new_submodule.state_dict())
+                    continue
+                else:
+                    engine_info = compiled_submodule.__getstate__()[0]
+                    engine = get_engine_from_encoded_engine(engine_info[3], runtime)
             else:
-                raise AssertionError(
-                    "The type of graph module is not supported for refitting."
-                )
+                compiled_submodule = getattr(compiled_module, name)
+                if isinstance(compiled_submodule, PythonTorchTensorRTModule):
+                    engine = compiled_submodule.engine
+                elif isinstance(compiled_submodule, TorchTensorRTModule):
+                    engine_info = compiled_submodule.engine.__getstate__()[0]
+                    engine = get_engine_from_encoded_engine(engine_info[3], runtime)
+                elif isinstance(compiled_submodule, torch.fx.graph_module.GraphModule):
+                    # This is graph break resulted by unsupported ops
+                    compiled_submodule.load_state_dict(new_submodule.state_dict())
+                    continue
+                else:
+                    raise AssertionError(
+                        "The type of graph module is not supported for refitting."
+                    )
         except AttributeError:
             raise AssertionError(
                 "The type of graph module is not supported for refitting or two compiled modules do not match."
@@ -258,7 +300,7 @@ def refit_module_weights(
         # Handle long/double inputs if requested by the user
         if settings.truncate_double:
             submodule_inputs = repair_double_inputs(
-                partitioned_module,
+                new_partitioned_module,
                 new_submodule,
                 submodule_inputs,
                 to_torch_device(settings.device),
@@ -279,15 +321,16 @@ def refit_module_weights(
             refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
             compiled_submodule.engine = refitted_engine
 
-        if verify_output:
-            check_output(
-                new_submodule=new_submodule,
-                compiled_submodule=compiled_submodule,
-                inputs=raw_inputs,
-            )
-            logger.info("Refit Successful!")
-        else:
-            logger.info("Refit Completed! Output verification skipped.")
+    if verify_output:
+        check_output(
+            new_module=new_gm,
+            refitted_module=compiled_module,
+            inputs=raw_inputs,
+        )
+        logger.info("Refit Successful!")
+    else:
+        logger.info("Refit Completed! Output verification skipped.")
+
     return compiled_module
 
 
@@ -301,3 +344,9 @@ def get_engine_from_encoded_engine(
     serialized_engine = base64.b64decode(encoded_engine)
     engine = runtime.deserialize_cuda_engine(serialized_engine)
     return engine
+
+
+def get_settings(encoded_settings: bytes) -> Any:
+    dumped_settings = base64.b64decode(encoded_settings.encode("utf-8"))
+    settings = pickle.loads(dumped_settings)
+    return settings
