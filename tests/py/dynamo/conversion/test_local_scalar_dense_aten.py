@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
-from harness import DispatchTestCase
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+
+from .harness import DispatchTestCase
 
 
 class TestLocalScalarDenseConverter(DispatchTestCase):
