@@ -1,6 +1,5 @@
 import logging
 import os
-import tempfile
 import warnings
 from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set
@@ -284,7 +283,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         By default the timing_cache_path="/tmp/timing_cache.bin"
         """
         buffer = b""
-        if os.path.exists(timing_cache_path):
+        if os.path.isfile(timing_cache_path):
             # Load from existing cache
             with open(timing_cache_path, mode="rb") as timing_cache_file:
                 buffer = timing_cache_file.read()
@@ -294,19 +293,14 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     def _save_timing_cache(
         self,
         builder_config: trt.IBuilderConfig,
-        timing_cache_path: str = "",
+        timing_cache_path: str,
     ) -> None:
         """
         This is called after a TensorRT engine is built. Save the timing cache
         """
         timing_cache = builder_config.get_timing_cache()
-        if timing_cache_path:
-            with open(timing_cache_path, "wb") as timing_cache_file:
-                timing_cache_file.write(memoryview(timing_cache.serialize()))
-        else:
-            tmp_dir_path = os.path.join(tempfile.gettempdir(), "timing_cache.bin")
-            with open(tmp_dir_path, "wb") as timing_cache_file:
-                timing_cache_file.write(memoryview(timing_cache.serialize()))
+        with open(timing_cache_path, "wb") as timing_cache_file:
+            timing_cache_file.write(memoryview(timing_cache.serialize()))
 
     def run(
         self,

@@ -1,3 +1,6 @@
+import os
+import tempfile
+
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
@@ -28,7 +31,7 @@ REQUIRE_FULL_COMPILATION = False
 DRYRUN = False
 HARDWARE_COMPATIBLE = False
 SUPPORTED_KERNEL_PRECISIONS = {dtype.f32, dtype.f16, dtype.bf16, dtype.i8, dtype.f8}
-TIMING_CACHE_PATH = ""
+TIMING_CACHE_PATH = os.path.join(tempfile.gettempdir(), "timing_cache.bin")
 
 
 def default_device() -> Device:
