@@ -33,6 +33,21 @@ TRTEngine::TRTEngine(
     const RTDevice& cuda_device,
     const std::vector<std::string>& _in_binding_names,
     const std::vector<std::string>& _out_binding_names,
+    bool hardware_compatible)
+    : TRTEngine(
+          "deserialized_trt",
+          serialized_engine,
+          cuda_device,
+          _in_binding_names,
+          _out_binding_names,
+          "",
+          hardware_compatible) {}
+
+TRTEngine::TRTEngine(
+    const std::string& serialized_engine,
+    const RTDevice& cuda_device,
+    const std::vector<std::string>& _in_binding_names,
+    const std::vector<std::string>& _out_binding_names,
     const std::string& serialized_settings,
     bool hardware_compatible)
     : TRTEngine(
@@ -44,7 +59,7 @@ TRTEngine::TRTEngine(
           serialized_settings,
           hardware_compatible) {}
 
-TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
+TRTEngine::TRTEngine(std::vector<std::string> serialized_info) try
     : TRTEngine(
           serialized_info[NAME_IDX],
           serialized_info[ENGINE_IDX],
@@ -52,7 +67,27 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           split(serialized_info[INPUT_BINDING_NAMES_IDX], BINDING_DELIM),
           split(serialized_info[OUTPUT_BINDING_NAMES_IDX], BINDING_DELIM),
           serialized_info[SETTING_IDX],
-          static_cast<bool>(std::stoi(serialized_info[HW_COMPATIBLE_IDX]))) {}
+          static_cast<bool>(std::stoi(serialized_info[HW_COMPATIBLE_IDX]))) {
+} catch (const std::exception& e) {
+  std::cerr << "No compilation settings is passed in" << std::endl;
+  handleConstructorError(serialized_info);
+}
+
+TRTEngine::TRTEngine(
+    const std::string& mod_name,
+    const std::string& serialized_engine,
+    const RTDevice& cuda_device,
+    const std::vector<std::string>& _in_binding_names,
+    const std::vector<std::string>& _out_binding_names,
+    bool hardware_compatible)
+    : TRTEngine(
+          mod_name,
+          serialized_engine,
+          cuda_device,
+          _in_binding_names,
+          _out_binding_names,
+          "",
+          hardware_compatible) {}
 
 TRTEngine::TRTEngine(
     const std::string& mod_name,
@@ -188,6 +223,18 @@ TRTEngine::TRTEngine(
   this->enable_profiling();
 #endif
   LOG_DEBUG(*this);
+}
+
+void TRTEngine::handleConstructorError(std::vector<std::string> serialized_info) {
+  // Delegate to the fallback constructor
+  *this = TRTEngine(
+      serialized_info[NAME_IDX],
+      serialized_info[ENGINE_IDX],
+      RTDevice(serialized_info[DEVICE_IDX]),
+      split(serialized_info[INPUT_BINDING_NAMES_IDX], BINDING_DELIM),
+      split(serialized_info[OUTPUT_BINDING_NAMES_IDX], BINDING_DELIM),
+      "",
+      static_cast<bool>(std::stoi(serialized_info[HW_COMPATIBLE_IDX])));
 }
 
 TRTEngine::~TRTEngine() {
