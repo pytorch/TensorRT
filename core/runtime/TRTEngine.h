@@ -42,14 +42,8 @@ struct TRTEngine : torch::CustomClassHolder {
       const RTDevice& cuda_device,
       const std::vector<std::string>& in_binding_names,
       const std::vector<std::string>& out_binding_names,
-      bool hardware_compatible = false);
-  TRTEngine(
-      const std::string& serialized_engine,
-      const RTDevice& cuda_device,
-      const std::vector<std::string>& in_binding_names,
-      const std::vector<std::string>& out_binding_names,
-      const std::string& serialized_settings,
-      bool hardware_compatible = false);
+      bool hardware_compatible = false,
+      const std::string& serialized_settings = "");
   TRTEngine(std::vector<std::string> serialized_info);
   TRTEngine(
       const std::string& mod_name,
@@ -57,16 +51,8 @@ struct TRTEngine : torch::CustomClassHolder {
       const RTDevice& cuda_device,
       const std::vector<std::string>& in_binding_names,
       const std::vector<std::string>& out_binding_names,
-      bool hardware_compatible = false);
-  TRTEngine(
-      const std::string& mod_name,
-      const std::string& serialized_engine,
-      const RTDevice& cuda_device,
-      const std::vector<std::string>& in_binding_names,
-      const std::vector<std::string>& out_binding_names,
-      const std::string& serialized_settings,
-      bool hardware_compatible = false);
-  void handleConstructorError(std::vector<std::string> serialized_info);
+      bool hardware_compatible = false,
+      const std::string& serialized_settings = "");
   TRTEngine& operator=(const TRTEngine& other);
   std::string to_str() const;
   static void verify_serialization_fmt(const std::vector<std::string>& serialized_info);
