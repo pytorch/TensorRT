@@ -10,6 +10,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
+
 cc_library(
     name = "torch_tensorrt_plugins",
     srcs = [
@@ -30,11 +37,10 @@ cc_library(
     ],
     deps = [
         "//core/util:prelude",
-        "@tensorrt//:nvinfer",
-        "@tensorrt//:nvinferplugin",
     ] + select({
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch"],
+        ":windows": ["@tensorrt_win//:nvinfer", "@tensorrt_win//:nvinferplugin", "@libtorch_win//:libtorch"],
+        ":use_pre_cxx11_abi": ["@tensorrt//:nvinfer", "@tensorrt//:nvinferplugin", "@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@tensorrt//:nvinfer", "@tensorrt//:nvinferplugin", "@libtorch"],
     }),
     alwayslink = True,
 )

@@ -8,6 +8,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
+
 lowering_test(
     name = "test_linear_to_addmm",
 )
@@ -22,6 +29,7 @@ cc_test(
         "//tests/util",
         "@googletest//:gtest_main",
     ] + select({
+        ":windows": ["@libtorch_win//:libtorch"],
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),

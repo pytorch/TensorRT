@@ -226,6 +226,15 @@ def select_scatter_decomposition(
     return torch.slice_scatter(input_tensor, src_tensor, dim, index, index + 1, 1)
 
 
+@register_torch_trt_decomposition(
+    torch.ops.aten.empty_strided.default, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def empty_strided_decomposition(*args, **kwargs) -> torch.Tensor:
+    empty_size = args[0]
+    empty_stride = args[1]
+    return torch.as_strided(torch.empty(empty_size), empty_size, empty_stride)
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:

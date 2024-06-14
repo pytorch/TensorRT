@@ -19,6 +19,7 @@ def runtime_test(name, visibility = None):
             "//tests/util",
             "@googletest//:gtest_main",
         ] + select({
+            ":windows": ["@libtorch_win//:libtorch"],
             ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
             "//conditions:default": ["@libtorch//:libtorch"],
         }),

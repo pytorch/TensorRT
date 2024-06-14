@@ -9,6 +9,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
+
 cc_binary(
     name = "torchtrtc",
     srcs = [
@@ -28,6 +35,10 @@ cc_binary(
         "//cpp:torch_tensorrt",
         "//third_party/args",
     ] + select({
+        ":windows": [
+            "@libtorch_win//:caffe2",
+            "@libtorch_win//:libtorch",
+        ],
         ":use_pre_cxx11_abi": [
             "@libtorch_pre_cxx11_abi//:caffe2",
             "@libtorch_pre_cxx11_abi//:libtorch",
