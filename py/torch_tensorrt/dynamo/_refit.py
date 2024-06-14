@@ -3,7 +3,6 @@ from __future__ import annotations
 import collections.abc
 import copy
 import logging
-import pickle
 from typing import Any, Sequence, Tuple
 
 import numpy as np
@@ -144,12 +143,13 @@ def refit_module_weights(
     verify_output: bool = True,
 ) -> torch.fx.GraphModule:
     """
-    Refit a compiled graph module with ExportedProgram
+    Refit a compiled graph module with ExportedProgram. This performs weight updates in compiled_module without recompiling the engine.
+
     Args:
         compiled_module: compiled TensorRT module that needs to be refitted.
                         This compiled_module should be compmiled by torch_tensorrt.dynamo.compile
                         or load it from disk using trt.load.
-        new_weight_module: exported program with the updated weights
+        new_weight_module: exported program with the updated weights. This one should have the same model architecture as the compiled module.
         inputs: sample inputs
         verify_output: whether to verify output of refitted module
     Returns:
@@ -183,7 +183,7 @@ def refit_module_weights(
         assert (
             encoded_settings != ""
         ), "Settings are not saved in the engine. Please recompile the engine."
-        settings = get_settings(encoded_settings)
+        settings = TorchTensorRTModule.decode_metadata(encoded_settings)
         # Handle torch modules
         compiled_submodules_map = dict(compiled_submodules)
         for name, submodule in compiled_module.named_children():
@@ -371,9 +371,3 @@ def get_engine_from_encoded_engine(
     serialized_engine = base64.b64decode(encoded_engine)
     engine = runtime.deserialize_cuda_engine(serialized_engine)
     return engine
-
-
-def get_settings(encoded_settings: str) -> Any:
-    dumped_settings = base64.b64decode(encoded_settings.encode("utf-8"))
-    settings = pickle.loads(dumped_settings)
-    return settings
