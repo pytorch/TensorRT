@@ -7,133 +7,26 @@ Torch-TensorRT has community support for Windows platform using CMake
 
 Prerequisite:
 
-* Microsoft Visual Studio
-* LibTorch
-* TensorRT
+* Microsoft VS 2022 Tools
+* Bazelisk
 * CUDA
 
 
-Build configuration
+Build steps
 -------------------
 
-* Open Microsoft Visual Studio
-* Open Torch-TensorRT source code folder
-* Open Manage configurations -> Edit JSON to open CMakeSettings.json file.
-* Configure the CMake build configurations. Following is an example configuration:
+* Open the app "x64 Native Tools Command Prompt for VS 2022" - note that Admin priveleges may be necessary
+* Ensure Bazelisk (Bazel launcher) is installed on your machine and available from the command line. Package installers such as Chocolatey can be used to install Bazelisk
+* Install latest version of Torch (i.e. with `pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu124`)
+* Clone the Torch-TensorRT repository and navigate to its root directory
+* Run `set DISTUTILS_USE_SDK=1` in the command prompt
+* Run `python setup.py bdist_wheel`
+* Run python -m pip install dist/*.whl
 
-.. code-block:: none
+Advanced setup and Troubleshooting
+-------------------
+In the `WORKSPACE` file, the `cuda_win`, `libtorch_win`, and `tensorrt_win` are Windows-specific modules which can be customized. For instance, if you would like to build with a different version of CUDA, or your CUDA installation is in a non-standard location, update the `path` in the `cuda_win` module.
 
-    {
-      "configurations": [
-        {
-          "name": "x64-Debug",
-          "generator": "Ninja",
-          "configurationType": "Debug",
-          "inheritEnvironments": [ "msvc_x64_x64" ],
-          "buildRoot": "${projectDir}\\out\\build\\${name}",
-          "installRoot": "${projectDir}\\out\\install\\${name}",
-          "cmakeCommandArgs": "-S . -B out",
-          "buildCommandArgs": "cmake --build out",
-          "ctestCommandArgs": "",
-          "variables": [
-            {
-              "name": "CMAKE_MODULE_PATH",
-              "value": "$PWD\cmake\Modules",
-              "type": "FILEPATH"
-            },
-            {
-              "name": "Torch_DIR",
-              "value": "<Path to libtorch>\share\cmake\Torch",
-              "type": "FILEPATH"
-            },
-            {
-              "name": "TensorRT_ROOT",
-              "value": "<Path to TensorRT directory>",
-              "type": "FILEPATH"
-            },
-            {
-              "name": "CMAKE_BUILD_TYPE",
-              "value": "Release",
-              "type": " STRING"
-            }
-          ]
-        }
-      ]
-    }
+Similarly, if you would like to use a different version of pytorch or tensorrt, customize the `urls` in the `libtorch_win` and `tensorrt_win` modules, respectively.
 
-
-Compilation
------------
-
-* Click Build -> Build All or directly press Ctrl + Shift + B
-
-Note: After successful compilation, the build artifacts will be present at buildRoot path configured.
-
-Installation
-------------
-
-* Build -> Install Torch-TensorRT
-
-Note: After successful installation, the artifacts will be present at installRoot.
-
-
-Building With Visual Studio Code
-==================================
-
-1. Install Visual Studio Code
-2. Install Build Tools for Visual Studio 2022
-
-    - Select "Desktop Development with C++"
-      > Currently, this installs MSVC v143 - 2022. There are also options to install previous 2019/2017/2015 editions of MSVC
-      > License term "1b Build Tools additional use right" allows using Build Tools to compile Open Source Dependencies
-      > Also allows using Build Tools to develop and test Open Source Dependencies, to the minor extend of ensuring compatibility with Build Tools
-
-3. Install CUDA (e.g. 11.7.1)
-
-4. Install `TensorRT` (e.g 8.5.1.7)
-
-    - Set ``TensorRT_ROOT``
-    - Add ``TensorRT_ROOT\lib`` to ``PATH``
-
-5. Install "libtorch-win-shared-with-deps-latest.zip"
-
-    - Select build targeting the appropriate CUDA version
-    - Set ``Torch_DIR``
-    - Add ``Torch_DIR\lib`` to ``PATH``
-
-6. Clone TensorRT repo
-7. Install C++ and CMake Tools extensions from MS
-
-    - Change build to ``RelWithDebInfo``
-
-8. Update ``.vscode\settings.json``
-
-    - Clean, configure, build
-
-e.g. /.vscode/settings.json
-
-.. code-block:: json
-
-    {
-        "cmake.generator": "Ninja",
-        "cmake.configureSettings": {
-            "CMAKE_MODULE_PATH": {
-                "type": "FILEPATH",
-                "value": "$PWD\\cmake\\Modules"
-            },
-            "CMAKE_CXX_FLAGS": {
-                "type": "STRING",
-                "value": "-D_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING"
-            },
-            "Torch_DIR": {
-                "type": "FILEPATH",
-                "value": "X:\\libtorch\\share\\cmake\\Torch"
-            },
-            "TensorRT_ROOT": {
-                "type": "FILEPATH",
-                "value": "X:\\path\\to\\tensorrt"
-            },
-            "CMAKE_CUDA_FLAGS": "-allow-unsupported-compiler"
-        },
-        "cmake.buildDirectory": "${workspaceFolder}/torch_tensorrt_build"
-    }
+Local versions of these packages can also be used on Windows. See `toolchains\ci_workspaces\WORKSPACE.win.release.tmpl` for an example of using a local version of TensorRT on Windows.
