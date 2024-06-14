@@ -78,7 +78,7 @@ load_dep_info()
 
 dir_path = os.path.join(str(get_root_dir()), "py")
 
-CXX11_ABI = sys.platform.startswith("win")
+CXX11_ABI = IS_WINDOWS
 JETPACK_VERSION = None
 PY_ONLY = False
 NO_TS = False
@@ -197,6 +197,8 @@ def build_libtorchtrt_pre_cxx11_abi(
 
     if IS_WINDOWS:
         cmd.append("--config=windows")
+    else:
+        cmd.append("--config=default")
 
     if JETPACK_VERSION == "4.5":
         cmd.append("--platforms=//toolchains:jetpack_4.5")
