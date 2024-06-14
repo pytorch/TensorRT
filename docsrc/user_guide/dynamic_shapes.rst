@@ -53,16 +53,27 @@ Torch-TensorRT attempts to automatically set the constraints during ``torch.expo
 `torch.export.Dim` objects with the provided dynamic dimensions accordingly. Sometimes, we might need to set additional constraints and Torchdynamo errors out if we don't specify them.
 If you have to set any custom constraints to your model (by using `torch.export.Dim`), we recommend exporting your program first before compiling with Torch-TensorRT.
 Please refer to this `documentation <https://pytorch.org/tutorials/intermediate/torch_export_tutorial.html#constraints-dynamic-shapes>`_ to export the Pytorch module with dynamic shapes.
+Here's a simple example that exports a matmul layer with some restrictions on dynamic dimensions.
 
 .. code-block:: python
 
     import torch
     import torch_tensorrt
 
-    model = MyModel().eval().cuda()
-    inputs = torch.randn((1, 3, 224, 224), dtype=float32)
-    # User can provide dynamic shapes based on Torchdynamo feedback
-    exp_program = torch.export.export(model, (inputs,), dynamic_shapes=<user_provided_dynamic_shapes>)
+    class MatMul(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+
+        def forward(self, query, key):
+            attn_weight = torch.matmul(query, key.transpose(-1, -2))
+            return attn_weight
+
+    model = MatMul().eval().cuda()
+    inputs = [torch.randn(1, 12, 7, 64).cuda(), torch.randn(1, 12, 7, 64).cuda()]
+    seq_len = torch.export.Dim("seq_len", min=1, max=10)
+    dynamic_shapes=({2: seq_len}, {2: seq_len})
+    # Export the model first with custom dynamic shape constraints
+    exp_program = torch.export.export(model, tuple(inputs), dynamic_shapes=dynamic_shapes)
     trt_gm = torch_tensorrt.dynamo.compile(exp_program, [inputs])
     # Run inference
     trt_gm(inputs)
