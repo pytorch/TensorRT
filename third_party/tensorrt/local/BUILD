@@ -80,7 +80,7 @@ cc_import(
     static_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvinfer_static.a",
         ":ci_rhel_x86_64_linux": "lib64/libnvinfer_static.a",
-        ":windows": "lib/nvinfer.lib",
+        ":windows": "lib/nvinfer_10.lib",
         "//conditions:default": "lib/x86_64-linux-gnu/libnvinfer_static.a",
     }),
     visibility = ["//visibility:private"],
@@ -91,7 +91,7 @@ cc_import(
     shared_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvinfer.so",
         ":ci_rhel_x86_64_linux": "lib64/libnvinfer.so",
-        ":windows": "lib/nvinfer.dll",
+        ":windows": "lib/nvinfer_10.dll",
         "//conditions:default": "lib/x86_64-linux-gnu/libnvinfer.so",
     }),
     visibility = ["//visibility:private"],
@@ -104,7 +104,10 @@ cc_library(
         "nvinfer_headers",
         "nvinfer_lib",
         "@cuda//:cudart",
-    ],
+    ] + select({
+        ":windows": ["nvinfer_static_lib"],
+        "//conditions:default": [],
+    }),
 )
 
 ####################################################################################
@@ -330,7 +333,7 @@ cc_library(
     srcs = select({
         ":aarch64_linux": ["lib/aarch64-linux-gnu/libnvinfer_plugin.so"],
         ":ci_rhel_x86_64_linux": ["lib64/libnvinfer_plugin.so"],
-        ":windows": ["lib/nvinfer_plugin.lib"],
+        ":windows": ["lib/nvinfer_plugin_10.lib"],
         "//conditions:default": ["lib/x86_64-linux-gnu/libnvinfer_plugin.so"],
     }),
     hdrs = select({

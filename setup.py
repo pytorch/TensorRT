@@ -15,6 +15,7 @@ from shutil import copyfile, rmtree, which
 from typing import List
 
 import setuptools
+import torch
 import yaml
 from setuptools import Extension, find_namespace_packages, setup
 from setuptools.command.build_ext import build_ext
@@ -79,8 +80,7 @@ dir_path = os.path.join(str(get_root_dir()), "py")
 
 CXX11_ABI = False
 JETPACK_VERSION = None
-# TODO: Remove once C++ Runtime is integrated in Windows
-PY_ONLY = IS_WINDOWS
+PY_ONLY = False
 NO_TS = False
 LEGACY = False
 RELEASE = False
@@ -238,7 +238,7 @@ def copy_libtorchtrt(multilinux=False, rt_only=False):
     if IS_WINDOWS:
         copyfile(
             dir_path + "/../bazel-bin/cpp/lib/torchtrt.dll",
-            dir_path + "/torch_tensorrt/torchtrt.dll",
+            dir_path + "/torch_tensorrt/lib/torchtrt.dll",
         )
         copyfile(
             dir_path + "/../bazel-bin/cpp/lib/torchtrt.dll.if.lib",
@@ -379,7 +379,6 @@ class CleanCommand(Command):
     ]
     PY_CLEAN_FILES = [
         os.path.join(".", "torch_tensorrt", "*.so"),
-        os.path.join(".", "torch_tensorrt", "*.dll"),
         os.path.join(".", "torch_tensorrt", "_version.py"),
         os.path.join(".", "torch_tensorrt", "BUILD"),
         os.path.join(".", "torch_tensorrt", "WORKSPACE"),
@@ -506,6 +505,7 @@ if not (PY_ONLY or NO_TS):
             ],
             extra_compile_args=(
                 [
+                    f'/DPYBIND11_BUILD_ABI=\\"{torch._C._PYBIND11_BUILD_ABI}\\"',
                     "/GS-",
                     "/permissive-",
                 ]
@@ -584,7 +584,6 @@ if not (PY_ONLY or NO_TS):
                 "include/torch_tensorrt/core/util/logging/*.h",
                 "bin/*",
                 "lib/*",
-                "*.dll",
             ]
         }
     )

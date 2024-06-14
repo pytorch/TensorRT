@@ -1,4 +1,5 @@
 import os
+import sys
 from collections import namedtuple
 
 from torch_tensorrt._utils import sanitized_torch_version
@@ -15,10 +16,23 @@ FeatureSet = namedtuple(
     ],
 )
 
-_TS_FE_AVAIL = os.path.isfile(os.path.dirname(__file__) + "/lib/libtorchtrt.so")
-_TORCHTRT_RT_AVAIL = _TS_FE_AVAIL or os.path.isfile(
-    os.path.dirname(__file__) + "/lib/libtorchtrt_runtime.so"
+trtorch_dir = os.path.dirname(__file__)
+linked_file = os.path.join(
+    "lib", "torchtrt.dll" if sys.platform.startswith("win") else "libtorchtrt.so"
 )
+linked_file_runtime = os.path.join(
+    "lib",
+    (
+        "torchtrt_runtime.dll"
+        if sys.platform.startswith("win")
+        else "libtorchtrt_runtime.so"
+    ),
+)
+linked_file_full_path = os.path.join(trtorch_dir, linked_file)
+linked_file_runtime_full_path = os.path.join(trtorch_dir, linked_file_runtime)
+
+_TS_FE_AVAIL = os.path.isfile(linked_file_full_path)
+_TORCHTRT_RT_AVAIL = _TS_FE_AVAIL or os.path.isfile(linked_file_runtime_full_path)
 _DYNAMO_FE_AVAIL = version.parse(sanitized_torch_version()) >= version.parse("2.1.dev")
 _FX_FE_AVAIL = True
 

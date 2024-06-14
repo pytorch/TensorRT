@@ -36,7 +36,7 @@ http_archive(
 # External dependency for torch_tensorrt if you already have precompiled binaries.
 local_repository(
     name = "torch_tensorrt",
-    path = "/opt/circleci/.pyenv/versions/3.10.9/lib/python3.10/site-packages/torch_tensorrt"
+    path = "/opt/conda/lib/python3.8/site-packages/torch_tensorrt",
 )
 
 # CUDA should be installed on the system locally
@@ -46,11 +46,6 @@ new_local_repository(
     path = "${CUDA_HOME}",
 )
 
-new_local_repository(
-    name = "cublas",
-    build_file = "@//third_party/cublas:BUILD",
-    path = "C:/",
-)
 #############################################################################################################
 # Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
 #############################################################################################################
@@ -59,14 +54,14 @@ http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
+    urls = ["https://download.pytorch.org/libtorch/${CHANNEL}/${CU_VERSION}/libtorch-win-shared-with-deps-latest.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu121/libtorch-shared-with-deps-latest.zip"],
+    urls = ["https://download.pytorch.org/libtorch/${CHANNEL}/${CU_VERSION}/libtorch-win-shared-with-deps-latest.zip"],
 )
 
 ####################################################################################
@@ -75,13 +70,13 @@ http_archive(
 
 new_local_repository(
    name = "tensorrt",
-   path = "C:/",
+   path = "C:/TensorRT-10.0.1.6",
    build_file = "@//third_party/tensorrt/local:BUILD"
 )
 
-# #########################################################################
-# # Testing Dependencies (optional - comment out on aarch64)
-# #########################################################################
+#########################################################################
+# Development Dependencies (optional - comment out on aarch64)
+#########################################################################
 
 load("@rules_python//python:pip.bzl", "pip_parse")
 
