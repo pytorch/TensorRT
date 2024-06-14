@@ -198,9 +198,15 @@ def aten_ops_native_group_norm(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.group_norm.default, supports_dynamic_shapes=True
+    torch.ops.aten.group_norm.default,
+    capability_validator=one_user_validator,
+    supports_dynamic_shapes=True,
 )
-@dynamo_tensorrt_converter(torch.ops.aten.group_norm, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.group_norm,
+    capability_validator=one_user_validator,
+    supports_dynamic_shapes=True,
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
