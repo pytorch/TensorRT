@@ -165,7 +165,9 @@ def aten_ops_layer_norm(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.native_group_norm.default, capability_validator=one_user_validator
+    torch.ops.aten.native_group_norm.default,
+    capability_validator=one_user_validator,
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
     {
@@ -195,8 +197,14 @@ def aten_ops_native_group_norm(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.group_norm.default)
-@dynamo_tensorrt_converter(torch.ops.aten.group_norm)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.group_norm.default,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.group_norm,
+    supports_dynamic_shapes=True,
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -563,7 +571,7 @@ def aten_ops_rsqrt(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.neg.default)
+@dynamo_tensorrt_converter(torch.ops.aten.neg.default, supports_dynamic_shapes=True)
 def aten_ops_neg(
     ctx: ConversionContext,
     target: Target,
@@ -581,7 +589,7 @@ def aten_ops_neg(
 
 
 try:
-    import modelopt.torch.quantization as mtq
+    import modelopt.torch.quantization as mtq  # noqa: F401
 
     assert torch.ops.trt.quantize_fp8.default
 except Exception as e:
@@ -668,14 +676,19 @@ def aten_ops_softmax(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.split.Tensor, capability_validator=has_static_shapes_in_args([1])
+    torch.ops.aten.split.Tensor,
+    capability_validator=has_static_shapes_in_args([1]),
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
-    torch.ops.aten.split.sizes, capability_validator=has_static_shapes_in_args([1])
+    torch.ops.aten.split.sizes,
+    capability_validator=has_static_shapes_in_args([1]),
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
     torch.ops.aten.split_with_sizes.default,
     capability_validator=has_static_shapes_in_args([1]),
+    supports_dynamic_shapes=True,
 )
 def aten_ops_split(
     ctx: ConversionContext,
@@ -695,7 +708,7 @@ def aten_ops_split(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.where.self)
+@dynamo_tensorrt_converter(torch.ops.aten.where.self, supports_dynamic_shapes=True)
 def aten_ops_where(
     ctx: ConversionContext,
     target: Target,
@@ -733,6 +746,25 @@ def aten_ops_clamp(
         input_val=args[0],
         min_val=args_bounds_check(args, 1),
         max_val=args_bounds_check(args, 2),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.gather.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        2: (TRTTensor,),
+    }
+)
+def aten_ops_gather(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.select.gather(
+        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2]
     )
 
 

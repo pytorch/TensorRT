@@ -18,6 +18,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise import sub, trunc_div
 from torch_tensorrt.fx.types import TRTTensor
+from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -165,3 +166,43 @@ def aten_ops_randperm(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return np.random.permutation(args[0])
+
+
+def empty_validator(empty_node: Node) -> bool:
+    device = empty_node.kwargs.get("device", None)
+    if device is not None:
+        _LOGGER.debug(f"Currently we don't support specifying device, got {device}.")
+        return False
+    layout = empty_node.kwargs.get("layout", None)
+    if layout is not None:
+        _LOGGER.debug(f"Currently we don't support specifying layout, got {layout}.")
+        return False
+    memory_format = empty_node.kwargs.get("memory_format", None)
+    if memory_format is not None:
+        _LOGGER.debug(
+            f"Currently we don't support specifying memory_format, got {memory_format}."
+        )
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.empty.memory_format, capability_validator=empty_validator
+)
+def aten_ops_empty(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    empty_np_tensor = None
+    if kwargs.get("dtype") is not None:
+        empty_np_tensor = np.empty(
+            tuple(args[0]),
+            dtype=unified_dtype_converter(kwargs.get("dtype"), Frameworks.NUMPY),
+        )
+    else:
+        # default returns np.float64. Verify the correctness of this
+        empty_np_tensor = np.empty(tuple(args[0]))
+    return empty_np_tensor

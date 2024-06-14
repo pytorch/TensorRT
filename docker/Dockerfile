@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 
 # Base image starts with CUDA
-ARG BASE_IMG=nvidia/cuda:12.1.1-devel-ubuntu22.04
+ARG BASE_IMG=nvidia/cuda:12.4.1-devel-ubuntu22.04
 FROM ${BASE_IMG} as base
-ENV BASE_IMG=nvidia/cuda:12.1.1-devel-ubuntu22.04
+ENV BASE_IMG=nvidia/cuda:12.4.1-devel-ubuntu22.04
 
 ARG TENSORRT_VERSION
 ENV TENSORRT_VERSION=${TENSORRT_VERSION}
@@ -36,7 +36,7 @@ RUN pyenv global ${PYTHON_VERSION}
 RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub
 RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /"
 RUN apt-get update
-RUN TENSORRT_MAJOR_VERSION=`echo ${TENSORRT_VERSION} | cut -d '.' -f 1` && apt-get install -y libnvinfer${TENSORRT_MAJOR_VERSION}=${TENSORRT_VERSION}.* libnvinfer-plugin${TENSORRT_MAJOR_VERSION}=${TENSORRT_VERSION}.* libnvinfer-dev=${TENSORRT_VERSION}.* libnvinfer-plugin-dev=${TENSORRT_VERSION}.* libnvonnxparsers${TENSORRT_MAJOR_VERSION}=${TENSORRT_VERSION}.* libnvonnxparsers-dev=${TENSORRT_VERSION}.* 
+RUN TENSORRT_MAJOR_VERSION=`echo ${TENSORRT_VERSION} | cut -d '.' -f 1` && apt-get install -y libnvinfer${TENSORRT_MAJOR_VERSION}=${TENSORRT_VERSION}.* libnvinfer-plugin${TENSORRT_MAJOR_VERSION}=${TENSORRT_VERSION}.* libnvinfer-dev=${TENSORRT_VERSION}.* libnvinfer-plugin-dev=${TENSORRT_VERSION}.* libnvonnxparsers${TENSORRT_MAJOR_VERSION}=${TENSORRT_VERSION}.* libnvonnxparsers-dev=${TENSORRT_VERSION}.*
 
 # Setup Bazel via Bazelisk
 RUN wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -O /usr/bin/bazel &&\

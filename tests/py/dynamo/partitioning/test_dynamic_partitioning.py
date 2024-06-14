@@ -48,12 +48,12 @@ class TestDynamicPartitioning(TestCase):
             elif "_run_on_gpu" in submod[0]:
                 pyt_segments += 1
 
-        self.assertEquals(
+        self.assertEqual(
             trt_segments,
             1,
             f"Number of TRT segments should be 1 but got {trt_segments}",
         )
-        self.assertEquals(
+        self.assertEqual(
             pyt_segments,
             1,
             f"Number of PyTorch segments should be 1 but got {pyt_segments}",
@@ -93,12 +93,12 @@ class TestDynamicPartitioning(TestCase):
             elif "_run_on_gpu" in submod[0]:
                 pyt_segments += 1
 
-        self.assertEquals(
+        self.assertEqual(
             trt_segments,
             1,
             f"Number of TRT segments should be 2 but got {trt_segments}",
         )
-        self.assertEquals(
+        self.assertEqual(
             pyt_segments,
             0,
             f"Number of PyTorch segments should be 0 but got {pyt_segments}",
