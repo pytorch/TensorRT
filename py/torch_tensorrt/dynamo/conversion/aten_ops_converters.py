@@ -751,6 +751,25 @@ def aten_ops_clamp(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.gather.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        2: (TRTTensor,),
+    }
+)
+def aten_ops_gather(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.select.gather(
+        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2]
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.scatter.src)
 @dynamo_tensorrt_converter(torch.ops.aten.scatter.value)
 @enforce_tensor_types(
