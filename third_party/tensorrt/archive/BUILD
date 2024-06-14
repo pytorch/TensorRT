@@ -198,9 +198,9 @@ cc_library(
     linkopts = ["-lpthread"],
     deps = [
         "nvinfer",
-        ] + select({
-            ":windows": ["@cuda_win//:cudart"],
-            "//conditions:default": ["@cuda//:cudart"],
-        }),
+    ] + select({
+        ":windows": ["@cuda_win//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
+    }),
     alwayslink = True,
 )

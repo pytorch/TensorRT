@@ -28,7 +28,7 @@ cc_library(
     deps = [
         "//core/ir",
         "//core/util:prelude",
-        ] + select({
+    ] + select({
         ":windows": ["@tensorrt_win//:nvinfer", "@libtorch_win//:libtorch"],
         ":use_pre_cxx11_abi": ["@tensorrt//:nvinfer", "@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@tensorrt//:nvinfer", "@libtorch"],

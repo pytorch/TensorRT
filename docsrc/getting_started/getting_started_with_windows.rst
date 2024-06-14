@@ -19,11 +19,11 @@ Build steps
 * Ensure Bazelisk (Bazel launcher) is installed on your machine and available from the command line. Package installers such as Chocolatey can be used to install Bazelisk
 * Install latest version of Torch (i.e. with `pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu124`)
 * Clone the Torch-TensorRT repository and navigate to its root directory
-* Run `pip install ninja`
-* Run `pip install -r requirements-dev.txt`
+* Run `pip install ninja wheel setuptools`
+* Run `pip install --pre -r py/requirements.txt`
 * Run `set DISTUTILS_USE_SDK=1`
 * Run `python setup.py bdist_wheel`
-* Run `python -m pip install dist/*.whl`
+* Run `pip install dist/*.whl`
 
 Advanced setup and Troubleshooting
 -------------------
