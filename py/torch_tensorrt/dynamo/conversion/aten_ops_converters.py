@@ -573,7 +573,7 @@ def aten_ops_rsqrt(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.neg.default)
+@dynamo_tensorrt_converter(torch.ops.aten.neg.default, supports_dynamic_shapes=True)
 def aten_ops_neg(
     ctx: ConversionContext,
     target: Target,
