@@ -118,7 +118,7 @@ jobs:
           {
             echo "${SCRIPT}";
           } > "user_script"
-          cat .github/scripts/install-torch-tensorrt-windows.sh user_script > exec_script
+          cat .github/scripts/install-torch-tensorrt.sh user_script > exec_script
       - name: Run script
         uses: ./test-infra/.github/actions/run-script-with-cache
         with:
