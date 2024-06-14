@@ -15,6 +15,7 @@ from shutil import copyfile, rmtree, which
 from typing import List
 
 import setuptools
+import torch
 import yaml
 from setuptools import Extension, find_namespace_packages, setup
 from setuptools.command.build_ext import build_ext
@@ -77,10 +78,9 @@ load_dep_info()
 
 dir_path = os.path.join(str(get_root_dir()), "py")
 
-CXX11_ABI = False
+CXX11_ABI = IS_WINDOWS
 JETPACK_VERSION = None
-# TODO: Remove once C++ Runtime is integrated in Windows
-PY_ONLY = IS_WINDOWS
+PY_ONLY = False
 NO_TS = False
 LEGACY = False
 RELEASE = False
@@ -197,6 +197,8 @@ def build_libtorchtrt_pre_cxx11_abi(
 
     if IS_WINDOWS:
         cmd.append("--config=windows")
+    else:
+        cmd.append("--config=default")
 
     if JETPACK_VERSION == "4.5":
         cmd.append("--platforms=//toolchains:jetpack_4.5")
@@ -238,7 +240,7 @@ def copy_libtorchtrt(multilinux=False, rt_only=False):
     if IS_WINDOWS:
         copyfile(
             dir_path + "/../bazel-bin/cpp/lib/torchtrt.dll",
-            dir_path + "/torch_tensorrt/torchtrt.dll",
+            dir_path + "/torch_tensorrt/lib/torchtrt.dll",
         )
         copyfile(
             dir_path + "/../bazel-bin/cpp/lib/torchtrt.dll.if.lib",
@@ -379,7 +381,6 @@ class CleanCommand(Command):
     ]
     PY_CLEAN_FILES = [
         os.path.join(".", "torch_tensorrt", "*.so"),
-        os.path.join(".", "torch_tensorrt", "*.dll"),
         os.path.join(".", "torch_tensorrt", "_version.py"),
         os.path.join(".", "torch_tensorrt", "BUILD"),
         os.path.join(".", "torch_tensorrt", "WORKSPACE"),
@@ -494,18 +495,33 @@ if not (PY_ONLY or NO_TS):
                 "/opt/conda/lib/python3.6/config-3.6m-x86_64-linux-gnu",
             ],
             libraries=["torchtrt"],
-            include_dirs=[
-                dir_path + "torch_tensorrt/csrc",
-                dir_path + "torch_tensorrt/include",
-                dir_path + "/../bazel-TRTorch/external/tensorrt/include",
-                dir_path + "/../bazel-Torch-TensorRT/external/tensorrt/include",
-                dir_path + "/../bazel-TensorRT/external/tensorrt/include",
-                dir_path + "/../bazel-tensorrt/external/tensorrt/include",
-                dir_path + "/../",
-                "/usr/local/cuda",
-            ],
+            include_dirs=(
+                [
+                    dir_path + "torch_tensorrt/csrc",
+                    dir_path + "torch_tensorrt/include",
+                    dir_path + "/../",
+                    "/usr/local/cuda",
+                ]
+                + (
+                    [
+                        dir_path + "/../bazel-TRTorch/external/tensorrt_win/include",
+                        dir_path
+                        + "/../bazel-Torch-TensorRT/external/tensorrt_win/include",
+                        dir_path + "/../bazel-TensorRT/external/tensorrt_win/include",
+                        dir_path + "/../bazel-tensorrt/external/tensorrt_win/include",
+                    ]
+                    if IS_WINDOWS
+                    else [
+                        dir_path + "/../bazel-TRTorch/external/tensorrt/include",
+                        dir_path + "/../bazel-Torch-TensorRT/external/tensorrt/include",
+                        dir_path + "/../bazel-TensorRT/external/tensorrt/include",
+                        dir_path + "/../bazel-tensorrt/external/tensorrt/include",
+                    ]
+                )
+            ),
             extra_compile_args=(
                 [
+                    f'/DPYBIND11_BUILD_ABI=\\"{torch._C._PYBIND11_BUILD_ABI}\\"',
                     "/GS-",
                     "/permissive-",
                 ]
@@ -584,7 +600,6 @@ if not (PY_ONLY or NO_TS):
                 "include/torch_tensorrt/core/util/logging/*.h",
                 "bin/*",
                 "lib/*",
-                "*.dll",
             ]
         }
     )

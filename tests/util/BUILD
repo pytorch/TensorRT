@@ -10,6 +10,13 @@ config_setting(
 )
 
 config_setting(
+    name = "windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
+
+config_setting(
     name = "ci_build_testing",
     values = {
         "define": "torchtrt_src=prebuilt",
@@ -30,8 +37,14 @@ cc_library(
     ],
     deps = [
         "@googletest//:gtest_main",
-        "@tensorrt//:nvinfer",
     ] + select({
+        ":windows": ["@tensorrt_win//:nvinfer"],
+        "//conditions:default": ["@tensorrt//:nvinfer"],
+    }) + select({
+        ":windows": [
+            "@libtorch_win//:caffe2",
+            "@libtorch_win//:libtorch",
+        ],
         ":use_pre_cxx11_abi": [
             "@libtorch_pre_cxx11_abi//:caffe2",
             "@libtorch_pre_cxx11_abi//:libtorch",
