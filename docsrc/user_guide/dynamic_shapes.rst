@@ -6,7 +6,7 @@ Dynamic shapes with Torch-TensorRT
 By default, you can run a pytorch model with varied input shapes and the output shapes are determined eagerly.
 However, Torch-TensorRT is an AOT compiler which requires some prior information about the input shapes to compile and optimize the model.
 
-Dynamic shapes with ir=dynamo
+Dynamic shapes using torch.export (AOT)
 ------------------------------------
 
 In the case of dynamic input shapes, we must provide the (min_shape, opt_shape, max_shape) arguments so that the model can be optimized for
@@ -45,11 +45,11 @@ Please take a look at ``_tracer.py`` file to understand how this works under the
 
 In the conversion to TensorRT, the graph already has the dynamic shape information in the node's metadata which will be used during engine building phase.
 
-Custom dynamic shape constraints
+Custom Dynamic Shape Constraints
 ---------------------------------
 
 Given an input ``x = torch_tensorrt.Input(min_shape, opt_shape, max_shape, dtype)``,
-Torch-TensorRT automatically sets the constraints during ``torch.export`` tracing by constructing 
+Torch-TensorRT attempts to automatically set the constraints during ``torch.export`` tracing by constructing 
 `torch.export.Dim` objects with the provided dynamic dimensions accordingly. Sometimes, we might need to set additional constraints and Torchdynamo errors out if we don't specify them.
 If you have to set any custom constraints to your model (by using `torch.export.Dim`), we recommend exporting your program first before compiling with Torch-TensorRT.
 Please refer to this `documentation <https://pytorch.org/tutorials/intermediate/torch_export_tutorial.html#constraints-dynamic-shapes>`_ to export the Pytorch module with dynamic shapes.
@@ -68,7 +68,7 @@ Please refer to this `documentation <https://pytorch.org/tutorials/intermediate/
     trt_gm(inputs)
 
 
-Dynamic shapes with ir=torch_compile
+Dynamic shapes using torch.compile (JIT)
 ------------------------------------
 
 ``torch_tensorrt.compile(model, inputs, ir="torch_compile")`` returns a torch.compile boxed function with the backend
@@ -84,7 +84,7 @@ to avoid recompilation of TensorRT engines.
     inputs = torch.randn((1, 3, 224, 224), dtype=float32)
     # This indicates the dimension 0 is dynamic and the range is [1, 8]
     torch._dynamo.mark_dynamic(inputs, 0, min=1, max=8)
-    trt_gm = torch_tensorrt.compile(model, ir="torch_compile", [inputs])
+    trt_gm = torch.compile(model, backend="tensorrt")
     # Compilation happens when you call the model
     trt_gm(inputs)
 

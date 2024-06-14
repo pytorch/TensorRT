@@ -1,10 +1,10 @@
 """
 .. _vgg16_fp8_ptq:
 
-Deploying Torch-TRT programs in FP8 precision
+Deploy Quantized Models using Torch-TensorRT
 ======================================================
 
-This script demonstrates the Torch-TensorRT dynamo workflow on a VGG16 model with FP8 precision.
+Here we demonstrate how to deploy a model quantized to FP8 using the Dynamo frontend of Torch-TensorRT
 """
 
 # %%
