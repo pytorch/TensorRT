@@ -66,7 +66,7 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info) try
           RTDevice(serialized_info[DEVICE_IDX]),
           split(serialized_info[INPUT_BINDING_NAMES_IDX], BINDING_DELIM),
           split(serialized_info[OUTPUT_BINDING_NAMES_IDX], BINDING_DELIM),
-          serialized_info[SETTING_IDX],
+          serialized_info[SERIALIZED_COMPILE_SETTINGS_IDX],
           static_cast<bool>(std::stoi(serialized_info[HW_COMPATIBLE_IDX]))) {
 } catch (const std::exception& e) {
   std::cerr << "No compilation settings is passed in" << std::endl;
