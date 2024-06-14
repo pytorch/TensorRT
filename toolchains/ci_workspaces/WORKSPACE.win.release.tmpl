@@ -41,7 +41,7 @@ local_repository(
 
 # CUDA should be installed on the system locally
 new_local_repository(
-    name = "cuda",
+    name = "cuda_win",
     build_file = "@//third_party/cuda:BUILD",
     path = "${CUDA_HOME}",
 )
@@ -51,14 +51,7 @@ new_local_repository(
 #############################################################################################################
 
 http_archive(
-    name = "libtorch",
-    build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/${CHANNEL}/${CU_VERSION}/libtorch-win-shared-with-deps-latest.zip"],
-)
-
-http_archive(
-    name = "libtorch_pre_cxx11_abi",
+    name = "libtorch_win",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
     urls = ["https://download.pytorch.org/libtorch/${CHANNEL}/${CU_VERSION}/libtorch-win-shared-with-deps-latest.zip"],
@@ -69,7 +62,7 @@ http_archive(
 ####################################################################################
 
 new_local_repository(
-   name = "tensorrt",
+   name = "tensorrt_win",
    path = "C:/TensorRT-10.0.1.6",
    build_file = "@//third_party/tensorrt/local:BUILD"
 )
