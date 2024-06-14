@@ -145,9 +145,24 @@ def refit_module_weights(
 ) -> torch.fx.GraphModule:
     """
     Refit a compiled graph module with ExportedProgram
+    Args:
+        compiled_module: compiled TensorRT module that needs to be refitted.
+                        This compiled_module should be compmiled by torch_tensorrt.dynamo.compile
+                        or load it from disk using trt.load.
+        new_weight_module: exported program with the updated weights
+        inputs: sample inputs
+        verify_output: whether to verify output of refitted module
+    Returns:
+        A new compiled TensorRT module that has the updated weights.
     """
     inline_module = False
-    raw_inputs = copy.deepcopy(inputs)
+    raw_inputs = []
+    if verify_output:
+        for inp in inputs:
+            if isinstance(inp, torch.Tensor):
+                raw_inputs.append(copy.deepcopy(inp))
+            elif isinstance(inp, Input):
+                raw_inputs.append(copy.deepcopy(input.torch_tensor))
     if isinstance(compiled_module, ExportedProgram):
         inline_module = True
         compiled_module = compiled_module.module()
@@ -332,14 +347,16 @@ def refit_module_weights(
             setattr(compiled_module, f"{name}_engine", refitted_engine)
 
     if verify_output:
-        check_output(
+        if check_output(
             new_module=new_gm,
             refitted_module=compiled_module,
             inputs=raw_inputs,
-        )
-        logger.info("Refit Successfully!")
+        ):
+            logger.info("Refitting Succeed!")
+        else:
+            logger.error("Refitting Failed! The outputs do not match.")
     else:
-        logger.info("Refit Completed! Output verification skipped.")
+        logger.info("Refitting Completed! Output verification skipped.")
 
     return compiled_module
 
