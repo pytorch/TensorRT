@@ -11,6 +11,8 @@ cc_binary(
         "//core/runtime",
         "@libtorch",
         "@libtorch//:caffe2",
-        "@tensorrt//:nvinfer",
-    ],
+    ] + select({
+        ":windows": ["@tensorrt_win//:nvinfer"],
+        "//conditions:default": ["@tensorrt//:nvinfer"],
+    })
 )

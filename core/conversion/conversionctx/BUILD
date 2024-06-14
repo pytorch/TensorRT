@@ -10,6 +10,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
+
 cc_library(
     name = "conversionctx",
     srcs = [
@@ -21,10 +28,10 @@ cc_library(
     deps = [
         "//core/ir",
         "//core/util:prelude",
-        "@tensorrt//:nvinfer",
     ] + select({
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch"],
+        ":windows": ["@tensorrt_win//:nvinfer", "@libtorch_win//:libtorch"],
+        ":use_pre_cxx11_abi": ["@tensorrt//:nvinfer", "@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@tensorrt//:nvinfer", "@libtorch"],
     }),
     alwayslink = True,
 )
