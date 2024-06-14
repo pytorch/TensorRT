@@ -321,13 +321,20 @@ def refit_module_weights(
             refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
             compiled_submodule.engine = refitted_engine
 
+        elif inline_module:
+            serialized_engine = bytes(engine.serialize())
+            new_engine_info = list(engine_info)
+            new_engine_info[3] = serialized_engine
+            refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
+            setattr(compiled_module, f"{name}_engine", refitted_engine)
+
     if verify_output:
         check_output(
             new_module=new_gm,
             refitted_module=compiled_module,
             inputs=raw_inputs,
         )
-        logger.info("Refit Successful!")
+        logger.info("Refit Successfully!")
     else:
         logger.info("Refit Completed! Output verification skipped.")
 
