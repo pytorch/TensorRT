@@ -165,6 +165,9 @@ def refit_module_weights(
             if "engine" in name
         ]
         encoded_settings = compiled_submodules[0][1].__getstate__()[0][7]
+        assert (
+            encoded_settings != ""
+        ), "Settings are not saved in the engine. Please recompile the engine."
         settings = get_settings(encoded_settings)
         # Handle torch modules
         compiled_submodules_map = dict(compiled_submodules)
