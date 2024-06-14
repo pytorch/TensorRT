@@ -318,13 +318,13 @@ def check_output(
     new_module: torch.fx.GraphModule,
     refitted_module: torch.fx.GraphModule,
     inputs: tuple[Any, ...],
-) -> None:
-    # inputs = [t.contiguous() for t in inputs]
+) -> bool:
     old_outputs, new_outputs = refitted_module(*inputs), new_module(*inputs)
     for old_output, new_output in zip(old_outputs, new_outputs):
         if isinstance(old_output, torch.Tensor) and isinstance(
             new_outputs, torch.Tensor
         ):
-            assert torch.allclose(
-                old_output, new_output, 1e-2, 1e-2
-            ), "Refit Result is not correct. Refit failed"
+            if not torch.allclose(old_output, new_output, 1e-2, 1e-2):
+                return False
+
+    return True
