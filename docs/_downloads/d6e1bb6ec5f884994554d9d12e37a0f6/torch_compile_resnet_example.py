@@ -75,19 +75,45 @@ new_batch_size_inputs = [torch.randn((8, 3, 224, 224)).half().to("cuda")]
 new_batch_size_outputs = optimized_model(*new_batch_size_inputs)
 
 # %%
-# Cleanup
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Avoid recompilation by specifying dynamic shapes before Torch-TRT compilation
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-# Finally, we use Torch utilities to clean up the workspace
-torch._dynamo.reset()
+# The following code illustrates the workflow using ir=torch_compile (which uses torch.compile under the hood)
+inputs_bs8 = torch.randn((8, 3, 224, 224)).half().to("cuda")
+# This indicates dimension 0 of inputs_bs8 is dynamic whose range of values is [2, 16]
+torch._dynamo.mark_dynamic(inputs_bs8, 0, min=2, max=16)
+optimized_model = torch_tensorrt.compile(
+    model,
+    ir="torch_compile",
+    inputs=inputs_bs8,
+    enabled_precisions=enabled_precisions,
+    debug=debug,
+    workspace_size=workspace_size,
+    min_block_size=min_block_size,
+    torch_executed_ops=torch_executed_ops,
+)
+outputs_bs8 = optimized_model(inputs_bs8)
 
-# %%
-# Cuda Driver Error Note
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-#
-# Occasionally, upon exiting the Python runtime after Dynamo compilation with `torch_tensorrt`,
-# one may encounter a Cuda Driver Error. This issue is related to https://github.com/NVIDIA/TensorRT/issues/2052
-# and can be resolved by wrapping the compilation/inference in a function and using a scoped call, as in::
-#
-#       if __name__ == '__main__':
-#           compile_engine_and_infer()
+# No recompilation happens for batch size = 12
+inputs_bs12 = torch.randn((12, 3, 224, 224)).half().to("cuda")
+outputs_bs12 = optimized_model(inputs_bs12)
+
+# The following code illustrates the workflow using ir=dynamo (which uses torch.export APIs under the hood)
+# dynamic shapes for any inputs are specified using torch_tensorrt.Input API
+compile_spec = {
+    "inputs": [
+        torch_tensorrt.Input(
+            min_shape=(1, 3, 224, 224),
+            opt_shape=(8, 3, 224, 224),
+            max_shape=(16, 3, 224, 224),
+            dtype=torch.half,
+        )
+    ],
+    "enabled_precisions": enabled_precisions,
+    "ir": "dynamo",
+}
+trt_model = torch_tensorrt.compile(model, **compile_spec)
+
+# No recompilation happens for batch size = 12
+inputs_bs12 = torch.randn((12, 3, 224, 224)).half().to("cuda")
+outputs_bs12 = trt_model(inputs_bs12)
