@@ -493,16 +493,30 @@ if not (PY_ONLY or NO_TS):
                 "/opt/conda/lib/python3.6/config-3.6m-x86_64-linux-gnu",
             ],
             libraries=["torchtrt"],
-            include_dirs=[
-                dir_path + "torch_tensorrt/csrc",
-                dir_path + "torch_tensorrt/include",
-                dir_path + "/../bazel-TRTorch/external/tensorrt/include",
-                dir_path + "/../bazel-Torch-TensorRT/external/tensorrt/include",
-                dir_path + "/../bazel-TensorRT/external/tensorrt/include",
-                dir_path + "/../bazel-tensorrt/external/tensorrt/include",
-                dir_path + "/../",
-                "/usr/local/cuda",
-            ],
+            include_dirs=(
+                [
+                    dir_path + "torch_tensorrt/csrc",
+                    dir_path + "torch_tensorrt/include",
+                    dir_path + "/../",
+                    "/usr/local/cuda",
+                ]
+                + (
+                    [
+                        dir_path + "/../bazel-TRTorch/external/tensorrt_win/include",
+                        dir_path
+                        + "/../bazel-Torch-TensorRT/external/tensorrt_win/include",
+                        dir_path + "/../bazel-TensorRT/external/tensorrt_win/include",
+                        dir_path + "/../bazel-tensorrt/external/tensorrt_win/include",
+                    ]
+                    if IS_WINDOWS
+                    else [
+                        dir_path + "/../bazel-TRTorch/external/tensorrt/include",
+                        dir_path + "/../bazel-Torch-TensorRT/external/tensorrt/include",
+                        dir_path + "/../bazel-TensorRT/external/tensorrt/include",
+                        dir_path + "/../bazel-tensorrt/external/tensorrt/include",
+                    ]
+                )
+            ),
             extra_compile_args=(
                 [
                     f'/DPYBIND11_BUILD_ABI=\\"{torch._C._PYBIND11_BUILD_ABI}\\"',
