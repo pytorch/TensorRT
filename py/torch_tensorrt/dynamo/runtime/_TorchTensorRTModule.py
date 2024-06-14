@@ -105,16 +105,26 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     TorchTensorRTModule._pack_binding_names(self.input_binding_names),
                     TorchTensorRTModule._pack_binding_names(self.output_binding_names),
                     str(int(hardware_compatible)),
-                    self.encode_settings(settings),
+                    self.encode_metadata(settings),
                 ]
             )
         else:
             self.engine = None
 
-    def encode_settings(self, settings: Any) -> str:
+    def encode_metadata(self, settings: Any) -> str:
+        settings.torch_executed_ops = {
+            f"torch.ops.{op.__str__()}" for op in settings.torch_executed_ops
+        }
         dumped_settings = pickle.dumps(settings)
         encoded_settings = base64.b64encode(dumped_settings).decode("utf-8")
         return encoded_settings
+
+    @staticmethod
+    def decode_metadata(encoded_settings: str) -> Any:
+        dumped_settings = base64.b64decode(encoded_settings.encode("utf-8"))
+        settings = pickle.loads(dumped_settings)
+        settings.torch_executed_ops = {eval(op) for op in settings.torch_executed_ops}
+        return settings
 
     def get_extra_state(self) -> SerializedTorchTensorRTModuleFmt:
         return (
@@ -150,6 +160,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.hardware_compatible = (
             bool(int(state[1][6])) if state[1] is not None else False
         )
+        self.settings = TorchTensorRTModule.decode_metadata(serialized_engine_info[7])
 
     def forward(self, *inputs: Any) -> torch.Tensor | Tuple[torch.Tensor, ...]:
         """Implementation of the forward pass for a TensorRT engine
