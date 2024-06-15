@@ -188,8 +188,6 @@ def refit_module_weights(
                 submodule, (PythonTorchTensorRTModule, TorchTensorRTModule)
             ):
                 continue
-            if settings is not None:
-                assert settings == submodule.settings
             settings = submodule.settings
 
     if settings.debug:
