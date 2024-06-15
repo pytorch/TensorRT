@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 import logging
 import pickle
 from typing import Any, List, Optional, Tuple
@@ -94,7 +95,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         )
         self.name = name
         self.hardware_compatible = hardware_compatible
-        self.settings = settings
+        self.settings = copy.deepcopy(settings)
         if serialized_engine is not None:
             self.engine = torch.classes.tensorrt.Engine(
                 [
@@ -112,6 +113,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.engine = None
 
     def encode_metadata(self, settings: Any) -> str:
+        settings = copy.deepcopy(settings)
         settings.torch_executed_ops = {
             f"torch.ops.{op.__str__()}" for op in settings.torch_executed_ops
         }
