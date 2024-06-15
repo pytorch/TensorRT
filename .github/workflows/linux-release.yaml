@@ -30,11 +30,11 @@ jobs:
             smoke-test-script: packaging/smoke_test_script.sh
             package-name: torch_tensorrt
     env:
-      CU_VERSION: ${{ matrix.desired_cuda }}
-      PYTHON_VERSION: ${{ matrix.python_version }}
+      CU_VERSION: ${{ build-matrix.desired_cuda }}
+      PYTHON_VERSION: ${{ build-matrix.python_version }}
     name: Build torch-tensorrt whl package
     uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
-    if: ${{ matrix.desired_cuda == 'cu121' }}
+    if: ${{ build-matrix.desired_cuda == 'cu121' }}
     with:
       repository: ${{ matrix.repository }}
       ref: ""
