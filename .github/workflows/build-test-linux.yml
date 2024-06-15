@@ -1,7 +1,8 @@
 name: Build and test Linux wheels
 
 on:
-  pull_request:
+  # temporary remove this so that it is not triggering too much during my automated release workflow debug
+  # pull_request:
   push:
     branches:
       - main
