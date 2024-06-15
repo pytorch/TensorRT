@@ -1,3 +1,4 @@
 export CI_BUILD="1"
 export RELEASE="1"
+export CHANNEL="test"
 export BUILD_VERSION="2.4.0"

@@ -26,7 +26,7 @@ fi
 python -m pip install auditwheel
 
 # download TensorRT tarball
-RUN wget -q https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.0.1/tars/TensorRT-10.0.1.6.Linux.x86_64-gnu.cuda-12.4.tar.gz \
+wget -q https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.0.1/tars/TensorRT-10.0.1.6.Linux.x86_64-gnu.cuda-12.4.tar.gz \
 && gunzip TensorRT-10.0.1.6.Linux.x86_64-gnu.cuda-12.4.tar.gz \
 && tar -xvf TensorRT-10.0.1.6.Linux.x86_64-gnu.cuda-12.4.tar \
 && rm TensorRT-10.0.1.6.Linux.x86_64-gnu.cuda-12.4.tar
@@ -56,7 +56,7 @@ libtorchtrt() {
     PY_DIR=/opt/python/${PY_BUILD_CODE}
 
     python -m pip install -r ${PROJECT_DIR}/py/requirements.txt
-    if [[ '${pre_cxx11_abi}' == 'true' ]]:
+    if [[ '${pre_cxx11_abi}' == 'true' ]]; then
       bazel build //:libtorchtrt --config pre_cxx11_abi --platforms //toolchains:ci_rhel_x86_64_linux -c opt --noshow_progress
       cp ${PROJECT_DIR}/bazel-bin/libtorchtrt.tar.gz \
       ${PROJECT_DIR}/py/wheelhouse/libtorchtrt-${TORCHTRT_VERSION}-pre-cxx11-abi-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
