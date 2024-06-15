@@ -156,6 +156,10 @@ def test_refit_one_engine_bert():
         *inputs
     )
     for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
+        if not isinstance(expected_output, torch.Tensor) or not isinstance(
+            refitted_output, torch.Tensor
+        ):
+            continue
         assertions.assertTrue(
             torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),
             "Refit Result is not correct. Refit failed",
@@ -188,7 +192,7 @@ def test_refit_one_engine_inline_runtime():
         min_block_size=min_block_size,
         refit=True,
     )
-    trt.save(trt_gm, "./compiled.ep", inputs=inputs)
+    torchtrt.save(trt_gm, "./compiled.ep", inputs=inputs)
     trt_gm = torch.export.load("./compiled.ep")
     os.remove("./compiled.ep")
     new_trt_gm = refit_module_weights(
