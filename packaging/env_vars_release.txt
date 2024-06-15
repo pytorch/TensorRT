@@ -1,0 +1,3 @@
+export CI_BUILD="1"
+export RELEASE="1"
+export BUILD_VERSION="2.4.0"
