@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Building Torch-TensorRT on Windows &mdash; Torch-TensorRT v2.4.0.dev0+bd538b9 documentation</title>
+  <title>Building Torch-TensorRT on Windows &mdash; Torch-TensorRT v2.5.0.dev0+279f78b documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.4.0.dev0+bd538b9
+                  v2.5.0.dev0+279f78b
                 </div>
               
             
@@ -307,7 +307,6 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Building Torch-TensorRT on Windows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -345,7 +344,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#wrapping-custom-kernels-to-use-in-tensorrt">Wrapping Custom Kernels to use in TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#using-torch-tensorrt-to-insert-the-kernel">Using Torch-TensorRT to Insert the Kernel</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Torch Compile VGG16 with FP8 and PTQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
 <ul>
@@ -460,148 +459,30 @@
 <p>Torch-TensorRT has community support for Windows platform using CMake</p>
 <p>Prerequisite:</p>
 <ul class="simple">
-<li><p>Microsoft Visual Studio</p></li>
-<li><p>LibTorch</p></li>
-<li><p>TensorRT</p></li>
+<li><p>Microsoft VS 2022 Tools</p></li>
+<li><p>Bazelisk</p></li>
 <li><p>CUDA</p></li>
 </ul>
-<section id="build-configuration">
-<h2>Build configuration<a class="headerlink" href="#build-configuration" title="Permalink to this heading">¶</a></h2>
+<section id="build-steps">
+<h2>Build steps<a class="headerlink" href="#build-steps" title="Permalink to this heading">¶</a></h2>
 <ul class="simple">
-<li><p>Open Microsoft Visual Studio</p></li>
-<li><p>Open Torch-TensorRT source code folder</p></li>
-<li><p>Open Manage configurations -&gt; Edit JSON to open CMakeSettings.json file.</p></li>
-<li><p>Configure the CMake build configurations. Following is an example configuration:</p></li>
+<li><p>Open the app “x64 Native Tools Command Prompt for VS 2022” - note that Admin priveleges may be necessary</p></li>
+<li><p>Ensure Bazelisk (Bazel launcher) is installed on your machine and available from the command line. Package installers such as Chocolatey can be used to install Bazelisk</p></li>
+<li><p>Install latest version of Torch (i.e. with <cite>pip install –pre torch –index-url https://download.pytorch.org/whl/nightly/cu124</cite>)</p></li>
+<li><p>Clone the Torch-TensorRT repository and navigate to its root directory</p></li>
+<li><p>Run <cite>pip install ninja wheel setuptools</cite></p></li>
+<li><p>Run <cite>pip install –pre -r py/requirements.txt</cite></p></li>
+<li><p>Run <cite>set DISTUTILS_USE_SDK=1</cite></p></li>
+<li><p>Run <cite>python setup.py bdist_wheel</cite></p></li>
+<li><p>Run <cite>pip install dist/*.whl</cite></p></li>
 </ul>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>{
-  &quot;configurations&quot;: [
-    {
-      &quot;name&quot;: &quot;x64-Debug&quot;,
-      &quot;generator&quot;: &quot;Ninja&quot;,
-      &quot;configurationType&quot;: &quot;Debug&quot;,
-      &quot;inheritEnvironments&quot;: [ &quot;msvc_x64_x64&quot; ],
-      &quot;buildRoot&quot;: &quot;${projectDir}\\out\\build\\${name}&quot;,
-      &quot;installRoot&quot;: &quot;${projectDir}\\out\\install\\${name}&quot;,
-      &quot;cmakeCommandArgs&quot;: &quot;-S . -B out&quot;,
-      &quot;buildCommandArgs&quot;: &quot;cmake --build out&quot;,
-      &quot;ctestCommandArgs&quot;: &quot;&quot;,
-      &quot;variables&quot;: [
-        {
-          &quot;name&quot;: &quot;CMAKE_MODULE_PATH&quot;,
-          &quot;value&quot;: &quot;$PWD\cmake\Modules&quot;,
-          &quot;type&quot;: &quot;FILEPATH&quot;
-        },
-        {
-          &quot;name&quot;: &quot;Torch_DIR&quot;,
-          &quot;value&quot;: &quot;&lt;Path to libtorch&gt;\share\cmake\Torch&quot;,
-          &quot;type&quot;: &quot;FILEPATH&quot;
-        },
-        {
-          &quot;name&quot;: &quot;TensorRT_ROOT&quot;,
-          &quot;value&quot;: &quot;&lt;Path to TensorRT directory&gt;&quot;,
-          &quot;type&quot;: &quot;FILEPATH&quot;
-        },
-        {
-          &quot;name&quot;: &quot;CMAKE_BUILD_TYPE&quot;,
-          &quot;value&quot;: &quot;Release&quot;,
-          &quot;type&quot;: &quot; STRING&quot;
-        }
-      ]
-    }
-  ]
-}
-</pre></div>
-</div>
 </section>
-<section id="compilation">
-<h2>Compilation<a class="headerlink" href="#compilation" title="Permalink to this heading">¶</a></h2>
-<ul class="simple">
-<li><p>Click Build -&gt; Build All or directly press Ctrl + Shift + B</p></li>
-</ul>
-<p>Note: After successful compilation, the build artifacts will be present at buildRoot path configured.</p>
+<section id="advanced-setup-and-troubleshooting">
+<h2>Advanced setup and Troubleshooting<a class="headerlink" href="#advanced-setup-and-troubleshooting" title="Permalink to this heading">¶</a></h2>
+<p>In the <cite>WORKSPACE</cite> file, the <cite>cuda_win</cite>, <cite>libtorch_win</cite>, and <cite>tensorrt_win</cite> are Windows-specific modules which can be customized. For instance, if you would like to build with a different version of CUDA, or your CUDA installation is in a non-standard location, update the <cite>path</cite> in the <cite>cuda_win</cite> module.</p>
+<p>Similarly, if you would like to use a different version of pytorch or tensorrt, customize the <cite>urls</cite> in the <cite>libtorch_win</cite> and <cite>tensorrt_win</cite> modules, respectively.</p>
+<p>Local versions of these packages can also be used on Windows. See <cite>toolchainsci_workspacesWORKSPACE.win.release.tmpl</cite> for an example of using a local version of TensorRT on Windows.</p>
 </section>
-<section id="installation">
-<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this heading">¶</a></h2>
-<ul class="simple">
-<li><p>Build -&gt; Install Torch-TensorRT</p></li>
-</ul>
-<p>Note: After successful installation, the artifacts will be present at installRoot.</p>
-</section>
-</section>
-<section id="building-with-visual-studio-code">
-<h1>Building With Visual Studio Code<a class="headerlink" href="#building-with-visual-studio-code" title="Permalink to this heading">¶</a></h1>
-<ol class="arabic">
-<li><p>Install Visual Studio Code</p></li>
-<li><p>Install Build Tools for Visual Studio 2022</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>Select “Desktop Development with C++”
-&gt; Currently, this installs MSVC v143 - 2022. There are also options to install previous 2019/2017/2015 editions of MSVC
-&gt; License term “1b Build Tools additional use right” allows using Build Tools to compile Open Source Dependencies
-&gt; Also allows using Build Tools to develop and test Open Source Dependencies, to the minor extend of ensuring compatibility with Build Tools</p></li>
-</ul>
-</div></blockquote>
-</li>
-<li><p>Install CUDA (e.g. 11.7.1)</p></li>
-<li><p>Install <cite>TensorRT</cite> (e.g 8.5.1.7)</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>Set <code class="docutils literal notranslate"><span class="pre">TensorRT_ROOT</span></code></p></li>
-<li><p>Add <code class="docutils literal notranslate"><span class="pre">TensorRT_ROOT\lib</span></code> to <code class="docutils literal notranslate"><span class="pre">PATH</span></code></p></li>
-</ul>
-</div></blockquote>
-</li>
-<li><p>Install “libtorch-win-shared-with-deps-latest.zip”</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>Select build targeting the appropriate CUDA version</p></li>
-<li><p>Set <code class="docutils literal notranslate"><span class="pre">Torch_DIR</span></code></p></li>
-<li><p>Add <code class="docutils literal notranslate"><span class="pre">Torch_DIR\lib</span></code> to <code class="docutils literal notranslate"><span class="pre">PATH</span></code></p></li>
-</ul>
-</div></blockquote>
-</li>
-<li><p>Clone TensorRT repo</p></li>
-<li><p>Install C++ and CMake Tools extensions from MS</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>Change build to <code class="docutils literal notranslate"><span class="pre">RelWithDebInfo</span></code></p></li>
-</ul>
-</div></blockquote>
-</li>
-<li><p>Update <code class="docutils literal notranslate"><span class="pre">.vscode\settings.json</span></code></p>
-<blockquote>
-<div><ul class="simple">
-<li><p>Clean, configure, build</p></li>
-</ul>
-</div></blockquote>
-</li>
-</ol>
-<p>e.g. /.vscode/settings.json</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;cmake.generator&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Ninja&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;cmake.configureSettings&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;CMAKE_MODULE_PATH&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;FILEPATH&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;$PWD\\cmake\\Modules&quot;</span>
-<span class="w">        </span><span class="p">},</span>
-<span class="w">        </span><span class="nt">&quot;CMAKE_CXX_FLAGS&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;-D_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING&quot;</span>
-<span class="w">        </span><span class="p">},</span>
-<span class="w">        </span><span class="nt">&quot;Torch_DIR&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;FILEPATH&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;X:\\libtorch\\share\\cmake\\Torch&quot;</span>
-<span class="w">        </span><span class="p">},</span>
-<span class="w">        </span><span class="nt">&quot;TensorRT_ROOT&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;FILEPATH&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;X:\\path\\to\\tensorrt&quot;</span>
-<span class="w">        </span><span class="p">},</span>
-<span class="w">        </span><span class="nt">&quot;CMAKE_CUDA_FLAGS&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;-allow-unsupported-compiler&quot;</span>
-<span class="w">    </span><span class="p">},</span>
-<span class="w">    </span><span class="nt">&quot;cmake.buildDirectory&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;${workspaceFolder}/torch_tensorrt_build&quot;</span>
-<span class="p">}</span>
-</pre></div>
-</div>
 </section>
 
 
@@ -648,12 +529,10 @@
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
 <li><a class="reference internal" href="#">Building Torch-TensorRT on Windows</a><ul>
-<li><a class="reference internal" href="#build-configuration">Build configuration</a></li>
-<li><a class="reference internal" href="#compilation">Compilation</a></li>
-<li><a class="reference internal" href="#installation">Installation</a></li>
+<li><a class="reference internal" href="#build-steps">Build steps</a></li>
+<li><a class="reference internal" href="#advanced-setup-and-troubleshooting">Advanced setup and Troubleshooting</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
 </ul>
 
             </div>

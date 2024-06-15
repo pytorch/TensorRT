@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compiling ResNet using the Torch-TensorRT torch.compile Backend &mdash; Torch-TensorRT v2.4.0.dev0+bd538b9 documentation</title>
+  <title>Compiling ResNet using the Torch-TensorRT torch.compile Backend &mdash; Torch-TensorRT v2.5.0.dev0+279f78b documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.4.0.dev0+bd538b9
+                  v2.5.0.dev0+279f78b
                 </div>
               
             
@@ -307,7 +307,6 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/getting_started_with_windows.html#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -345,7 +344,7 @@
 <li class="toctree-l1"><a class="reference internal" href="custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="custom_kernel_plugins.html#wrapping-custom-kernels-to-use-in-tensorrt">Wrapping Custom Kernels to use in TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="custom_kernel_plugins.html#using-torch-tensorrt-to-insert-the-kernel">Using Torch-TensorRT to Insert the Kernel</a></li>
-<li class="toctree-l1"><a class="reference internal" href="vgg16_fp8_ptq.html">Torch Compile VGG16 with FP8 and PTQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
 <ul>
@@ -527,20 +526,47 @@ to download the full example code</p>
 </pre></div>
 </div>
 </section>
-<section id="cleanup">
-<h2>Cleanup<a class="headerlink" href="#cleanup" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Finally, we use Torch utilities to clean up the workspace</span>
-<span class="n">torch</span><span class="o">.</span><span class="n">_dynamo</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
-</pre></div>
-</div>
-</section>
-<section id="cuda-driver-error-note">
-<h2>Cuda Driver Error Note<a class="headerlink" href="#cuda-driver-error-note" title="Permalink to this heading">¶</a></h2>
-<p>Occasionally, upon exiting the Python runtime after Dynamo compilation with <cite>torch_tensorrt</cite>,
-one may encounter a Cuda Driver Error. This issue is related to <a class="reference external" href="https://github.com/NVIDIA/TensorRT/issues/2052">https://github.com/NVIDIA/TensorRT/issues/2052</a>
-and can be resolved by wrapping the compilation/inference in a function and using a scoped call, as in:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span>if __name__ == &#39;__main__&#39;:
-    compile_engine_and_infer()
+<section id="avoid-recompilation-by-specifying-dynamic-shapes-before-torch-trt-compilation">
+<h2>Avoid recompilation by specifying dynamic shapes before Torch-TRT compilation<a class="headerlink" href="#avoid-recompilation-by-specifying-dynamic-shapes-before-torch-trt-compilation" title="Permalink to this heading">¶</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># The following code illustrates the workflow using ir=torch_compile (which uses torch.compile under the hood)</span>
+<span class="n">inputs_bs8</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">8</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">half</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+<span class="c1"># This indicates dimension 0 of inputs_bs8 is dynamic whose range of values is [2, 16]</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">_dynamo</span><span class="o">.</span><span class="n">mark_dynamic</span><span class="p">(</span><span class="n">inputs_bs8</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">16</span><span class="p">)</span>
+<span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span>
+    <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;torch_compile&quot;</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="o">=</span><span class="n">inputs_bs8</span><span class="p">,</span>
+    <span class="n">enabled_precisions</span><span class="o">=</span><span class="n">enabled_precisions</span><span class="p">,</span>
+    <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
+    <span class="n">workspace_size</span><span class="o">=</span><span class="n">workspace_size</span><span class="p">,</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="n">min_block_size</span><span class="p">,</span>
+    <span class="n">torch_executed_ops</span><span class="o">=</span><span class="n">torch_executed_ops</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">outputs_bs8</span> <span class="o">=</span> <span class="n">optimized_model</span><span class="p">(</span><span class="n">inputs_bs8</span><span class="p">)</span>
+
+<span class="c1"># No recompilation happens for batch size = 12</span>
+<span class="n">inputs_bs12</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">12</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">half</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+<span class="n">outputs_bs12</span> <span class="o">=</span> <span class="n">optimized_model</span><span class="p">(</span><span class="n">inputs_bs12</span><span class="p">)</span>
+
+<span class="c1"># The following code illustrates the workflow using ir=dynamo (which uses torch.export APIs under the hood)</span>
+<span class="c1"># dynamic shapes for any inputs are specified using torch_tensorrt.Input API</span>
+<span class="n">compile_spec</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;inputs&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
+            <span class="n">min_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+            <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+            <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">],</span>
+    <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="n">enabled_precisions</span><span class="p">,</span>
+    <span class="s2">&quot;ir&quot;</span><span class="p">:</span> <span class="s2">&quot;dynamo&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">compile_spec</span><span class="p">)</span>
+
+<span class="c1"># No recompilation happens for batch size = 12</span>
+<span class="n">inputs_bs12</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">12</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">half</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+<span class="n">outputs_bs12</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="n">inputs_bs12</span><span class="p">)</span>
 </pre></div>
 </div>
 <p class="sphx-glr-timing"><strong>Total running time of the script:</strong> ( 0 minutes  0.000 seconds)</p>
@@ -604,8 +630,7 @@ and can be resolved by wrapping the compilation/inference in a function and usin
 <li><a class="reference internal" href="#optional-input-arguments-to-torch-tensorrt-compile">Optional Input Arguments to <cite>torch_tensorrt.compile</cite></a></li>
 <li><a class="reference internal" href="#compilation-with-torch-tensorrt-compile">Compilation with <cite>torch_tensorrt.compile</cite></a></li>
 <li><a class="reference internal" href="#inference">Inference</a></li>
-<li><a class="reference internal" href="#cleanup">Cleanup</a></li>
-<li><a class="reference internal" href="#cuda-driver-error-note">Cuda Driver Error Note</a></li>
+<li><a class="reference internal" href="#avoid-recompilation-by-specifying-dynamic-shapes-before-torch-trt-compilation">Avoid recompilation by specifying dynamic shapes before Torch-TRT compilation</a></li>
 </ul>
 </li>
 </ul>

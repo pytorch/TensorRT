@@ -1,4 +1,4 @@
-FROM pytorch/manylinux-builder:cuda12.1
+FROM pytorch/manylinux-builder:cuda12.4
 
 RUN yum install -y ninja-build
 

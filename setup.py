@@ -78,7 +78,7 @@ load_dep_info()
 
 dir_path = os.path.join(str(get_root_dir()), "py")
 
-CXX11_ABI = False
+CXX11_ABI = IS_WINDOWS
 JETPACK_VERSION = None
 PY_ONLY = False
 NO_TS = False
@@ -197,6 +197,8 @@ def build_libtorchtrt_pre_cxx11_abi(
 
     if IS_WINDOWS:
         cmd.append("--config=windows")
+    else:
+        cmd.append("--config=default")
 
     if JETPACK_VERSION == "4.5":
         cmd.append("--platforms=//toolchains:jetpack_4.5")
@@ -493,16 +495,30 @@ if not (PY_ONLY or NO_TS):
                 "/opt/conda/lib/python3.6/config-3.6m-x86_64-linux-gnu",
             ],
             libraries=["torchtrt"],
-            include_dirs=[
-                dir_path + "torch_tensorrt/csrc",
-                dir_path + "torch_tensorrt/include",
-                dir_path + "/../bazel-TRTorch/external/tensorrt/include",
-                dir_path + "/../bazel-Torch-TensorRT/external/tensorrt/include",
-                dir_path + "/../bazel-TensorRT/external/tensorrt/include",
-                dir_path + "/../bazel-tensorrt/external/tensorrt/include",
-                dir_path + "/../",
-                "/usr/local/cuda",
-            ],
+            include_dirs=(
+                [
+                    dir_path + "torch_tensorrt/csrc",
+                    dir_path + "torch_tensorrt/include",
+                    dir_path + "/../",
+                    "/usr/local/cuda",
+                ]
+                + (
+                    [
+                        dir_path + "/../bazel-TRTorch/external/tensorrt_win/include",
+                        dir_path
+                        + "/../bazel-Torch-TensorRT/external/tensorrt_win/include",
+                        dir_path + "/../bazel-TensorRT/external/tensorrt_win/include",
+                        dir_path + "/../bazel-tensorrt/external/tensorrt_win/include",
+                    ]
+                    if IS_WINDOWS
+                    else [
+                        dir_path + "/../bazel-TRTorch/external/tensorrt/include",
+                        dir_path + "/../bazel-Torch-TensorRT/external/tensorrt/include",
+                        dir_path + "/../bazel-TensorRT/external/tensorrt/include",
+                        dir_path + "/../bazel-tensorrt/external/tensorrt/include",
+                    ]
+                )
+            ),
             extra_compile_args=(
                 [
                     f'/DPYBIND11_BUILD_ABI=\\"{torch._C._PYBIND11_BUILD_ABI}\\"',

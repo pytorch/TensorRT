@@ -103,10 +103,9 @@ cc_library(
     deps = [
         "nvinfer_headers",
         "nvinfer_lib",
-        "@cuda//:cudart",
     ] + select({
-        ":windows": ["nvinfer_static_lib"],
-        "//conditions:default": [],
+        ":windows": ["@cuda_win//:cudart", "nvinfer_static_lib"],
+        "//conditions:default": ["@cuda//:cudart"],
     }),
 )
 
@@ -359,7 +358,9 @@ cc_library(
     }),
     deps = [
         "nvinfer",
-        "@cuda//:cudart",
-    ],
+    ] + select({
+        ":windows": ["@cuda_win//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
+    }),
     alwayslink = True,
 )
