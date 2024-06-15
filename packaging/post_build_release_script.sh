@@ -41,6 +41,8 @@ python -m auditwheel repair \
  $(cat py/ci/soname_excludes.params) \
  --plat manylinux_2_34_x86_64 dist/torch_tensorrt-*-${PY_BUILD_CODE}-linux_x86_64.whl
 
+cp wheelhouse/torch_tensorrt*x86_64.whl dist/
+
 CUDA_VERSION=$(python -c "import versions; versions.cuda_version()")
 TORCHTRT_VERSION=$(python -c "import versions; versions.torch_tensorrt_version_release()")
 TRT_VERSION=$(python -c "import versions; versions.tensorrt_version()")
@@ -50,7 +52,7 @@ libtorchtrt() {
     pre_cxx11_abi=${1}
     PROJECT_DIR=${CURRENT_DIR}
     cd ${PROJECT_DIR}
-    mkdir -p ${PROJECT_DIR}/py/wheelhouse
+    # mkdir -p ${PROJECT_DIR}/py/wheelhouse
 
     PY_NAME=python${PYTHON_VERSION}
     PY_DIR=/opt/python/${PY_BUILD_CODE}
@@ -59,11 +61,11 @@ libtorchtrt() {
     if [[ '${pre_cxx11_abi}' == 'true' ]]; then
       bazel build //:libtorchtrt --config pre_cxx11_abi --platforms //toolchains:ci_rhel_x86_64_linux -c opt --noshow_progress
       cp ${PROJECT_DIR}/bazel-bin/libtorchtrt.tar.gz \
-      ${PROJECT_DIR}/py/wheelhouse/libtorchtrt-${TORCHTRT_VERSION}-pre-cxx11-abi-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
+      ${PROJECT_DIR}/dist/libtorchtrt-${TORCHTRT_VERSION}-pre-cxx11-abi-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
     else
       bazel build //:libtorchtrt --platforms //toolchains:ci_rhel_x86_64_linux -c opt --noshow_progress
       cp ${PROJECT_DIR}/bazel-bin/libtorchtrt.tar.gz \
-      ${PROJECT_DIR}/py/wheelhouse/libtorchtrt-${TORCHTRT_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
+      ${PROJECT_DIR}/dist/libtorchtrt-${TORCHTRT_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
     fi
 }
 

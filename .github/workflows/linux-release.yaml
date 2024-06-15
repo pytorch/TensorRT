@@ -11,6 +11,7 @@ jobs:
       os: linux
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
+      channel: release
       with-rocm: false
       with-cpu: false
 
@@ -33,13 +34,13 @@ jobs:
     #   CU_VERSION: ${{ build-matrix.desired_cuda }}
     #   PYTHON_VERSION: ${{ build-matrix.python_version }}
     name: Build torch-tensorrt whl package
-    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
-    # if: ${{ build-matrix.desired_cuda == 'cu121' }}
+    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@release/2.3
+    if: ${{ toJSON(fromJSON(inputs.build-matrix).desired_cuda) == 'cu121' }}
     with:
       repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
+      test-infra-ref: release/2.3
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       env-var-script: ${{ matrix.env-var-script }}
