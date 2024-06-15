@@ -26,11 +26,9 @@ In this tutorial, we are going to walk through
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 import torch_tensorrt as trt
 import torchvision.models as models
-from torch import nn
-from torch_tensorrt.dynamo._refit import refit_module_weights
+from torch_tensorrt.dynamo import refit_module_weights
 
 np.random.seed(0)
 torch.manual_seed(0)
@@ -61,6 +59,7 @@ trt_gm = trt.dynamo.compile(
 )  # Output is a torch.fx.GraphModule
 
 # Save the graph module as an exported program
+# This is only supported when use_python_runtime = False
 trt.save(trt_gm, "./compiled.ep", inputs=inputs)
 
 
@@ -95,42 +94,5 @@ print("Refit successfully!")
 # Alterative Workflow using Python Runtime
 # -----------------------------
 
-# Currently python runtime does not support engine serialization. So the refitt will be done in the same runtime.
-# This usecase is more useful when you need to switch different weights during runtime, such as using Stable Diffusion.
-
-model = models.resnet18(pretrained=False).eval().to("cuda")
-exp_program = torch.export.export(model, tuple(inputs))
-enabled_precisions = {torch.float}
-debug = False
-workspace_size = 20 << 30
-min_block_size = 0
-use_python_runtime = True
-torch_executed_ops = {}
-trt_gm = trt.dynamo.compile(
-    exp_program,
-    tuple(inputs),
-    use_python_runtime=use_python_runtime,
-    enabled_precisions=enabled_precisions,
-    debug=debug,
-    min_block_size=min_block_size,
-    torch_executed_ops=torch_executed_ops,
-    refit=True,
-)
-
-model2 = models.resnet18(pretrained=True).eval().to("cuda")
-exp_program2 = torch.export.export(model2, tuple(inputs))
-
-new_trt_gm = refit_module_weights(
-    compiled_module=compiled_trt_gm,
-    new_weight_module=exp_program2,
-    inputs=inputs,
-)
-
-# Check the output
-expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(*inputs)
-for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
-    assert torch.allclose(
-        expected_output, refitted_output, 1e-2, 1e-2
-    ), "Refit Result is not correct. Refit failed"
-
-print("Refit successfully!")
+# Currently python runtime does not support engine serialization. So the refitting will be done in the same runtime.
+# This usecase is more useful when you need to switch different weights in the same runtime, such as using Stable Diffusion.
