@@ -15,7 +15,7 @@ Torch-TensorRT
 ---
 <div align="left">
 
-Torch-TensorRT brings the power of TensorRT to PyTorch. Accelerate inference latency by up to 5x compared to eager execution in just one line of code. 
+Torch-TensorRT brings the power of TensorRT to PyTorch. Accelerate inference latency by up to 5x compared to eager execution in just one line of code.
 </div></div>
 
 ## Installation
@@ -52,7 +52,7 @@ optimized_model(x) # this will be fast!
 ```
 
 ### Option 2: Export
-If you want to optimize your model ahead-of-time and/or deploy in a C++ environment, Torch-TensorRT provides an export-style workflow that serializes an optimized module. This module can be deployed in PyTorch or with libtorch (i.e. without a Python dependency). 
+If you want to optimize your model ahead-of-time and/or deploy in a C++ environment, Torch-TensorRT provides an export-style workflow that serializes an optimized module. This module can be deployed in PyTorch or with libtorch (i.e. without a Python dependency).
 
 #### Step 1: Optimize + serialize
 ```python
@@ -62,7 +62,7 @@ import torch_tensorrt
 model = MyModel().eval().cuda() # define your model here
 inputs = [torch.randn((1, 3, 224, 224)).cuda()] # define a list of representative inputs here
 
-trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs) 
+trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs)
 torch_tensorrt.save(trt_gm, "trt.ep", inputs=inputs) # PyTorch only supports Python runtime for an ExportedProgram. For C++ deployment, use a TorchScript file
 torch_tensorrt.save(trt_gm, "trt.ts", output_format="torchscript", inputs=inputs)
 ```
@@ -116,9 +116,9 @@ auto results = trt_mod.forward({input_tensor});
 
 These are the following dependencies used to verify the testcases. Torch-TensorRT can work with other versions, but the tests are not guaranteed to pass.
 
-- Bazel 5.2.0
-- Libtorch 2.4.0.dev (latest nightly) (built with CUDA 12.4)
-- CUDA 12.1
+- Bazel 6.3.2
+- Libtorch 2.5.0.dev (latest nightly) (built with CUDA 12.4)
+- CUDA 12.4
 - TensorRT 10.0.1.6
 
 ## Deprecation Policy
