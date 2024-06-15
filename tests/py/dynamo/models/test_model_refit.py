@@ -1,3 +1,4 @@
+import os
 import time
 import unittest
 
@@ -18,6 +19,7 @@ from torch_tensorrt.dynamo._refit import (
 )
 from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decompositions
 from torch_tensorrt.logging import TRT_LOGGER
+from transformers import BertModel
 
 assertions = unittest.TestCase()
 
@@ -118,6 +120,142 @@ def test_refit_one_engine():
 
 
 @pytest.mark.unit
+def test_refit_one_engine_bert():
+    inputs = [
+        torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
+    ]
+    model = BertModel.from_pretrained("bert-base-uncased").eval().to("cuda")
+    model2 = BertModel.from_pretrained("bert-base-uncased").eval().to("cuda")
+    nn.init.xavier_normal_(model2.embeddings.word_embeddings.weight)
+    enabled_precisions = {torch.float}
+    debug = False
+    min_block_size = 0
+    use_python_runtime = False
+
+    exp_program = torch.export.export(model, tuple(inputs))
+    exp_program2 = torch.export.export(model2, tuple(inputs))
+
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        use_python_runtime=use_python_runtime,
+        enabled_precisions=enabled_precisions,
+        debug=debug,
+        min_block_size=min_block_size,
+        refit=True,
+    )
+
+    new_trt_gm = refit_module_weights(
+        compiled_module=trt_gm,
+        new_weight_module=exp_program2,
+        inputs=inputs,
+    )
+
+    # Check the output
+    expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
+        *inputs
+    )
+    for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
+        assertions.assertTrue(
+            torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),
+            "Refit Result is not correct. Refit failed",
+        )
+        # Clean up model env
+
+    torch._dynamo.reset()
+
+
+@pytest.mark.unit
+def test_refit_one_engine_inline_runtime():
+
+    model = models.resnet18(pretrained=False).eval().to("cuda")
+    model2 = models.resnet18(pretrained=True).eval().to("cuda")
+    inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
+    enabled_precisions = {torch.float}
+    debug = False
+    min_block_size = 0
+    use_python_runtime = False
+
+    exp_program = torch.export.export(model, tuple(inputs))
+    exp_program2 = torch.export.export(model2, tuple(inputs))
+
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        use_python_runtime=use_python_runtime,
+        enabled_precisions=enabled_precisions,
+        debug=debug,
+        min_block_size=min_block_size,
+        refit=True,
+    )
+    trt.save(trt_gm, "./compiled.ep", inputs=inputs)
+    trt_gm = torch.export.load("./compiled.ep")
+    os.remove("./compiled.ep")
+    new_trt_gm = refit_module_weights(
+        compiled_module=trt_gm,
+        new_weight_module=exp_program2,
+        inputs=inputs,
+    )
+
+    # Check the output
+    expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
+        *inputs
+    )
+    for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
+        assertions.assertTrue(
+            torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),
+            "Refit Result is not correct. Refit failed",
+        )
+        # Clean up model env
+
+    torch._dynamo.reset()
+
+
+@pytest.mark.unit
+def test_refit_one_engine_python_runtime():
+
+    model = models.resnet18(pretrained=False).eval().to("cuda")
+    model2 = models.resnet18(pretrained=True).eval().to("cuda")
+    inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
+    enabled_precisions = {torch.float}
+    debug = False
+    min_block_size = 0
+    use_python_runtime = True
+
+    exp_program = torch.export.export(model, tuple(inputs))
+    exp_program2 = torch.export.export(model2, tuple(inputs))
+
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        use_python_runtime=use_python_runtime,
+        enabled_precisions=enabled_precisions,
+        debug=debug,
+        min_block_size=min_block_size,
+        refit=True,
+    )
+
+    new_trt_gm = refit_module_weights(
+        compiled_module=trt_gm,
+        new_weight_module=exp_program2,
+        inputs=inputs,
+    )
+
+    # Check the output
+    expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
+        *inputs
+    )
+    for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
+        assertions.assertTrue(
+            torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),
+            "Refit Result is not correct. Refit failed",
+        )
+        # Clean up model env
+
+    torch._dynamo.reset()
+
+
+@pytest.mark.unit
 def test_refit_multiple_engine():
 
     class net(nn.Module):
@@ -126,14 +264,18 @@ def test_refit_multiple_engine():
             self.conv1 = nn.Conv2d(3, 12, 3, padding=1)
             self.bn = nn.BatchNorm2d(12)
             self.conv2 = nn.Conv2d(12, 12, 3, padding=1)
+            self.fc1 = nn.Linear(12 * 56 * 56, 10)
 
         def forward(self, x):
             x = self.conv1(x)
             x = F.relu(x)
             x = self.bn(x)
+            x = F.max_pool2d(x, (2, 2))
             x = self.conv2(x)
             x = F.relu(x)
-            return x
+            x = F.max_pool2d(x, (2, 2))
+            x = torch.flatten(x, 1)
+            return self.fc1(x)
 
     model = net().eval().to("cuda")
     model2 = net().eval().to("cuda")
