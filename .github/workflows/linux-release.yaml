@@ -34,7 +34,6 @@ jobs:
     #   PYTHON_VERSION: ${{ build-matrix.python_version }}
     name: Build torch-tensorrt whl package
     uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@release/2.3
-    if: ${{ fromJSON(inputs.build-matrix).desired_cuda == 'cu121' }}
     with:
       repository: ${{ matrix.repository }}
       ref: ""

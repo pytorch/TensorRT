@@ -1,6 +1,6 @@
 name: Lint Code
 
-on:
+# on:
   # pull_request:
   #   types: [opened, synchronize, ready_for_review, review_requested, reopened]
 

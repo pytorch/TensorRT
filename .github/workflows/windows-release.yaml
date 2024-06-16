@@ -25,12 +25,10 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             pre-script: packaging/pre_build_script_windows.sh
-            env-script: packaging/env_vars.txt
+            env-script: packaging/env_vars_release.txt
             smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
     name: Build torch-tensorrt whl package
-    env:
-      BUILD_VERSION: ${BUILD_VERSION%+*}
     uses: pytorch/test-infra/.github/workflows/build_wheels_windows.yml@release/2.3
     # if: ${{ build-matrix.desired_cuda == 'cu121' }}
     with:
