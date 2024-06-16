@@ -11,7 +11,6 @@ jobs:
       os: linux
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      channel: release
       with-rocm: false
       with-cpu: false
 
@@ -35,7 +34,7 @@ jobs:
     #   PYTHON_VERSION: ${{ build-matrix.python_version }}
     name: Build torch-tensorrt whl package
     uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@release/2.3
-    if: ${{ toJSON(fromJSON(inputs.build-matrix).desired_cuda) == 'cu121' }}
+    if: ${{ fromJSON(inputs.build-matrix).desired_cuda == 'cu121' }}
     with:
       repository: ${{ matrix.repository }}
       ref: ""
@@ -50,5 +49,5 @@ jobs:
       trigger-event: ${{ github.event_name }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{github.ref_name }}
+  group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: true
