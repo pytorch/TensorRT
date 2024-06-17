@@ -22,11 +22,140 @@ class TestIndexPutConverter(DispatchTestCase):
                 indices_tensor=(torch.tensor([0, 3], dtype=torch.int32),),
                 value_tensor=torch.tensor([1, 3], dtype=torch.int32),
             ),
+            param(
+                test_name="2d_indices_single",
+                source_tensor=torch.zeros([5, 5], dtype=torch.int32),
+                indices_tensor=(
+                    torch.tensor([2], dtype=torch.int32),
+                    torch.tensor([0], dtype=torch.int32),
+                ),
+                value_tensor=torch.tensor([3], dtype=torch.int32),
+            ),
+            param(
+                test_name="2d_indices_multiple",
+                source_tensor=torch.zeros([5, 5], dtype=torch.int32),
+                indices_tensor=(
+                    torch.tensor([0, 2, 2], dtype=torch.int32),
+                    torch.tensor([2, 0, 2], dtype=torch.int32),
+                ),
+                value_tensor=torch.tensor([1, 3, 4], dtype=torch.int32),
+            ),
+            param(
+                test_name="3d_indices_single",
+                source_tensor=torch.zeros([3, 3, 3], dtype=torch.int32),
+                indices_tensor=(
+                    torch.tensor([1], dtype=torch.int32),
+                    torch.tensor([2], dtype=torch.int32),
+                    torch.tensor([2], dtype=torch.int32),
+                ),
+                value_tensor=torch.tensor([7], dtype=torch.int32),
+            ),
+            param(
+                test_name="3d_indices_multiple",
+                source_tensor=torch.zeros([3, 3, 3], dtype=torch.int32),
+                indices_tensor=(
+                    torch.tensor([0, 1, 1], dtype=torch.int32),
+                    torch.tensor([1, 2, 1], dtype=torch.int32),
+                    torch.tensor([2, 0, 2], dtype=torch.int32),
+                ),
+                value_tensor=torch.tensor([5, 7, 2], dtype=torch.int32),
+            ),
+            param(
+                test_name="4d_indices_single",
+                source_tensor=torch.zeros([2, 2, 2, 2], dtype=torch.int32),
+                indices_tensor=(
+                    torch.tensor([1], dtype=torch.int32),
+                    torch.tensor([1], dtype=torch.int32),
+                    torch.tensor([0], dtype=torch.int32),
+                    torch.tensor([1], dtype=torch.int32),
+                ),
+                value_tensor=torch.tensor([5], dtype=torch.int32),
+            ),
+            param(
+                test_name="4d_indices_multiple",
+                source_tensor=torch.zeros([2, 2, 2, 2], dtype=torch.int32),
+                indices_tensor=(
+                    torch.tensor([0, 1], dtype=torch.int32),
+                    torch.tensor([1, 1], dtype=torch.int32),
+                    torch.tensor([1, 0], dtype=torch.int32),
+                    torch.tensor([1, 0], dtype=torch.int32),
+                ),
+                value_tensor=torch.tensor([5, 7], dtype=torch.int32),
+            ),
+            param(
+                test_name="negative_indices",
+                source_tensor=torch.zeros([5, 5], dtype=torch.int32),
+                indices_tensor=(
+                    torch.tensor([-1, -2], dtype=torch.int32),
+                    torch.tensor([2, 0], dtype=torch.int32),
+                ),
+                value_tensor=torch.tensor([1, 3], dtype=torch.int32),
+            ),
+            param(
+                test_name="mixed_indices",
+                source_tensor=torch.zeros([4, 4], dtype=torch.int32),
+                indices_tensor=(
+                    torch.tensor([0, 1, -1, -2], dtype=torch.int32),
+                    torch.tensor([0, -1, 2, 1], dtype=torch.int32),
+                ),
+                value_tensor=torch.tensor([2, 4, 6, 8], dtype=torch.int32),
+            ),
+            param(
+                test_name="1d_indices_float",
+                source_tensor=torch.zeros([5], dtype=torch.float32),
+                indices_tensor=(torch.tensor([0, 3], dtype=torch.int32),),
+                value_tensor=torch.tensor([1.5, 3.5], dtype=torch.float32),
+            ),
+            param(
+                test_name="2d_indices_float",
+                source_tensor=torch.zeros([5, 5], dtype=torch.float32),
+                indices_tensor=(
+                    torch.tensor([0, 2], dtype=torch.int32),
+                    torch.tensor([2, 0], dtype=torch.int32),
+                ),
+                value_tensor=torch.tensor([1.5, 3.5], dtype=torch.float32),
+            ),
+            param(
+                test_name="3d_indices_float",
+                source_tensor=torch.zeros([3, 3, 3], dtype=torch.float32),
+                indices_tensor=(
+                    torch.tensor([0, 1], dtype=torch.int32),
+                    torch.tensor([1, 2], dtype=torch.int32),
+                    torch.tensor([2, 0], dtype=torch.int32),
+                ),
+                value_tensor=torch.tensor([5.5, 7.5], dtype=torch.float32),
+            ),
+            param(
+                test_name="4d_indices_float",
+                source_tensor=torch.zeros([2, 2, 2, 2], dtype=torch.float32),
+                indices_tensor=(
+                    torch.tensor([0, 1], dtype=torch.int32),
+                    torch.tensor([1, 0], dtype=torch.int32),
+                    torch.tensor([0, 1], dtype=torch.int32),
+                    torch.tensor([1, 0], dtype=torch.int32),
+                ),
+                value_tensor=torch.tensor([5.5, 7.5], dtype=torch.float32),
+            ),
             # param(
-            #     test_name="2d_indices",
-            #     source_tensor=torch.zeros([5,5], dtype=torch.int32),
-            #     indices_tensor=(torch.tensor([0,2], dtype=torch.int32),torch.tensor([2,0], dtype=torch.int32),),
-            #     value_tensor=torch.tensor([1,3], dtype=torch.int32),
+            #     test_name="2d_indices_accumulate_True",
+            #     source_tensor=torch.zeros([5, 5], dtype=torch.int32),
+            #     indices_tensor=(torch.tensor([0, 0], dtype=torch.int32), torch.tensor([1, 1], dtype=torch.int32)),
+            #     value_tensor=torch.tensor([1, 2], dtype=torch.int32),
+            #     accumulate=True,
+            # ),
+            # param(
+            #     test_name="3d_indices_accumulate_True",
+            #     source_tensor=torch.zeros([3, 3, 3], dtype=torch.int32),
+            #     indices_tensor=(torch.tensor([0, 0], dtype=torch.int32), torch.tensor([1, 1], dtype=torch.int32), torch.tensor([2, 2], dtype=torch.int32)),
+            #     value_tensor=torch.tensor([1, 2], dtype=torch.int32),
+            #     accumulate=True,
+            # ),
+            # param(
+            #     test_name="4d_indices_accumulate_True",
+            #     source_tensor=torch.zeros([2, 2, 2, 2], dtype=torch.int32),
+            #     indices_tensor=(torch.tensor([0, 0], dtype=torch.int32), torch.tensor([1, 1], dtype=torch.int32), torch.tensor([0, 0], dtype=torch.int32), torch.tensor([1, 1], dtype=torch.int32)),
+            #     value_tensor=torch.tensor([1, 2], dtype=torch.int32),
+            #     accumulate=True,
             # ),
         ]
     )
@@ -36,7 +165,7 @@ class TestIndexPutConverter(DispatchTestCase):
         class TestIndexPut(torch.nn.Module):
             def forward(self, source_tensor, value_tensor):
                 return torch.ops.aten.index_put_.default(
-                    source_tensor, indices_tensor, value_tensor
+                    source_tensor, indices_tensor, value_tensor, accumulate
                 )
 
         self.run_test(

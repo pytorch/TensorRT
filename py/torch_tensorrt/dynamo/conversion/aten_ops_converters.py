@@ -801,6 +801,22 @@ def aten_ops_select(
     )
 
 
+def index_put_accumulate_validator(node: Node) -> bool:
+    if args_bounds_check(node.args, 3, False):
+        _LOGGER.debug("We do not support accumulate=True for aten.index_put operation")
+        return False
+    else:
+        return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.index_put_.default,
+    capability_validator=index_put_accumulate_validator,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.index_put.default,
+    capability_validator=index_put_accumulate_validator,
+)
 @dynamo_tensorrt_converter(torch.ops.aten.index_put.default)
 @dynamo_tensorrt_converter(torch.ops.aten.index_put_.default)
 @enforce_tensor_types(
@@ -809,7 +825,7 @@ def aten_ops_select(
         2: (TRTTensor,),
     }
 )
-def aten_ops_index_put_(
+def aten_ops_index_put(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
@@ -824,7 +840,7 @@ def aten_ops_index_put_(
         args[0],
         args[1],
         args[2],
-        args_bounds_check(args, 3, []),
+        args_bounds_check(args, 3, False),
     )
 
 
@@ -3237,27 +3253,6 @@ def aten_ops_roll(
         args[0],
         args[1],
         args_bounds_check(args, 2, []),
-    )
-
-
-@enforce_tensor_types(
-    {
-        0: (TRTTensor,),
-    }
-)
-@dynamo_tensorrt_converter(torch.ops.aten.scatter.src)
-# @dynamo_tensorrt_converter(torch.ops.aten.scatter.src.default)
-@dynamo_tensorrt_converter(torch.ops.aten.scatter.value)
-# @dynamo_tensorrt_converter(torch.ops.aten.scatter.value.default)
-def aten_ops_scatter(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.select.scatter(
-        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2], args[3]
     )
 
 

@@ -6,6 +6,7 @@ import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     broadcastable,
@@ -410,7 +411,7 @@ def scatter(
     dim = get_positive_dim(dim, len(input_shape))
     src_tensor = src
     # scatter.value
-    if isinstance(src, int) or isinstance(src, float):
+    if isinstance(src, (int, float)):
         src_tensor = get_trt_tensor(
             ctx, src * np.ones(index_shape_list), name + "_value_tensor"
         )
@@ -458,9 +459,8 @@ def index_put_converter(
     values: TRTTensor,
     accumulate: bool = False,
 ) -> TRTTensor:
-    from torch_tensorrt.dynamo.conversion import impl
-
-    trt_inputs = []
+    # Reshape indices to add an extra dimension if necessary (indices is a Tuple of ITensors)
+    reshaped_indices = []
     for i, each_input in enumerate(indices):
         if not isinstance(each_input, TRTTensor):
             each_input = get_trt_tensor(ctx, each_input, f"{name}_tensor_{i}")
@@ -468,23 +468,19 @@ def index_put_converter(
             ctx,
             target,
             source_ir,
-            f"{name}_broadcast_{i}",
+            f"{name}_reshape_{i}",
             each_input,
-            (each_input.shape[0],),
+            (-1, 1),  # Reshape to (N, 1)
         )
-        trt_inputs.append(each_input)
-    concat_layer = ctx.net.add_concatenation(trt_inputs)
-    dim = get_positive_dim(0, len(indices[0].shape))
-    concat_layer.axis = dim
-    set_layer_name(concat_layer, target, f"{name}_gather", source_ir)
-    indices = concat_layer.get_output(0)
+        reshaped_indices.append(each_input)
 
-    values = impl.shuffle.reshape(
-        ctx, target, source_ir, f"{name}_broadcast", values, (values.shape[0],)
+    # Concatenate along the second dimension (columns)
+    indices_cat = impl.cat.cat(
+        ctx, target, source_ir, f"{name}_cat", reshaped_indices, dim=1
     )
 
     scatter_layer = ctx.net.add_scatter(
-        input_tensor, indices, values, trt.ScatterMode.ELEMENT  # trt.ScatterMode.ND
+        input_tensor, indices_cat, values, trt.ScatterMode.ND
     )
     scatter_layer.axis = 0
     set_layer_name(scatter_layer, target, f"{name}_scatter_layer", source_ir)
