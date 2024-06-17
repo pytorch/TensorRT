@@ -100,6 +100,12 @@ jobs:
         with:
           github-secret: ${{ github.token }}
       - uses: ./test-infra/.github/actions/set-channel
+      - name: Set PYTORCH_VERSION
+        if: ${{ env.CHANNEL == 'test' }}
+        run: |
+          # When building RC, set the version to be the current candidate version,
+          # otherwise, leave it alone so nightly will pick up the latest
+          echo "PYTORCH_VERSION=${{ matrix.stable_version }}" >> "${GITHUB_ENV}"
       - uses: ./test-infra/.github/actions/setup-binary-builds
         with:
           repository: ${{ inputs.repository }}
