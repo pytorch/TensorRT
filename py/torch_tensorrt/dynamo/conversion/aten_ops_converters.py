@@ -801,6 +801,33 @@ def aten_ops_select(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.index_put.default)
+@dynamo_tensorrt_converter(torch.ops.aten.index_put_.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        2: (TRTTensor,),
+    }
+)
+def aten_ops_index_put_(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.select.index_put_converter(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args[2],
+        args_bounds_check(args, 3, []),
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.slice.Tensor, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
@@ -3210,6 +3237,27 @@ def aten_ops_roll(
         args[0],
         args[1],
         args_bounds_check(args, 2, []),
+    )
+
+
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+@dynamo_tensorrt_converter(torch.ops.aten.scatter.src)
+# @dynamo_tensorrt_converter(torch.ops.aten.scatter.src.default)
+@dynamo_tensorrt_converter(torch.ops.aten.scatter.value)
+# @dynamo_tensorrt_converter(torch.ops.aten.scatter.value.default)
+def aten_ops_scatter(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.select.scatter(
+        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2], args[3]
     )
 
 

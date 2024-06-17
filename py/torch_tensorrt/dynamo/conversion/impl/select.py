@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Sequence, Union, cast
+from typing import Optional, Sequence, Tuple, Union, cast
 
 import numpy as np
 import tensorrt as trt
@@ -446,3 +446,46 @@ def gather(
     set_layer_name(gather_layer, target, name + "_gather_layer_element", source_ir)
     out = gather_layer.get_output(0)
     return out
+
+
+def index_put_converter(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_tensor: TRTTensor,
+    indices: Union[TRTTensor, Tuple[TRTTensor, ...]],
+    values: TRTTensor,
+    accumulate: bool = False,
+) -> TRTTensor:
+    from torch_tensorrt.dynamo.conversion import impl
+
+    trt_inputs = []
+    for i, each_input in enumerate(indices):
+        if not isinstance(each_input, TRTTensor):
+            each_input = get_trt_tensor(ctx, each_input, f"{name}_tensor_{i}")
+        each_input = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_broadcast_{i}",
+            each_input,
+            (each_input.shape[0],),
+        )
+        trt_inputs.append(each_input)
+    concat_layer = ctx.net.add_concatenation(trt_inputs)
+    dim = get_positive_dim(0, len(indices[0].shape))
+    concat_layer.axis = dim
+    set_layer_name(concat_layer, target, f"{name}_gather", source_ir)
+    indices = concat_layer.get_output(0)
+
+    values = impl.shuffle.reshape(
+        ctx, target, source_ir, f"{name}_broadcast", values, (values.shape[0],)
+    )
+
+    scatter_layer = ctx.net.add_scatter(
+        input_tensor, indices, values, trt.ScatterMode.ELEMENT  # trt.ScatterMode.ND
+    )
+    scatter_layer.axis = 0
+    set_layer_name(scatter_layer, target, f"{name}_scatter_layer", source_ir)
+    return scatter_layer.get_output(0)
