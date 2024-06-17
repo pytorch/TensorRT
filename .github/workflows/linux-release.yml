@@ -57,7 +57,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
     if: ${{ env.CHANNEL == 'release'}}
-    uses: pytorch/tensorrt/.github/workflows/linuex-release-artifacts.yml@lluo/test_release_automation
+    uses: ./.github/workflows/linux-release-artifacts.yml
     with:
       job-name: build-other-release-artifiacts
       repository: "pytorch/tensorrt"
