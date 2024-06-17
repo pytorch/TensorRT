@@ -2,6 +2,7 @@
 
 set -x
 
+export CXX=g++
 CURRENT_DIR=`pwd`
 
 if [[ "${PYTHON_VERSION}" == "3.8" ]]; then

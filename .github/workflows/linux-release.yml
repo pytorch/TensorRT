@@ -65,7 +65,6 @@ jobs:
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
-        export USE_HOST_DEPS=1
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ inputs.repository }}-${{ inputs.job-name }}
