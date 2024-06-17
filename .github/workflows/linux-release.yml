@@ -48,7 +48,7 @@ jobs:
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
 
-  build-other-release-artifacts:
+  build-release-artifacts:
     name: Build other release artifacts
     needs: [generate-matrix, build]
     strategy:
@@ -56,10 +56,10 @@ jobs:
       matrix:
         include:
           - repository: pytorch/tensorrt
-    if: ${{ env.CHANNEL == 'release'}}
     uses: ./.github/workflows/linux-release-artifacts.yml
+    if: ${{ contains( github.event.pull_request.labels.*.name, 'build-release-artifacts') }}
     with:
-      job-name: build-other-release-artifiacts
+      job-name: build-release-artifiacts
       repository: "pytorch/tensorrt"
       ref: ""
       test-infra-repository: pytorch/test-infra
