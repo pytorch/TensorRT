@@ -1,4 +1,5 @@
 import logging
+import os
 import warnings
 from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set
@@ -44,7 +45,6 @@ class TRTInterpreterResult(NamedTuple):
     engine: Any
     input_names: Sequence[str]
     output_names: Sequence[str]
-    serialized_cache: bytearray
 
 
 class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
@@ -276,22 +276,36 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     def _create_timing_cache(
         self,
         builder_config: trt.IBuilderConfig,
-        existing_cache: Optional[trt.ITimingCache] = None,
-    ) -> trt.ITimingCache:
-        cache = None
-        if existing_cache:
-            cache_file = np.array(existing_cache)
-            cache = builder_config.create_timing_cache(cache_file.tobytes())
-        else:
-            cache = builder_config.create_timing_cache(b"")
+        timing_cache_path: str = "",
+    ) -> None:
+        """
+        Create a timing cache to enable faster build time for TRT engines.
+        By default the timing_cache_path="/tmp/timing_cache.bin"
+        """
+        buffer = b""
+        if os.path.isfile(timing_cache_path):
+            # Load from existing cache
+            with open(timing_cache_path, mode="rb") as timing_cache_file:
+                buffer = timing_cache_file.read()
+        cache = builder_config.create_timing_cache(buffer)
         builder_config.set_timing_cache(cache, False)
-        return cache
+
+    def _save_timing_cache(
+        self,
+        builder_config: trt.IBuilderConfig,
+        timing_cache_path: str,
+    ) -> None:
+        """
+        This is called after a TensorRT engine is built. Save the timing cache
+        """
+        timing_cache = builder_config.get_timing_cache()
+        with open(timing_cache_path, "wb") as timing_cache_file:
+            timing_cache_file.write(memoryview(timing_cache.serialize()))
 
     def run(
         self,
         strict_type_constraints: bool = False,
         algorithm_selector: Optional[trt.IAlgorithmSelector] = None,
-        existing_cache: Optional[trt.ITimingCache] = None,
         tactic_sources: Optional[int] = None,
     ) -> TRTInterpreterResult:
         """
@@ -299,7 +313,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         Args:
             strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric reasons.
             algorithm_selector: set up algorithm selection for certain layer
-            existing_cache: enable timing cache for TensorRT
         Return:
             TRTInterpreterResult
         """
@@ -316,25 +329,27 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         builder_config = self._populate_trt_builder_config(
             strict_type_constraints, algorithm_selector, tactic_sources
         )
-        timing_cache = self._create_timing_cache(builder_config, existing_cache)
+
+        self._create_timing_cache(
+            builder_config, self.compilation_settings.timing_cache_path
+        )
 
         serialized_engine = self.builder.build_serialized_network(
             self.ctx.net, builder_config
         )
         assert serialized_engine
 
-        serialized_cache = (
-            bytearray(timing_cache.serialize())
-            if builder_config.get_timing_cache()
-            else bytearray()
-        )
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
         _LOGGER.info(f"TRT Engine uses: {serialized_engine.nbytes} bytes of Memory")
 
+        self._save_timing_cache(
+            builder_config, self.compilation_settings.timing_cache_path
+        )
+
         return TRTInterpreterResult(
-            serialized_engine, self._input_names, self._output_names, serialized_cache
+            serialized_engine, self._input_names, self._output_names
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
