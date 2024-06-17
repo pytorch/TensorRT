@@ -137,6 +137,15 @@ class TestIndexPutConverter(DispatchTestCase):
                 value_tensor=torch.tensor([5.5, 7.5], dtype=torch.float32),
             ),
             # param(
+            #     test_name="3d_indices_float_broadcase_index",
+            #     source_tensor=torch.zeros([3, 3, 3], dtype = torch.int32),
+            #     indices_tensor=(
+            #         torch.tensor([0,1], dtype=torch.int32), 
+            #         torch.tensor([0,1], dtype=torch.int32),
+            #     ),
+            #     value_tensor=torch.tensor([10],  dtype = torch.int32),
+            # ),
+            # param(
             #     test_name="2d_indices_accumulate_True",
             #     source_tensor=torch.zeros([5, 5], dtype=torch.int32),
             #     indices_tensor=(torch.tensor([0, 0], dtype=torch.int32), torch.tensor([1, 1], dtype=torch.int32)),
@@ -160,7 +169,7 @@ class TestIndexPutConverter(DispatchTestCase):
         ]
     )
     def test_index_put(
-        self, test_name, source_tensor, indices_tensor, value_tensor, accumulate=True
+        self, test_name, source_tensor, indices_tensor, value_tensor, accumulate=False
     ):
         class TestIndexPut(torch.nn.Module):
             def forward(self, source_tensor, value_tensor):
@@ -171,6 +180,8 @@ class TestIndexPutConverter(DispatchTestCase):
         self.run_test(
             TestIndexPut(),
             inputs=[source_tensor, value_tensor],
+            # enable_passes=True,
+            # use_dynamo_tracer=True,
         )
 
 
