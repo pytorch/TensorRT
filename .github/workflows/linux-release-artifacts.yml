@@ -77,7 +77,7 @@ jobs:
     container:
       image: ${{ matrix.container_image }}
       options: ${{ matrix.gpu_arch_type == 'cuda' && '--gpus all' || ' ' }}
-    if: ${{ matrix.desired_cuda == '12.1' }}
+    if: ${{ env.CU_VERSION == '12.1' }}
     # If a build is taking longer than 60 minutes on these runners we need
     # to have a conversation
     timeout-minutes: 60
