@@ -1779,6 +1779,7 @@ def aten_ops_add(
     )
 
 
+@dynamo_tensorrt_converter(operator.mul, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mul.Tensor, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mul.Scalar, supports_dynamic_shapes=True)
 def aten_ops_mul(
