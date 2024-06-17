@@ -42,6 +42,9 @@ python -m auditwheel repair \
  --plat manylinux_2_34_x86_64 \
  /opt/torch-tensorrt-builds/torch_tensorrt-*-${PY_BUILD_CODE}-linux_x86_64.whl
 
+if [[ ! -d dist ]]; then
+  mkdir dist
+fi
 cp wheelhouse/torch_tensorrt*x86_64.whl dist/
 
 CUDA_VERSION=$(python -c "import versions; versions.cuda_version()")

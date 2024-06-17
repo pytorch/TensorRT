@@ -146,6 +146,12 @@ jobs:
         with:
           repository: ${{ inputs.repository  }}
           script: exec_script
+      - name: Upload release artifacts to GitHub
+        continue-on-error: true
+        uses: actions/upload-artifact@v3
+        with:
+          name: release_${{ env.ARTIFACT_NAME }}
+          path: ${{ inputs.repository }}/dist/
       # - name: Surface failing tests
       #   if: always()
       #   uses: pmeier/pytest-results-action@v0.3.0
