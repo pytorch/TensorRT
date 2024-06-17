@@ -1,4 +1,4 @@
-name: Release artifacts on Linux
+name: Build release artifacts on Linux
 
 on:
   workflow_call:
@@ -59,7 +59,7 @@ on:
         type: string
 
 jobs:
-  build:
+  build-release:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.build-matrix) }}
@@ -200,5 +200,5 @@ jobs:
       #     s3-prefix: ${{ env.REPOSITORY }}/${{ github.event.pull_request.number }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref_name }}
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ inputs.repository }}-${{ inputs.job-name }}
   cancel-in-progress: true
