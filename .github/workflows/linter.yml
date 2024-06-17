@@ -1,8 +1,8 @@
 name: Lint Code
 
-# on:
-  # pull_request:
-  #   types: [opened, synchronize, ready_for_review, review_requested, reopened]
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, review_requested, reopened]
 
 jobs:
   cpp-linting:

@@ -1,0 +1,50 @@
+name: Release Windows wheels
+
+# on:
+#   pull_request:
+
+jobs:
+  generate-matrix:
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    with:
+      package-type: wheel
+      os: windows
+      channel: release
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      with-rocm: false
+      with-cpu: false
+
+  build:
+    needs: generate-matrix
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            pre-script: packaging/pre_build_script_windows.sh
+            env-script: packaging/env_vars_release.txt
+            smoke-test-script: packaging/smoke_test_windows.py
+            package-name: torch_tensorrt
+    name: Build torch-tensorrt whl package
+    uses: pytorch/test-infra/.github/workflows/build_wheels_windows.yml@release/2.3
+    # if: ${{ build-matrix.desired_cuda == 'cu121' }}
+    with:
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: release/2.3
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      env-script: ${{ matrix.env-script }}
+      pre-script: ${{ matrix.pre-script }}
+      wheel-build-params: "--release"
+      smoke-test-script: ${{ matrix.smoke-test-script }}
+      package-name: ${{ matrix.package-name }}
+      trigger-event: ${{ github.event_name }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true

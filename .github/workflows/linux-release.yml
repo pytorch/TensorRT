@@ -1,0 +1,72 @@
+name: Release Linux wheels and tarball
+
+on:
+  pull_request:
+
+jobs:
+  generate-matrix:
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    with:
+      package-type: wheel
+      os: linux
+      channel: release
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      with-rocm: false
+      with-cpu: false
+
+  build:
+    needs: generate-matrix
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            pre-script: packaging/pre_build_script.sh
+            env-var-script: packaging/env_vars.txt
+            post-script: packaging/post_build_release_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            package-name: torch_tensorrt
+    # env:
+    #   CU_VERSION: ${{ build-matrix.desired_cuda }}
+    #   PYTHON_VERSION: ${{ build-matrix.python_version }}
+    name: Build torch-tensorrt whl package
+    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@release/2.3
+    with:
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: release/2.3
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      env-var-script: ${{ matrix.env-var-script }}
+      post-script: ${{ matrix.post-script }}
+      package-name: ${{ matrix.package-name }}
+      smoke-test-script: ${{ matrix.smoke-test-script }}
+      trigger-event: ${{ github.event_name }}
+
+  build-other-release-artifacts:
+    name: Build other release artifacts
+    needs: [generate-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+    if: ${{ env.CHANNEL == 'release'}}
+    uses: pytorch/tensorrt/.github/workflows/linuex-release-artifacts.yml@release/2.3
+    with:
+      job-name: build-other-release-artifiacts
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
