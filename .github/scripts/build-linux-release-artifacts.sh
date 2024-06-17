@@ -2,6 +2,8 @@
 
 set -x
 
+source "${BUILD_ENV_FILE}"
+
 export CXX=g++
 CURRENT_DIR=`pwd`
 
@@ -90,3 +92,6 @@ python -m auditwheel repair \
  /opt/torch-tensorrt-builds/torch_tensorrt-*-${PY_BUILD_CODE}-linux_x86_64.whl
 
 cp wheelhouse/torch_tensorrt*x86_64.whl dist/
+
+
+BUILD_VERSION=${TORCHTRT_VERSION} CI_BUILD=1 RELEASE=1 C python setup.py bdist_wheel --release

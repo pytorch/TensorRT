@@ -19,6 +19,10 @@ on:
         description: "Pre script to run prior to build"
         default: ""
         type: string
+      env-var-script:
+        description: "Script that sets Domain-Specific Environment Variables"
+        default: ""
+        type: string
       test-infra-repository:
         description: "Test infra repository to use"
         default: "pytorch/test-infra"
@@ -77,9 +81,6 @@ jobs:
     container:
       image: ${{ matrix.container_image }}
       options: ${{ matrix.gpu_arch_type == 'cuda' && '--gpus all' || ' ' }}
-    # TO DO: ask Naren, I am not able to skip the release build if it is not cuda12.1 on the job level
-    # if: ${{ env.CU_VERSION == '12.1' }}
-
     # If a build is taking longer than 60 minutes on these runners we need
     # to have a conversation
     timeout-minutes: 60
@@ -116,6 +117,19 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cuda-version: ${{ env.CU_VERSION }}
           arch: ${{ env.ARCH }}
+      - name: Combine Env Var and Build Env Files
+        if: ${{ inputs.env-var-script != '' }}
+        working-directory: ${{ inputs.repository }}
+        run: |
+          set -euxo pipefail
+          cat "${{ inputs.env-var-script }}" >> "${BUILD_ENV_FILE}"
+      - name: Install torch dependency
+        run: |
+          set -euxo pipefail
+          # shellcheck disable=SC1090
+          source "${BUILD_ENV_FILE}"
+          # shellcheck disable=SC2086
+          ${CONDA_RUN} ${PIP_INSTALL_TORCH}
       - name: Run Pre-Script with Caching
         if: ${{ inputs.pre-script != '' }}
         uses: ./test-infra/.github/actions/run-script-with-cache
@@ -129,12 +143,12 @@ jobs:
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: /opt/torch-tensorrt-builds/
-      - name: Install torch and torch-tensorrt
-        if: ${{ inputs.pre-script != '' }}
-        uses: ./test-infra/.github/actions/run-script-with-cache
-        with:
-          repository: ${{ inputs.repository  }}
-          script: .github/scripts/install-torch-tensorrt.sh
+      # - name: Install torch and torch-tensorrt
+      #   if: ${{ inputs.pre-script != '' }}
+      #   uses: ./test-infra/.github/actions/run-script-with-cache
+      #   with:
+      #     repository: ${{ inputs.repository  }}
+      #     script: .github/scripts/install-torch-tensorrt.sh
       - name: Pack script
         continue-on-error: ${{ inputs.continue-on-error }}
         working-directory: ${{ inputs.repository }}

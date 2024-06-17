@@ -53,10 +53,11 @@ jobs:
       matrix:
         include:
           - repository: pytorch/tensorrt
-          - package-name: torch_tensorrt
-          - pre-script: packaging/pre_build_script.sh
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            env-var-script: packaging/env_vars.txt
     uses: ./.github/workflows/linux-release-artifacts.yml
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') }}
+    if: ${{ (contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v')) && needs.generate-matrix.outputs.matrix.desired_cuda == 'cu121' }}
     with:
       job-name: build-release-artifiacts
       repository: "pytorch/tensorrt"
@@ -65,6 +66,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      env-var-script: ${{ matrix.env-var-script }}
       script: |
 
 concurrency:
