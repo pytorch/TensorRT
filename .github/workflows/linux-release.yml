@@ -57,7 +57,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             env-var-script: packaging/env_vars.txt
     uses: ./.github/workflows/linux-release-artifacts.yml
-    if: ${{ (contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v')) && needs.generate-matrix.outputs.matrix.desired_cuda == 'cu121' }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
     with:
       job-name: build-release-artifiacts
       repository: "pytorch/tensorrt"
