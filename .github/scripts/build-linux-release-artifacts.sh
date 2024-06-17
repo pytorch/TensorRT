@@ -6,13 +6,20 @@ export CXX=g++
 CURRENT_DIR=`pwd`
 
 if [[ "${PYTHON_VERSION}" == "3.8" ]]; then
+  PY_SINGLE_BUILD_CODE=cp38
   PY_BUILD_CODE=cp38-cp38
 elif [[ "${PYTHON_VERSION}" == "3.9" ]]; then
+  PY_SINGLE_BUILD_CODE=cp39
   PY_BUILD_CODE=cp39-cp39
 elif [[ "${PYTHON_VERSION}" == "3.10" ]]; then
+  PY_SINGLE_BUILD_CODE=cp310
   PY_BUILD_CODE=cp310-cp310
 elif [[ "${PYTHON_VERSION}" == "3.11" ]]; then
-  PY_BUILD_CODE=cp38-cp38
+  PY_SINGLE_BUILD_CODE=cp311
+  PY_BUILD_CODE=cp311-cp311
+elif [[ "${PYTHON_VERSION}" == "3.12" ]]; then
+  PY_SINGLE_BUILD_CODE=cp312
+  PY_BUILD_CODE=cp312-cp312
 else
    echo "python version: ${PYTHON_VERSION} is not supported"
    exit
@@ -33,7 +40,9 @@ wget -q https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt
 && tar -xvf TensorRT-10.0.1.6.Linux.x86_64-gnu.cuda-12.4.tar \
 && rm TensorRT-10.0.1.6.Linux.x86_64-gnu.cuda-12.4.tar
 
-TENSERRT_DIR=${CURRENT_DIR}/TensorRT-10.0.1.6
+TENSERRT_DIR=${CURRENT_DIR}/TensorRT-10.0.1.6/
+
+python -m pip install ${TENSERRT_DIR}/python/tensorrt-${TRT_VERSION}-${PY_SINGLE_BUILD_CODE}-none-linux_x86_64.whl
 
 SITE_PKG_DIR=`python -c  'import sysconfig; print(sysconfig.get_paths()["purelib"])'`
 

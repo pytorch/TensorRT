@@ -77,7 +77,9 @@ jobs:
     container:
       image: ${{ matrix.container_image }}
       options: ${{ matrix.gpu_arch_type == 'cuda' && '--gpus all' || ' ' }}
+    # TO DO: ask Naren, I am not able to skip the release build if it is not cuda12.1 on the job level
     # if: ${{ env.CU_VERSION == '12.1' }}
+
     # If a build is taking longer than 60 minutes on these runners we need
     # to have a conversation
     timeout-minutes: 60
@@ -127,12 +129,12 @@ jobs:
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: /opt/torch-tensorrt-builds/
-      # - name: Install torch and torch-tensorrt
-      #   if: ${{ inputs.pre-script != '' }}
-      #   uses: ./test-infra/.github/actions/run-script-with-cache
-      #   with:
-      #     repository: ${{ inputs.repository  }}
-      #     script: .github/scripts/install-torch-tensorrt.sh
+      - name: Install torch and torch-tensorrt
+        if: ${{ inputs.pre-script != '' }}
+        uses: ./test-infra/.github/actions/run-script-with-cache
+        with:
+          repository: ${{ inputs.repository  }}
+          script: .github/scripts/install-torch-tensorrt.sh
       - name: Pack script
         continue-on-error: ${{ inputs.continue-on-error }}
         working-directory: ${{ inputs.repository }}
@@ -142,7 +144,6 @@ jobs:
           set -euxo pipefail
           # shellcheck disable=SC2086
           source "${BUILD_ENV_FILE}"
-          echo "lan added"
           {
             echo "${SCRIPT}";
           } > "user_script"
