@@ -64,6 +64,8 @@ bool valid_input_dtype(nvinfer1::DataType dtype) {
       return true;
     case nvinfer1::DataType::kINT32:
       return true;
+    case nvinfer1::DataType::kINT64:
+      return true;
     default:
       return false;
   }
