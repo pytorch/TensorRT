@@ -72,11 +72,11 @@ model2 = models.resnet18(pretrained=True).eval().to("cuda")
 exp_program2 = torch.export.export(model2, tuple(inputs))
 
 
-compiled_trt_gm = torch_trt.load("./compiled.ep")
+compiled_trt_ep = torch_trt.load("./compiled.ep")
 
 # This returns a new module with updated weights
 new_trt_gm = refit_module_weights(
-    compiled_module=compiled_trt_gm,
+    compiled_module=compiled_trt_ep,
     new_weight_module=exp_program2,
     inputs=inputs,
 )
