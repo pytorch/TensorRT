@@ -26,7 +26,7 @@ In this tutorial, we are going to walk through
 
 import numpy as np
 import torch
-import torch_tensorrt as trt
+import torch_tensorrt as torch_trt
 import torchvision.models as models
 from torch_tensorrt.dynamo import refit_module_weights
 
@@ -47,7 +47,7 @@ workspace_size = 20 << 30
 min_block_size = 0
 use_python_runtime = False
 torch_executed_ops = {}
-trt_gm = trt.dynamo.compile(
+trt_gm = torch_trt.dynamo.compile(
     exp_program,
     tuple(inputs),
     use_python_runtime=use_python_runtime,
@@ -60,7 +60,7 @@ trt_gm = trt.dynamo.compile(
 
 # Save the graph module as an exported program
 # This is only supported when use_python_runtime = False
-trt.save(trt_gm, "./compiled.ep", inputs=inputs)
+torch_trt.save(trt_gm, "./compiled.ep", inputs=inputs)
 
 
 # %%
@@ -72,7 +72,7 @@ model2 = models.resnet18(pretrained=True).eval().to("cuda")
 exp_program2 = torch.export.export(model2, tuple(inputs))
 
 
-compiled_trt_gm = trt.load("./compiled.ep")
+compiled_trt_gm = torch_trt.load("./compiled.ep")
 
 # This returns a new module with updated weights
 new_trt_gm = refit_module_weights(
