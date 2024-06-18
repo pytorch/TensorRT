@@ -61,12 +61,12 @@ def unsqueeze(
             new_shape[i] = 0
     layer = ctx.net.add_shuffle(input_val)
     layer.reshape_dims = tuple(new_shape)
-    # if the intermediate_dim is not the final dim we want to squeeze, add a second_transpose after reshape
+    # if the intermediate_dim is not the final dim we want to unsqueeze, add a second_transpose after reshape
     if intermediate_dim != dim:
         # calculate the second_transpose for the shuffle layer
         permutation = [*range(0, len(new_shape))]
         # for example: if the reshape_dims is (3, 3, 5, 1, 5) and the final shape we want is (3, 1, 3, 5, 5)
-        # here intermediate_dim=3, dim=1, we need to move intermediate_dim before [dim: intermediate_dim]
+        # here intermediate_dim=3, dim=1, we need to move intermediate_dim before [dim: intermediate_dim)
         new_permutation = (
             tuple(permutation[:dim])
             + (intermediate_dim,)
