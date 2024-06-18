@@ -10,16 +10,21 @@ from .harness import DispatchTestCase
 class TestRSqrtConverter(DispatchTestCase):
     @parameterized.expand(
         [
-            ("2d_dim_alpha", (2, 1), 2),
-            ("3d_dim_alpha", (2, 1, 2), 2),
+            ("2d_dim_float", (2, 1), torch.float),
+            ("3d_dim_float", (2, 1, 2), torch.float),
+            ("3d_dim_int32", (2, 1, 2), torch.int32),
         ]
     )
-    def test_rsqrt(self, _, x, alpha):
+    def test_rsqrt(self, _, x, type):
         class rsqrt(nn.Module):
             def forward(self, input):
                 return torch.ops.aten.rsqrt.default(input)
 
-        inputs = [torch.randn(x) + 1]
+        if type == torch.int32:
+            inputs = [torch.randint(255, x, dtype=torch.int32)]
+        else:
+            inputs = [torch.randn(x) + 1]
+
         self.run_test(
             rsqrt(),
             inputs,
@@ -41,6 +46,14 @@ class TestRSqrtConverter(DispatchTestCase):
                 (1, 2, 3),
                 (3, 3, 3),
                 torch.float,
+                torch.float,
+            ),
+            (
+                "3d_dim_dtype_int32",
+                (1, 1, 1),
+                (2, 2, 4),
+                (2, 3, 5),
+                torch.int32,
                 torch.float,
             ),
         ]
