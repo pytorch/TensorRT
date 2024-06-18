@@ -1,3 +1,4 @@
+import collections
 import functools
 import logging
 import re
@@ -8,6 +9,7 @@ import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Argument, Target
+from torch.fx.passes.shape_prop import TensorMetadata
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -42,6 +44,75 @@ def get_node_name(node: torch.fx.Node) -> str:
         pass
 
     return node_name
+
+
+def get_node_io(
+    node: torch.fx.Node, constant_mapping: Dict[str, Tuple[Sequence[int], str]]
+) -> str:
+    """Gets a string representing the node inputs and outputs including tensor shapes and dtypes"""
+
+    def format_tensor_metadata(metadata: Union[Any, Sequence[Any]]) -> str:
+        """Formats the metadata for a single node"""
+        # If the provided data is a simple TensorMetadata object, parse it
+        if isinstance(metadata, TensorMetadata) or issubclass(
+            type(metadata), torch.Tensor
+        ):
+            return f"{tuple(metadata.shape)}@{metadata.dtype}"  # type: ignore
+        # If the provided data is a scalar, return it as is
+        elif isinstance(metadata, (int, float, bool)):
+            return f"{metadata}@Python-{type(metadata)}"
+        # If the provided data is a sequence, recursively parse it
+        elif isinstance(metadata, collections.abc.Sequence):
+            formatted_str = "("
+            for meta in metadata:
+                formatted_str += format_tensor_metadata(meta) + ", "
+
+            return formatted_str[:-2] + ")"
+        else:
+            _LOGGER.warning(
+                f"Detected unparseable type in node formatting: {type(metadata)}"
+            )
+            return ""
+
+    # Format input tensors
+    metadata_string = "Inputs: ("
+
+    # For each input argument, format it accordingly
+    for arg in node.args:
+        if isinstance(arg, torch.fx.Node):
+            if arg.op == "get_attr":
+                shape, dtype = constant_mapping[str(arg)]
+                arg_repr = f"{shape}@{dtype}"
+            elif arg.meta.get("tensor_meta") is not None:
+                arg_repr = format_tensor_metadata(arg.meta["tensor_meta"])
+            elif arg.meta.get("val") is not None:
+                arg_repr = format_tensor_metadata(arg.meta["val"])
+            else:
+                arg_repr = ""
+
+            metadata_string += f"{arg}: {arg_repr}, "
+        else:
+            metadata_string += f"{arg}, "
+
+    metadata_string = (
+        metadata_string[:-2] if metadata_string[-1] != "(" else metadata_string
+    ) + ")"
+
+    # Format output tensors and arguments
+    metadata_string += " | Outputs: ("
+    if node.op == "get_attr":
+        shape, dtype = constant_mapping[str(node)]
+        node_repr = f"{shape}@{dtype}"
+    elif node.meta.get("tensor_meta") is not None:
+        node_repr = format_tensor_metadata(node.meta["tensor_meta"])
+    elif node.meta.get("val") is not None:
+        node_repr = format_tensor_metadata(node.meta["val"])
+    else:
+        node_repr = ""
+    metadata_string += f"{node}: {node_repr}, "
+    metadata_string = metadata_string[:-2] + ")"
+
+    return metadata_string
 
 
 def is_only_operator_on_placeholder(node: torch.fx.Node) -> bool:

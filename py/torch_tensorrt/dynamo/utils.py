@@ -191,7 +191,7 @@ def parse_complex_tensor_structs(
 
     else:
         raise ValueError(
-            f"Invalid input type {type(inputs)} encountered in parse_complex_tensor_structs parsing. "
+            f"Invalid input type {type(inputs)} encountered during Dynamo input parsing. "
             + "Allowed input types: {torch_tensorrt.Input, torch.Tensor, list, tuple, dict}"
         )
 

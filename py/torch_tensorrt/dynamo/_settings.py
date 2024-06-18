@@ -24,6 +24,7 @@ from torch_tensorrt.dynamo._defaults import (
     REFIT,
     REQUIRE_FULL_COMPILATION,
     SPARSE_WEIGHTS,
+    TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
     USE_FAST_PARTITIONER,
     USE_PYTHON_RUNTIME,
@@ -71,6 +72,7 @@ class CompilationSettings:
             TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the
             ouptut to a file if a string path is specified
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -101,3 +103,4 @@ class CompilationSettings:
     dla_global_dram_size: int = DLA_GLOBAL_DRAM_SIZE
     dryrun: Union[bool, str] = DRYRUN
     hardware_compatible: bool = HARDWARE_COMPATIBLE
+    timing_cache_path: str = TIMING_CACHE_PATH

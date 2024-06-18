@@ -47,23 +47,6 @@ a number of ways you can leverage this backend to accelerate inference.
 
 .. only:: html
 
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_compile_resnet_example_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_compile_resnet_example.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Compiling ResNet using the Torch-TensorRT torch.compile Backend</div>
-    </div>
-
-
-.. raw:: html
-
-    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi...">
-
-.. only:: html
-
   .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_compile_transformers_example_thumb.png
     :alt:
 
@@ -94,7 +77,24 @@ a number of ways you can leverage this backend to accelerate inference.
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="This script is intended as a sample of the Torch-TensorRT workflow with torch.compile on a VGG1...">
+    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_compile_resnet_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_compile_resnet_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling ResNet using the Torch-TensorRT torch.compile Backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="Here we demonstrate how to deploy a model quantized to FP8 using the Dynamo frontend of Torch-T...">
 
 .. only:: html
 
@@ -105,7 +105,7 @@ a number of ways you can leverage this backend to accelerate inference.
 
 .. raw:: html
 
-      <div class="sphx-glr-thumbnail-title">Torch Compile VGG16 with FP8 and PTQ</div>
+      <div class="sphx-glr-thumbnail-title">Deploy Quantized Models using Torch-TensorRT</div>
     </div>
 
 
@@ -135,9 +135,9 @@ a number of ways you can leverage this backend to accelerate inference.
    :hidden:
 
    /tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
-   /tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
    /tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
    /tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
+   /tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
    /tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq
    /tutorials/_rendered_examples/dynamo/custom_kernel_plugins
 
