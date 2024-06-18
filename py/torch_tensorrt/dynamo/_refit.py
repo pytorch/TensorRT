@@ -163,7 +163,7 @@ def refit_module_weights(
     compiled_module = copy.deepcopy(compiled_module)
 
     # Get the settings and check the setting to be uniform
-    settings: Any = None
+    settings: CompilationSettings = None
     if inline_module:
 
         # Obtain the settings
@@ -175,7 +175,7 @@ def refit_module_weights(
         encoded_settings = compiled_submodules[0][1].__getstate__()[0][7]
         assert (
             encoded_settings != ""
-        ), "Settings are not saved in the engine. Please recompile the engine."
+        ), "Settings are not saved in the engine. Please recompile the engine with refit=True."
         settings = TorchTensorRTModule.decode_metadata(encoded_settings)
         # Handle torch modules
         compiled_submodules_map = dict(compiled_submodules)
@@ -189,6 +189,10 @@ def refit_module_weights(
             ):
                 continue
             settings = submodule.settings
+
+    assert (
+        settings.refit
+    ), "Refitting is not enabled. Please recompile the engine with refit=True."
 
     if settings.debug:
         set_log_level(logger.parent, logging.DEBUG)
