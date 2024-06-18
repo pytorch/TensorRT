@@ -255,11 +255,11 @@ def refit_module_weights(
     if inline_module:
         assert {sm[0] for sm in new_partitioned_module.named_children()} == set(
             compiled_submodules_map.keys()
-        ), "The compiled module is incompatible with the new module!"
+        ), "New weights module is not compatible with previously compiled Torch-TensorRT module"
     else:
         assert {sm[0] for sm in new_partitioned_module.named_children()} == {
             sm[0] for sm in compiled_module.named_children()
-        }, "The compiled module is incompatible with the new module!"
+        }, "New weights module is not compatible with previously compiled Torch-TensorRT module"
     # 2. TODO: Check the hash of source fx.Graph and new fx.Graph
 
     # Iterate over all components that can be accelerated
