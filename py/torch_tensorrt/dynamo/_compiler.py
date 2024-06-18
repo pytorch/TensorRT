@@ -78,6 +78,7 @@ def compile(
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
+    timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -137,6 +138,7 @@ def compile(
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the grap easier to covert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -220,6 +222,7 @@ def compile(
         "dla_global_dram_size": dla_global_dram_size,
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
+        "timing_cache_path": timing_cache_path,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -310,6 +313,7 @@ def compile_module(
     # If specified, try using the fast partitioner and fall back to the global one on failure
     if settings.use_fast_partitioner:
         try:
+            logger.info("Partitioning the graph via the fast partitioner")
             partitioned_module, supported_ops = partitioning.fast_partition(
                 gm,
                 verbose=settings.debug,
@@ -319,7 +323,7 @@ def compile_module(
         except torch.fx.passes.splitter_base.FxNetSplitterInternalError:
             logger.error(
                 "Partitioning failed on the subgraph with fast partition. See trace above. "
-                + "Retrying with global partition.",
+                "Retrying with global partition.",
                 exc_info=True,
             )
 
@@ -327,6 +331,7 @@ def compile_module(
             settings.use_fast_partitioner = False
 
     if not settings.use_fast_partitioner:
+        logger.info("Partitioning the graph via the global partitioner")
         partitioned_module, supported_ops = partitioning.global_partition(
             gm,
             verbose=settings.debug,
@@ -364,14 +369,15 @@ def compile_module(
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
         submodule_inputs = partitioning.construct_submodule_inputs(submodule)
 
+        assert submodule_inputs is not None
+
         logger.debug(
-            "Submodule name: %s\n Input shapes: %s\n %s",
+            "Converting submodule: %s\n Input shapes: %s\n %s",
             str(name),
             [input.shape for input in submodule_inputs],
             str(submodule.graph),
         )
 
-        assert submodule_inputs is not None
         # Handle long/double inputs if requested by the user
         if settings.truncate_double:
             submodule_inputs = repair_double_inputs(
@@ -477,6 +483,7 @@ def convert_module_to_trt_engine(
     dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
     calibrator: object = None,
     allow_shape_tensors: bool = False,
+    timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -532,7 +539,7 @@ def convert_module_to_trt_engine(
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
-
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
@@ -585,6 +592,7 @@ def convert_module_to_trt_engine(
         "dla_sram_size": dla_sram_size,
         "dla_local_dram_size": dla_local_dram_size,
         "dla_global_dram_size": dla_global_dram_size,
+        "timing_cache_path": timing_cache_path,
     }
 
     exported_program = pre_export_lowering(exported_program, torch_inputs)

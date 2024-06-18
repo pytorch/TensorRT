@@ -1,10 +1,10 @@
 """
 .. _vgg16_fp8_ptq:
 
-Torch Compile VGG16 with FP8 and PTQ
+Deploy Quantized Models using Torch-TensorRT
 ======================================================
 
-This script is intended as a sample of the Torch-TensorRT workflow with `torch.compile` on a VGG16 model with FP8 and PTQ.
+Here we demonstrate how to deploy a model quantized to FP8 using the Dynamo frontend of Torch-TensorRT
 """
 
 # %%
@@ -100,7 +100,7 @@ def vgg16(num_classes=1000, init_weights=False):
 
 
 PARSER = argparse.ArgumentParser(
-    description="Load pre-trained VGG model and then tune with FP8 and PTQ"
+    description="Load pre-trained VGG model and then tune with FP8 and PTQ. For having a pre-trained VGG model, please refer to https://github.com/pytorch/TensorRT/tree/main/examples/int8/training/vgg16"
 )
 PARSER.add_argument(
     "--ckpt", type=str, required=True, help="Path to the pre-trained checkpoint"
@@ -226,6 +226,8 @@ with torch.no_grad():
             min_block_size=1,
             debug=False,
         )
+        # You can also use torch compile path to compile the model with Torch-TensorRT:
+        # trt_model = torch.compile(model, backend="tensorrt")
 
         # Inference compiled Torch-TensorRT model over the testing dataset
         total = 0

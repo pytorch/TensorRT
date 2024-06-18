@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.4.0.dev0+0387757 documentation</title>
+  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.5.0.dev0+363d0bd documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.4.0.dev0+0387757
+                  v2.5.0.dev0+363d0bd
                 </div>
               
             
@@ -304,7 +304,6 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/getting_started_with_windows.html#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -342,7 +341,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#wrapping-custom-kernels-to-use-in-tensorrt">Wrapping Custom Kernels to use in TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#using-torch-tensorrt-to-insert-the-kernel">Using Torch-TensorRT to Insert the Kernel</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Torch Compile VGG16 with FP8 and PTQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
 <ul>
@@ -477,6 +476,7 @@
     <span class="n">REFIT</span><span class="p">,</span>
     <span class="n">REQUIRE_FULL_COMPILATION</span><span class="p">,</span>
     <span class="n">SPARSE_WEIGHTS</span><span class="p">,</span>
+    <span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
     <span class="n">TRUNCATE_DOUBLE</span><span class="p">,</span>
     <span class="n">USE_FAST_PARTITIONER</span><span class="p">,</span>
     <span class="n">USE_PYTHON_RUNTIME</span><span class="p">,</span>
@@ -524,6 +524,7 @@
 <span class="sd">            TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the</span>
 <span class="sd">            ouptut to a file if a string path is specified</span>
 <span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
+<span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">ENABLED_PRECISIONS</span><span class="p">)</span>
@@ -553,7 +554,8 @@
     <span class="n">dla_local_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DLA_LOCAL_DRAM_SIZE</span>
     <span class="n">dla_global_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DLA_GLOBAL_DRAM_SIZE</span>
     <span class="n">dryrun</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">DRYRUN</span>
-    <span class="n">hardware_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">HARDWARE_COMPATIBLE</span></div>
+    <span class="n">hardware_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">HARDWARE_COMPATIBLE</span>
+    <span class="n">timing_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">TIMING_CACHE_PATH</span></div>
 </pre></div>
 
              </article>

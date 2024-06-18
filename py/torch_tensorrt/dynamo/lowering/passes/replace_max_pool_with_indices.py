@@ -43,6 +43,7 @@ def replace_max_pool_with_indices(
                     args=node.args,
                     kwargs=node.kwargs,
                 )
+                maxpool_fused.meta = node.meta
 
             logger.debug(
                 f"Replacing all uses of nodes {node}, {getitem_node} with fused maxpool node {maxpool_fused} "

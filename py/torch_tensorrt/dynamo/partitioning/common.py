@@ -35,8 +35,16 @@ def construct_dynamic_input(
             node = dim.node
             expr = node.expr
             shape_env = node.shape_env
-            var_range = shape_env.var_to_range.get(expr, None)
-            var_val = shape_env.var_to_val.get(expr, None)
+            # An expr can be a independent SymInt node (eg: s0 or s1) or a composition of them eg: (48*s0 or s0*s1).
+            # In the case of expr which has symbolic computation, bound_sympy evaluates them.
+            # https://pytorch.org/docs/stable/generated/torch.fx.experimental.symbolic_shapes.ShapeEnv.html#torch.fx.experimental.symbolic_shapes.ShapeEnv.bound_sympy
+            # expr.xreplace replaces the symbolic variables with their current values and computes the expression.
+            var_range = shape_env.var_to_range.get(expr, None) or shape_env.bound_sympy(
+                expr
+            )
+            var_val = shape_env.var_to_val.get(expr, None) or expr.xreplace(
+                shape_env.var_to_val
+            )
             assert var_range, var_val
             # Torchdynamo 0/1 specialization outlier
             if var_range.lower == 2:

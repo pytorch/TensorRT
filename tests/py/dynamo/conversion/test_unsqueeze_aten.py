@@ -3,9 +3,8 @@ import torch.fx
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.conversion import UnsupportedOperatorException
-
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo.conversion import UnsupportedOperatorException
 
 from .harness import DispatchTestCase
 
@@ -29,16 +28,32 @@ class TestUnsqueeze(DispatchTestCase):
         inputs = [torch.randn(1, 2, 3)]
         self.run_test(Unsqueeze(dim), inputs)
 
-    # Testing with more than one dynamic dims results in following error:
-    # AssertionError: Currently we don't support unsqueeze with more than one dynamic dims.
-
     @parameterized.expand(
         [
-            ("negative_dim_dynamic", -4),
-            ("positive_dim_dynamic", 1),
+            ("1_dynamic_shape_2d_-3", -3, (2, 5), (3, 5), (4, 5)),
+            ("1_dynamic_shape_2d_-2", -2, (2, 3), (2, 4), (2, 5)),
+            ("1_dynamic_shape_2d_-1", -1, (2, 3), (2, 4), (2, 5)),
+            ("1_dynamic_shape_2d_0", 0, (2, 3), (2, 4), (2, 5)),
+            ("1_dynamic_shape_2d_1", 1, (2, 3), (2, 4), (2, 5)),
+            ("1_dynamic_shape_2d_2", 2, (2, 3), (2, 4), (2, 5)),
+            ("2_dynamic_shape_3d_-1", -1, (2, 2, 3), (4, 3, 3), (5, 5, 3)),
+            ("2_dynamic_shape_3d_0", 2, (2, 2, 3), (4, 3, 3), (5, 5, 3)),
+            ("2_dynamic_shape_3d_1", 1, (2, 2, 3), (4, 3, 3), (5, 6, 3)),
+            ("2_dynamic_shape_3d_2", 2, (2, 2, 3), (4, 3, 3), (6, 5, 3)),
+            ("4_dynamic_shape_4d_-4", -4, (1, 2, 3, 4), (2, 2, 3, 5), (3, 3, 5, 5)),
+            ("4_dynamic_shape_4d_-3", -3, (1, 2, 3, 4), (2, 2, 3, 5), (3, 3, 5, 5)),
+            ("4_dynamic_shape_4d_-2", -2, (1, 2, 3, 4), (2, 2, 3, 5), (4, 3, 5, 6)),
+            ("4_dynamic_shape_4d_-1", -1, (1, 2, 3, 4), (2, 2, 3, 5), (4, 3, 5, 6)),
+            ("4_dynamic_shape_4d_0", 0, (1, 2, 3, 4), (2, 2, 5, 7), (2, 3, 6, 8)),
+            ("4_dynamic_shape_4d_1", 1, (1, 2, 3, 4), (2, 2, 3, 5), (3, 3, 5, 5)),
+            ("4_dynamic_shape_4d_2", 2, (1, 2, 3, 4), (2, 2, 3, 5), (3, 3, 5, 5)),
+            ("4_dynamic_shape_4d_3", 3, (1, 2, 3, 4), (2, 2, 3, 5), (3, 3, 5, 5)),
+            ("4_dynamic_shape_4d_4", 4, (1, 2, 3, 4), (2, 2, 3, 5), (3, 3, 5, 5)),
         ]
     )
-    def test_unsqueeze_with_dynamic_shape(self, _, dim):
+    def test_unsqueeze_with_dynamic_shape(
+        self, _, dim, min_shape, opt_shape, max_shape
+    ):
         class Unsqueeze(nn.Module):
             def __init__(self, dim):
                 super().__init__()
@@ -49,9 +64,10 @@ class TestUnsqueeze(DispatchTestCase):
 
         input_specs = [
             Input(
-                shape=(-1, 2, 3),
                 dtype=torch.float32,
-                shape_ranges=[((1, 2, 3), (2, 2, 3), (3, 2, 3))],
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
             ),
         ]
         self.run_test_with_dynamic_shape(Unsqueeze(dim), input_specs)
