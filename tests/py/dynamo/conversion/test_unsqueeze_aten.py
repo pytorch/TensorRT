@@ -28,9 +28,6 @@ class TestUnsqueeze(DispatchTestCase):
         inputs = [torch.randn(1, 2, 3)]
         self.run_test(Unsqueeze(dim), inputs)
 
-    # Testing with more than one dynamic dims results in following error:
-    # AssertionError: Currently we don't support unsqueeze with more than one dynamic dims.
-
     @parameterized.expand(
         [
             ("1_dynamic_shape_2d_-3", -3, (2, 5), (3, 5), (4, 5)),
