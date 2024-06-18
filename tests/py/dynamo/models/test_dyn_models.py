@@ -310,3 +310,59 @@ def test_linear(ir):
         cos_sim > COSINE_THRESHOLD,
         msg=f"test_linear model TRT outputs don't match with the pytorch model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
+
+
+@pytest.mark.unit
+def test_dynamic_with_fallback_shape_tensor_pass_through(ir):
+    class MyModule(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = torch.nn.Conv2d(3, 16, 3, stride=1, bias=True)
+            self.relu = torch.nn.ReLU()
+
+        def forward(self, x):
+            out = self.conv(x)
+            x = x + 2
+            x = x * 2
+            out = torch.reshape(x, (-1, 2))
+            out = self.relu(out)
+            return out
+
+    model = MyModule().eval().cuda()
+    input_bs4 = torch.randn((4, 3, 224, 224)).to("cuda")
+
+    compile_spec = {
+        "device": torchtrt.Device("cuda:0"),
+        "enabled_precisions": {torch.float},
+        "ir": ir,
+        "pass_through_build_failures": True,
+        "min_block_size": 1,
+        "torch_executed_ops": {"torch.ops.aten.add.Tensor"},
+    }
+
+    # Compile the model
+    if ir == "torch_compile":
+        torch._dynamo.mark_dynamic(input_bs4, 0, min=1, max=8)
+        # Compile the model
+        trt_model = torch.compile(model, backend="tensorrt", options=compile_spec)
+        trt_model(input_bs4)
+    elif ir == "dynamo":
+        compile_spec["inputs"] = [
+            torchtrt.Input(
+                min_shape=(1, 3, 224, 224),
+                opt_shape=(4, 3, 224, 224),
+                max_shape=(8, 3, 224, 224),
+                dtype=torch.float32,
+                name="x",
+            )
+        ]
+        trt_model = torchtrt.compile(model, **compile_spec)
+
+    trt_model(input_bs4)
+
+    input_bs6 = torch.randn((6, 3, 224, 224)).to("cuda")
+    cos_sim = cosine_similarity(model(input_bs6), trt_model(input_bs6))
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_dynamic_with_fallback_shape_tensor_pass_through model TRT outputs don't match with the pytorch model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
