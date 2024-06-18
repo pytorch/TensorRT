@@ -12,7 +12,7 @@ from torch_tensorrt._Device import Device
 logger = logging.getLogger(__name__)
 
 SerializedTensorRTEngineFmt = Tuple[
-    str, str, str, bytes, str, str, bytes, str
+    str, str, str, bytes, str, str, str, bytes
 ]  # Defined in //core/runtime/register_jit_hooks.cpp
 SerializedTorchTensorRTModuleFmt = Tuple[
     str, Optional[SerializedTensorRTEngineFmt], List[str], List[str]
@@ -122,7 +122,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         return encoded_settings
 
     @staticmethod
-    def decode_metadata(encoded_settings: str) -> Any:
+    def decode_metadata(encoded_settings: bytes) -> Any:
         dumped_settings = base64.b64decode(encoded_settings.encode("utf-8"))
         settings = pickle.loads(dumped_settings)
         settings.torch_executed_ops = {eval(op) for op in settings.torch_executed_ops}
