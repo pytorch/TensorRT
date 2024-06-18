@@ -3247,7 +3247,13 @@ def aten_ops_index_select(
 
 def dropout_inference_validator(node: Node) -> bool:
     train_mode = args_bounds_check(node.args, 2, None)
-    return train_mode is False
+    if train_mode is False:
+        return True
+    else:  # train_mode is True or None
+        _LOGGER.debug(
+            "Currently only inference mode is supported for dropout operation."
+        )
+        return False
 
 
 @dynamo_tensorrt_converter(
