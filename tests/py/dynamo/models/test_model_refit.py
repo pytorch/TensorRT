@@ -1,4 +1,5 @@
 import os
+import tempfile
 import time
 import unittest
 
@@ -171,7 +172,7 @@ def test_refit_one_engine_bert():
 
 @pytest.mark.unit
 def test_refit_one_engine_inline_runtime():
-
+    trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
@@ -192,9 +193,8 @@ def test_refit_one_engine_inline_runtime():
         min_block_size=min_block_size,
         refit=True,
     )
-    torchtrt.save(trt_gm, "./compiled.ep", inputs=inputs)
-    trt_gm = torch.export.load("./compiled.ep")
-    os.remove("./compiled.ep")
+    torchtrt.save(trt_gm, trt_ep_path, inputs=inputs)
+    trt_gm = torch.export.load(trt_ep_path)
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
