@@ -140,7 +140,7 @@ def refit_module_weights(
     compiled_module: torch.fx.GraphModule | ExportedProgram,
     new_weight_module: ExportedProgram,
     inputs: Tuple[Any, ...],
-    verify_output: bool = True,
+    verify_output: bool = False,
 ) -> torch.fx.GraphModule:
     """
     Refit a compiled graph module with ExportedProgram. This performs weight updates in compiled_module without recompiling the engine.
