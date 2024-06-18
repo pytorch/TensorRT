@@ -834,7 +834,7 @@ def index_put_validator(node: Node) -> bool:
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.index_put_.default,
+    torch.ops.aten.index_put.default,
     capability_validator=index_put_validator,
 )
 @enforce_tensor_types(

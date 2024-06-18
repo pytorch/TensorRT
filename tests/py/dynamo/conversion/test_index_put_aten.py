@@ -171,19 +171,24 @@ class TestIndexPutConverter(DispatchTestCase):
     def test_index_put(
         self, test_name, source_tensor, indices_tensor, value_tensor, accumulate=False
     ):
+        @torch._dynamo.assume_constant_result
+        def get_indices_tensor():
+            return indices_tensor
+            # return (torch.tensor([0], dtype=torch.int32),)
+
         class TestIndexPut(torch.nn.Module):
             def forward(self, source_tensor, value_tensor):
-                return torch.ops.aten.index_put_.default(
-                    source_tensor, indices_tensor, value_tensor, accumulate
+                indices_tensor_const = get_indices_tensor()
+                return torch.ops.aten.index_put.default(
+                    source_tensor, indices_tensor_const, value_tensor, accumulate
                 )
 
         self.run_test(
             TestIndexPut(),
             inputs=[source_tensor, value_tensor],
-            # enable_passes=True,
-            # use_dynamo_tracer=True,
+            enable_passes=True,
+            use_dynamo_tracer=True,
         )
-
 
 if __name__ == "__main__":
     run_tests()
