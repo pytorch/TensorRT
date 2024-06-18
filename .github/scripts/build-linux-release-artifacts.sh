@@ -80,10 +80,10 @@ libtorchtrt() {
     fi
 }
 
-# build pre_cxx11_abi
-libtorchtrt true
-# build cxx11_abi
-libtorchtrt false
+# # build pre_cxx11_abi
+# libtorchtrt true
+# # build cxx11_abi
+# libtorchtrt false
 
 # auditwheel repair
 python -m auditwheel repair \
@@ -94,4 +94,4 @@ python -m auditwheel repair \
 cp wheelhouse/torch_tensorrt*x86_64.whl dist/
 
 
-BUILD_VERSION=${TORCHTRT_VERSION} CI_BUILD=1 RELEASE=1 C python setup.py bdist_wheel --release
+BUILD_VERSION=${TORCHTRT_VERSION} CI_BUILD=1 RELEASE=1 python setup.py bdist_wheel --release
