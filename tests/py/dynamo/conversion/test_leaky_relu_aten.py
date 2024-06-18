@@ -22,9 +22,10 @@ class TestLeakyReLUConverter(DispatchTestCase):
 
         input_specs = [
             Input(
-                shape=(-1, -1, -1),
                 dtype=torch.float32,
-                shape_ranges=[((1, 1, 1), (1, 2, 3), (3, 3, 3))],
+                min_shape=(1, 1, 1),
+                opt_shape=(1, 2, 3),
+                max_shape=(3, 3, 3),
             ),
         ]
         self.run_test_with_dynamic_shape(TestModule(), input_specs)
@@ -36,9 +37,10 @@ class TestLeakyReLUConverter(DispatchTestCase):
 
         input_specs = [
             Input(
-                shape=(-1, -1, -1, -1),
                 dtype=torch.float32,
-                shape_ranges=[((1, 1, 1, 5), (1, 2, 3, 5), (3, 3, 3, 5))],
+                min_shape=(1, 1, 1, 5),
+                opt_shape=(1, 2, 3, 5),
+                max_shape=(3, 3, 3, 5),
             ),
         ]
 

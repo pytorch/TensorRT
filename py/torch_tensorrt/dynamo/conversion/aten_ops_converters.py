@@ -459,7 +459,9 @@ def aten_ops_tanh(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.leaky_relu.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.leaky_relu.default, supports_dynamic_shapes=True
+)
 def aten_ops_leaky_relu(
     ctx: ConversionContext,
     target: Target,
@@ -477,7 +479,7 @@ def aten_ops_leaky_relu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.elu.default)
+@dynamo_tensorrt_converter(torch.ops.aten.elu.default, supports_dynamic_shapes=True)
 def aten_ops_elu(
     ctx: ConversionContext,
     target: Target,
@@ -496,7 +498,9 @@ def aten_ops_elu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.softplus.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.softplus.default, supports_dynamic_shapes=True
+)
 def aten_ops_softplus(
     ctx: ConversionContext,
     target: Target,
@@ -514,7 +518,9 @@ def aten_ops_softplus(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.hardsigmoid.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.hardsigmoid.default, supports_dynamic_shapes=True
+)
 def aten_ops_hard_sigmoid(
     ctx: ConversionContext,
     target: Target,
@@ -1779,6 +1785,7 @@ def aten_ops_add(
     )
 
 
+@dynamo_tensorrt_converter(operator.mul, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mul.Tensor, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mul.Scalar, supports_dynamic_shapes=True)
 def aten_ops_mul(

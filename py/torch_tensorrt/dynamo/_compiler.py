@@ -78,6 +78,7 @@ def compile(
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
+    timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -137,6 +138,7 @@ def compile(
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the grap easier to covert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -220,6 +222,7 @@ def compile(
         "dla_global_dram_size": dla_global_dram_size,
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
+        "timing_cache_path": timing_cache_path,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -477,6 +480,7 @@ def convert_module_to_trt_engine(
     dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
     calibrator: object = None,
     allow_shape_tensors: bool = False,
+    timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -532,7 +536,7 @@ def convert_module_to_trt_engine(
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
-
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
@@ -585,6 +589,7 @@ def convert_module_to_trt_engine(
         "dla_sram_size": dla_sram_size,
         "dla_local_dram_size": dla_local_dram_size,
         "dla_global_dram_size": dla_global_dram_size,
+        "timing_cache_path": timing_cache_path,
     }
 
     exported_program = pre_export_lowering(exported_program, torch_inputs)
