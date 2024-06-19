@@ -1,5 +1,7 @@
 from typing import Optional, Sequence, Union
 
+import numpy as np
+import tensorrt as trt
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
 from torch_tensorrt import _enums
@@ -7,9 +9,14 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     SourceIR,
     cast_trt_tensor,
+    flatten_dims,
     get_trt_tensor,
 )
-from torch_tensorrt.fx.converters.converter_utils import set_layer_name
+from torch_tensorrt.fx.converters.converter_utils import (
+    Frameworks,
+    set_layer_name,
+    unified_dtype_converter,
+)
 from torch_tensorrt.fx.types import TRTTensor
 
 
@@ -131,3 +138,60 @@ def pixel_unshuffle(
         permuted_tensor,
         shape[:-3] + (out_channels, out_height, out_width),
     )
+
+
+def resize_(
+    ctx: ConversionContext,
+    target: Union[Target, str],
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    sizes: Sequence[int],
+) -> TRTTensor:
+
+    input_np_dtype = unified_dtype_converter(input.dtype, Frameworks.NUMPY)
+
+    input_val = get_trt_tensor(ctx, input, f"{name}_input")
+
+    # Calculate the total number of elements for new and current shape
+    new_num_elements = np.prod(sizes)
+    current_num_elements = np.prod(input_val.shape)
+
+    if new_num_elements > current_num_elements:
+        # Create a padding tensor with the required size and initialize new elements with zeros
+        padding_size = new_num_elements - current_num_elements
+        padding_tensor = ctx.net.add_constant(
+            (padding_size,), trt.Weights(np.zeros(padding_size, dtype=input_np_dtype))
+        ).get_output(0)
+
+        # Flatten input tensor to 1D for concatenation
+        flatten_shape = flatten_dims(input_val, 0, -1)
+        flattened_input = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_flatten_input", input_val, flatten_shape
+        )
+
+        # Concatenate the flattened input tensor and padding tensor
+        concat_layer = ctx.net.add_concatenation([flattened_input, padding_tensor])
+        concat_layer.axis = 0
+        reshaped_tensor = concat_layer.get_output(0)
+
+    elif new_num_elements < current_num_elements:
+        # Flatten input tensor to 1D for slicing
+        flatten_shape = flatten_dims(input_val, 0, -1)
+        flattened_input = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_flatten_input", input_val, flatten_shape
+        )
+
+        # Slice the flattened input tensor to the desired number of elements
+        slice_layer = ctx.net.add_slice(flattened_input, [0], [new_num_elements], [1])
+        reshaped_tensor = slice_layer.get_output(0)
+
+    else:
+        reshaped_tensor = input_val
+
+    # Reshape the final output tensor to the target sizes
+    resized_output = impl.shuffle.reshape(
+        ctx, target, source_ir, f"{name}_final_reshape", reshaped_tensor, sizes
+    )
+
+    return resized_output
