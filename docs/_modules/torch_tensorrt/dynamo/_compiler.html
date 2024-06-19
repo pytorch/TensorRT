@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.5.0.dev0+e50550d documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.5.0.dev0+950b791 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+e50550d
+                  v2.5.0.dev0+950b791
                 </div>
               
             
@@ -765,6 +765,7 @@
     <span class="c1"># If specified, try using the fast partitioner and fall back to the global one on failure</span>
     <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">use_fast_partitioner</span><span class="p">:</span>
         <span class="k">try</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Partitioning the graph via the fast partitioner&quot;</span><span class="p">)</span>
             <span class="n">partitioned_module</span><span class="p">,</span> <span class="n">supported_ops</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">fast_partition</span><span class="p">(</span>
                 <span class="n">gm</span><span class="p">,</span>
                 <span class="n">verbose</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">debug</span><span class="p">,</span>
@@ -774,7 +775,7 @@
         <span class="k">except</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">passes</span><span class="o">.</span><span class="n">splitter_base</span><span class="o">.</span><span class="n">FxNetSplitterInternalError</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
                 <span class="s2">&quot;Partitioning failed on the subgraph with fast partition. See trace above. &quot;</span>
-                <span class="o">+</span> <span class="s2">&quot;Retrying with global partition.&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;Retrying with global partition.&quot;</span><span class="p">,</span>
                 <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
             <span class="p">)</span>
 
@@ -782,6 +783,7 @@
             <span class="n">settings</span><span class="o">.</span><span class="n">use_fast_partitioner</span> <span class="o">=</span> <span class="kc">False</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">use_fast_partitioner</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Partitioning the graph via the global partitioner&quot;</span><span class="p">)</span>
         <span class="n">partitioned_module</span><span class="p">,</span> <span class="n">supported_ops</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">global_partition</span><span class="p">(</span>
             <span class="n">gm</span><span class="p">,</span>
             <span class="n">verbose</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">debug</span><span class="p">,</span>
@@ -819,14 +821,15 @@
         <span class="c1"># Get the submodule inputs for min, opt, max shapes of the graph inputs</span>
         <span class="n">submodule_inputs</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">construct_submodule_inputs</span><span class="p">(</span><span class="n">submodule</span><span class="p">)</span>
 
+        <span class="k">assert</span> <span class="n">submodule_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;Submodule name: </span><span class="si">%s</span><span class="se">\n</span><span class="s2"> Input shapes: </span><span class="si">%s</span><span class="se">\n</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Converting submodule: </span><span class="si">%s</span><span class="se">\n</span><span class="s2"> Input shapes: </span><span class="si">%s</span><span class="se">\n</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
             <span class="nb">str</span><span class="p">(</span><span class="n">name</span><span class="p">),</span>
             <span class="p">[</span><span class="nb">input</span><span class="o">.</span><span class="n">shape</span> <span class="k">for</span> <span class="nb">input</span> <span class="ow">in</span> <span class="n">submodule_inputs</span><span class="p">],</span>
             <span class="nb">str</span><span class="p">(</span><span class="n">submodule</span><span class="o">.</span><span class="n">graph</span><span class="p">),</span>
         <span class="p">)</span>
 
-        <span class="k">assert</span> <span class="n">submodule_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
         <span class="c1"># Handle long/double inputs if requested by the user</span>
         <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">truncate_double</span><span class="p">:</span>
             <span class="n">submodule_inputs</span> <span class="o">=</span> <span class="n">repair_double_inputs</span><span class="p">(</span>
