@@ -807,6 +807,67 @@ def aten_ops_select(
     )
 
 
+def index_put_validator(node: Node) -> bool:
+    if args_bounds_check(node.args, 3, False):  # Check if accumulate is valid
+        _LOGGER.debug("We do not support accumulate=True for aten.index_put operation")
+        accumulate_valid = False
+    else:
+        accumulate_valid = True
+
+    # Retrieve input tensor's meta information
+    input_meta = node.args[0].meta.get("tensor_meta")
+    if not input_meta:
+        _LOGGER.warning(
+            "Meta information of input is missing. Unable to validate if broadcasting is needed, falling back to PyTorch operation."
+        )
+        return False
+
+    input_shape = input_meta.shape
+    input_num_dims = len(input_shape)
+
+    # Check if broadcasting is valid
+    indices_num_dims = len(node.args[1])
+    if indices_num_dims == input_num_dims:
+        broadcast_valid = True
+    else:
+        _LOGGER.debug(
+            "We do not support broadcasting when the number of index dimensions does not match the number of input tensor dimensions."
+        )
+        broadcast_valid = False
+
+    # Return validation result
+    return accumulate_valid and broadcast_valid
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.index_put.default,
+    capability_validator=index_put_validator,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        2: (TRTTensor,),
+    }
+)
+def aten_ops_index_put(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.select.index_put_converter(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args[2],
+        args_bounds_check(args, 3, False),
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.slice.Tensor, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
