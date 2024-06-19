@@ -6,6 +6,24 @@ from .harness import DispatchTestCase
 
 
 class TestResizeConverter(DispatchTestCase):
+
+    def compare_resized_tensors(self, tensor1, tensor2, input_shape, target_shape):
+        # Check if the sizes match
+        if tensor1.size() != tensor2.size():
+            return False
+
+        # Flatten the tensors to ensure we are comparing the valid elements
+        flat_tensor1 = tensor1.flatten()
+        flat_tensor2 = tensor2.flatten()
+
+        # Calculate the number of valid elements to compare
+        input_numel = torch.Size(input_shape).numel()
+        target_numel = torch.Size(target_shape).numel()
+        min_size = min(input_numel, target_numel)
+
+        # Compare only the valid elements
+        return torch.equal(flat_tensor1[:min_size], flat_tensor2[:min_size])
+
     @parameterized.expand(
         [
             ((3,),),
@@ -28,24 +46,7 @@ class TestResizeConverter(DispatchTestCase):
         input_shape = (5,)
         inputs = [torch.randn(input_shape)]
 
-        def compare_resized_tensors(tensor1, tensor2, input_shape, target_shape):
-            # Check if the sizes match
-            if tensor1.size() != tensor2.size():
-                return False
-
-            # Flatten the tensors to ensure we are comparing the valid elements
-            flat_tensor1 = tensor1.flatten()
-            flat_tensor2 = tensor2.flatten()
-
-            # Calculate the number of valid elements to compare
-            input_numel = torch.Size(input_shape).numel()
-            target_numel = torch.Size(target_shape).numel()
-            min_size = min(input_numel, target_numel)
-
-            # Compare only the valid elements
-            return torch.equal(flat_tensor1[:min_size], flat_tensor2[:min_size])
-
-        comparators = [(compare_resized_tensors, [input_shape, target_shape])]
+        comparators = [(self.compare_resized_tensors, [input_shape, target_shape])]
 
         self.run_test_compare_tensor_attributes_only(
             Resize(),
@@ -76,24 +77,7 @@ class TestResizeConverter(DispatchTestCase):
         input_shape = (5,)
         inputs = [torch.randint(1, 5, input_shape)]
 
-        def compare_resized_tensors(tensor1, tensor2, input_shape, target_shape):
-            # Check if the sizes match
-            if tensor1.size() != tensor2.size():
-                return False
-
-            # Flatten the tensors to ensure we are comparing the valid elements
-            flat_tensor1 = tensor1.flatten()
-            flat_tensor2 = tensor2.flatten()
-
-            # Calculate the number of valid elements to compare
-            input_numel = torch.Size(input_shape).numel()
-            target_numel = torch.Size(target_shape).numel()
-            min_size = min(input_numel, target_numel)
-
-            # Compare only the valid elements
-            return torch.equal(flat_tensor1[:min_size], flat_tensor2[:min_size])
-
-        comparators = [(compare_resized_tensors, [input_shape, target_shape])]
+        comparators = [(self.compare_resized_tensors, [input_shape, target_shape])]
 
         self.run_test_compare_tensor_attributes_only(
             Resize(),
@@ -124,24 +108,7 @@ class TestResizeConverter(DispatchTestCase):
         input_shape = (4, 4)
         inputs = [torch.randint(1, 10, input_shape)]
 
-        def compare_resized_tensors(tensor1, tensor2, input_shape, target_shape):
-            # Check if the sizes match
-            if tensor1.size() != tensor2.size():
-                return False
-
-            # Flatten the tensors to ensure we are comparing the valid elements
-            flat_tensor1 = tensor1.flatten()
-            flat_tensor2 = tensor2.flatten()
-
-            # Calculate the number of valid elements to compare
-            input_numel = torch.Size(input_shape).numel()
-            target_numel = torch.Size(target_shape).numel()
-            min_size = min(input_numel, target_numel)
-
-            # Compare only the valid elements
-            return torch.equal(flat_tensor1[:min_size], flat_tensor2[:min_size])
-
-        comparators = [(compare_resized_tensors, [input_shape, target_shape])]
+        comparators = [(self.compare_resized_tensors, [input_shape, target_shape])]
 
         self.run_test_compare_tensor_attributes_only(
             Resize(),
@@ -171,24 +138,7 @@ class TestResizeConverter(DispatchTestCase):
         input_shape = (4, 4)
         inputs = [torch.randint(1, 10, input_shape)]
 
-        def compare_resized_tensors(tensor1, tensor2, input_shape, target_shape):
-            # Check if the sizes match
-            if tensor1.size() != tensor2.size():
-                return False
-
-            # Flatten the tensors to ensure we are comparing the valid elements
-            flat_tensor1 = tensor1.flatten()
-            flat_tensor2 = tensor2.flatten()
-
-            # Calculate the number of valid elements to compare
-            input_numel = torch.Size(input_shape).numel()
-            target_numel = torch.Size(target_shape).numel()
-            min_size = min(input_numel, target_numel)
-
-            # Compare only the valid elements
-            return torch.equal(flat_tensor1[:min_size], flat_tensor2[:min_size])
-
-        comparators = [(compare_resized_tensors, [input_shape, target_shape])]
+        comparators = [(self.compare_resized_tensors, [input_shape, target_shape])]
 
         self.run_test_compare_tensor_attributes_only(
             Resize(),
