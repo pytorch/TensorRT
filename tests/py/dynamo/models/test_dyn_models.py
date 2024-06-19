@@ -324,7 +324,7 @@ def test_dynamic_with_fallback_shape_tensor_pass_through(ir):
             out = self.conv(x)
             x = x + 2
             x = x * 2
-            out = torch.reshape(x, (-1, 222 * 222))
+            out = torch.reshape(x, (-1, 224 * 224))
             out = self.relu(out)
             return out
 
