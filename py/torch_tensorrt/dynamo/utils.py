@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import fields, replace
+from enum import Enum
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 
+import numpy as np
+import tensorrt as trt
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
@@ -13,10 +16,61 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 
 from packaging import version
 
+from .types import TRTDataType
+
 logger = logging.getLogger(__name__)
 
 COSINE_THRESHOLD = 0.99
 DYNAMIC_DIM = -1
+
+
+class Frameworks(Enum):
+    NUMPY = "numpy"
+    TORCH = "torch"
+    TRT = "trt"
+
+
+DataTypeEquivalence: Dict[
+    TRTDataType, Dict[Frameworks, Union[TRTDataType, np.dtype, torch.dtype]]
+] = {
+    trt.int8: {
+        Frameworks.NUMPY: np.int8,
+        Frameworks.TORCH: torch.int8,
+        Frameworks.TRT: trt.int8,
+    },
+    trt.int32: {
+        Frameworks.NUMPY: np.int32,
+        Frameworks.TORCH: torch.int32,
+        Frameworks.TRT: trt.int32,
+    },
+    trt.int64: {
+        Frameworks.NUMPY: np.int64,
+        Frameworks.TORCH: torch.int64,
+        Frameworks.TRT: trt.int64,
+    },
+    trt.float16: {
+        Frameworks.NUMPY: np.float16,
+        Frameworks.TORCH: torch.float16,
+        Frameworks.TRT: trt.float16,
+    },
+    trt.float32: {
+        Frameworks.NUMPY: np.float32,
+        Frameworks.TORCH: torch.float32,
+        Frameworks.TRT: trt.float32,
+    },
+    trt.bool: {
+        Frameworks.NUMPY: bool,
+        Frameworks.TORCH: torch.bool,
+        Frameworks.TRT: trt.bool,
+    },
+}
+
+if trt.__version__ >= "7.0":
+    DataTypeEquivalence[trt.bool] = {
+        Frameworks.NUMPY: np.bool_,
+        Frameworks.TORCH: torch.bool,
+        Frameworks.TRT: trt.bool,
+    }
 
 
 def use_python_runtime_parser(use_python_runtime: Optional[bool] = None) -> bool:
@@ -317,3 +371,34 @@ def req_torch_version(min_torch_version: str = "2.dev") -> Callable[..., Any]:
         return function_wrapper
 
     return nested_decorator
+
+
+def unified_dtype_converter(
+    dtype: Union[TRTDataType, torch.dtype, np.dtype], to: Frameworks
+) -> Union[np.dtype, torch.dtype, TRTDataType]:
+    """
+    Convert TensorRT, Numpy, or Torch data types to any other of those data types.
+
+    Args:
+        dtype (TRTDataType, torch.dtype, np.dtype): A TensorRT, Numpy, or Torch data type.
+        to (Frameworks): The framework to convert the data type to.
+
+    Returns:
+        The equivalent data type in the requested framework.
+    """
+    assert to in Frameworks, f"Expected valid Framework for translation, got {to}"
+    trt_major_version = int(trt.__version__.split(".")[0])
+    if dtype in (np.int8, torch.int8, trt.int8):
+        return DataTypeEquivalence[trt.int8][to]
+    elif trt_major_version >= 7 and dtype in (np.bool_, torch.bool, trt.bool):
+        return DataTypeEquivalence[trt.bool][to]
+    elif dtype in (np.int32, torch.int32, trt.int32):
+        return DataTypeEquivalence[trt.int32][to]
+    elif dtype in (np.int64, torch.int64, trt.int64):
+        return DataTypeEquivalence[trt.int64][to]
+    elif dtype in (np.float16, torch.float16, trt.float16):
+        return DataTypeEquivalence[trt.float16][to]
+    elif dtype in (np.float32, torch.float32, trt.float32):
+        return DataTypeEquivalence[trt.float32][to]
+    else:
+        raise TypeError("%s is not a supported dtype" % dtype)
