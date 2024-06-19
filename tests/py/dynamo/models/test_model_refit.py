@@ -37,7 +37,7 @@ def test_mapping():
     ]
     enabled_precisions = {torch.float}
     debug = False
-    min_block_size = 0
+    min_block_size = 1
     use_python_runtime = False
 
     exp_program = torch.export.export(model, tuple(inputs))
@@ -84,7 +84,7 @@ def test_refit_one_engine():
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
     debug = False
-    min_block_size = 0
+    min_block_size = 1
     use_python_runtime = False
 
     exp_program = torch.export.export(model, tuple(inputs))
@@ -130,7 +130,7 @@ def test_refit_one_engine_bert():
     nn.init.xavier_normal_(model2.embeddings.word_embeddings.weight)
     enabled_precisions = {torch.float}
     debug = False
-    min_block_size = 0
+    min_block_size = 1
     use_python_runtime = False
 
     exp_program = torch.export.export(model, tuple(inputs))
@@ -178,7 +178,7 @@ def test_refit_one_engine_inline_runtime():
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
     debug = False
-    min_block_size = 0
+    min_block_size = 1
     use_python_runtime = False
 
     exp_program = torch.export.export(model, tuple(inputs))
@@ -223,7 +223,7 @@ def test_refit_one_engine_python_runtime():
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
     debug = False
-    min_block_size = 0
+    min_block_size = 1
     use_python_runtime = True
 
     exp_program = torch.export.export(model, tuple(inputs))
@@ -287,7 +287,7 @@ def test_refit_multiple_engine():
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
     debug = False
-    min_block_size = 0
+    min_block_size = 1
     use_python_runtime = False
 
     exp_program = torch.export.export(model, tuple(inputs))
