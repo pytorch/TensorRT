@@ -254,8 +254,8 @@ def test_refit_one_engine_python_runtime():
             torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),
             "Refit Result is not correct. Refit failed",
         )
-        # Clean up model env
 
+    # Clean up model env
     torch._dynamo.reset()
 
 
