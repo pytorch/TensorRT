@@ -324,7 +324,7 @@ def test_dynamic_with_fallback_shape_tensor_pass_through(ir):
             out = self.conv(x)
             x = x + 2
             x = x * 2
-            out = torch.reshape(x, (-1, 224 * 224))
+            out = torch.reshape(x, (-1, 222 * 222))
             out = self.relu(out)
             return out
 
@@ -342,7 +342,7 @@ def test_dynamic_with_fallback_shape_tensor_pass_through(ir):
 
     # Compile the model
     if ir == "torch_compile":
-        torch._dynamo.mark_dynamic(input_bs4, 0, min=1, max=24)
+        torch._dynamo.mark_dynamic(input_bs4, 0, min=1, max=1024)
         # Compile the model
         trt_model = torch.compile(model, backend="tensorrt", options=compile_spec)
         trt_model(input_bs4)
@@ -351,7 +351,7 @@ def test_dynamic_with_fallback_shape_tensor_pass_through(ir):
             torchtrt.Input(
                 min_shape=(1, 3, 224, 224),
                 opt_shape=(4, 3, 224, 224),
-                max_shape=(24, 3, 224, 224),
+                max_shape=(1024, 3, 224, 224),
                 dtype=torch.float32,
                 name="x",
             )
