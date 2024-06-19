@@ -342,8 +342,7 @@ def test_dynamic_with_fallback_shape_tensor_pass_through(ir):
 
     # Compile the model
     if ir == "torch_compile":
-        torch._dynamo.mark_dynamic(input_bs4, 0, min=1, max=1024)
-        # Compile the model
+        torch._dynamo.mark_dynamic(input_bs4, 0, min=2, max=1024)
         trt_model = torch.compile(model, backend="tensorrt", options=compile_spec)
         trt_model(input_bs4)
     elif ir == "dynamo":
