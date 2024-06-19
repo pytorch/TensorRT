@@ -20,9 +20,6 @@ class TestResizeConverter(DispatchTestCase):
     )
     def test_resize_1d_input_float(self, target_shape):
         class Resize(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-
             def forward(self, x):
                 return torch.ops.aten.resize_.default(x, target_shape)
 
@@ -46,9 +43,6 @@ class TestResizeConverter(DispatchTestCase):
     )
     def test_resize_1d_input_int(self, target_shape):
         class Resize(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-
             def forward(self, x):
                 return torch.ops.aten.resize_.default(x, target_shape)
 
@@ -73,9 +67,6 @@ class TestResizeConverter(DispatchTestCase):
     )
     def test_resize_2d_input_float(self, target_shape):
         class Resize(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-
             def forward(self, x):
                 return torch.ops.aten.resize_.default(x, target_shape)
 
@@ -100,9 +91,6 @@ class TestResizeConverter(DispatchTestCase):
     )
     def test_resize_2d_input_int(self, target_shape):
         class Resize(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-
             def forward(self, x):
                 return torch.ops.aten.resize_.default(x, target_shape)
 

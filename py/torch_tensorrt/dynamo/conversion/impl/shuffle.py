@@ -140,7 +140,7 @@ def pixel_unshuffle(
     )
 
 
-def resize_(
+def resize(
     ctx: ConversionContext,
     target: Union[Target, str],
     source_ir: Optional[SourceIR],
@@ -148,9 +148,7 @@ def resize_(
     input: TRTTensor,
     sizes: Sequence[int],
 ) -> TRTTensor:
-
     input_np_dtype = unified_dtype_converter(input.dtype, Frameworks.NUMPY)
-
     input_val = get_trt_tensor(ctx, input, f"{name}_input")
 
     # Calculate the total number of elements for new and current shape
@@ -166,31 +164,34 @@ def resize_(
 
         # Flatten input tensor to 1D for concatenation
         flatten_shape = flatten_dims(input_val, 0, -1)
-        flattened_input = impl.shuffle.reshape(
+        flattened_input = reshape(
             ctx, target, source_ir, f"{name}_flatten_input", input_val, flatten_shape
         )
 
         # Concatenate the flattened input tensor and padding tensor
-        concat_layer = ctx.net.add_concatenation([flattened_input, padding_tensor])
-        concat_layer.axis = 0
-        reshaped_tensor = concat_layer.get_output(0)
-
+        reshaped_tensor = impl.cat.cat(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_cat",
+            [flattened_input, padding_tensor],
+            dim=0,
+        )
     elif new_num_elements < current_num_elements:
         # Flatten input tensor to 1D for slicing
         flatten_shape = flatten_dims(input_val, 0, -1)
-        flattened_input = impl.shuffle.reshape(
+        flattened_input = reshape(
             ctx, target, source_ir, f"{name}_flatten_input", input_val, flatten_shape
         )
 
         # Slice the flattened input tensor to the desired number of elements
         slice_layer = ctx.net.add_slice(flattened_input, [0], [new_num_elements], [1])
         reshaped_tensor = slice_layer.get_output(0)
-
     else:
         reshaped_tensor = input_val
 
     # Reshape the final output tensor to the target sizes
-    resized_output = impl.shuffle.reshape(
+    resized_output = reshape(
         ctx, target, source_ir, f"{name}_final_reshape", reshaped_tensor, sizes
     )
 

@@ -2695,7 +2695,6 @@ def aten_ops_pixel_unshuffle(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.resize.default)
 @dynamo_tensorrt_converter(torch.ops.aten.resize_.default)
 @enforce_tensor_types(
     {
@@ -2709,7 +2708,7 @@ def aten_ops_resize(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.shuffle.resize_(
+    return impl.shuffle.resize(
         ctx,
         target,
         SourceIR.ATEN,
