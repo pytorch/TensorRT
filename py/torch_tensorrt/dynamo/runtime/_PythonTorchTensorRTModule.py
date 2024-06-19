@@ -32,8 +32,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         engine: bytes,
         input_names: Optional[List[str]] = None,
         output_names: Optional[List[str]] = None,
-        target_device: Device = Device._current_device(),
-        profiling_enabled: Optional[bool] = None,
         settings: Any = None,
     ):
         super(PythonTorchTensorRTModule, self).__init__()
@@ -46,13 +44,15 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.input_names = input_names if input_names is not None else []
         self.output_names = output_names if output_names is not None else []
         self.initialized = False
-        self.target_device_id = target_device.gpu_id
+        self.target_device_id = (
+            settings.device.gpu_id
+            if settings.device is not None
+            else Device._current_device().gpu_id
+        )
         self.target_device_properties = torch.cuda.get_device_properties(
             self.target_device_id
         )
-        self.profiling_enabled = (
-            profiling_enabled if profiling_enabled is not None else False
-        )
+        self.profiling_enabled = settings.debug if settings.debug is not None else False
         self.settings = settings
         self._initialize()
 
