@@ -11,12 +11,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     flatten_dims,
     get_trt_tensor,
-)
-from torch_tensorrt.fx.converters.converter_utils import (
-    Frameworks,
     set_layer_name,
-    unified_dtype_converter,
 )
+from torch_tensorrt.dynamo.utils import Frameworks, unified_dtype_converter
 from torch_tensorrt.fx.types import TRTTensor
 
 
