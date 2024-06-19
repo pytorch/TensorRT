@@ -571,3 +571,20 @@ def isnan(
     )
 
     return nan_values_mask
+
+
+def native_dropout(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: Union[TRTTensor, torch.Tensor, np.ndarray],
+    p: float,
+    train: Optional[bool] = False,
+) -> TRTTensor:
+    if train is False:
+        identity_layer = ctx.net.add_identity(input_val)
+        set_layer_name(identity_layer, target, f"{name}_input", source_ir)
+        mask = np.ones(input_val.shape, dtype=bool)
+        mask = get_trt_tensor(ctx, mask, f"{name}_mask")
+        return identity_layer.get_output(0), mask
