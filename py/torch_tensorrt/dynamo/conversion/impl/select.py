@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Sequence, Tuple, Union, cast
+from typing import Optional, Sequence, Union, cast
 
 import numpy as np
 import tensorrt as trt
@@ -455,7 +455,7 @@ def index_put_converter(
     source_ir: Optional[SourceIR],
     name: str,
     input_tensor: TRTTensor,
-    indices: Union[TRTTensor, Tuple[TRTTensor, ...]],
+    indices: Sequence[Union[TRTTensor, np.ndarray, torch.Tensor]],
     values: TRTTensor,
     accumulate: bool = False,
 ) -> TRTTensor:

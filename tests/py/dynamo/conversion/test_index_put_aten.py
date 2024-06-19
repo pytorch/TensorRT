@@ -1,8 +1,6 @@
 import torch
-import torch.nn as nn
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
@@ -174,7 +172,6 @@ class TestIndexPutConverter(DispatchTestCase):
         @torch._dynamo.assume_constant_result
         def get_indices_tensor():
             return indices_tensor
-            # return (torch.tensor([0], dtype=torch.int32),)
 
         class TestIndexPut(torch.nn.Module):
             def forward(self, source_tensor, value_tensor):
