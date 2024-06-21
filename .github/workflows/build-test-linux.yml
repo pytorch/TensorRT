@@ -58,9 +58,7 @@ jobs:
     needs: build
     name: Check files
     outputs:
-      folder_names:
-        description: "the list of folder names which has file change"
-        value: ${{ steps.check_files.outputs.folder_names }}
+      folder_names: ${{ steps.check_files.outputs.folder_names }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout torch-tensorrt repository
