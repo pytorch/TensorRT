@@ -24,8 +24,38 @@ jobs:
       with-rocm: false
       with-cpu: false
 
+  build-release-artifacts:
+    name: Build torch-tensorrt release artifacts
+    needs: [generate-matrix]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            env-var-script: packaging/env_vars.txt
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/release-linux.yml
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
+    with:
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      env-var-script: ${{ matrix.env-var-script }}
+      post-script: ${{ matrix.post-script }}
+      package-name: ${{ matrix.package-name }}
+      smoke-test-script: ${{ matrix.smoke-test-script }}
+      trigger-event: ${{ github.event_name }}
+
   build:
     needs: generate-matrix
+    # temporary to disable the build and test
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') }}
     permissions:
       id-token: write
       contents: read
