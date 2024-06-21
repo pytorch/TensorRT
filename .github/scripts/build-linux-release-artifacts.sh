@@ -27,7 +27,7 @@ else
    exit
 fi
 
-python -m pip install auditwheel
+python -m pip install auditwheel pyyaml
 
 # Setup Bazel via Bazelisk
 wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -O /usr/bin/bazel &&\

@@ -143,6 +143,13 @@ jobs:
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: /opt/torch-tensorrt-builds/
+      - name: Build clean
+        working-directory: ${{ inputs.repository }}
+        shell: bash -l {0}
+        run: |
+          set -euxo pipefail
+          source "${BUILD_ENV_FILE}"
+          ${CONDA_RUN} python setup.py clean
       # - name: Install torch and torch-tensorrt
       #   if: ${{ inputs.pre-script != '' }}
       #   uses: ./test-infra/.github/actions/run-script-with-cache
