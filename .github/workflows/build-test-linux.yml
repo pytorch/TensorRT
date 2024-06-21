@@ -54,9 +54,47 @@ jobs:
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
 
+  check:
+    needs: build
+    name: Check files
+    outputs:
+      folder_names:
+        description: "the list of folder names which has file change"
+        value: ${{ steps.check_files.outputs.folder_names }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout torch-tensorrt repository
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.ref_ }}
+      - name: Check modified files
+        id: check_files
+        run: |
+          set -eou pipfail
+          if [ ${{ github.event.ref }} == refs/tags/v* ]; then
+            echo "this is the release tag, always run the full tests"
+          elif [ ${{github.event.ref_type != 'branch' }} ]; then
+            echo "this is ref_type=${{github.event.ref_type}}, always run the full tests "
+          else
+            echo "=============== last modified files ==============="
+            git diff --name-only HEAD^ HEAD
+            echo "=============== check paths of modified files ==============="
+            git diff --name-only github.event.ref main
+          fi
+
+          echo "github.event.ref_type: ${{ github.event.ref_type }}"
+          echo "github.event.ref: ${{ github.event.ref }}"
+          echo "github.event.ref_name: ${{ github.event.ref_name }}"
+          echo "github.event.master_branch: ${{ github.event.master_branch }}"
+          echo "github.event.pull_request: ${{ github.event.pull_request }}"
+          folder_names="$(python3 scripts/check_files.py)"
+          echo "folder_names=${folder_names}" >> "${GITHUB_OUTPUT}"
+
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
-    needs: [generate-matrix, build]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.folder_names, 'tests/modules') }}
     strategy:
       fail-fast: false
       matrix:
@@ -91,7 +129,8 @@ jobs:
 
   tests-py-dynamo-converters:
     name: Test dynamo converters [Python]
-    needs: [generate-matrix, build]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.folder_names, 'tests/py/dynamo') }}
     strategy:
       fail-fast: false
       matrix:
@@ -236,7 +275,8 @@ jobs:
 
   tests-py-core:
     name: Test core [Python]
-    needs: [generate-matrix, build]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.folder_names, 'tests/py/dynamo') }}
     strategy:
       fail-fast: false
       matrix:
