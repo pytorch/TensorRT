@@ -90,7 +90,9 @@ jobs:
       ARCH: ${{ inputs.architecture }}
     name: ${{ matrix.build_name }}
     # only run the build release artifacts on latest cuda version
-    if: ${{ matrix.desired_cuda == 'cu121' }}
+    # Unrecognized named-value: 'matrix'. Located at position 1 within expression: matrix.desired_cuda == 'cu121
+    # if: ${{ matrix.desired_cuda == 'cu121' }}
+    if: ${{ inputs.build-matrix.desired_cuda == 'cu121' }}
     runs-on: ${{ matrix.validation_runner }}
     container:
       image: ${{ matrix.container_image }}
