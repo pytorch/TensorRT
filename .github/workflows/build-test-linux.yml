@@ -27,6 +27,9 @@ jobs:
   build-release-artifacts:
     name: Build torch-tensorrt release artifacts
     needs: [generate-matrix]
+    permissions:
+      id-token: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
