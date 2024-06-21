@@ -93,7 +93,7 @@ jobs:
     container:
       image: ${{ matrix.container_image }}
       options: ${{ matrix.gpu_arch_type == 'cuda' && '--gpus all' || ' ' }}
-    # If a build is taking longer than 60 minutes on these runners we need
+    # If a build is taking longer than 120 minutes on these runners we need
     # to have a conversation
     timeout-minutes: 120
     steps:
@@ -192,7 +192,23 @@ jobs:
           TRT_VERSION=10.0.1
           ls -lart bazel-bin
           ls -lart dist
-          cp bazel-bin/libtorchtrt.tar.gz dist/libtorchtrt-${TORCHTRT_VERSION}-pre-cxx11-abi-tensorrt${TRT_VERSION}-cuda${CU_VERSION}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
+          ${CONDA_RUN} python -m pip install auditwheel
+
+          ${CONDA_RUN} python -m auditwheel repair \
+            $(cat py/ci/soname_excludes.params) \
+            --plat manylinux_2_34_x86_64 \
+            dist/torch_tensorrt-*-linux_x86_64.whl
+          ls -lart wheelhouse
+          ${CONDA_RUN} python -m zipfile --list torch_tensorrt*x86_64.whl
+          cp wheelhouse/torch_tensorrt*x86_64.whl dist/
+          cp bazel-bin/libtorchtrt.tar.gz \
+            dist/libtorchtrt-${TORCHTRT_VERSION}-pre-cxx11-abi-tensorrt${TRT_VERSION}-cuda${CU_VERSION}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
+          ${CONDA_RUN} python setup.py bdist_wheel --release --use-cxx11-abi
+          ls -lart bazel-bin
+          cp bazel-bin/libtorchtrt.tar.gz \
+            dist/libtorchtrt-${TORCHTRT_VERSION}-tensorrt${TRT_VERSION}-cuda${CU_VERSION}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
+          ls -lart dist/
+
       - name: Run Post-Script
         if: ${{ inputs.post-script != '' }}
         uses: ./test-infra/.github/actions/run-script-with-cache
