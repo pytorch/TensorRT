@@ -1085,7 +1085,7 @@ def aten_ops_expand(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.amax.default)
+@dynamo_tensorrt_converter(torch.ops.aten.amax.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -1109,7 +1109,7 @@ def aten_ops_amax(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.amin.default)
+@dynamo_tensorrt_converter(torch.ops.aten.amin.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -1133,9 +1133,9 @@ def aten_ops_amin(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sum.default)
-@dynamo_tensorrt_converter(torch.ops.aten.sum.dim_IntList)
-@dynamo_tensorrt_converter(torch.ops.prims.sum.default)
+@dynamo_tensorrt_converter(torch.ops.aten.sum.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.sum.dim_IntList, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.prims.sum.default, supports_dynamic_shapes=True)
 def aten_ops_sum(
     ctx: ConversionContext,
     target: Target,
@@ -1167,8 +1167,8 @@ def aten_ops_sum(
         return sum_
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.prod.default)
-@dynamo_tensorrt_converter(torch.ops.aten.prod.dim_int)
+@dynamo_tensorrt_converter(torch.ops.aten.prod.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.prod.dim_int, supports_dynamic_shapes=True)
 def aten_ops_prod(
     ctx: ConversionContext,
     target: Target,
@@ -1187,9 +1187,14 @@ def aten_ops_prod(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.max.default)
 @dynamo_tensorrt_converter(
-    torch.ops.aten.max.dim, capability_validator=one_user_validator
+    torch.ops.aten.max.default,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.max.dim,
+    capability_validator=one_user_validator,
+    supports_dynamic_shapes=True,
 )
 def aten_ops_max(
     ctx: ConversionContext,
@@ -1210,9 +1215,14 @@ def aten_ops_max(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.min.default)
 @dynamo_tensorrt_converter(
-    torch.ops.aten.min.dim, capability_validator=one_user_validator
+    torch.ops.aten.min.default,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.min.dim,
+    capability_validator=one_user_validator,
+    supports_dynamic_shapes=True,
 )
 def aten_ops_min(
     ctx: ConversionContext,

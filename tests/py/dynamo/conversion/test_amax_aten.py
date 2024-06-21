@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
@@ -88,6 +89,38 @@ class TestAmaxConverter(DispatchTestCase):
             Amax(),
             inputs,
             check_dtype=False,
+        )
+
+    @parameterized.expand(
+        [
+            ((0, 1), True, (2, 3, 5), (3, 4, 6), (4, 5, 7)),
+            ((0,), True, (2, 3, 5), (3, 4, 6), (4, 5, 7)),
+            (1, True, (2, 3, 5), (3, 4, 6), (4, 5, 7)),
+            (2, True, (2, 3, 5), (3, 4, 6), (4, 5, 7)),
+            (-1, True, (2, 3, 5), (3, 4, 6), (4, 5, 7)),
+            ((-1, 0), True, (2, 2, 5), (3, 3, 6), (4, 5, 7)),
+        ]
+    )
+    def test_amax_dynamic_shape(self, dim, keep_dim, min_shape, opt_shape, max_shape):
+        class Amax(nn.Module):
+            def __init__(self, dim):
+                super().__init__()
+                self.dim = dim
+
+            def forward(self, x):
+                return torch.ops.aten.amax.default(x, dim, keep_dim)
+
+        input_specs = [
+            Input(
+                dtype=torch.float32,
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            Amax(dim),
+            input_specs,
         )
 
 

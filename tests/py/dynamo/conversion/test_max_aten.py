@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
@@ -63,6 +64,62 @@ class TestMaxConverter(DispatchTestCase):
             Max(),
             inputs,
             check_dtype=False,
+        )
+
+    @parameterized.expand(
+        [
+            (1, True, (2, 2, 3), (2, 3, 3), (3, 3, 4)),
+            (2, False, (2, 3, 5), (3, 4, 6), (4, 5, 7)),
+            (-1, True, (2, 3, 5), (3, 4, 6), (4, 5, 7)),
+        ]
+    )
+    def test_max_dim_dynamic_shape(
+        self, dim, keep_dim, min_shape, opt_shape, max_shape
+    ):
+        class Max(nn.Module):
+            def __init__(self, dim):
+                super().__init__()
+                self.dim = dim
+
+            def forward(self, x):
+                return torch.ops.aten.max.dim(x, dim, keep_dim)[0]
+
+        input_specs = [
+            Input(
+                dtype=torch.float32,
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            Max(dim),
+            input_specs,
+        )
+
+    @parameterized.expand(
+        [
+            ((2, 2, 3), (2, 3, 3), (3, 3, 4)),
+            ((2, 3, 5), (3, 4, 6), (4, 5, 7)),
+            ((2, 3, 5), (3, 4, 6), (4, 5, 7)),
+        ]
+    )
+    def test_max_default_dynamic_shape(self, min_shape, opt_shape, max_shape):
+        class Max(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.max.default(x)
+
+        input_specs = [
+            Input(
+                dtype=torch.float32,
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            Max(),
+            input_specs,
         )
 
 
