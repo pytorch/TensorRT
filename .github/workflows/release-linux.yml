@@ -92,7 +92,7 @@ jobs:
     # only run the build release artifacts on latest cuda version
     # Unrecognized named-value: 'matrix'. Located at position 1 within expression: matrix.desired_cuda == 'cu121
     # if: ${{ matrix.desired_cuda == 'cu121' }}
-    if: ${{ inputs.build-matrix.desired_cuda == 'cu121' }}
+    if: ${{ inputs.build-matrix.desired_cuda != 'cu121' }}
     runs-on: ${{ matrix.validation_runner }}
     container:
       image: ${{ matrix.container_image }}
@@ -105,6 +105,8 @@ jobs:
         shell: bash -l {0}
         run: |
           set -euxo pipefail
+          echo "${{ inputs.build-matrix }}"
+          echo "${{ inputs.build-matrix.desired_cuda }}"
           echo "::group::Cleanup debug output"
           rm -rf "${GITHUB_WORKSPACE}"
           mkdir -p "${GITHUB_WORKSPACE}"
