@@ -214,7 +214,7 @@ def build_libtorchtrt_pre_cxx11_abi(
         cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
         print("CI based build")
 
-    print("building libtorchtrt")
+    print(f"building libtorchtrt: cmd={cmd}")
     status_code = subprocess.run(cmd).returncode
 
     if status_code != 0:

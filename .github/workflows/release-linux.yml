@@ -92,7 +92,8 @@ jobs:
     # only run the build release artifacts on latest cuda version
     # Unrecognized named-value: 'matrix'. Located at position 1 within expression: matrix.desired_cuda == 'cu121
     # if: ${{ matrix.desired_cuda == 'cu121' }}
-    if: ${{ inputs.build-matrix.desired_cuda != 'cu121' }}
+    if: ${{ env.CU_VERSION == 'cu121' }}
+    # if: ${{ inputs.build-matrix.desired_cuda != 'cu121' }}
     runs-on: ${{ matrix.validation_runner }}
     container:
       image: ${{ matrix.container_image }}
@@ -105,8 +106,6 @@ jobs:
         shell: bash -l {0}
         run: |
           set -euxo pipefail
-          echo "${{ inputs.build-matrix }}"
-          echo "${{ inputs.build-matrix.desired_cuda }}"
           echo "::group::Cleanup debug output"
           rm -rf "${GITHUB_WORKSPACE}"
           mkdir -p "${GITHUB_WORKSPACE}"
@@ -195,7 +194,7 @@ jobs:
           source "${BUILD_ENV_FILE}"
           export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version:  *//' | sed 's/+.\+//')"
           ${CONDA_RUN} python setup.py bdist_wheel --release
-          TORCHTRT_VERSION=${BUILD_VERSION%+*}
+          BUILD_VERSION=${BUILD_VERSION%+*}
           TRT_VERSION=10.0.1
           ls -lart bazel-bin
           ls -lart dist
@@ -209,11 +208,12 @@ jobs:
           ${CONDA_RUN} python -m zipfile --list wheelhouse/torch_tensorrt-*_x86_64.whl
           cp wheelhouse/torch_tensorrt-*_x86_64.whl dist/
           cp bazel-bin/libtorchtrt.tar.gz \
-            dist/libtorchtrt-${TORCHTRT_VERSION}-pre-cxx11-abi-tensorrt${TRT_VERSION}-cuda${CU_VERSION}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
+            dist/libtorchtrt-${BUILD_VERSION}-pre-cxx11-abi-tensorrt${TRT_VERSION}-cuda${CU_VERSION}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
+          ${CONDA_RUN} python setup.py clean
           ${CONDA_RUN} python setup.py bdist_wheel --release --use-cxx11-abi
           ls -lart bazel-bin
           cp bazel-bin/libtorchtrt.tar.gz \
-            dist/libtorchtrt-${TORCHTRT_VERSION}-tensorrt${TRT_VERSION}-cuda${CU_VERSION}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
+            dist/libtorchtrt-${BUILD_VERSION}-tensorrt${TRT_VERSION}-cuda${CU_VERSION}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
           ls -lart dist/
 
       - name: Run Post-Script
