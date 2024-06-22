@@ -91,7 +91,7 @@ jobs:
         if: ${{ env.CU_VERSION == 'cu121' && (env.PYTHON_VERSION == '3.8' || env.PYTHON_VERSION == '3.9' || env.PYTHON_VERSION == '3.10' || env.PYTHON_VERSION == '3.11') }}
         run: |
           set -eou pipefail
-          echo "trigger release artifacts on cuda version: ${CU_VERSION}, python version: ${PY_VERSION}"
+          echo "trigger release artifacts on cuda version: ${CU_VERSION}, python version: ${PYTHON_VERSION}"
 
   release:
     needs: check
