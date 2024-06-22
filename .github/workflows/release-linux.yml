@@ -76,7 +76,25 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  check:
+    name: check_${{ matrix.build_name }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.build-matrix) }}
+    env:
+      PYTHON_VERSION: ${{ matrix.python_version }}
+      CU_VERSION: ${{ matrix.desired_cuda }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check whether to run the release artifacts job or not
+        id: check_whether_to_trigger_release
+        if: ${{ env.CU_VERSION == 'cu121' && (env.PYTHON_VERSION == '3.8' || env.PYTHON_VERSION == '3.9' || env.PYTHON_VERSION == '3.10' || env.PYTHON_VERSION == '3.11') }}
+        run: |
+          set -eou pipefail
+          echo "trigger release artifacts on cuda version: ${CU_VERSION}, python version: ${PY_VERSION}"
+
+  release:
+    needs: check
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.build-matrix) }}
@@ -88,12 +106,7 @@ jobs:
       CU_VERSION: ${{ matrix.desired_cuda }}
       UPLOAD_TO_BASE_BUCKET: ${{ matrix.upload_to_base_bucket }}
       ARCH: ${{ inputs.architecture }}
-    name: ${{ matrix.build_name }}
-    # only run the build release artifacts on latest cuda version
-    # Unrecognized named-value: 'matrix'. Located at position 1 within expression: matrix.desired_cuda == 'cu121
-    # if: ${{ matrix.desired_cuda == 'cu121' }}
-    if: ${{ env.CU_VERSION == 'cu121' }}
-    # if: ${{ inputs.build-matrix.desired_cuda != 'cu121' }}
+    name: release_${{ matrix.build_name }}
     runs-on: ${{ matrix.validation_runner }}
     container:
       image: ${{ matrix.container_image }}
