@@ -92,7 +92,7 @@ jobs:
         id: check_whether_to_trigger_release
         run: |
           set -eou pipefail
-          if [ ${CU_VERSION} == 'cu121' && (PYTHON_VERSION == '3.8' || PYTHON_VERSION == '3.9' || PYTHON_VERSION == '3.10' || PYTHON_VERSION == '3.11') ]; then
+          if [ ${CU_VERSION} == 'cu121' && (${PYTHON_VERSION} == '3.8' || ${PYTHON_VERSION} == '3.9' || ${PYTHON_VERSION} == '3.10' || ${PYTHON_VERSION} == '3.11') ]; then
             echo "trigger release artifacts on cuda version: ${CU_VERSION}, python version: ${PYTHON_VERSION}"
             echo "release_flag=true" >> "${GITHUB_OUTPUT}"
           else
