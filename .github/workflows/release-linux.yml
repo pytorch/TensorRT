@@ -96,11 +96,20 @@ jobs:
             echo "trigger release artifacts on cuda version: ${CU_VERSION}, python version: ${PYTHON_VERSION}"
             release_flag='true'
           else
-            release_flat='false'
+            release_flag='false'
           fi
           echo "release_flag=${release_flag}" >> "${GITHUB_OUTPUT}"
   release:
     needs: check
+    #
+    # not sure why the release_flag is changing between jobs:
+    # in the following job the output release flag is true in the check step, but it did not trigger release job
+    # https://github.com/pytorch/TensorRT/actions/runs/9636159305/job/26573800066
+    # added the print out to see what the release flag value is in the release job clean workspace step
+    # in check step, the release_flag is true: https://github.com/pytorch/TensorRT/actions/runs/9636210253/job/26573900382
+    # in clean workfpace step, the release_flag became false: https://github.com/pytorch/TensorRT/actions/runs/9636210253/job/26573902391
+    #
+    # disable this for now
     # if: ${{ needs.check.outputs.release_flag == 'true' }}
     strategy:
       fail-fast: false
@@ -123,7 +132,6 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Clean workspace
-        if: ${{ env.CU_VERSION == 'cu121' && (env.PYTHON_VERSION == '3.8' || env.PYTHON_VERSION == '3.9' || env.PYTHON_VERSION == '3.10' || env.PYTHON_VERSION == '3.11') }}
         shell: bash -l {0}
         run: |
           set -euxo pipefail
