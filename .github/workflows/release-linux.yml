@@ -94,11 +94,11 @@ jobs:
           set -eou pipefail
           if [[ ${CU_VERSION} == 'cu121' && (${PYTHON_VERSION} == '3.8' || ${PYTHON_VERSION} == '3.9' || ${PYTHON_VERSION} == '3.10' || ${PYTHON_VERSION} == '3.11') ]]; then
             echo "trigger release artifacts on cuda version: ${CU_VERSION}, python version: ${PYTHON_VERSION}"
-            echo "release_flag=true" >> "${GITHUB_OUTPUT}"
+            release_flag='true'
           else
-            echo "release_flag=false" >> "${GITHUB_OUTPUT}"
+            release_flat='false'
           fi
-
+          echo "release_flag=${release_flag}" >> "${GITHUB_OUTPUT}"
   release:
     needs: check
     # if: ${{ needs.check.outputs.release_flag == 'true' }}
@@ -123,11 +123,11 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Clean workspace
+        if: ${{ env.CU_VERSION == 'cu121' && (env.PYTHON_VERSION == '3.8' || env.PYTHON_VERSION == '3.9' || env.PYTHON_VERSION == '3.10' || env.PYTHON_VERSION == '3.11') }}
         shell: bash -l {0}
         run: |
           set -euxo pipefail
           echo "needs.check.outputs.release_flag: ${{ needs.check.outputs.release_flag }}"
-          echo "needs.check.outputs: ${{ needs.check.outputs }}"
           echo "::group::Cleanup debug output"
           rm -rf "${GITHUB_WORKSPACE}"
           mkdir -p "${GITHUB_WORKSPACE}"
