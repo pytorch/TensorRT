@@ -101,7 +101,7 @@ jobs:
 
   release:
     needs: check
-    if: ${{ needs.check.release_flag == 'true' }}
+    if: ${{ needs.check.outputs.release_flag == 'true' }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.build-matrix) }}
@@ -126,6 +126,8 @@ jobs:
         shell: bash -l {0}
         run: |
           set -euxo pipefail
+          echo "needs.check.outputs.release_flag: ${{ needs.check.outputs.release_flag }}"
+          echo "needs.check.outputs: ${{ needs.check.outputs }}"
           echo "::group::Cleanup debug output"
           rm -rf "${GITHUB_WORKSPACE}"
           mkdir -p "${GITHUB_WORKSPACE}"
