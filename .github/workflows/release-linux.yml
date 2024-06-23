@@ -101,7 +101,7 @@ jobs:
 
   release:
     needs: check
-    if: ${{ needs.check.outputs.release_flag == 'true' }}
+    # if: ${{ needs.check.outputs.release_flag == 'true' }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.build-matrix) }}
