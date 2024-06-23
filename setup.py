@@ -211,9 +211,9 @@ def build_libtorchtrt_pre_cxx11_abi(
         print("Jetpack version: 5.0")
 
     if CI_BUILD:
-        cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux --sandbox_debug")
+        cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
         print("CI based build")
-
+    cmd.append("--sandbox_debug")
     print(f"building libtorchtrt: cmd={cmd}")
     status_code = subprocess.run(cmd).returncode
 
