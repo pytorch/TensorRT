@@ -121,6 +121,10 @@ def rsqrt(
     name: str,
     input: TRTTensor,
 ) -> TRTTensor:
+    if (isinstance(input, TRTTensor)) and (
+        input.dtype == trt.int8 or input.dtype == trt.int32
+    ):
+        input = cast_trt_tensor(ctx, input, trt.float32, f"{name}_cast")
     sqrt_trt_output = convert_unary(
         ctx,
         target,

@@ -560,7 +560,7 @@ def aten_ops_matmul(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.rsqrt.default)
+@dynamo_tensorrt_converter(torch.ops.aten.rsqrt.default, supports_dynamic_shapes=True)
 def aten_ops_rsqrt(
     ctx: ConversionContext,
     target: Target,
@@ -634,7 +634,7 @@ def aten_ops_squeeze(
     return impl.squeeze.squeeze(ctx, target, SourceIR.ATEN, name, args[0], args[1])
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.erf.default)
+@dynamo_tensorrt_converter(torch.ops.aten.erf.default, supports_dynamic_shapes=True)
 def aten_ops_erf(
     ctx: ConversionContext,
     target: Target,
