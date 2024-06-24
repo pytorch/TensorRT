@@ -27,7 +27,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 def args_bounds_check(
     args: Tuple[Argument, ...], i: int, replacement: Optional[Any] = None
 ) -> Any:
-    return args[i] if len(args) > i else replacement
+    return args[i] if len(args) > i and args[i] is not None else replacement
 
 
 def get_ir(target: Target) -> SourceIR:
@@ -156,8 +156,8 @@ def aten_ops_layer_norm(
         name,
         input=args[0],
         normalized_shape=args[1],
-        weight=args_bounds_check(args, 2),
-        bias=args_bounds_check(args, 3),
+        weight=args_bounds_check(args, 2, 1.0),
+        bias=args_bounds_check(args, 3, 0.0),
         eps=args_bounds_check(args, 4, 1e-05),
         cudnn_enable=args_bounds_check(args, 5, True),
         return_mean_rstd=(target == torch.ops.aten.native_layer_norm.default),
