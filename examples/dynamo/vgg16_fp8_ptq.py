@@ -243,7 +243,6 @@ with torch.no_grad():
         loss = 0.0
         class_probs = []
         class_preds = []
-        trt_model.eval()
         for data, labels in testing_dataloader:
             data, labels = data.cuda(), labels.cuda(non_blocking=True)
             out = trt_model(data)
