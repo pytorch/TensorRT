@@ -256,10 +256,7 @@ def refit_module_weights(
         # Preprocess the partitioned module to be in the same format as the inline module
         inline_torch_modules(new_partitioned_module)
         new_partitioned_module.delete_all_unused_submodules()
-
-    # Check whether two modules have the same subcomponents
-    # 1. Check the number of partitions and name
-    if inline_module:
+        # Check the number of partitions and name
         assert {sm[0] for sm in new_partitioned_module.named_children()} == set(
             compiled_submodules_map.keys()
         ), "New weights module is not compatible with previously compiled Torch-TensorRT module"
