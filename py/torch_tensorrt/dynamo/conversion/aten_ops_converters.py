@@ -1511,7 +1511,7 @@ def aten_ops_cos(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.tan.default)
+@dynamo_tensorrt_converter(torch.ops.aten.tan.default, supports_dynamic_shapes=True)
 def aten_ops_tan(
     ctx: ConversionContext,
     target: Target,
@@ -1528,7 +1528,7 @@ def aten_ops_tan(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sinh.default)
+@dynamo_tensorrt_converter(torch.ops.aten.sinh.default, supports_dynamic_shapes=True)
 def aten_ops_sinh(
     ctx: ConversionContext,
     target: Target,
@@ -1545,7 +1545,7 @@ def aten_ops_sinh(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.cosh.default)
+@dynamo_tensorrt_converter(torch.ops.aten.cosh.default, supports_dynamic_shapes=True)
 def aten_ops_cosh(
     ctx: ConversionContext,
     target: Target,
@@ -1562,7 +1562,7 @@ def aten_ops_cosh(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.asin.default)
+@dynamo_tensorrt_converter(torch.ops.aten.asin.default, supports_dynamic_shapes=True)
 def aten_ops_asin(
     ctx: ConversionContext,
     target: Target,
@@ -1579,7 +1579,7 @@ def aten_ops_asin(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.acos.default)
+@dynamo_tensorrt_converter(torch.ops.aten.acos.default, supports_dynamic_shapes=True)
 def aten_ops_acos(
     ctx: ConversionContext,
     target: Target,
