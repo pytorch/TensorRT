@@ -222,8 +222,12 @@ jobs:
           # set -euxo pipefail
           set -x
           source "${BUILD_ENV_FILE}"
-          echo ${LD_LIBRARY_PATH}
+          echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}""
           g++ --version
+          ldd --version
+
+          file $(gcc -print-file-name=libc.so)
+          cat $(gcc -print-file-name=libc.so)
 
           export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version:  *//' | sed 's/+.\+//')"
           TORCHTRT_VERSION=${BUILD_VERSION%+*}
