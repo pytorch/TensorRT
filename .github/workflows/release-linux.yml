@@ -222,6 +222,9 @@ jobs:
           # set -euxo pipefail
           set -x
           source "${BUILD_ENV_FILE}"
+          echo ${LD_LIBRARY_PATH}
+          g++ --version
+
           export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version:  *//' | sed 's/+.\+//')"
           TORCHTRT_VERSION=${BUILD_VERSION%+*}
           ${CONDA_RUN} python -m pip list
