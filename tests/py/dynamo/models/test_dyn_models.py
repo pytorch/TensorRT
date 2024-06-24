@@ -337,7 +337,7 @@ def test_dynamic_with_fallback_shape_tensor_pass_through(ir):
         "ir": ir,
         "pass_through_build_failures": True,
         "min_block_size": 1,
-        "torch_executed_ops": {"torch.ops.aten.add.Tensor"},
+        "torch_executed_ops": {"torch.ops.aten.reshape.default"},
     }
 
     # Compile the model
