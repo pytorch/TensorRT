@@ -78,7 +78,7 @@ load_dep_info()
 
 dir_path = os.path.join(str(get_root_dir()), "py")
 
-CXX11_ABI = IS_WINDOWS
+CXX11_ABI = True
 JETPACK_VERSION = None
 PY_ONLY = False
 NO_TS = False
@@ -213,8 +213,8 @@ def build_libtorchtrt_pre_cxx11_abi(
     if CI_BUILD:
         cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
         print("CI based build")
-
-    print("building libtorchtrt")
+    cmd.append("--sandbox_debug")
+    print(f"building libtorchtrt: cmd={cmd}")
     status_code = subprocess.run(cmd).returncode
 
     if status_code != 0:

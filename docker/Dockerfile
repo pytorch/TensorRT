@@ -12,7 +12,7 @@ RUN test -n "$TENSORRT_VERSION" || (echo "No tensorrt version specified, please 
 ARG PYTHON_VERSION=3.10
 ENV PYTHON_VERSION=${PYTHON_VERSION}
 
-ARG USE_CXX11_ABI
+ARG USE_CXX11_ABI=True
 ENV USE_CXX11=${USE_CXX11_ABI}
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -36,8 +36,15 @@ RUN pyenv global ${PYTHON_VERSION}
 RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub
 RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /"
 RUN apt-get update
-RUN TENSORRT_MAJOR_VERSION=`echo ${TENSORRT_VERSION} | cut -d '.' -f 1` && apt-get install -y libnvinfer${TENSORRT_MAJOR_VERSION}=${TENSORRT_VERSION}.* libnvinfer-plugin${TENSORRT_MAJOR_VERSION}=${TENSORRT_VERSION}.* libnvinfer-dev=${TENSORRT_VERSION}.* libnvinfer-plugin-dev=${TENSORRT_VERSION}.* libnvonnxparsers${TENSORRT_MAJOR_VERSION}=${TENSORRT_VERSION}.* libnvonnxparsers-dev=${TENSORRT_VERSION}.*
-
+RUN TENSORRT_MAJOR_VERSION=`echo ${TENSORRT_VERSION} | cut -d '.' -f 1` && \
+    apt-get install -y libnvinfer${TENSORRT_MAJOR_VERSION}=${TENSORRT_VERSION}.* \
+                       libnvinfer-plugin${TENSORRT_MAJOR_VERSION}=${TENSORRT_VERSION}.* \
+                       libnvinfer-dev=${TENSORRT_VERSION}.* \
+                       libnvinfer-headers-dev=${TENSORRT_VERSION}.* \
+                       libnvinfer-headers-plugin-dev=${TENSORRT_VERSION}.* \
+                       libnvinfer-plugin-dev=${TENSORRT_VERSION}.* \
+                       libnvonnxparsers${TENSORRT_MAJOR_VERSION}=${TENSORRT_VERSION}.* \
+                       libnvonnxparsers-dev=${TENSORRT_VERSION}.*
 # Setup Bazel via Bazelisk
 RUN wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -O /usr/bin/bazel &&\
     chmod a+x /usr/bin/bazel
