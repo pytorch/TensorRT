@@ -235,10 +235,10 @@ with torch.no_grad():
         loss = 0.0
         class_probs = []
         class_preds = []
-        model.eval()
+        trt_model.eval()
         for data, labels in testing_dataloader:
             data, labels = data.cuda(), labels.cuda(non_blocking=True)
-            out = model(data)
+            out = trt_model(data)
             loss += crit(out, labels)
             preds = torch.max(out, 1)[1]
             class_probs.append([F.softmax(i, dim=0) for i in out])
