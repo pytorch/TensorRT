@@ -155,7 +155,11 @@ training_dataset = datasets.CIFAR10(
     ),
 )
 training_dataloader = torch.utils.data.DataLoader(
-    training_dataset, batch_size=args.batch_size, shuffle=True, num_workers=2
+    training_dataset,
+    batch_size=args.batch_size,
+    shuffle=True,
+    num_workers=2,
+    drop_last=True,
 )
 
 data = iter(training_dataloader)
@@ -211,8 +215,12 @@ testing_dataset = datasets.CIFAR10(
 )
 
 testing_dataloader = torch.utils.data.DataLoader(
-    testing_dataset, batch_size=args.batch_size, shuffle=False, num_workers=2
-)
+    testing_dataset,
+    batch_size=args.batch_size,
+    shuffle=False,
+    num_workers=2,
+    drop_last=True,
+)  # set drop_last=True to drop the last incomplete batch for static shape `torchtrt.dynamo.compile()`
 
 with torch.no_grad():
     with export_torch_mode():
