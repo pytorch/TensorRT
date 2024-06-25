@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
@@ -128,6 +129,39 @@ class TestPrimsSumConverter(DispatchTestCase):
         self.run_test(
             Sum(),
             inputs,
+        )
+
+    @parameterized.expand(
+        [
+            ([0], (2, 3), (2, 4), (3, 5)),
+            ([1], (2, 3), (2, 4), (3, 5)),
+            (
+                [
+                    2,
+                ],
+                (2, 2, 4),
+                (2, 3, 4),
+                (3, 4, 5),
+            ),
+            ([0, 1], (2, 2, 4), (2, 3, 4), (3, 4, 5)),
+        ]
+    )
+    def test_sum_dynamic_shape(self, dim, min_shape, opt_shape, max_shape):
+        class Sum(nn.Module):
+            def forward(self, x):
+                return torch.ops.prims.sum.default(x, dim)
+
+        input_specs = [
+            Input(
+                dtype=torch.float32,
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            Sum(),
+            input_specs,
         )
 
 

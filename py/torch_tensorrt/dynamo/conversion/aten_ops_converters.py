@@ -27,7 +27,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 def args_bounds_check(
     args: Tuple[Argument, ...], i: int, replacement: Optional[Any] = None
 ) -> Any:
-    return args[i] if len(args) > i else replacement
+    return args[i] if len(args) > i and args[i] is not None else replacement
 
 
 def get_ir(target: Target) -> SourceIR:
@@ -156,8 +156,8 @@ def aten_ops_layer_norm(
         name,
         input=args[0],
         normalized_shape=args[1],
-        weight=args_bounds_check(args, 2),
-        bias=args_bounds_check(args, 3),
+        weight=args_bounds_check(args, 2, 1.0),
+        bias=args_bounds_check(args, 3, 0.0),
         eps=args_bounds_check(args, 4, 1e-05),
         cudnn_enable=args_bounds_check(args, 5, True),
         return_mean_rstd=(target == torch.ops.aten.native_layer_norm.default),
@@ -560,7 +560,7 @@ def aten_ops_matmul(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.rsqrt.default)
+@dynamo_tensorrt_converter(torch.ops.aten.rsqrt.default, supports_dynamic_shapes=True)
 def aten_ops_rsqrt(
     ctx: ConversionContext,
     target: Target,
@@ -634,7 +634,7 @@ def aten_ops_squeeze(
     return impl.squeeze.squeeze(ctx, target, SourceIR.ATEN, name, args[0], args[1])
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.erf.default)
+@dynamo_tensorrt_converter(torch.ops.aten.erf.default, supports_dynamic_shapes=True)
 def aten_ops_erf(
     ctx: ConversionContext,
     target: Target,
@@ -1146,7 +1146,7 @@ def aten_ops_expand(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.amax.default)
+@dynamo_tensorrt_converter(torch.ops.aten.amax.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -1170,7 +1170,7 @@ def aten_ops_amax(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.amin.default)
+@dynamo_tensorrt_converter(torch.ops.aten.amin.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -1194,9 +1194,9 @@ def aten_ops_amin(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sum.default)
-@dynamo_tensorrt_converter(torch.ops.aten.sum.dim_IntList)
-@dynamo_tensorrt_converter(torch.ops.prims.sum.default)
+@dynamo_tensorrt_converter(torch.ops.aten.sum.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.sum.dim_IntList, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.prims.sum.default, supports_dynamic_shapes=True)
 def aten_ops_sum(
     ctx: ConversionContext,
     target: Target,
@@ -1228,8 +1228,8 @@ def aten_ops_sum(
         return sum_
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.prod.default)
-@dynamo_tensorrt_converter(torch.ops.aten.prod.dim_int)
+@dynamo_tensorrt_converter(torch.ops.aten.prod.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.prod.dim_int, supports_dynamic_shapes=True)
 def aten_ops_prod(
     ctx: ConversionContext,
     target: Target,
@@ -1248,9 +1248,14 @@ def aten_ops_prod(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.max.default)
 @dynamo_tensorrt_converter(
-    torch.ops.aten.max.dim, capability_validator=one_user_validator
+    torch.ops.aten.max.default,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.max.dim,
+    capability_validator=one_user_validator,
+    supports_dynamic_shapes=True,
 )
 def aten_ops_max(
     ctx: ConversionContext,
@@ -1271,9 +1276,14 @@ def aten_ops_max(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.min.default)
 @dynamo_tensorrt_converter(
-    torch.ops.aten.min.dim, capability_validator=one_user_validator
+    torch.ops.aten.min.default,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.min.dim,
+    capability_validator=one_user_validator,
+    supports_dynamic_shapes=True,
 )
 def aten_ops_min(
     ctx: ConversionContext,
@@ -1501,7 +1511,7 @@ def aten_ops_cos(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.tan.default)
+@dynamo_tensorrt_converter(torch.ops.aten.tan.default, supports_dynamic_shapes=True)
 def aten_ops_tan(
     ctx: ConversionContext,
     target: Target,
@@ -1518,7 +1528,7 @@ def aten_ops_tan(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sinh.default)
+@dynamo_tensorrt_converter(torch.ops.aten.sinh.default, supports_dynamic_shapes=True)
 def aten_ops_sinh(
     ctx: ConversionContext,
     target: Target,
@@ -1535,7 +1545,7 @@ def aten_ops_sinh(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.cosh.default)
+@dynamo_tensorrt_converter(torch.ops.aten.cosh.default, supports_dynamic_shapes=True)
 def aten_ops_cosh(
     ctx: ConversionContext,
     target: Target,
@@ -1552,7 +1562,7 @@ def aten_ops_cosh(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.asin.default)
+@dynamo_tensorrt_converter(torch.ops.aten.asin.default, supports_dynamic_shapes=True)
 def aten_ops_asin(
     ctx: ConversionContext,
     target: Target,
@@ -1569,7 +1579,7 @@ def aten_ops_asin(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.acos.default)
+@dynamo_tensorrt_converter(torch.ops.aten.acos.default, supports_dynamic_shapes=True)
 def aten_ops_acos(
     ctx: ConversionContext,
     target: Target,

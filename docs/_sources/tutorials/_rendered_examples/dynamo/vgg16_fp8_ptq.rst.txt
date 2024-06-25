@@ -174,7 +174,7 @@ Load the pre-trained model weights
 Load training dataset and define loss function for PTQ
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 143-166
+.. GENERATED FROM PYTHON SOURCE LINES 143-170
 
 .. code-block:: python
 
@@ -193,7 +193,11 @@ Load training dataset and define loss function for PTQ
         ),
     )
     training_dataloader = torch.utils.data.DataLoader(
-        training_dataset, batch_size=args.batch_size, shuffle=True, num_workers=2
+        training_dataset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=2,
+        drop_last=True,
     )
 
     data = iter(training_dataloader)
@@ -202,12 +206,12 @@ Load training dataset and define loss function for PTQ
     crit = nn.CrossEntropyLoss()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 167-169
+.. GENERATED FROM PYTHON SOURCE LINES 171-173
 
 Define Calibration Loop for quantization
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 169-187
+.. GENERATED FROM PYTHON SOURCE LINES 173-191
 
 .. code-block:: python
 
@@ -230,12 +234,12 @@ Define Calibration Loop for quantization
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 188-190
+.. GENERATED FROM PYTHON SOURCE LINES 192-194
 
 Tune the pre-trained model with FP8 and PTQ
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 190-196
+.. GENERATED FROM PYTHON SOURCE LINES 194-200
 
 .. code-block:: python
 
@@ -246,12 +250,12 @@ Tune the pre-trained model with FP8 and PTQ
     # model has FP8 qdq nodes at this point
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 197-199
+.. GENERATED FROM PYTHON SOURCE LINES 201-203
 
 Inference
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 199-254
+.. GENERATED FROM PYTHON SOURCE LINES 203-261
 
 .. code-block:: python
 
@@ -270,8 +274,12 @@ Inference
     )
 
     testing_dataloader = torch.utils.data.DataLoader(
-        testing_dataset, batch_size=args.batch_size, shuffle=False, num_workers=2
-    )
+        testing_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=2,
+        drop_last=True,
+    )  # set drop_last=True to drop the last incomplete batch for static shape `torchtrt.dynamo.compile()`
 
     with torch.no_grad():
         with export_torch_mode():
@@ -294,10 +302,9 @@ Inference
             loss = 0.0
             class_probs = []
             class_preds = []
-            model.eval()
             for data, labels in testing_dataloader:
                 data, labels = data.cuda(), labels.cuda(non_blocking=True)
-                out = model(data)
+                out = trt_model(data)
                 loss += crit(out, labels)
                 preds = torch.max(out, 1)[1]
                 class_probs.append([F.softmax(i, dim=0) for i in out])

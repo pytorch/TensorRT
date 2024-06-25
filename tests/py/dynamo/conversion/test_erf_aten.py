@@ -41,6 +41,54 @@ class TestErfConverter(DispatchTestCase):
             inputs,
         )
 
+    @parameterized.expand(
+        [
+            (
+                "2d_dim_dtype_half",
+                (1, 1),
+                (2, 2),
+                (4, 4),
+                torch.half,
+                torch.half,
+            ),
+            (
+                "3d_dim_dtype_float",
+                (1, 1, 1),
+                (1, 2, 3),
+                (3, 3, 3),
+                torch.float,
+                torch.float,
+            ),
+            (
+                "3d_dim_dtype_int32",
+                (1, 1, 1),
+                (2, 2, 4),
+                (2, 3, 5),
+                torch.int32,
+                torch.float,
+            ),
+        ]
+    )
+    def test_dynamic_shape_erf(
+        self, _, min_shape, opt_shape, max_shape, type, output_type
+    ):
+        class erf(nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.erf.default(input)
+
+        input_specs = [
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            erf(), input_specs, output_dtypes=[output_type]
+        )
+
 
 if __name__ == "__main__":
     run_tests()
