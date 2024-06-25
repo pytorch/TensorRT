@@ -60,21 +60,21 @@ http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu124/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
+    urls = ["https://download.pytorch.org/libtorch/test/cu124/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu124/libtorch-shared-with-deps-latest.zip"],
+    urls = ["https://download.pytorch.org/libtorch/test/cu124/libtorch-shared-with-deps-latest.zip"],
 )
 
 http_archive(
     name = "libtorch_win",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu124/libtorch-win-shared-with-deps-latest.zip"],
+    urls = ["https://download.pytorch.org/libtorch/test/cu124/libtorch-win-shared-with-deps-latest.zip"],
 )
 
 # Download these tarballs manually from the NVIDIA website
@@ -100,8 +100,6 @@ http_archive(
         "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.0.1/zip/TensorRT-10.0.1.6.Windows10.win10.cuda-12.4.zip",
     ],
 )
-
-
 
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
