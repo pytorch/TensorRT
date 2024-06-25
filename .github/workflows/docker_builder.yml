@@ -2,6 +2,7 @@ name: 'Torch-TensorRT Docker Build'
 
 # Apply workflow only to main, nightly, release branches
 on:
+  pull_request:
   push:
     branches:
       - main
@@ -59,7 +60,24 @@ jobs:
       env:
         DOCKER_URL: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
       run: docker push $DOCKER_URL
+    
+    - name: Build CXX11_ABI Docker image
+      env:
+        DOCKER_TAG: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}_cxx11_abi
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
+      run: |
+        python3 -m pip install pyyaml
+        TRT_VERSION=$(python3 -c "import versions; versions.tensorrt_version()")
+        echo "TRT VERSION = ${TRT_VERSION}"
 
+        DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=$TRT_VERSION --build-arg USE_CXX11_ABI=True -f docker/Dockerfile --tag $DOCKER_TAG .
+
+    - name: Push CXX11_ABI Docker image
+      if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
+      env:
+        DOCKER_URL: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}_cxx11_abi
+      run: docker push $DOCKER_URL
+  
     # Clean up all untagged containers in registry
     - name: Container Registry Cleanup
       uses: actions/delete-package-versions@v4
