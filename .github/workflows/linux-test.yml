@@ -25,7 +25,7 @@ on:
         type: string
       test-infra-ref:
         description: "Test infra reference to use"
-        default: ""
+        default: "release/2.4"
         type: string
       build-matrix:
         description: "Build matrix to utilize"
