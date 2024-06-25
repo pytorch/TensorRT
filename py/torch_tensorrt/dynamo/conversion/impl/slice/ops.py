@@ -14,6 +14,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
 )
 from torch_tensorrt.dynamo.conversion.impl.cat import cat
+from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
 from torch_tensorrt.dynamo.conversion.impl.slice.base import slice
 from torch_tensorrt.fx.converters.converter_utils import (
     has_dynamic_shape,
@@ -90,10 +91,14 @@ def expand(
     # After the above padding, the shape and tensor rank must be equal
     assert len(input_t.shape) == shape_rank
 
-    # -1 denotes taking the shape from the original input tensor
-    shape = tuple(
-        [input_t.shape[i] if shape[i] == -1 else shape[i] for i in range(shape_rank)]
-    )
+    shape_t = []
+    for i in range(shape_rank):
+        if shape[i] == -1:
+            shape_t.append(
+                get_shape(ctx, target, source_ir, name + f"_shape_dim{i}", input_t, i)
+            )
+        else:
+            shape_t.append(shape[i])
 
     # Establish the desired output shape, strides, and starting indices
     input_tensor_shape = tuple(input_t.shape)
@@ -102,7 +107,7 @@ def expand(
         [int(i == o) for i, o in zip(input_tensor_shape, shape)]
     )  # stride == 1 if dimensions match, 0 otherwise
 
-    shape_ = shape
+    shape_ = shape_t
     # Handle dynamic shapes case where shape has dynamic dimension
     if any(isinstance(ele, TRTTensor) for ele in shape):
         shape_ = cat(
@@ -110,7 +115,7 @@ def expand(
             target,
             source_ir,
             name + "_shape_concat",
-            shape,
+            shape_t,
             0,
             cast_dtype=trt.int32,
         )
