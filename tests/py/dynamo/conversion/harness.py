@@ -157,12 +157,20 @@ class TRTTestCase(TestCase):
             res_trt = trt_mod(*cuda_inputs).cpu()
             res_cpu = mod(*cuda_inputs).cpu()
             assert len(res_trt) == len(res_cpu)
-            for output_trt, output_cpu, comparator in zip(
-                res_trt, res_cpu, comparators
-            ):
-                comp_func = comparator[0]
-                args = comparator[1]
-                self.assertTrue(comp_func(output_trt, output_cpu, *args))
+            comparator = comparators
+
+            if len(cuda_inputs) == 1:
+                for comparator in comparators:
+                    comp_func = comparator[0]
+                    args = comparator[1]
+                    self.assertTrue(comp_func(res_trt, res_cpu, *args))
+            else:
+                for output_trt, output_cpu, comparator in zip(
+                    res_trt, res_cpu, comparators
+                ):
+                    comp_func = comparator[0]
+                    args = comparator[1]
+                    self.assertTrue(comp_func(output_trt, output_cpu, *args))
 
     def run_test_with_error(self, mod, inputs, interpreter, expect_error):
         with self.assertRaises(expect_error):
