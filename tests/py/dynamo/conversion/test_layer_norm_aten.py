@@ -119,6 +119,24 @@ class TestNativeLayerNormConverter(DispatchTestCase):
             input_specs,
         )
 
+    @parameterized.expand([((5, 3, 2, 4), [2, 4])])
+    def test_layer_norm_without_Scaling(self, input_shape, normalized_shape, eps=1e-05):
+        class LayerNorm(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.native_layer_norm.default(
+                    x,
+                    normalized_shape,
+                    None,
+                    None,
+                    eps,
+                )[0]
+
+        inputs = [torch.randn(input_shape)]
+        self.run_test(
+            LayerNorm(),
+            inputs,
+        )
+
 
 if __name__ == "__main__":
     run_tests()
