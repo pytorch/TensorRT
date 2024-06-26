@@ -46,25 +46,52 @@ class TestSqueezeConverter(DispatchTestCase):
 class TestSqueezeConverter(DispatchTestCase):
     @parameterized.expand(
         [
-            ("2d_dim", (1), (-1, 1), [((1, 1), (1, 1), (3, 1))]),
-            ("3d_one_dim", (1), (-1, 2, 1), [((1, 2, 1), (1, 2, 1), (3, 2, 1))]),
+            (
+                "2d_dim",
+                (1),
+                (1, 1),
+                (1, 1),
+                (3, 1),
+                torch.half,
+                torch.half,
+            ),
+            (
+                "3d_one_dim",
+                (1),
+                (1, 2, 1),
+                (1, 2, 1),
+                (3, 2, 1),
+                torch.float,
+                torch.float,
+            ),
+            (
+                "3d_one_dim_dynamic",
+                (0),
+                (1, 2, 1),
+                (1, 2, 1),
+                (3, 2, 1),
+                torch.float,
+                torch.float,
+            ),
         ]
     )
-    def test_squeeze(self, _, dim, init_size, shape_range):
+    def test_squeeze(self, _, dim, min_shape, opt_shape, max_shape, type, output_type):
         class Squeeze(nn.Module):
             def forward(self, x):
                 return torch.ops.aten.squeeze.dim(x, dim)
 
         input_specs = [
             Input(
-                shape=init_size,
-                dtype=torch.float32,
-                shape_ranges=shape_range,
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
             ),
         ]
         self.run_test_with_dynamic_shape(
             Squeeze(),
             input_specs,
+            output_dtypes=[output_type],
         )
 
 
