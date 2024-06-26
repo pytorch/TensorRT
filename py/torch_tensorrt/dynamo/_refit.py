@@ -24,7 +24,10 @@ from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decomposit
 from torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule import (
     PythonTorchTensorRTModule,
 )
-from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
+from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+    SERIALIZED_METADATA_IDX,
+    TorchTensorRTModule,
+)
 from torch_tensorrt.dynamo.utils import (
     check_output,
     get_torch_inputs,
@@ -171,7 +174,9 @@ def refit_module_weights(
             for name, engine in compiled_module.__dict__.items()
             if "engine" in name
         ]
-        encoded_settings = compiled_submodules[0][1].__getstate__()[0][7]
+        encoded_settings = compiled_submodules[0][1].__getstate__()[0][
+            SERIALIZED_METADATA_IDX
+        ]
         assert (
             encoded_settings != ""
         ), "Settings are not saved in the engine. Please recompile the engine with refit=True."

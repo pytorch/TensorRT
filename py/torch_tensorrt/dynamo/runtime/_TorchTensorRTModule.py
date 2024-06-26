@@ -18,6 +18,16 @@ SerializedTorchTensorRTModuleFmt = Tuple[
     str, Optional[SerializedTensorRTEngineFmt], List[str], List[str]
 ]
 
+ABI_TARGET_IDX = torch.ops.tensorrt.ABI_TARGET_IDX()
+NAME_IDX = torch.ops.tensorrt.NAME_IDX()
+DEVICE_IDX = torch.ops.tensorrt.DEVICE_IDX()
+ENGINE_IDX = torch.ops.tensorrt.ENGINE_IDX()
+INPUT_BINDING_NAMES_IDX = torch.ops.tensorrt.INPUT_BINDING_NAMES_IDX()
+OUTPUT_BINDING_NAMES_IDX = torch.ops.tensorrt.OUTPUT_BINDING_NAMES_IDX()
+HW_COMPATIBLE_IDX = torch.ops.tensorrt.HW_COMPATIBLE_IDX()
+SERIALIZED_METADATA_IDX = torch.ops.tensorrt.SERIALIZED_METADATA_IDX()
+SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()
+
 
 class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     """TorchTensorRTModule is a PyTorch module which encompasses an arbitrary TensorRT Engine.
@@ -145,14 +155,14 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             serialized_engine = base64.b64decode(serialized_engine_info[3])
             self.engine = torch.classes.tensorrt.Engine(
                 [
-                    serialized_engine_info[0],
-                    serialized_engine_info[1],
-                    serialized_engine_info[2],
+                    serialized_engine_info[ABI_TARGET_IDX],
+                    serialized_engine_info[NAME_IDX],
+                    serialized_engine_info[DEVICE_IDX],
                     serialized_engine,
-                    serialized_engine_info[4],
-                    serialized_engine_info[5],
-                    serialized_engine_info[6],
-                    serialized_engine_info[7],
+                    serialized_engine_info[INPUT_BINDING_NAMES_IDX],
+                    serialized_engine_info[OUTPUT_BINDING_NAMES_IDX],
+                    serialized_engine_info[HW_COMPATIBLE_IDX],
+                    serialized_engine_info[SERIALIZED_METADATA_IDX],
                 ]
             )
         else:
