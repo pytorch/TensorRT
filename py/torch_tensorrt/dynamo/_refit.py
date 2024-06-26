@@ -92,11 +92,7 @@ def construct_refit_mapping(
             layer.__class__ = MODULE_MAP[layer_type][0]
             for weight_type, weight_name in MODULE_MAP[layer_type][1]:
                 weight = layer.__getattribute__(weight_type).copy()
-                weight_dtype = (
-                    layer.precision
-                    if layer.precision_is_set
-                    else dtype.try_from(weight.dtype).to(trt.DataType)
-                )
+                weight_dtype = dtype.try_from(weight.dtype).to(trt.DataType)
                 weight_map[f"{layer.name} {weight_name}"] = (
                     weight,
                     weight_dtype,
