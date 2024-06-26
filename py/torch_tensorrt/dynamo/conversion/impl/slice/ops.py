@@ -103,9 +103,16 @@ def expand(
     # Establish the desired output shape, strides, and starting indices
     input_tensor_shape = tuple(input_t.shape)
     start = tuple([0] * shape_rank)
-    stride = tuple(
-        [int(i == o) for i, o in zip(input_tensor_shape, shape)]
-    )  # stride == 1 if dimensions match, 0 otherwise
+
+    # TODO: Revisit stride calculation. stride[dim]=0 implies that dimension is being broadcasted.
+    # stride should be 1 for all non-broadcasted dims
+    stride = []
+    for i, o in zip(input_tensor_shape, shape_t):
+        # If the shape has ITensor, we treat it as a reshape dim instead of a broadcasted dim
+        if isinstance(i, int) and isinstance(o, int):
+            stride.append(int(i == o))
+        else:
+            stride.append(1)
 
     shape_ = shape_t
     # Handle dynamic shapes case where shape has dynamic dimension
