@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.dynamo.conversion.impl.cat import cat
 from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
 from torch_tensorrt.dynamo.conversion.impl.slice.base import slice
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.fx.converters.converter_utils import (
     has_dynamic_shape,
     prepend_ones,
@@ -109,7 +110,8 @@ def expand(
     stride = []
     for i, o in zip(input_tensor_shape, shape_t):
         # If the shape has ITensor, we treat it as a reshape dim instead of a broadcasted dim
-        if isinstance(i, int) and isinstance(o, int):
+        # shape_t cannot have -1. If the input at this dimension has a shape of -1, set the stride to 1. This indicates that the input is dynamic and does not imply broadcasting at that specific dimension.
+        if isinstance(i, int) and isinstance(o, int) and i != DYNAMIC_DIM:
             stride.append(int(i == o))
         else:
             stride.append(1)
