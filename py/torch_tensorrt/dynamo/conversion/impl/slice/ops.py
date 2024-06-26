@@ -109,7 +109,7 @@ def expand(
 
     shape_ = shape_t
     # Handle dynamic shapes case where shape has dynamic dimension
-    if any(isinstance(ele, TRTTensor) for ele in shape):
+    if any(isinstance(ele, TRTTensor) for ele in shape_t):
         shape_ = cat(
             ctx,
             target,
