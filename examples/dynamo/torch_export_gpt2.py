@@ -57,11 +57,7 @@ input_ids = model_inputs["input_ids"]
 max_tokens = 40
 
 # Pyt model outputs
-# greedy_output = model.generate(**model_inputs, max_new_tokens=max_tokens)
-# print(
-#     "Pytorch model generated text: ",
-#     tokenizer.decode(greedy_output[0], skip_special_tokens=True),
-# )
+greedy_output = model.generate(**model_inputs, max_new_tokens=max_tokens)
 pyt_outputs = model(input_ids)
 
 # Compile Torch-TRT model
@@ -70,24 +66,23 @@ trt_model = torch_tensorrt.dynamo.compile(
     gpt2_ep,
     inputs=[input_ids],
     enabled_precisions={torch.float32},
-    # min_block_size=5,
     truncate_double=True,
     torch_executed_ops={"torch.ops.aten.slice.Tensor"},
     disable_tf32=True,
-    debug=True,
 )
 
 trt_outputs = trt_model(input_ids)
 
 # Auto-regressive generation loop for greedy search
+max_length = len(input_ids) + max_tokens
 stopping_criteria = StoppingCriteriaList(
     [
-        MaxLengthCriteria(max_length=max_tokens),
+        MaxLengthCriteria(max_length=max_length),
         EosTokenCriteria(eos_token_id=tokenizer.eos_token_id),
     ]
 )
 token_id = 0
-while token_id < 20:
+while token_id < max_tokens:
     trt_outputs = model(input_ids)
     logits = trt_outputs.logits
     next_token_logits = logits[:, -1, :]
@@ -98,6 +93,11 @@ while token_id < 20:
     token_id += 1
 
 # Decode the sentence
+print(
+    "Pytorch model generated text: ",
+    tokenizer.decode(greedy_output[0], skip_special_tokens=True),
+)
+print("=============================")
 print(
     "TensorRT model generated text: ",
     tokenizer.decode(input_ids[0], skip_special_tokens=True),
