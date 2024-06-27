@@ -10,19 +10,19 @@ from .harness import DispatchTestCase
 class TestExpandConverter(DispatchTestCase):
     @parameterized.expand(
         [
-            ("2d_dim", (2, 3), (2, 1)),
-            ("3d_dim", (2, 3, 4), (2, 1, 1)),
-            ("4d_dim", (2, 3, 4, 5), (2, 1, 1, 1)),
-            ("keep_dim", (2, 3, -1, -1), (2, 1, 5, 5)),
-            ("different_ranks", (2, 3, -1, -1), (1, 5, 7)),
+            ("2d_dim", (2, 1), (2, 3)),
+            ("3d_dim", (2, 1, 1), (2, 3, 4)),
+            ("4d_dim", (2, 1, 1, 1), (2, 3, 4, 5)),
+            ("keep_dim", (2, 1, 5, 5), (2, 3, -1, -1)),
+            ("different_ranks", (1, 5, 7), (2, 3, -1, -1)),
         ]
     )
-    def test_expand(self, _, sizes, init_size):
+    def test_expand(self, _, input_shape, expanded_shape):
         class Expand(nn.Module):
             def forward(self, x):
-                return torch.ops.aten.expand.default(x, sizes)
+                return torch.ops.aten.expand.default(x, expanded_shape)
 
-        inputs = [torch.randn(*init_size)]
+        inputs = [torch.randn(*input_shape)]
         self.run_test(
             Expand(),
             inputs,
