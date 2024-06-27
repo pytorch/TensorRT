@@ -11,6 +11,8 @@ import os
 import sys
 from typing import List
 
+import regex
+
 MAX_FOLDER_DEPTH = 3
 
 # TODO: discuss with Naren for a better mapping
@@ -24,6 +26,18 @@ Folder_To_TestModules_Dict = {
     ],
     "py/torch_tensorrt/ts": ["ts_frontend"],
     "py/torch_tensorrt": ["py_core"],
+}
+
+Folder_To_Skip_TestModules = {
+    "docker/*",
+    "docs/*",
+    "docsrc/*",
+    "examples/*",
+    "notenooks/*",
+    "packaging/*",
+    "third_party/*",
+    "toolchains/*",
+    "tools/*",
 }
 
 # TODO: discuss with Naren for a basic set of tests here
@@ -65,6 +79,13 @@ def generate_test_modules(
 ) -> List[str]:
     testModules = []
     for folder in folders:
+        skip = False
+        for to_skip in Folder_To_Skip_TestModules:
+            if regex.match(to_skip, folder):
+                skip = True
+                break
+        if skip == True:
+            continue
         if folder in Folder_To_TestModules_Dict.keys():
             modules = Folder_To_TestModules_Dict[folder]
             testModules.extend(modules)
