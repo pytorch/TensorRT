@@ -71,7 +71,7 @@ jobs:
         run: |
           #set -euxo pipefail
           set -x
-          echo "${{ github. }}"
+
           if [ ${{ github.event_name }} == 'pull_request' ]; then
             git log -10
             base=${{ github.event.pull_request.base.sha }}
