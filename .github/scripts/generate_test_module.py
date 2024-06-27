@@ -93,7 +93,6 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     options = parse_args()
-    print(f"got options={options}")
     assert options.event_name != "", "Must provide the --event-name str"
 
     # if it is the Pull Request:
