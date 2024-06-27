@@ -62,10 +62,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout torch-tensorrt repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repository }}
           ref: ${{ inputs.ref }}
+          fetch-depth: 0
       - name: Check modified files
         id: check_files
         run: |
