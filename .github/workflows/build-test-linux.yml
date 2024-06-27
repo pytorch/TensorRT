@@ -70,11 +70,8 @@ jobs:
       - name: Check modified files
         id: check_files
         run: |
-          #set -euxo pipefail
-          set -x
-
+          set -euxo pipefail
           if [ ${{ github.event_name }} == 'pull_request' ]; then
-            git log -10
             base=${{ github.event.pull_request.base.sha }}
             head=${{ github.event.pull_request.head.sha }}
             git merge-base "${base}" "${head}"

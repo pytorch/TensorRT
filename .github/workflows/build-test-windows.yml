@@ -1,7 +1,7 @@
 name: Build and test Windows wheels
 
 on:
-  # pull_request:
+  pull_request:
   push:
     branches:
       - main
@@ -63,9 +63,39 @@ jobs:
       package-name: ${{ matrix.package-name }}
       trigger-event: ${{ github.event_name }}
 
+  check:
+    needs: build
+    name: Check files
+    outputs:
+      test_modules: ${{ steps.check_files.outputs.test_modules }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout torch-tensorrt repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+      - name: Check modified files
+        id: check_files
+        run: |
+          set -euxo pipefail
+          if [ ${{ github.event_name }} == 'pull_request' ]; then
+            base=${{ github.event.pull_request.base.sha }}
+            head=${{ github.event.pull_request.head.sha }}
+            git merge-base "${base}" "${head}"
+
+            files=$(git diff --name-only "${base}" "${head}")
+            test_modules="$(python .github/scripts/generate_test_module.py --event-name 'pull_request' --files '${files}')"
+          else
+            test_modules="$(python .github/scripts/generate_test_module.py --event-name ${{ github.event_name }})"
+          fi
+          echo "test_modules=${test_modules}" >> "${GITHUB_OUTPUT}"
+
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
-    needs: [generate-matrix, build]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'ts_frontend') }}
     strategy:
       fail-fast: false
       matrix:
@@ -96,7 +126,8 @@ jobs:
 
   tests-py-dynamo-converters:
     name: Test dynamo converters [Python]
-    needs: [generate-matrix, build]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'dynamo_converter') }}
     strategy:
       fail-fast: false
       matrix:
@@ -121,7 +152,8 @@ jobs:
 
   tests-py-dynamo-fe:
     name: Test dynamo frontend [Python]
-    needs: [generate-matrix, build]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'dynamo_frontend') }}
     strategy:
       fail-fast: false
       matrix:
@@ -147,7 +179,8 @@ jobs:
 
   tests-py-dynamo-serde:
     name: Test dynamo export serde [Python]
-    needs: [generate-matrix, build]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'dynamo_serde') }}
     strategy:
       fail-fast: false
       matrix:
@@ -172,7 +205,8 @@ jobs:
 
   tests-py-torch-compile-be:
     name: Test torch compile backend [Python]
-    needs: [generate-matrix, build]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'torch_compile_backend') }}
     strategy:
       fail-fast: false
       matrix:
@@ -199,7 +233,8 @@ jobs:
 
   tests-py-dynamo-core:
     name: Test dynamo core [Python]
-    needs: [generate-matrix, build]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.folder_names, 'dynamo_core') }}
     strategy:
       fail-fast: false
       matrix:
@@ -226,7 +261,8 @@ jobs:
 
   tests-py-core:
     name: Test core [Python]
-    needs: [generate-matrix, build]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.folder_names, 'py_core') }}
     strategy:
       fail-fast: false
       matrix:

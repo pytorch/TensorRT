@@ -28,7 +28,7 @@ Folder_To_TestModules_Dict = {
 
 # TODO: discuss with Naren for a basic set of tests here
 # this is just an example only
-Base_Test_Modules = ["torch_compile_back"]
+Base_Test_Modules = ["torch_compile_backend"]
 Full_Test_Modules = [
     "ts_frontend",
     "py_core",
