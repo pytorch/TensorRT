@@ -18,15 +18,15 @@ SerializedTorchTensorRTModuleFmt = Tuple[
     str, Optional[SerializedTensorRTEngineFmt], List[str], List[str]
 ]
 
-ABI_TARGET_IDX = torch.ops.tensorrt.ABI_TARGET_IDX()
-NAME_IDX = torch.ops.tensorrt.NAME_IDX()
-DEVICE_IDX = torch.ops.tensorrt.DEVICE_IDX()
-ENGINE_IDX = torch.ops.tensorrt.ENGINE_IDX()
-INPUT_BINDING_NAMES_IDX = torch.ops.tensorrt.INPUT_BINDING_NAMES_IDX()
-OUTPUT_BINDING_NAMES_IDX = torch.ops.tensorrt.OUTPUT_BINDING_NAMES_IDX()
-HW_COMPATIBLE_IDX = torch.ops.tensorrt.HW_COMPATIBLE_IDX()
-SERIALIZED_METADATA_IDX = torch.ops.tensorrt.SERIALIZED_METADATA_IDX()
-SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()
+ABI_TARGET_IDX = torch.ops.tensorrt.ABI_TARGET_IDX()  # 0
+NAME_IDX = torch.ops.tensorrt.NAME_IDX()  # 1
+DEVICE_IDX = torch.ops.tensorrt.DEVICE_IDX()  # 2
+ENGINE_IDX = torch.ops.tensorrt.ENGINE_IDX()  # 3
+INPUT_BINDING_NAMES_IDX = torch.ops.tensorrt.INPUT_BINDING_NAMES_IDX()  # 4
+OUTPUT_BINDING_NAMES_IDX = torch.ops.tensorrt.OUTPUT_BINDING_NAMES_IDX()  # 5
+HW_COMPATIBLE_IDX = torch.ops.tensorrt.HW_COMPATIBLE_IDX()  # 6
+SERIALIZED_METADATA_IDX = torch.ops.tensorrt.SERIALIZED_METADATA_IDX()  # 7
+SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 8
 
 
 class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]

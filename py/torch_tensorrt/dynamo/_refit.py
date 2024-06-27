@@ -25,6 +25,7 @@ from torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule import (
     PythonTorchTensorRTModule,
 )
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+    ENGINE_IDX,
     SERIALIZED_METADATA_IDX,
     TorchTensorRTModule,
 )
@@ -283,14 +284,18 @@ def refit_module_weights(
                     continue
                 else:
                     engine_info = compiled_submodule.__getstate__()[0]
-                    engine = get_engine_from_encoded_engine(engine_info[3], runtime)
+                    engine = get_engine_from_encoded_engine(
+                        engine_info[ENGINE_IDX], runtime
+                    )
             else:
                 compiled_submodule = getattr(compiled_module, name)
                 if isinstance(compiled_submodule, PythonTorchTensorRTModule):
                     engine = compiled_submodule.engine
                 elif isinstance(compiled_submodule, TorchTensorRTModule):
                     engine_info = compiled_submodule.engine.__getstate__()[0]
-                    engine = get_engine_from_encoded_engine(engine_info[3], runtime)
+                    engine = get_engine_from_encoded_engine(
+                        engine_info[ENGINE_IDX], runtime
+                    )
                 elif isinstance(compiled_submodule, torch.fx.graph_module.GraphModule):
                     # This is graph break resulted by unsupported ops
                     compiled_submodule.load_state_dict(new_submodule.state_dict())
@@ -331,14 +336,14 @@ def refit_module_weights(
         if isinstance(compiled_submodule, TorchTensorRTModule):
             serialized_engine = bytes(engine.serialize())
             new_engine_info = list(engine_info)
-            new_engine_info[3] = serialized_engine
+            new_engine_info[ENGINE_IDX] = serialized_engine
             refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
             compiled_submodule.engine = refitted_engine
 
         elif inline_module:
             serialized_engine = bytes(engine.serialize())
             new_engine_info = list(engine_info)
-            new_engine_info[3] = serialized_engine
+            new_engine_info[ENGINE_IDX] = serialized_engine
             refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
             setattr(compiled_module, f"{name}_engine", refitted_engine)
 
