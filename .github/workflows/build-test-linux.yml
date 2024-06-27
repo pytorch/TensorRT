@@ -69,23 +69,13 @@ jobs:
       - name: Check modified files
         id: check_files
         run: |
-          # set -euxo pipefail
-          set -x
-          #if [ ${{ github.event_name }} == 'pull_request' ]; then
-          if [[ ${event_name} == 'pull_request' ]]; then
+          set -euxo pipefail
+          if [ ${{ github.event_name }} == 'pull_request' ]; then
             files=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
             test_modules="$(python .github/scripts/generate_test_module.py --event-name 'pull_request' --files '${files}')"
           else
             test_modules="$(python .github/scripts/generate_test_module.py --event-name ${{ github.event_name }})"
-
           fi
-
-          echo "github.event_name: ${{ github.event_name }}"
-          echo "github.ref: ${{ github.ref }}"
-          echo "github.ref_name: ${{ github.ref_name }}"
-          echo "github.event.master_branch: ${{ github.event.master_branch }}"
-          echo "github.event.pull_request.base.sha: ${{ github.event.pull_request.base.sha }}"
-          echo "github.event.pull_request.head.sha: "
           echo "test_modules=${test_modules}" >> "${GITHUB_OUTPUT}"
 
   tests-py-torchscript-fe:

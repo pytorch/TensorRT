@@ -26,6 +26,9 @@ Folder_To_TestModules_Dict = {
     "py/torch_tensorrt": ["py_core"],
 }
 
+# TODO: discuss with Naren for a basic set of tests here
+# this is just an example only
+Base_Test_Modules = ["torch_compile_back"]
 Full_Test_Modules = [
     "ts_frontend",
     "py_core",
@@ -65,6 +68,9 @@ def generate_test_modules(
         if folder in Folder_To_TestModules_Dict.keys():
             modules = Folder_To_TestModules_Dict[folder]
             testModules.extend(modules)
+        else:
+            # if there is files changed in other folders, always run the base tests
+            testModules.extend(Base_Test_Modules)
     return list(dict.fromkeys(testModules))
 
 
