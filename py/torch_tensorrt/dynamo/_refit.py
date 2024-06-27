@@ -160,8 +160,10 @@ def refit_module_weights(
     """
     inline_module = False
     if isinstance(compiled_module, ExportedProgram):
-        inline_module = True
         compiled_module = compiled_module.module()
+
+    if len(list(compiled_module.named_children())) == 0:
+        inline_module = True
 
     compiled_module = copy.deepcopy(compiled_module)
 
