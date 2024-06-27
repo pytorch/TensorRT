@@ -346,7 +346,7 @@ def refit_module_weights(
         if check_output(
             new_module=new_gm,
             refitted_module=compiled_module,
-            inputs=get_torch_inputs(inputs, device),
+            inputs=torch_inputs,
         ):
             logger.info("Refitting Succeed!")
         else:
