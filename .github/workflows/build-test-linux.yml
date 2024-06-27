@@ -74,8 +74,7 @@ jobs:
           if [ ${{ github.event_name }} == 'pull_request' ]; then
             base=${{ github.event.pull_request.base.sha }}
             head=${{ github.event.pull_request.head.sha }}
-            git merge-base "${base}" "${head}"
-
+            python -m pip install regex
             files=$(git diff --name-only "${base}" "${head}")
             test_modules="$(python .github/scripts/generate_test_module.py --event-name 'pull_request' --files '${files}')"
           else
