@@ -14,7 +14,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
 )
 from torch_tensorrt.dynamo.conversion.impl.cat import cat
+from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
 from torch_tensorrt.dynamo.conversion.impl.slice.base import slice
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.fx.converters.converter_utils import (
     has_dynamic_shape,
     prepend_ones,
@@ -90,27 +92,39 @@ def expand(
     # After the above padding, the shape and tensor rank must be equal
     assert len(input_t.shape) == shape_rank
 
-    # -1 denotes taking the shape from the original input tensor
-    shape = tuple(
-        [input_t.shape[i] if shape[i] == -1 else shape[i] for i in range(shape_rank)]
-    )
+    shape_t = []
+    for i in range(shape_rank):
+        if shape[i] == -1:
+            shape_t.append(
+                get_shape(ctx, target, source_ir, name + f"_shape_dim{i}", input_t, i)
+            )
+        else:
+            shape_t.append(shape[i])
 
     # Establish the desired output shape, strides, and starting indices
     input_tensor_shape = tuple(input_t.shape)
     start = tuple([0] * shape_rank)
-    stride = tuple(
-        [int(i == o) for i, o in zip(input_tensor_shape, shape)]
-    )  # stride == 1 if dimensions match, 0 otherwise
 
-    shape_ = shape
+    # TODO: Revisit stride calculation. stride[dim]=0 implies that dimension is being broadcasted.
+    # stride should be 1 for all non-broadcasted dims
+    stride = []
+    for i, o in zip(input_tensor_shape, shape_t):
+        # If the shape has ITensor, we treat it as a reshape dim instead of a broadcasted dim
+        # shape_t cannot have -1. If the input at this dimension has a shape of -1, set the stride to 1. This indicates that the input is dynamic and does not imply broadcasting at that specific dimension.
+        if isinstance(i, int) and isinstance(o, int) and i != DYNAMIC_DIM:
+            stride.append(int(i == o))
+        else:
+            stride.append(1)
+
+    shape_ = shape_t
     # Handle dynamic shapes case where shape has dynamic dimension
-    if any(isinstance(ele, TRTTensor) for ele in shape):
+    if any(isinstance(ele, TRTTensor) for ele in shape_t):
         shape_ = cat(
             ctx,
             target,
             source_ir,
             name + "_shape_concat",
-            shape,
+            shape_t,
             0,
             cast_dtype=trt.int32,
         )
