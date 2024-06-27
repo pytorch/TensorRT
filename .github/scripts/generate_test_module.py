@@ -28,6 +28,7 @@ Folder_To_TestModules_Dict = {
     "py/torch_tensorrt": ["py_core"],
 }
 
+# The following folder files change will trigger the build but will skip all the test modules
 Folder_To_Skip_TestModules = {
     "docker/*",
     "docs/*",
