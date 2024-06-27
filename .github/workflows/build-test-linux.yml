@@ -69,9 +69,16 @@ jobs:
       - name: Check modified files
         id: check_files
         run: |
-          set -euxo pipefail
+          #set -euxo pipefail
+          set -x
+          echo "${{ github. }}"
           if [ ${{ github.event_name }} == 'pull_request' ]; then
-            files=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+            git log -10
+            base=${{ github.event.pull_request.base.sha }}
+            head=${{ github.event.pull_request.head.sha }}
+            git merge-base "${base}" "${head}"
+
+            files=$(git diff --name-only "${base}" "${head}")
             test_modules="$(python .github/scripts/generate_test_module.py --event-name 'pull_request' --files '${files}')"
           else
             test_modules="$(python .github/scripts/generate_test_module.py --event-name ${{ github.event_name }})"
