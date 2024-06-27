@@ -1721,7 +1721,7 @@ def aten_ops_ceil(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.floor.default)
+@dynamo_tensorrt_converter(torch.ops.aten.floor.default, supports_dynamic_shapes=True)
 def aten_ops_floor(
     ctx: ConversionContext,
     target: Target,
@@ -1738,7 +1738,9 @@ def aten_ops_floor(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.logical_not.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.logical_not.default, supports_dynamic_shapes=True
+)
 def aten_ops_logical_not(
     ctx: ConversionContext,
     target: Target,
@@ -1755,7 +1757,7 @@ def aten_ops_logical_not(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sign.default)
+@dynamo_tensorrt_converter(torch.ops.aten.sign.default, supports_dynamic_shapes=True)
 def aten_ops_sign(
     ctx: ConversionContext,
     target: Target,
@@ -1772,7 +1774,7 @@ def aten_ops_sign(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.round.default)
+@dynamo_tensorrt_converter(torch.ops.aten.round.default, supports_dynamic_shapes=True)
 def aten_ops_round(
     ctx: ConversionContext,
     target: Target,
@@ -1789,7 +1791,7 @@ def aten_ops_round(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.isinf.default)
+@dynamo_tensorrt_converter(torch.ops.aten.isinf.default, supports_dynamic_shapes=True)
 def aten_ops_isinf(
     ctx: ConversionContext,
     target: Target,
@@ -1806,7 +1808,7 @@ def aten_ops_isinf(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.isnan.default)
+@dynamo_tensorrt_converter(torch.ops.aten.isnan.default, supports_dynamic_shapes=True)
 def aten_ops_isnan(
     ctx: ConversionContext,
     target: Target,
