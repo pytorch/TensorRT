@@ -140,8 +140,13 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         set_rt_device(device);
 
         // Update active stream based on new device
-        compiled_engine->active_stream = c10::cuda::getStreamFromPool(true, device.id);
-        c10::cuda::setCurrentCUDAStream(compiled_engine->active_stream);
+        auto current_stream = c10::cuda::getCurrentCUDAStream(device.id);
+        if (current_stream == c10::cuda::getDefaultCUDAStream(device.id)) {
+          compiled_engine->active_stream = c10::cuda::getStreamFromPool(false, device.id);
+          c10::cuda::setCurrentCUDAStream(compiled_engine->active_stream);
+        } else {
+          compiled_engine->active_stream = current_stream;
+        }
 
         // Target device is new device
         target_device += std::to_string(device.id);
@@ -274,7 +279,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     // If cudagraphs needs to record a graph, capture the enqueueV3 call in a graph
 
     // Cudagraphs cannot record on the current stream, so use an alternate
-    c10::cuda::CUDAStream recording_stream = c10::cuda::getStreamFromPool(true, inputs[0].device().index());
+    c10::cuda::CUDAStream recording_stream = c10::cuda::getStreamFromPool(false, inputs[0].device().index());
     c10::cuda::CUDAStreamGuard guard(recording_stream);
 
     compiled_engine->exec_ctx->enqueueV3(recording_stream);
