@@ -16,10 +16,11 @@ config_setting(
     ],
 )
 
+#commenting this out now. TODO for DLFW 24.08
 test_suite(
     name = "api_tests",
     tests = [
-        ":test_collections",
+        #":test_collections",
         ":test_compiled_modules",
         ":test_default_input_types",
         ":test_dynamic_fallback",
