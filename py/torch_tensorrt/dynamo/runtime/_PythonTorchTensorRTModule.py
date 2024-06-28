@@ -46,8 +46,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.input_buffers: List[torch.Tensor] = []
         self.output_buffers: List[torch.Tensor] = []
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
-        # {shape: cudagraph}
-        # limitation on CG
+        self.active_stream: Optional[torch.cuda.Stream] = None
+
+        # TODO: Make the below a Dictionary {shape: cudagraph}
         self.shape_key: Optional[str] = None
 
         # See https://github.com/pytorch/pytorch/blob/acfe237a71af609e837a34bb38048aa8acb8eb4d/torch/cuda/graphs.py#L92-L98
@@ -99,6 +100,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if torch_tensorrt.runtime.get_cudagraphs_mode():
             self.cudagraph = torch.cuda.CUDAGraph()
             self.graph_capturer = torch.cuda.graphs.graph(self.cudagraph)
+
+        # Set the active stream using the current device, with a high priority flag
+        self.active_stream = torch.cuda.Stream(torch.cuda.current_device(), priority=-1)
+        torch.cuda.set_stream(self.active_stream)
 
     def _check_initialized(self) -> None:
         if not self.initialized:
@@ -195,8 +200,14 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                             self.target_device_id,
                             self.target_device_properties,
                         )
+
+                        # Update current device
                         device = torch.device(device_id)
                         torch.cuda.set_device(device_id)
+
+                        # Update current stream
+                        self.active_stream = torch.cuda.Stream(device, priority=-1)
+                        torch.cuda.set_stream(self.active_stream)
 
                         contiguous_inputs = [
                             tensor.to(device) for tensor in contiguous_inputs
@@ -316,21 +327,19 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             ):
 
                 if not cudagraphs_enabled:
-                    self.context.execute_async_v3(
-                        torch.cuda.current_stream().cuda_stream
-                    )
+                    self.context.execute_async_v3(self.active_stream)
 
                 elif need_cudagraphs_record:
                     self.input_buffers = list(contiguous_inputs)
                     self.output_buffers = list(outputs)
 
-                    current_stream = self.graph_capturer.capture_stream
+                    graph_capturer_stream = self.graph_capturer.capture_stream
 
-                    self.context.execute_async_v3(current_stream.cuda_stream)
-                    current_stream.synchronize()
+                    self.context.execute_async_v3(graph_capturer_stream.cuda_stream)
+                    graph_capturer_stream.synchronize()
 
                     with self.graph_capturer:
-                        self.context.execute_async_v3(current_stream.cuda_stream)
+                        self.context.execute_async_v3(graph_capturer_stream.cuda_stream)
 
                 else:
                     for idx, input_tensor in enumerate(inputs):
@@ -387,8 +396,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         """
         # Representation of input shapes to a given model
         # Shapes are concatenated as so:
-        # x: (3, 4), y: (4, 5) --> Key: (3, 4)(4, 5)
-        new_shape_key = "".join(str(tuple(t.shape)) for t in inputs)
+        # x: (3, 4), y: (4, 5) --> Key: (3,4)(4,5)
+        new_shape_key = "".join(str(tuple(t.shape)).replace(" ", "") for t in inputs)
 
         # If the new shape key differs from the existing one,
         # invalidate the old shape key and remove the CUDAGraph

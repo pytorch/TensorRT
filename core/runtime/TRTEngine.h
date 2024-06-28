@@ -9,6 +9,7 @@
 #include "ATen/core/function_schema.h"
 #include "ATen/cuda/CUDAGraph.h"
 #include "NvInfer.h"
+#include "c10/cuda/CUDAStream.h"
 #include "torch/custom_class.h"
 
 #include "core/runtime/TRTEngineProfiler.h"
@@ -69,6 +70,7 @@ struct TRTEngine : torch::CustomClassHolder {
 
   // CUDAGraph-Related Functionality
   at::cuda::CUDAGraph cudagraph = {};
+  at::cuda::CUDAStream active_stream = c10::cuda::getDefaultCUDAStream();
   std::vector<at::Tensor> input_buffers = {};
   std::vector<at::Tensor> output_buffers = {};
   std::string shape_key;

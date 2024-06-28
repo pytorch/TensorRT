@@ -4,7 +4,9 @@ from typing import Any
 
 import torch
 
-if find_spec("torch_tensorrt._C") is not None:
+import torch_tensorrt
+
+if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
     _PY_RT_CUDAGRAPHS = torch.ops.tensorrt.get_cudagraphs_mode()
 else:
     _PY_RT_CUDAGRAPHS = False

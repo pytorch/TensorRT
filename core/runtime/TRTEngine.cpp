@@ -2,6 +2,7 @@
 
 #include <cuda_runtime.h>
 #include "NvInfer.h"
+#include "c10/cuda/CUDAStream.h"
 #include "torch/csrc/jit/frontend/function_schema_parser.h"
 #include "torch/cuda.h"
 
@@ -69,6 +70,10 @@ TRTEngine::TRTEngine(
   device_info = most_compatible_device.value();
   multi_gpu_device_check();
   set_rt_device(device_info);
+
+  // Set active stream to high-priority, non-default stream
+  active_stream = c10::cuda::getStreamFromPool(true, device_info.id);
+  c10::cuda::setCurrentCUDAStream(active_stream);
 
   rt = make_trt(nvinfer1::createInferRuntime(util::logging::get_logger()));
 
