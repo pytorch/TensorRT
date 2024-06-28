@@ -101,9 +101,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.cudagraph = torch.cuda.CUDAGraph()
             self.graph_capturer = torch.cuda.graphs.graph(self.cudagraph)
 
-        # Set the active stream using the current device, with a high priority flag
-        self.active_stream = torch.cuda.Stream(torch.cuda.current_device(), priority=-1)
-        torch.cuda.set_stream(self.active_stream)
+        # Set the active stream using the current device
+        current_stream = torch.cuda.current_stream()
+        if current_stream == torch.cuda.default_stream():
+            self.active_stream = torch.cuda.Stream()
+            torch.cuda.set_stream(self.active_stream)
+        else:
+            self.active_stream = current_stream
 
     def _check_initialized(self) -> None:
         if not self.initialized:
@@ -206,8 +210,12 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         torch.cuda.set_device(device_id)
 
                         # Update current stream
-                        self.active_stream = torch.cuda.Stream(device, priority=-1)
-                        torch.cuda.set_stream(self.active_stream)
+                        current_stream = torch.cuda.current_stream(device)
+                        if current_stream == torch.cuda.default_stream(device):
+                            self.active_stream = torch.cuda.Stream(device)
+                            torch.cuda.set_stream(self.active_stream)
+                        else:
+                            self.active_stream = current_stream
 
                         contiguous_inputs = [
                             tensor.to(device) for tensor in contiguous_inputs
