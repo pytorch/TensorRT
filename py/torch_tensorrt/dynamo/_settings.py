@@ -15,12 +15,12 @@ from torch_tensorrt.dynamo._defaults import (
     ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
+    MAKE_REFITABLE,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
-    REFIT,
     REQUIRE_FULL_COMPILATION,
     SPARSE_WEIGHTS,
     TRUNCATE_DOUBLE,
@@ -88,7 +88,7 @@ class CompilationSettings:
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION
     disable_tf32: bool = DISABLE_TF32
     sparse_weights: bool = SPARSE_WEIGHTS
-    refit: bool = REFIT
+    make_refitable: bool = MAKE_REFITABLE
     engine_capability: EngineCapability = field(
         default_factory=lambda: ENGINE_CAPABILITY
     )

@@ -182,7 +182,7 @@ def refit_module_weights(
         ]
         assert (
             encoded_settings != ""
-        ), "Settings are not saved in the engine. Please recompile the engine with refit=True."
+        ), "Settings are not saved in the engine. Please recompile the engine with make_refitable=True."
         settings = TorchTensorRTModule.decode_metadata(encoded_settings)
         # Handle torch modules
         compiled_submodules_map = dict(compiled_submodules)
@@ -198,7 +198,7 @@ def refit_module_weights(
             settings = submodule.settings
 
     assert (
-        settings.refit
+        settings.make_refitable
     ), "Refitting is not enabled. Please recompile the engine with refit=True."
 
     if settings.debug:

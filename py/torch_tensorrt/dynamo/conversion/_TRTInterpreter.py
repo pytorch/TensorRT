@@ -251,7 +251,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if self.compilation_settings.disable_tf32:
             builder_config.clear_flag(trt.BuilderFlag.TF32)
 
-        if self.compilation_settings.refit:
+        if self.compilation_settings.make_refitable:
             builder_config.set_flag(trt.BuilderFlag.REFIT)
 
         if strict_type_constraints:

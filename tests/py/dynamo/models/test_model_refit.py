@@ -50,7 +50,7 @@ def test_mapping():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        refit=True,
+        make_refitable=True,
     )
     settings = trt_gm._run_on_acc_0.settings
     runtime = trt.Runtime(TRT_LOGGER)
@@ -97,7 +97,7 @@ def test_refit_one_engine():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        refit=True,
+        make_refitable=True,
     )
 
     new_trt_gm = refit_module_weights(
@@ -143,7 +143,7 @@ def test_refit_one_engine_bert():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        refit=True,
+        make_refitable=True,
     )
 
     new_trt_gm = refit_module_weights(
@@ -191,7 +191,7 @@ def test_refit_one_engine_inline_runtime():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        refit=True,
+        make_refitable=True,
     )
     torchtrt.save(trt_gm, trt_ep_path, inputs=inputs)
     trt_gm = torch.export.load(trt_ep_path)
@@ -236,7 +236,7 @@ def test_refit_one_engine_python_runtime():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        refit=True,
+        make_refitable=True,
     )
 
     new_trt_gm = refit_module_weights(
@@ -301,7 +301,7 @@ def test_refit_multiple_engine():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        refit=True,
+        make_refitable=True,
         torch_executed_ops=torch_executed_ops,
     )
 
