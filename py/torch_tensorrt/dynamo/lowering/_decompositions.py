@@ -4,7 +4,9 @@ from typing import Any, Callable, Dict, List, Optional
 import torch
 from torch._decomp import register_decomposition
 from torch._ops import OpOverload
+from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
+from torch_tensorrt.dynamo.utils import to_torch_device
 
 from ._decomposition_groups import (
     ENABLED_TORCH_DECOMPOSITIONS,
@@ -172,6 +174,7 @@ def empty_permuted_decomposition(*args, **kwargs) -> torch.Tensor:
     perm = [0] * len(empty_size)
     for permute_index, permute_element in enumerate(empty_permute):
         perm[permute_element] = permute_index
+    kwargs["device"] = to_torch_device(default_device())
     return torch.empty([empty_size[l] for l in empty_permute], **kwargs).permute(perm)
 
 
@@ -233,7 +236,11 @@ def select_scatter_decomposition(
 def empty_strided_decomposition(*args, **kwargs) -> torch.Tensor:
     empty_size = args[0]
     empty_stride = args[1]
-    return torch.as_strided(torch.empty(empty_size), empty_size, empty_stride)
+    return torch.as_strided(
+        torch.empty(empty_size, device=to_torch_device(default_device())),
+        empty_size,
+        empty_stride,
+    )
 
 
 def get_decompositions(
