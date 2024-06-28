@@ -228,11 +228,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     if cudagraphs_enabled:
                         # If cudagraphs is enabled, this memory is reserved for future cudagraph runs
                         # Clone is required to avoid re-using user-provided GPU memory
-                        contiguous_inputs = [
-                            i.contiguous().clone() for i in contiguous_inputs
-                        ]
-                    else:
-                        contiguous_inputs = [i.contiguous() for i in contiguous_inputs]
+                        contiguous_inputs = [i.clone() for i in contiguous_inputs]
+
                     bindings = []
                     for i, input_name in enumerate(self.input_names):
                         if not contiguous_inputs[i].is_cuda:
@@ -327,7 +324,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             ):
 
                 if not cudagraphs_enabled:
-                    self.context.execute_async_v3(self.active_stream)
+                    self.context.execute_async_v3(self.active_stream.cuda_stream)  # type: ignore
 
                 elif need_cudagraphs_record:
                     self.input_buffers = list(contiguous_inputs)
