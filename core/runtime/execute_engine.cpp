@@ -1,4 +1,3 @@
-#include "c10/cuda/CUDAGuard.h"
 #include "c10/cuda/CUDAStream.h"
 
 #include "torch/csrc/jit/runtime/custom_operator.h"
@@ -64,9 +63,20 @@ bool _cudagraphs_validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_
   // invalidate the existing cudagraphs object
 
   // Populate the shape key for the inputs
+  // x: (3, 4), y: (4, 5) --> Key: (3,4)(4,5)
   std::stringstream new_shape_key_ss;
   for (auto input : inputs) {
-    new_shape_key_ss << input.sizes();
+    new_shape_key_ss << "(";
+    auto sizes = input.sizes();
+    auto rank = input.sizes().size();
+    for (auto i = 0; i < rank; i++) {
+      new_shape_key_ss << sizes[i];
+      // For all but the final dimension in the shape key, add comma separator
+      if (i < rank - 1) {
+        new_shape_key_ss << ",";
+      }
+    }
+    new_shape_key_ss << ")";
   }
 
   auto new_shape_key = new_shape_key_ss.str();
@@ -128,6 +138,10 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             select_rt_device(compiled_engine->device_info, curr_device, compiled_engine->hardware_compatible);
         set_rt_device(device);
 
+        // Update active stream based on new device
+        compiled_engine->active_stream = c10::cuda::getStreamFromPool(true, device.id);
+        c10::cuda::setCurrentCUDAStream(compiled_engine->active_stream);
+
         // Target device is new device
         target_device += std::to_string(device.id);
 
@@ -157,6 +171,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       }
     }
 
+    // this is a buffer to store shape tensor input addresses throughout the runtime scope
+    std::list<std::vector<int32_t>> inputShapeTensorValues;
     {
       std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
       if (compiled_engine->profile_execution) {
@@ -252,22 +268,17 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
   if (!CUDAGRAPHS_MODE) {
     // If not in cudagraphs mode, proceed with enqueueV3 as normal
-    c10::cuda::CUDAStream stream = c10::cuda::getCurrentCUDAStream(inputs[0].device().index());
-    compiled_engine->exec_ctx->enqueueV3(stream);
+    compiled_engine->exec_ctx->enqueueV3(compiled_engine->active_stream);
   } else if (need_cudagraphs_record) {
     // If cudagraphs needs to record a graph, capture the enqueueV3 call in a graph
 
     // Cudagraphs cannot record on the default stream, so use an alternate
     c10::cuda::CUDAStream stream = c10::cuda::getStreamFromPool(true, inputs[0].device().index());
-    c10::cuda::CUDAStreamGuard guard(stream);
-    compiled_engine->exec_ctx->enqueueV3(stream);
+    compiled_engine->exec_ctx->enqueueV3(compiled_engine->active_stream);
 
     compiled_engine->cudagraph.capture_begin();
-    compiled_engine->exec_ctx->enqueueV3(stream);
+    compiled_engine->exec_ctx->enqueueV3(compiled_engine->active_stream);
     compiled_engine->cudagraph.capture_end();
-
-    // Reset the stream to its original setting
-    guard.reset_stream(guard.original_stream());
 
   } else {
     // If the cudagraph has already been recorded, copy the input buffers and replay it

@@ -8,10 +8,6 @@ import torch_tensorrt
 from ..testing_utilities import DECIMALS_OF_AGREEMENT
 
 
-@unittest.skipIf(
-    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "Torch-TensorRT runtime is not available",
-)
 class TestCudagraphs(TestCase):
     def test_cudagraphs_on(self):
         torch_tensorrt.runtime.set_cudagraphs_mode(True)
@@ -66,6 +62,10 @@ class TestCudagraphs(TestCase):
         )
         torch._dynamo.reset()
 
+    @unittest.skipIf(
+        not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+        "Torch-TensorRT runtime is not available",
+    )
     def test_cudagraphs_enabled_inference_cpp(self):
         class SampleModel(torch.nn.Module):
             def forward(self, x):
