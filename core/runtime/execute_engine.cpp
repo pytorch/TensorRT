@@ -1,3 +1,4 @@
+#include "c10/cuda/CUDAGuard.h"
 #include "c10/cuda/CUDAStream.h"
 
 #include "torch/csrc/jit/runtime/custom_operator.h"
@@ -271,11 +272,20 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     compiled_engine->exec_ctx->enqueueV3(compiled_engine->active_stream);
   } else if (need_cudagraphs_record) {
     // If cudagraphs needs to record a graph, capture the enqueueV3 call in a graph
-    compiled_engine->exec_ctx->enqueueV3(compiled_engine->active_stream);
+
+    // Cudagraphs cannot record on the current stream, so use an alternate
+    c10::cuda::CUDAStream recording_stream = c10::cuda::getStreamFromPool(true, inputs[0].device().index());
+    c10::cuda::CUDAStreamGuard guard(recording_stream);
+
+    compiled_engine->exec_ctx->enqueueV3(recording_stream);
+    recording_stream.synchronize();
 
     compiled_engine->cudagraph.capture_begin();
-    compiled_engine->exec_ctx->enqueueV3(compiled_engine->active_stream);
+    compiled_engine->exec_ctx->enqueueV3(recording_stream);
     compiled_engine->cudagraph.capture_end();
+
+    // Reset the stream to its original setting
+    guard.reset_stream(guard.original_stream());
 
   } else {
     // If the cudagraph has already been recorded, copy the input buffers and replay it
