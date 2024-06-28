@@ -128,8 +128,10 @@ def input_is_dynamic(inputs: Sequence[Union[Input, torch.Tensor]]) -> bool:
 
 
 def get_torch_inputs(
-    inputs: Sequence[Input], device: Union[Device, torch.device, str], mode: str = ""
-) -> Sequence[torch.tensor]:
+    inputs: Sequence[Input] | Dict[Any, Any],
+    device: Union[Device, torch.device, str],
+    mode: str = "",
+) -> Sequence[torch.tensor] | Dict[Any, Any]:
     """
     Return the torch_tensor from the Input object. If mode is set, this implies
     user is using dynamic shaped inputs and return the corresponding input based
@@ -137,15 +139,34 @@ def get_torch_inputs(
     """
     device = to_torch_device(device)
     if mode:
+        if isinstance(inputs, dict):
+            result = {}
+            for k, v in inputs.items():
+                if isinstance(v, (list, tuple, dict)):
+                    result[k] = get_torch_inputs(v, device)
+                else:
+                    result[k] = v.example_tensor(mode).to(device)
+            return result
+        else:
+            return [
+                input.example_tensor(mode).to(device)
+                for input in inputs
+                if isinstance(input, Input)
+            ]
+
+    if isinstance(inputs, dict):
+        result = {}
+        for k, v in inputs.items():
+            if isinstance(v, (list, tuple, dict)):
+                result[k] = get_torch_inputs(v, device)
+            else:
+                result[k] = v.torch_tensor.to(device)
+        return result
+    else:
         return [
-            input.example_tensor(mode).to(device)
+            input.torch_tensor.to(device) if isinstance(input, Input) else input
             for input in inputs
-            if isinstance(input, Input)
         ]
-    return [
-        input.torch_tensor.to(device) if isinstance(input, Input) else input
-        for input in inputs
-    ]
 
 
 def set_log_level(parent_logger: Any, level: Any) -> None:

@@ -49,6 +49,7 @@ def compile(
     exported_program: ExportedProgram,
     inputs: Tuple[Any, ...],
     *,
+    kwarg_inputs: Any = None,
     device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
     disable_tf32: bool = _defaults.DISABLE_TF32,
     assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
@@ -148,7 +149,6 @@ def compile(
 
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
-
     if "truncate_long_and_double" in kwargs.keys():
         if truncate_double is not _defaults.TRUNCATE_DOUBLE:
             raise ValueError(
@@ -173,6 +173,8 @@ def compile(
         else:
             make_refitable = kwargs["refit"]
 
+    if kwarg_inputs is None:
+        kwarg_inputs = {}
     engine_capability = EngineCapability._from(engine_capability)
 
     if torch_executed_modules is not None and torch_executed_modules:
@@ -186,7 +188,7 @@ def compile(
 
     # Prepare torch_trt inputs
     inputs = prepare_inputs(inputs)
-    torch_inputs = get_torch_inputs(inputs, device)
+    kwarg_inputs = prepare_inputs(kwarg_inputs)
     device = to_torch_tensorrt_device(device)
     enabled_precisions = {dtype._from(p) for p in enabled_precisions}
 
@@ -194,14 +196,14 @@ def compile(
         raise AssertionError(
             f"Input graph should be an ExportedProgram but got type {type(exported_program)}"
         )
-    exported_program = pre_export_lowering(exported_program, torch_inputs)
+    exported_program = pre_export_lowering(exported_program, None)
     exported_program = exported_program.run_decompositions(
         get_decompositions(enable_experimental_decompositions)
     )
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
     # Apply lowering on the graph module
-    gm = post_lowering(gm, torch_inputs)
+    gm = post_lowering(gm, None)
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     compilation_options = {
@@ -240,13 +242,14 @@ def compile(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-    trt_gm = compile_module(gm, inputs, settings)
+    trt_gm = compile_module(gm, inputs, kwarg_inputs, settings)
     return trt_gm
 
 
 def compile_module(
     gm: torch.fx.GraphModule,
     sample_inputs: Sequence[Input],
+    sample_kwarg_inputs: Any = None,
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
@@ -261,7 +264,8 @@ def compile_module(
         Compiled FX GraphModule
     """
     dryrun_tracker = DryRunTracker()
-
+    if sample_kwarg_inputs is None:
+        sample_kwarg_inputs = {}
     # Assume converters support dynamic shapes and disable validation
     CONVERTERS.set_dynamic_shape_support(settings.assume_dynamic_shape_support)
 
@@ -437,9 +441,13 @@ def compile_module(
 
             trt_modules[name] = trt_module
 
-    sample_outputs = gm(
-        *get_torch_inputs(sample_inputs, to_torch_device(settings.device))
+    torch_sample_inputs = get_torch_inputs(
+        sample_inputs, to_torch_device(settings.device)
     )
+    torch_sample_kwarg_inputs = get_torch_inputs(
+        sample_kwarg_inputs, to_torch_device(settings.device)
+    )
+    sample_outputs = gm(*torch_sample_inputs, **torch_sample_kwarg_inputs)
 
     if not isinstance(sample_outputs, (list, tuple)):
         sample_outputs = [sample_outputs]
