@@ -8,7 +8,7 @@ def export_llama2(model, inputs):
     Exports the llama2 model into an ExportedProgram
     """
     with torch.no_grad():
-        seq_len = torch.export.Dim("seq_len", min=2, max=1024)
+        seq_len = torch.export.Dim("seq_len", min=1, max=64)
         ep = torch.export.export(
             model, (inputs,), dynamic_shapes=({1: seq_len},), strict=False
         )
@@ -38,11 +38,17 @@ llama2_ep = export_llama2(model, input_ids)
 trt_model = torch_tensorrt.dynamo.compile(
     llama2_ep,
     inputs=[input_ids],
-    enabled_precisions={torch.float16},
-    min_block_size=5,
+    enabled_precisions={torch.float32},
+    min_block_size=1,
     truncate_double=True,
     torch_executed_ops={"torch.ops.aten.slice.Tensor"},
     debug=True,
+    disable_tf32=True,
 )
 
-trt_out = model(input_ids)
+trt_out = trt_model(input_ids)
+# breakpoint()
+# print("Mean diff: ", torch.mean(torch.abs(pyt_out.logits-trt_out.logits)))
+print("Mean diff: ", torch.mean(torch.abs(pyt_out - trt_out)))
+breakpoint()
+print("done")
