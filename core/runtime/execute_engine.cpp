@@ -271,9 +271,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     compiled_engine->exec_ctx->enqueueV3(compiled_engine->active_stream);
   } else if (need_cudagraphs_record) {
     // If cudagraphs needs to record a graph, capture the enqueueV3 call in a graph
-
-    // Cudagraphs cannot record on the default stream, so use an alternate
-    c10::cuda::CUDAStream stream = c10::cuda::getStreamFromPool(true, inputs[0].device().index());
     compiled_engine->exec_ctx->enqueueV3(compiled_engine->active_stream);
 
     compiled_engine->cudagraph.capture_begin();
