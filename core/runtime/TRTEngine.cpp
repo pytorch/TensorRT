@@ -122,7 +122,9 @@ TRTEngine::TRTEngine(
 
     num_io = std::make_pair(inputs, outputs);
     in_binding_names.resize(inputs);
+    input_buffers.resize(inputs);
     out_binding_names.resize(outputs);
+    output_buffers.resize(outputs);
     for (int64_t x = 0; x < cuda_engine->getNbIOTensors(); x++) {
       std::string bind_name = cuda_engine->getIOTensorName(x);
       if (cuda_engine->getTensorIOMode(bind_name.c_str()) == nvinfer1::TensorIOMode::kINPUT) {
