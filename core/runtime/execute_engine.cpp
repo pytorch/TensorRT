@@ -225,7 +225,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
           TORCHTRT_CHECK(
               compiled_engine->exec_ctx->setTensorAddress(name.c_str(), contig_input.data_ptr()),
               "Error while setting the input tensor address for inputs");
-          compiled_engine->input_buffers[i] = contig_input;
         }
       }
 
