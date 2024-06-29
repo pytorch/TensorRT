@@ -473,7 +473,6 @@ def run_l1_int8_accuracy_tests(session):
         install_deps(session)
         install_torch_trt(session)
     train_model(session)
-    finetune_model(session)
     run_int8_accuracy_tests(session)
     cleanup(session)
 
