@@ -9,6 +9,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
+
 runtime_test(
     name = "test_multi_device_safe_mode",
 )
