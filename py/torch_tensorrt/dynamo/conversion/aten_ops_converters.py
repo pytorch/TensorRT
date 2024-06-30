@@ -1324,7 +1324,7 @@ def aten_ops_mean(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.exp.default)
+@dynamo_tensorrt_converter(torch.ops.aten.exp.default, supports_dynamic_shapes=True)
 def aten_ops_exp(
     ctx: ConversionContext,
     target: Target,
@@ -1341,7 +1341,7 @@ def aten_ops_exp(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.expm1.default)
+@dynamo_tensorrt_converter(torch.ops.aten.expm1.default, supports_dynamic_shapes=True)
 def aten_ops_expm1(
     ctx: ConversionContext,
     target: Target,
@@ -1358,7 +1358,7 @@ def aten_ops_expm1(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.log.default)
+@dynamo_tensorrt_converter(torch.ops.aten.log.default, supports_dynamic_shapes=True)
 def aten_ops_log(
     ctx: ConversionContext,
     target: Target,
@@ -1375,7 +1375,7 @@ def aten_ops_log(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.log2.default)
+@dynamo_tensorrt_converter(torch.ops.aten.log2.default, supports_dynamic_shapes=True)
 def aten_ops_log2(
     ctx: ConversionContext,
     target: Target,
@@ -1392,7 +1392,7 @@ def aten_ops_log2(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.log10.default)
+@dynamo_tensorrt_converter(torch.ops.aten.log10.default, supports_dynamic_shapes=True)
 def aten_ops_log10(
     ctx: ConversionContext,
     target: Target,
@@ -1443,7 +1443,9 @@ def aten_ops_sqrt(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.reciprocal.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.reciprocal.default, supports_dynamic_shapes=True
+)
 def aten_ops_recip(
     ctx: ConversionContext,
     target: Target,
@@ -2052,7 +2054,9 @@ def aten_ops_logical_and(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.logical_or.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.logical_or.default, supports_dynamic_shapes=True
+)
 def aten_ops_logical_or(
     ctx: ConversionContext,
     target: Target,
@@ -2070,7 +2074,9 @@ def aten_ops_logical_or(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.logical_xor.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.logical_xor.default, supports_dynamic_shapes=True
+)
 def aten_ops_logical_xor(
     ctx: ConversionContext,
     target: Target,
@@ -2106,7 +2112,6 @@ def bitwise_type_validator(node: Node) -> bool:
         torch.ops.aten.bitwise_or.Scalar_Tensor,
         torch.ops.aten.bitwise_xor.Scalar_Tensor,
     ]
-
     if node.target in tensor_targets:
         lhs_val = node.args[0]
         rhs_val = node.args[1]
@@ -2137,14 +2142,19 @@ def bitwise_type_validator(node: Node) -> bool:
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.bitwise_and.Tensor, capability_validator=bitwise_type_validator
+    torch.ops.aten.bitwise_and.Tensor,
+    capability_validator=bitwise_type_validator,
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
-    torch.ops.aten.bitwise_and.Scalar, capability_validator=bitwise_type_validator
+    torch.ops.aten.bitwise_and.Scalar,
+    capability_validator=bitwise_type_validator,
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
     torch.ops.aten.bitwise_and.Scalar_Tensor,
     capability_validator=bitwise_type_validator,
+    supports_dynamic_shapes=True,
 )
 def aten_ops_bitwise_and(
     ctx: ConversionContext,
@@ -2164,13 +2174,19 @@ def aten_ops_bitwise_and(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.bitwise_or.Tensor, capability_validator=bitwise_type_validator
+    torch.ops.aten.bitwise_or.Tensor,
+    capability_validator=bitwise_type_validator,
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
-    torch.ops.aten.bitwise_or.Scalar, capability_validator=bitwise_type_validator
+    torch.ops.aten.bitwise_or.Scalar,
+    capability_validator=bitwise_type_validator,
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
-    torch.ops.aten.bitwise_or.Scalar_Tensor, capability_validator=bitwise_type_validator
+    torch.ops.aten.bitwise_or.Scalar_Tensor,
+    capability_validator=bitwise_type_validator,
+    supports_dynamic_shapes=True,
 )
 def aten_ops_bitwise_or(
     ctx: ConversionContext,
@@ -2190,14 +2206,19 @@ def aten_ops_bitwise_or(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.bitwise_xor.Tensor, capability_validator=bitwise_type_validator
+    torch.ops.aten.bitwise_xor.Tensor,
+    capability_validator=bitwise_type_validator,
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
-    torch.ops.aten.bitwise_xor.Scalar, capability_validator=bitwise_type_validator
+    torch.ops.aten.bitwise_xor.Scalar,
+    capability_validator=bitwise_type_validator,
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
     torch.ops.aten.bitwise_xor.Scalar_Tensor,
     capability_validator=bitwise_type_validator,
+    supports_dynamic_shapes=True,
 )
 def aten_ops_bitwise_xor(
     ctx: ConversionContext,
@@ -2228,7 +2249,9 @@ def bitwise_not_type_validator(node: Node) -> bool:
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.bitwise_not.default, capability_validator=bitwise_not_type_validator
+    torch.ops.aten.bitwise_not.default,
+    capability_validator=bitwise_not_type_validator,
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
     {

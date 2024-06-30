@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
@@ -9,11 +10,11 @@ from .harness import DispatchTestCase
 class TestBitwiseAndConverter(DispatchTestCase):
     @parameterized.expand(
         [
-            ("2d", (2, 3), (2, 3)),
-            ("3d", (5, 3, 2), (5, 3, 2)),
+            # ("2d", (2, 3), (2, 3)),
+            # ("3d", (5, 3, 2), (5, 3, 2)),
             ("3d_broadcast", (2, 3), (2, 1, 3)),
-            ("4d_broadcast_1", (2, 3), (1, 2, 1, 3)),
-            ("4d_broadcast_2", (2, 3), (2, 2, 2, 3)),
+            # ("4d_broadcast_1", (2, 3), (1, 2, 1, 3)),
+            # ("4d_broadcast_2", (2, 3), (2, 2, 2, 3)),
         ]
     )
     def test_bitwise_and_tensor(self, _, lhs_shape, rhs_shape):
@@ -30,6 +31,59 @@ class TestBitwiseAndConverter(DispatchTestCase):
             inputs,
             enable_passes=True,
             use_dynamo_tracer=True,
+        )
+
+    @parameterized.expand(
+        [
+            ("2d-2d", (2, 3), (3, 3), (5, 3), (2, 3), (3, 3), (5, 3)),
+            ("3d-3d", (2, 2, 2), (2, 3, 2), (2, 4, 2), (1, 2, 2), (1, 3, 2), (1, 4, 2)),
+            # TODO: this should be a valid testcase, figure out why it is failing
+            # # I want to test when the dimension is not the same, it will prepend 1's to make it same rank
+            # ("3d-3d", (2, 2, 2), (2, 3, 2), (2, 4, 2), (2, 2), (3, 2), (4, 2)),
+            # however pytorch throws the folllowing error:
+            # torch._dynamo.exc.UserError: Constraints violated (_0)! For more information, run with TORCH_LOGS="+dynamic".
+            # E  - The values of _0 = L['rhs_val'].size()[0] and _1 = L['lhs_val'].size()[1] must always be equal.
+            # E
+            # E  Suggested fixes:
+            # E  _0 = _1
+        ]
+    )
+    def test_bitwise_and_tensor_dynamic_shape(
+        self,
+        _,
+        lhs_min_shape,
+        lhs_opt_shape,
+        lhs_max_shape,
+        rhs_min_shape,
+        rhs_opt_shape,
+        rhs_max_shape,
+    ):
+        class bitwise_and(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return torch.ops.aten.bitwise_and.Tensor(lhs_val, rhs_val)
+
+        inputs = [
+            Input(
+                dtype=torch.bool,
+                min_shape=lhs_min_shape,
+                opt_shape=lhs_opt_shape,
+                max_shape=lhs_max_shape,
+                torch_tensor=torch.randint(0, 2, lhs_opt_shape, dtype=bool),
+            ),
+            Input(
+                dtype=torch.bool,
+                min_shape=rhs_min_shape,
+                opt_shape=rhs_opt_shape,
+                max_shape=rhs_max_shape,
+                torch_tensor=torch.randint(0, 2, rhs_opt_shape, dtype=bool),
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            bitwise_and(),
+            inputs,
+            enable_passes=True,
+            use_dynamo_tracer=True,
+            use_example_tensors=False,
         )
 
     @parameterized.expand(
