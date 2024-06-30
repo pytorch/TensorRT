@@ -10,11 +10,11 @@ from .harness import DispatchTestCase
 class TestBitwiseAndConverter(DispatchTestCase):
     @parameterized.expand(
         [
-            # ("2d", (2, 3), (2, 3)),
-            # ("3d", (5, 3, 2), (5, 3, 2)),
+            ("2d", (2, 3), (2, 3)),
+            ("3d", (5, 3, 2), (5, 3, 2)),
             ("3d_broadcast", (2, 3), (2, 1, 3)),
-            # ("4d_broadcast_1", (2, 3), (1, 2, 1, 3)),
-            # ("4d_broadcast_2", (2, 3), (2, 2, 2, 3)),
+            ("4d_broadcast_1", (2, 3), (1, 2, 1, 3)),
+            ("4d_broadcast_2", (2, 3), (2, 2, 2, 3)),
         ]
     )
     def test_bitwise_and_tensor(self, _, lhs_shape, rhs_shape):

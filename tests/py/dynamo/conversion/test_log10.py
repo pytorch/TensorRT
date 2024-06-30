@@ -10,6 +10,25 @@ from .harness import DispatchTestCase
 class TestLogConverter(DispatchTestCase):
     @parameterized.expand(
         [
+            ((10,), torch.float),
+            ((1, 20), torch.float),
+            ((2, 3, 4), torch.float),
+            ((2, 3, 4, 5), torch.float),
+        ]
+    )
+    def test_log10_float(self, input_shape, dtype):
+        class log10(nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.log10.default(input)
+
+        inputs = [torch.randn(input_shape, dtype=dtype)]
+        self.run_test(
+            log10(),
+            inputs,
+        )
+
+    @parameterized.expand(
+        [
             ((1,), (3,), (5,)),
             ((1, 20), (2, 20), (3, 20)),
             ((2, 3, 4), (3, 4, 5), (4, 5, 6)),
@@ -32,17 +51,6 @@ class TestLogConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             log10(),
             input_specs,
-        )
-
-    def test_log10_float(self, input_shape, dtype):
-        class log10(nn.Module):
-            def forward(self, input):
-                return torch.ops.aten.log10.default(input)
-
-        inputs = [torch.randn(input_shape, dtype=dtype)]
-        self.run_test(
-            log10(),
-            inputs,
         )
 
     @parameterized.expand(
