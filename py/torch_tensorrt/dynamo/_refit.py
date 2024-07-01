@@ -20,7 +20,11 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 )
 from torch_tensorrt.dynamo.conversion._TRTInterpreter import TRTInterpreter
 from torch_tensorrt.dynamo.conversion.truncate_double import repair_double_inputs
-from torch_tensorrt.dynamo.lowering import apply_lowering_passes, get_decompositions
+from torch_tensorrt.dynamo.lowering import (
+    get_decompositions,
+    post_lowering,
+    pre_export_lowering,
+)
 from torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule import (
     PythonTorchTensorRTModule,
 )
@@ -210,19 +214,21 @@ def refit_module_weights(
     # Prepare torch_trt inputs
     inputs = prepare_inputs(inputs)
     device = to_torch_tensorrt_device(settings.device)
+    torch_inputs = get_torch_inputs(inputs, device)
     runtime = trt.Runtime(TRT_LOGGER)
     if not isinstance(new_weight_module, ExportedProgram):
         raise AssertionError(
             f"Input graph should be an ExportedProgram but got type {type(new_weight_module)}"
         )
+    new_weight_module = pre_export_lowering(new_weight_module, torch_inputs)
     new_weight_module = new_weight_module.run_decompositions(
         get_decompositions(settings.enable_experimental_decompositions)
     )
     new_gm = new_weight_module.module()
     logger.debug("Input graph: " + str(new_gm.graph))
     # Apply lowering on the graph module
-    torch_inputs = get_torch_inputs(inputs, device)
-    new_gm = apply_lowering_passes(new_gm, torch_inputs)
+
+    new_gm = post_lowering(new_gm, torch_inputs)
 
     logger.info("Compilation Settings: %s\n", settings)
 
@@ -245,7 +251,6 @@ def refit_module_weights(
                 exc_info=True,
             )
 
-            fast_partitioner_failed = True
             settings.use_fast_partitioner = False
 
     if not settings.use_fast_partitioner:
