@@ -3370,3 +3370,29 @@ def aten_ops_native_dropout(
         args[1],
         args_bounds_check(args, 2, None),
     )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._prelu_kernel.default, supports_dynamic_shapes=True
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        1: (TRTTensor,),
+    }
+)
+def aten_ops_prelu(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.prelu.prelu(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
