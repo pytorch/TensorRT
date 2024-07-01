@@ -15,11 +15,11 @@ class Input(object):
         shape_mode (torch_tensorrt.Input._ShapeMode): Is input statically or dynamically shaped
         shape (Tuple or Dict): Either a single Tuple or a dict of tuples defining the input shape.
             Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form
-            ``{
-                "min_shape": Tuple,
-                "opt_shape": Tuple,
-                "max_shape": Tuple
-            }``
+
+            .. code-block:: py
+
+                {"min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple}
+
         dtype (torch_tensorrt.dtype): The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)
         format (torch_tensorrt.TensorFormat): The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)
     """

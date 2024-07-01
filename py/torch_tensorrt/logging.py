@@ -36,10 +36,12 @@ TRT_LOGGER = _TRTLogger()
 class internal_errors:
     """Context-manager to limit displayed log messages to just internal errors
 
-    Example::
+    Example:
 
-    with torch_tensorrt.logging.internal_errors():
-        outputs = model_torchtrt(inputs)
+        .. code-block:: py
+
+            with torch_tensorrt.logging.internal_errors():
+                outputs = model_torchtrt(inputs)
     """
 
     def __enter__(self) -> None:
@@ -73,10 +75,12 @@ class internal_errors:
 class errors:
     """Context-manager to limit displayed log messages to just errors and above
 
-    Example::
+    Example:
 
-    with torch_tensorrt.logging.errors():
-        outputs = model_torchtrt(inputs)
+        .. code-block:: py
+
+            with torch_tensorrt.logging.errors():
+                outputs = model_torchtrt(inputs)
     """
 
     def __enter__(self) -> None:
@@ -108,10 +112,12 @@ class errors:
 class warnings:
     """Context-manager to limit displayed log messages to just warnings and above
 
-    Example::
+    Example:
 
-    with torch_tensorrt.logging.warnings():
-        model_trt = torch_tensorrt.compile(model, **spec)
+        .. code-block:: py
+
+            with torch_tensorrt.logging.warnings():
+                model_trt = torch_tensorrt.compile(model, **spec)
     """
 
     def __enter__(self) -> None:
@@ -143,10 +149,12 @@ class warnings:
 class info:
     """Context-manager to display all info and greater severity messages
 
-    Example::
+    Example:
 
-    with torch_tensorrt.logging.info():
-        model_trt = torch_tensorrt.compile(model, **spec)
+        .. code-block:: py
+
+            with torch_tensorrt.logging.info():
+                model_trt = torch_tensorrt.compile(model, **spec)
     """
 
     def __enter__(self) -> None:
@@ -178,10 +186,12 @@ class info:
 class debug:
     """Context-manager to display full debug information through the logger
 
-    Example::
+    Example:
 
-    with torch_tensorrt.logging.debug():
-        model_trt = torch_tensorrt.compile(model, **spec)
+        .. code-block:: py
+
+            with torch_tensorrt.logging.debug():
+                model_trt = torch_tensorrt.compile(model, **spec)
     """
 
     def __enter__(self) -> None:
@@ -214,10 +224,12 @@ class graphs:
     """Context-manager to display the results of intermediate lowering passes
     as well as full debug information through the logger
 
-    Example::
+    Example:
 
-    with torch_tensorrt.logging.graphs():
-        model_trt = torch_tensorrt.compile(model, **spec)
+        .. code-block:: py
+
+            with torch_tensorrt.logging.graphs():
+                model_trt = torch_tensorrt.compile(model, **spec)
     """
 
     def __enter__(self) -> None:

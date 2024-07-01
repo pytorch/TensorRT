@@ -26,13 +26,8 @@ Functions
 
 
 
+
 Classes
 --------
 
 .. autoclass:: CompilationSettings
-
-.. autoclass:: SourceIR
-
-.. autoclass:: runtime.TorchTensorRTModule
-
-.. autoclass:: runtime.PythonTorchTensorRTModule

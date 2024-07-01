@@ -147,7 +147,7 @@ def triton_circular_pad(x: torch.Tensor, padding: Sequence[int]) -> torch.Tensor
 
 # %%
 # Testing our custom op
-# ^^^^^^^^^^^^^^^^^^^^^^^
+# -----------------------------------------
 
 # %%
 # The native PyTorch implementation
@@ -304,7 +304,7 @@ torchtrt.compile(
 
 # %%
 # Wrapping Custom Kernels to use in TensorRT
-# =============================================
+# --------------------------------------------
 #
 # To address this graph break, the first step is to make our kernel implementation available in TensorRT. Again this can be done in either C++ or Python. For the actual details on how to implement
 # TensorRT plugins refer `here <https://github.com/NVIDIA/TensorRT/tree/release/10.0/samples/python/python_plugin>`_. From a high level, similar to PyTorch you will need to
@@ -501,7 +501,7 @@ TRT_PLUGIN_REGISTRY.register_creator(CircularPaddingPluginCreator(), "")  # type
 
 # %%
 # Using Torch-TensorRT to Insert the Kernel
-# =============================================
+# -------------------------------------------
 # Now with our TensorRT plugin, we can create a converter so that Torch-TensorRT knows to insert our plugin in place of our custom circular padding operator.
 # More information on writing converters can be found `here <https://pytorch.org/TensorRT/contributors/dynamo_converters.html>`_
 
