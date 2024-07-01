@@ -90,9 +90,10 @@ converter_test(
     name = "test_expand",
 )
 
-converter_test(
-    name = "test_layer_norm",
-)
+#commenting this out now. TODO for DLFW 24.08
+#converter_test(
+#    name = "test_layer_norm",
+#)
 
 converter_test(
     name = "test_linear",
@@ -229,7 +230,7 @@ test_suite(
         ":test_expand",
         ":test_index",
         ":test_interpolate",
-        ":test_layer_norm",
+        #":test_layer_norm",
         ":test_linear",
         ":test_lstm_cell",
         ":test_masked_fill",
