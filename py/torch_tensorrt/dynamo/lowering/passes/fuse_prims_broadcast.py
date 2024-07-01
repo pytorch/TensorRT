@@ -1,5 +1,4 @@
 import logging
-from typing import Sequence
 
 import torch
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
@@ -10,9 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: Add relevant prims to this fusion
-def fuse_prims_broadcast(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]
-) -> torch.fx.GraphModule:
+def fuse_prims_broadcast(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """Fuses prim nodes which are effectively the ATen equivalents with keep_dim=True"""
     modified_graph = False
 
