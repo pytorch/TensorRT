@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
@@ -37,6 +38,29 @@ class TestIsNanConverter(DispatchTestCase):
         self.run_test(
             isnan(),
             inputs,
+        )
+
+    def test_isnan_dynamic_shape_float(self):
+        class isnan(nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.isnan.default(input)
+
+        inputs = [
+            Input(
+                min_shape=(1, 2, 3),
+                opt_shape=(3, 2, 3),
+                max_shape=(5, 3, 3),
+                dtype=torch.float32,
+                torch_tensor=torch.tensor(
+                    ([[[3.2, float("nan"), 3.1], [float("inf"), 1.1, float("nan")]]]),
+                    dtype=torch.float32,
+                ).cuda(),
+            )
+        ]
+        self.run_test_with_dynamic_shape(
+            isnan(),
+            inputs,
+            use_example_tensors=False,
         )
 
     @parameterized.expand(
