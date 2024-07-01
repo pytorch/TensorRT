@@ -23,7 +23,6 @@ def scaled_dot_product_attention(
     scale: Optional[float],
 ) -> TRTTensor:
     L, S = query.shape[-2], key.shape[-2]
-
     mm = impl.matmul.matrix_multiply(
         ctx,
         target,
@@ -34,13 +33,20 @@ def scaled_dot_product_attention(
         other_matrix_op=trt.MatrixOperation.TRANSPOSE,
     )
     if scale is None:
+        scale = query.shape[-1]
+        # if the last dimension of query tensor is dynamic the shape is -1, we can not do math.sqrt on the negative number
+        # TODO: confirm with Dheeraj, what to do in this case, for now raise a runtime error
+        if scale < 0:
+            raise RuntimeError(
+                f"scaled_do_product_attention does not support the last dimension of query: {query.shape} to be dynamic when scale is not provided"
+            )
         scaled = impl.elementwise.div(
             ctx,
             target,
             source_ir,
             name + "_scale",
             mm,
-            math.sqrt(query.shape[-1]),
+            math.sqrt(scale),
         )
     else:
         scaled = impl.elementwise.mul(
@@ -53,6 +59,10 @@ def scaled_dot_product_attention(
         )
 
     if is_causal:
+        if L < 0 or S < 0:
+            raise RuntimeError(
+                "scaled_do_product_attention does not support query.shape[-2] or key.shape[-2] is dynamic when is_casual is True"
+            )
         attn_bias = np.zeros((L, S), dtype=dtype._from(query.dtype).to(np.dtype))
         temp_mask = np.logical_not(np.tril(np.ones((L, S), dtype=np.bool_), k=0))
         attn_bias = np.ma.array(attn_bias, mask=temp_mask).filled(float("-inf"))

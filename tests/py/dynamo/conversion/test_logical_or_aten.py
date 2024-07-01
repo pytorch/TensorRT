@@ -25,6 +25,48 @@ class TestLogicalOrConverter(DispatchTestCase):
             inputs,
         )
 
+    @parameterized.expand(
+        [
+            ("2d-1d", (2, 1), (3, 5), (4, 7), (1), (5), (7)),
+            # ("3d", (2, 1, 2)),
+        ]
+    )
+    def test_logical_or_dynamic_shape(
+        self,
+        _,
+        l_min_shape,
+        l_opt_shape,
+        l_max_shape,
+        r_min_shape,
+        r_opt_shape,
+        r_max_shape,
+    ):
+        class logical_or(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return torch.ops.aten.logical_or.default(lhs_val, rhs_val)
+
+        inputs = [
+            Input(
+                dtype=torch.bool,
+                min_shape=l_min_shape,
+                opt_shape=l_opt_shape,
+                max_shape=l_max_shape,
+                torch_tensor=torch.randint(0, 2, l_opt_shape, dtype=bool),
+            ),
+            Input(
+                dtype=torch.bool,
+                min_shape=r_min_shape,
+                opt_shape=r_opt_shape,
+                max_shape=r_max_shape,
+                torch_tensor=torch.randint(0, 2, r_opt_shape, dtype=bool),
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            logical_or(),
+            inputs,
+            use_example_tensors=False,
+        )
+
 
 if __name__ == "__main__":
     run_tests()
