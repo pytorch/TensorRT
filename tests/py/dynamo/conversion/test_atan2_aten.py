@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
@@ -127,6 +128,59 @@ class TestAtan2Converter(DispatchTestCase):
             inputs,
         )
 
+    @parameterized.expand(
+        [
+            (
+                "2d_dim_dtype_half",
+                (1, 1),
+                (2, 2),
+                (4, 4),
+                torch.half,
+                torch.half,
+            ),
+            (
+                "3d_dim_dtype_float",
+                (1, 1, 1),
+                (1, 2, 3),
+                (3, 3, 3),
+                torch.float,
+                torch.float,
+            ),
+            (
+                "3d_dim_dtype_int32",
+                (1, 1, 1),
+                (1, 2, 4),
+                (2, 3, 5),
+                torch.int32,
+                torch.float,
+            ),
+        ]
+    )
+    def test_dynamic_shape_atan2(
+        self, _, min_shape, opt_shape, max_shape, type, output_type
+    ):
+        class atan2(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return torch.ops.aten.atan2.default(lhs_val, rhs_val)
+
+        input_specs = [
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
+            ),
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            atan2(), input_specs, output_dtypes=[output_type]
+        )
+
 
 class TestAtan2OutConverter(DispatchTestCase):
     @parameterized.expand(
@@ -151,6 +205,57 @@ class TestAtan2OutConverter(DispatchTestCase):
         self.run_test(
             atan2_out(),
             inputs,
+        )
+
+    @parameterized.expand(
+        [
+            (
+                "2d_dim_dtype_half",
+                (1, 1),
+                (2, 2),
+                (4, 4),
+                torch.half,
+                torch.half,
+            ),
+            (
+                "3d_dim_dtype_float",
+                (1, 1, 1),
+                (1, 2, 3),
+                (3, 3, 3),
+                torch.float,
+                torch.float,
+            ),
+        ]
+    )
+    def test_dynamic_shape_atan2_out(
+        self, _, min_shape, opt_shape, max_shape, type, output_type
+    ):
+        class atan2(nn.Module):
+            def forward(self, lhs_val, rhs_val, out):
+                return torch.ops.aten.atan2.out(lhs_val, rhs_val, out=out)
+
+        input_specs = [
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
+            ),
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
+            ),
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            atan2(), input_specs, output_dtypes=[output_type]
         )
 
 

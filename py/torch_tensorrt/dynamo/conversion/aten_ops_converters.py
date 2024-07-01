@@ -1596,7 +1596,7 @@ def aten_ops_acos(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.atan.default)
+@dynamo_tensorrt_converter(torch.ops.aten.atan.default, supports_dynamic_shapes=True)
 def aten_ops_atan(
     ctx: ConversionContext,
     target: Target,
@@ -1613,7 +1613,7 @@ def aten_ops_atan(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.asinh.default)
+@dynamo_tensorrt_converter(torch.ops.aten.asinh.default, supports_dynamic_shapes=True)
 def aten_ops_asinh(
     ctx: ConversionContext,
     target: Target,
@@ -1630,7 +1630,7 @@ def aten_ops_asinh(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.acosh.default)
+@dynamo_tensorrt_converter(torch.ops.aten.acosh.default, supports_dynamic_shapes=True)
 def aten_ops_acosh(
     ctx: ConversionContext,
     target: Target,
@@ -1647,7 +1647,7 @@ def aten_ops_acosh(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.atanh.default)
+@dynamo_tensorrt_converter(torch.ops.aten.atanh.default, supports_dynamic_shapes=True)
 def aten_ops_atanh(
     ctx: ConversionContext,
     target: Target,
@@ -1664,7 +1664,7 @@ def aten_ops_atanh(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.atan2.default)
+@dynamo_tensorrt_converter(torch.ops.aten.atan2.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -1688,7 +1688,7 @@ def aten_ops_atan2(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.atan2.out)
+@dynamo_tensorrt_converter(torch.ops.aten.atan2.out, supports_dynamic_shapes=True)
 def aten_ops_atan2_out(
     ctx: ConversionContext,
     target: Target,
@@ -1704,7 +1704,7 @@ def aten_ops_atan2_out(
     return out_return
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.ceil.default)
+@dynamo_tensorrt_converter(torch.ops.aten.ceil.default, supports_dynamic_shapes=True)
 def aten_ops_ceil(
     ctx: ConversionContext,
     target: Target,
