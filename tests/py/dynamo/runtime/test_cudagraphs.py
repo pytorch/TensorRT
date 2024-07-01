@@ -134,7 +134,10 @@ class TestCudagraphs(TestCase):
             torch_executed_ops={"torch.ops.aten.mul.Tensor"},
             use_python_runtime=True,
         )
-        optimized_model_results = optimized_model(*inputs).detach().cpu()
+
+        with torch_tensorrt.runtime.enable_cudagraphs():
+            optimized_model_results = optimized_model(*inputs).detach().cpu()
+
         torch_model_results = fx_graph(*inputs).detach().cpu()
 
         max_diff = float(
