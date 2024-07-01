@@ -27,8 +27,9 @@ class TestLogicalOrConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
-            ("2d-1d", (2, 1), (3, 5), (4, 7), (1), (5), (7)),
-            # ("3d", (2, 1, 2)),
+            ("2d-1d", (2, 1), (3, 5), (4, 7), (1,), (5,), (7,)),
+            ("2d-3d", (3, 2), (4, 5), (6, 7), (2, 3, 2), (3, 4, 5), (5, 6, 7)),
+            ("2d-3d", (3, 2), (4, 5), (6, 7), (2, 3, 1), (3, 4, 1), (5, 6, 1)),
         ]
     )
     def test_logical_or_dynamic_shape(

@@ -40,6 +40,76 @@ class TestScaledDotProductAttention(DispatchTestCase):
             (
                 "4d-4d",
                 (4, 2, 12, 16),
+                (6, 3, 16, 32),
+                (32, 8, 18, 64),
+                (4, 2, 4, 16),
+                (6, 3, 8, 32),
+                (32, 8, 12, 64),
+            ),
+        ]
+    )
+    def test_sdpa_no_causal_dynamic_shape_with_scale(
+        self,
+        _,
+        query_min_shape,
+        query_opt_shape,
+        query_max_shape,
+        key_min_shape,
+        key_opt_shape,
+        key_max_shape,
+    ):
+        class SDPA(nn.Module):
+            def forward(self, query, key, value):
+                return torch.nn.functional.scaled_dot_product_attention(
+                    query,
+                    key,
+                    value,
+                    None,
+                    0.0,
+                    is_causal=False,
+                    scale=-0.5,
+                )
+
+        inputs = [
+            # query
+            Input(
+                dtype=torch.float32,
+                min_shape=query_min_shape,
+                opt_shape=query_opt_shape,
+                max_shape=query_max_shape,
+            ),
+            # key
+            Input(
+                dtype=torch.float32,
+                min_shape=key_min_shape,
+                opt_shape=key_opt_shape,
+                max_shape=key_max_shape,
+            ),
+            # value
+            Input(
+                dtype=torch.float32,
+                min_shape=key_min_shape,
+                opt_shape=key_opt_shape,
+                max_shape=key_max_shape,
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(SDPA(), inputs)
+
+    @parameterized.expand(
+        [
+            (
+                "4d-2d",
+                (4, 2, 128, 64),
+                (6, 3, 128, 64),
+                (32, 8, 128, 64),
+                (4, 64),
+                (4, 64),
+                (16, 64),
+            ),
+            (
+                "4d-4d",
+                (4, 2, 12, 16),
                 (6, 3, 16, 16),
                 (32, 8, 18, 16),
                 (4, 2, 4, 16),
@@ -61,7 +131,13 @@ class TestScaledDotProductAttention(DispatchTestCase):
         class SDPA(nn.Module):
             def forward(self, query, key, value):
                 return torch.nn.functional.scaled_dot_product_attention(
-                    query, key, value, None, 0.0, False, scale=None
+                    query,
+                    key,
+                    value,
+                    None,
+                    0.0,
+                    is_casual=False,
+                    scale=None,
                 )
 
         inputs = [
