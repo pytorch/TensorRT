@@ -8,7 +8,7 @@ from typing import Any, List, Optional, Tuple
 
 import torch
 from torch_tensorrt._Device import Device
-from torch_tensorrt.dynamo import CompilationSettings
+from torch_tensorrt.dynamo._settings import CompilationSettings
 
 logger = logging.getLogger(__name__)
 
