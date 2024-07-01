@@ -10,6 +10,7 @@ import torch_tensorrt
 from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
+from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.runtime.tools import (
     _is_switch_required,
     _select_rt_device,
@@ -33,7 +34,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         engine: bytes,
         input_names: Optional[List[str]] = None,
         output_names: Optional[List[str]] = None,
-        settings: Any = None,
+        settings: CompilationSettings = CompilationSettings(),
     ):
         super(PythonTorchTensorRTModule, self).__init__()
         self._register_state_dict_hook(PythonTorchTensorRTModule._on_state_dict)

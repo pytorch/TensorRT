@@ -8,6 +8,7 @@ from typing import Any, List, Optional, Tuple
 
 import torch
 from torch_tensorrt._Device import Device
+from torch_tensorrt.dynamo import CompilationSettings
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         name: str = "",
         input_binding_names: Optional[List[str]] = None,
         output_binding_names: Optional[List[str]] = None,
-        settings: Any = None,
+        settings: CompilationSettings = CompilationSettings(),
     ):
         """__init__ method for torch_tensorrt.dynamo.runtime._TorchTensorRTModule.TorchTensorRTModule
 
