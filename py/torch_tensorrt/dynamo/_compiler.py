@@ -196,14 +196,14 @@ def compile(
         raise AssertionError(
             f"Input graph should be an ExportedProgram but got type {type(exported_program)}"
         )
-    exported_program = pre_export_lowering(exported_program, None)
+    exported_program = pre_export_lowering(exported_program)
     exported_program = exported_program.run_decompositions(
         get_decompositions(enable_experimental_decompositions)
     )
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
     # Apply lowering on the graph module
-    gm = post_lowering(gm, None)
+    gm = post_lowering(gm)
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     compilation_options = {
@@ -624,7 +624,7 @@ def convert_module_to_trt_engine(
         "timing_cache_path": timing_cache_path,
     }
 
-    exported_program = pre_export_lowering(exported_program, torch_inputs)
+    exported_program = pre_export_lowering(exported_program)
     # Decompose the exported program
     exported_program = exported_program.run_decompositions(
         get_decompositions(enable_experimental_decompositions)
@@ -633,7 +633,7 @@ def convert_module_to_trt_engine(
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module
-    gm = post_lowering(gm, torch_inputs)
+    gm = post_lowering(gm)
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     settings = CompilationSettings(**compilation_options)

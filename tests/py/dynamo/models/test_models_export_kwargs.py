@@ -66,7 +66,7 @@ def test_custom_model():
     cos_sim = cosine_similarity(model(*args, **kwargs), trt_mod(*args, **kwargs)[0])
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
-        msg=f"Resnet18 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        msg=f"CustomKwargs Module TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
 
     # Clean up model env
