@@ -5,6 +5,7 @@ from torch.fx.node import Target
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
+    ASSUME_DYNAMIC_SHAPE_SUPPORT,
     DEBUG,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
@@ -23,6 +24,7 @@ from torch_tensorrt.dynamo._defaults import (
     PASS_THROUGH_BUILD_FAILURES,
     REQUIRE_FULL_COMPILATION,
     SPARSE_WEIGHTS,
+    TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
     USE_FAST_PARTITIONER,
     USE_PYTHON_RUNTIME,
@@ -57,6 +59,7 @@ class CompilationSettings:
         device (Device): GPU to compile the model on
         require_full_compilation (bool): Whether to require the graph is fully compiled in TensorRT.
             Only applicable for `ir="dynamo"`; has no effect for `torch.compile` path
+        assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         disable_tf32 (bool): Whether to disable TF32 computation for TRT layers
         sparse_weights (bool): Whether to allow the builder to use sparse weights
         refit (bool): Whether to build a refittable engine
@@ -69,6 +72,7 @@ class CompilationSettings:
             TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the
             ouptut to a file if a string path is specified
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -87,6 +91,7 @@ class CompilationSettings:
     device: Device = field(default_factory=default_device)
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION
     disable_tf32: bool = DISABLE_TF32
+    assume_dynamic_shape_support: bool = ASSUME_DYNAMIC_SHAPE_SUPPORT
     sparse_weights: bool = SPARSE_WEIGHTS
     make_refitable: bool = MAKE_REFITABLE
     engine_capability: EngineCapability = field(
@@ -98,3 +103,4 @@ class CompilationSettings:
     dla_global_dram_size: int = DLA_GLOBAL_DRAM_SIZE
     dryrun: Union[bool, str] = DRYRUN
     hardware_compatible: bool = HARDWARE_COMPATIBLE
+    timing_cache_path: str = TIMING_CACHE_PATH

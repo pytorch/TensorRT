@@ -111,7 +111,6 @@ def layer_norm(
 ) -> Union[TRTTensor, Tuple[TRTTensor, torch.Tensor, torch.Tensor]]:
     dims = list(range(len(input.shape) - len(normalized_shape), len(input.shape)))
     axes = get_axes_for_reduce_op(dims)
-
     weight = get_trt_tensor(ctx, weight, f"{name}_weight")
     bias = get_trt_tensor(ctx, bias, f"{name}_bias")
     if tuple(input.shape) != tuple(weight.shape):
@@ -153,157 +152,80 @@ def native_group_norm(
     assert (
         len(input.shape) >= 3
     ), f"The input dimension should not be less than 3, got {len(input.shape)}!"
-    B, C = input.shape[0], input.shape[1]
 
+    B = input.shape[0]
+    # if C is provided, it must be as same as the channel from the input shape,
+    # else if C is zero, we should get the channel from the input shape
+    if C == 0:
+        C = input.shape[1]
+    assert (
+        C == input.shape[1]
+    ), f"The number of Channel={C} must be equal to the number of channels in the input shape={input.shape[1]}"
     # Groups are a subdivision of the channel dimension.
     assert (
         C % group == 0
     ), f"The num of channels ({C}) should be divisible by num_groups ({group})!"
+    input = get_trt_tensor(ctx, input, f"{name}_input")
 
-    if weight is None:
-        weight = to_numpy(1.0)
+    shape = list(input.shape)
 
-    if bias is None:
-        bias = to_numpy(0.0)
+    for i, s in enumerate(shape):
+        if i == 0 and s > 0:
+            shape[i] = B * group
+        elif i == 1:
+            shape[i] = C // group
+        elif i > 1 and s == -1:
+            shape[i] = 0
 
     # Normalize every group.
     reshaped_input = impl.shuffle.reshape(
         ctx,
         target,
         source_ir,
-        name,
+        f"{name}_reshape_input",
         input,
-        (B * group, -1),
+        shape,
     )
 
-    dim = 1
+    weight = get_trt_tensor(ctx, weight, f"{name}_weight")
+    bias = get_trt_tensor(ctx, bias, f"{name}_bias")
+    if tuple(reshaped_input.shape) != tuple(weight.shape):
+        weight = impl.slice.expand(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_expand_weight",
+            weight,
+            reshaped_input.shape,
+        )
+    if tuple(reshaped_input.shape) != tuple(bias.shape):
+        bias = impl.slice.expand(
+            ctx, target, source_ir, f"{name}_expand_bias", bias, reshaped_input.shape
+        )
+    dims = list(range(1, len(input.shape)))
+    axes = get_axes_for_reduce_op(dims)
+    group_norm = ctx.net.add_normalization(reshaped_input, weight, bias, axes)
+    group_norm.epsilon = eps
+    group_norm.compute_precision = input.dtype
+    set_layer_name(group_norm, target, f"{name}_group_norm", source_ir)
+    output = group_norm.get_output(0)
 
-    # E[X]
-    mean_trt = impl.reduce.mean(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_mean",
-        reshaped_input,
-        dim,
-        True,
+    shape = list(output.shape)
+    for i, s in enumerate(shape):
+        if i == 0 and s > 0:
+            shape[i] = B
+        elif i == 1:
+            shape[i] = C
+        elif i > 1 and s == -1:
+            shape[i] = 0
+
+    reshaped_output = impl.shuffle.reshape(
+        ctx, target, source_ir, f"{name}_reshape_output", output, shape
     )
-
-    # X - E[X]
-    sub_trt = impl.elementwise.sub(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_sub",
-        reshaped_input,
-        mean_trt,
-    )
-
-    # variance = mean(pow(sub_trt, 2))
-    pow_trt = get_trt_tensor(ctx, 2, f"{name}_power", np.float32)
-    pow_var = impl.elementwise.pow(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_pow",
-        sub_trt,
-        pow_trt,
-    )
-
-    var_trt = impl.reduce.mean(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_mean_var",
-        pow_var,
-        dim,
-        True,
-    )
-
-    # sqrt((var + eps))
-    eps_trt = get_trt_tensor(ctx, eps, f"{name}_eps", np.float32)
-    add_trt = impl.elementwise.add(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_add",
-        var_trt,
-        eps_trt,
-    )
-    sqrt_trt = impl.unary.sqrt(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_sqrt",
-        add_trt,
-    )
-
-    # y = (X - E[X]) / sqrt((var + eps))
-    div_trt = impl.elementwise.div(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_div",
-        sub_trt,
-        sqrt_trt,
-    )
-
-    # y * gamma + beta
-    gamma_trt = get_trt_tensor(ctx, weight, f"{name}_gamma")
-    beta_trt = get_trt_tensor(ctx, bias, f"{name}_beta")
-
-    output = impl.shuffle.reshape(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_reshape_div",
-        div_trt,
-        input.shape,
-    )
-
-    weight_bias_shape = (1, C) + (1,) * (len(input.shape) - 2)
-
-    reshaped_gamma = impl.shuffle.reshape(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_reshape_gamma",
-        gamma_trt,
-        weight_bias_shape,
-    )
-
-    output = impl.elementwise.mul(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_mul_gamma",
-        output,
-        reshaped_gamma,
-    )
-
-    reshaped_bias = impl.shuffle.reshape(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_reshape_beta",
-        beta_trt,
-        weight_bias_shape,
-    )
-
-    output = impl.elementwise.add(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_add_beta",
-        output,
-        reshaped_bias,
-    )
-
     if return_mean_rstd:
         # return fake mean and rstd for now
-        return output, None, None
-
-    return output
+        return reshaped_output, None, None
+    return reshaped_output
 
 
 def group_norm(

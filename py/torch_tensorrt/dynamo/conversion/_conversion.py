@@ -6,6 +6,7 @@ from typing import List, Sequence
 
 import tensorrt as trt
 import torch
+from torch.fx.experimental.proxy_tensor import maybe_disable_fake_tensor_mode
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -27,12 +28,12 @@ def infer_module_output_dtypes(
     device: Device,
     truncate_double: bool = False,
 ) -> List[dtype]:
-    torch_inputs = get_torch_inputs(inputs, device)
-    module = module.to(device.to(torch.device))
-    module_outputs = module(*torch_inputs)
-
-    if not isinstance(module_outputs, (list, tuple)):
-        module_outputs = [module_outputs]
+    with maybe_disable_fake_tensor_mode():
+        torch_inputs = get_torch_inputs(inputs, device)
+        module = module.to(device.to(torch.device))
+        module_outputs = module(*torch_inputs)
+        if not isinstance(module_outputs, (list, tuple)):
+            module_outputs = [module_outputs]
 
     # Int64 outputs can sometimes be generated from within other operators
     # such as aten.sum - such outputs can be truncated

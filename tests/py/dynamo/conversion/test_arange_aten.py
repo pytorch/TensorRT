@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 
@@ -31,6 +32,29 @@ class TestArangeConverter(DispatchTestCase):
             Arange(),
             inputs,
             use_dynamo_tracer=True,
+        )
+
+    def test_arange_dynamic(self):
+        class Arange(nn.Module):
+            def forward(self, end_tensor):
+                return torch.ops.aten.arange.start_step(0, end_tensor, 1)
+
+        pyt_input = 7
+        inputs = [
+            torch_tensorrt.Input(
+                min_shape=(5,),
+                opt_shape=(7,),
+                max_shape=(10,),
+                dtype=torch.int64,
+                torch_tensor=torch.tensor(pyt_input, dtype=torch.int64).cuda(),
+                is_shape_tensor=True,
+            )
+        ]
+        self.run_test_with_dynamic_shape(
+            Arange(),
+            inputs,
+            use_example_tensors=False,
+            pyt_inputs=[pyt_input],
         )
 
 

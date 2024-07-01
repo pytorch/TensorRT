@@ -179,7 +179,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         """Implementation of the forward pass for a TensorRT engine
 
         Args:
-            *inputs (torch.Tensor): Inputs to the forward function, must all be ``torch.Tensor``
+            *inputs (Union[torch.Tensor, int]): Inputs to the forward function
 
         Returns:
             torch.Tensor or Tuple(torch.Tensor): Result of the engine computation
@@ -191,22 +191,18 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.input_binding_names
         ), f"Wrong number of inputs, expected {len(self.input_binding_names)} got {len(inputs)}."
 
-        types: List[bool] = [issubclass(type(i), torch.Tensor) for i in inputs]
-
-        try:
-            assert all(types)
-        except AssertionError:
-
-            def is_non_tensor(i: Tuple[Any, bool]) -> bool:
-                return not i[1]
-
-            non_tensors = [i[0] for i in filter(is_non_tensor, zip(inputs, types))]
-            raise RuntimeError(
-                f"TorchTensorRTModule expects a flattened list of tensors as input, found non tensors: {non_tensors}"
-            )
+        # If the inputs are not Torch Tensors, which can occur in scenarios such as shape tensors
+        # which are outputs of a preceding Torch subgraph (where the Dynamic input may be an integer)
+        # directly cast the input to a Torch Tensor.
+        #
+        # This also avoids the need for type-checking inputs, since they are now explicitly casted to Torch tensors
+        input_tensors: List[torch.Tensor] = [
+            (i if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
+            for i in inputs
+        ]
 
         outputs: List[torch.Tensor] = torch.ops.tensorrt.execute_engine(
-            list(inputs), self.engine
+            list(input_tensors), self.engine
         )
 
         if len(outputs) == 1:

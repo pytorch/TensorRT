@@ -1,7 +1,8 @@
 import logging
+import os
 import warnings
 from datetime import datetime
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set, Tuple
 
 import numpy as np
 import tensorrt as trt
@@ -20,9 +21,11 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 )
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import CallingConvention
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    get_node_io,
     get_node_name,
     get_trt_tensor,
 )
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
@@ -43,7 +46,6 @@ class TRTInterpreterResult(NamedTuple):
     engine: Any
     input_names: Sequence[str]
     output_names: Sequence[str]
-    serialized_cache: bytearray
 
 
 class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
@@ -105,7 +107,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             [dtype._from(o) for o in output_dtypes] if output_dtypes else None
         )
 
-        _LOGGER.debug(f"Graph to be compiled to TensorRT: {self.module.graph}")
+        # Mapping of constants to shapes and dtypes
+        self.const_mapping: Dict[str, Tuple[Sequence[int], str]] = {}
 
     def validate_conversion(self) -> Set[str]:
         missing_converters: Set[str] = set()
@@ -242,6 +245,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if dtype.int8 in self.compilation_settings.enabled_precisions:
             builder_config.set_flag(trt.BuilderFlag.INT8)
 
+        if dtype.fp8 in self.compilation_settings.enabled_precisions:
+            builder_config.set_flag(trt.BuilderFlag.FP8)
+
         if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
             builder_config.set_flag(trt.BuilderFlag.BF16)
 
@@ -274,16 +280,31 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     def _create_timing_cache(
         self,
         builder_config: trt.IBuilderConfig,
-        existing_cache: Optional[trt.ITimingCache] = None,
-    ) -> trt.ITimingCache:
-        cache = None
-        if existing_cache:
-            cache_file = np.array(existing_cache)
-            cache = builder_config.create_timing_cache(cache_file.tobytes())
-        else:
-            cache = builder_config.create_timing_cache(b"")
+        timing_cache_path: str = "",
+    ) -> None:
+        """
+        Create a timing cache to enable faster build time for TRT engines.
+        By default the timing_cache_path="/tmp/timing_cache.bin"
+        """
+        buffer = b""
+        if os.path.isfile(timing_cache_path):
+            # Load from existing cache
+            with open(timing_cache_path, mode="rb") as timing_cache_file:
+                buffer = timing_cache_file.read()
+        cache = builder_config.create_timing_cache(buffer)
         builder_config.set_timing_cache(cache, False)
-        return cache
+
+    def _save_timing_cache(
+        self,
+        builder_config: trt.IBuilderConfig,
+        timing_cache_path: str,
+    ) -> None:
+        """
+        This is called after a TensorRT engine is built. Save the timing cache
+        """
+        timing_cache = builder_config.get_timing_cache()
+        with open(timing_cache_path, "wb") as timing_cache_file:
+            timing_cache_file.write(memoryview(timing_cache.serialize()))
 
     def _construct_trt_network_def(self) -> None:
         """
@@ -302,7 +323,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self,
         strict_type_constraints: bool = False,
         algorithm_selector: Optional[trt.IAlgorithmSelector] = None,
-        existing_cache: Optional[trt.ITimingCache] = None,
         tactic_sources: Optional[int] = None,
     ) -> TRTInterpreterResult:
         """
@@ -310,7 +330,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         Args:
             strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric reasons.
             algorithm_selector: set up algorithm selection for certain layer
-            existing_cache: enable timing cache for TensorRT
         Return:
             TRTInterpreterResult
         """
@@ -320,25 +339,27 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         builder_config = self._populate_trt_builder_config(
             strict_type_constraints, algorithm_selector, tactic_sources
         )
-        timing_cache = self._create_timing_cache(builder_config, existing_cache)
+
+        self._create_timing_cache(
+            builder_config, self.compilation_settings.timing_cache_path
+        )
 
         serialized_engine = self.builder.build_serialized_network(
             self.ctx.net, builder_config
         )
         assert serialized_engine
 
-        serialized_cache = (
-            bytearray(timing_cache.serialize())
-            if builder_config.get_timing_cache()
-            else bytearray()
-        )
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
         _LOGGER.info(f"TRT Engine uses: {serialized_engine.nbytes} bytes of Memory")
 
+        self._save_timing_cache(
+            builder_config, self.compilation_settings.timing_cache_path
+        )
+
         return TRTInterpreterResult(
-            serialized_engine, self._input_names, self._output_names, serialized_cache
+            serialized_engine, self._input_names, self._output_names
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
@@ -350,7 +371,18 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         n.kwargs = kwargs
 
         # run the node
+        _LOGGER.debug(
+            f"Running node {self._cur_node_name}, a {self._cur_node.op} node "
+            f"with target {self._cur_node.target} in the TensorRT Interpreter"
+        )
         trt_node: torch.fx.Node = super().run_node(n)
+
+        if n.op == "get_attr":
+            self.const_mapping[str(n)] = (tuple(trt_node.shape), str(trt_node.dtype))
+
+        _LOGGER.debug(
+            f"Ran node {self._cur_node_name} with properties: {get_node_io(n, self.const_mapping)}"
+        )
 
         # remove "_itensor_to_tensor_meta"
         kwargs = dict(n.kwargs)
@@ -376,18 +408,29 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             max_shape = current_input.shape["max_shape"]
             # TODO: Does not support disjoint optimization profiles?
             assert self.optimization_profiles is not None
-            self.optimization_profiles[0].set_shape(
-                target, min_shape, opt_shape, max_shape
-            )
-
             assert len(min_shape) == len(opt_shape) == len(max_shape)
-            for i in range(len(min_shape)):
-                if min_shape[i] == opt_shape[i] == max_shape[i]:
-                    shape.append(min_shape[i])
-                else:
-                    # -1 to represent the dynamic dimension
-                    shape.append(-1)
-        elif current_input.shape_mode == Input._ShapeMode.STATIC:
+            if current_input.is_shape_tensor:
+                # For shape_tensors, min/opt/max_shapes correspond to actual values
+                # of the shapes provided during runtime
+                self.optimization_profiles[0].set_shape_input(
+                    target, min_shape, opt_shape, max_shape
+                )
+                shape.append(len(opt_shape))
+            else:
+                self.optimization_profiles[0].set_shape(
+                    target, min_shape, opt_shape, max_shape
+                )
+
+                for i in range(len(min_shape)):
+                    if min_shape[i] == opt_shape[i] == max_shape[i]:
+                        shape.append(min_shape[i])
+                    else:
+                        # -1 to represent the dynamic dimension
+                        shape.append(DYNAMIC_DIM)
+        elif (
+            not current_input.is_shape_tensor
+            and current_input.shape_mode == Input._ShapeMode.STATIC
+        ):
             assert isinstance(current_input.shape, tuple)
             shape = list(current_input.shape)
         else:
@@ -399,6 +442,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.debug(
             f"Adding input to in-progress INetwork: {target} [shape={shape}, dtype={trt_input_dtype}]"
         )
+
         return self.ctx.net.add_input(
             name=target,
             shape=tuple(shape),

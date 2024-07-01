@@ -1,13 +1,15 @@
+import collections
 import functools
 import logging
 import re
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
-from torch import SymBool, SymFloat, SymInt
 from torch.fx.node import Argument, Target
+from torch.fx.passes.shape_prop import TensorMetadata
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -15,13 +17,8 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
     DynamoConverterImplSignature,
 )
-from torch_tensorrt.fx.converters.converter_utils import (
-    broadcast,
-    get_axes_for_reduce_op,
-)
-from torch_tensorrt.fx.types import TRTDataType, TRTTensor
 
-import tensorrt as trt
+from ..types import Shape, TRTDataType, TRTLayer, TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -49,6 +46,75 @@ def get_node_name(node: torch.fx.Node) -> str:
     return node_name
 
 
+def get_node_io(
+    node: torch.fx.Node, constant_mapping: Dict[str, Tuple[Sequence[int], str]]
+) -> str:
+    """Gets a string representing the node inputs and outputs including tensor shapes and dtypes"""
+
+    def format_tensor_metadata(metadata: Union[Any, Sequence[Any]]) -> str:
+        """Formats the metadata for a single node"""
+        # If the provided data is a simple TensorMetadata object, parse it
+        if isinstance(metadata, TensorMetadata) or issubclass(
+            type(metadata), torch.Tensor
+        ):
+            return f"{tuple(metadata.shape)}@{metadata.dtype}"  # type: ignore
+        # If the provided data is a scalar, return it as is
+        elif isinstance(metadata, (int, float, bool)):
+            return f"{metadata}@Python-{type(metadata)}"
+        # If the provided data is a sequence, recursively parse it
+        elif isinstance(metadata, collections.abc.Sequence):
+            formatted_str = "("
+            for meta in metadata:
+                formatted_str += format_tensor_metadata(meta) + ", "
+
+            return formatted_str[:-2] + ")"
+        else:
+            _LOGGER.warning(
+                f"Detected unparseable type in node formatting: {type(metadata)}"
+            )
+            return ""
+
+    # Format input tensors
+    metadata_string = "Inputs: ("
+
+    # For each input argument, format it accordingly
+    for arg in node.args:
+        if isinstance(arg, torch.fx.Node):
+            if arg.op == "get_attr":
+                shape, dtype = constant_mapping[str(arg)]
+                arg_repr = f"{shape}@{dtype}"
+            elif arg.meta.get("tensor_meta") is not None:
+                arg_repr = format_tensor_metadata(arg.meta["tensor_meta"])
+            elif arg.meta.get("val") is not None:
+                arg_repr = format_tensor_metadata(arg.meta["val"])
+            else:
+                arg_repr = ""
+
+            metadata_string += f"{arg}: {arg_repr}, "
+        else:
+            metadata_string += f"{arg}, "
+
+    metadata_string = (
+        metadata_string[:-2] if metadata_string[-1] != "(" else metadata_string
+    ) + ")"
+
+    # Format output tensors and arguments
+    metadata_string += " | Outputs: ("
+    if node.op == "get_attr":
+        shape, dtype = constant_mapping[str(node)]
+        node_repr = f"{shape}@{dtype}"
+    elif node.meta.get("tensor_meta") is not None:
+        node_repr = format_tensor_metadata(node.meta["tensor_meta"])
+    elif node.meta.get("val") is not None:
+        node_repr = format_tensor_metadata(node.meta["val"])
+    else:
+        node_repr = ""
+    metadata_string += f"{node}: {node_repr}, "
+    metadata_string = metadata_string[:-2] + ")"
+
+    return metadata_string
+
+
 def is_only_operator_on_placeholder(node: torch.fx.Node) -> bool:
     """Detects whether a call_function node is the only operator on a placeholder"""
     # Returns true if the node operates on a placeholder and is a direct output
@@ -61,62 +127,6 @@ def is_only_operator_on_placeholder(node: torch.fx.Node) -> bool:
         )
         and any(user.op == "output" for user in list(node.users.keys()))
     )
-
-
-def dynamic_unsupported(node: torch.fx.Node) -> bool:
-    """Validates that a node has no dynamic args, kwargs, or outputs"""
-    return _dynamic_unsupported(node=node)
-
-
-def dynamic_unsupported_with_args(
-    arg_positions_to_check: Optional[List[int]] = None,
-) -> Callable[[torch.fx.Node], bool]:
-    """Returns a validator that a node has no dynamic args at specific positions"""
-    return functools.partial(
-        _dynamic_unsupported, arg_positions_to_check=arg_positions_to_check
-    )
-
-
-def _dynamic_unsupported(
-    node: torch.fx.Node, arg_positions_to_check: Optional[List[int]] = None
-) -> bool:
-    # Validate that none of the inputs to the node have Dynamic shapes
-    assert isinstance(
-        node, torch.fx.Node
-    ), "Inputs to validator functions must be FX Nodes"
-
-    def _is_subnode_dynamic(subnode: torch.fx.Node) -> bool:
-        """Checks if a node itself has Dynamic properties"""
-        return getattr(
-            subnode.meta["val"], "_has_symbolic_sizes_strides", False
-        ) or isinstance(subnode.meta["val"], (SymFloat, SymInt, SymBool))
-
-    # Check node value itself
-    if arg_positions_to_check is None and _is_subnode_dynamic(node):
-        return False
-
-    # Check node arguments individually
-    if arg_positions_to_check is None and any(
-        _is_subnode_dynamic(arg) for arg in node.args if isinstance(arg, torch.fx.Node)
-    ):
-        return False
-    # Check specific arg positions if the caller has specified positions to check
-    elif arg_positions_to_check is not None and any(
-        _is_subnode_dynamic(node.args[i])
-        for i in arg_positions_to_check
-        if isinstance(node.args[i], torch.fx.Node)
-    ):
-        return False
-
-    # Check node keyword arguments individually
-    if arg_positions_to_check is None and any(
-        _is_subnode_dynamic(kwarg)
-        for kwarg in node.kwargs.values()
-        if isinstance(kwarg, torch.fx.Node)
-    ):
-        return False
-
-    return True
 
 
 def cast_trt_tensor(
@@ -235,9 +245,7 @@ def broadcast_to_same_shape(
         Tuple[TRTTensor, TRTTensor]: Two TensorRT ITensors that are broadcasted to the same shape
 
     """
-    lhs_val, rhs_val = broadcast(
-        ctx.net, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
-    )
+    lhs_val, rhs_val = broadcast(ctx, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs")
 
     lhs_val_shape = lhs_val.shape
     rhs_val_shape = rhs_val.shape
@@ -272,11 +280,6 @@ def broadcast_to_same_shape(
             )
 
     return lhs_val, rhs_val
-
-
-get_axes_for_reduce_op = functools.partial(
-    get_axes_for_reduce_op, has_implicit_batch_dimension=False
-)
 
 
 def extend_attr_to_tuple(
@@ -321,6 +324,7 @@ def create_constant(
     value: Union[int, float, bool, np.ndarray, torch.Tensor],
     name: str,
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]],
+    min_rank: Optional[int] = 1,
 ) -> TRTTensor:
     """
     Add a TensorRT constant layer whose value is `value` to `ctx.net`.
@@ -332,14 +336,19 @@ def create_constant(
         name (str): Name of the added TensorRT Constant layer.
         dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
             If a dtype is given, we will convert the type of the given `value` to this dtype.
+        min_rank (int): minimum rank of the constant tensor.
     Returns:
         A TensorRT ITensor that represents the given value.
     """
+    shape = (1,)
+    # Rank 0 constant is required in IFillLayer inputs.
+    if min_rank == 0:
+        shape = trt.Dims()
     numpy_value = to_numpy(
         value, _enums.dtype._from(dtype).to(np.dtype) if dtype is not None else None
     )
     constant = ctx.net.add_constant(
-        (1,) if isinstance(value, (int, float, bool)) else value.shape,
+        shape if isinstance(value, (int, float, bool)) else value.shape,
         numpy_value.copy() if isinstance(numpy_value, np.ndarray) else numpy_value,
     )
     constant.name = name
@@ -351,6 +360,7 @@ def get_trt_tensor(
     input_val: Any,
     name: str,
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]] = None,
+    min_rank: int = 1,
 ) -> TRTTensor:
     """
     Given a value of random type, we try to convert it to a TensorRT ITensor.
@@ -363,6 +373,7 @@ def get_trt_tensor(
             one.
         dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
             If dtype is provided, the given value will be converted to this dtype.
+        min_rank (int): minimum rank of the constant tensor.
     Returns:
         A TensorRT ITensor that represents the given value.
     """
@@ -375,7 +386,7 @@ def get_trt_tensor(
             input_val = input_val.astype(np.float32)
 
     if isinstance(input_val, (torch.Tensor, np.ndarray, int, float, bool)):
-        return create_constant(ctx, input_val, name, dtype)
+        return create_constant(ctx, input_val, name, dtype, min_rank)
     elif isinstance(input_val, TRTTensor):
         return input_val
     else:
@@ -711,3 +722,191 @@ def set_item(
         0,
     )
     return ans
+
+
+def calculate_strides(shape: Sequence[int]) -> Sequence[int]:
+    """
+    Calculate the strides for a given shape of a multi-dimensional array.
+
+    The output stride for each dimension indicates the number of elements to skip in
+    memory to move to the next element along that dimension. The last dimension always
+    has a stride of 1 because elements are stored contiguously along this dimension.
+
+    Example:
+        For a 3-dimensional array with shape [2, 3, 4]:
+        - shape = [2, 3, 4]
+        - The function will calculate the strides as follows:
+            1. Initialize strides: [1, 1, 1]
+            2. Calculate strides for each dimension from right to left:
+               - For i = 1: strides[1] = strides[2] * shape[2] = 1 * 4 = 4
+               - For i = 0: strides[0] = strides[1] * shape[1] = 4 * 3 = 12
+            - Final strides: [12, 4, 1]
+
+        Therefore, the output will be [12, 4, 1].
+
+        This means:
+        - To move along the first dimension, skip 12 elements.
+        - To move along the second dimension, skip 4 elements.
+        - To move along the third dimension, skip 1 element.
+    """
+    strides = [1] * len(shape)
+    for i in range(len(shape) - 2, -1, -1):
+        strides[i] = strides[i + 1] * shape[i + 1]
+    return strides
+
+
+def broadcast(
+    ctx: ConversionContext,
+    a: TRTTensor,
+    b: TRTTensor,
+    a_name: str,
+    b_name: str,
+    preset_diff: int = 0,
+) -> Tuple[TRTTensor, TRTTensor]:
+    """
+    Broadcast two TensorRT tensors to the same number of dimensions by
+    prepending 1s to the tensor with less number of dimensions.
+
+    Args:
+        ctx (ConversionContext): A ConversionContext containing the TensorRT network
+        a (TRTTensor): A TensorRT ITensor.
+        b (TRTTensor): A TensorRT ITensor.
+        a_name (str): Name of tensor a.
+        b_name (str): Name of tensor b.
+        preset_diff (int): The difference of number of dimensions after broadcast.
+            A positive number means after broadcast, tensor `a` would have `preset_diff`
+            more dimensions than `b`. This is used in matmul, since we need to broadcast
+            tensors but not always to the same number of dimension. The reason is that
+            matmul supports Matrix x Vector and in this case broadcasted vector should
+            have 1 less number of dimensions than the matrix tensor.
+
+    Returns:
+        Two TensorRT ITensors that are broadcasted to the same number of dimensions.
+    """
+    a_shape = tuple(a.shape)
+    b_shape = tuple(b.shape)
+
+    diff = len(a_shape) - len(b_shape) - preset_diff
+    if diff > 0:
+        b = prepend_ones(ctx, b, f"{b_name}_broadcast", diff)
+    elif diff < 0:
+        a = prepend_ones(ctx, a, f"{a_name}_broadcast", -diff)
+
+    return a, b
+
+
+def get_axes_for_reduce_op(
+    dim: Union[int, Sequence[int]],
+) -> int:
+    """
+    TensorRT reduce layer relies on the binary representation of axes to
+    determine which dims to reduce. For example, if we want to reduce on
+    dim 1 and 2 then axes should be 6(110).
+
+    Args:
+        dim (Union[int, Sequence[int]]): An integer or a sequence of integers
+            that will be used to generate axes for TensorRT.
+
+    Returns:
+        An integer which binary form can be used as axes for TensorRT reduce
+        layer.
+    """
+    if isinstance(dim, int):
+        dim = (dim,)
+
+    axes = 0
+    for d in dim:
+        axes |= 1 << d
+
+    return axes
+
+
+def has_dynamic_shape(shape: Shape) -> bool:
+    """
+    Determine if the given shape has dynamic dim. i.e. if there're -1 in shape.
+
+    Args:
+        shape (Shape): Shape of a tensor. Essentially is a sequence of integers.
+
+    Returns:
+        A boolean value indicates whether there's dynamic dim in the shape.
+    """
+    count = 0
+    for s in shape:
+        count += 1 if s == -1 else 0
+    return count > 0
+
+
+def prepend_ones(
+    ctx: ConversionContext,
+    tensor: TRTTensor,
+    name: str,
+    num_prepend_ones: int,
+) -> TRTTensor:
+    """
+    Prepend 1s to the shape of TensorRT ITensor `tensor`.
+
+    Args:
+        ctx (ConversionContext): A ConversionContext containing the TensorRT network
+        tensor (TRTTensor): A TensorRT tensor.
+        name (str): Name of the TensorRT Shuffle layer which is used to prepend
+            1s.
+        num_prepend_ones (int): Number of 1s that will be prepend.
+
+    Returns:
+        A Tensorrt ITensor which contains the same value as `tensor` but with
+        more 1s prepended to the beginning of `tensor` shape.
+    """
+    layer = ctx.net.add_shuffle(tensor)
+
+    # If there're dynamic dim in tensor's shape, we need to use shape layer to
+    # compute the final shape.
+    if has_dynamic_shape(tensor.shape):
+        tensor_shape_layer = ctx.net.add_shape(tensor)
+        tensor_shape = tensor_shape_layer.get_output(0)
+        tensor_shape = cast_trt_tensor(
+            ctx, tensor_shape, trt.int32, name + "shape_casted", "shape"
+        )
+        tensor_shape_layer.name = f"{name}_broadcast_orig_shape"
+        prepend_shape_layer = ctx.net.add_constant(
+            (num_prepend_ones,), np.ones((num_prepend_ones,), dtype=np.int32)
+        )
+        prepend_shape_layer.name = f"{name}_broadcast_prepend_ones"
+        reshape_dim_layer = ctx.net.add_concatenation(
+            [prepend_shape_layer.get_output(0), tensor_shape]
+        )
+        reshape_dim_layer.axis = 0
+        reshape_dim_layer.name = f"{name}_broadcast_final_shape"
+        layer.set_input(1, reshape_dim_layer.get_output(0))
+    else:
+        layer.reshape_dims = (1,) * num_prepend_ones + tuple(tensor.shape)
+
+    layer.name = name
+    return layer.get_output(0)
+
+
+def set_layer_name(
+    layer: TRTLayer,
+    target: Union[Target, torch.nn.Module, str],
+    name: str,
+    source_ir: Optional[SourceIR] = None,
+) -> None:
+    """
+    Set the TensorRT layer name to "[TensorRT Layer Type]_[Original Op Name]_[FX Node Name with Suffix]"
+
+    Args:
+        layer (TRTLayer): A TensorRT layer of which we want to set the name.
+        target (Target): A fx node.target or submodule. For call_function node, it's the function that
+            the node represents.
+        name (str): Consists of fx node.name with optional suffix.
+        source_ir: (Optional[SourceIR]): The IR producing the op.
+    """
+
+    source_ir = source_ir if source_ir is not None else SourceIR.UNKNOWN
+
+    target_name = (
+        f"{source_ir}_ops.{target}"
+        if isinstance(target, str)
+        else f"{source_ir}_ops.{target.__name__}"
+    )
+    layer.name = f"[{layer.type.name}]-[{target_name}]-[{name}]"

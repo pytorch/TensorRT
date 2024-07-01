@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Dynamic shapes with Torch-TensorRT &mdash; Torch-TensorRT v2.4.0.dev0+7c05926 documentation</title>
+  <title>Dynamic shapes with Torch-TensorRT &mdash; Torch-TensorRT v2.5.0.dev0+caf3a92 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.4.0.dev0+7c05926
+                  v2.5.0.dev0+caf3a92
                 </div>
               
             
@@ -307,7 +307,6 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_windows.html#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -345,6 +344,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#wrapping-custom-kernels-to-use-in-tensorrt">Wrapping Custom Kernels to use in TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#using-torch-tensorrt-to-insert-the-kernel">Using Torch-TensorRT to Insert the Kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
 <ul>
@@ -457,8 +457,10 @@
   <section id="dynamic-shapes-with-torch-tensorrt">
 <span id="dynamic-shapes"></span><h1>Dynamic shapes with Torch-TensorRT<a class="headerlink" href="#dynamic-shapes-with-torch-tensorrt" title="Permalink to this heading">¶</a></h1>
 <p>By default, you can run a pytorch model with varied input shapes and the output shapes are determined eagerly.
-However, Torch-TensorRT is an AOT compiler which requires some prior information about the input shapes to compile and optimize the model.
-In the case of dynamic input shapes, we must provide the (min_shape, opt_shape, max_shape) arguments so that the model can be optimized for
+However, Torch-TensorRT is an AOT compiler which requires some prior information about the input shapes to compile and optimize the model.</p>
+<section id="dynamic-shapes-using-torch-export-aot">
+<h2>Dynamic shapes using torch.export (AOT)<a class="headerlink" href="#dynamic-shapes-using-torch-export-aot" title="Permalink to this heading">¶</a></h2>
+<p>In the case of dynamic input shapes, we must provide the (min_shape, opt_shape, max_shape) arguments so that the model can be optimized for
 this range of input shapes. An example usage of static and dynamic shapes is as follows.</p>
 <p>NOTE: The following code uses Dynamo Frontend. In case of Torchscript Frontend, please swap out <code class="docutils literal notranslate"><span class="pre">ir=dynamo</span></code> with <code class="docutils literal notranslate"><span class="pre">ir=ts</span></code> and the behavior is exactly the same.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
@@ -475,166 +477,72 @@ this range of input shapes. An example usage of static and dynamic shapes is as 
 <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
+</section>
 <section id="under-the-hood">
 <h2>Under the hood<a class="headerlink" href="#under-the-hood" title="Permalink to this heading">¶</a></h2>
 <p>There are two phases of compilation when we use <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile</span></code> API with <code class="docutils literal notranslate"><span class="pre">ir=dynamo</span></code> (default).</p>
 <ul class="simple">
-<li><p>aten_tracer.trace (which uses torch.export to trace the graph with the given inputs)</p></li>
+<li><p>torch_tensorrt.dynamo.trace (which uses torch.export to trace the graph with the given inputs)</p></li>
 </ul>
-<p>In the tracing phase, we use torch.export along with the constraints. In the case of
-dynamic shaped inputs, the range can be provided to the tracing via constraints. Please
-refer to this <a class="reference external" href="https://github.com/pytorch/pytorch/blob/5dcee01c2b89f6bedeef9dd043fd8d6728286582/torch/export/__init__.py#L372-L434">docstring</a>
-for detailed information on how to set constraints. In short, we create new inputs for
-torch.export tracing and provide constraints on the min and max values(provided by the user), a particular dimension can take.
-Please take a look at <code class="docutils literal notranslate"><span class="pre">aten_tracer.py</span></code> file to understand how this works under the hood.</p>
+<p>We use <code class="docutils literal notranslate"><span class="pre">torch.export.export()</span></code> API for tracing and exporting a PyTorch module into <code class="docutils literal notranslate"><span class="pre">torch.export.ExportedProgram</span></code>. In the case of
+dynamic shaped inputs, the <code class="docutils literal notranslate"><span class="pre">(min_shape,</span> <span class="pre">opt_shape,</span> <span class="pre">max_shape)</span></code> range provided via <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.Input</span></code> API is used to construct <code class="docutils literal notranslate"><span class="pre">torch.export.Dim</span></code> objects
+which is used in the <code class="docutils literal notranslate"><span class="pre">dynamic_shapes</span></code> argument for the export API.
+Please take a look at <code class="docutils literal notranslate"><span class="pre">_tracer.py</span></code> file to understand how this works under the hood.</p>
 <ul class="simple">
-<li><p>dynamo.compile (which compiles a torch.fx.GraphModule object using TensorRT)</p></li>
+<li><p>torch_tensorrt.dynamo.compile (which compiles an torch.export.ExportedProgram object using TensorRT)</p></li>
 </ul>
-<p>In the conversion to TensorRT, we use the user provided dynamic shape inputs.
-We perform shape analysis using dummy inputs (across min, opt and max shapes) and store the
-intermediate output shapes which can be used in case the graph has a mix of Pytorch
-and TensorRT submodules.</p>
+<p>In the conversion to TensorRT, the graph already has the dynamic shape information in the node’s metadata which will be used during engine building phase.</p>
 </section>
-<section id="custom-constraints">
-<h2>Custom Constraints<a class="headerlink" href="#custom-constraints" title="Permalink to this heading">¶</a></h2>
+<section id="custom-dynamic-shape-constraints">
+<h2>Custom Dynamic Shape Constraints<a class="headerlink" href="#custom-dynamic-shape-constraints" title="Permalink to this heading">¶</a></h2>
 <p>Given an input <code class="docutils literal notranslate"><span class="pre">x</span> <span class="pre">=</span> <span class="pre">torch_tensorrt.Input(min_shape,</span> <span class="pre">opt_shape,</span> <span class="pre">max_shape,</span> <span class="pre">dtype)</span></code>,
-Torch-TensorRT automatically sets the constraints during <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> tracing as follows</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">constraint_dims</span><span class="p">:</span>
-    <span class="k">if</span> <span class="n">min_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="n">constraints</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">min_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">dynamic_dim</span><span class="p">(</span><span class="n">trace_input</span><span class="p">,</span> <span class="n">dim</span><span class="p">))</span>
-    <span class="k">if</span> <span class="n">max_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="n">constraints</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dynamic_dim</span><span class="p">(</span><span class="n">trace_input</span><span class="p">,</span> <span class="n">dim</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">max_shape</span><span class="p">[</span><span class="n">dim</span><span class="p">])</span>
-</pre></div>
-</div>
-<p>Sometimes, we might need to set additional constraints and Torchdynamo errors out if we don’t specify them.
-For example, in the case of BERT model compilation, there are two inputs and a constraint has to be set involving the sequence length size of these two inputs.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">constraints</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dynamic_dim</span><span class="p">(</span><span class="n">trace_inputs</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">0</span><span class="p">)</span> <span class="o">==</span> <span class="n">dynamic_dim</span><span class="p">(</span><span class="n">trace_inputs</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">0</span><span class="p">))</span>
-</pre></div>
-</div>
-<p>If you have to provide any custom constraints to your model, the overall workflow for model compilation using <code class="docutils literal notranslate"><span class="pre">ir=dynamo</span></code> would involve a few steps.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.lowering</span> <span class="kn">import</span> <span class="n">apply_lowering_passes</span><span class="p">,</span> <span class="n">get_decompositions</span>
-<span class="c1"># Assume the model has two inputs</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span>
-<span class="n">torch_input_1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">14</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-<span class="n">torch_input_2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">14</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-
-<span class="n">dynamic_inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="n">min_shape</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">14</span><span class="p">],</span>
-                    <span class="n">opt_shape</span><span class="o">=</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">14</span><span class="p">],</span>
-                    <span class="n">max_shape</span><span class="o">=</span><span class="p">[</span><span class="mi">8</span><span class="p">,</span> <span class="mi">14</span><span class="p">],</span>
-                    <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span>
-                  <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="n">min_shape</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">14</span><span class="p">],</span>
-                    <span class="n">opt_shape</span><span class="o">=</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">14</span><span class="p">],</span>
-                    <span class="n">max_shape</span><span class="o">=</span><span class="p">[</span><span class="mi">8</span><span class="p">,</span> <span class="mi">14</span><span class="p">],</span>
-                    <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">)]</span>
-
-<span class="c1"># Export the model with additional constraints</span>
-<span class="n">constraints</span> <span class="o">=</span> <span class="p">[]</span>
-<span class="c1"># The following constraints are automatically added by Torch-TensorRT in the</span>
-<span class="c1"># general case when you call torch_tensorrt.compile directly on MyModel()</span>
-<span class="n">constraints</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dynamic_dim</span><span class="p">(</span><span class="n">torch_input_1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">8</span><span class="p">)</span>
-<span class="n">constraints</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dynamic_dim</span><span class="p">(</span><span class="n">torch_input_2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">8</span><span class="p">)</span>
-<span class="c1"># This is an additional constraint as instructed by Torchdynamo</span>
-<span class="n">constraints</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dynamic_dim</span><span class="p">(</span><span class="n">torch_input_1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">==</span> <span class="n">dynamic_dim</span><span class="p">(</span><span class="n">torch_input_2</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
-<span class="k">with</span> <span class="n">unittest</span><span class="o">.</span><span class="n">mock</span><span class="o">.</span><span class="n">patch</span><span class="p">(</span>
-    <span class="s2">&quot;torch._export.DECOMP_TABLE&quot;</span><span class="p">,</span> <span class="n">get_decompositions</span><span class="p">(</span><span class="n">experimental_decompositions</span><span class="p">)</span>
-<span class="p">):</span>
-    <span class="n">graph_module</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span>
-        <span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">torch_input_1</span><span class="p">,</span> <span class="n">torch_input_2</span><span class="p">),</span> <span class="n">constraints</span><span class="o">=</span><span class="n">constraints</span>
-    <span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
-
-<span class="c1"># Use the dynamo.compile API</span>
-<span class="n">trt_mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">graph_module</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">dynamic_inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">compile_spec</span><span class="p">)</span>
-</pre></div>
-</div>
-</section>
-<section id="limitations">
-<h2>Limitations<a class="headerlink" href="#limitations" title="Permalink to this heading">¶</a></h2>
-<p>If there are operations in the graph that use the dynamic dimension of the input, Pytorch
-introduces <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.sym_size.int</span></code> ops in the graph. Currently, we cannot handle these operators and
-the compilation results in undefined behavior. We plan to add support for these operators and implement
-robust support for shape tensors in the next release. Here is an example of the limitation described above</p>
+Torch-TensorRT attempts to automatically set the constraints during <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> tracing by constructing
+<cite>torch.export.Dim</cite> objects with the provided dynamic dimensions accordingly. Sometimes, we might need to set additional constraints and Torchdynamo errors out if we don’t specify them.
+If you have to set any custom constraints to your model (by using <cite>torch.export.Dim</cite>), we recommend exporting your program first before compiling with Torch-TensorRT.
+Please refer to this <a class="reference external" href="https://pytorch.org/tutorials/intermediate/torch_export_tutorial.html#constraints-dynamic-shapes">documentation</a> to export the Pytorch module with dynamic shapes.
+Here’s a simple example that exports a matmul layer with some restrictions on dynamic dimensions.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torch_tensorrt</span>
 
-<span class="k">class</span> <span class="nc">MyModule</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="k">class</span> <span class="nc">MatMul</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">avgpool</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">AdaptiveAvgPool2d</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
 
-    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">avgpool</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-        <span class="n">out</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">out</span>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="n">attn_weight</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">key</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">attn_weight</span>
 
-<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-<span class="c1"># Compile with dynamic shapes</span>
-<span class="n">inputs</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="n">min_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
-                     <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
-                     <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
-                     <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
-</pre></div>
-</div>
-<p>The traced graph of <cite>MyModule()</cite> looks as follows</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">Post</span> <span class="n">export</span> <span class="n">graph</span><span class="p">:</span> <span class="n">graph</span><span class="p">():</span>
-<span class="o">%</span><span class="n">arg0_1</span> <span class="p">:</span> <span class="p">[</span><span class="n">num_users</span><span class="o">=</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">placeholder</span><span class="p">[</span><span class="n">target</span><span class="o">=</span><span class="n">arg0_1</span><span class="p">]</span>
-<span class="o">%</span><span class="n">mean</span> <span class="p">:</span> <span class="p">[</span><span class="n">num_users</span><span class="o">=</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">call_function</span><span class="p">[</span><span class="n">target</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">mean</span><span class="o">.</span><span class="n">dim</span><span class="p">](</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="o">%</span><span class="n">arg0_1</span><span class="p">,</span> <span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">],</span> <span class="kc">True</span><span class="p">),</span> <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{})</span>
-<span class="o">%</span><span class="n">sym_size</span> <span class="p">:</span> <span class="p">[</span><span class="n">num_users</span><span class="o">=</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">call_function</span><span class="p">[</span><span class="n">target</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">sym_size</span><span class="o">.</span><span class="n">int</span><span class="p">](</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="o">%</span><span class="n">arg0_1</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{})</span>
-<span class="o">%</span><span class="n">view</span> <span class="p">:</span> <span class="p">[</span><span class="n">num_users</span><span class="o">=</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">call_function</span><span class="p">[</span><span class="n">target</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">view</span><span class="o">.</span><span class="n">default</span><span class="p">](</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="o">%</span><span class="n">mean</span><span class="p">,</span> <span class="p">[</span><span class="o">%</span><span class="n">sym_size</span><span class="p">,</span> <span class="mi">512</span><span class="p">]),</span> <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{})</span>
-<span class="k">return</span> <span class="p">(</span><span class="n">view</span><span class="p">,)</span>
-</pre></div>
-</div>
-<p>Here the <code class="docutils literal notranslate"><span class="pre">%sym_size</span></code> node captures the dynamic batch and uses it in the <code class="docutils literal notranslate"><span class="pre">aten.view</span></code> layer. This requires shape tensors support
-which would be a part of our next release.</p>
-</section>
-<section id="workaround-bert-static-compilation-example">
-<h2>Workaround (BERT static compilation example)<a class="headerlink" href="#workaround-bert-static-compilation-example" title="Permalink to this heading">¶</a></h2>
-<p>In the case where you encounter the issues mentioned in the <strong>Limitations</strong> section,
-you can compile the model (static mode) with max input size that can be provided. In the cases of smaller inputs,
-we can pad them accordingly. This is only a workaround until we address the limitations.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
-<span class="kn">from</span> <span class="nn">transformers.utils.fx</span> <span class="kn">import</span> <span class="n">symbolic_trace</span> <span class="k">as</span> <span class="n">transformers_trace</span>
-
-<span class="n">model</span> <span class="o">=</span> <span class="n">BertModel</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">&quot;bert-base-uncased&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
-
-<span class="c1"># Input sequence length is 20.</span>
-<span class="n">input1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
-<span class="n">input2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
-
-<span class="n">model</span> <span class="o">=</span> <span class="n">transformers_trace</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">input_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;input_ids&quot;</span><span class="p">,</span> <span class="s2">&quot;attention_mask&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-<span class="n">trt_mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">input1</span><span class="p">,</span> <span class="n">input2</span><span class="p">],</span> <span class="o">**</span><span class="n">compile_spec</span><span class="p">)</span>
-<span class="n">model_outputs</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">input2</span><span class="p">)</span>
-
-<span class="c1"># If you have a sequence of length 14, pad 6 zero tokens and run inference</span>
-<span class="c1"># or recompile for sequence length of 14.</span>
-<span class="n">input1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">14</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
-<span class="n">input2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">14</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
-<span class="n">trt_mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">input1</span><span class="p">,</span> <span class="n">input2</span><span class="p">],</span> <span class="o">**</span><span class="n">compile_spec</span><span class="p">)</span>
-<span class="n">model_outputs</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">input2</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">MatMul</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">64</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">(),</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">64</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
+<span class="n">seq_len</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">&quot;seq_len&quot;</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="n">dynamic_shapes</span><span class="o">=</span><span class="p">({</span><span class="mi">2</span><span class="p">:</span> <span class="n">seq_len</span><span class="p">},</span> <span class="p">{</span><span class="mi">2</span><span class="p">:</span> <span class="n">seq_len</span><span class="p">})</span>
+<span class="c1"># Export the model first with custom dynamic shape constraints</span>
+<span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">),</span> <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="p">[</span><span class="n">inputs</span><span class="p">])</span>
+<span class="c1"># Run inference</span>
+<span class="n">trt_gm</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
-<section id="dynamic-shapes-with-ir-torch-compile">
-<h2>Dynamic shapes with ir=torch_compile<a class="headerlink" href="#dynamic-shapes-with-ir-torch-compile" title="Permalink to this heading">¶</a></h2>
+<section id="dynamic-shapes-using-torch-compile-jit">
+<h2>Dynamic shapes using torch.compile (JIT)<a class="headerlink" href="#dynamic-shapes-using-torch-compile-jit" title="Permalink to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile(model,</span> <span class="pre">inputs,</span> <span class="pre">ir=&quot;torch_compile&quot;)</span></code> returns a torch.compile boxed function with the backend
-configured to Tensorrt. In the case of <code class="docutils literal notranslate"><span class="pre">ir=torch_compile</span></code>, when the input size changes, Dynamo will trigger a recompilation
-of the TensorRT engine automatically giving dynamic shape behavior similar to native PyTorch eager however with the cost of rebuilding
-TRT engine. This limitation will be addressed in future versions of Torch-TensorRT.</p>
+configured to TensorRT. In the case of <code class="docutils literal notranslate"><span class="pre">ir=torch_compile</span></code>, users can provide dynamic shape information for the inputs using <code class="docutils literal notranslate"><span class="pre">torch._dynamo.mark_dynamic</span></code> API (<a class="reference external" href="https://pytorch.org/docs/stable/torch.compiler_dynamic_shapes.html">https://pytorch.org/docs/stable/torch.compiler_dynamic_shapes.html</a>)
+to avoid recompilation of TensorRT engines.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torch_tensorrt</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">float32</span><span class="p">)</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;torch_compile&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
+<span class="c1"># This indicates the dimension 0 is dynamic and the range is [1, 8]</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">_dynamo</span><span class="o">.</span><span class="n">mark_dynamic</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;tensorrt&quot;</span><span class="p">)</span>
 <span class="c1"># Compilation happens when you call the model</span>
 <span class="n">trt_gm</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
 
-<span class="c1"># Recompilation happens with modified batch size</span>
+<span class="c1"># No recompilation of TRT engines with modified batch size</span>
 <span class="n">inputs_bs2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;torch_compile&quot;</span><span class="p">,</span> <span class="n">inputs_bs2</span><span class="p">)</span>
+<span class="n">trt_gm</span><span class="p">(</span><span class="n">inputs_bs2</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -684,11 +592,10 @@ TRT engine. This limitation will be addressed in future versions of Torch-Tensor
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
 <li><a class="reference internal" href="#">Dynamic shapes with Torch-TensorRT</a><ul>
+<li><a class="reference internal" href="#dynamic-shapes-using-torch-export-aot">Dynamic shapes using torch.export (AOT)</a></li>
 <li><a class="reference internal" href="#under-the-hood">Under the hood</a></li>
-<li><a class="reference internal" href="#custom-constraints">Custom Constraints</a></li>
-<li><a class="reference internal" href="#limitations">Limitations</a></li>
-<li><a class="reference internal" href="#workaround-bert-static-compilation-example">Workaround (BERT static compilation example)</a></li>
-<li><a class="reference internal" href="#dynamic-shapes-with-ir-torch-compile">Dynamic shapes with ir=torch_compile</a></li>
+<li><a class="reference internal" href="#custom-dynamic-shape-constraints">Custom Dynamic Shape Constraints</a></li>
+<li><a class="reference internal" href="#dynamic-shapes-using-torch-compile-jit">Dynamic shapes using torch.compile (JIT)</a></li>
 </ul>
 </li>
 </ul>

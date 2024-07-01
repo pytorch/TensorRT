@@ -7,6 +7,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
+
 evaluator_test(
     name = "test_prim_evaluators",
 )

@@ -15,6 +15,7 @@ from torch_tensorrt.dynamo.runtime.tools import (
     _select_rt_device,
     multi_gpu_device_check,
 )
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
 
 logger = logging.getLogger(__name__)
@@ -136,6 +137,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         return result
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
+        # Ensure inputs are available in all scopes and cast symbolic integers to Tensors
+        contiguous_inputs: List[torch.Tensor] = [
+            (i.contiguous() if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
+            for i in inputs
+        ]
         with (
             torch.autograd.profiler.record_function("PythonTorchTensorRTModule:Forward")
             if self.profiling_enabled
@@ -182,8 +188,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     self.input_names
                 ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(inputs)}."
 
-                contiguous_inputs: List[torch.Tensor] = [i.contiguous() for i in inputs]
-                bindings = []
                 for i, input_name in enumerate(self.input_names):
                     if not contiguous_inputs[i].is_cuda:
                         logger.warning(
@@ -202,9 +206,32 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         contiguous_inputs[i].dtype == self.input_dtypes[i]
                     ), f"Dtype mismatch for {i}th input({input_name}). Expect {self.input_dtypes[i]}, got {contiguous_inputs[i].dtype}."
 
-                    bindings.append(contiguous_inputs[i].data_ptr())
-                    self.context.set_input_shape(
-                        input_name, tuple(contiguous_inputs[i].shape)
+                    # For shape tensors, we use CPU pointers and for data tensors, we use GPU pointers
+                    # as per TensorRT requirements
+                    if self.engine.is_shape_inference_io(input_name):
+                        # Shape tensor inputs are casted to int64 explicitly
+                        # Currently Torch CPU pointers are not working; numpy pointers are used instead
+                        # to refer to underlying memory
+                        inputs_cpu = (
+                            contiguous_inputs[i].cpu().to(torch.int64).numpy().copy()
+                        )
+                        self.context.set_tensor_address(
+                            input_name, inputs_cpu.ctypes.data
+                        )
+                    else:
+                        self.context.set_input_shape(
+                            input_name, tuple(contiguous_inputs[i].shape)
+                        )
+                        self.context.set_tensor_address(
+                            input_name, contiguous_inputs[i].data_ptr()
+                        )
+
+                # Check if input shapes can be inferred.
+                uninferred_input_names = self.context.infer_shapes()
+                if uninferred_input_names:
+                    logger.warning(
+                        f"The shapes of the inputs: {uninferred_input_names} cannot be inferred and could lead to undefined behavior. \
+                                   This could happen if the input tensor addresses/shapes haven't been configured correctly"
                     )
 
             with (
@@ -220,19 +247,18 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 for i, output_name in enumerate(self.output_names):
                     shape = tuple(self.context.get_tensor_shape(output_name))
 
+                    if DYNAMIC_DIM in shape:
+                        raise ValueError(
+                            "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
+                        )
+
                     output = torch.empty(
                         size=shape,
                         dtype=self.output_dtypes[i].to(torch.dtype),
                         device=torch.cuda.current_device(),
                     )
-                    bindings.append(output.data_ptr())
+                    self.context.set_tensor_address(output_name, output.data_ptr())
                     outputs.append(output)
-
-            # Assign tensor address appropriately
-            for idx in range(self.engine.num_io_tensors):
-                self.context.set_tensor_address(
-                    self.engine.get_tensor_name(idx), bindings[idx]
-                )
 
             with (
                 torch.autograd.profiler.record_function(

@@ -12,3 +12,4 @@ a number of ways you can leverage this backend to accelerate inference.
 * :ref:`torch_compile_stable_diffusion`: Compiling a Stable Diffusion model using ``torch.compile``
 * :ref:`custom_kernel_plugins`: Creating a plugin to use a custom kernel inside TensorRT engines
 * :ref:`refit_engine_example`: Refitting a compiled TensorRT Graph Module with updated weights
+* :ref:`vgg16_fp8_ptq`: Compiling a VGG16 model with FP8 and PTQ using ``torch.compile``

@@ -82,15 +82,59 @@ class TestNativeLayerNormConverter(DispatchTestCase):
 
         input_specs = [
             Input(
-                shape=(-1, 3, 224, 224),
                 dtype=torch.float32,
-                shape_ranges=[((1, 3, 224, 224), (5, 3, 224, 224), (10, 3, 224, 224))],
+                min_shape=(1, 3, 224, 224),
+                opt_shape=(5, 3, 224, 224),
+                max_shape=(10, 3, 224, 224),
             ),
         ]
 
         self.run_test_with_dynamic_shape(
             LayerNorm(),
             input_specs,
+        )
+
+    def test_layernorm_with_dynamic_shape_1(self):
+        class LayerNorm(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.native_layer_norm.default(
+                    x,
+                    torch.tensor([3]),
+                    torch.ones((3)),
+                    torch.zeros((3)),
+                    1e-05,
+                )[0]
+
+        input_specs = [
+            Input(
+                dtype=torch.float32,
+                min_shape=(1, 2, 3),
+                opt_shape=(3, 3, 3),
+                max_shape=(4, 5, 3),
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            LayerNorm(),
+            input_specs,
+        )
+
+    @parameterized.expand([((5, 3, 2, 4), [2, 4])])
+    def test_layer_norm_without_Scaling(self, input_shape, normalized_shape, eps=1e-05):
+        class LayerNorm(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.native_layer_norm.default(
+                    x,
+                    normalized_shape,
+                    None,
+                    None,
+                    eps,
+                )[0]
+
+        inputs = [torch.randn(input_shape)]
+        self.run_test(
+            LayerNorm(),
+            inputs,
         )
 
 

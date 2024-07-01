@@ -42,6 +42,46 @@ class TestNegConverter(DispatchTestCase):
             check_dtype=False,
         )
 
+    @parameterized.expand(
+        [
+            (
+                "2d_dim_dtype_half",
+                (1, 1),
+                (2, 2),
+                (4, 4),
+                torch.half,
+                torch.half,
+            ),
+            (
+                "3d_dim_dtype_float",
+                (1, 1, 1),
+                (1, 2, 3),
+                (3, 3, 3),
+                torch.float,
+                torch.float,
+            ),
+        ]
+    )
+    def test_dynamic_shape_neg(
+        self, _, min_shape, opt_shape, max_shape, type, output_type
+    ):
+        class neg(nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.neg.default(input)
+
+        input_specs = [
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            neg(), input_specs, output_dtypes=[output_type]
+        )
+
 
 if __name__ == "__main__":
     run_tests()

@@ -1,12 +1,18 @@
-#!/usr/bin/env bash
 set -eou pipefail
-# Source conda so it's available to the script environment
-source ${BUILD_ENV_FILE}
-${CONDA_RUN} ${PIP_INSTALL_TORCH} torchvision
-${CONDA_RUN} python -m pip install pyyaml mpmath==1.3.0
-export TRT_VERSION=$(${CONDA_RUN} python -c "import versions; versions.tensorrt_version()")
+
+TORCH_TORCHVISION=$(grep "^torch" ${PWD}/py/requirements.txt)
+INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
+PLATFORM=$(python -c "import sys; print(sys.platform)")
+
+# Install all the dependencies required for Torch-TensorRT
+pip install --pre ${TORCH_TORCHVISION} --index-url ${INDEX_URL}
+pip install --pre -r ${PWD}/tests/py/requirements.txt --use-deprecated legacy-resolver
 
 # Install Torch-TensorRT
-${CONDA_RUN} python -m pip install /opt/torch-tensorrt-builds/torch_tensorrt*+${CU_VERSION}*.whl tensorrt~=${TRT_VERSION} --extra-index-url=https://pypi.ngc.nvidia.com
+if [[ ${PLATFORM} == win32 ]]; then
+    pip install ${RUNNER_ARTIFACT_DIR}/torch_tensorrt*.whl
+else
+    pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl
+fi
 
 echo -e "Running test script";

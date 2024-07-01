@@ -1,6 +1,13 @@
+# This file is specifically to install correct version of libraries during CI testing.
+# networkx library issue: https://discuss.pytorch.org/t/installing-pytorch-under-python-3-8-question-about-networkx-version/196740
+expecttest==0.1.6
+networkx==2.8.8
+numpy<2.0.0
+parameterized>=0.2.0
 pytest>=8.2.1
 pytest-xdist>=3.6.1
+pyyaml
+tensorrt==10.0.1
 timm>=1.0.3
-transformers==4.39.3
-parameterized>=0.2.0
-expecttest==0.1.6
+transformers==4.40.2
+--extra-index-url https://pypi.nvidia.com

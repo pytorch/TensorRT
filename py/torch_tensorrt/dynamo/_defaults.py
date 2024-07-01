@@ -1,3 +1,6 @@
+import os
+import tempfile
+
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
@@ -6,6 +9,7 @@ ENABLED_PRECISIONS = {dtype.f32}
 DEBUG = False
 DEVICE = None
 DISABLE_TF32 = False
+ASSUME_DYNAMIC_SHAPE_SUPPORT = False
 DLA_LOCAL_DRAM_SIZE = 1073741824
 DLA_GLOBAL_DRAM_SIZE = 536870912
 DLA_SRAM_SIZE = 1048576
@@ -26,7 +30,8 @@ MAKE_REFITABLE = False
 REQUIRE_FULL_COMPILATION = False
 DRYRUN = False
 HARDWARE_COMPATIBLE = False
-SUPPORTED_KERNEL_PRECISIONS = {dtype.f32, dtype.f16, dtype.i8, dtype.bf16}
+SUPPORTED_KERNEL_PRECISIONS = {dtype.f32, dtype.f16, dtype.bf16, dtype.i8, dtype.f8}
+TIMING_CACHE_PATH = os.path.join(tempfile.gettempdir(), "timing_cache.bin")
 
 
 def default_device() -> Device:
