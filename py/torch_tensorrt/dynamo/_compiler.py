@@ -92,19 +92,21 @@ def compile(
         exported_program (torch.export.ExportedProgram): Source module, running torch.export on a ``torch.nn.Module``
         inputs (Tuple[Any, ...]): List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
             torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
-            to select device type. ::
+            to select device type.
 
-                input=[
-                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
-                    torch_tensorrt.Input(
-                        min_shape=(1, 224, 224, 3),
-                        opt_shape=(1, 512, 512, 3),
-                        max_shape=(1, 1024, 1024, 3),
-                        dtype=torch.int32
-                        format=torch.channel_last
-                    ), # Dynamic input shape for input #2
-                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
-                ]
+                .. code-block:: py
+
+                    inputs=[
+                        torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                        torch_tensorrt.Input(
+                            min_shape=(1, 224, 224, 3),
+                            opt_shape=(1, 512, 512, 3),
+                            max_shape=(1, 1024, 1024, 3),
+                            dtype=torch.int32
+                            format=torch.channel_last
+                        ), # Dynamic input shape for input #2
+                        torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+                    ]
 
     Keyword Arguments:
         device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
@@ -453,7 +455,7 @@ def compile_module(
 
 def convert_module_to_trt_engine(
     exported_program: ExportedProgram,
-    inputs: Tuple[Any, ...],
+    inputs: Sequence[Any],
     *,
     enabled_precisions: (
         Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
@@ -496,19 +498,21 @@ def convert_module_to_trt_engine(
     Keyword Args:
         inputs (Optional[Sequence[torch_tensorrt.Input | torch.Tensor]]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
             torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
-            to select device type. ::
+            to select device type.
 
-                input=[
-                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
-                    torch_tensorrt.Input(
-                        min_shape=(1, 224, 224, 3),
-                        opt_shape=(1, 512, 512, 3),
-                        max_shape=(1, 1024, 1024, 3),
-                        dtype=torch.int32
-                        format=torch.channel_last
-                    ), # Dynamic input shape for input #2
-                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
-                ]
+                .. code-block:: py
+
+                  inputs=[
+                        torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                        torch_tensorrt.Input(
+                            min_shape=(1, 224, 224, 3),
+                            opt_shape=(1, 512, 512, 3),
+                            max_shape=(1, 1024, 1024, 3),
+                            dtype=torch.int32
+                            format=torch.channel_last
+                        ), # Dynamic input shape for input #2
+                        torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+                    ]
         enabled_precisions (Optional[Set[torch.dtype | _enums.dtype]]): The set of datatypes that TensorRT can use
         debug (bool): Whether to print out verbose debugging information
         workspace_size (int): Workspace TRT is allowed to use for the module (0 is default)

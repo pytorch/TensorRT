@@ -1,7 +1,6 @@
 from typing import Optional, Sequence, Union
 
 import numpy as np
-import tensorrt as trt
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
 from torch_tensorrt import _enums
@@ -13,8 +12,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     set_layer_name,
 )
-from torch_tensorrt.dynamo.utils import Frameworks, unified_dtype_converter
 from torch_tensorrt.fx.types import TRTTensor
+
+import tensorrt as trt
 
 
 def reshape(
@@ -145,7 +145,7 @@ def resize(
     input: TRTTensor,
     sizes: Sequence[int],
 ) -> TRTTensor:
-    input_np_dtype = unified_dtype_converter(input.dtype, Frameworks.NUMPY)
+    input_np_dtype = _enums.dtype._from(input.dtype).to(np.dtype)
     input_val = get_trt_tensor(ctx, input, f"{name}_input")
 
     # Calculate the total number of elements for new and current shape

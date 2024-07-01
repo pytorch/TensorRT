@@ -5,7 +5,6 @@ import re
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
-import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Argument, Target
@@ -17,6 +16,8 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
     DynamoConverterImplSignature,
 )
+
+import tensorrt as trt
 
 from ..types import Shape, TRTDataType, TRTLayer, TRTTensor
 
@@ -344,9 +345,7 @@ def create_constant(
     # Rank 0 constant is required in IFillLayer inputs.
     if min_rank == 0:
         shape = trt.Dims()
-    numpy_value = to_numpy(
-        value, _enums.dtype._from(dtype).to(np.dtype) if dtype is not None else None
-    )
+    numpy_value = to_numpy(value, dtype)
     constant = ctx.net.add_constant(
         shape if isinstance(value, (int, float, bool)) else value.shape,
         numpy_value.copy() if isinstance(numpy_value, np.ndarray) else numpy_value,
@@ -576,7 +575,7 @@ def to_numpy(
         return (
             output
             if (dtype is None or output is None)
-            else output.astype(_enums.dtype._from(dtype).to(np.dtype))
+            else output.astype(_enums.dtype._from(dtype).to(np.dtype, use_default=True))
         )
     else:
         raise AssertionError(

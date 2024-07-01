@@ -26,6 +26,10 @@ Functions
 
 .. autofunction:: dump_build_info
 
+.. autofunction:: save
+
+.. autofunction:: load
+
 Classes
 ---------
 
@@ -41,12 +45,20 @@ Enums
 -------
 
 .. autoclass:: dtype
+   :members:
+   :member-order:
 
 .. autoclass:: DeviceType
+   :members:
+   :member-order:
 
 .. autoclass:: EngineCapability
+   :members:
+   :member-order:
 
 .. autoclass:: memory_format
+   :members:
+   :member-order:
 
 Submodules
 ----------
@@ -59,3 +71,4 @@ Submodules
    ts
    fx
    dynamo
+   runtime

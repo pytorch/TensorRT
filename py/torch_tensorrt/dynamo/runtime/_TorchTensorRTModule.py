@@ -45,9 +45,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         target_device: Device = Device._current_device(),
         hardware_compatible: bool = False,
     ):
-        """__init__ method for torch_tensorrt.dynamo.runtime._TorchTensorRTModule.TorchTensorRTModule
-
-        Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
+        """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it.
 
         If binding names are not provided, it is assumed that the engine binding names follow the following convention:
@@ -55,16 +53,17 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             - [symbol].[index in input / output array]
                 - ex. [x.0, x.1, x.2] -> [y.0]
 
-        Args:
+        Arguments:
             name (str): Name for module
             serialized_engine (bytearray): Serialized TensorRT engine in the form of a bytearray
             input_binding_names (List[str]): List of input TensorRT engine binding names in the order they would be passed to the TRT modules
             output_binding_names (List[str]): List of output TensorRT engine binding names in the order they should be returned
-            target_device: (torch_tensorrt.Device): Device to instantiate TensorRT engine on. Must be a compatible device i.e. same GPU model / compute capability as was used to build the engine
+            target_device (torch_tensorrt.Device): Device to instantiate TensorRT engine on. Must be a compatible device i.e. same GPU model / compute capability as was used to build the engine
+            hardware_compatible (bool): If the engine has be built with the hardware compatibility feature enabled
 
         Example:
 
-            ..code-block:: py
+            .. code-block:: py
 
                 with io.BytesIO() as engine_bytes:
                     engine_bytes.write(trt_engine.serialize())
