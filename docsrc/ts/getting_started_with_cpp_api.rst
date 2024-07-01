@@ -100,7 +100,7 @@ As you can see it is pretty similar to the Python API. When you call the ``forwa
 
 Compiling with Torch-TensorRT in C++
 -------------------------------------
-We are also at the point were we can compile and optimize our module with Torch-TensorRT, but instead of in a JIT fashion we must do it ahead-of-time (AOT) i.e. before we start doing actual inference work
+We are also at the point where we can compile and optimize our module with Torch-TensorRT, but instead of in a JIT fashion we must do it ahead-of-time (AOT) i.e. before we start doing actual inference work
 since it takes a bit of time to optimize the module, it would not make sense to do this every time you run the module or even the first time you run it.
 
 With our module loaded, we can feed it into the Torch-TensorRT compiler. When we do so we must provide some information on the expected input size and also configure any additional settings.
@@ -113,9 +113,10 @@ With our module loaded, we can feed it into the Torch-TensorRT compiler. When we
 
         mod.to(at::kCUDA);
         mod.eval();
-
-        auto in = torch::randn({1, 1, 32, 32}, {torch::kCUDA});
-        auto trt_mod = torch_tensorrt::CompileGraph(mod, std::vector<torch_tensorrt::CompileSpec::InputRange>{{in.sizes()}});
+        std::vector<torch_tensorrt::core::ir::Input> inputs{torch_tensorrt::core::ir::Input({1, 3, 224, 224})};
+        torch_tensorrt::ts::CompileSpec cfg(inputs);
+        auto trt_mod = torch_tensorrt::ts::compile(mod, cfg);
+        auto in = torch::randn({1, 3, 224, 224}, {torch::kCUDA});
         auto out = trt_mod.forward({in});
 
 Thats it! Now the graph runs primarily not with the JIT compiler but using TensorRT (though we execute the graph using the JIT runtime).
@@ -131,11 +132,11 @@ We can also set settings like operating precision to run in FP16.
         mod.to(at::kCUDA);
         mod.eval();
 
-        auto in = torch::randn({1, 1, 32, 32}, {torch::kCUDA}).to(torch::kHALF);
-        auto input_sizes = std::vector<torch_tensorrt::CompileSpec::InputRange>({in.sizes()});
-        torch_tensorrt::CompileSpec info(input_sizes);
-        info.enable_precisions.insert(torch::kHALF);
-        auto trt_mod = torch_tensorrt::CompileGraph(mod, info);
+        auto in = torch::randn({1, 3, 224, 224}, {torch::kCUDA}).to(torch::kHALF);
+        std::vector<torch_tensorrt::core::ir::Input> inputs{torch_tensorrt::core::ir::Input({1, 3, 224, 224})};
+        torch_tensorrt::ts::CompileSpec cfg(inputs);
+        cfg.enable_precisions.insert(torch::kHALF);
+        auto trt_mod = torch_tensorrt::ts::compile(mod, cfg);
         auto out = trt_mod.forward({in});
 
 And now we are running the module in FP16 precision. You can then save the module to load later.
@@ -179,11 +180,12 @@ If you want to save the engine produced by Torch-TensorRT to use in a TensorRT a
         mod.to(at::kCUDA);
         mod.eval();
 
-        auto in = torch::randn({1, 1, 32, 32}, {torch::kCUDA}).to(torch::kHALF);
-        auto input_sizes = std::vector<torch_tensorrt::CompileSpec::InputRange>({in.sizes()});
-        torch_tensorrt::CompileSpec info(input_sizes);
-        info.enabled_precisions.insert(torch::kHALF);
-        auto trt_mod = torch_tensorrt::ConvertGraphToTRTEngine(mod, "forward", info);
+        auto in = torch::randn({1, 3, 224, 224}, {torch::kCUDA}).to(torch::kHALF);
+
+        std::vector<torch_tensorrt::core::ir::Input> inputs{torch_tensorrt::core::ir::Input({1, 3, 224, 224})};
+        torch_tensorrt::ts::CompileSpec cfg(inputs);
+        cfg.enabled_precisions.insert(torch::kHALF);
+        auto trt_mod = torch_tensorrt::ts::convert_method_to_trt_engine(mod, "forward", cfg);
         std::ofstream out("/tmp/engine_converted_from_jit.trt");
         out << engine;
         out.close();
