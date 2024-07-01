@@ -4,7 +4,6 @@ import logging
 from contextlib import nullcontext
 from typing import Any, Dict, List, Optional, Tuple
 
-import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch.nn import Module
@@ -19,13 +18,15 @@ from torch_tensorrt.dynamo.runtime.tools import (
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
 
+import tensorrt as trt
+
 logger = logging.getLogger(__name__)
 
 
 class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     """PythonTorchTensorRTModule is a PyTorch module which encompasses an arbitrary TensorRT Engine.
 
-    This module is backed by the Torch-TensorRT runtime and is only compatibile with
+    This module is backed by the Torch-TensorRT runtime and is only compatible with
     FX / Dynamo / Python deployments. This module cannot be serialized to torchscript via torch.jit.trace for C++ deployment.
     """
 

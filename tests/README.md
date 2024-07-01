@@ -5,7 +5,7 @@ Currently, following tests are supported:
 2. Module level tests
 3. Accuracy tests
 
-The goal of Converter tests are to tests individual converters againsts specific subgraphs. The current tests in `core/conveters` are good examples on how to write these tests. In general every converter should have at least 1 test. More may be required if the operation has switches that change the behavior of the op.
+The goal of Converter tests are to tests individual converters againsts specific subgraphs. The current tests in `core/converters` are good examples on how to write these tests. In general every converter should have at least 1 test. More may be required if the operation has switches that change the behavior of the op.
 
 Module tests are designed to test the compiler against common network architectures and verify the integration of converters together into a single engine.
 
@@ -44,7 +44,7 @@ Note: Supported Python tests
 ```
 ### Testing using pre-built Torch-TensorRT library
 
-Currently, the default strategy when we run all the tests (`bazel test //tests`) is to build the testing scripts along with the full Torch-TensorRT library (`libtorchtrt.so`) from scratch. This can lead to increased testing time and might not be needed incase you already have a pre-built Torch-TensorRT library that you want to link against.
+Currently, the default strategy when we run all the tests (`bazel test //tests`) is to build the testing scripts along with the full Torch-TensorRT library (`libtorchtrt.so`) from scratch. This can lead to increased testing time and might not be needed in case you already have a pre-built Torch-TensorRT library that you want to link against.
 
 In order to **not** build the entire Torch-TensorRT library and only build the test scripts, please use the following command.
 

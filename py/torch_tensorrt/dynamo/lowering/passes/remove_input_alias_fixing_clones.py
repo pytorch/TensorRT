@@ -30,7 +30,7 @@ def remove_input_alias_fixing_clones(
         ):
             modified_graph = True
 
-            # Replace all uses of the clone with the placholder, delete the clone
+            # Replace all uses of the clone with the placeholder, delete the clone
             clone_node = list(node.users)[0]
             logger.debug(
                 f"Removing node {clone_node} from graph, since it is a clone node which "

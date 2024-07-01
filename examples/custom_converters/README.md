@@ -23,7 +23,7 @@ it doesn't support elu operator in default. (Torch-TensorRT <= v0.1.0)
 We can register a converter for this operator in our application. You can find more
 information on all the details of writing converters in the contributors documentation
 ([Writing Converters](https://nvidia.github.io/Torch-TensorRT/contributors/writing_converters.html)).
-Once we are clear about these rules and writing patterns, we can create a seperate new C++ source file as:
+Once we are clear about these rules and writing patterns, we can create a separate new C++ source file as:
 
 ```c++
 #include "core/conversion/converters/converters.h"
@@ -58,7 +58,7 @@ auto actelu = torch_tensorrt::core::conversion::converters::RegisterNodeConversi
 To use this converter in Python, it is recommended to use PyTorch's
 [C++/CUDA Extension](https://pytorch.org/tutorials/advanced/cpp_extension.html#custom-c-and-cuda-extensions).
 We give an example here about how to wrap the converter into a `.so`
-library so that you can load it to use in Python applicaton.
+library so that you can load it to use in Python application.
 ```python
 import os
 from setuptools import setup, Extension
@@ -124,7 +124,7 @@ def cal_max_diff(pytorch_out, torch_tensorrt_out):
     diff = torch.sub(pytorch_out, torch_tensorrt_out)
     abs_diff = torch.abs(diff)
     max_diff = torch.max(abs_diff)
-    print("Maximum differnce between Torch-TensorRT and PyTorch: \n", max_diff)
+    print("Maximum difference between Torch-TensorRT and PyTorch: \n", max_diff)
 
 
 def main():

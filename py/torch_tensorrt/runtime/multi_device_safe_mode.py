@@ -36,6 +36,24 @@ class _MultiDeviceSafeModeContextManager(object):
 
 
 def set_multi_device_safe_mode(mode: bool) -> _MultiDeviceSafeModeContextManager:
+    """Sets the runtime (Python-only and default) into multi-device safe mode
+
+    In the case that multiple devices are available on the system, in order for the
+    runtime to execute safely, additional device checks are necessary. These checks
+    can have a performance impact so they are therefore opt-in. Used to suppress
+    the warning about running unsafely in a multi-device context.
+
+    Arguments:
+        mode (bool): Enable (``True``) or disable (``False``) multi-device checks
+
+    Example:
+
+        .. code-block:: py
+
+            with torch_tensorrt.runtime.set_multi_device_safe_mode(True):
+                results = trt_compiled_module(*inputs)
+
+    """
     # Fetch existing safe mode and set new mode for Python
     global _PY_RT_MULTI_DEVICE_SAFE_MODE
     old_mode = _PY_RT_MULTI_DEVICE_SAFE_MODE

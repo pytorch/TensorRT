@@ -33,11 +33,11 @@ class TorchScriptInput(Input):
         Keyword Arguments:
             shape (Tuple or List, optional): Static shape of input tensor
             min_shape (Tuple or List, optional): Min size of input tensor's shape range
-                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implictly this sets Input's shape_mode to DYNAMIC
+                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC
             opt_shape (Tuple or List, optional): Opt size of input tensor's shape range
-                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implictly this sets Input's shape_mode to DYNAMIC
+                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC
             max_shape (Tuple or List, optional): Max size of input tensor's shape range
-                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implictly this sets Input's shape_mode to DYNAMIC
+                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC
             dtype (torch.dtype or torch_tensorrt.dtype): Expected data type for input tensor (default: torch_tensorrt.dtype.float32)
             format (torch.memory_format or torch_tensorrt.TensorFormat): The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)
             tensor_domain (Tuple(float, float), optional): The domain of allowed values for the tensor, as interval notation: [tensor_domain[0], tensor_domain[1]).

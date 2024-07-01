@@ -232,7 +232,7 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
 
     else:
         raise KeyError(
-            'Module input definitions are requried to compile module. Provide a list of torch_tensorrt.Input keyed to "inputs" in the compile spec'
+            'Module input definitions are required to compile module. Provide a list of torch_tensorrt.Input keyed to "inputs" in the compile spec'
         )
 
     if "enabled_precisions" in compile_spec:
@@ -323,7 +323,7 @@ def TensorRTCompileSpec(
     calibrator: object = None,
     allow_shape_tensors: bool = False,
 ) -> torch.classes.tensorrt.CompileSpec:
-    """Utility to create a formated spec dictionary for using the PyTorch TensorRT backend
+    """Utility to create a formatted spec dictionary for using the PyTorch TensorRT backend
 
     Keyword Args:
         inputs (List[Union(torch_tensorrt.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
@@ -359,7 +359,7 @@ def TensorRTCompileSpec(
         allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
 
       Returns:
-        torch.classes.tensorrt.CompileSpec: List of methods and formated spec objects to be provided to ``torch._C._jit_to_tensorrt``
+        torch.classes.tensorrt.CompileSpec: List of methods and formatted spec objects to be provided to ``torch._C._jit_to_tensorrt``
     """
 
     compile_spec = {
