@@ -49,11 +49,12 @@ class TestBitwiseNotConverter(DispatchTestCase):
                 torch_tensor=torch.randint(0, 2, opt_shape, dtype=bool),
             )
         ]
-        self.run_test(
+        self.run_test_with_dynamic_shape(
             bitwise_not(),
             inputs,
             enable_passes=True,
             use_dynamo_tracer=True,
+            use_example_tensors=False,
         )
 
 
