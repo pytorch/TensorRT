@@ -1,5 +1,4 @@
 import logging
-from typing import Sequence
 
 import torch
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
@@ -10,9 +9,7 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 logger = logging.getLogger(__name__)
 
 
-def repair_input_as_output(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]
-) -> torch.fx.GraphModule:
+def repair_input_as_output(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """Repair scenarios where inputs are also outputs of the graph
 
     TRT does not allow such cases, so we insert a clone (identity) layer

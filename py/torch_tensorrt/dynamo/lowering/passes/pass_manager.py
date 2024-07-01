@@ -8,11 +8,7 @@ class DynamoPassManager(PassManager):  # type: ignore[misc]
     def __init__(
         self,
         passes: Optional[
-            List[
-                Callable[
-                    [torch.fx.GraphModule, Sequence[torch.Tensor]], torch.fx.GraphModule
-                ]
-            ]
+            List[Callable[[torch.fx.GraphModule], torch.fx.GraphModule]]
         ] = None,
     ):
         super().__init__(passes)
@@ -20,13 +16,7 @@ class DynamoPassManager(PassManager):  # type: ignore[misc]
     @classmethod
     def build_from_passlist(
         cls,
-        passes: Optional[
-            List[
-                Callable[
-                    [torch.fx.GraphModule, Sequence[torch.Tensor]], torch.fx.GraphModule
-                ]
-            ]
-        ],
+        passes: Optional[List[Callable[[torch.fx.GraphModule], torch.fx.GraphModule]]],
     ) -> Any:
         pm = DynamoPassManager(passes)
         return pm
@@ -47,11 +37,11 @@ class DynamoPassManager(PassManager):  # type: ignore[misc]
     def remove_pass_with_index(self, index: int) -> None:
         del self.passes[index]
 
-    def __call__(self, gm: Any, sample_inputs: Any) -> Any:
+    def __call__(self, gm: Any) -> Any:
         self.validate()
-        out, example_inputs = gm, sample_inputs
+        out = gm
         for _pass in self.passes:
-            out = _pass(out, example_inputs)
+            out = _pass(out)
         return out
 
     def __str__(self) -> str:

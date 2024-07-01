@@ -1,5 +1,5 @@
 import logging
-from typing import List, Sequence
+from typing import List
 
 import torch
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
@@ -11,9 +11,7 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 logger = logging.getLogger(__name__)
 
 
-def view_to_reshape(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]
-) -> torch.fx.GraphModule:
+def view_to_reshape(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """Replace aten.view with an equivalent implementation which avoids Tensor memory issues"""
     orig_op = torch.ops.aten.view.default
     replacement_op = torch.ops.aten.reshape.default
