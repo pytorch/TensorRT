@@ -118,7 +118,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
             ),
         ]
     )
-    def test_sdpa_no_causal_dynamic_shape(
+    def test_sdpa_no_causal_no_scale_dynamic_shape(
         self,
         _,
         query_min_shape,
@@ -136,7 +136,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
                     value,
                     None,
                     0.0,
-                    is_casual=False,
+                    is_causal=False,
                     scale=None,
                 )
 
