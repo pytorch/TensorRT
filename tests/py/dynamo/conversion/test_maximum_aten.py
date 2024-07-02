@@ -17,13 +17,58 @@ class TestMaximumConverter(DispatchTestCase):
     def test_maximum(self, _, shape):
         class Maximum(nn.Module):
             def forward(self, lhs_val, rhs_val):
-                return torch.maximum(lhs_val, rhs_val)
+                return torch.ops.aten.maximum.default(lhs_val, rhs_val)
 
         inputs = [torch.randn(shape), torch.randn(shape)]
         self.run_test(
             Maximum(),
             inputs,
             use_dynamo_tracer=True,
+        )
+
+    @parameterized.expand(
+        [
+            (
+                "2d_dim_dtype_half",
+                (1, 1),
+                (2, 2),
+                (4, 4),
+                torch.half,
+                torch.half,
+            ),
+            (
+                "3d_dim_dtype_float",
+                (1, 1, 1),
+                (1, 2, 3),
+                (3, 3, 3),
+                torch.float,
+                torch.float,
+            ),
+        ]
+    )
+    def test_maximum_dynamic_shape(
+        self, _, min_shape, opt_shape, max_shape, type, output_type
+    ):
+        class Maximum(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return torch.ops.aten.maximum.default(lhs_val, rhs_val)
+
+        input_specs = [
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
+            ),
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            Maximum(), input_specs, output_dtypes=[output_type]
         )
 
 
