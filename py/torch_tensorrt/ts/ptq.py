@@ -101,7 +101,7 @@ class DataLoaderCalibrator(object):
                 ),
             )
 
-        if not cache_file:
+        if cache_file:
             if use_cache:
                 log(
                     Level.Debug,
@@ -112,8 +112,8 @@ class DataLoaderCalibrator(object):
         else:
             if use_cache:
                 log(
-                    Level.Error,
-                    "Input cache file is None but use_cache is set to True in INT8 mode.",
+                    Level.Warning,
+                    "Input cache file is None but use_cache is set to True in INT8 mode. Ignoring use_cache flag in this run.",
                 )
 
         # Define attributes and member functions for the calibrator class
