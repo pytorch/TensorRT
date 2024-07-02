@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
+from torch.export import Dim
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
@@ -118,6 +120,43 @@ class TestBitwiseAndConverter(DispatchTestCase):
             enable_passes=True,
             use_dynamo_tracer=True,
         )
+
+    # this test case is to test the bitwise_and with different ranks
+    # it cannot use the normal test_with_dynamic_shape due to the
+    # torch_tensorrt.dynamo.trace doesn't automatically handle it
+    # hence has to manually export the graph and run the test.
+    def test_bitwise_and_dynamic_shape_with_different_ranks(self):
+        class bitwise_and(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return torch.ops.aten.bitwise_and.Tensor(lhs_val, rhs_val)
+
+        dyn_dim = Dim("dyn_dim", min=2, max=6)
+        inputs = (
+            torch.randint(0, 2, (2, 4, 2), dtype=bool),
+            torch.randint(0, 2, (4, 2), dtype=bool),
+        )
+        mod = bitwise_and()
+        fx_mod = torch.export.export(
+            mod, inputs, dynamic_shapes=({1: dyn_dim}, {0: dyn_dim})
+        )
+        trt_mod = torch_tensorrt.dynamo.compile(
+            fx_mod, inputs=inputs, enable_precisions={torch.bool}, min_block_size=1
+        )
+        with torch.no_grad():
+            cuda_inputs = []
+            for i in inputs:
+                cuda_inputs.append(i.cuda())
+            ref_outputs = mod(*cuda_inputs)
+            outputs = trt_mod(*cuda_inputs)
+            for out, ref in zip(outputs, ref_outputs):
+                torch.testing.assert_close(
+                    out,
+                    ref,
+                    rtol=0.001,
+                    atol=0.001,
+                    equal_nan=True,
+                    check_dtype=True,
+                )
 
 
 if __name__ == "__main__":
