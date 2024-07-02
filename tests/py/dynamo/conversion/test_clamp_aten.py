@@ -54,12 +54,12 @@ class TestClampConverter(DispatchTestCase):
 
         input_specs = [
             Input(
-                shape=(-1, -1, 3, 3),
-                dtype=torch.float32,
-                shape_ranges=[((1, 1, 3, 3), (3, 3, 3, 3), (5, 5, 3, 3))],
+                min_shape=(1, 1, 3, 3),
+                opt_shape=(3, 3, 3, 3),
+                max_shape=(5, 5, 3, 3),
+                dtype=torch.float,
             ),
         ]
-
         self.run_test_with_dynamic_shape(TestModule(), input_specs)
         self.run_test_with_dynamic_shape(TestScalarModule(), input_specs)
 
