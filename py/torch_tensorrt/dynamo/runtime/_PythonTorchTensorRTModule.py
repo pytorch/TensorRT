@@ -10,6 +10,7 @@ import torch_tensorrt
 from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.runtime.tools import (
     _is_switch_required,
     _select_rt_device,
@@ -33,8 +34,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         engine: bytes,
         input_names: Optional[List[str]] = None,
         output_names: Optional[List[str]] = None,
-        target_device: Device = Device._current_device(),
-        profiling_enabled: Optional[bool] = None,
+        settings: CompilationSettings = CompilationSettings(),
     ):
         super(PythonTorchTensorRTModule, self).__init__()
         self._register_state_dict_hook(PythonTorchTensorRTModule._on_state_dict)
@@ -46,13 +46,16 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.input_names = input_names if input_names is not None else []
         self.output_names = output_names if output_names is not None else []
         self.initialized = False
-        self.target_device_id = target_device.gpu_id
+        self.target_device_id = (
+            settings.device.gpu_id
+            if settings.device is not None
+            else Device._current_device().gpu_id
+        )
         self.target_device_properties = torch.cuda.get_device_properties(
             self.target_device_id
         )
-        self.profiling_enabled = (
-            profiling_enabled if profiling_enabled is not None else False
-        )
+        self.profiling_enabled = settings.debug if settings.debug is not None else False
+        self.settings = settings
         self._initialize()
 
     def _initialize(self) -> None:
@@ -126,6 +129,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.__dict__.update(state)
         if self.engine:
             self.context = self.engine.create_execution_context()
+
+    def __deepcopy__(self, memo: Any) -> PythonTorchTensorRTModule:
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        result.__setstate__(self.__getstate__())
+        return result
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
         # Ensure inputs are available in all scopes and cast symbolic integers to Tensors

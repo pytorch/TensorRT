@@ -257,7 +257,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if self.compilation_settings.disable_tf32:
             builder_config.clear_flag(trt.BuilderFlag.TF32)
 
-        if self.compilation_settings.refit:
+        if self.compilation_settings.make_refitable:
             builder_config.set_flag(trt.BuilderFlag.REFIT)
 
         if strict_type_constraints:
@@ -306,6 +306,19 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         with open(timing_cache_path, "wb") as timing_cache_file:
             timing_cache_file.write(memoryview(timing_cache.serialize()))
 
+    def _construct_trt_network_def(self) -> None:
+        """
+        Run the interpreter on each node to get TRT INetwork
+        """
+        TRT_INTERPRETER_CALL_PRE_OBSERVER.observe(self.module)
+
+        self.input_specs_iter = 0
+        run_module_start_time = datetime.now()
+        super().run()
+        _LOGGER.info(
+            f"TRT INetwork construction elapsed time: {datetime.now() - run_module_start_time}"
+        )
+
     def run(
         self,
         strict_type_constraints: bool = False,
@@ -320,14 +333,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         Return:
             TRTInterpreterResult
         """
-        TRT_INTERPRETER_CALL_PRE_OBSERVER.observe(self.module)
-
-        self.input_specs_iter = 0
-        run_module_start_time = datetime.now()
-        super().run()
-        _LOGGER.info(
-            f"TRT INetwork construction elapsed time: {datetime.now() - run_module_start_time}"
-        )
+        self._construct_trt_network_def()
         build_engine_start_time = datetime.now()
 
         builder_config = self._populate_trt_builder_config(

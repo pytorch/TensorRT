@@ -114,8 +114,7 @@ def convert_module(
             engine=interpreter_result.engine,
             input_names=list(interpreter_result.input_names),
             output_names=list(interpreter_result.output_names),
-            target_device=settings.device,
-            profiling_enabled=settings.debug,
+            settings=settings,
         )
 
     else:
@@ -130,6 +129,5 @@ def convert_module(
             name=name,
             input_binding_names=list(interpreter_result.input_names),
             output_binding_names=list(interpreter_result.output_names),
-            target_device=settings.device,
-            hardware_compatible=settings.hardware_compatible,
+            settings=settings,
         )

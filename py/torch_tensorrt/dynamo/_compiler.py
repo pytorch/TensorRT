@@ -57,7 +57,7 @@ def compile(
         Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
     ) = _defaults.ENABLED_PRECISIONS,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-    refit: bool = _defaults.REFIT,
+    make_refitable: bool = _defaults.MAKE_REFITABLE,
     debug: bool = _defaults.DEBUG,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
@@ -160,6 +160,17 @@ def compile(
                 stacklevel=2,
             )
 
+    if "refit" in kwargs.keys():
+        warnings.warn(
+            "Refit is deprecated. Please use make_refitable=True if you want to enable refitting of the engine.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if make_refitable:
+            raise ValueError("Use flag make_refitable only. Flag refit is deprecated.")
+        else:
+            make_refitable = kwargs["refit"]
+
     engine_capability = EngineCapability._from(engine_capability)
 
     if torch_executed_modules is not None and torch_executed_modules:
@@ -215,7 +226,7 @@ def compile(
         "require_full_compilation": require_full_compilation,
         "disable_tf32": disable_tf32,
         "sparse_weights": sparse_weights,
-        "refit": refit,
+        "make_refitable": make_refitable,
         "engine_capability": engine_capability,
         "dla_sram_size": dla_sram_size,
         "dla_local_dram_size": dla_local_dram_size,
@@ -475,7 +486,7 @@ def convert_module_to_trt_engine(
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     disable_tf32: bool = _defaults.DISABLE_TF32,
     sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
-    refit: bool = _defaults.REFIT,
+    make_refitable: bool = _defaults.MAKE_REFITABLE,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
@@ -558,6 +569,12 @@ def convert_module_to_trt_engine(
                 DeprecationWarning,
                 stacklevel=2,
             )
+    if "refit" in kwargs.keys():
+        warnings.warn(
+            "Refit is deprecated. Please use make_refitable=True if you want to enable refitting of the engine.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     input_list = list(inputs) if inputs is not None else []
     torch_executed_ops = torch_executed_ops if torch_executed_ops is not None else set()
@@ -586,7 +603,7 @@ def convert_module_to_trt_engine(
         "require_full_compilation": require_full_compilation,
         "disable_tf32": disable_tf32,
         "sparse_weights": sparse_weights,
-        "refit": refit,
+        "make_refitable": make_refitable,
         "engine_capability": engine_capability,
         "num_avg_timing_iters": num_avg_timing_iters,
         "dla_sram_size": dla_sram_size,
