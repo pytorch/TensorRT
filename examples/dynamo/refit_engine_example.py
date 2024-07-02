@@ -91,7 +91,7 @@ for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
 print("Refit successfully!")
 
 # %%
-# Alternative Workflow using Python Runtime
+# Alterative Workflow using Python Runtime
 # -----------------------------
 
 # Currently python runtime does not support engine serialization. So the refitting will be done in the same runtime.

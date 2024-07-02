@@ -176,6 +176,18 @@ def compile(
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
+
+    if "refit" in kwargs.keys():
+        warnings.warn(
+            "Refit is deprecated. Please use make_refitable=True if you want to enable refitting of the engine.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if make_refitable:
+            raise ValueError("Use flag make_refitable only. Flag refit is deprecated.")
+        else:
+            make_refitable = kwargs["refit"]
+
     engine_capability = EngineCapability._from(engine_capability)
 
     if torch_executed_modules is not None and torch_executed_modules:
