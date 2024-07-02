@@ -84,24 +84,22 @@ http_archive(
 http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    sha256 = "a5cd2863793d69187ce4c73b2fffc1f470ff28cfd91e3640017e53b8916453d5",
-    strip_prefix = "TensorRT-10.0.1.6",
+    sha256 = "606436ed219c72d1a25a889b2b0ae5cb5a68499dd6f944da4cabb3c34c067d55",
+    strip_prefix = "TensorRT-10.1.0.27",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.0.1/tars/TensorRT-10.0.1.6.Linux.x86_64-gnu.cuda-12.4.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.1.0/tars/TensorRT-10.1.0.27.Linux.x86_64-gnu.cuda-12.4.tar.gz",
     ],
 )
 
 http_archive(
     name = "tensorrt_win",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    sha256 = "d667bd10b178e239b621a8929008ef3e27967d181bf07a39845a0f99edeec47a",
-    strip_prefix = "TensorRT-10.0.1.6",
+    sha256 = "2eb98008944945377eb328871a308704e95bf3bb295fc548784c6da41a70bbed",
+    strip_prefix = "TensorRT-10.1.0.27",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.0.1/zip/TensorRT-10.0.1.6.Windows10.win10.cuda-12.4.zip",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.1.0/zip/TensorRT-10.1.0.27.Windows.win10.cuda-12.4.zip",
     ],
 )
-
-
 
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
