@@ -36,16 +36,7 @@ class TestBitwiseXorConverter(DispatchTestCase):
     @parameterized.expand(
         [
             ("2d-2d", (2, 3), (3, 3), (5, 3), (2, 3), (3, 3), (5, 3)),
-            # ("3d-3d", (2, 2, 2), (2, 3, 2), (2, 4, 2), (1, 2, 2), (1, 3, 2), (1, 4, 2)),
-            # TODO: this should be a valid testcase, figure out why it is failing
-            # # I want to test when the dimension is not the same, it will prepend 1's to make it same rank
-            # ("3d-3d", (2, 2, 2), (2, 3, 2), (2, 4, 2), (2, 2), (3, 2), (4, 2)),
-            # however pytorch throws the folllowing error:
-            # torch._dynamo.exc.UserError: Constraints violated (_0)! For more information, run with TORCH_LOGS="+dynamic".
-            # E  - The values of _0 = L['rhs_val'].size()[0] and _1 = L['lhs_val'].size()[1] must always be equal.
-            # E
-            # E  Suggested fixes:
-            # E  _0 = _1
+            ("3d-3d", (2, 2, 2), (2, 3, 2), (2, 4, 2), (1, 2, 2), (1, 3, 2), (1, 4, 2)),
         ]
     )
     def test_bitwise_xor_tensor_dynamic_shape(

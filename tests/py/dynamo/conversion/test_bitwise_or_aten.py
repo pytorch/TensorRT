@@ -37,8 +37,6 @@ class TestBitwiseOrConverter(DispatchTestCase):
         [
             ("2d-2d", (2, 3), (3, 3), (5, 3), (2, 3), (3, 3), (5, 3)),
             ("3d-3d", (2, 2, 2), (2, 3, 2), (2, 4, 2), (1, 2, 2), (1, 3, 2), (1, 4, 2)),
-            # TODO: figure out why this is failing
-            # ("3d-3d", (2, 2, 2), (2, 3, 2), (2, 4, 2), (2, 2), (3, 2), (4, 2)),
         ]
     )
     def test_bitwise_or_tensor_dynamic_shape(
