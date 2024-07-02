@@ -24,7 +24,7 @@ Functions
 
 .. autofunction:: convert_module_to_trt_engine
 
-
+.. autofunction:: refit_module_weights
 
 Classes
 --------
