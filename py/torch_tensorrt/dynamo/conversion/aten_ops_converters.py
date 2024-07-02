@@ -2054,7 +2054,9 @@ def aten_ops_logical_and(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.logical_or.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.logical_or.default, supports_dynamic_shapes=True
+)
 def aten_ops_logical_or(
     ctx: ConversionContext,
     target: Target,
@@ -2072,7 +2074,9 @@ def aten_ops_logical_or(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.logical_xor.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.logical_xor.default, supports_dynamic_shapes=True
+)
 def aten_ops_logical_xor(
     ctx: ConversionContext,
     target: Target,
