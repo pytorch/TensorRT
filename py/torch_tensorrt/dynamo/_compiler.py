@@ -166,6 +166,10 @@ def compile(
             DeprecationWarning,
             stacklevel=2,
         )
+        if make_refitable:
+            raise ValueError("Use flag make_refitable only. Flag refit is deprecated.")
+        else:
+            make_refitable = kwargs["refit"]
 
     engine_capability = EngineCapability._from(engine_capability)
 
