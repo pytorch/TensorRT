@@ -11,6 +11,8 @@ from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
+from torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule import MutableTorchTensorRTModule
+
 from torch_tensorrt.fx import InputTensorSpec
 from torch_tensorrt.fx.lower import compile as fx_compile
 from torch_tensorrt.fx.utils import LowerPrecision
@@ -241,38 +243,27 @@ def compile(
         )
         return compiled_fx_module
     elif target_ir == _IRType.dynamo:
+        if kwargs["mutable"]:
+            mutable_trt_graph_module = MutableTorchTensorRTModule(module, input_list, enabled_precisions_set, **kwargs)
+            mutable_trt_graph_module.compile()
+            return mutable_trt_graph_module
+        else:
         # Prepare torch and torchtrt inputs
-        if not arg_inputs and not inputs:
-            raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
+            from torch_tensorrt.dynamo.utils import prepare_inputs
 
-        elif arg_inputs and inputs:
-            raise AssertionError(
-                "'arg_inputs' and 'inputs' should not be used at the same time."
+            if not isinstance(input_list, collections.abc.Sequence):
+                input_list = [input_list]
+
+            # Export the module
+            torchtrt_inputs = prepare_inputs(input_list)
+            exp_program = dynamo_trace(module, torchtrt_inputs, **kwargs)
+            trt_graph_module = dynamo_compile(
+                exp_program,
+                inputs=torchtrt_inputs,
+                enabled_precisions=enabled_precisions_set,
+                **kwargs,
             )
-        arg_inputs = inputs or arg_inputs
-
-        if kwarg_inputs is None:
-            kwarg_inputs = {}
-
-        from torch_tensorrt.dynamo.utils import prepare_inputs
-
-        if not isinstance(arg_inputs, collections.abc.Sequence):
-            arg_inputs = [arg_inputs]  # type: ignore
-
-        # Export the module
-        torchtrt_arg_inputs = prepare_inputs(arg_inputs)
-        torchtrt_kwarg_inputs = prepare_inputs(kwarg_inputs)
-
-        exp_program = dynamo_trace(
-            module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
-        )
-        trt_graph_module = dynamo_compile(
-            exp_program,
-            arg_inputs=torchtrt_arg_inputs,
-            enabled_precisions=enabled_precisions_set,
-            **kwargs,
-        )
-        return trt_graph_module
+            return trt_graph_module
     elif target_ir == _IRType.torch_compile:
         return torch_compile(
             module, enabled_precisions=enabled_precisions_set, **kwargs
