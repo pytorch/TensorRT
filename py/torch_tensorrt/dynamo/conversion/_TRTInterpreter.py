@@ -47,6 +47,7 @@ class TRTInterpreterResult(NamedTuple):
     serialized_engine: bytes
     input_names: Sequence[str]
     output_names: Sequence[str]
+    weight_name_map: Optional[dict[Any, Any]]
 
 
 class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
@@ -110,6 +111,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         # Mapping of constants to shapes and dtypes
         self.const_mapping: Dict[str, Tuple[Sequence[int], str]] = {}
+        self.weight_name_map: Optional[dict[str, Any]] = None
 
     def validate_conversion(self) -> Set[str]:
         missing_converters: Set[str] = set()
@@ -320,6 +322,134 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             f"TRT INetwork construction elapsed time: {datetime.now() - run_module_start_time}"
         )
 
+    def _save_weight_mapping(self) -> None:
+
+        def find_weight(
+            weight_name: str, np_map: dict[str, Any], sd: dict[str, Any]
+        ) -> str:
+            network_weight = np_map[weight_name]
+            for sd_w_name, sd_weight in sd.items():
+                if check_weight_equal(sd_weight, network_weight):
+                    return sd_w_name
+            return ""
+
+        def check_weight_equal(
+            sd_weight: torch.tensor, network_weight: np.ndarray
+        ) -> Any:
+            sd_weight = sd_weight.reshape(-1).cpu().numpy()
+            return sd_weight.size == network_weight.size and np.allclose(
+                sd_weight, network_weight, 1e-1, 1e-1
+            )
+
+        MODULE_MAP = {
+            "SCALE": (
+                trt.IScaleLayer,
+                [
+                    (
+                        "scale",
+                        "SCALE",
+                        ("weight", "bias", "running_mean", "running_var"),
+                    ),
+                    (
+                        "shift",
+                        "SHIFT",
+                        ("weight", "bias", "running_mean", "running_var"),
+                    ),
+                ],
+            ),
+            "CONVOLUTION": (
+                trt.IConvolutionLayer,
+                [("kernel", "KERNEL", "weight"), ("bias", "BIAS", "bias")],
+            ),
+            "DECONVOLUTION": (
+                trt.IDeconvolutionLayer,
+                [("kernel", "KERNEL", "weight"), ("bias", "BIAS", "bias")],
+            ),
+            "CONSTANT": (
+                trt.IConstantLayer,
+                [("weights", "CONSTANT", ("weight", "bias"))],
+            ),
+        }
+        """
+        The structure of this map is:
+        {
+            layer_type: (
+                Corresponding ILayer type to cast,
+                [
+                    (
+                        ILayer weight attribute,
+                        Weight name postfix in TRT Engine,
+                        Weight name postfix in state_dict
+                    ),
+                    ...
+                ]
+            )
+        }
+        """
+
+        sd = self.module.state_dict()
+        weight_name_map: dict[str, Any] = {}
+        np_map = {}
+        net = self.ctx.net
+        for i in range(net.num_layers):
+            layer = net[i]
+            layer_type: str = layer.type.name
+            if layer_type in MODULE_MAP:
+                layer.__class__ = MODULE_MAP[layer_type][0]
+                # Name mapping
+                for weight_type, weight_name, torch_attr in MODULE_MAP[layer_type][1]:
+                    weight = layer.__getattribute__(weight_type).copy()
+                    if weight.size == 0:
+                        continue
+                    engine_weight_name = f"{layer.name} {weight_name}"
+                    # Infer the corresponding weight name(s) in state_dict
+                    sd_weight_name_list = (
+                        layer.name.split("-")[-1]
+                        .replace("[", "")
+                        .replace("]", "")
+                        .split("/")
+                    )
+                    sd_weight_name: Any = ".".join(
+                        [i for i in sd_weight_name_list[:-1] if i]
+                    )
+                    suffix = sd_weight_name_list[-1]
+                    if layer_type == "CONSTANT":
+                        if "embedding" in suffix:
+                            sd_weight_name = f"{sd_weight_name}.{torch_attr[0]}"
+                        elif "weight" in suffix or "mm_other" in suffix:
+                            # Linear layer weight
+                            sd_weight_name = f"{sd_weight_name}.{torch_attr[0]}"
+                        else:
+                            sd_weight_name = f"{sd_weight_name}.{torch_attr[1]}"
+                    elif layer_type == "SCALE":
+                        # Batch norm needs all weights to calculate scale and shift
+                        sd_weight_name = [f"{sd_weight_name}.{n}" for n in torch_attr]
+                    else:
+                        sd_weight_name = f"{sd_weight_name}.{torch_attr}"
+
+                    weight_name_map[engine_weight_name] = sd_weight_name
+                    np_map[engine_weight_name] = weight
+
+        # Value mapping
+        for engine_weight_name, sd_weight_name in weight_name_map.items():
+            if "SCALE" in engine_weight_name:
+                # There is no direct connection in batch_norm layer. So skip it
+                pass
+            elif sd_weight_name not in sd or not check_weight_equal(
+                sd[sd_weight_name], np_map[engine_weight_name]
+            ):
+                weight_name_map[engine_weight_name] = find_weight(
+                    engine_weight_name, np_map, sd
+                )
+
+            weight_name_map[engine_weight_name] = [
+                weight_name_map[engine_weight_name],
+                np_map[engine_weight_name].dtype,
+            ]
+
+        self.weight_name_map = weight_name_map
+        # check = {k:(weight_name_map[k], np_map[k]) for k, v in np_map.items()}
+
     def run(
         self,
         strict_type_constraints: bool = False,
@@ -335,6 +465,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             TRTInterpreterResult
         """
         self._construct_trt_network_def()
+
+        if self.compilation_settings.make_refitable:
+            self._save_weight_mapping()
+
         build_engine_start_time = datetime.now()
 
         builder_config = self._populate_trt_builder_config(
@@ -363,7 +497,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             engine_bytes.write(serialized_engine)
             engine_str = engine_bytes.getvalue()
 
-        return TRTInterpreterResult(engine_str, self._input_names, self._output_names)
+        return TRTInterpreterResult(engine_str, self._input_names, self._output_names, self.weight_name_map)
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
         self._cur_node_name = get_node_name(n)
