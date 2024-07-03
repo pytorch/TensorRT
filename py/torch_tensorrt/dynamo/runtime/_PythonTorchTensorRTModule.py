@@ -35,6 +35,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         input_names: Optional[List[str]] = None,
         output_names: Optional[List[str]] = None,
         settings: CompilationSettings = CompilationSettings(),
+        weight_name_map: Any = None,
     ):
         super(PythonTorchTensorRTModule, self).__init__()
         self._register_state_dict_hook(PythonTorchTensorRTModule._on_state_dict)
@@ -56,6 +57,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         )
         self.profiling_enabled = settings.debug if settings.debug is not None else False
         self.settings = settings
+        self.weight_name_map = weight_name_map
         self._initialize()
 
     def _initialize(self) -> None:

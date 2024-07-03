@@ -57,6 +57,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         input_binding_names: Optional[List[str]] = None,
         output_binding_names: Optional[List[str]] = None,
         settings: CompilationSettings = CompilationSettings(),
+        weight_name_map: Optional[dict[Any, Any]] = None,
     ):
         """__init__ method for torch_tensorrt.dynamo.runtime._TorchTensorRTModule.TorchTensorRTModule
 
@@ -108,6 +109,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         )
         self.hardware_compatible = settings.hardware_compatible
         self.settings = copy.deepcopy(settings)
+        self.weight_name_map = weight_name_map
+        metadata = {"settings": settings, "weight_name_map": weight_name_map}
         if serialized_engine is not None:
             self.engine = torch.classes.tensorrt.Engine(
                 [
@@ -118,27 +121,30 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     TorchTensorRTModule._pack_binding_names(self.input_binding_names),
                     TorchTensorRTModule._pack_binding_names(self.output_binding_names),
                     str(int(self.hardware_compatible)),
-                    self.encode_metadata(settings),
+                    self.encode_metadata(metadata),
                 ]
             )
         else:
             self.engine = None
 
-    def encode_metadata(self, settings: Any) -> str:
-        settings = copy.deepcopy(settings)
-        settings.torch_executed_ops = {
-            f"torch.ops.{op.__str__()}" for op in settings.torch_executed_ops
+    def encode_metadata(self, metadata: Any) -> str:
+        metadata = copy.deepcopy(metadata)
+        metadata["settings"].torch_executed_ops = {
+            f"torch.ops.{op.__str__()}"
+            for op in metadata["settings"].torch_executed_ops
         }
-        dumped_settings = pickle.dumps(settings)
-        encoded_settings = base64.b64encode(dumped_settings).decode("utf-8")
-        return encoded_settings
+        dumped_metadata = pickle.dumps(metadata)
+        encoded_metadata = base64.b64encode(dumped_metadata).decode("utf-8")
+        return encoded_metadata
 
     @staticmethod
-    def decode_metadata(encoded_settings: bytes) -> Any:
-        dumped_settings = base64.b64decode(encoded_settings.encode("utf-8"))
-        settings = pickle.loads(dumped_settings)
-        settings.torch_executed_ops = {eval(op) for op in settings.torch_executed_ops}
-        return settings
+    def decode_metadata(encoded_metadata: bytes) -> Any:
+        dumped_metadata = base64.b64decode(encoded_metadata.encode("utf-8"))
+        metadata = pickle.loads(dumped_metadata)
+        metadata["settings"].torch_executed_ops = {
+            eval(op) for op in metadata["settings"].torch_executed_ops
+        }
+        return metadata
 
     def get_extra_state(self) -> SerializedTorchTensorRTModuleFmt:
         return (

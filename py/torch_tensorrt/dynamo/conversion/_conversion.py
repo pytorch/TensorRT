@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import List, Sequence
+from typing import Any, List, Sequence
 
 import tensorrt as trt
 import torch
@@ -104,6 +104,24 @@ def convert_module(
         _PythonTorchTensorRTModule or TorchTensorRTModule
     """
     interpreter_result = interpret_module_to_result(module, inputs, settings)
+    # Test fast refit:
+    from torch_tensorrt.dynamo._refit import _refit_single_trt_engine_with_gm
+    from torch_tensorrt.logging import TRT_LOGGER
+
+    runtime = trt.Runtime(TRT_LOGGER)
+    refit_test_engine = runtime.deserialize_cuda_engine(interpreter_result.engine)
+    weight_name_map: Any = interpreter_result.weight_name_map
+    try:
+        _refit_single_trt_engine_with_gm(
+            new_gm=module,
+            old_engine=refit_test_engine,
+            input_list=inputs,
+            settings=settings,
+            weight_name_map=interpreter_result.weight_name_map,
+        )
+    except AssertionError:
+        logger.warning("Fast refit test failed. Removing the weight map caching.")
+        weight_name_map = None
 
     if settings.use_python_runtime or not ENABLED_FEATURES.torch_tensorrt_runtime:
         if not settings.use_python_runtime:
@@ -115,6 +133,7 @@ def convert_module(
             input_names=list(interpreter_result.input_names),
             output_names=list(interpreter_result.output_names),
             settings=settings,
+            weight_name_map=weight_name_map,
         )
 
     else:
@@ -130,4 +149,5 @@ def convert_module(
             input_binding_names=list(interpreter_result.input_names),
             output_binding_names=list(interpreter_result.output_names),
             settings=settings,
+            weight_name_map=weight_name_map,
         )
