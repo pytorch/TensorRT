@@ -351,9 +351,9 @@ def convert_method_to_trt_engine(
         torchtrt_inputs = prepare_inputs(inputs)
         exp_program = torch_tensorrt.dynamo.trace(module, torchtrt_inputs, **kwargs)
 
-        return dynamo_convert_module_to_trt_engine(  # type: ignore[no-any-return]
+        return dynamo_convert_module_to_trt_engine(
             exp_program,
-            inputs=inputs,
+            inputs=tuple(inputs),
             enabled_precisions=enabled_precisions_set,
             **kwargs,
         )

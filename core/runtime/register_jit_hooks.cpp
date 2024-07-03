@@ -102,7 +102,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
               serialize_info[INPUT_BINDING_NAMES_IDX] = serialize_bindings(self->in_binding_names);
               serialize_info[OUTPUT_BINDING_NAMES_IDX] = serialize_bindings(self->out_binding_names);
               serialize_info[HW_COMPATIBLE_IDX] = self->hardware_compatible ? "1" : "0";
-
+              serialize_info[SERIALIZED_METADATA_IDX] = self->serialized_metadata;
               LOG_DEBUG("Serialized Hardware Compatibility: " << (self->hardware_compatible ? "Enabled" : "Disabled"));
 
               return serialize_info;
@@ -127,6 +127,15 @@ TORCH_LIBRARY(tensorrt, m) {
   });
   m.def(
       "get_logging_level", []() -> int64_t { return int64_t(util::logging::get_logger().get_reportable_log_level()); });
+  m.def("ABI_TARGET_IDX", []() -> int64_t { return ABI_TARGET_IDX; });
+  m.def("NAME_IDX", []() -> int64_t { return NAME_IDX; });
+  m.def("DEVICE_IDX", []() -> int64_t { return DEVICE_IDX; });
+  m.def("ENGINE_IDX", []() -> int64_t { return ENGINE_IDX; });
+  m.def("INPUT_BINDING_NAMES_IDX", []() -> int64_t { return INPUT_BINDING_NAMES_IDX; });
+  m.def("OUTPUT_BINDING_NAMES_IDX", []() -> int64_t { return OUTPUT_BINDING_NAMES_IDX; });
+  m.def("HW_COMPATIBLE_IDX", []() -> int64_t { return HW_COMPATIBLE_IDX; });
+  m.def("SERIALIZED_METADATA_IDX", []() -> int64_t { return SERIALIZED_METADATA_IDX; });
+  m.def("SERIALIZATION_LEN", []() -> int64_t { return SERIALIZATION_LEN; });
 }
 
 } // namespace
