@@ -44,6 +44,7 @@ jobs:
         shell: bash -l {0}
         run: |
           set -euxo pipefail
+          cd /opt/torch_tensorrt
           bazel build //:libtorchtrt --compilation_mode opt --config=default
           mkdir release
           # example: 2.4.0.dev20240610+cu124, we don't want the +cu124 part, so remove +cu124
@@ -60,7 +61,6 @@ jobs:
         with:
           name: release-tarball
           path: /opt/torch_tensorrt/release
-
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
