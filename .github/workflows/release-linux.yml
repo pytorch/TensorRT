@@ -94,31 +94,32 @@ jobs:
       with-rocm: false
       with-cpu: false
 
-  generate-release-matrix:
-    needs: [generate-matrix]
-    outputs:
-      release_matrix: ${{ steps.generate.outputs.release_matrix }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Generate release matrix
-        id: generate
-        run: |
-          set -x
-          sudo apt-get update && sudo apt-get install -y jq
-          matrix=${{ fromJSON(needs.generate-matrix.outputs.matrix) }}
-          echo "${matrix}"
+  # generate-release-matrix:
+  #   needs: [generate-matrix]
+  #   outputs:
+  #     release_matrix: ${{ steps.generate.outputs.release_matrix }}
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Generate release matrix
+  #       id: generate
+  #       run: |
+  #         set -x
+  #         sudo apt-get update && sudo apt-get install -y jq
+  #         matrix=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
+  #         echo "${matrix}"
 
-          RELEASE_MATRIX_INCLUDE=$(echo ${matrix} | jq -c '.[] | map(select(.desired_cuda=="cu124"))')
-          RELEASE_MATRIX_BLOB=$(jq -c -n '{"include": $RELEASE_MATRIX_INCLUDE}' --argjson RELEASE_MATRIX_INCLUDE "$RELEASE_MATRIX_INCLUDE")
-          echo "${RELEASE_MATRIX_BLOB}"
-          echo "release_matrix=${RELEASE_MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+  #         RELEASE_MATRIX_INCLUDE=$(echo ${matrix} | jq -c '.[] | map(select(.desired_cuda=="cu124"))')
+  #         RELEASE_MATRIX_BLOB=$(jq -c -n '{"include": $RELEASE_MATRIX_INCLUDE}' --argjson RELEASE_MATRIX_INCLUDE "$RELEASE_MATRIX_INCLUDE")
+  #         echo "${RELEASE_MATRIX_BLOB}"
+  #         echo "release_matrix=${RELEASE_MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
   build-wheel-artifacts:
     name: Build torch-tensorrt release wheel artifacts
-    needs: [generate-release-matrix]
+    needs: [generate-matrix]
     strategy:
       fail-fast: false
       matrix:
+        desired_cuda: ["cu124"]
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
