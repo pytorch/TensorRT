@@ -208,6 +208,7 @@ def refit_module_weights(
     kwarg_inputs: Optional[dict[str, Any]] = None,
     verify_output: bool = False,
     fast_refit: bool = True,
+    in_place: bool = False,
 ) -> torch.fx.GraphModule:
     """
     Refit a compiled graph module with ExportedProgram. This performs weight updates in compiled_module without recompiling the engine.
@@ -230,7 +231,12 @@ def refit_module_weights(
     if len(list(compiled_module.named_children())) == 0:
         inline_module = True
 
-    compiled_module = copy.deepcopy(compiled_module)
+    if not in_place:
+        if inline_module:
+            logger.warning(
+                "Inplace has no effect on exported program. Please use the returned module as the updated module."
+            )
+        compiled_module = copy.deepcopy(compiled_module)
 
     # Get the settings and check the setting to be uniform
     settings: CompilationSettings = None
