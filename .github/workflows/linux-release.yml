@@ -21,25 +21,20 @@ jobs:
       options: '--gpus all'
     timeout-minutes: 120
     steps:
-      - name: Clean workspace
-        shell: bash -l {0}
-        run: |
-          set -euxo pipefail
-          echo "::group::Cleanup debug output"
-          rm -rf "${GITHUB_WORKSPACE}"
-          mkdir -p "${GITHUB_WORKSPACE}"
-
-          if [[ "${{ inputs.architecture }}" = "aarch64" ]]; then
-            rm -rf "${RUNNER_TEMP}/*"
-          fi
-
-          echo "::endgroup::"
-      - uses: actions/checkout@v3
-        with:
-          # Support the use case where we need to checkout someone's fork
-          repository: ${{ inputs.test-infra-repository }}
-          ref: ${{ inputs.test-infra-ref }}
-          path: test-infra
+      # - name: Clean workspace
+      #   shell: bash -l {0}
+      #   run: |
+      #     set -euxo pipefail
+      #     echo "::group::Cleanup debug output"
+      #     rm -rf "${GITHUB_WORKSPACE}"
+      #     mkdir -p "${GITHUB_WORKSPACE}"
+      #     echo "::endgroup::"
+      # - uses: actions/checkout@v3
+      #   with:
+      #     # Support the use case where we need to checkout someone's fork
+      #     repository: ${{ inputs.test-infra-repository }}
+      #     ref: ${{ inputs.test-infra-ref }}
+      #     path: test-infra
       - name: Build CXX11-ABI Tarball
         shell: bash -l {0}
         run: |

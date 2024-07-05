@@ -15,21 +15,21 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: true
 
+permissions:
+  packages: write
+  id-token: write
+  contents: read
+
 jobs:
-  build:
-    permissions:
-      packages: write
-      id-token: write
-      contents: read
+  build-pre-cxx11:
     runs-on: linux.4xlarge.nvidia.gpu
     outputs:
-      cxx11_docker_url: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes_cxx11.outputs.cxx11_container_name }}
+      docker_url: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
     # Define key environment variables
     # Container name is of the form torch_tensorrt:<branch_name>
     env:
       DOCKER_REGISTRY: ghcr.io/pytorch/tensorrt
       CONTAINER_NAME: torch_tensorrt:${{ github.ref_name }}
-      CXX11_CONTAINER_NAME: torch_tensorrt_cxx11:${{ github.ref_name }}
 
     steps:
     - name: Checkout repository
@@ -41,13 +41,6 @@ jobs:
         export container_name=$(echo ${{ env.CONTAINER_NAME }} |  sed 's|/|_|g')
         echo "container_name=$container_name" >> $GITHUB_OUTPUT
 
-    - name: Fix Slashes CXX11 Repo Name
-      id: fix_slashes_cxx11
-      if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
-      run: |
-        export container_name=$(echo ${{ env.CXX11_CONTAINER_NAME }} |  sed 's|/|_|g')
-        echo "cxx11_container_name=$container_name" >> $GITHUB_OUTPUT
-
     - name: Log in to the Container registry
       uses: docker/login-action@v2
       with:
@@ -55,39 +48,19 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    # Automatically detect TensorRT default versions for Torch-TRT build
-    - name: Build Pre_CXX11_ABI Docker image
+    - name: Build PRE_CXX11_ABI Docker image
       env:
         DOCKER_TAG: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
       run: |
+        set -x
         python3 -m pip install pyyaml
         TRT_VERSION=$(python3 -c "import versions; versions.tensorrt_version()")
         echo "TRT VERSION = ${TRT_VERSION}"
-
         DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=$TRT_VERSION -f docker/Dockerfile --tag $DOCKER_TAG .
 
-    - name: Build CXX11_ABI Docker image
-      env:
-        DOCKER_TAG: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes_cxx11.outputs.cxx11_container_name }}
-      if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
-      run: |
-        set -x
-        python3 -m pip install pyyaml
-        TRT_VERSION=$(python3 -c "import versions; versions.tensorrt_version()")
-        echo "TRT VERSION = ${TRT_VERSION}"
-        DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=$TRT_VERSION --build-arg USE_CXX11_ABI=True -f docker/Dockerfile --tag $DOCKER_TAG .
-
-    - name: Push Docker image
+    - name: Push PRE_CXX11_ABI Docker image
       env:
         DOCKER_URL: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
-      run: |
-        set -x
-        docker push $DOCKER_URL
-
-    - name: Push CXX11_ABI Docker image
-      env:
-        DOCKER_URL: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes_cxx11.outputs.cxx11_container_name }}
-      if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
       run: |
         set -x
         docker push $DOCKER_URL
@@ -101,41 +74,86 @@ jobs:
         min-versions-to-keep: 0
         delete-only-untagged-versions: True
 
-  release_tar_ball:
-    needs: [build]
-    permissions:
-      packages: write
-      id-token: write
-      contents: read
+  build-cxx11:
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
+    runs-on: linux.4xlarge.nvidia.gpu
+    outputs:
+      docker_url: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
+    # Define key environment variables
+    # Container name is of the form torch_tensorrt_cxx11:<branch_name>
+    env:
+      DOCKER_REGISTRY: ghcr.io/pytorch/tensorrt
+      CONTAINER_NAME: torch_tensorrt_cxx11:${{ github.ref_name }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Fix Slashes Repo Name
+      id: fix_slashes
+      run: |
+        export container_name=$(echo ${{ env.CONTAINER_NAME }} |  sed 's|/|_|g')
+        echo "container_name=$container_name" >> $GITHUB_OUTPUT
+
+    - name: Log in to the Container registry
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ env.DOCKER_REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build CXX11_ABI Docker image
+      env:
+        DOCKER_TAG: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
+      run: |
+        set -x
+        python3 -m pip install pyyaml
+        TRT_VERSION=$(python3 -c "import versions; versions.tensorrt_version()")
+        echo "TRT VERSION = ${TRT_VERSION}"
+        DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=$TRT_VERSION --build-arg USE_CXX11_ABI=True -f docker/Dockerfile --tag $DOCKER_TAG .
+
+    - name: Push CXX11_ABI Docker image
+      env:
+        DOCKER_URL: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
+      run: |
+        set -x
+        docker push $DOCKER_URL
+
+    # Clean up all untagged containers in registry
+    - name: Container Registry Cleanup
+      uses: actions/delete-package-versions@v4
+      with:
+        package-name: "tensorrt/torch_tensorrt_cxx11"
+        package-type: container
+        min-versions-to-keep: 0
+        delete-only-untagged-versions: True
+
+  release_cxx11_tar_ball:
+    needs: [build-cxx11]
     env:
       PYTHON_VERSION: 3.10
       CU_VERSION: cu124
     name: release_tar_ball
     runs-on: linux.4xlarge.nvidia.gpu
     container:
-      image: ${{ needs.outputs.cxx11_docker_url }}
+      image: ${{ needs.outputs.docker_url }}
       options: '--gpus all'
     timeout-minutes: 120
     if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
     steps:
-      - name: Clean workspace
-        shell: bash -l {0}
-        run: |
-          set -euxo pipefail
-          echo "::group::Cleanup debug output"
-          rm -rf "${GITHUB_WORKSPACE}"
-          mkdir -p "${GITHUB_WORKSPACE}"
-
-          if [[ "${{ inputs.architecture }}" = "aarch64" ]]; then
-            rm -rf "${RUNNER_TEMP}/*"
-          fi
-
-          echo "::endgroup::"
-      - uses: actions/checkout@v3
-        with:
-          repository: ${{ inputs.test-infra-repository }}
-          ref: ${{ inputs.test-infra-ref }}
-          path: test-infra
+      # - name: Clean workspace
+      #   shell: bash -l {0}
+      #   run: |
+      #     set -euxo pipefail
+      #     echo "::group::Cleanup debug output"
+      #     rm -rf "${GITHUB_WORKSPACE}"
+      #     mkdir -p "${GITHUB_WORKSPACE}"
+      #     echo "::endgroup::"
+      # - uses: actions/checkout@v3
+      #   with:
+      #     repository: ${{ inputs.test-infra-repository }}
+      #     ref: ${{ inputs.test-infra-ref }}
+      #     path: test-infra
       - name: Build CXX11-ABI Tarball
         shell: bash -l {0}
         run: |
@@ -154,5 +172,52 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: cxx11-tarball
+          name: cxx11-tarball-${PYTHON_VERSION}-${CU_VERSION}
+          path: /opt/torch_tensorrt/release/
+
+  release_pre_cxx11_tar_ball:
+    needs: [build-pre-cxx11]
+    env:
+      PYTHON_VERSION: 3.10
+      CU_VERSION: cu124
+    name: release_tar_ball
+    runs-on: linux.4xlarge.nvidia.gpu
+    container:
+      image: ${{ needs.outputs.docker_url }}
+      options: '--gpus all'
+    timeout-minutes: 120
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
+    steps:
+      # - name: Clean workspace
+      #   shell: bash -l {0}
+      #   run: |
+      #     set -euxo pipefail
+      #     echo "::group::Cleanup debug output"
+      #     rm -rf "${GITHUB_WORKSPACE}"
+      #     mkdir -p "${GITHUB_WORKSPACE}"
+      #     echo "::endgroup::"
+      # - uses: actions/checkout@v3
+      #   with:
+      #     repository: ${{ inputs.test-infra-repository }}
+      #     ref: ${{ inputs.test-infra-ref }}
+      #     path: test-infra
+      - name: Build PRE-CXX11-ABI Tarball
+        shell: bash -l {0}
+        run: |
+          set -euxo pipefail
+          cd /opt/torch_tensorrt
+          bazel build //:libtorchtrt --compilation_mode opt --config=pre_cxx11_abi
+          mkdir release
+          # example: 2.4.0.dev20240610+cu124, we don't want the +cu124 part, so remove +cu124
+          PYTORCH_VERSION=$(python -c "import torch; print(torch.__version__)")
+          PYTORCH_VERSION=${PYTORCH_VERSION%+*}
+          TORCHTRT_VERSION=2.5.0
+          cp bazel-bin/libtorchtrt.tar.gz \
+          release/libtorchtrt-${TORCHTRT_VERSION}-pre-cxx11-abi-tensorrt${TENSORRT_VERSION}-cuda${CU_VERSION}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
+
+      - name: Upload tarball to GitHub
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-cxx11-tarball-${PYTHON_VERSION}-${CU_VERSION}
           path: /opt/torch_tensorrt/release/
