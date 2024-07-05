@@ -183,14 +183,16 @@ jobs:
         working-directory: ${{ inputs.repository }}
         shell: bash -l {0}
         run: |
-          # set -euxo pipefail
-          set -x
+          set -euxo pipefail
           source "${BUILD_ENV_FILE}"
 
           # BUILD_VERSION example: 2.4.0.dev20240610+cu121, we don't want the +cu121 part, so remove +cu121
           BUILD_VERSION=${BUILD_VERSION%+*}
           ${CONDA_RUN} python setup.py bdist_wheel --release
           TRT_VERSION=10.0.1
+          mkdir tarball
+          cp bazel-bin/libtorchtrt.tar.gz \
+          tarball/libtorchtrt-${BUILD_VERSION}-pre-cxx11-abi-tensorrt${TRT_VERSION}-cuda${CU_VERSION}-libtorch${BUILD_VERSION}-x86_64-linux.tar.gz
 
           ${CONDA_RUN} python -m pip install auditwheel
           ${CONDA_RUN} python -m auditwheel repair \
@@ -244,7 +246,13 @@ jobs:
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ inputs.repository }}/dist/
-
+      - name: Upload pre-cxx11 tarball to GitHub
+        if: ${{ env.PYTHON_VERSION == "3.10" && env.CU_VERSION == "cu124" }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v3
+        with:
+          name: pre-cxx11-tarball-${PYTHON_VERSION}-${CU_VERSION}
+          path: ${{ inputs.repository }}/tarball/
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
