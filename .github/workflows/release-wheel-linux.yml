@@ -247,7 +247,7 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ inputs.repository }}/dist/
       - name: Upload pre-cxx11 tarball to GitHub
-        if: ${{ env.PYTHON_VERSION == "3.10" && env.CU_VERSION == "cu124" }}
+        if: ${{ env.PYTHON_VERSION == '3.10' && env.CU_VERSION == 'cu124' }}
         continue-on-error: true
         uses: actions/upload-artifact@v3
         with:
