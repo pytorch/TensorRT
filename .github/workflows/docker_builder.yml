@@ -38,6 +38,7 @@ jobs:
     - name: Fix Slashes Repo Name
       id: fix_slashes
       run: |
+        set -x
         export container_name=$(echo ${{ env.CONTAINER_NAME }} |  sed 's|/|_|g')
         echo "container_name=$container_name" >> $GITHUB_OUTPUT
 
@@ -92,6 +93,7 @@ jobs:
     - name: Fix Slashes Repo Name
       id: fix_slashes
       run: |
+        set -x
         export container_name=$(echo ${{ env.CONTAINER_NAME }} |  sed 's|/|_|g')
         echo "container_name=$container_name" >> $GITHUB_OUTPUT
 
@@ -128,32 +130,18 @@ jobs:
         min-versions-to-keep: 0
         delete-only-untagged-versions: True
 
-  release_cxx11_tar_ball:
+  release-cxx11-tar-ball:
     needs: [build-cxx11]
     env:
       PYTHON_VERSION: 3.10
       CU_VERSION: cu124
-    name: release_tar_ball
     runs-on: linux.4xlarge.nvidia.gpu
     container:
-      image: ${{ needs.outputs.docker_url }}
+      image: ${{ needs.build-cxx11.outputs.docker_url }}
       options: '--gpus all'
     timeout-minutes: 120
     if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
     steps:
-      # - name: Clean workspace
-      #   shell: bash -l {0}
-      #   run: |
-      #     set -euxo pipefail
-      #     echo "::group::Cleanup debug output"
-      #     rm -rf "${GITHUB_WORKSPACE}"
-      #     mkdir -p "${GITHUB_WORKSPACE}"
-      #     echo "::endgroup::"
-      # - uses: actions/checkout@v3
-      #   with:
-      #     repository: ${{ inputs.test-infra-repository }}
-      #     ref: ${{ inputs.test-infra-ref }}
-      #     path: test-infra
       - name: Build CXX11-ABI Tarball
         shell: bash -l {0}
         run: |
@@ -175,32 +163,18 @@ jobs:
           name: cxx11-tarball-${PYTHON_VERSION}-${CU_VERSION}
           path: /opt/torch_tensorrt/release/
 
-  release_pre_cxx11_tar_ball:
+  release-pre-cxx11-tar-ball:
     needs: [build-pre-cxx11]
     env:
       PYTHON_VERSION: 3.10
       CU_VERSION: cu124
-    name: release_tar_ball
     runs-on: linux.4xlarge.nvidia.gpu
     container:
-      image: ${{ needs.outputs.docker_url }}
+      image: ${{ needs.build-pre-cxx11.outputs.docker_url }}
       options: '--gpus all'
     timeout-minutes: 120
     if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
     steps:
-      # - name: Clean workspace
-      #   shell: bash -l {0}
-      #   run: |
-      #     set -euxo pipefail
-      #     echo "::group::Cleanup debug output"
-      #     rm -rf "${GITHUB_WORKSPACE}"
-      #     mkdir -p "${GITHUB_WORKSPACE}"
-      #     echo "::endgroup::"
-      # - uses: actions/checkout@v3
-      #   with:
-      #     repository: ${{ inputs.test-infra-repository }}
-      #     ref: ${{ inputs.test-infra-ref }}
-      #     path: test-infra
       - name: Build PRE-CXX11-ABI Tarball
         shell: bash -l {0}
         run: |

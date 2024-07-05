@@ -1,0 +1,131 @@
+name: Release Linux wheels and tarball
+
+on:
+  pull_request:
+  push:
+    tags:
+      # NOTE: Binary build pipelines should only get triggered on release candidate builds
+      # Release candidate tags look like: v1.11.0-rc1
+      - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
+
+permissions:
+  id-token: write
+  contents: read
+  packages: write
+
+jobs:
+  release-cxx11-tar-ball:
+    env:
+      PYTHON_VERSION: 3.10
+      CU_VERSION: cu124
+    name: release_cxx11_tar_ball
+    runs-on: linux.4xlarge.nvidia.gpu
+    container:
+      # TODO: this should be changed to ghcr.io/pytorch/tensorrt/torch_tensorrt_cxx11:release_2.4
+      # once the PR is committed to release/2.4 branch
+      image: 'ghcr.io/pytorch/tensorrt/torch_tensorrt_cxx11:2987_merge'
+      options: '--gpus all'
+    timeout-minutes: 120
+    steps:
+      - name: Build CXX11-ABI Tarball
+        shell: bash -l {0}
+        run: |
+          set -euxo pipefail
+          cd /opt/torch_tensorrt
+          bazel build //:libtorchtrt --compilation_mode opt --config=default
+          mkdir release
+          # example: 2.4.0.dev20240610+cu124, we don't want the +cu124 part, so remove +cu124
+          PYTORCH_VERSION=$(python -c "import torch; print(torch.__version__)")
+          PYTORCH_VERSION=${PYTORCH_VERSION%+*}
+          TORCHTRT_VERSION=2.4.0
+          cp bazel-bin/libtorchtrt.tar.gz \
+          release/libtorchtrt-${TORCHTRT_VERSION}-tensorrt${TENSORRT_VERSION}-cuda${CU_VERSION}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
+
+      # NB: Only upload to GitHub after passing smoke tests
+      - name: Upload tarball to GitHub
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: cxx11-tarball-${PYTHON_VERSION}-${CU_VERSION}
+          path: /opt/torch_tensorrt/release/
+
+  release-pre-cxx11-tar-ball:
+    env:
+      PYTHON_VERSION: 3.10
+      CU_VERSION: cu124
+    name: release_pre_cxx11_tar_ball
+    runs-on: linux.4xlarge.nvidia.gpu
+    container:
+      # TODO: this should be changed to ghcr.io/pytorch/tensorrt/torch_tensorrt:release_2.4
+      # once the PR is committed to release/2.4 branch
+      image: 'ghcr.io/pytorch/tensorrt/torch_tensorrt:2987_merge'
+      options: '--gpus all'
+    timeout-minutes: 120
+    steps:
+      - name: Build PRE-CXX11-ABI Tarball
+        shell: bash -l {0}
+        run: |
+          set -euxo pipefail
+          cd /opt/torch_tensorrt
+          bazel build //:libtorchtrt --compilation_mode opt --config=pre_cxx11_abi
+          mkdir release
+          # example: 2.4.0.dev20240610+cu124, we don't want the +cu124 part, so remove +cu124
+          PYTORCH_VERSION=$(python -c "import torch; print(torch.__version__)")
+          PYTORCH_VERSION=${PYTORCH_VERSION%+*}
+          TORCHTRT_VERSION=2.4.0
+          cp bazel-bin/libtorchtrt.tar.gz \
+          release/libtorchtrt-${TORCHTRT_VERSION}-pre-cxx11-abi-tensorrt${TENSORRT_VERSION}-cuda${CU_VERSION}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
+
+      # NB: Only upload to GitHub after passing smoke tests
+      - name: Upload tarball to GitHub
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-cxx11-tarball-${PYTHON_VERSION}-${CU_VERSION}
+          path: /opt/torch_tensorrt/release/
+
+  generate-matrix:
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    with:
+      package-type: wheel
+      os: linux
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      with-rocm: false
+      with-cpu: false
+
+  generate-release-matrix:
+    needs: [generate-matrix]
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate release matrix
+        id: generate
+        run: |
+          set -x
+          apt-get update && apt-get install -y jq
+          MATRIX_BLOB=${{ needs.generate-matrix.outputs.matrix }}
+          echo "${MATRIX_BLOB}"
+          RELEASE_MATRIX_BLOB=$(echo ${MATRIX_BLOB} | jq ."include" | jq '.[] | select(.desired_cuda=="cu124")' )
+          echo "${RELEASE_MATRIX_BLOB}"
+          echo "matrix=${RELEASE_MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+
+  build-wheel-artifacts:
+    name: Build torch-tensorrt release wheel artifacts
+    needs: [generate-release-matrix]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            env-var-script: packaging/env_vars.txt
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/release-wheel-linux.yml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  cancel-in-progress: true
