@@ -1,4 +1,6 @@
-set -eou pipefail
+#set -eou pipefail
+
+set -x
 
 pip install -U numpy packaging pyyaml setuptools wheel
 
@@ -15,4 +17,6 @@ export CUDA_HOME="$(echo ${CUDA_PATH} | sed -e 's#\\#\/#g')"
 
 cat toolchains/ci_workspaces/WORKSPACE.win.release.tmpl | envsubst > WORKSPACE
 
+echo ${BUILD_VERSION}
+echo "BUILD_VERSION=2.4.0" >> ${GITHUB_ENV}
 echo "RELEASE=1" >> ${GITHUB_ENV}

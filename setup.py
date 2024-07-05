@@ -124,6 +124,7 @@ if (gpu_arch_version := os.environ.get("CU_VERSION")) is None:
 
 if RELEASE:
     __version__ = os.environ.get("BUILD_VERSION")
+    print(f"lan added __version__={__version__}")
 else:
     __version__ = f"{get_base_version()}.dev0+{get_git_revision_short_hash()}"
 
