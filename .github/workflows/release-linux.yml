@@ -59,9 +59,24 @@ jobs:
       with-rocm: false
       with-cpu: false
 
+  generate-release-matrix:
+    needs: [generate-matrix]
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate release matrix
+        id: generate
+        run: |
+          set -eou pipefail
+          MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
+          MATRIX_BLOB="$(python3 .github/scripts/generate_release_matrix.py --matrix "${MATRIX_BLOB}")"
+          echo "${MATRIX_BLOB}"
+          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+
   release-other-artifacts:
     name: Release torch-tensorrt wheel and pre-cxx11 tarball artifacts
-    needs: [generate-matrix]
+    needs: [generate-release-matrix]
     strategy:
       fail-fast: false
       matrix:
@@ -78,7 +93,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.generate-release-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       env-var-script: ${{ matrix.env-var-script }}
       post-script: ${{ matrix.post-script }}

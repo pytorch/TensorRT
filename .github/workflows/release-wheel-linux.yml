@@ -96,7 +96,7 @@ jobs:
     # If a build is taking longer than 120 minutes on these runners we need
     # to have a conversation
     timeout-minutes: 120
-    if: ${{ env.CU_VERSION == 'cu124' }}
+
     steps:
       - name: Clean workspace
         shell: bash -l {0}
