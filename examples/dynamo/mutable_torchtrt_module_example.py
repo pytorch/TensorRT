@@ -45,8 +45,9 @@ kwargs = {
 
 model = models.resnet18(pretrained=False).eval().to("cuda")
 model2 = models.resnet18(pretrained=True).eval().to("cuda")
-mutable_module = torch_trt.MutableTorchTensorRTModule(model, inputs, **kwargs)
-mutable_module.compile()
+mutable_module = torch_trt.MutableTorchTensorRTModule(model, **kwargs)
+mutable_module(*inputs)
+
 
 # Save the graph module as an exported program
 # This is only supported when use_python_runtime = False

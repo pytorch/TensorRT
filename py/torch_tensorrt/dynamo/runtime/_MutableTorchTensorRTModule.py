@@ -1,4 +1,3 @@
-import collections
 import logging
 from typing import Any, Collection, List, Optional, Set, Tuple, Union
 
@@ -33,7 +32,6 @@ class MutableTorchTensorRTModule(object):
     def __init__(
         self,
         pytorch_model: torch.nn.Module,
-        inputs: Any,
         *,
         device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
         disable_tf32: bool = _defaults.DISABLE_TF32,
@@ -72,13 +70,9 @@ class MutableTorchTensorRTModule(object):
         self.pytorch_model = _make_refit_change_trigger(pytorch_model, self.refit_flag)
         self.original_model = pytorch_model
         # Process settings
-        self.original_inputs = inputs
-        if not isinstance(inputs, collections.abc.Sequence):
-            inputs = [inputs]
-        self.inputs = tuple(inputs)
-        self.torchtrt_inputs = prepare_inputs(self.inputs)
         self.gm: Any = None
         self.exp_program: Any = None
+        self.inputs: Optional[tuple[Any, ...]] = None
         device = to_torch_tensorrt_device(device)
         enabled_precisions = {dtype._from(p) for p in enabled_precisions}
         if not make_refitable:
@@ -128,7 +122,7 @@ class MutableTorchTensorRTModule(object):
         self.refit_flag.set_on()
         self.pytorch_model.load_state_dict(state_dict)
 
-    def refit_gm(self) -> None:
+    def _refit_gm(self) -> None:
         if self.exp_program is None:
             self.exp_program = torch.export.export(
                 self.pytorch_model, self.inputs, **self.settings.__dict__
@@ -139,7 +133,7 @@ class MutableTorchTensorRTModule(object):
         )
         self.gm = refit_module_weights(self.gm, self.exp_program, self.inputs)
 
-    def compile(self) -> None:
+    def _compile(self) -> None:
 
         # Export the module
         self.exp_program = dynamo_trace(
@@ -170,12 +164,25 @@ class MutableTorchTensorRTModule(object):
 
     def forward(self, *args: Any, **kwargs: Any) -> Any:
         # TODO: Check the inputs is the same as the sample input
-        if self.refit_flag.flag:
+        if not self.inputs or MutableTorchTensorRTModule.check_inputs(
+            self.inputs, args
+        ):
+            logger.info("Input change detected. (Re)Compiling the engine.")
+            self.inputs = args
+            self.torchtrt_inputs = prepare_inputs(self.inputs)
+            self.refit_flag.set_off()
+            self._compile()
+
+        elif self.refit_flag.flag:
             print("Model weight change detected. Refitting the module...")
             self.refit_flag.set_off()
-            self.refit_gm()
+            self._refit_gm()
 
         return self.gm(*args, **kwargs)
+
+    @staticmethod
+    def check_inputs(input1: tuple[Any, ...], input2: tuple[Any, ...]) -> bool:
+        return True
 
 
 def _make_refit_change_trigger(obj: object, refit_flag: RefitFlag) -> Any:
