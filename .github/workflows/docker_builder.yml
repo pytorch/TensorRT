@@ -2,7 +2,7 @@ name: 'Torch-TensorRT Docker Build'
 
 # Apply workflow only to main, nightly, release branches
 on:
-  #pull_request:
+  pull_request:
   push:
     branches:
       - main
