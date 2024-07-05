@@ -4,6 +4,7 @@ import collections.abc
 import copy
 import logging
 from typing import Any, List, Optional, Sequence, Tuple
+import time
 
 import numpy as np
 import tensorrt as trt
@@ -156,7 +157,7 @@ def _refit_single_trt_engine_with_gm(
     """
     Refit a TensorRT Engine in place
     """
-
+    start_time = time.time()
     refitted = set()
 
     refitter = trt.Refitter(old_engine, TRT_LOGGER)
@@ -168,6 +169,8 @@ def _refit_single_trt_engine_with_gm(
         mapping = construct_refit_mapping_from_weight_name_map(
             weight_name_map, new_gm.state_dict()
         )
+        after_map_time = time.time()
+        print(f'Fast mapping time is: {after_map_time - start_time}')
         for layer_name in weight_list:
             if layer_name not in mapping:
                 logger.warning(f"{layer_name} is not found in weight mapping.")
@@ -184,6 +187,8 @@ def _refit_single_trt_engine_with_gm(
 
     else:
         mapping = construct_refit_mapping(new_gm, input_list, settings)
+        after_map_time = time.time()
+        print(f'Slow mapping time is: {after_map_time - start_time}')
         trt_wt_location = trt.TensorLocation.HOST
         for layer_name in weight_list:
             if layer_name not in mapping:
@@ -196,7 +201,8 @@ def _refit_single_trt_engine_with_gm(
 
         if len(refitted) != len(weight_list):
             logger.warning("Not all weights have been refitted!!!")
-
+    after_refit_time = time.time()
+    print(f'Refit weight time is: {after_refit_time- after_map_time}')
     if not refitter.refit_cuda_engine():
         logger.error("Error: failed to refit new weights.")
         raise AssertionError("Refitting failed.")
@@ -222,6 +228,8 @@ def refit_module_weights(
     Returns:
         A new compiled TensorRT module that has the updated weights.
     """
+
+    refit_start_time = time.time()
     inline_module = False
     if isinstance(compiled_module, ExportedProgram):
         compiled_module = compiled_module.module()
@@ -281,6 +289,8 @@ def refit_module_weights(
         raise AssertionError(
             f"Input graph should be an ExportedProgram but got type {type(new_weight_module)}"
         )
+    pre_lowering_processing_time = time.time()
+    print(f'Pre lowering processing time is: {pre_lowering_processing_time - refit_start_time}')
     new_weight_module = pre_export_lowering(new_weight_module, torch_inputs)
     new_weight_module = new_weight_module.run_decompositions(
         get_decompositions(settings.enable_experimental_decompositions)
@@ -288,7 +298,8 @@ def refit_module_weights(
     new_gm = new_weight_module.module()
     logger.debug("Input graph: " + str(new_gm.graph))
     # Apply lowering on the graph module
-
+    after_lowering_processing_time = time.time()
+    print(f'Lowering time is: {after_lowering_processing_time - pre_lowering_processing_time}')
     new_gm = post_lowering(new_gm, torch_inputs)
 
     logger.info("Compilation Settings: %s\n", settings)
@@ -321,7 +332,9 @@ def refit_module_weights(
             min_block_size=settings.min_block_size,
             torch_executed_ops=settings.torch_executed_ops,
         )
-
+    after_partition_time = time.time()
+    print(f'partition time is: {after_partition_time - after_lowering_processing_time}')
+    
     if inline_module:
         # Preprocess the partitioned module to be in the same format as the inline module
         inline_torch_modules(new_partitioned_module)
@@ -468,6 +481,8 @@ def refit_module_weights(
     else:
         logger.info("Refitting Completed! Output verification skipped.")
 
+    end = time.time()
+    print(f'Refitting total time is: {end - refit_start_time}')
     return compiled_module
 
 

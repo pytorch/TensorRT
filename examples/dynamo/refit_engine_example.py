@@ -24,6 +24,7 @@ In this tutorial, we are going to walk through
 # Imports and model definition
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+import time
 import numpy as np
 import torch
 import torch_tensorrt as torch_trt
@@ -47,6 +48,7 @@ workspace_size = 20 << 30
 min_block_size = 0
 use_python_runtime = False
 torch_executed_ops = {}
+compile_time = time.time()
 trt_gm = torch_trt.dynamo.compile(
     exp_program,
     tuple(inputs),
@@ -57,10 +59,11 @@ trt_gm = torch_trt.dynamo.compile(
     torch_executed_ops=torch_executed_ops,
     make_refitable=True,
 )  # Output is a torch.fx.GraphModule
-
+end = time.time()
+print("Engine compilation time:", end - compile_time)
 # Save the graph module as an exported program
 # This is only supported when use_python_runtime = False
-torch_trt.save(trt_gm, "./compiled.ep", inputs=inputs)
+# torch_trt.save(trt_gm, "./compiled.ep", inputs=inputs)
 
 
 # %%
@@ -79,6 +82,7 @@ new_trt_gm = refit_module_weights(
     compiled_module=compiled_trt_ep,
     new_weight_module=exp_program2,
     inputs=inputs,
+    fast_refit=False
 )
 
 # Check the output
