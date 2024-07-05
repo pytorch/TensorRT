@@ -108,7 +108,7 @@ jobs:
           MATRIX_BLOB=${{ needs.generate-matrix.outputs.matrix }}
           echo "${MATRIX_BLOB}"
           RELEASE_MATRIX_INCLUDE=$(echo ${MATRIX_BLOB} | jq -c '.[] | map(select(.desired_cuda=="cu124"))')
-          RELEASE_MATRIX_BLOB=$(echo {\"include\":"${RELEASE_MATRIX_INCLUDE}"})
+          RELEASE_MATRIX_BLOB=$(jq -c -n '{"include": $RELEASE_MATRIX_INCLUDE}' --argjson RELEASE_MATRIX_INCLUDE "$RELEASE_MATRIX_INCLUDE")
           echo "${RELEASE_MATRIX_BLOB}"
           echo "matrix=${RELEASE_MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
