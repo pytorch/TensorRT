@@ -99,15 +99,13 @@ jobs:
     outputs:
       release_matrix: ${{ steps.generate.outputs.release_matrix }}
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.generate-matrix.outputs.matrix) }}
     steps:
       - name: Generate release matrix
         id: generate
         run: |
           set -x
           sudo apt-get update && sudo apt-get install -y jq
+          matrix=${{ fromJSON(needs.generate-matrix.outputs.matrix) }}
           echo "${matrix}"
 
           RELEASE_MATRIX_INCLUDE=$(echo ${matrix} | jq -c '.[] | map(select(.desired_cuda=="cu124"))')
