@@ -163,8 +163,8 @@ class MutableTorchTensorRTModule(object):
         return self.forward(*args, **kwargs)
 
     def forward(self, *args: Any, **kwargs: Any) -> Any:
-        # TODO: Check the inputs is the same as the sample input
-        if not self.inputs or MutableTorchTensorRTModule.check_inputs(
+        # TODO: Add support for kwargs
+        if not self.inputs or not MutableTorchTensorRTModule.check_inputs(
             self.inputs, args
         ):
             logger.info("Input change detected. (Re)Compiling the engine.")
@@ -181,7 +181,36 @@ class MutableTorchTensorRTModule(object):
         return self.gm(*args, **kwargs)
 
     @staticmethod
-    def check_inputs(input1: tuple[Any, ...], input2: tuple[Any, ...]) -> bool:
+    def check_inputs(
+        input1: Any,
+        input2: Any,
+    ) -> bool:
+        # TODO: Add support for dynamic shape
+        if isinstance(input1, (tuple, list)):
+            if len(input1) != len(input2):
+                return False
+            for a, b in zip(input1, input2):
+                if type(a) != type(b):
+                    return False
+                if isinstance(a, torch.Tensor) and a.shape != b.shape:
+                    return False
+                if isinstance(a, bool) and a != b:
+                    return False
+
+        if isinstance(input1, dict):
+            if input1.keys() != input2.keys():
+                return False
+            for a, b in zip(input1.items(), input2.items()):
+                if type(a) != type(b):
+                    return False
+                if isinstance(a, torch.tensor) and a.shape != b.shape:
+                    return False
+                if isinstance(a, bool) and a != b:
+                    return False
+                if isinstance(
+                    a, (list, tuple, dict)
+                ) and not MutableTorchTensorRTModule.check_inputs(input1, input2):
+                    return False
         return True
 
 
