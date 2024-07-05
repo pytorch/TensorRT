@@ -70,7 +70,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  build-release-wheel:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.build-matrix) }}
@@ -204,17 +204,6 @@ jobs:
         if: always()
         name: Teardown Windows
 
-  upload:
-    needs: build
-    uses: ./.github/workflows/_binary_upload.yml
-    if: always()
-    with:
-      repository: ${{ inputs.repository }}
-      ref: ${{ inputs.ref }}
-      test-infra-repository: ${{ inputs.test-infra-repository }}
-      test-infra-ref: ${{ inputs.test-infra-ref }}
-      build-matrix: ${{ inputs.build-matrix }}
-      trigger-event: ${{ inputs.trigger-event }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
