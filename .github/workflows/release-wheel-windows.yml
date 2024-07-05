@@ -1,4 +1,4 @@
-name: Build Release Wheel Artifacts on Linux
+name: Build Release Wheel Artifacts on Windows
 
 on:
   workflow_call:
@@ -27,16 +27,20 @@ on:
         description: "Pre script to run prior to build"
         default: ""
         type: string
+      env-script:
+        description: "Script to setup environment variables for the build"
+        default: ""
+        type: string
+      wheel-build-params:
+        description: "Additional parameters for bdist_wheel"
+        default: ""
+        type: string
       post-script:
         description: "Post script to run prior to build"
         default: ""
         type: string
       smoke-test-script:
         description: "Script for Smoke Test for a specific domain"
-        default: ""
-        type: string
-      env-var-script:
-        description: "Script that sets Domain-Specific Environment Variables"
         default: ""
         type: string
       package-name:
@@ -55,28 +59,18 @@ on:
         description: "The key created when saving a cache and the key used to search for a cache."
         default: ""
         type: string
-      architecture:
-        description: Architecture to build for x86_64 for default Linux, or aarch64 for Linux aarch64 builds
-        required: false
-        type: string
-        default: x86_64
       submodules:
-        description: Works as stated in actions/checkout, but the default value is recursive
+        description: "Works as stated in actions/checkout, but the default value is recursive"
         required: false
         type: string
         default: recursive
-      setup-miniconda:
-        description: Set to true if setup-miniconda is needed
-        required: false
-        type: boolean
-        default: true
 
 permissions:
   id-token: write
   contents: read
 
 jobs:
-  release-wheel:
+  build:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.build-matrix) }}
@@ -87,53 +81,30 @@ jobs:
       REF: ${{ inputs.ref }}
       CU_VERSION: ${{ matrix.desired_cuda }}
       UPLOAD_TO_BASE_BUCKET: ${{ matrix.upload_to_base_bucket }}
-      ARCH: ${{ inputs.architecture }}
-    name: release_${{ matrix.build_name }}
+    name: ${{ matrix.build_name }}
     runs-on: ${{ matrix.validation_runner }}
-    container:
-      image: ${{ matrix.container_image }}
-      options: ${{ matrix.gpu_arch_type == 'cuda' && '--gpus all' || ' ' }}
+    defaults:
+      run:
+        shell: bash -l {0}
     # If a build is taking longer than 120 minutes on these runners we need
     # to have a conversation
     timeout-minutes: 120
-
     steps:
-      - name: Clean workspace
-        shell: bash -l {0}
-        run: |
-          set -euxo pipefail
-          echo "needs.check.outputs.release_flag: ${{ needs.check.outputs.release_flag }}"
-          echo "::group::Cleanup debug output"
-          rm -rf "${GITHUB_WORKSPACE}"
-          mkdir -p "${GITHUB_WORKSPACE}"
-          if [[ "${{ inputs.architecture }}" = "aarch64" ]]; then
-            rm -rf "${RUNNER_TEMP}/*"
-          fi
-          echo "::endgroup::"
       - uses: actions/checkout@v3
         with:
           # Support the use case where we need to checkout someone's fork
           repository: ${{ inputs.test-infra-repository }}
           ref: ${{ inputs.test-infra-ref }}
           path: test-infra
-      - uses: actions/checkout@v3
-        if: ${{ env.ARCH == 'aarch64' }}
+      - uses: ./test-infra/.github/actions/setup-ssh
+        name: Setup SSH
         with:
-          # Support the use case where we need to checkout someone's fork
-          repository: "pytorch/builder"
-          ref: "main"
-          path: builder
-      - name: Set linux aarch64 CI
-        if: ${{ inputs.architecture == 'aarch64' }}
-        shell: bash -l {0}
-        env:
-          DESIRED_PYTHON: ${{ matrix.python_version }}
+          github-secret: ${{ secrets.GITHUB_TOKEN }}
+          activate-with-label: false
+          instructions: "SSH with rdesktop using ssh -L 3389:localhost:3389 %%username%%@%%hostname%%"
+      - name: Add Conda scripts to GitHub path
         run: |
-          set +e
-          # TODO: This is temporary aarch64 setup script, this should be integrated into aarch64 docker.
-          ${GITHUB_WORKSPACE}/builder/aarch64_linux/aarch64_ci_setup.sh
-          echo "/opt/conda/bin" >> $GITHUB_PATH
-          set -e
+          echo "C:/Jenkins/Miniconda3/Scripts" >> $GITHUB_PATH
       - uses: ./test-infra/.github/actions/set-channel
       - name: Set PYTORCH_VERSION
         if: ${{ env.CHANNEL == 'test' }}
@@ -142,26 +113,16 @@ jobs:
           # otherwise, leave it alone so nightly will pick up the latest
           echo "PYTORCH_VERSION=${{ matrix.stable_version }}" >> "${GITHUB_ENV}"
       - uses: ./test-infra/.github/actions/setup-binary-builds
-        env:
-          PLATFORM: ${{ inputs.architecture == 'aarch64'  && 'linux-aarch64' || ''}}
         with:
           repository: ${{ inputs.repository }}
           ref: ${{ inputs.ref }}
           submodules: ${{ inputs.submodules }}
-          setup-miniconda: ${{ inputs.setup-miniconda }}
+          setup-miniconda: false
           python-version: ${{ env.PYTHON_VERSION }}
           cuda-version: ${{ env.CU_VERSION }}
           arch: ${{ env.ARCH }}
-      - name: Combine Env Var and Build Env Files
-        if: ${{ inputs.env-var-script != '' }}
-        working-directory: ${{ inputs.repository }}
-        run: |
-          set -euxo pipefail
-          cat "${{ inputs.env-var-script }}" >> "${BUILD_ENV_FILE}"
       - name: Install torch dependency
         run: |
-          set -euxo pipefail
-          # shellcheck disable=SC1090
           source "${BUILD_ENV_FILE}"
           # shellcheck disable=SC2086
           ${CONDA_RUN} ${PIP_INSTALL_TORCH}
@@ -173,68 +134,87 @@ jobs:
           cache-key: ${{ inputs.cache-key }}
           repository: ${{ inputs.repository  }}
           script: ${{ inputs.pre-script }}
+          is_windows: 'enabled'
       - name: Build clean
         working-directory: ${{ inputs.repository }}
-        shell: bash -l {0}
         run: |
-          set -euxo pipefail
           source "${BUILD_ENV_FILE}"
           ${CONDA_RUN} python setup.py clean
       - name: Build the wheel (bdist_wheel)
         working-directory: ${{ inputs.repository }}
-        shell: bash -l {0}
+        env:
+          ENV_SCRIPT: ${{ inputs.env-script }}
+          BUILD_PARAMS: ${{ inputs.wheel-build-params }}
+        run: |
+          set -x
+          source "${BUILD_ENV_FILE}"
+
+          if [[ "$CU_VERSION" == "cpu" ]]; then
+          # CUDA and CPU are ABI compatible on the CPU-only parts, so strip
+          # in this case
+            export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version:  *//' | sed 's/+.\+//')"
+          else
+            export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version:  *//')"
+          fi
+
+          if [[ -z "${ENV_SCRIPT}" ]]; then
+            BUILD_VERSION=${PYTORCH_VERSION} ${CONDA_RUN} python setup.py bdist_wheel
+          else
+            if [[ ! -f ${ENV_SCRIPT} ]]; then
+              echo "::error::Specified env-script file (${ENV_SCRIPT}) not found"
+              exit 1
+            else
+              ${CONDA_RUN} ${ENV_SCRIPT} BUILD_VERSION=${PYTORCH_VERSION} python setup.py bdist_wheel ${BUILD_PARAMS}
+            fi
+          fi
+      - name: Run post-script
+        working-directory: ${{ inputs.repository }}
+        env:
+          POST_SCRIPT: ${{ inputs.post-script }}
+          ENV_SCRIPT: ${{ inputs.env-script }}
+        if: ${{ inputs.post-script != '' }}
         run: |
           set -euxo pipefail
           source "${BUILD_ENV_FILE}"
-
-          # BUILD_VERSION example: 2.4.0.dev20240610+cu121, we don't want the +cu121 part, so remove +cu121
-          BUILD_VERSION=${BUILD_VERSION%+*}
-          ${CONDA_RUN} python setup.py bdist_wheel --release
-          TRT_VERSION=10.0.1
-          mkdir release
-          mkdir release/tarball
-          mkdir release/wheel
-          cp bazel-bin/libtorchtrt.tar.gz \
-          release/tarball/libtorchtrt-${BUILD_VERSION}-pre-cxx11-abi-tensorrt${TRT_VERSION}-cuda${CU_VERSION}-libtorch${BUILD_VERSION}-x86_64-linux.tar.gz
-
-          ${CONDA_RUN} python -m pip install auditwheel
-          ${CONDA_RUN} python -m auditwheel repair \
-            $(cat py/ci/soname_excludes.params) \
-            --plat manylinux_2_34_x86_64 \
-            dist/torch_tensorrt-*-linux_x86_64.whl
-          ${CONDA_RUN} python -m zipfile --list wheelhouse/torch_tensorrt-*_x86_64.whl
-          cp wheelhouse/torch_tensorrt-*_x86_64.whl release/wheel/
-      - name: Run Post-Script
-        if: ${{ inputs.post-script != '' }}
-        uses: ./test-infra/.github/actions/run-script-with-cache
-        with:
-          repository: ${{ inputs.repository  }}
-          script: ${{ inputs.post-script }}
+          ${CONDA_RUN} ${ENV_SCRIPT} ${POST_SCRIPT}
       - name: Smoke Test
-        shell: bash -l {0}
         env:
           PACKAGE_NAME: ${{ inputs.package-name }}
           SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
         run: |
-          set -euxo pipefail
           source "${BUILD_ENV_FILE}"
-          WHEEL_NAME=$(ls "${{ inputs.repository }}/release/wheel/" | grep .whl)
-          # TODO: add smoke test for the auditwheel built
-
+          WHEEL_NAME=$(ls "${{ inputs.repository }}/dist/")
+          echo "$WHEEL_NAME"
+          ${CONDA_RUN} pip install "${{ inputs.repository }}/dist/$WHEEL_NAME"
+          if [[ ! -f "${{ inputs.repository }}"/${SMOKE_TEST_SCRIPT} ]]; then
+            echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} not found"
+            ${CONDA_RUN} python -c "import ${PACKAGE_NAME}; print('package version is ', ${PACKAGE_NAME}.__version__)"
+          else
+            echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} found"
+            ${CONDA_RUN} python "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT}"
+          fi
       # NB: Only upload to GitHub after passing smoke tests
       - name: Upload wheel to GitHub
         continue-on-error: true
         uses: actions/upload-artifact@v3
         with:
           name: ${{ env.ARTIFACT_NAME }}
-          path: ${{ inputs.repository }}/release/wheel/
-      - name: Upload pre-cxx11 tarball to GitHub
-        if: ${{ env.PYTHON_VERSION == '3.10' && env.CU_VERSION == 'cu124' }}
-        continue-on-error: true
-        uses: actions/upload-artifact@v3
-        with:
-          name: pre-cxx11-tarball-${{ env.PYTHON_VERSION }}-${{ env.CU_VERSION }}
-          path: ${{ inputs.repository }}/release/tarball/
+          path: ${{ inputs.repository }}/dist/
+      - uses: ./test-infra/.github/actions/teardown-windows
+        if: always()
+        name: Teardown Windows
+
+  upload:
+    needs: build
+    uses: ./.github/workflows/_binary_upload.yml
+    if: always()
+    with:
+      repository: ${{ inputs.repository }}
+      ref: ${{ inputs.ref }}
+      test-infra-repository: ${{ inputs.test-infra-repository }}
+      test-infra-ref: ${{ inputs.test-infra-ref }}
+      build-matrix: ${{ inputs.build-matrix }}
+      trigger-event: ${{ inputs.trigger-event }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}

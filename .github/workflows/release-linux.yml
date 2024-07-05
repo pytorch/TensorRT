@@ -1,6 +1,7 @@
 name: Release Linux wheels and tarball artifacts
 
 on:
+  pull_request:
   push:
     tags:
       # NOTE: Binary build pipelines should only get triggered on release candidate builds
@@ -46,7 +47,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v3
         with:
-          name: cxx11-tarball-${PYTHON_VERSION}-${CU_VERSION}
+          name: cxx11-tarball-${{ env.PYTHON_VERSION }}-${{ env.CU_VERSION }}
           path: /opt/torch_tensorrt/release/
 
   generate-matrix:
