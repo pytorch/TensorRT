@@ -104,10 +104,11 @@ jobs:
         id: generate
         run: |
           set -x
-          sudo apt-get update && apt-get install -y jq
+          sudo apt-get update && sudo apt-get install -y jq
           MATRIX_BLOB=${{ needs.generate-matrix.outputs.matrix }}
           echo "${MATRIX_BLOB}"
-          RELEASE_MATRIX_BLOB=$(echo ${MATRIX_BLOB} | jq ."include" | jq '.[] | select(.desired_cuda=="cu124")' )
+          RELEASE_MATRIX_INCLUDE=$(echo ${MATRIX_BLOB} | jq -c '.[] | map(select(.desired_cuda=="cu124"))')
+          RELEASE_MATRIX_BLOB=$(echo {\"include\":"${RELEASE_MATRIX_INCLUDE}"})
           echo "${RELEASE_MATRIX_BLOB}"
           echo "matrix=${RELEASE_MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
