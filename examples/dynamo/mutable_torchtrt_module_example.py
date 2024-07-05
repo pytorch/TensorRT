@@ -38,16 +38,15 @@ inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 # Compile the module for the first time and save it.
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 kwargs = {
-    'use_python': False,
-    'enabled_precisions': {torch.float16, torch.float32},
-    'mutable': True
+    "use_python": False,
+    "enabled_precisions": {torch.float32},
+    "make_refitable": True,
 }
 
 model = models.resnet18(pretrained=False).eval().to("cuda")
 model2 = models.resnet18(pretrained=True).eval().to("cuda")
-mutable_module = torch_trt.compile(inputs=inputs, 
-                                   module=model, 
-                                   **kwargs)
+mutable_module = torch_trt.MutableTorchTensorRTModule(model, inputs, **kwargs)
+mutable_module.compile()
 
 # Save the graph module as an exported program
 # This is only supported when use_python_runtime = False

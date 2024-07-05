@@ -134,3 +134,6 @@ if ENABLED_FEATURES.dynamo_frontend:
     from torch_tensorrt import dynamo  # noqa: F401
 
 from torch_tensorrt._compile import *  # noqa: F403
+from torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule import (
+    MutableTorchTensorRTModule,
+)
