@@ -201,11 +201,11 @@ def _refit_single_trt_engine_with_gm(
 
         if len(refitted) != len(weight_list):
             logger.warning("Not all weights have been refitted!!!")
-    after_refit_time = time.time()
-    print(f'Refit weight time is: {after_refit_time- after_map_time}')
     if not refitter.refit_cuda_engine():
         logger.error("Error: failed to refit new weights.")
         raise AssertionError("Refitting failed.")
+    after_refit_time = time.time()
+    print(f'Refit weight time is: {after_refit_time- after_map_time}')
 
 
 def refit_module_weights(
@@ -238,7 +238,8 @@ def refit_module_weights(
         inline_module = True
 
     compiled_module = copy.deepcopy(compiled_module)
-
+    after_copy = time.time()
+    print(f'Graph module copy time is: {after_copy - refit_start_time}')
     # Get the settings and check the setting to be uniform
     settings: CompilationSettings = None
     if inline_module:
@@ -290,7 +291,7 @@ def refit_module_weights(
             f"Input graph should be an ExportedProgram but got type {type(new_weight_module)}"
         )
     pre_lowering_processing_time = time.time()
-    print(f'Pre lowering processing time is: {pre_lowering_processing_time - refit_start_time}')
+    print(f'Pre lowering processing time is: {pre_lowering_processing_time - after_copy}')
     new_weight_module = pre_export_lowering(new_weight_module, torch_inputs)
     new_weight_module = new_weight_module.run_decompositions(
         get_decompositions(settings.enable_experimental_decompositions)
@@ -436,6 +437,8 @@ def refit_module_weights(
                 to_torch_device(settings.device),
                 name,
             )
+        pre_refit = time.time()
+        print(f'Pre refit time (get engine) is: {pre_refit - after_partition_time}')
         try:
             _refit_single_trt_engine_with_gm(
                 new_gm=new_submodule,
@@ -454,7 +457,7 @@ def refit_module_weights(
                     settings=settings,
                     weight_name_map=None,
                 )
-
+        after_refit = time.time()
         if isinstance(compiled_submodule, TorchTensorRTModule):
             serialized_engine = bytes(engine.serialize())
             new_engine_info = list(engine_info)
@@ -482,6 +485,7 @@ def refit_module_weights(
         logger.info("Refitting Completed! Output verification skipped.")
 
     end = time.time()
+    print(f'Post refit time is: {end - after_refit}')
     print(f'Refitting total time is: {end - refit_start_time}')
     return compiled_module
 
