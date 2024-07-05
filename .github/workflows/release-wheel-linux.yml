@@ -96,6 +96,7 @@ jobs:
     # If a build is taking longer than 120 minutes on these runners we need
     # to have a conversation
     timeout-minutes: 120
+    if: ${{ env.CU_VERSION == 'cu124' }}
     steps:
       - name: Clean workspace
         shell: bash -l {0}
@@ -190,9 +191,11 @@ jobs:
           BUILD_VERSION=${BUILD_VERSION%+*}
           ${CONDA_RUN} python setup.py bdist_wheel --release
           TRT_VERSION=10.0.1
-          mkdir tarball
+          mkdir release
+          mkdir release/tarball
+          mkdir release/wheel
           cp bazel-bin/libtorchtrt.tar.gz \
-          tarball/libtorchtrt-${BUILD_VERSION}-pre-cxx11-abi-tensorrt${TRT_VERSION}-cuda${CU_VERSION}-libtorch${BUILD_VERSION}-x86_64-linux.tar.gz
+          release/tarball/libtorchtrt-${BUILD_VERSION}-pre-cxx11-abi-tensorrt${TRT_VERSION}-cuda${CU_VERSION}-libtorch${BUILD_VERSION}-x86_64-linux.tar.gz
 
           ${CONDA_RUN} python -m pip install auditwheel
           ${CONDA_RUN} python -m auditwheel repair \
@@ -200,7 +203,7 @@ jobs:
             --plat manylinux_2_34_x86_64 \
             dist/torch_tensorrt-*-linux_x86_64.whl
           ${CONDA_RUN} python -m zipfile --list wheelhouse/torch_tensorrt-*_x86_64.whl
-          cp wheelhouse/torch_tensorrt-*_x86_64.whl dist/
+          cp wheelhouse/torch_tensorrt-*_x86_64.whl release/wheel/
       - name: Run Post-Script
         if: ${{ inputs.post-script != '' }}
         uses: ./test-infra/.github/actions/run-script-with-cache
@@ -215,7 +218,7 @@ jobs:
         run: |
           set -euxo pipefail
           source "${BUILD_ENV_FILE}"
-          WHEEL_NAME=$(ls "${{ inputs.repository }}/dist/" | grep .whl)
+          WHEEL_NAME=$(ls "${{ inputs.repository }}/release/wheel/" | grep .whl)
           echo "$WHEEL_NAME"
           ${CONDA_RUN} pip install "${{ inputs.repository }}/dist/$WHEEL_NAME"
           # Checking that we have a pinned version of torch in our dependency tree
@@ -245,14 +248,14 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: ${{ env.ARTIFACT_NAME }}
-          path: ${{ inputs.repository }}/dist/
+          path: ${{ inputs.repository }}/release/wheel/
       - name: Upload pre-cxx11 tarball to GitHub
         if: ${{ env.PYTHON_VERSION == '3.10' && env.CU_VERSION == 'cu124' }}
         continue-on-error: true
         uses: actions/upload-artifact@v3
         with:
           name: pre-cxx11-tarball-${PYTHON_VERSION}-${CU_VERSION}
-          path: ${{ inputs.repository }}/tarball/
+          path: ${{ inputs.repository }}/release/tarball/
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
