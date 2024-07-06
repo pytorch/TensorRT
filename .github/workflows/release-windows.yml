@@ -70,7 +70,7 @@ jobs:
             env-script: packaging/vc_env_helper.bat
             smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
-    uses: .github/workflows/release-wheel-windows.yml
+    uses: ./.github/workflows/release-wheel-windows.yml
     with:
       repository: ${{ matrix.repository }}
       ref: ""
@@ -81,4 +81,3 @@ jobs:
       env-script: ${{ matrix.env-script }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
       package-name: ${{ matrix.package-name }}
-      wheel-build-params: "--release"

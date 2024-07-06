@@ -45,10 +45,12 @@ jobs:
       # NB: Only upload to GitHub after passing smoke tests
       - name: Upload tarball to GitHub
         continue-on-error: true
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: cxx11-tarball-${{ env.PYTHON_VERSION }}-${{ env.CU_VERSION }}
           path: /opt/torch_tensorrt/release/
+          # no compression, keep the .tar.gz, otherwise it will became a .zip
+          compression-level: 0
 
   generate-matrix:
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
