@@ -156,7 +156,10 @@ jobs:
           else
             export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version:  *//')"
           fi
-          export BUILD_VERSION=${PYTORCH_VERSION}
+
+          # BUILD_VERSION example: 2.4.0+cu121, we don't want the +cu121 part, so remove +cu121
+          BUILD_VERSION=${BUILD_VERSION%+*}
+
           if [[ -z "${ENV_SCRIPT}" ]]; then
             ${CONDA_RUN} python setup.py bdist_wheel
           else

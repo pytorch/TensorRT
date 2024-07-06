@@ -187,7 +187,7 @@ jobs:
           set -euxo pipefail
           source "${BUILD_ENV_FILE}"
 
-          # BUILD_VERSION example: 2.4.0.dev20240610+cu121, we don't want the +cu121 part, so remove +cu121
+          # BUILD_VERSION example: 2.4.0+cu121, we don't want the +cu121 part, so remove +cu121
           BUILD_VERSION=${BUILD_VERSION%+*}
           ${CONDA_RUN} python setup.py bdist_wheel --release
           TRT_VERSION=10.0.1
