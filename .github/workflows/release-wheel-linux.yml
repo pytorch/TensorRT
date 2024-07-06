@@ -224,19 +224,17 @@ jobs:
       # NB: Only upload to GitHub after passing smoke tests
       - name: Upload wheel to GitHub
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ inputs.repository }}/release/wheel/
       - name: Upload pre-cxx11 tarball to GitHub
         if: ${{ env.PYTHON_VERSION == '3.10' && env.CU_VERSION == 'cu124' }}
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: pre-cxx11-tarball-${{ env.PYTHON_VERSION }}-${{ env.CU_VERSION }}
           path: ${{ inputs.repository }}/release/tarball/
-          # no compression, keep the .tar.gz, otherwise it will became a .zip
-          compression-level: 0
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}

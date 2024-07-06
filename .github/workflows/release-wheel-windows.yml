@@ -156,15 +156,15 @@ jobs:
           else
             export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version:  *//')"
           fi
-
+          export BUILD_VERSION=${PYTORCH_VERSION}
           if [[ -z "${ENV_SCRIPT}" ]]; then
-            BUILD_VERSION=${PYTORCH_VERSION} ${CONDA_RUN} python setup.py bdist_wheel
+            ${CONDA_RUN} python setup.py bdist_wheel
           else
             if [[ ! -f ${ENV_SCRIPT} ]]; then
               echo "::error::Specified env-script file (${ENV_SCRIPT}) not found"
               exit 1
             else
-              ${CONDA_RUN} ${ENV_SCRIPT} BUILD_VERSION=${PYTORCH_VERSION} python setup.py bdist_wheel ${BUILD_PARAMS}
+              ${CONDA_RUN} ${ENV_SCRIPT} python setup.py bdist_wheel ${BUILD_PARAMS}
             fi
           fi
       - name: Run post-script
