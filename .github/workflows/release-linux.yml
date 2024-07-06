@@ -17,7 +17,7 @@ permissions:
 jobs:
   release-cxx11-tarball-artifacts:
     env:
-      PYTHON_VERSION: 3.10
+      PYTHON_VERSION: '3.10'
       CU_VERSION: cu124
     name: Release torch-tensorrt cxx11 tarball artifacts
     runs-on: linux.4xlarge.nvidia.gpu
