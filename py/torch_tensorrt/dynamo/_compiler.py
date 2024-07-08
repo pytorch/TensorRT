@@ -47,9 +47,9 @@ logger = logging.getLogger(__name__)
 
 def compile(
     exported_program: ExportedProgram,
-    inputs: Tuple[Any, ...],
+    arg_inputs: Tuple[Any, ...],
     *,
-    kwarg_inputs: Any = None,
+    kwarg_inputs: Optional[dict[Any, Any]] = None,
     device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
     disable_tf32: bool = _defaults.DISABLE_TF32,
     assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
@@ -183,11 +183,11 @@ def compile(
             "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
         )
 
-    if not isinstance(inputs, collections.abc.Sequence):
-        inputs = [inputs]
+    if not isinstance(arg_inputs, collections.abc.Sequence):
+        arg_inputs = [arg_inputs]
 
     # Prepare torch_trt inputs
-    inputs = prepare_inputs(inputs)
+    arg_inputs = prepare_inputs(arg_inputs)
     kwarg_inputs = prepare_inputs(kwarg_inputs)
     device = to_torch_tensorrt_device(device)
     enabled_precisions = {dtype._from(p) for p in enabled_precisions}
@@ -242,7 +242,7 @@ def compile(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-    trt_gm = compile_module(gm, inputs, kwarg_inputs, settings)
+    trt_gm = compile_module(gm, arg_inputs, kwarg_inputs, settings)
     return trt_gm
 
 

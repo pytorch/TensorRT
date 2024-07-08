@@ -222,7 +222,7 @@ def test_base_fp8(ir):
             exp_program = torch.export.export(model, (input_tensor,))
             trt_model = torchtrt.dynamo.compile(
                 exp_program,
-                inputs=[input_tensor],
+                arg_inputs=[input_tensor],
                 enabled_precisions={torch.float8_e4m3fn},
                 min_block_size=1,
                 debug=True,

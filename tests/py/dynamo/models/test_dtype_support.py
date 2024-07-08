@@ -36,7 +36,7 @@ class Test64BitSupport(TestCase):
         exp_mod = torch.export.export(mod, (in_tensor,))
         trt_mod = torch_tensorrt.dynamo.compile(
             exp_mod,
-            inputs=[in_tensor],
+            arg_inputs=[in_tensor],
             pass_through_build_failures=True,
             truncate_double=True,
             min_block_size=1,
@@ -74,7 +74,7 @@ class Test64BitSupport(TestCase):
         exp_mod = torch.export.export(mod, (in_tensor,))
         trt_mod = torch_tensorrt.dynamo.compile(
             exp_mod,
-            inputs=[in_tensor],
+            arg_inputs=[in_tensor],
             pass_through_build_failures=True,
             truncate_double=True,
             min_block_size=1,
@@ -118,7 +118,7 @@ class Test64BitSupport(TestCase):
         exp_mod = torch.export.export(mod, (in_tensor,))
         trt_mod = torch_tensorrt.dynamo.compile(
             exp_mod,
-            inputs=[in_tensor],
+            arg_inputs=[in_tensor],
             pass_through_build_failures=True,
             truncate_double=False,
             min_block_size=1,
@@ -157,7 +157,7 @@ class Test64BitSupport(TestCase):
         exp_mod = torch.export.export(mod, (in_tensor,))
         trt_mod = torch_tensorrt.dynamo.compile(
             exp_mod,
-            inputs=[in_tensor],
+            arg_inputs=[in_tensor],
             pass_through_build_failures=True,
             truncate_double=False,
             min_block_size=1,
@@ -201,7 +201,7 @@ class TestBF16Support(TestCase):
         exp_mod = torch.export.export(mod, (in_tensor,))
         trt_mod = torch_tensorrt.dynamo.compile(
             exp_mod,
-            inputs=[in_tensor],
+            arg_inputs=[in_tensor],
             pass_through_build_failures=True,
             enabled_precisions={torch.float, torch.bfloat16, torch.half},
             min_block_size=1,
@@ -239,7 +239,7 @@ class TestBF16Support(TestCase):
         exp_mod = torch.export.export(mod, (in_tensor,))
         trt_mod = torch_tensorrt.dynamo.compile(
             exp_mod,
-            inputs=[in_tensor],
+            arg_inputs=[in_tensor],
             pass_through_build_failures=True,
             enabled_precisions={torch.float, torch.bfloat16, torch.half},
             min_block_size=1,
