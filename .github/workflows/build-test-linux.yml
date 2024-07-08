@@ -242,7 +242,7 @@ jobs:
   tests-py-dynamo-core:
     name: Test dynamo core [Python]
     needs: [generate-matrix, build, check]
-    if: ${{ contains(needs.check.folder_names, 'dynamo_core') }}
+    if: ${{ contains(needs.check.outputs.test_modules, 'dynamo_core') }}
     strategy:
       fail-fast: false
       matrix:
@@ -273,7 +273,7 @@ jobs:
   tests-py-core:
     name: Test core [Python]
     needs: [generate-matrix, build, check]
-    if: ${{ contains(needs.check.folder_names, 'py_core') }}
+    if: ${{ contains(needs.check.outputs.test_modules, 'py_core') }}
     strategy:
       fail-fast: false
       matrix:
