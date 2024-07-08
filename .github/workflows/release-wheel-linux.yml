@@ -233,21 +233,21 @@ jobs:
 
       # NB: Only upload to GitHub after passing smoke tests
       - name: Upload wheel to GitHub
-        if: ${{ inputs.cxx11-tarball-release != "true" }}
+        if: ${{ inputs.cxx11-tarball-release != 'true' }}
         continue-on-error: true
         uses: actions/upload-artifact@v3
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ inputs.repository }}/release/wheel/
       - name: Upload pre-cxx11 tarball to GitHub
-        if: ${{ inputs.cxx11-tarball-release != "true" && env.PYTHON_VERSION == '3.10' && env.CU_VERSION == 'cu124' }}
+        if: ${{ inputs.cxx11-tarball-release != 'true' && env.PYTHON_VERSION == '3.10' && env.CU_VERSION == 'cu124' }}
         continue-on-error: true
         uses: actions/upload-artifact@v3
         with:
           name: pre-cxx11-tarball-${{ env.PYTHON_VERSION }}-${{ env.CU_VERSION }}
           path: ${{ inputs.repository }}/release/tarball/
       - name: Upload cxx11 tarball to GitHub
-        if: ${{ inputs.cxx11-tarball-release == "true" }}
+        if: ${{ inputs.cxx11-tarball-release == 'true' }}
         continue-on-error: true
         uses: actions/upload-artifact@v3
         with:
