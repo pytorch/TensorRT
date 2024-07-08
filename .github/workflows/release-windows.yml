@@ -3,6 +3,8 @@ name: Release Windows wheels artifacts
 on:
   pull_request:
   push:
+    branches:
+      - release/*
     tags:
       # NOTE: Binary build pipelines should only get triggered on release candidate builds
       # Release candidate tags look like: v1.11.0-rc1
@@ -17,6 +19,7 @@ permissions:
 jobs:
   generate-matrix:
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
     with:
       package-type: wheel
       os: windows
@@ -26,7 +29,6 @@ jobs:
       with-cpu: false
 
   generate-release-matrix:
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
     needs: [generate-matrix]
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
