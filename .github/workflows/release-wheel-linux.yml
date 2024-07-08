@@ -202,14 +202,14 @@ jobs:
               bazel build //:libtorchtrt --compilation_mode opt --config=default
               cp bazel-bin/libtorchtrt.tar.gz \
               release/libtorchtrt-${TORCHTRT_VERSION}-tensorrt${TENSORRT_VERSION}-cuda${CU_VERSION}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
-          elif
+          else
               ${CONDA_RUN} python setup.py bdist_wheel --release
               cp bazel-bin/libtorchtrt.tar.gz \
               release/tarball/libtorchtrt-${BUILD_VERSION}-pre-cxx11-abi-tensorrt${TRT_VERSION}-cuda${CU_VERSION}-libtorch${BUILD_VERSION}-x86_64-linux.tar.gz
 
               ${CONDA_RUN} python -m pip install auditwheel
               ${CONDA_RUN} python -m auditwheel repair \
-                $(cat py/ci/soname_excludes.params) \
+              $(cat py/ci/soname_excludes.params) \
                 --plat manylinux_2_34_x86_64 \
                 dist/torch_tensorrt-*-linux_x86_64.whl
               ${CONDA_RUN} python -m zipfile --list wheelhouse/torch_tensorrt-*_x86_64.whl
