@@ -43,7 +43,12 @@ Folder_To_Skip_TestModules = {
 
 # TODO: discuss with Naren for a basic set of tests here
 # this is just an example only
-Base_Test_Modules = ["py_core"]
+Base_Test_Modules = [
+    "cpp_core_conversion",
+    "cpp_core_lowering",
+    "cpp_core_partitioning",
+    "cpp_core_runtime",
+]
 Full_Test_Modules = [
     "ts_frontend",
     "py_core",

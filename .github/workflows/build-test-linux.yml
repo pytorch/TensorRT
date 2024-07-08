@@ -299,9 +299,118 @@ jobs:
         cd tests/py/core
         python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_core_test_results.xml .
         popd
-        bazel test //tests/core/conversion/converters:test_activation --compilation_mode=opt \
+
+  tests-cpp-core-conversion:
+    name: Test core conversion[CPP]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'cpp_core_conversion') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-cpp-core-conversion
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      script: |
+        set -x
+        export USE_HOST_DEPS=1
+        bazel test //tests/core/conversion/conversion_tests --compilation_mode=opt \
         --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures
 
+  tests-cpp-core-lowering:
+    name: Test core lowering[CPP]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'cpp_core_lowering') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-cpp-core-lowering
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      script: |
+        set -x
+        export USE_HOST_DEPS=1
+        bazel test //tests/core/lowering/lowering_tests --compilation_mode=opt \
+        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures
+
+  tests-cpp-core-partitioning:
+    name: Test core partitioning[CPP]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'cpp_core_partitioning') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-cpp-core-partitioning
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      script: |
+        set -x
+        export USE_HOST_DEPS=1
+        bazel test //tests/core/partitioning/partitioning_tests --compilation_mode=opt \
+        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures
+
+  tests-cpp-core-runtime:
+    name: Test core runtime[CPP]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'cpp_core_runtime') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-cpp-core-partitioning
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      script: |
+        set -x
+        export USE_HOST_DEPS=1
+        bazel test //tests/core/runtime/runtime_tests --compilation_mode=opt \
+        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
   cancel-in-progress: true
