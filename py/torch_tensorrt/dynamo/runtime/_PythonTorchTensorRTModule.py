@@ -10,6 +10,7 @@ import torch_tensorrt
 from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.runtime.tools import (
     _is_switch_required,
     _select_rt_device,
@@ -33,8 +34,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         engine: bytes,
         input_names: Optional[List[str]] = None,
         output_names: Optional[List[str]] = None,
-        target_device: Device = Device._current_device(),
-        profiling_enabled: Optional[bool] = None,
+        settings: CompilationSettings = CompilationSettings(),
     ):
         super(PythonTorchTensorRTModule, self).__init__()
         self._register_state_dict_hook(PythonTorchTensorRTModule._on_state_dict)
@@ -46,13 +46,16 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.input_names = input_names if input_names is not None else []
         self.output_names = output_names if output_names is not None else []
         self.initialized = False
-        self.target_device_id = target_device.gpu_id
+        self.target_device_id = (
+            settings.device.gpu_id
+            if settings.device is not None
+            else Device._current_device().gpu_id
+        )
         self.target_device_properties = torch.cuda.get_device_properties(
             self.target_device_id
         )
-        self.profiling_enabled = (
-            profiling_enabled if profiling_enabled is not None else False
-        )
+        self.profiling_enabled = settings.debug if settings.debug is not None else False
+        self.settings = settings
         self._initialize()
 
     def _initialize(self) -> None:
@@ -127,7 +130,19 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if self.engine:
             self.context = self.engine.create_execution_context()
 
+    def __deepcopy__(self, memo: Any) -> PythonTorchTensorRTModule:
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        result.__setstate__(self.__getstate__())
+        return result
+
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
+        # Ensure inputs are available in all scopes and cast symbolic integers to Tensors
+        contiguous_inputs: List[torch.Tensor] = [
+            (i.contiguous() if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
+            for i in inputs
+        ]
         with (
             torch.autograd.profiler.record_function("PythonTorchTensorRTModule:Forward")
             if self.profiling_enabled
@@ -174,7 +189,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     self.input_names
                 ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(inputs)}."
 
-                contiguous_inputs: List[torch.Tensor] = [i.contiguous() for i in inputs]
                 for i, input_name in enumerate(self.input_names):
                     if not contiguous_inputs[i].is_cuda:
                         logger.warning(
@@ -193,12 +207,17 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         contiguous_inputs[i].dtype == self.input_dtypes[i]
                     ), f"Dtype mismatch for {i}th input({input_name}). Expect {self.input_dtypes[i]}, got {contiguous_inputs[i].dtype}."
 
+                    # For shape tensors, we use CPU pointers and for data tensors, we use GPU pointers
+                    # as per TensorRT requirements
                     if self.engine.is_shape_inference_io(input_name):
-                        # Shape tensor inputs are casted to int32 explicitly.
-                        # Refer to https://github.com/NVIDIA/TensorRT/blob/d2f4ef789a9a6ffdf37b55c3f81b486225f6b380/samples/common/sampleInference.cpp#L435
-                        inputs_cpu = contiguous_inputs[i].cpu().to(torch.int32)
+                        # Shape tensor inputs are casted to int64 explicitly
+                        # Currently Torch CPU pointers are not working; numpy pointers are used instead
+                        # to refer to underlying memory
+                        inputs_cpu = (
+                            contiguous_inputs[i].cpu().to(torch.int64).numpy().copy()
+                        )
                         self.context.set_tensor_address(
-                            input_name, inputs_cpu.data_ptr()
+                            input_name, inputs_cpu.ctypes.data
                         )
                     else:
                         self.context.set_input_shape(

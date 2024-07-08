@@ -95,7 +95,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+    uses: ./.github/workflows/linux-test.yml
     with:
       job-name: tests-py-torchscript-fe
       repository: "pytorch/tensorrt"
@@ -131,7 +131,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+    uses: ./.github/workflows/linux-test.yml
     with:
       job-name: tests-py-dynamo-converters
       repository: "pytorch/tensorrt"
@@ -160,7 +160,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+    uses: ./.github/workflows/linux-test.yml
     with:
       job-name: tests-py-dynamo-fe
       repository: "pytorch/tensorrt"
@@ -192,7 +192,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+    uses: ./.github/workflows/linux-test.yml
     with:
       job-name: tests-py-dynamo-serde
       repository: "pytorch/tensorrt"
@@ -221,7 +221,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+    uses: ./.github/workflows/linux-test.yml
     with:
       job-name: tests-py-torch-compile-be
       repository: "pytorch/tensorrt"
@@ -252,7 +252,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@main
+    uses: ./.github/workflows/linux-test.yml
     with:
       job-name: tests-py-dynamo-core
       repository: "pytorch/tensorrt"
@@ -283,7 +283,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
-    uses: pytorch/tensorrt/.github/workflows/linux-test.yml@release/2.3
+    uses: ./.github/workflows/linux-test.yml
     with:
       job-name: tests-py-core
       repository: "pytorch/tensorrt"

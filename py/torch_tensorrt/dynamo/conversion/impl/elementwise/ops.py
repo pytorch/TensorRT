@@ -1,6 +1,7 @@
 from typing import Optional, Union
 
 import numpy as np
+from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
 import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
@@ -13,6 +14,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_int_or_float_to_bool,
     cast_trt_tensor,
     get_trt_tensor,
+    has_dynamic_shape,
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
@@ -121,6 +123,10 @@ def rsqrt(
     name: str,
     input: TRTTensor,
 ) -> TRTTensor:
+    if (isinstance(input, TRTTensor)) and (
+        input.dtype == trt.int8 or input.dtype == trt.int32
+    ):
+        input = cast_trt_tensor(ctx, input, trt.float32, f"{name}_cast")
     sqrt_trt_output = convert_unary(
         ctx,
         target,
@@ -328,25 +334,56 @@ def atan2(
         y_positive,
     )
 
-    # on x or y-axis
-    pi_over_2_tensor = get_trt_tensor(
-        ctx,
-        (pi_value / 2) * np.ones(input.shape, dtype=np.float32),
-        f"{name}_pi_over_2_tensor",
-        dtype=trt.float32,
-    )
-    minus_pi_over_2_tensor = get_trt_tensor(
-        ctx,
-        (-pi_value / 2) * np.ones(input.shape, dtype=np.float32),
-        f"{name}_minus_pi_over_2_tensor",
-        dtype=trt.float32,
-    )
-    zero_tensor = get_trt_tensor(
-        ctx,
-        np.zeros(input.shape, dtype=np.float32),
-        f"{name}_zero_tensor",
-        dtype=trt.float32,
-    )
+    if has_dynamic_shape(input.shape):
+        pi_over_2_tensor = convert_binary_elementwise(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_pi_over_2_tensor",
+            trt.ElementWiseOperation.PROD,
+            (pi_value / 2),
+            input,
+        )
+
+        minus_pi_over_2_tensor = convert_binary_elementwise(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_minus_pi_over_2_tensor",
+            trt.ElementWiseOperation.PROD,
+            (-pi_value / 2),
+            input,
+        )
+        zero_tensor = convert_binary_elementwise(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_zero_tensor",
+            trt.ElementWiseOperation.PROD,
+            0,
+            input,
+        )
+    else:
+        # on x or y-axis
+        pi_over_2_tensor = get_trt_tensor(
+            ctx,
+            (pi_value / 2) * np.ones(input.shape, dtype=np.float32),
+            f"{name}_pi_over_2_tensor",
+            dtype=trt.float32,
+        )
+
+        minus_pi_over_2_tensor = get_trt_tensor(
+            ctx,
+            (-pi_value / 2) * np.ones(input.shape, dtype=np.float32),
+            f"{name}_minus_pi_over_2_tensor",
+            dtype=trt.float32,
+        )
+        zero_tensor = get_trt_tensor(
+            ctx,
+            np.zeros(input.shape, dtype=np.float32),
+            f"{name}_zero_tensor",
+            dtype=trt.float32,
+        )
 
     # π/2 if x>0 and y=0,
     pi_over_2_output = impl.condition.select(

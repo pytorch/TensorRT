@@ -373,6 +373,22 @@ def req_torch_version(min_torch_version: str = "2.dev") -> Callable[..., Any]:
     return nested_decorator
 
 
+def check_output(
+    new_module: torch.fx.GraphModule,
+    refitted_module: torch.fx.GraphModule,
+    inputs: tuple[Any, ...],
+) -> bool:
+    old_outputs, new_outputs = refitted_module(*inputs), new_module(*inputs)
+    for old_output, new_output in zip(old_outputs, new_outputs):
+        if isinstance(old_output, torch.Tensor) and isinstance(
+            new_outputs, torch.Tensor
+        ):
+            if not torch.allclose(old_output, new_output, 1e-2, 1e-2):
+                return False
+
+    return True
+
+
 def unified_dtype_converter(
     dtype: Union[TRTDataType, torch.dtype, np.dtype], to: Frameworks
 ) -> Union[np.dtype, torch.dtype, TRTDataType]:
