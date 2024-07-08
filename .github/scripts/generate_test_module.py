@@ -43,7 +43,7 @@ Folder_To_Skip_TestModules = {
 
 # TODO: discuss with Naren for a basic set of tests here
 # this is just an example only
-Base_Test_Modules = ["torch_compile_backend"]
+Base_Test_Modules = ["py_core"]
 Full_Test_Modules = [
     "ts_frontend",
     "py_core",
