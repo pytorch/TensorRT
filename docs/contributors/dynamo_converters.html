@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Writing Dynamo Converters &mdash; Torch-TensorRT v2.5.0.dev0+bb405b0 documentation</title>
+  <title>Writing Dynamo Converters &mdash; Torch-TensorRT v2.5.0.dev0+250b9b7 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+bb405b0
+                  v2.5.0.dev0+250b9b7
                 </div>
               
             
@@ -306,7 +306,17 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/quick_start.html">Quick Start</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -320,18 +330,11 @@
 <li class="toctree-l1"><a class="reference internal" href="../ts/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../ts/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../ts/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ts/ptq.html">Post Training Quantization (PTQ)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">FX Frontend</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../fx/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/using_dla.html">DLA</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
@@ -342,20 +345,18 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#wrapping-custom-kernels-to-use-in-tensorrt">Wrapping Custom Kernels to use in TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#using-torch-tensorrt-to-insert-the-kernel">Using Torch-TensorRT to Insert the Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../py_api/logging.html">torch_tensorrt.logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../py_api/ptq.html">torch_tensorrt.ptq</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../py_api/dynamo.html">torch_tensorrt.dynamo</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/logging.html">torch_tensorrt.logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../py_api/fx.html">torch_tensorrt.fx</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ptq.html">torch_tensorrt.ts.ptq</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
@@ -363,7 +364,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">CLI Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
 </ul>
@@ -483,7 +484,7 @@
 </div></blockquote>
 <p>All that is required for a converter is the key.</p>
 <p>The function body is responsible for taking the current state of the network and adding the next subgraph to perform the op specified in the decorator with TensorRT operations.
-The function is provided arguments as the native PyTorch op would be provided with the added case of numpy arrays for frozen Tensor attributes or TensorRT ITensors which are ouput Tensors of previous nodes, correspoding to edges/output Tensors of intermediate operations in the graph.
+The function is provided arguments as the native PyTorch op would be provided with the added case of numpy arrays for frozen Tensor attributes or TensorRT ITensors which are output Tensors of previous nodes, corresponding to edges/output Tensors of intermediate operations in the graph.
 To determine the types expected as well as the return type of the converter, look at the definition of the op being converted. In the case of <code class="docutils literal notranslate"><span class="pre">aten</span></code> operations, this file will be the source of truth: <a class="reference external" href="https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/native_functions.yaml">https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/native_functions.yaml</a>
 Since many converters a developer may write are a composition of lower level operators, instead of needing to implement the converter in raw TensorRT, the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.conversion.impl</span></code> subpackage contains many implementations of operations that can be chained to create a TensorRT subgraph.</p>
 <blockquote>
@@ -501,12 +502,12 @@ Since many converters a developer may write are a composition of lower level ope
 <h3>Capability Validation<a class="headerlink" href="#capability-validation" title="Permalink to this heading">¶</a></h3>
 <p>There are some converters which have special cases to be accounted for. In those cases, one should use <code class="docutils literal notranslate"><span class="pre">capability_validators</span></code> to register the converter using <code class="docutils literal notranslate"><span class="pre">&#64;dynamo_tensorrt_converter</span></code>
 We illustrate this through <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.embedding.default</span></code>. It has parameters - <code class="docutils literal notranslate"><span class="pre">scale_grad_by_freq</span></code> and <code class="docutils literal notranslate"><span class="pre">sparse</span></code> which are not currently supported by the implementation.
-In such cases we can write validator <code class="docutils literal notranslate"><span class="pre">embedding_param_validator</span></code> which implements that given those paramters the converter is not supported and register the converter by</p>
+In such cases we can write validator <code class="docutils literal notranslate"><span class="pre">embedding_param_validator</span></code> which implements that given those parameters the converter is not supported and register the converter by</p>
 </section>
 <section id="type-contract">
 <h3>Type Contract<a class="headerlink" href="#type-contract" title="Permalink to this heading">¶</a></h3>
 <p>The function is expected to follow the type contract established by the signature. This includes accepting the union of valid PyTorch types + numpy arrays for constant tensors and TensorRT ITensors.
-In the case that only a subset of types is supported in the converter, you can also add the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.conversion.converter_utils.enforce_tensor_types</span></code>, which allows you to specify a dictionary mapping between input positions and types that those inputs can take. Where possible the decorator will convert inputs to match these types prefering the order provided.
+In the case that only a subset of types is supported in the converter, you can also add the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.conversion.converter_utils.enforce_tensor_types</span></code>, which allows you to specify a dictionary mapping between input positions and types that those inputs can take. Where possible the decorator will convert inputs to match these types preferring the order provided.
 <code class="docutils literal notranslate"><span class="pre">int</span></code> keys in the dictionary will refer to positional arguments in <code class="docutils literal notranslate"><span class="pre">args</span></code>. <code class="docutils literal notranslate"><span class="pre">str</span></code> keys will refer to keyword arguments in <code class="docutils literal notranslate"><span class="pre">kwargs</span></code>.</p>
 </section>
 <section id="example-convolution">
@@ -546,7 +547,7 @@ The opcode is <code class="docutils literal notranslate"><span class="pre">opera
 </section>
 <section id="operator-decomposition">
 <h2>Operator Decomposition<a class="headerlink" href="#operator-decomposition" title="Permalink to this heading">¶</a></h2>
-<p>There are some converters which can be decomposed into suboperations in PyTorch and need not have seperate converter registration.
+<p>There are some converters which can be decomposed into suboperations in PyTorch and need not have separate converter registration.
 Such converters can be implemented via a decomposition</p>
 <section id="example-addmm">
 <h3>Example: <code class="docutils literal notranslate"><span class="pre">addmm</span></code><a class="headerlink" href="#example-addmm" title="Permalink to this heading">¶</a></h3>
@@ -594,7 +595,7 @@ We define <code class="docutils literal notranslate"><span class="pre">addmm_rep
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2022, NVIDIA Corporation.
+        &copy; Copyright 2024, NVIDIA Corporation.
 
     </p>
   </div>

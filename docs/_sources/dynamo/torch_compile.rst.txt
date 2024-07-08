@@ -26,7 +26,7 @@ The primary goal of the Torch-TensorRT `torch.compile` backend is to enable Just
 
 The backend can handle a variety of challenging model structures and offers a simple-to-use interface for effective acceleration of models. Additionally, it has many customization options to ensure the compilation process is fitting to the specific use case.
 
-Customizeable Settings
+Customizable Settings
 -----------------
 .. autoclass:: CompilationSettings
 
@@ -87,7 +87,7 @@ If key operators for your model are unsupported, see :ref:`dynamo_conversion` to
 
 Feasibility of Serialization
 ^^^^^^^^^^^^^^^^^
-Compilation can also be helpful in demonstrating graph breaks and the feasibility of serialization of a particular model. For instance, if a model has no graph breaks and compiles successfully with the Torch-TensorRT backend, then that model should be compileable and serializeable via the `torch_tensorrt` Dynamo IR, as discussed in :ref:`dynamic_shapes`. To determine the number of graph breaks in a model, the `torch._dynamo.explain` function is very useful:
+Compilation can also be helpful in demonstrating graph breaks and the feasibility of serialization of a particular model. For instance, if a model has no graph breaks and compiles successfully with the Torch-TensorRT backend, then that model should be compilable and serializeable via the `torch_tensorrt` Dynamo IR, as discussed in :ref:`dynamic_shapes`. To determine the number of graph breaks in a model, the `torch._dynamo.explain` function is very useful:
 
 .. code-block:: python
 

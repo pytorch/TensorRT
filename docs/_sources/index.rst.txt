@@ -26,8 +26,31 @@ Getting Started
    :hidden:
 
    getting_started/installation
-   getting_started/getting_started_with_windows
+   getting_started/quick_start
 
+User Guide
+------------
+
+* :ref:`torch_tensorrt_explained`
+* :ref:`dynamic_shapes`
+* :ref:`ptq`
+* :ref:`saving_models`
+* :ref:`runtime`
+* :ref:`using_dla`
+
+.. toctree::
+   :caption: User Guide
+   :maxdepth: 1
+   :hidden:
+
+   user_guide/torch_tensorrt_explained
+   user_guide/getting_started
+   user_guide/dynamic_shapes
+   user_guide/saving_models
+   user_guide/runtime
+   user_guide/using_dla
+   tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
+   tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq
 
 Dynamo Frontend
 ----------------
@@ -59,6 +82,7 @@ TorchScript Frontend
    ts/getting_started_with_python_api
    ts/getting_started_with_cpp_api
    ts/use_from_pytorch
+   ts/ptq
 
 FX Frontend
 ------------
@@ -71,28 +95,6 @@ FX Frontend
    :hidden:
 
    fx/getting_started_with_fx_path
-
-
-User Guide
-------------
-
-* :ref:`dynamic_shapes`
-* :ref:`ptq`
-* :ref:`saving_models`
-* :ref:`runtime`
-* :ref:`using_dla`
-
-.. toctree::
-   :caption: User Guide
-   :maxdepth: 1
-   :hidden:
-
-
-   user_guide/dynamic_shapes
-   user_guide/ptq
-   user_guide/saving_models
-   user_guide/runtime
-   user_guide/using_dla
 
 Tutorials
 ------------
@@ -116,28 +118,28 @@ Tutorials
    tutorials/_rendered_examples/distributed_inference/data_parallel_stable_diffusion
    tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq
 
-Python API Documenation
+Python API Documentation
 ------------------------
 * :ref:`torch_tensorrt_py`
-* :ref:`torch_tensorrt_logging_py`
-* :ref:`torch_tensorrt_ptq_py`
 * :ref:`torch_tensorrt_dynamo_py`
-* :ref:`torch_tensorrt_ts_py`
+* :ref:`torch_tensorrt_logging_py`
 * :ref:`torch_tensorrt_fx_py`
+* :ref:`torch_tensorrt_ts_py`
+* :ref:`torch_tensorrt_ptq_py`
 
 .. toctree::
-   :caption: Python API Documenation
+   :caption: Python API Documentation
    :maxdepth: 0
    :hidden:
 
    py_api/torch_tensorrt
-   py_api/logging
-   py_api/ptq
    py_api/dynamo
-   py_api/ts
+   py_api/logging
    py_api/fx
+   py_api/ts
+   py_api/ptq
 
-C++ API Documenation
+C++ API Documentation
 ----------------------
 * :ref:`namespace_torch_tensorrt`
 * :ref:`namespace_torch_tensorrt__logging`
@@ -146,7 +148,7 @@ C++ API Documenation
 
 
 .. toctree::
-   :caption: C++ API Documenation
+   :caption: C++ API Documentation
    :maxdepth: 1
    :hidden:
 
@@ -161,7 +163,7 @@ CLI Documentation
 * :ref:`torchtrtc`
 
 .. toctree::
-   :caption: CLI Documenation
+   :caption: CLI Documentation
    :maxdepth: 0
    :hidden:
 

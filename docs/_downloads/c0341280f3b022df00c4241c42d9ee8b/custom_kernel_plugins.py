@@ -13,7 +13,7 @@ The easiest way to fix lack of support for ops is by adding a decomposition (see
 in terms of PyTorch ops that are supported in Torch-TensorRT or a converter (see:
 `Writing converters for the Dynamo frontend <https://pytorch.org/TensorRT/contributors/dynamo_converters.html>`_) - which defines the operator in terms of TensorRT operators.
 
-In some cases there isnt a great way to do either of these, perhaps because the operator is a custom kernel that is not part of standard PyTorch or
+In some cases there isn't a great way to do either of these, perhaps because the operator is a custom kernel that is not part of standard PyTorch or
 TensorRT cannot support it natively.
 
 For these cases, it is possible to use a TensorRT plugin to replace the operator **inside** the TensorRT engine, thereby avoiding
@@ -147,7 +147,7 @@ def triton_circular_pad(x: torch.Tensor, padding: Sequence[int]) -> torch.Tensor
 
 # %%
 # Testing our custom op
-# ^^^^^^^^^^^^^^^^^^^^^^^
+# -----------------------------------------
 
 # %%
 # The native PyTorch implementation
@@ -190,7 +190,7 @@ def _(x: torch.Tensor, padding: Sequence[int]) -> torch.Tensor:
     return torch.nn.functional.pad(x, padding, "circular")
 
 
-# Additionally one may want to define an autograd implementation for the backwards pass to round out the custom op implmentation but that is beyond the scope of this tutorial (see https://pytorch.org/docs/main/library.html#torch.library.register_autograd for more)
+# Additionally one may want to define an autograd implementation for the backwards pass to round out the custom op implementation but that is beyond the scope of this tutorial (see https://pytorch.org/docs/main/library.html#torch.library.register_autograd for more)
 
 
 # %%
@@ -304,7 +304,7 @@ torchtrt.compile(
 
 # %%
 # Wrapping Custom Kernels to use in TensorRT
-# =============================================
+# --------------------------------------------
 #
 # To address this graph break, the first step is to make our kernel implementation available in TensorRT. Again this can be done in either C++ or Python. For the actual details on how to implement
 # TensorRT plugins refer `here <https://github.com/NVIDIA/TensorRT/tree/release/10.0/samples/python/python_plugin>`_. From a high level, similar to PyTorch you will need to
@@ -501,7 +501,7 @@ TRT_PLUGIN_REGISTRY.register_creator(CircularPaddingPluginCreator(), "")  # type
 
 # %%
 # Using Torch-TensorRT to Insert the Kernel
-# =============================================
+# -------------------------------------------
 # Now with our TensorRT plugin, we can create a converter so that Torch-TensorRT knows to insert our plugin in place of our custom circular padding operator.
 # More information on writing converters can be found `here <https://pytorch.org/TensorRT/contributors/dynamo_converters.html>`_
 
@@ -534,7 +534,7 @@ def circular_padding_converter(
     plugin_creator = plugin_registry.get_plugin_creator(
         type="CircularPaddingPlugin", version="1", plugin_namespace=""
     )
-    assert plugin_creator, f"Unabled to find CircularPaddingPlugin creator"
+    assert plugin_creator, f"Unable to find CircularPaddingPlugin creator"
 
     # Pass configurations to the plugin implementation
     field_configs = trt.PluginFieldCollection(

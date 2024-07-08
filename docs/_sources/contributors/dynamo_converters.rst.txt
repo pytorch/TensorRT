@@ -36,7 +36,7 @@ The decorator takes a number of arguments:
 All that is required for a converter is the key.
 
 The function body is responsible for taking the current state of the network and adding the next subgraph to perform the op specified in the decorator with TensorRT operations.
-The function is provided arguments as the native PyTorch op would be provided with the added case of numpy arrays for frozen Tensor attributes or TensorRT ITensors which are ouput Tensors of previous nodes, correspoding to edges/output Tensors of intermediate operations in the graph.
+The function is provided arguments as the native PyTorch op would be provided with the added case of numpy arrays for frozen Tensor attributes or TensorRT ITensors which are output Tensors of previous nodes, corresponding to edges/output Tensors of intermediate operations in the graph.
 To determine the types expected as well as the return type of the converter, look at the definition of the op being converted. In the case of ``aten`` operations, this file will be the source of truth: https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/native_functions.yaml
 Since many converters a developer may write are a composition of lower level operators, instead of needing to implement the converter in raw TensorRT, the ``torch_tensorrt.dynamo.conversion.impl`` subpackage contains many implementations of operations that can be chained to create a TensorRT subgraph.
 
@@ -53,14 +53,14 @@ Capability Validation
 
 There are some converters which have special cases to be accounted for. In those cases, one should use ``capability_validators`` to register the converter using ``@dynamo_tensorrt_converter``
 We illustrate this through ``torch.ops.aten.embedding.default``. It has parameters - ``scale_grad_by_freq`` and ``sparse`` which are not currently supported by the implementation.
-In such cases we can write validator ``embedding_param_validator`` which implements that given those paramters the converter is not supported and register the converter by
+In such cases we can write validator ``embedding_param_validator`` which implements that given those parameters the converter is not supported and register the converter by
 
 
 Type Contract
 ^^^^^^^^^^^^^^^
 
 The function is expected to follow the type contract established by the signature. This includes accepting the union of valid PyTorch types + numpy arrays for constant tensors and TensorRT ITensors.
-In the case that only a subset of types is supported in the converter, you can also add the ``torch_tensorrt.dynamo.conversion.converter_utils.enforce_tensor_types``, which allows you to specify a dictionary mapping between input positions and types that those inputs can take. Where possible the decorator will convert inputs to match these types prefering the order provided.
+In the case that only a subset of types is supported in the converter, you can also add the ``torch_tensorrt.dynamo.conversion.converter_utils.enforce_tensor_types``, which allows you to specify a dictionary mapping between input positions and types that those inputs can take. Where possible the decorator will convert inputs to match these types preferring the order provided.
 ``int`` keys in the dictionary will refer to positional arguments in ``args``. ``str`` keys will refer to keyword arguments in ``kwargs``.
 
 
@@ -105,7 +105,7 @@ Some operations do not produce TensorRT subgraphs as a side-effect. These are te
 Operator Decomposition
 -----------------------
 
-There are some converters which can be decomposed into suboperations in PyTorch and need not have seperate converter registration.
+There are some converters which can be decomposed into suboperations in PyTorch and need not have separate converter registration.
 Such converters can be implemented via a decomposition
 
 Example: ``addmm``

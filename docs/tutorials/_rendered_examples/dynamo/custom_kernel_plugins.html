@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Using Custom Kernels within TensorRT Engines with Torch-TensorRT &mdash; Torch-TensorRT v2.5.0.dev0+bb405b0 documentation</title>
+  <title>Using Custom Kernels within TensorRT Engines with Torch-TensorRT &mdash; Torch-TensorRT v2.5.0.dev0+250b9b7 documentation</title>
   
 
   
@@ -39,7 +39,7 @@
   <link rel="stylesheet" href="../../../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Deploy Quantized Models using Torch-TensorRT" href="vgg16_fp8_ptq.html" />
+    <link rel="next" title="torch_tensorrt" href="../../../py_api/torch_tensorrt.html" />
     <link rel="prev" title="Torch Compile Stable Diffusion" href="torch_compile_stable_diffusion.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+bb405b0
+                  v2.5.0.dev0+250b9b7
                 </div>
               
             
@@ -306,7 +306,17 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/quick_start.html">Quick Start</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -320,18 +330,11 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../ts/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../ts/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../ts/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ts/ptq.html">Post Training Quantization (PTQ)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">FX Frontend</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../fx/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/using_dla.html">DLA</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="current">
@@ -342,20 +345,18 @@
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="#wrapping-custom-kernels-to-use-in-tensorrt">Wrapping Custom Kernels to use in TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="#using-torch-tensorrt-to-insert-the-kernel">Using Torch-TensorRT to Insert the Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../py_api/logging.html">torch_tensorrt.logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../py_api/ptq.html">torch_tensorrt.ptq</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../py_api/dynamo.html">torch_tensorrt.dynamo</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/logging.html">torch_tensorrt.logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../py_api/fx.html">torch_tensorrt.fx</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/ptq.html">torch_tensorrt.ts.ptq</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
@@ -363,7 +364,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">CLI Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../cli/torchtrtc.html">torchtrtc</a></li>
 </ul>
@@ -468,7 +469,7 @@ The easiest way to fix lack of support for ops is by adding a decomposition (see
 <a class="reference external" href="https://pytorch.org/TensorRT/contributors/writing_dynamo_aten_lowering_passes.html">Writing lowering passes for the Dynamo frontend</a>) - which defines the operator
 in terms of PyTorch ops that are supported in Torch-TensorRT or a converter (see:
 <a class="reference external" href="https://pytorch.org/TensorRT/contributors/dynamo_converters.html">Writing converters for the Dynamo frontend</a>) - which defines the operator in terms of TensorRT operators.</p>
-<p>In some cases there isnt a great way to do either of these, perhaps because the operator is a custom kernel that is not part of standard PyTorch or
+<p>In some cases there isn’t a great way to do either of these, perhaps because the operator is a custom kernel that is not part of standard PyTorch or
 TensorRT cannot support it natively.</p>
 <p>For these cases, it is possible to use a TensorRT plugin to replace the operator <strong>inside</strong> the TensorRT engine, thereby avoiding
 the performance and resource overhead from a graph break.
@@ -584,8 +585,9 @@ the operation in Torch-TensorRT and simplify its use in PyTorch. This could eith
 </pre></div>
 </div>
 <p>Above is all that is required to create a custom operator for PyTorch. We can now call it directly as <code class="docutils literal notranslate"><span class="pre">torch.ops.torchtrt_ex.triton_circular_pad</span></code></p>
+</section>
 <section id="testing-our-custom-op">
-<h3>Testing our custom op<a class="headerlink" href="#testing-our-custom-op" title="Permalink to this heading">¶</a></h3>
+<h2>Testing our custom op<a class="headerlink" href="#testing-our-custom-op" title="Permalink to this heading">¶</a></h2>
 <p>The native PyTorch implementation</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">ex_input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
 <span class="n">padding</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
@@ -619,10 +621,9 @@ In our case we can just use the native circular pad operation as our FakeTensor 
     <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="s2">&quot;circular&quot;</span><span class="p">)</span>
 
 
-<span class="c1"># Additionally one may want to define an autograd implementation for the backwards pass to round out the custom op implmentation but that is beyond the scope of this tutorial (see https://pytorch.org/docs/main/library.html#torch.library.register_autograd for more)</span>
+<span class="c1"># Additionally one may want to define an autograd implementation for the backwards pass to round out the custom op implementation but that is beyond the scope of this tutorial (see https://pytorch.org/docs/main/library.html#torch.library.register_autograd for more)</span>
 </pre></div>
 </div>
-</section>
 </section>
 <section id="using-the-custom-operator-in-a-model">
 <h2>Using the Custom Operator in a Model<a class="headerlink" href="#using-the-custom-operator-in-a-model" title="Permalink to this heading">¶</a></h2>
@@ -726,9 +727,8 @@ Compiled with: CompilationSettings(enabled_precisions={&lt;dtype.f32: 7&gt;}, de
 </div>
 <p>We see that there is going to be 2 subgraphs, one that will run through PyTorch for our custom op and one through TensorRT for the convolution. This graph break is going to be a significant portion of the latency of this model.</p>
 </section>
-</section>
 <section id="wrapping-custom-kernels-to-use-in-tensorrt">
-<h1>Wrapping Custom Kernels to use in TensorRT<a class="headerlink" href="#wrapping-custom-kernels-to-use-in-tensorrt" title="Permalink to this heading">¶</a></h1>
+<h2>Wrapping Custom Kernels to use in TensorRT<a class="headerlink" href="#wrapping-custom-kernels-to-use-in-tensorrt" title="Permalink to this heading">¶</a></h2>
 <p>To address this graph break, the first step is to make our kernel implementation available in TensorRT. Again this can be done in either C++ or Python. For the actual details on how to implement
 TensorRT plugins refer <a class="reference external" href="https://github.com/NVIDIA/TensorRT/tree/release/10.0/samples/python/python_plugin">here</a>. From a high level, similar to PyTorch you will need to
 define systems to handle setting up the operator, calculating the effect of the operation abstractly, serializing the op and the actual mechanics of calling the implementation of the op in the engine.</p>
@@ -922,7 +922,7 @@ define systems to handle setting up the operator, calculating the effect of the 
 </div>
 </section>
 <section id="using-torch-tensorrt-to-insert-the-kernel">
-<h1>Using Torch-TensorRT to Insert the Kernel<a class="headerlink" href="#using-torch-tensorrt-to-insert-the-kernel" title="Permalink to this heading">¶</a></h1>
+<h2>Using Torch-TensorRT to Insert the Kernel<a class="headerlink" href="#using-torch-tensorrt-to-insert-the-kernel" title="Permalink to this heading">¶</a></h2>
 <p>Now with our TensorRT plugin, we can create a converter so that Torch-TensorRT knows to insert our plugin in place of our custom circular padding operator.
 More information on writing converters can be found <a class="reference external" href="https://pytorch.org/TensorRT/contributors/dynamo_converters.html">here</a></p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Tuple</span>
@@ -954,7 +954,7 @@ More information on writing converters can be found <a class="reference external
     <span class="n">plugin_creator</span> <span class="o">=</span> <span class="n">plugin_registry</span><span class="o">.</span><span class="n">get_plugin_creator</span><span class="p">(</span>
         <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;CircularPaddingPlugin&quot;</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="n">plugin_namespace</span><span class="o">=</span><span class="s2">&quot;&quot;</span>
     <span class="p">)</span>
-    <span class="k">assert</span> <span class="n">plugin_creator</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Unabled to find CircularPaddingPlugin creator&quot;</span>
+    <span class="k">assert</span> <span class="n">plugin_creator</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Unable to find CircularPaddingPlugin creator&quot;</span>
 
     <span class="c1"># Pass configurations to the plugin implementation</span>
     <span class="n">field_configs</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">PluginFieldCollection</span><span class="p">(</span>
@@ -1087,6 +1087,7 @@ Compiled with: CompilationSettings(enabled_precisions={&lt;dtype.f32: 7&gt;}, de
 </div>
 <p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
 </section>
+</section>
 
 
              </article>
@@ -1096,7 +1097,7 @@ Compiled with: CompilationSettings(enabled_precisions={&lt;dtype.f32: 7&gt;}, de
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="vgg16_fp8_ptq.html" class="btn btn-neutral float-right" title="Deploy Quantized Models using Torch-TensorRT" accesskey="n" rel="next">Next <img src="../../../_static/images/chevron-right-orange.svg" class="next-page"></a>
+        <a href="../../../py_api/torch_tensorrt.html" class="btn btn-neutral float-right" title="torch_tensorrt" accesskey="n" rel="next">Next <img src="../../../_static/images/chevron-right-orange.svg" class="next-page"></a>
       
       
         <a href="torch_compile_stable_diffusion.html" class="btn btn-neutral" title="Torch Compile Stable Diffusion" accesskey="p" rel="prev"><img src="../../../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
@@ -1112,7 +1113,7 @@ Compiled with: CompilationSettings(enabled_precisions={&lt;dtype.f32: 7&gt;}, de
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2022, NVIDIA Corporation.
+        &copy; Copyright 2024, NVIDIA Corporation.
 
     </p>
   </div>
@@ -1132,15 +1133,13 @@ Compiled with: CompilationSettings(enabled_precisions={&lt;dtype.f32: 7&gt;}, de
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
 <li><a class="reference internal" href="#">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a><ul>
-<li><a class="reference internal" href="#writing-custom-operators-in-pytorch">Writing Custom Operators in PyTorch</a><ul>
+<li><a class="reference internal" href="#writing-custom-operators-in-pytorch">Writing Custom Operators in PyTorch</a></li>
 <li><a class="reference internal" href="#testing-our-custom-op">Testing our custom op</a></li>
-</ul>
-</li>
 <li><a class="reference internal" href="#using-the-custom-operator-in-a-model">Using the Custom Operator in a Model</a></li>
-</ul>
-</li>
 <li><a class="reference internal" href="#wrapping-custom-kernels-to-use-in-tensorrt">Wrapping Custom Kernels to use in TensorRT</a></li>
 <li><a class="reference internal" href="#using-torch-tensorrt-to-insert-the-kernel">Using Torch-TensorRT to Insert the Kernel</a></li>
+</ul>
+</li>
 </ul>
 
             </div>
