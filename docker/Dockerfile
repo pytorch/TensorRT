@@ -50,7 +50,7 @@ RUN TENSORRT_MAJOR_VERSION=`echo ${TENSORRT_VERSION} | cut -d '.' -f 1` && \
 RUN wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -O /usr/bin/bazel &&\
     chmod a+x /usr/bin/bazel
 
-# Build Torch-TensorRT in an auxillary container
+# Build Torch-TensorRT in an auxiliary container
 FROM base as torch-tensorrt-builder-base
 
 ARG ARCH="x86_64"

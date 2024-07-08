@@ -49,11 +49,11 @@ For example, we can define a LeNet module like this:
         def __init__(self):
             super(LeNet, self).__init__()
             self.feat = LeNetFeatExtractor()
-            self.classifer = LeNetClassifier()
+            self.classifier = LeNetClassifier()
 
         def forward(self, x):
             x = self.feat(x)
-            x = self.classifer(x)
+            x = self.classifier(x)
             return x
 
 .
@@ -84,7 +84,7 @@ include these components. We can run the script compiler on our LeNet module by 
     model = LeNet()
     script_model = torch.jit.script(model)
 
-There are reasons to use one path or another, the PyTorch documentation has information on how to choose. From a Torch-TensorRT prespective, there is
+There are reasons to use one path or another, the PyTorch documentation has information on how to choose. From a Torch-TensorRT perspective, there is
 better support (i.e your module is more likely to compile) for traced modules because it doesn't include all the complexities of a complete
 programming language, though both paths supported.
 
@@ -97,7 +97,7 @@ Here is what the LeNet traced module IR looks like:
 
     graph(%self.1 : __torch__.___torch_mangle_10.LeNet,
         %input.1 : Float(1, 1, 32, 32)):
-        %129 : __torch__.___torch_mangle_9.LeNetClassifier = prim::GetAttr[name="classifer"](%self.1)
+        %129 : __torch__.___torch_mangle_9.LeNetClassifier = prim::GetAttr[name="classifier"](%self.1)
         %119 : __torch__.___torch_mangle_5.LeNetFeatExtractor = prim::GetAttr[name="feat"](%self.1)
         %137 : Tensor = prim::CallMethod[name="forward"](%119, %input.1)
         %138 : Tensor = prim::CallMethod[name="forward"](%129, %137)
@@ -111,7 +111,7 @@ and the LeNet scripted module IR:
         %x.1 : Tensor):
         %2 : __torch__.LeNetFeatExtractor = prim::GetAttr[name="feat"](%self)
         %x.3 : Tensor = prim::CallMethod[name="forward"](%2, %x.1) # x.py:38:12
-        %5 : __torch__.LeNetClassifier = prim::GetAttr[name="classifer"](%self)
+        %5 : __torch__.LeNetClassifier = prim::GetAttr[name="classifier"](%self)
         %x.5 : Tensor = prim::CallMethod[name="forward"](%5, %x.3) # x.py:39:12
         return (%x.5)
 
@@ -123,7 +123,7 @@ Working with TorchScript in Python
 -----------------------------------
 
 TorchScript Modules are run the same way you run normal PyTorch modules. You can run the forward pass using the
-``forward`` method or just calling the module ``torch_scirpt_module(in_tensor)`` The JIT compiler will compile
+``forward`` method or just calling the module ``torch_script_module(in_tensor)`` The JIT compiler will compile
 and optimize the module on the fly and then returns the results.
 
 Saving TorchScript Module to Disk

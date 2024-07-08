@@ -5,27 +5,81 @@ from enum import Enum, auto
 from typing import Any, Optional, Type, Union
 
 import numpy as np
-import tensorrt as trt
 import torch
 from torch_tensorrt._features import ENABLED_FEATURES
 
+import tensorrt as trt
+
 
 class dtype(Enum):
-    """Enum to set supported dtypes in the compiler"""
+    """Enum to describe data types to Torch-TensorRT, has compatibility with torch, tensorrt and numpy dtypes"""
 
     # Supported types in Torch-TensorRT
     unknown = auto()
+    """Sentinel value
+
+    :meta hide-value:
+    """
+
     u8 = auto()
+    """Unsigned 8 bit integer, equivalent to ``dtype.uint8``
+
+    :meta hide-value:
+    """
+
     i8 = auto()
+    """Signed 8 bit integer, equivalent to ``dtype.int8``, when enabled as a kernel precision typically requires the model to support quantization
+
+    :meta hide-value:
+    """
+
     i32 = auto()
+    """Signed 32 bit integer, equivalent to ``dtype.int32`` and ``dtype.int``
+
+    :meta hide-value:
+    """
+
     i64 = auto()
+    """Signed 64 bit integer, equivalent to ``dtype.int64`` and ``dtype.long``
+
+    :meta hide-value:
+    """
+
     f16 = auto()
+    """16 bit floating-point number, equivalent to ``dtype.half``, ``dtype.fp16`` and ``dtype.float16``
+
+    :meta hide-value:
+    """
+
     f32 = auto()
+    """32 bit floating-point number, equivalent to ``dtype.float``, ``dtype.fp32`` and ``dtype.float32``
+
+    :meta hide-value:
+    """
+
     f64 = auto()
+    """64 bit floating-point number, equivalent to ``dtype.double``, ``dtype.fp64`` and ``dtype.float64``
+
+    :meta hide-value:
+    """
+
     b = auto()
+    """Boolean value, equivalent to ``dtype.bool``
+
+    :meta hide-value:
+    """
 
     bf16 = auto()
+    """16 bit "Brain" floating-point number, equivalent to ``dtype.bfloat16``
+
+    :meta hide-value:
+    """
+
     f8 = auto()
+    """8 bit floating-point number, equivalent to ``dtype.fp8`` and ``dtype.float8``
+
+    :meta hide-value:
+    """
 
     uint8 = u8
     int8 = i8
@@ -67,6 +121,36 @@ class dtype(Enum):
         t: Union[torch.dtype, trt.DataType, np.dtype, dtype, type],
         use_default: bool = False,
     ) -> dtype:
+        """Create a Torch-TensorRT dtype from another library's dtype system.
+
+        Takes a dtype enum from one of numpy, torch, and tensorrt and create a ``torch_tensorrt.dtype``.
+        If the source dtype system is not supported or the type is not supported in Torch-TensorRT,
+        then an exception will be raised. As such it is not recommended to use this method directly.
+
+        Alternatively use ``torch_tensorrt.dtype.try_from()``
+
+        Arguments:
+            t (Union(torch.dtype, tensorrt.DataType, numpy.dtype, dtype)): Data type enum from another library
+            use_default (bool): In some cases a catch all type (such as ``torch_tensorrt.dtype.f32``) is sufficient, so instead of throwing an exception, return default value.
+
+        Returns:
+            dtype: Equivalent ``torch_tensorrt.dtype`` to ``t``
+
+        Raises:
+            TypeError: Unsupported data type or unknown source
+
+        Examples:
+
+            .. code:: py
+
+                # Succeeds
+                float_dtype = torch_tensorrt.dtype._from(torch.float) # Returns torch_tensorrt.dtype.f32
+
+                # Throws exception
+                float_dtype = torch_tensorrt.dtype._from(torch.complex128)
+
+        """
+
         # TODO: Ideally implemented with match statement but need to wait for Py39 EoL
         if isinstance(t, torch.dtype):
             if t == torch.uint8:
@@ -139,6 +223,10 @@ class dtype(Enum):
                 return dtype.f64
             elif t == np.bool:
                 return dtype.b
+            # TODO: Consider using ml_dtypes when issues like this are resolved:
+            # https://github.com/pytorch/pytorch/issues/109873
+            # elif t == ml_dtypes.bfloat16:
+            #    return dtype.bf16
             elif use_default:
                 logging.warning(
                     f"Given dtype that does not have direct mapping to Torch-TensorRT supported types ({t}), defaulting to torch_tensorrt.dtype.float"
@@ -188,6 +276,32 @@ class dtype(Enum):
         t: Union[torch.dtype, trt.DataType, np.dtype, dtype],
         use_default: bool = False,
     ) -> Optional[dtype]:
+        """Create a Torch-TensorRT dtype from another library's dtype system.
+
+        Takes a dtype enum from one of numpy, torch, and tensorrt and create a ``torch_tensorrt.dtype``.
+        If the source dtype system is not supported or the type is not supported in Torch-TensorRT,
+        then returns ``None``.
+
+
+        Arguments:
+            t (Union(torch.dtype, tensorrt.DataType, numpy.dtype, dtype)): Data type enum from another library
+            use_default (bool): In some cases a catch all type (such as ``torch_tensorrt.dtype.f32``) is sufficient, so instead of throwing an exception, return default value.
+
+        Returns:
+            Optional(dtype): Equivalent ``torch_tensorrt.dtype`` to ``t`` or ``None``
+
+        Examples:
+
+            .. code:: py
+
+                # Succeeds
+                float_dtype = torch_tensorrt.dtype.try_from(torch.float) # Returns torch_tensorrt.dtype.f32
+
+                # Unsupported type
+                float_dtype = torch_tensorrt.dtype.try_from(torch.complex128) # Returns None
+
+        """
+
         try:
             casted_format = dtype._from(t, use_default=use_default)
             return casted_format
@@ -202,6 +316,36 @@ class dtype(Enum):
         t: Union[Type[torch.dtype], Type[trt.DataType], Type[np.dtype], Type[dtype]],
         use_default: bool = False,
     ) -> Union[torch.dtype, trt.DataType, np.dtype, dtype]:
+        """Convert dtype into the equivalent type in [torch, numpy, tensorrt]
+
+        Converts ``self`` into one of numpy, torch, and tensorrt equivalent dtypes.
+        If  ``self`` is not supported in the target library, then an exception will be raised.
+        As such it is not recommended to use this method directly.
+
+        Alternatively use ``torch_tensorrt.dtype.try_to()``
+
+        Arguments:
+            t (Union(Type(torch.dtype), Type(tensorrt.DataType), Type(numpy.dtype), Type(dtype))): Data type enum from another library to convert to
+            use_default (bool): In some cases a catch all type (such as ``torch.float``) is sufficient, so instead of throwing an exception, return default value.
+
+        Returns:
+            Union(torch.dtype, tensorrt.DataType, numpy.dtype, dtype): dtype equivalent ``torch_tensorrt.dtype`` from library enum ``t``
+
+        Raises:
+            TypeError: Unsupported data type or unknown target
+
+        Examples:
+
+            .. code:: py
+
+                # Succeeds
+                float_dtype = torch_tensorrt.dtype.f32.to(torch.dtype) # Returns torch.float
+
+                # Failure
+                float_dtype = torch_tensorrt.dtype.bf16.to(numpy.dtype) # Throws exception
+
+        """
+
         # TODO: Ideally implemented with match statement but need to wait for Py39 EoL
         if t == torch.dtype:
             if self == dtype.u8:
@@ -273,10 +417,14 @@ class dtype(Enum):
                 return np.float64
             elif self == dtype.b:
                 return np.bool_
+            # TODO: Consider using ml_dtypes when issues like this are resolved:
+            # https://github.com/pytorch/pytorch/issues/109873
+            # elif self == dtype.bf16:
+            #    return ml_dtypes.bfloat16
             elif use_default:
                 return np.float32
             else:
-                raise TypeError("Unspported numpy dtype")
+                raise TypeError("Unsupported numpy dtype")
 
         elif t == dtype:
             return self
@@ -315,6 +463,30 @@ class dtype(Enum):
         t: Union[Type[torch.dtype], Type[trt.DataType], Type[np.dtype], Type[dtype]],
         use_default: bool,
     ) -> Optional[Union[torch.dtype, trt.DataType, np.dtype, dtype]]:
+        """Convert dtype into the equivalent type in [torch, numpy, tensorrt]
+
+        Converts ``self`` into one of numpy, torch, and tensorrt equivalent dtypes.
+        If  ``self`` is not supported in the target library, then returns ``None``.
+
+        Arguments:
+            t (Union(Type(torch.dtype), Type(tensorrt.DataType), Type(numpy.dtype), Type(dtype))): Data type enum from another library to convert to
+            use_default (bool): In some cases a catch all type (such as ``torch.float``) is sufficient, so instead of throwing an exception, return default value.
+
+        Returns:
+            Optional(Union(torch.dtype, tensorrt.DataType, numpy.dtype, dtype)): dtype equivalent ``torch_tensorrt.dtype`` from library enum ``t``
+
+        Examples:
+
+            .. code:: py
+
+                # Succeeds
+                float_dtype = torch_tensorrt.dtype.f32.to(torch.dtype) # Returns torch.float
+
+                # Failure
+                float_dtype = torch_tensorrt.dtype.bf16.to(numpy.dtype) # Returns None
+
+        """
+
         try:
             casted_format = self.to(t, use_default)
             return casted_format
@@ -338,21 +510,130 @@ class dtype(Enum):
 
 
 class memory_format(Enum):
+    """"""
 
     # TensorRT supported memory layouts
     linear = auto()
+    """Row major linear format.
+
+    For a tensor with dimensions {N, C, H, W}, the W axis always has unit stride, and the stride of every other axis is at least the product of the next dimension times the next stride. the strides are the same as for a C array with dimensions [N][C][H][W].
+
+    Equivient to ``memory_format.contiguous``
+
+    :meta hide-value:
+    """
+
     chw2 = auto()
+    """Two wide channel vectorized row major format.
+
+    This format is bound to FP16 in TensorRT. It is only available for dimensions >= 3.
+
+    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+1)/2][H][W][2], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c/2][h][w][c%2].
+
+    :meta hide-value:
+    """
+
     hwc8 = auto()
+    """Eight channel format where C is padded to a multiple of 8.
+
+    This format is bound to FP16. It is only available for dimensions >= 3.
+
+    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to the array with dimensions [N][H][W][(C+7)/8*8], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][h][w][c].
+
+    :meta hide-value:
+    """
+
     chw4 = auto()
+    """Four wide channel vectorized row major format. This format is bound to INT8. It is only available for dimensions >= 3.
+
+    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+3)/4][H][W][4], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c/4][h][w][c%4].
+
+    :meta hide-value:
+    """
+
     chw16 = auto()
+    """Sixteen wide channel vectorized row major format.
+
+    This format is bound to FP16. It is only available for dimensions >= 3.
+
+    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+15)/16][H][W][16], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c/16][h][w][c%16].
+
+    :meta hide-value:
+    """
+
     chw32 = auto()
+    """Thirty-two wide channel vectorized row major format.
+
+    This format is only available for dimensions >= 3.
+
+    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+31)/32][H][W][32], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c/32][h][w][c%32].
+
+    :meta hide-value:
+    """
+
     dhwc8 = auto()
+    """Eight channel format where C is padded to a multiple of 8.
+
+    This format is bound to FP16, and it is only available for dimensions >= 4.
+
+    For a tensor with dimensions {N, C, D, H, W}, the memory layout is equivalent to an array with dimensions [N][D][H][W][(C+7)/8*8], with the tensor coordinates (n, c, d, h, w) mapping to array subscript [n][d][h][w][c].
+
+    :meta hide-value:
+    """
+
     cdhw32 = auto()
+    """Thirty-two wide channel vectorized row major format with 3 spatial dimensions.
+
+    This format is bound to FP16 and INT8. It is only available for dimensions >= 4.
+
+    For a tensor with dimensions {N, C, D, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+31)/32][D][H][W][32], with the tensor coordinates (n, d, c, h, w) mapping to array subscript [n][c/32][d][h][w][c%32].
+
+    :meta hide-value:
+    """
+
     hwc = auto()
+    """Non-vectorized channel-last format. This format is bound to FP32 and is only available for dimensions >= 3.
+
+    Equivient to ``memory_format.channels_last``
+
+    :meta hide-value:
+    """
+
     dla_linear = auto()
+    """ DLA planar format. Row major format. The stride for stepping along the H axis is rounded up to 64 bytes.
+
+    This format is bound to FP16/Int8 and is only available for dimensions >= 3.
+
+    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][C][H][roundUp(W, 64/elementSize)] where elementSize is 2 for FP16 and 1 for Int8, with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c][h][w].
+
+    :meta hide-value:
+    """
+
     dla_hwc4 = auto()
+    """DLA image format. channel-last format. C can only be 1, 3, 4. If C == 3 it will be rounded to 4. The stride for stepping along the H axis is rounded up to 32 bytes.
+
+    This format is bound to FP16/Int8 and is only available for dimensions >= 3.
+
+    For a tensor with dimensions {N, C, H, W}, with C’ is 1, 4, 4 when C is 1, 3, 4 respectively, the memory layout is equivalent to a C array with dimensions [N][H][roundUp(W, 32/C’/elementSize)][C’] where elementSize is 2 for FP16 and 1 for Int8, C’ is the rounded C. The tensor coordinates (n, c, h, w) maps to array subscript [n][h][w][c].
+
+    :meta hide-value:
+    """
+
     hwc16 = auto()
+    """Sixteen channel format where C is padded to a multiple of 16. This format is bound to FP16. It is only available for dimensions >= 3.
+
+    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to the array with dimensions [N][H][W][(C+15)/16*16], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][h][w][c].
+
+    :meta hide-value:
+    """
+
     dhwc = auto()
+    """Non-vectorized channel-last format. This format is bound to FP32. It is only available for dimensions >= 4.
+
+    Equivient to ``memory_format.channels_last_3d``
+
+    :meta hide-value:
+    """
 
     # PyTorch aliases for TRT layouts
     contiguous = linear
@@ -363,6 +644,30 @@ class memory_format(Enum):
     def _from(
         cls, f: Union[torch.memory_format, trt.TensorFormat, memory_format]
     ) -> memory_format:
+        """Create a Torch-TensorRT memory format enum from another library memory format enum.
+
+        Takes a memory format enum from one of torch, and tensorrt and create a ``torch_tensorrt.memory_format``.
+        If the source is not supported or the memory format is not supported in Torch-TensorRT,
+        then an exception will be raised. As such it is not recommended to use this method directly.
+
+        Alternatively use ``torch_tensorrt.memory_format.try_from()``
+
+        Arguments:
+            f (Union(torch.memory_format, tensorrt.TensorFormat, memory_format)): Memory format enum from another library
+
+        Returns:
+            memory_format: Equivalent ``torch_tensorrt.memory_format`` to ``f``
+
+        Raises:
+            TypeError: Unsupported memory format or unknown source
+
+        Examples:
+
+            .. code:: py
+
+                torchtrt_linear = torch_tensorrt.memory_format._from(torch.contiguous)
+
+        """
         # TODO: Ideally implemented with match statement but need to wait for Py39 EoL
         if isinstance(f, torch.memory_format):
             if f == torch.contiguous_format:
@@ -430,6 +735,26 @@ class memory_format(Enum):
     def try_from(
         cls, f: Union[torch.memory_format, trt.TensorFormat, memory_format]
     ) -> Optional[memory_format]:
+        """Create a Torch-TensorRT memory format enum from another library memory format enum.
+
+        Takes a memory format enum from one of torch, and tensorrt and create a ``torch_tensorrt.memory_format``.
+        If the source is not supported or the memory format is not supported in Torch-TensorRT,
+        then ``None`` will be returned.
+
+
+        Arguments:
+            f (Union(torch.memory_format, tensorrt.TensorFormat, memory_format)): Memory format enum from another library
+
+        Returns:
+            Optional(memory_format): Equivalent ``torch_tensorrt.memory_format`` to ``f``
+
+        Examples:
+
+            .. code:: py
+
+                torchtrt_linear = torch_tensorrt.memory_format.try_from(torch.contiguous)
+
+        """
         try:
             casted_format = memory_format._from(f)
             return casted_format
@@ -446,6 +771,31 @@ class memory_format(Enum):
             Type[torch.memory_format], Type[trt.TensorFormat], Type[memory_format]
         ],
     ) -> Union[torch.memory_format, trt.TensorFormat, memory_format]:
+        """Convert ``memory_format`` into the equivalent type in torch or tensorrt
+
+        Converts ``self`` into one of torch or tensorrt equivalent memory format.
+        If  ``self`` is not supported in the target library, then an exception will be raised.
+        As such it is not recommended to use this method directly.
+
+        Alternatively use ``torch_tensorrt.memory_format.try_to()``
+
+        Arguments:
+            t (Union(Type(torch.memory_format), Type(tensorrt.TensorFormat), Type(memory_format))): Memory format type enum from another library to convert to
+
+        Returns:
+            Union(torch.memory_format, tensorrt.TensorFormat, memory_format): Memory format equivalent ``torch_tensorrt.memory_format`` in enum ``t``
+
+        Raises:
+            TypeError: Unknown target type or unsupported memory format
+
+        Examples:
+
+            .. code:: py
+
+                # Succeeds
+                tf = torch_tensorrt.memory_format.linear.to(torch.dtype) # Returns torch.contiguous
+        """
+
         if t == torch.memory_format:
             if self == memory_format.contiguous:
                 return torch.contiguous_format
@@ -512,6 +862,25 @@ class memory_format(Enum):
             Type[torch.memory_format], Type[trt.TensorFormat], Type[memory_format]
         ],
     ) -> Optional[Union[torch.memory_format, trt.TensorFormat, memory_format]]:
+        """Convert ``memory_format`` into the equivalent type in torch or tensorrt
+
+        Converts ``self`` into one of torch or tensorrt equivalent memory format.
+        If  ``self`` is not supported in the target library, then ``None`` will be returned
+
+        Arguments:
+            t (Union(Type(torch.memory_format), Type(tensorrt.TensorFormat), Type(memory_format))): Memory format type enum from another library to convert to
+
+        Returns:
+            Optional(Union(torch.memory_format, tensorrt.TensorFormat, memory_format)): Memory format equivalent ``torch_tensorrt.memory_format`` in enum ``t``
+
+        Examples:
+
+            .. code:: py
+
+                # Succeeds
+                tf = torch_tensorrt.memory_format.linear.to(torch.dtype) # Returns torch.contiguous
+        """
+
         try:
             casted_format = self.to(t)
             return casted_format
@@ -533,12 +902,55 @@ class memory_format(Enum):
 
 
 class DeviceType(Enum):
+    """Type of device TensorRT will target"""
+
     UNKNOWN = auto()
+    """
+    Sentinel value
+
+    :meta hide-value:
+    """
+
     GPU = auto()
+    """
+    Target is a GPU
+
+    :meta hide-value:
+    """
+
     DLA = auto()
+    """
+    Target is a DLA core
+
+    :meta hide-value:
+    """
 
     @classmethod
     def _from(cls, d: Union[trt.DeviceType, DeviceType]) -> DeviceType:
+        """Create a Torch-TensorRT device type enum from a TensorRT device type enum.
+
+        Takes a device type enum from tensorrt and create a ``torch_tensorrt.DeviceType``.
+        If the source is not supported or the device type is not supported in Torch-TensorRT,
+        then an exception will be raised. As such it is not recommended to use this method directly.
+
+        Alternatively use ``torch_tensorrt.DeviceType.try_from()``
+
+        Arguments:
+            d (Union(tensorrt.DeviceType, DeviceType)): Device type enum from another library
+
+        Returns:
+            DeviceType: Equivalent ``torch_tensorrt.DeviceType`` to ``d``
+
+        Raises:
+            TypeError: Unknown source type or unsupported device type
+
+        Examples:
+
+            .. code:: py
+
+                torchtrt_dla = torch_tensorrt.DeviceType._from(tensorrt.DeviceType.DLA)
+
+        """
         if isinstance(d, trt.DeviceType):
             if d == trt.DeviceType.GPU:
                 return DeviceType.GPU
@@ -569,6 +981,27 @@ class DeviceType(Enum):
 
     @classmethod
     def try_from(cls, d: Union[trt.DeviceType, DeviceType]) -> Optional[DeviceType]:
+        """Create a Torch-TensorRT device type enum from a TensorRT device type enum.
+
+        Takes a device type enum from tensorrt and create a ``torch_tensorrt.DeviceType``.
+        If the source is not supported or the device type is not supported in Torch-TensorRT,
+        then an exception will be raised. As such it is not recommended to use this method directly.
+
+        Alternatively use ``torch_tensorrt.DeviceType.try_from()``
+
+        Arguments:
+            d (Union(tensorrt.DeviceType, DeviceType)): Device type enum from another library
+
+        Returns:
+            DeviceType: Equivalent ``torch_tensorrt.DeviceType`` to ``d``
+
+        Examples:
+
+            .. code:: py
+
+                torchtrt_dla = torch_tensorrt.DeviceType._from(tensorrt.DeviceType.DLA)
+
+        """
         try:
             casted_format = DeviceType._from(d)
             return casted_format
@@ -584,6 +1017,31 @@ class DeviceType(Enum):
         t: Union[Type[trt.DeviceType], Type[DeviceType]],
         use_default: bool = False,
     ) -> Union[trt.DeviceType, DeviceType]:
+        """Convert ``DeviceType`` into the equivalent type in tensorrt
+
+        Converts ``self`` into one of torch or tensorrt equivalent device type.
+        If  ``self`` is not supported in the target library, then an exception will be raised.
+        As such it is not recommended to use this method directly.
+
+        Alternatively use ``torch_tensorrt.DeviceType.try_to()``
+
+        Arguments:
+            t (Union(Type(tensorrt.DeviceType), Type(DeviceType))): Device type enum from another library to convert to
+
+        Returns:
+            Union(tensorrt.DeviceType, DeviceType): Device type equivalent ``torch_tensorrt.DeviceType`` in enum ``t``
+
+        Raises:
+            TypeError: Unknown target type or unsupported device type
+
+        Examples:
+
+            .. code:: py
+
+                # Succeeds
+                trt_dla = torch_tensorrt.DeviceType.DLA.to(tensorrt.DeviceType) # Returns tensorrt.DeviceType.DLA
+        """
+
         if t == trt.DeviceType:
             if self == DeviceType.GPU:
                 return trt.DeviceType.GPU
@@ -621,6 +1079,24 @@ class DeviceType(Enum):
         t: Union[Type[trt.DeviceType], Type[DeviceType]],
         use_default: bool = False,
     ) -> Optional[Union[trt.DeviceType, DeviceType]]:
+        """Convert ``DeviceType`` into the equivalent type in tensorrt
+
+        Converts ``self`` into one of torch or tensorrt equivalent memory format.
+        If  ``self`` is not supported in the target library, then ``None`` will be returned.
+
+        Arguments:
+            t (Union(Type(tensorrt.DeviceType), Type(DeviceType))): Device type enum from another library to convert to
+
+        Returns:
+            Optional(Union(tensorrt.DeviceType, DeviceType)): Device type equivalent ``torch_tensorrt.DeviceType`` in enum ``t``
+
+        Examples:
+
+            .. code:: py
+
+                # Succeeds
+                trt_dla = torch_tensorrt.DeviceType.DLA.to(tensorrt.DeviceType) # Returns tensorrt.DeviceType.DLA
+        """
         try:
             casted_format = self.to(t, use_default=use_default)
             return casted_format
@@ -640,14 +1116,59 @@ class DeviceType(Enum):
 
 
 class EngineCapability(Enum):
+    """
+    EngineCapability determines the restrictions of a network during build time and what runtime it targets.
+    """
+
     STANDARD = auto()
+    """
+    EngineCapability.STANDARD does not provide any restrictions on functionality and the resulting serialized engine can be executed with TensorRT’s standard runtime APIs.
+
+    :meta hide-value:
+    """
+
     SAFETY = auto()
+    """
+    EngineCapability.SAFETY provides a restricted subset of network operations that are safety certified and the resulting serialized engine can be executed with TensorRT’s safe runtime APIs in the tensorrt.safe namespace.
+
+    :meta hide-value:
+    """
+
     DLA_STANDALONE = auto()
+    """
+    ``EngineCapability.DLA_STANDALONE`` provides a restricted subset of network operations that are DLA compatible and the resulting serialized engine can be executed using standalone DLA runtime APIs.
+
+    :meta hide-value:
+    """
 
     @classmethod
     def _from(
         cls, c: Union[trt.EngineCapability, EngineCapability]
     ) -> EngineCapability:
+        """Create a Torch-TensorRT Engine capability enum from a TensorRT Engine capability enum.
+
+        Takes a device type enum from tensorrt and create a ``torch_tensorrt.EngineCapability``.
+        If the source is not supported or the engine capability is not supported in Torch-TensorRT,
+        then an exception will be raised. As such it is not recommended to use this method directly.
+
+        Alternatively use ``torch_tensorrt.EngineCapability.try_from()``
+
+        Arguments:
+            c (Union(tensorrt.EngineCapability, EngineCapability)): Engine capability enum from another library
+
+        Returns:
+            EngineCapability: Equivalent ``torch_tensorrt.EngineCapability`` to ``c``
+
+        Raises:
+            TypeError: Unknown source type or unsupported engine capability
+
+        Examples:
+
+            .. code:: py
+
+                torchtrt_ec = torch_tensorrt.EngineCapability._from(tensorrt.EngineCapability.SAFETY)
+
+        """
         if isinstance(c, trt.EngineCapability):
             if c == trt.EngineCapability.STANDARD:
                 return EngineCapability.STANDARD
@@ -682,6 +1203,27 @@ class EngineCapability(Enum):
     def try_from(
         c: Union[trt.EngineCapability, EngineCapability]
     ) -> Optional[EngineCapability]:
+        """Create a Torch-TensorRT engine capability enum from a TensorRT engine capability enum.
+
+        Takes a device type enum from tensorrt and create a ``torch_tensorrt.EngineCapability``.
+        If the source is not supported or the engine capability level is not supported in Torch-TensorRT,
+        then an exception will be raised. As such it is not recommended to use this method directly.
+
+        Alternatively use ``torch_tensorrt.EngineCapability.try_from()``
+
+        Arguments:
+            c (Union(tensorrt.EngineCapability, EngineCapability)): Engine capability enum from another library
+
+        Returns:
+            EngineCapability: Equivalent ``torch_tensorrt.EngineCapability`` to ``c``
+
+        Examples:
+
+            .. code:: py
+
+                torchtrt_safety_ec = torch_tensorrt.EngineCapability._from(tensorrt.EngineCapability.SAEFTY)
+
+        """
         try:
             casted_format = EngineCapability._from(c)
             return casted_format
@@ -695,6 +1237,30 @@ class EngineCapability(Enum):
     def to(
         self, t: Union[Type[trt.EngineCapability], Type[EngineCapability]]
     ) -> Union[trt.EngineCapability, EngineCapability]:
+        """Convert ``EngineCapability`` into the equivalent type in tensorrt
+
+        Converts ``self`` into one of torch or tensorrt equivalent engine capability.
+        If  ``self`` is not supported in the target library, then an exception will be raised.
+        As such it is not recommended to use this method directly.
+
+        Alternatively use ``torch_tensorrt.EngineCapability.try_to()``
+
+        Arguments:
+            t (Union(Type(tensorrt.EngineCapability), Type(EngineCapability))): Engine capability enum from another library to convert to
+
+        Returns:
+            Union(tensorrt.EngineCapability, EngineCapability): Engine capability equivalent ``torch_tensorrt.EngineCapability`` in enum ``t``
+
+        Raises:
+            TypeError: Unknown target type or unsupported engine capability
+
+        Examples:
+
+            .. code:: py
+
+                # Succeeds
+                torchtrt_dla_ec = torch_tensorrt.EngineCapability.DLA_STANDALONE.to(tensorrt.EngineCapability) # Returns tensorrt.EngineCapability.DLA
+        """
         if t == trt.EngineCapability:
             if self == EngineCapability.STANDARD:
                 return trt.EngineCapability.STANDARD
@@ -722,12 +1288,30 @@ class EngineCapability(Enum):
                     raise ValueError("Provided an unsupported engine capability")
         # else: # commented out for mypy
         raise TypeError(
-            "Provided unsupported destination type for engine capablity type conversion"
+            "Provided unsupported destination type for engine capability type conversion"
         )
 
     def try_to(
         self, t: Union[Type[trt.EngineCapability], Type[EngineCapability]]
     ) -> Optional[Union[trt.EngineCapability, EngineCapability]]:
+        """Convert ``EngineCapability`` into the equivalent type in tensorrt
+
+        Converts ``self`` into one of torch or tensorrt equivalent engine capability.
+        If  ``self`` is not supported in the target library, then ``None`` will be returned.
+
+        Arguments:
+            t (Union(Type(tensorrt.EngineCapability), Type(EngineCapability))): Engine capability enum from another library to convert to
+
+        Returns:
+            Optional(Union(tensorrt.EngineCapability, EngineCapability)): Engine capability equivalent ``torch_tensorrt.EngineCapability`` in enum ``t``
+
+        Examples:
+
+            .. code:: py
+
+                # Succeeds
+                trt_dla_ec = torch_tensorrt.EngineCapability.DLA.to(tensorrt.EngineCapability) # Returns tensorrt.EngineCapability.DLA_STANDALONE
+        """
         try:
             casted_format = self.to(t)
             return casted_format

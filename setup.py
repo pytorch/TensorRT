@@ -140,6 +140,10 @@ if "--use-cxx11-abi" in sys.argv:
     sys.argv.remove("--use-cxx11-abi")
     CXX11_ABI = True
 
+if (cxx11_abi_env_var := os.environ.get("USE_CXX11_ABI")) is not None:
+    if cxx11_abi_env_var == "1":
+        CXX11_ABI = True
+
 if platform.uname().processor == "aarch64":
     if "--jetpack-version" in sys.argv:
         version_idx = sys.argv.index("--jetpack-version") + 1
@@ -617,7 +621,7 @@ elif NO_TS:
         }
     )
 
-with open("README.md", "r", encoding="utf-8") as fh:
+with open(os.path.join(get_root_dir(), "README.md"), "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(

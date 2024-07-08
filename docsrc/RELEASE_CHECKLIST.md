@@ -9,7 +9,7 @@ While Torch-TensorRT is in alpha, patch versions are bumped sequentially on brea
 In beta Torch-TensorRT will get a minor version bump on breaking changes, or upgrade to the next version of PyTorch, patch version will be incremented based on significant bug fixes, or siginficant new functionality in the compiler.
 
 Once Torch-TensorRT hits version 1.0.0, major versions are bumped on breaking API changes, breaking changes or significant new functionality in the compiler
-will result in a minor version bump and sigificant bug fixes will result in a patch version change.
+will result in a minor version bump and significant bug fixes will result in a patch version change.
 
 ## Steps to Packaging a Release
 
@@ -50,7 +50,7 @@ will result in a minor version bump and sigificant bug fixes will result in a pa
             - `[3, 1920, 1080]` (P2)
     - Batch Sizes: 1, 4, 8, 16, 32
     - Frameworks: PyTorch, Torch-TensorRT, ONNX + TRT
-        - If any models do not convert to ONNX / TRT, that is fine. Mark them as failling / no result
+        - If any models do not convert to ONNX / TRT, that is fine. Mark them as failing / no result
     - Devices:
         - A100 (P0)
         - A30 / A30 MIG (P1) (same batches as T4

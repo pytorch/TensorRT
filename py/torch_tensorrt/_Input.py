@@ -15,11 +15,11 @@ class Input(object):
         shape_mode (torch_tensorrt.Input._ShapeMode): Is input statically or dynamically shaped
         shape (Tuple or Dict): Either a single Tuple or a dict of tuples defining the input shape.
             Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form
-            ``{
-                "min_shape": Tuple,
-                "opt_shape": Tuple,
-                "max_shape": Tuple
-            }``
+
+            .. code-block:: py
+
+                {"min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple}
+
         dtype (torch_tensorrt.dtype): The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)
         format (torch_tensorrt.TensorFormat): The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)
     """
@@ -60,11 +60,11 @@ class Input(object):
         Keyword Arguments:
             shape (Tuple or List, optional): Static shape of input tensor
             min_shape (Tuple or List, optional): Min size of input tensor's shape range
-                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implictly this sets Input's shape_mode to DYNAMIC
+                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC
             opt_shape (Tuple or List, optional): Opt size of input tensor's shape range
-                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implictly this sets Input's shape_mode to DYNAMIC
+                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC
             max_shape (Tuple or List, optional): Max size of input tensor's shape range
-                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implictly this sets Input's shape_mode to DYNAMIC
+                Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implicitly this sets Input's shape_mode to DYNAMIC
             dtype (torch.dtype or torch_tensorrt.dtype): Expected data type for input tensor (default: torch_tensorrt.dtype.float32)
             format (torch.memory_format or torch_tensorrt.TensorFormat): The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)
             tensor_domain (Tuple(float, float), optional): The domain of allowed values for the tensor, as interval notation: [tensor_domain[0], tensor_domain[1]).

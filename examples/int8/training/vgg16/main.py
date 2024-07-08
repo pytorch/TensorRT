@@ -35,7 +35,7 @@ PARSER.add_argument(
     "--start-from",
     default=0,
     type=int,
-    help="Epoch to resume from (requires a checkpoin in the providied checkpoi",
+    help="Epoch to resume from (requires a checkpoint in the providied checkpoi",
 )
 PARSER.add_argument("--seed", type=int, help="Seed value for rng")
 PARSER.add_argument(

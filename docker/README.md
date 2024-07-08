@@ -35,7 +35,7 @@ nvidia-docker run --gpus all -it --shm-size=8gb --env="DISPLAY" --volume="/tmp/.
 Test:
 
 
-You can run any converter test to verify if Torch-TRT built sucessfully inside the container. Once you launch the container, you can run
+You can run any converter test to verify if Torch-TRT built successfully inside the container. Once you launch the container, you can run
 ```
 bazel test //tests/core/conversion/converters:test_activation --compilation_mode=opt --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi
 ```

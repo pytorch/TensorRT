@@ -26,13 +26,8 @@ Functions
 
 .. autofunction:: refit_module_weights
 
+
 Classes
 --------
 
 .. autoclass:: CompilationSettings
-
-.. autoclass:: SourceIR
-
-.. autoclass:: runtime.TorchTensorRTModule
-
-.. autoclass:: runtime.PythonTorchTensorRTModule
