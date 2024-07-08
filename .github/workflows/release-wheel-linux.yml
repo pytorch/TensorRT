@@ -73,8 +73,8 @@ on:
       cxx11-tarball-release:
         description: "Flag whether this is the cxx11 tarball release"
         required: true
-        type: boolean
-        default: false
+        type: string
+        default: "false"
 
 permissions:
   id-token: write
