@@ -1,6 +1,8 @@
 import logging
+import pickle
+from copy import deepcopy
 from enum import Enum, auto
-from typing import Any, Collection, List, Optional, Set, Tuple, Union
+from typing import Any, Collection, Dict, List, Optional, Set, Tuple, Union
 
 import torch
 from torch.fx.node import Target
@@ -81,7 +83,7 @@ class MutableTorchTensorRTModule(object):
         # Process settings
         self.gm: Any = None
         self.exp_program: Any = None
-        self.inputs: Optional[tuple[Any, ...]] = None
+        self.args_inputs: tuple[Any, ...] = tuple()
         device = to_torch_tensorrt_device(device)
         enabled_precisions = {dtype._from(p) for p in enabled_precisions}
         if not make_refitable:
@@ -127,14 +129,14 @@ class MutableTorchTensorRTModule(object):
 
         self.settings = CompilationSettings(**compilation_options)
 
-    def load_state_dict(self, state_dict: dict[str, Any]) -> None:
+    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
         RefitState.set_state(RefitFlag.NEEDS_REFIT)
         self.pytorch_model.load_state_dict(state_dict)
 
     def _refit_gm(self) -> None:
         if self.exp_program is None:
             self.exp_program = torch.export.export(
-                self.pytorch_model, self.inputs, **self.settings.__dict__
+                self.pytorch_model, self.args_inputs, **self.settings.__dict__
             )
 
         if (
@@ -148,7 +150,7 @@ class MutableTorchTensorRTModule(object):
         self.exp_program._state_dict = MutableTorchTensorRTModule._transform_state_dict(
             self.pytorch_model.state_dict()
         )
-        self.gm = refit_module_weights(self.gm, self.exp_program, self.inputs)
+        self.gm = refit_module_weights(self.gm, self.exp_program, self.args_inputs)
 
     def _compile(self) -> None:
 
@@ -159,12 +161,11 @@ class MutableTorchTensorRTModule(object):
         self.gm = dynamo_compile(
             self.exp_program,
             inputs=self.torchtrt_inputs,
-            # make_refitable=True,
             **self.settings.__dict__,
         )
 
     @staticmethod
-    def _transform_state_dict(sd: dict[str, Any]) -> dict[str, torch.nn.Parameter]:
+    def _transform_state_dict(sd: Dict[str, Any]) -> Dict[str, torch.nn.Parameter]:
         return {k: torch.nn.Parameter(v, requires_grad=False) for k, v in sd.items()}
 
     def __getattr__(self, name: str) -> Any:
@@ -173,6 +174,11 @@ class MutableTorchTensorRTModule(object):
             # this object has it
             return getattr(self, name)
 
+        if "pytorch_model" not in self.__dict__:
+            raise AttributeError(
+                "Module is not properly initiated. Pytorch model is not found in the module."
+            )
+
         return getattr(self.pytorch_model, name)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
@@ -180,13 +186,13 @@ class MutableTorchTensorRTModule(object):
         return self.forward(*args, **kwargs)
 
     def _validate_inputs(self, *args: Any, **kwargs: Any) -> None:
-        if not self.inputs or not MutableTorchTensorRTModule.check_inputs_equal(
-            self.inputs, args
+        if not self.args_inputs or not MutableTorchTensorRTModule.check_inputs_equal(
+            self.args_inputs, args
         ):
             logger.info("Input change detected.")
             RefitState.set_state(RefitFlag.NEEDS_RECOMPILE)
-            self.inputs = args
-            self.torchtrt_inputs = prepare_inputs(self.inputs)
+            self.args_inputs = args
+            self.torchtrt_inputs = prepare_inputs(self.args_inputs)
 
     def forward(self, *args: Any, **kwargs: Any) -> Any:
         # TODO: Add support for kwargs
@@ -202,6 +208,41 @@ class MutableTorchTensorRTModule(object):
             RefitState.set_state(RefitFlag.LIVE)
 
         return self.gm(*args, **kwargs)
+
+    def __deepcopy__(self, memo: Any) -> Any:
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k != "pytorch_model":
+                setattr(result, k, deepcopy(v, memo))
+        result.pytorch_model = _make_refit_change_trigger(result.original_model)
+        return result
+
+    @staticmethod
+    def save(module: Any, path: str) -> None:
+        if module.settings.use_python_runtime:
+            logger.warning(
+                "Python runtime does not support serialization. Save failed."
+            )
+        exp_file_name = f"{path.split('.')[0]}_exp_program.ep"
+        torch.export.save(module.exp_program, exp_file_name)
+        exp_program = module.exp_program
+        module.pytorch_model = None
+        module.exp_program = None
+        with open(path, "wb") as f:
+            pickle.dump(module, f)
+        module.exp_program = exp_program
+        module.pytorch_model = _make_refit_change_trigger(module.original_model)
+
+    @staticmethod
+    def load(path: str) -> Any:
+        with open(path, "rb") as f:
+            module = pickle.load(f)
+        module.pytorch_model = _make_refit_change_trigger(module.original_model)
+        exp_file_name = f"{path.split('.')[0]}_exp_program.ep"
+        module.exp_program = torch.export.load(exp_file_name)
+        return module
 
     @staticmethod
     def check_inputs_equal(
