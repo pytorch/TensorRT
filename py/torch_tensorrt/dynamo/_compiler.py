@@ -47,9 +47,9 @@ logger = logging.getLogger(__name__)
 
 def compile(
     exported_program: ExportedProgram,
-    arg_inputs: Tuple[Any, ...],
     *,
-    inputs: Optional[Tuple[Any, ...]] = None,
+    arg_inputs: Optional[Sequence[Any]] = None,
+    inputs: Optional[Sequence[Any]] = None,
     kwarg_inputs: Optional[dict[Any, Any]] = None,
     device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
     disable_tf32: bool = _defaults.DISABLE_TF32,
@@ -183,22 +183,25 @@ def compile(
             f"Detected torch_executed_modules was non-empty: {torch_executed_modules}"
             "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
         )
-    if inputs:
+    if inputs is not None:
         logger.warning(
             "'inputs' is deprecated. Please use 'args_inputs' in the future."
         )
-        if not arg_inputs:
+        if arg_inputs is None:
             arg_inputs = inputs
         else:
             logger.warning(
                 "Both 'arg_inputs' and 'inputs' are received. 'inputs' will be ignored."
             )
+    else:
+        if arg_inputs is None:
+            raise AssertionError("'arg_inputs' cannot be empty")
     if not isinstance(arg_inputs, collections.abc.Sequence):
         arg_inputs = [arg_inputs]
 
     # Prepare torch_trt inputs
-    arg_inputs = prepare_inputs(arg_inputs)
-    kwarg_inputs = prepare_inputs(kwarg_inputs)
+    trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
+    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
     device = to_torch_tensorrt_device(device)
     enabled_precisions = {dtype._from(p) for p in enabled_precisions}
 
@@ -252,7 +255,7 @@ def compile(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-    trt_gm = compile_module(gm, arg_inputs, kwarg_inputs, settings)
+    trt_gm = compile_module(gm, trt_arg_inputs, trt_kwarg_inputs, settings)
     return trt_gm
 
 
