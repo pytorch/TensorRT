@@ -248,8 +248,8 @@ def compile(
 
 def compile_module(
     gm: torch.fx.GraphModule,
-    sample_inputs: Sequence[Input],
-    sample_kwarg_inputs: Any = None,
+    sample_arg_inputs: Sequence[Input],
+    sample_kwarg_inputs: Optional[dict[Any, Any]] = None,
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
@@ -280,10 +280,12 @@ def compile_module(
     dryrun_tracker.total_ops_in_graph = total_ops
     dryrun_tracker.supported_ops_in_graph = num_supported_ops
     dryrun_tracker.graph_input_shapes = parse_complex_tensor_structs(
-        sample_inputs, "shape", lambda x: dict(x) if isinstance(x, dict) else tuple(x)
+        sample_arg_inputs,
+        "shape",
+        lambda x: dict(x) if isinstance(x, dict) else tuple(x),
     )
     dryrun_tracker.graph_input_dtypes = parse_complex_tensor_structs(
-        sample_inputs, "dtype", lambda t: t.to(torch.dtype, use_default=True)
+        sample_arg_inputs, "dtype", lambda t: t.to(torch.dtype, use_default=True)
     )
     dryrun_tracker.compilation_settings = settings
 
@@ -442,7 +444,7 @@ def compile_module(
             trt_modules[name] = trt_module
 
     torch_sample_inputs = get_torch_inputs(
-        sample_inputs, to_torch_device(settings.device)
+        sample_arg_inputs, to_torch_device(settings.device)
     )
     torch_sample_kwarg_inputs = get_torch_inputs(
         sample_kwarg_inputs, to_torch_device(settings.device)
