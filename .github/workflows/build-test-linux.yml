@@ -293,12 +293,14 @@ jobs:
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
+        set -x
         export USE_HOST_DEPS=1
         pushd .
         cd tests/py/core
         python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_core_test_results.xml .
         popd
-        bazel test //tests/core/conversion/converters:test_activation --compilation_mode=opt --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi
+        bazel test //tests/core/conversion/converters:test_activation --compilation_mode=opt \
+        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
