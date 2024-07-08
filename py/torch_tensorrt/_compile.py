@@ -11,8 +11,6 @@ from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
-from torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule import MutableTorchTensorRTModule
-
 from torch_tensorrt.fx import InputTensorSpec
 from torch_tensorrt.fx.lower import compile as fx_compile
 from torch_tensorrt.fx.utils import LowerPrecision
@@ -243,27 +241,22 @@ def compile(
         )
         return compiled_fx_module
     elif target_ir == _IRType.dynamo:
-        if kwargs["mutable"]:
-            mutable_trt_graph_module = MutableTorchTensorRTModule(module, input_list, enabled_precisions_set, **kwargs)
-            mutable_trt_graph_module.compile()
-            return mutable_trt_graph_module
-        else:
         # Prepare torch and torchtrt inputs
-            from torch_tensorrt.dynamo.utils import prepare_inputs
+        from torch_tensorrt.dynamo.utils import prepare_inputs
 
-            if not isinstance(input_list, collections.abc.Sequence):
-                input_list = [input_list]
+        if not isinstance(input_list, collections.abc.Sequence):
+            input_list = [input_list]
 
-            # Export the module
-            torchtrt_inputs = prepare_inputs(input_list)
-            exp_program = dynamo_trace(module, torchtrt_inputs, **kwargs)
-            trt_graph_module = dynamo_compile(
-                exp_program,
-                inputs=torchtrt_inputs,
-                enabled_precisions=enabled_precisions_set,
-                **kwargs,
-            )
-            return trt_graph_module
+        # Export the module
+        torchtrt_inputs = prepare_inputs(input_list)
+        exp_program = dynamo_trace(module, torchtrt_inputs, **kwargs)
+        trt_graph_module = dynamo_compile(
+            exp_program,
+            inputs=torchtrt_inputs,
+            enabled_precisions=enabled_precisions_set,
+            **kwargs,
+        )
+        return trt_graph_module
     elif target_ir == _IRType.torch_compile:
         return torch_compile(
             module, enabled_precisions=enabled_precisions_set, **kwargs
@@ -450,8 +443,6 @@ def save(
     Arguments:
         module (Optional(torch.jit.ScriptModule | torch.export.ExportedProgram | torch.fx.GraphModule)): Compiled Torch-TensorRT module
         inputs (torch.Tensor): Torch input tensors
-        arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
-        kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
         output_format (str): Format to save the model. Options include exported_program | torchscript.
         retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
                 This flag is experimental for now.
