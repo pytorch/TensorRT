@@ -49,8 +49,6 @@ mutable_module = torch_trt.MutableTorchTensorRTModule(model, **kwargs)
 mutable_module(*inputs)
 
 
-# Save the graph module as an exported program
-# This is only supported when use_python_runtime = False
 mutable_module.load_state_dict(model2.state_dict())
 
 
@@ -62,3 +60,8 @@ for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
     ), "Refit Result is not correct. Refit failed"
 
 print("Refit successfully!")
+torch_trt.MutableTorchTensorRTModule.save(mutable_module, "mutable_module.pkl")
+reload = torch_trt.MutableTorchTensorRTModule.load("mutable_module.pkl")
+
+
+print()
