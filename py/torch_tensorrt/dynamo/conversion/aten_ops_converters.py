@@ -2023,6 +2023,7 @@ def aten_ops_pow(
 @dynamo_tensorrt_converter(
     torch.ops.aten.floor_divide.Scalar, supports_dynamic_shapes=True
 )
+@dynamo_tensorrt_converter(operator.floordiv, supports_dynamic_shapes=True)
 def aten_ops_floor_div(
     ctx: ConversionContext,
     target: Target,

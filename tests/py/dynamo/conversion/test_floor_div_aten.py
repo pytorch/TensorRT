@@ -88,6 +88,10 @@ class TestFloorDivConverter(DispatchTestCase):
             def forward(self, lhs_val, rhs_val):
                 return torch.ops.aten.floor_divide.default(lhs_val, rhs_val)
 
+        class floor_div_operator(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return lhs_val // rhs_val
+
         input_specs = [
             Input(
                 min_shape=min_shape,
@@ -104,6 +108,9 @@ class TestFloorDivConverter(DispatchTestCase):
         ]
         self.run_test_with_dynamic_shape(
             floor_div(), input_specs, output_dtypes=[output_type]
+        )
+        self.run_test_with_dynamic_shape(
+            floor_div_operator(), input_specs, output_dtypes=[output_type]
         )
 
 
