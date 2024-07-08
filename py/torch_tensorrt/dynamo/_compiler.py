@@ -49,6 +49,7 @@ def compile(
     exported_program: ExportedProgram,
     arg_inputs: Tuple[Any, ...],
     *,
+    inputs: Optional[Tuple[Any, ...]] = None,
     kwarg_inputs: Optional[dict[Any, Any]] = None,
     device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
     disable_tf32: bool = _defaults.DISABLE_TF32,
@@ -182,7 +183,16 @@ def compile(
             f"Detected torch_executed_modules was non-empty: {torch_executed_modules}"
             "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
         )
-
+    if inputs:
+        logger.warning(
+            "'inputs' is deprecated. Please use 'args_inputs' in the future."
+        )
+        if not arg_inputs:
+            arg_inputs = inputs
+        else:
+            logger.warning(
+                "Both 'arg_inputs' and 'inputs' are received. 'inputs' will be ignored."
+            )
     if not isinstance(arg_inputs, collections.abc.Sequence):
         arg_inputs = [arg_inputs]
 
