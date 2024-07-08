@@ -28,16 +28,14 @@ class RefitFlag(Enum):
 class RefitState:
     _state: RefitFlag = RefitFlag.UNKNOWN
 
-    @classmethod
-    def set_state(cls, state: RefitFlag) -> None:
+    def set_state(self, state: RefitFlag) -> None:
         if isinstance(state, RefitFlag):
-            cls._state = state
+            self._state = state
         else:
             raise ValueError(f"Invalid state: {state}")
 
-    @classmethod
-    def get_state(cls) -> RefitFlag:
-        return cls._state
+    def get_state(self) -> RefitFlag:
+        return self._state
 
 
 class MutableTorchTensorRTModule(object):
@@ -77,8 +75,8 @@ class MutableTorchTensorRTModule(object):
         timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
         **kwargs: Any,
     ) -> None:
-
-        self.pytorch_model = _make_refit_change_trigger(pytorch_model)
+        self.refit_state = RefitState()
+        self.pytorch_model = _make_refit_change_trigger(pytorch_model, self.refit_state)
         self.original_model = pytorch_model
         # Process settings
         self.gm: Any = None
@@ -130,7 +128,7 @@ class MutableTorchTensorRTModule(object):
         self.settings = CompilationSettings(**compilation_options)
 
     def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
-        RefitState.set_state(RefitFlag.NEEDS_REFIT)
+        self.refit_state.set_state(RefitFlag.NEEDS_REFIT)
         self.pytorch_model.load_state_dict(state_dict)
 
     def _refit_gm(self) -> None:
@@ -190,22 +188,22 @@ class MutableTorchTensorRTModule(object):
             self.args_inputs, args
         ):
             logger.info("Input change detected.")
-            RefitState.set_state(RefitFlag.NEEDS_RECOMPILE)
+            self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
             self.args_inputs = args
             self.torchtrt_inputs = prepare_inputs(self.args_inputs)
 
     def forward(self, *args: Any, **kwargs: Any) -> Any:
         # TODO: Add support for kwargs
         self._validate_inputs(*args, **kwargs)
-        if RefitState.get_state() == RefitFlag.NEEDS_RECOMPILE:
+        if self.refit_state.get_state() == RefitFlag.NEEDS_RECOMPILE:
             logger.info("(Re)Compiling the engine.")
             self._compile()
-            RefitState.set_state(RefitFlag.LIVE)
+            self.refit_state.set_state(RefitFlag.LIVE)
 
-        elif RefitState.get_state() == RefitFlag.NEEDS_REFIT:
+        elif self.refit_state.get_state() == RefitFlag.NEEDS_REFIT:
             print("Model weight change detected. Refitting the module...")
             self._refit_gm()
-            RefitState.set_state(RefitFlag.LIVE)
+            self.refit_state.set_state(RefitFlag.LIVE)
 
         return self.gm(*args, **kwargs)
 
@@ -216,7 +214,9 @@ class MutableTorchTensorRTModule(object):
         for k, v in self.__dict__.items():
             if k != "pytorch_model":
                 setattr(result, k, deepcopy(v, memo))
-        result.pytorch_model = _make_refit_change_trigger(result.original_model)
+        result.pytorch_model = _make_refit_change_trigger(
+            result.original_model, result.refit_state
+        )
         return result
 
     @staticmethod
@@ -233,13 +233,17 @@ class MutableTorchTensorRTModule(object):
         with open(path, "wb") as f:
             pickle.dump(module, f)
         module.exp_program = exp_program
-        module.pytorch_model = _make_refit_change_trigger(module.original_model)
+        module.pytorch_model = _make_refit_change_trigger(
+            module.original_model, module.refit_state
+        )
 
     @staticmethod
     def load(path: str) -> Any:
         with open(path, "rb") as f:
             module = pickle.load(f)
-        module.pytorch_model = _make_refit_change_trigger(module.original_model)
+        module.pytorch_model = _make_refit_change_trigger(
+            module.original_model, module.refit_state
+        )
         exp_file_name = f"{path.split('.')[0]}_exp_program.ep"
         module.exp_program = torch.export.load(exp_file_name)
         return module
@@ -278,7 +282,7 @@ class MutableTorchTensorRTModule(object):
         return True
 
 
-def _make_refit_change_trigger(obj: object) -> Any:
+def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
     subclass: type = obj.__class__
 
     class ChangeTriggerWrapper(subclass):  # type: ignore
@@ -291,7 +295,7 @@ def _make_refit_change_trigger(obj: object) -> Any:
             if not hasattr(obj, "__dict__"):
                 return obj
             else:
-                return _make_refit_change_trigger(obj)
+                return _make_refit_change_trigger(obj, refit_state)
 
         def __setattr__(self, name: str, value: Any) -> None:
             self._on_change()
@@ -305,7 +309,7 @@ def _make_refit_change_trigger(obj: object) -> Any:
             )
 
         def _on_change(self) -> None:
-            RefitState.set_state(RefitFlag.NEEDS_REFIT)
+            refit_state.set_state(RefitFlag.NEEDS_REFIT)
             print("Change!")
 
         def __call__(self, *args: Any, **kwargs: Any) -> Any:
