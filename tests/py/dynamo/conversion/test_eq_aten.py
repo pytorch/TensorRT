@@ -75,10 +75,6 @@ class TestEqualConverter(DispatchTestCase):
             def forward(self, lhs_val, rhs_val):
                 return torch.ops.aten.eq.Tensor(lhs_val, rhs_val)
 
-        class eq_operator(nn.Module):
-            def forward(self, lhs_val, rhs_val):
-                return lhs_val == rhs_val
-
         input_specs = [
             Input(
                 dtype=torch.float32,
@@ -95,10 +91,6 @@ class TestEqualConverter(DispatchTestCase):
         ]
         self.run_test_with_dynamic_shape(
             eq(),
-            input_specs,
-        )
-        self.run_test_with_dynamic_shape(
-            eq_operator(),
             input_specs,
         )
 
@@ -115,10 +107,6 @@ class TestEqualConverter(DispatchTestCase):
             def forward(self, lhs_val):
                 return torch.ops.aten.eq.Tensor(lhs_val, torch.tensor(1))
 
-        class eq_operator(nn.Module):
-            def forward(self, lhs_val):
-                return lhs_val == torch.tensor(1)
-
         input_specs = [
             Input(
                 dtype=torch.int32,
@@ -129,10 +117,6 @@ class TestEqualConverter(DispatchTestCase):
         ]
         self.run_test_with_dynamic_shape(
             eq(),
-            input_specs,
-        )
-        self.run_test_with_dynamic_shape(
-            eq_operator(),
             input_specs,
         )
 
@@ -149,10 +133,6 @@ class TestEqualConverter(DispatchTestCase):
             def forward(self, lhs_val):
                 return torch.ops.aten.eq.Scalar(lhs_val, 1.0)
 
-        class eq_operator(nn.Module):
-            def forward(self, lhs_val):
-                return lhs_val == 1.0
-
         input_specs = [
             Input(
                 dtype=torch.int32,
@@ -165,8 +145,52 @@ class TestEqualConverter(DispatchTestCase):
             eq(),
             input_specs,
         )
+
+    @parameterized.expand(
+        [
+            ((1,), (3,), (5,)),
+            ((1, 20), (2, 20), (3, 20)),
+            ((2, 3, 4), (3, 4, 5), (4, 5, 6)),
+            ((2, 3, 4, 5), (3, 5, 5, 6), (4, 5, 6, 7)),
+        ]
+    )
+    def test_eq_operator_dynamic_shape(self, min_shape, opt_shape, max_shape):
+        class eq_tensor_operator(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return lhs_val == rhs_val
+
+        class eq_tensor_scalar_operator(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return lhs_val == torch.tensor(1)
+
+        class eq_scalar_operator(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return lhs_val == 1.0
+
+        input_specs = [
+            Input(
+                dtype=torch.float32,
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+            ),
+            Input(
+                dtype=torch.float32,
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+            ),
+        ]
         self.run_test_with_dynamic_shape(
-            eq_operator(),
+            eq_tensor_operator(),
+            input_specs,
+        )
+        self.run_test_with_dynamic_shape(
+            eq_tensor_scalar_operator(),
+            input_specs,
+        )
+        self.run_test_with_dynamic_shape(
+            eq_scalar_operator(),
             input_specs,
         )
 
