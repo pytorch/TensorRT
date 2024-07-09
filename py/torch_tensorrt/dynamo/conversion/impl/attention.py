@@ -64,7 +64,6 @@ def scaled_dot_product_attention(
             raise RuntimeError(
                 "scaled_do_product_attention does not support query.shape[-2] or key.shape[-2] is dynamic when is_casual is True"
             )
-        
         attn_bias = np.zeros((L, S), dtype=dtype._from(query.dtype).to(np.dtype))
         temp_mask = np.logical_not(np.tril(np.ones((L, S), dtype=np.bool_), k=0))
         attn_bias = np.ma.array(attn_bias, mask=temp_mask).filled(float("-inf"))
