@@ -132,7 +132,7 @@ Refit the module with update model weights
 
 .. GENERATED FROM PYTHON SOURCE LINES 94-96
 
-Alterative Workflow using Python Runtime
+Alternative Workflow using Python Runtime
 -----------------------------
 
 .. GENERATED FROM PYTHON SOURCE LINES 96-99

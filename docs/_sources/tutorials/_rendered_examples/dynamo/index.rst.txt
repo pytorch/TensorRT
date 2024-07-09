@@ -14,6 +14,7 @@ a number of ways you can leverage this backend to accelerate inference.
 * :ref:`torch_compile_transformer`: Compiling a Transformer model using ``torch.compile``
 * :ref:`torch_compile_advanced_usage`: Advanced usage including making a custom backend to use directly with the ``torch.compile`` API
 * :ref:`torch_compile_stable_diffusion`: Compiling a Stable Diffusion model using ``torch.compile``
+* :ref:`torch_export_cudagraphs`: Using the Cudagraphs integration with `ir="dynamo"`
 * :ref:`custom_kernel_plugins`: Creating a plugin to use a custom kernel inside TensorRT engines
 * :ref:`refit_engine_example`: Refitting a compiled TensorRT Graph Module with updated weights
 * :ref:`vgg16_fp8_ptq`: Compiling a VGG16 model with FP8 and PTQ using ``torch.compile``
@@ -39,6 +40,23 @@ a number of ways you can leverage this backend to accelerate inference.
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Torch Compile Stable Diffusion</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as an overview of the process by which the Torch-TensorRT C...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_cudagraphs_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_cudagraphs.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Torch Export with Cudagraphs</div>
     </div>
 
 
@@ -153,6 +171,7 @@ a number of ways you can leverage this backend to accelerate inference.
    :hidden:
 
    /tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
+   /tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
    /tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
    /tutorials/_rendered_examples/dynamo/refit_engine_example
    /tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage

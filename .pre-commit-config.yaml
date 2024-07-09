@@ -51,6 +51,10 @@ repos:
     hooks:
       - id: black
         exclude: ^examples/custom_converters/elu_converter/setup.py|^docs
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.22.9
+    hooks:
+      - id: typos
   - repo: local
     hooks:
     -   id: dont-commit-upstream

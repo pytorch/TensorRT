@@ -6,7 +6,6 @@ import logging
 from typing import Any, Sequence, Tuple
 
 import numpy as np
-import tensorrt as trt
 import torch
 from torch.export import ExportedProgram
 from torch_tensorrt._enums import dtype
@@ -42,6 +41,8 @@ from torch_tensorrt.dynamo.utils import (
     to_torch_tensorrt_device,
 )
 from torch_tensorrt.logging import TRT_LOGGER
+
+import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -95,12 +96,16 @@ def construct_refit_mapping(
         layer_type: str = layer.type.name
         if layer_type in MODULE_MAP:
             # Cast the parent class to child class to access attributes
-            # For example: ILayer does not have ILayer.kernal/ILayer.bias
+            # For example: ILayer does not have ILayer.kernel/ILayer.bias
             # So we cast it to IConvolutionLayer and access the attributes
             layer.__class__ = MODULE_MAP[layer_type][0]
             for weight_type, weight_name in MODULE_MAP[layer_type][1]:
                 weight = layer.__getattribute__(weight_type).copy()
-                weight_dtype = dtype.try_from(weight.dtype).to(trt.DataType)
+                weight_dtype_opt = dtype.try_from(weight.dtype)
+                assert (
+                    weight_dtype_opt is not None
+                ), f"Weights {weight_name} has unsupported dtype {weight.dtype}"
+                weight_dtype = weight_dtype_opt.to(trt.DataType)
                 weight_map[f"{layer.name} {weight_name}"] = (
                     weight,
                     weight_dtype,

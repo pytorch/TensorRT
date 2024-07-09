@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import List, Optional, Tuple
 
 import numpy as np
-import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -22,6 +21,8 @@ from torch_tensorrt.fx.converters.converter_utils import (
     unified_dtype_converter,
 )
 from torch_tensorrt.fx.types import TRTTensor
+
+import tensorrt as trt
 
 
 def shape(
@@ -73,7 +74,7 @@ def get_shape_with_dynamic_shape(
     reduce operation output shape. Steps of calculations are:
         1. get the actual tensor shape of input_val via add_shape layer;
         2. create a all 0 tensor [0, 0, 0];
-        3. run elementwise comparision the [0, 0, 0] and [-1, 128, 256] tensor, get a condition tensor [True, False, False];
+        3. run elementwise comparison the [0, 0, 0] and [-1, 128, 256] tensor, get a condition tensor [True, False, False];
         4. use the condition tensor [True, False, False] to do selection between [2048, 256, 512] and [-1, 128, 256], replace
            all -1 dynamic shape dimensions with actual batch_size value;
         5. output shape with actual batch_size as [2048, 128, 256]

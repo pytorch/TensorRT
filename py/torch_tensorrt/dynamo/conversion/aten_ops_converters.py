@@ -2276,8 +2276,8 @@ def aten_ops_bitwise_not(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.eq.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.eq.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.eq.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.eq.Scalar, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2300,8 +2300,8 @@ def aten_ops_eq(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.ne.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.ne.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.ne.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.ne.Scalar, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2372,8 +2372,8 @@ def aten_ops_ge(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.lt.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.lt.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.lt.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.lt.Scalar, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2396,8 +2396,8 @@ def aten_ops_lt(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.le.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.le.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.le.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.le.Scalar, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -3394,4 +3394,30 @@ def aten_ops_native_dropout(
         args[0],
         args[1],
         args_bounds_check(args, 2, None),
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._prelu_kernel.default, supports_dynamic_shapes=True
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        1: (TRTTensor,),
+    }
+)
+def aten_ops_prelu(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.prelu.prelu(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
     )

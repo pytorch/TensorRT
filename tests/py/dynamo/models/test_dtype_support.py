@@ -258,3 +258,40 @@ class TestBF16Support(TestCase):
             DECIMALS_OF_AGREEMENT,
             msg=f"Torch outputs and TRT outputs don't match close enough.",
         )
+
+    def test_bf16_torch_compile(self):
+        class MyModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear = torch.nn.Linear(20, 30)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        device = torch.device("cuda", 0)
+        mod = MyModule().eval().to(device).bfloat16()
+        inputs = [torch.randn((128, 20), dtype=torch.bfloat16, device=device)]
+
+        with torch.inference_mode():
+            trt_mod = torch_tensorrt.compile(
+                mod,
+                ir="torch_compile",
+                inputs=inputs,
+                enabled_precisions={torch.bfloat16},
+                debug=True,
+                min_block_size=1,
+                device=device,
+            )
+
+            torch_model_results = mod(*inputs)
+            optimized_model_results = trt_mod(*inputs)
+
+            max_diff = float(
+                torch.max(torch.abs(optimized_model_results - torch_model_results))
+            )
+            self.assertAlmostEqual(
+                max_diff,
+                0,
+                DECIMALS_OF_AGREEMENT,
+                msg=f"Torch outputs and TRT outputs don't match close enough.",
+            )

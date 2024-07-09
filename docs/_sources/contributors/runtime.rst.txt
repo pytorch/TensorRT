@@ -6,9 +6,9 @@ Runtime Phase
 The Runtime phase is responsible for constructing self standing TorchScript graphs with embedded TensorRT engines and serving as the runtime
 when these engines are called. The main interface accepts a serialized TensorRT engine. The execution phase
 will deserialize and wrap this engine in a class which maintains a execution context for each engine
-and some metadata about its inputs and outputs and is compatable with the TorchScript interpreter so that
+and some metadata about its inputs and outputs and is compatible with the TorchScript interpreter so that
 it can be moved around and used like other TorchScript IValues. The engine is run by providing it and inputs
-to the ``tensorrt::execute_engine`` operator which will take the engine and its inputs and return the results of engine exeuction.
+to the ``tensorrt::execute_engine`` operator which will take the engine and its inputs and return the results of engine execution.
 
 
 Background

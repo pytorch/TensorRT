@@ -135,7 +135,7 @@ class TestIndexPutConverter(DispatchTestCase):
                 value_tensor=torch.tensor([5.5, 7.5], dtype=torch.float32),
             ),
             # param(
-            #     test_name="3d_indices_float_broadcase_index",
+            #     test_name="3d_indices_float_broadcast_index",
             #     source_tensor=torch.zeros([3, 3, 3], dtype = torch.int32),
             #     indices_tensor=(
             #         torch.tensor([0,1], dtype=torch.int32),
