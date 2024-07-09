@@ -1,0 +1,83 @@
+name: Release Windows wheels artifacts
+
+on:
+  pull_request:
+  push:
+    tags:
+      # NOTE: Binary build pipelines should only get triggered on release candidate builds
+      # Release candidate tags look like: v1.11.0-rc1
+      - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  packages: write
+
+jobs:
+  generate-matrix:
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
+    with:
+      package-type: wheel
+      os: windows
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      with-rocm: false
+      with-cpu: false
+
+  generate-release-matrix:
+    needs: [generate-matrix]
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - uses: actions/checkout@v3
+        with:
+          repository: pytorch/tensorrt
+      - name: Generate release matrix
+        id: generate
+        run: |
+          set -eou pipefail
+          MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
+          MATRIX_BLOB="$(python3 .github/scripts/generate-release-matrix.py --wheel_matrix "${MATRIX_BLOB}")"
+          echo "${MATRIX_BLOB}"
+          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+
+  substitute-runner:
+    needs: generate-release-matrix
+    outputs:
+      matrix: ${{ steps.substitute.outputs.matrix }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Substitute runner
+        id: substitute
+        run: |
+          echo matrix="$(echo '${{ needs.generate-release-matrix.outputs.matrix }}' | sed -e 's/windows.8xlarge.nvidia.gpu/windows.g5.4xlarge.nvidia.gpu/g')" >> ${GITHUB_OUTPUT}
+
+  release-wheel-artifacts:
+    needs: substitute-runner
+    name: Release torch-tensorrt wheel artifacts
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            pre-script: packaging/pre_build_script_windows.sh
+            env-script: packaging/vc_env_helper.bat
+            smoke-test-script: packaging/smoke_test_windows.py
+            package-name: torch_tensorrt
+    uses: ./.github/workflows/release-wheel-windows.yml
+    with:
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      env-script: ${{ matrix.env-script }}
+      smoke-test-script: ${{ matrix.smoke-test-script }}
+      package-name: ${{ matrix.package-name }}

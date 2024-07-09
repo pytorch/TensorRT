@@ -1,7 +1,7 @@
 name: Build and test Windows wheels
 
 on:
-  pull_request:
+  # pull_request:
   push:
     branches:
       - main
@@ -193,7 +193,7 @@ jobs:
         pushd .
         cd tests/py/dynamo
         python -m pytest -n 10 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_be_test_results.xml backend/
-        python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_comple_be_e2e_test_results.xml --ir torch_compile models/test_models.py
+        python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_complete_be_e2e_test_results.xml --ir torch_compile models/test_models.py
         python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_dyn_models_export.xml --ir torch_compile models/test_dyn_models.py
         popd
 
