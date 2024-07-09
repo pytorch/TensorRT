@@ -733,10 +733,10 @@ def aten_ops_where(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.clamp.default)
-@dynamo_tensorrt_converter(torch.ops.aten.clamp.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.clip.default)
-@dynamo_tensorrt_converter(torch.ops.aten.clip.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.clamp.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.clamp.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.clip.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.clip.Tensor, supports_dynamic_shapes=True)
 def aten_ops_clamp(
     ctx: ConversionContext,
     target: Target,
@@ -1880,7 +1880,7 @@ def aten_ops_mul(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.maximum.default)
+@dynamo_tensorrt_converter(torch.ops.aten.maximum.default, supports_dynamic_shapes=True)
 def aten_ops_maximum(
     ctx: ConversionContext,
     target: Target,
@@ -1898,7 +1898,7 @@ def aten_ops_maximum(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.minimum.default)
+@dynamo_tensorrt_converter(torch.ops.aten.minimum.default, supports_dynamic_shapes=True)
 def aten_ops_minimum(
     ctx: ConversionContext,
     target: Target,
@@ -2020,8 +2020,13 @@ def aten_ops_pow(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.floor_divide.default)
-@dynamo_tensorrt_converter(torch.ops.aten.floor_divide.Scalar)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.floor_divide.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.floor_divide.Scalar, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(operator.floordiv, supports_dynamic_shapes=True)
 def aten_ops_floor_div(
     ctx: ConversionContext,
     target: Target,
@@ -2039,7 +2044,9 @@ def aten_ops_floor_div(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.logical_and.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.logical_and.default, supports_dynamic_shapes=True
+)
 def aten_ops_logical_and(
     ctx: ConversionContext,
     target: Target,
