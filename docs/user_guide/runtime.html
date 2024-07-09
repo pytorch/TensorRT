@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Deploying Torch-TensorRT Programs &mdash; Torch-TensorRT v2.5.0.dev0+250b9b7 documentation</title>
+  <title>Deploying Torch-TensorRT Programs &mdash; Torch-TensorRT v2.5.0.dev0+3f8fff7 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+250b9b7
+                  v2.5.0.dev0+3f8fff7
                 </div>
               
             
@@ -344,6 +344,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
@@ -517,6 +518,26 @@ on a single GPU, and the default CUDA device on each thread corresponds to the G
 responsible (can be set via <code class="docutils literal notranslate"><span class="pre">torch.cuda.set_device(...)</span></code>). In this way, multiple threads can be used in the same
 Python script without needing to switch CUDA contexts and incur performance overhead.</p>
 </section>
+<section id="cudagraphs-mode">
+<h2>Cudagraphs Mode<a class="headerlink" href="#cudagraphs-mode" title="Permalink to this heading">¶</a></h2>
+<p>Cudagraphs mode is a setting in Torch-TensorRT which allows the user to determine whether
+the runtime uses cudagraphs to accelerate inference in certain cases.</p>
+<p>Cudagraphs can accelerate certain models by reducing kernel overheads, as documented further [here](<a class="reference external" href="https://pytorch.org/blog/accelerating-pytorch-with-cuda-graphs/">https://pytorch.org/blog/accelerating-pytorch-with-cuda-graphs/</a>).</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Enables Cudagraphs Mode</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Disables Cudagraphs Mode [Default Behavior]</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+
+<span class="c1"># Enables Cudagraphs Mode, then resets the mode to its prior setting</span>
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">():</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+<p>In the current implementation, use of a new input shape (for instance in dynamic shape
+cases), will cause the cudagraph to be re-recorded. Cudagraph recording is generally
+not latency intensive, and future improvements include caching cudagraphs for multiple input shapes.</p>
+</section>
 </section>
 
 
@@ -567,6 +588,7 @@ Python script without needing to switch CUDA contexts and incur performance over
 <li><a class="reference internal" href="#runtime-library">Runtime Library</a></li>
 <li><a class="reference internal" href="#plugin-library">Plugin Library</a></li>
 <li><a class="reference internal" href="#multi-device-safe-mode">Multi Device Safe Mode</a></li>
+<li><a class="reference internal" href="#cudagraphs-mode">Cudagraphs Mode</a></li>
 </ul>
 </li>
 </ul>

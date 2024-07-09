@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.runtime &mdash; Torch-TensorRT v2.5.0.dev0+250b9b7 documentation</title>
+  <title>torch_tensorrt.runtime &mdash; Torch-TensorRT v2.5.0.dev0+3f8fff7 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+250b9b7
+                  v2.5.0.dev0+3f8fff7
                 </div>
               
             
@@ -344,6 +344,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
@@ -652,6 +653,13 @@ FX / Dynamo / Python deployments. This module cannot be serialized to torchscrip
 <dt class="sig sig-object py" id="torch_tensorrt.runtime.PythonTorchTensorRTModule.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">engine:</span> <span class="pre">bytes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_names:</span> <span class="pre">~typing.Optional[~typing.List[str]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_names:</span> <span class="pre">~typing.Optional[~typing.List[str]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">settings:</span> <span class="pre">~torch_tensorrt.dynamo._settings.CompilationSettings</span> <span class="pre">=</span> <span class="pre">CompilationSettings(enabled_precisions={&lt;dtype.f32:</span> <span class="pre">7&gt;}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workspace_size=0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_block_size=5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">torch_executed_ops=set()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pass_through_build_failures=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_aux_streams=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">version_compatible=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimization_level=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_python_runtime=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truncate_double=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_fast_partitioner=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enable_experimental_decompositions=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device=Device(type=DeviceType.GPU</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gpu_id=0)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">require_full_compilation=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">disable_tf32=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">assume_dynamic_shape_support=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparse_weights=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">make_refitable=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">engine_capability=&lt;EngineCapability.STANDARD:</span> <span class="pre">1&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_avg_timing_iters=1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_sram_size=1048576</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_local_dram_size=1073741824</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_global_dram_size=536870912</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dryrun=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hardware_compatible=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timing_cache_path='/tmp/timing_cache.bin')</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_PythonTorchTensorRTModule.html#PythonTorchTensorRTModule.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.PythonTorchTensorRTModule.__init__" title="Permalink to this definition">¶</a></dt>
 <dd><p>Initialize internal Module state, shared by both nn.Module and ScriptModule.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.PythonTorchTensorRTModule.cudagraphs_validate_shapes">
+<span class="sig-name descname"><span class="pre">cudagraphs_validate_shapes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_PythonTorchTensorRTModule.html#PythonTorchTensorRTModule.cudagraphs_validate_shapes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.PythonTorchTensorRTModule.cudagraphs_validate_shapes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Validates the input shapes of the forward function
+versus the version currently active for the</p>
 </dd></dl>
 
 <dl class="py method">

@@ -68,3 +68,27 @@ multi-device safe mode is to use Python threads. Each thread is responsible for 
 on a single GPU, and the default CUDA device on each thread corresponds to the GPU for which it is
 responsible (can be set via ``torch.cuda.set_device(...)``). In this way, multiple threads can be used in the same
 Python script without needing to switch CUDA contexts and incur performance overhead.
+
+Cudagraphs Mode
+---------------
+
+Cudagraphs mode is a setting in Torch-TensorRT which allows the user to determine whether
+the runtime uses cudagraphs to accelerate inference in certain cases.
+
+Cudagraphs can accelerate certain models by reducing kernel overheads, as documented further [here](https://pytorch.org/blog/accelerating-pytorch-with-cuda-graphs/).
+
+.. code-block:: python
+
+    # Enables Cudagraphs Mode
+    torch_tensorrt.runtime.set_cudagraphs_mode(True)
+
+    # Disables Cudagraphs Mode [Default Behavior]
+    torch_tensorrt.runtime.set_cudagraphs_mode(False)
+
+    # Enables Cudagraphs Mode, then resets the mode to its prior setting
+    with torch_tensorrt.runtime.enable_cudagraphs():
+        ...
+
+In the current implementation, use of a new input shape (for instance in dynamic shape 
+cases), will cause the cudagraph to be re-recorded. Cudagraph recording is generally 
+not latency intensive, and future improvements include caching cudagraphs for multiple input shapes.
