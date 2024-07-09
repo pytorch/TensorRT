@@ -194,7 +194,7 @@ jobs:
 
           # BUILD_VERSION example: 2.4.0+cu121, we don't want the +cu121 part, so remove +cu121
           BUILD_VERSION=${BUILD_VERSION%+*}
-          TRT_VERSION=10.0.1
+          TRT_VERSION=$(cat dev_dep_versions.yml | grep __tensorrt_version__ | sed 's/__tensorrt_version__: //g' | sed 's/"//g')
           mkdir release
           mkdir release/tarball
           mkdir release/wheel
