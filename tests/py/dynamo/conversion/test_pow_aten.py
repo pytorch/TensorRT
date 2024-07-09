@@ -84,7 +84,7 @@ class TestPowConverter(DispatchTestCase):
     ):
         class pow(nn.Module):
             def forward(self, lhs_val, rhs_val):
-                return torch.ops.aten.floor_divide.default(lhs_val, rhs_val)
+                return torch.ops.aten.pow.Tensor_Tensor(lhs_val, rhs_val)
 
         class pow_scalar(nn.Module):
             def forward(self, lhs_val, rhs_val):
