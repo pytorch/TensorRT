@@ -440,8 +440,9 @@ def refit_module_weights(
                 settings=settings,
                 weight_name_map=weight_name_map,
             )
-        except AssertionError:
+        except AssertionError as e:
             # If fast_refit is used and failed, we fall back to regular refit
+            logger.warning(e)
             if fast_refit and weight_name_map:
                 _refit_single_trt_engine_with_gm(
                     new_gm=new_submodule,

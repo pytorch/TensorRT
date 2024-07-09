@@ -127,6 +127,104 @@ def test_fast_refit_one_engine():
 
 
 @pytest.mark.unit
+def test_fast_refit_one_engin_no_map():
+
+    model = models.resnet18(pretrained=False).eval().to("cuda")
+    model2 = models.resnet18(pretrained=True).eval().to("cuda")
+    inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
+    enabled_precisions = {torch.float}
+    debug = False
+    min_block_size = 1
+    use_python_runtime = False
+
+    exp_program = torch.export.export(model, tuple(inputs))
+    exp_program2 = torch.export.export(model2, tuple(inputs))
+
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        use_python_runtime=use_python_runtime,
+        enabled_precisions=enabled_precisions,
+        debug=debug,
+        min_block_size=min_block_size,
+        make_refitable=True,
+    )
+
+    trt_gm._run_on_acc_0.weight_name_map = None
+
+    new_trt_gm = refit_module_weights(
+        compiled_module=trt_gm,
+        new_weight_module=exp_program2,
+        inputs=inputs,
+        fast_refit=True,
+    )
+
+    # Check the output
+    expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
+        *inputs
+    )
+    for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
+        assertions.assertTrue(
+            torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),
+            "Refit Result is not correct. Refit failed",
+        )
+        # Clean up model env
+
+    torch._dynamo.reset()
+
+
+@pytest.mark.unit
+def test_fast_refit_one_engin_wrong_map():
+
+    model = models.resnet18(pretrained=False).eval().to("cuda")
+    model2 = models.resnet18(pretrained=True).eval().to("cuda")
+    inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
+    enabled_precisions = {torch.float}
+    debug = False
+    min_block_size = 1
+    use_python_runtime = False
+
+    exp_program = torch.export.export(model, tuple(inputs))
+    exp_program2 = torch.export.export(model2, tuple(inputs))
+
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        use_python_runtime=use_python_runtime,
+        enabled_precisions=enabled_precisions,
+        debug=debug,
+        min_block_size=min_block_size,
+        make_refitable=True,
+    )
+    # Manually Deleted all batch norm layer. This suppose to fail the fast refit
+    trt_gm._run_on_acc_0.weight_name_map = {
+        k: v
+        for k, v in trt_gm._run_on_acc_0.weight_name_map.items()
+        if "[SCALE]" not in k
+    }
+
+    new_trt_gm = refit_module_weights(
+        compiled_module=trt_gm,
+        new_weight_module=exp_program2,
+        inputs=inputs,
+        fast_refit=True,
+    )
+
+    # Check the output
+    expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
+        *inputs
+    )
+    for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
+        assertions.assertTrue(
+            torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),
+            "Refit Result is not correct. Refit failed",
+        )
+        # Clean up model env
+
+    torch._dynamo.reset()
+
+
+@pytest.mark.unit
 def test_fast_refit_one_engine_bert():
     inputs = [
         torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
