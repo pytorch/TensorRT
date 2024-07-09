@@ -3,7 +3,7 @@ from __future__ import annotations
 import collections.abc
 import copy
 import logging
-from typing import Any, Sequence, Tuple
+from typing import Any, Optional, Sequence, Tuple
 
 import numpy as np
 import tensorrt as trt
@@ -36,7 +36,6 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
 from torch_tensorrt.dynamo.utils import (
     check_output,
     get_torch_inputs,
-    prepare_inputs,
     set_log_level,
     to_torch_device,
     to_torch_tensorrt_device,
@@ -146,7 +145,8 @@ def _refit_single_trt_engine_with_gm(
 def refit_module_weights(
     compiled_module: torch.fx.GraphModule | ExportedProgram,
     new_weight_module: ExportedProgram,
-    inputs: Tuple[Any, ...],
+    arg_inputs: Optional[Tuple[Any, ...]] = None,
+    kwarg_inputs: Optional[dict[str, Any]] = None,
     verify_output: bool = False,
 ) -> torch.fx.GraphModule:
     """
@@ -208,19 +208,21 @@ def refit_module_weights(
     if settings.debug:
         set_log_level(logger.parent, logging.DEBUG)
 
-    if not isinstance(inputs, collections.abc.Sequence):
-        inputs = [inputs]
-
-    # Prepare torch_trt inputs
-    inputs = prepare_inputs(inputs)
     device = to_torch_tensorrt_device(settings.device)
-    torch_inputs = get_torch_inputs(inputs, device)
+    if arg_inputs:
+        if not isinstance(arg_inputs, collections.abc.Sequence):
+            # Prepare torch_trt inputs
+            arg_inputs = [arg_inputs]
+        torch_inputs = get_torch_inputs(arg_inputs, device)
+
+    if kwarg_inputs:
+        torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
     runtime = trt.Runtime(TRT_LOGGER)
     if not isinstance(new_weight_module, ExportedProgram):
         raise AssertionError(
             f"Input graph should be an ExportedProgram but got type {type(new_weight_module)}"
         )
-    new_weight_module = pre_export_lowering(new_weight_module, torch_inputs)
+    new_weight_module = pre_export_lowering(new_weight_module)
     new_weight_module = new_weight_module.run_decompositions(
         get_decompositions(settings.enable_experimental_decompositions)
     )
@@ -228,7 +230,7 @@ def refit_module_weights(
     logger.debug("Input graph: " + str(new_gm.graph))
     # Apply lowering on the graph module
 
-    new_gm = post_lowering(new_gm, torch_inputs)
+    new_gm = post_lowering(new_gm)
 
     logger.info("Compilation Settings: %s\n", settings)
 
@@ -354,11 +356,12 @@ def refit_module_weights(
             refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
             setattr(compiled_module, f"{name}_engine", refitted_engine)
 
-    if verify_output:
+    if verify_output and arg_inputs is not None:
         if check_output(
             new_module=new_gm,
             refitted_module=compiled_module,
-            inputs=torch_inputs,
+            arg_inputs=torch_inputs,
+            kwarg_inputs=torch_kwarg_inputs,
         ):
             logger.info("Refitting Succeed!")
         else:

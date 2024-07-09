@@ -108,7 +108,7 @@ def test_refit_one_engine():
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
-        inputs=inputs,
+        arg_inputs=inputs,
     )
 
     # Check the output
@@ -154,7 +154,7 @@ def test_refit_one_engine_bert():
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
-        inputs=inputs,
+        arg_inputs=inputs,
     )
 
     # Check the output
@@ -203,7 +203,7 @@ def test_refit_one_engine_inline_runtime():
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
-        inputs=inputs,
+        arg_inputs=inputs,
     )
 
     # Check the output
@@ -247,7 +247,7 @@ def test_refit_one_engine_python_runtime():
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
-        inputs=inputs,
+        arg_inputs=inputs,
     )
 
     # Check the output
@@ -313,7 +313,7 @@ def test_refit_multiple_engine():
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
-        inputs=inputs,
+        arg_inputs=inputs,
     )
 
     # Check the output
