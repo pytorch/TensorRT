@@ -57,7 +57,6 @@ def slice_op(  # TODO: This should be slice not whatever is in base
     stop_dynamic_None = False
     if stop is None:
         stop_dynamic_None = True if input.shape[dim] == -1 else False
-    if stop is None:
         stop = 0 if input.shape[dim] == -1 else input.shape[dim]
 
     dim = get_positive_dim(dim, len(input.shape))
@@ -70,7 +69,7 @@ def slice_op(  # TODO: This should be slice not whatever is in base
         start_slice[dim] = start
     else:
         for i in range(len(input.shape)):
-            start_slice.append(0) if i == dim else start_slice.append(start)
+            start_slice.append(0) if i != dim else start_slice.append(start)
 
     # Assign the initial stop tensor
     stop_slice = []
