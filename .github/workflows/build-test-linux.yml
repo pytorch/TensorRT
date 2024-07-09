@@ -325,7 +325,7 @@ jobs:
       script: |
         set -x
         export USE_HOST_DEPS=1
-        bazel test //tests/core/conversion/conversion_tests --compilation_mode=opt \
+        bazel test //tests/core/conversion:conversion_tests --compilation_mode=opt \
         --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures
 
   tests-cpp-core-lowering:
@@ -353,7 +353,7 @@ jobs:
       script: |
         set -x
         export USE_HOST_DEPS=1
-        bazel test //tests/core/lowering/lowering_tests --compilation_mode=opt \
+        bazel test //tests/core/lowering:lowering_tests --compilation_mode=opt \
         --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures
 
   tests-cpp-core-partitioning:
@@ -381,7 +381,7 @@ jobs:
       script: |
         set -x
         export USE_HOST_DEPS=1
-        bazel test //tests/core/partitioning/partitioning_tests --compilation_mode=opt \
+        bazel test //tests/core/partitioning:partitioning_tests --compilation_mode=opt \
         --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures
 
   tests-cpp-core-runtime:
@@ -409,7 +409,7 @@ jobs:
       script: |
         set -x
         export USE_HOST_DEPS=1
-        bazel test //tests/core/runtime/runtime_tests --compilation_mode=opt \
+        bazel test //tests/core/runtime:runtime_tests --compilation_mode=opt \
         --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
