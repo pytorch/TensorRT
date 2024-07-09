@@ -2,9 +2,10 @@
 from copy import deepcopy
 
 import torch
-import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo.partitioning import fast_partition
+
+import torch_tensorrt
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
@@ -120,9 +121,11 @@ class TestTRTModuleNextCompilation(TestCase):
 
         torch._dynamo.reset()
 
+        model = PartiallySupportedMultiOp().eval().cuda()
+
         # Validate that the results between Torch and Torch-TRT are similar
         optimized_model = torch_tensorrt.compile(
-            fx_graph,
+            model,
             "torch_compile",
             inputs,
             min_block_size=1,
@@ -132,7 +135,7 @@ class TestTRTModuleNextCompilation(TestCase):
             debug=True,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
-        torch_model_results = fx_graph(*inputs).detach().cpu()
+        torch_model_results = model(*inputs).detach().cpu()
 
         max_diff = float(
             torch.max(torch.abs(optimized_model_results - torch_model_results))
