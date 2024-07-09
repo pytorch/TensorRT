@@ -159,9 +159,11 @@ jobs:
       - name: Combine Env Var and Build Env Files
         if: ${{ inputs.env-var-script != '' }}
         working-directory: ${{ inputs.repository }}
+        shell: bash -l {0}
         run: |
           cat "${{ inputs.env-var-script }}" >> "${BUILD_ENV_FILE}"
       - name: Install torch dependency
+        shell: bash -l {0}
         run: |
           set -x
           # shellcheck disable=SC1090
