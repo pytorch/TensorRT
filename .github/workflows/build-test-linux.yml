@@ -325,6 +325,9 @@ jobs:
       script: |
         set -x
         export USE_HOST_DEPS=1
+        python -m pip show torch_tensorrt
+        location=$(python -m pip show torch_tensorrt | grep Location | sed "s/Location: //g")
+        ls -lart $location | grep torch_tensorrt
         bazel test //tests/core/conversion:conversion_tests --compilation_mode=opt \
         --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures
 
@@ -399,7 +402,7 @@ jobs:
             smoke-test-script: packaging/smoke_test_script.sh
     uses: ./.github/workflows/linux-test.yml
     with:
-      job-name: tests-cpp-core-partitioning
+      job-name: tests-cpp-core-runtime
       repository: "pytorch/tensorrt"
       ref: ""
       test-infra-repository: pytorch/test-infra
