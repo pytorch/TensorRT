@@ -204,6 +204,7 @@ jobs:
               release/tarball/libtorchtrt-${TORCHTRT_VERSION}-tensorrt${TENSORRT_VERSION}-cuda${CU_VERSION}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
           else
               ${CONDA_RUN} python setup.py bdist_wheel --release
+
               cp bazel-bin/libtorchtrt.tar.gz \
               release/tarball/libtorchtrt-${BUILD_VERSION}-pre-cxx11-abi-tensorrt${TRT_VERSION}-cuda${CU_VERSION}-libtorch${BUILD_VERSION}-x86_64-linux.tar.gz
 
@@ -240,7 +241,7 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ inputs.repository }}/release/wheel/
       - name: Upload pre-cxx11 tarball to GitHub
-        if: ${{ inputs.cxx11-tarball-release != 'true' && env.PYTHON_VERSION == '3.10' && env.CU_VERSION == 'cu124' }}
+        if: ${{ inputs.cxx11-tarball-release != 'true' && env.PYTHON_VERSION == '3.10' }}
         continue-on-error: true
         uses: actions/upload-artifact@v3
         with:
