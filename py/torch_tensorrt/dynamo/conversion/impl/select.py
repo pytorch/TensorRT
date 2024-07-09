@@ -47,26 +47,16 @@ def select(
     if dynamic_shape:
         # Check whether slice target dim is dynamic shape dim
         assert input.shape[dim] != -1, "Can't select on negative shape dimension!"
-    index = index
 
     if index >= input.shape[dim]:
         raise RuntimeError(
             f"cannot have index greater than the dimension length! {input.shape[dim]}"
         )
-    output_shape = list(input.shape)
-    output_shape[dim] = 1
-    if dynamic_shape > 0:
-        output_shape = get_shape_with_dynamic_shape(
-            ctx, target, source_ir, name, output_shape, input
-        )
+
     index_value = np.array(index, dtype=np.int32)
-    indices_tensor = ctx.net.add_constant(
-        index_value.shape, to_numpy(index_value)
-    ).get_output(0)
+    indices_tensor = ctx.net.add_constant(index_value.shape, index_value).get_output(0)
     layer = ctx.net.add_gather(input, indices_tensor, dim)
-    out = layer.get_output(0)
-    if len(out.shape) != 1:
-        layer = ctx.net.add_shuffle(out)
+
     return layer.get_output(0)
 
 
