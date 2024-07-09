@@ -161,7 +161,6 @@ jobs:
         if: ${{ inputs.env-var-script != '' }}
         working-directory: ${{ inputs.repository }}
         run: |
-          set -euxo pipefail
           cat "${{ inputs.env-var-script }}" >> "${BUILD_ENV_FILE}"
       - name: Install torch dependency
         run: |
