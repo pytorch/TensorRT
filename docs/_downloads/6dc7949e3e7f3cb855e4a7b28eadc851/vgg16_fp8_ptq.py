@@ -229,7 +229,7 @@ with torch.no_grad():
         exp_program = torch.export.export(model, (input_tensor,))
         trt_model = torchtrt.dynamo.compile(
             exp_program,
-            arg_inputs=[input_tensor],
+            inputs=[input_tensor],
             enabled_precisions={torch.float8_e4m3fn},
             min_block_size=1,
             debug=False,
