@@ -14,16 +14,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: true
 
-permissions:
-  packages: write
-  id-token: write
-  contents: read
-
 jobs:
-  build-pre-cxx11:
+  build:
+    permissions:
+      packages: write
+
     runs-on: linux.4xlarge.nvidia.gpu
-    outputs:
-      docker_url: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
+
     # Define key environment variables
     # Container name is of the form torch_tensorrt:<branch_name>
     env:
@@ -37,7 +34,6 @@ jobs:
     - name: Fix Slashes Repo Name
       id: fix_slashes
       run: |
-        set -x
         export container_name=$(echo ${{ env.CONTAINER_NAME }} |  sed 's|/|_|g')
         echo "container_name=$container_name" >> $GITHUB_OUTPUT
 
@@ -48,82 +44,27 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Build PRE_CXX11_ABI Docker image
+    # Automatically detect TensorRT default versions for Torch-TRT build
+    - name: Build Docker image
       env:
         DOCKER_TAG: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
       run: |
-        set -x
         python3 -m pip install pyyaml
         TRT_VERSION=$(python3 -c "import versions; versions.tensorrt_version()")
         echo "TRT VERSION = ${TRT_VERSION}"
+
         DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=$TRT_VERSION -f docker/Dockerfile --tag $DOCKER_TAG .
 
-    - name: Push PRE_CXX11_ABI Docker image
+    - name: Push Docker image
       env:
         DOCKER_URL: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
-      run: |
-        set -x
-        docker push $DOCKER_URL
+      run: docker push $DOCKER_URL
 
     # Clean up all untagged containers in registry
     - name: Container Registry Cleanup
       uses: actions/delete-package-versions@v4
       with:
         package-name: "tensorrt/torch_tensorrt"
-        package-type: container
-        min-versions-to-keep: 0
-        delete-only-untagged-versions: True
-
-  build-cxx11:
-    runs-on: linux.4xlarge.nvidia.gpu
-    outputs:
-      docker_url: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
-    # Define key environment variables
-    # Container name is of the form torch_tensorrt_cxx11:<branch_name>
-    env:
-      DOCKER_REGISTRY: ghcr.io/pytorch/tensorrt
-      CONTAINER_NAME: torch_tensorrt_cxx11:${{ github.ref_name }}
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-
-    - name: Fix Slashes Repo Name
-      id: fix_slashes
-      run: |
-        set -x
-        export container_name=$(echo ${{ env.CONTAINER_NAME }} |  sed 's|/|_|g')
-        echo "container_name=$container_name" >> $GITHUB_OUTPUT
-
-    - name: Log in to the Container registry
-      uses: docker/login-action@v2
-      with:
-        registry: ${{ env.DOCKER_REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Build CXX11_ABI Docker image
-      env:
-        DOCKER_TAG: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
-      run: |
-        set -x
-        python3 -m pip install pyyaml
-        TRT_VERSION=$(python3 -c "import versions; versions.tensorrt_version()")
-        echo "TRT VERSION = ${TRT_VERSION}"
-        DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=$TRT_VERSION --build-arg USE_CXX11_ABI=True -f docker/Dockerfile --tag $DOCKER_TAG .
-
-    - name: Push CXX11_ABI Docker image
-      env:
-        DOCKER_URL: ${{ env.DOCKER_REGISTRY }}/${{ steps.fix_slashes.outputs.container_name }}
-      run: |
-        set -x
-        docker push $DOCKER_URL
-
-    # Clean up all untagged containers in registry
-    - name: Container Registry Cleanup
-      uses: actions/delete-package-versions@v4
-      with:
-        package-name: "tensorrt/torch_tensorrt_cxx11"
         package-type: container
         min-versions-to-keep: 0
         delete-only-untagged-versions: True

@@ -106,8 +106,7 @@ jobs:
       - name: Clean workspace
         shell: bash -l {0}
         run: |
-          set -euxo pipefail
-          echo "needs.check.outputs.release_flag: ${{ needs.check.outputs.release_flag }}"
+          set -x
           echo "::group::Cleanup debug output"
           rm -rf "${GITHUB_WORKSPACE}"
           mkdir -p "${GITHUB_WORKSPACE}"
@@ -164,7 +163,7 @@ jobs:
           cat "${{ inputs.env-var-script }}" >> "${BUILD_ENV_FILE}"
       - name: Install torch dependency
         run: |
-          set -euxo pipefail
+          set -x
           # shellcheck disable=SC1090
           source "${BUILD_ENV_FILE}"
           # shellcheck disable=SC2086
@@ -181,14 +180,14 @@ jobs:
         working-directory: ${{ inputs.repository }}
         shell: bash -l {0}
         run: |
-          set -euxo pipefail
+          set -x
           source "${BUILD_ENV_FILE}"
           ${CONDA_RUN} python setup.py clean
       - name: Build the wheel (bdist_wheel)
         working-directory: ${{ inputs.repository }}
         shell: bash -l {0}
         run: |
-          set -euxo pipefail
+          set -x
           source "${BUILD_ENV_FILE}"
 
           # BUILD_VERSION example: 2.4.0+cu121, we don't want the +cu121 part, so remove +cu121
@@ -226,7 +225,7 @@ jobs:
           PACKAGE_NAME: ${{ inputs.package-name }}
           SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
         run: |
-          set -euxo pipefail
+          set -x
           source "${BUILD_ENV_FILE}"
           # TODO: add smoke test for the auditwheel tarball built
 
