@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo._defaults import (
     ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
+    LAZY_ENGINE_INIT,
     MAKE_REFITABLE,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
@@ -104,3 +105,4 @@ class CompilationSettings:
     dryrun: Union[bool, str] = DRYRUN
     hardware_compatible: bool = HARDWARE_COMPATIBLE
     timing_cache_path: str = TIMING_CACHE_PATH
+    lazy_engine_init: bool = LAZY_ENGINE_INIT

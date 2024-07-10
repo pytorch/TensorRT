@@ -79,6 +79,7 @@ def compile(
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -141,6 +142,7 @@ def compile(
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -236,6 +238,7 @@ def compile(
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
         "timing_cache_path": timing_cache_path,
+        "lazy_engine_init": lazy_engine_init,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -454,6 +457,8 @@ def compile_module(
     # Replace all FX Modules with TRT Modules
     for name, trt_module in trt_modules.items():
         setattr(partitioned_module, name, trt_module)
+        if settings.lazy_engine_init:
+            getattr(partitioned_module, name).setup_engine()
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:
@@ -464,7 +469,7 @@ def compile_module(
     return partitioned_module
 
 
-def convert_module_to_trt_engine(
+def convert_exported_program_to_serialized_trt_engine(
     exported_program: ExportedProgram,
     inputs: Sequence[Any],
     *,
@@ -647,10 +652,5 @@ def convert_module_to_trt_engine(
             exc_info=True,
         )
 
-    import io
-
-    with io.BytesIO() as engine_bytes:
-        engine_bytes.write(interpreter_result.engine)
-        engine_bytearray: bytes = engine_bytes.getvalue()
-
-    return engine_bytearray
+    serialized_engine: bytes = interpreter_result.serialized_engine
+    return serialized_engine
