@@ -43,55 +43,55 @@ class TestSqueezeConverter(DispatchTestCase):
         )
 
 
-class TestSqueezeConverter(DispatchTestCase):
+class TestSqueezeConverterDynamic(DispatchTestCase):
     @parameterized.expand(
         [
             (
-                "2d_dim",
-                (1),
-                (1, 1),
-                (1, 1),
-                (3, 1),
-                torch.half,
-                torch.half,
+                "5d_two_dynamic_shape_-1",
+                (0,),
+                (1, 1, 1, 1, 1),
+                (1, 2, 1, 2, 1),
+                (1, 4, 1, 3, 1),
             ),
             (
-                "3d_one_dim",
-                (1),
-                (1, 2, 1),
-                (1, 2, 1),
-                (3, 2, 1),
-                torch.float,
-                torch.float,
+                "5d_two_dynamic_shape_-2",
+                (0, 2),
+                (1, 1, 1, 1, 1),
+                (1, 2, 1, 2, 1),
+                (1, 4, 1, 3, 1),
             ),
             (
-                "3d_one_dim_dynamic",
-                (0),
-                (1, 2, 1),
-                (1, 2, 1),
-                (3, 2, 1),
-                torch.float,
-                torch.float,
+                "5d_three_dynamic_shape_-2",
+                (0, 4),
+                (1, 1, 1, 1, 1),
+                (1, 2, 4, 2, 1),
+                (1, 4, 4, 3, 1),
+            ),
+            (
+                "4d_two_dynamic_shape_-2",
+                (0, 2),
+                (1, 1, 2, 1),
+                (1, 2, 2, 2),
+                (1, 4, 2, 3),
             ),
         ]
     )
-    def test_squeeze(self, _, dim, min_shape, opt_shape, max_shape, type, output_type):
+    def test_squeeze(self, _, dim, min_shape, opt_shape, max_shape):
         class Squeeze(nn.Module):
             def forward(self, x):
-                return torch.ops.aten.squeeze.dim(x, dim)
+                return torch.ops.aten.squeeze.dims(x, dim)
 
         input_specs = [
             Input(
                 min_shape=min_shape,
                 opt_shape=opt_shape,
                 max_shape=max_shape,
-                dtype=type,
+                dtype=torch.float,
             ),
         ]
         self.run_test_with_dynamic_shape(
             Squeeze(),
             input_specs,
-            output_dtypes=[output_type],
         )
 
 
