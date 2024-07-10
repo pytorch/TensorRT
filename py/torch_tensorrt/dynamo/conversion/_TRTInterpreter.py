@@ -323,6 +323,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         This is called after a TensorRT engine is built. Save the timing cache
         """
         timing_cache = builder_config.get_timing_cache()
+        os.makedirs(os.path.dirname(timing_cache_path), exist_ok=True)
         with open(timing_cache_path, "wb") as timing_cache_file:
             timing_cache_file.write(memoryview(timing_cache.serialize()))
 
@@ -516,15 +517,50 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         Args:
             strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric reasons.
             algorithm_selector: set up algorithm selection for certain layer
+            tactic_sources: set up tactic sources for certain layer
         Return:
             TRTInterpreterResult
         """
+        if (
+            self.compilation_settings.save_engine_cache
+            or self.compilation_settings.load_engine_cache
+        ):
+            engine_cache = self.compilation_settings.engine_cache_instance
+            hash_val = engine_cache.get_hash(self.module)
+
+        if self.compilation_settings.load_engine_cache:
+            # query the cached TRT engine
+            serialized_engine, input_names, output_names = engine_cache.load(hash_val)
+            if serialized_engine is not None:
+                self._input_names = input_names
+                self._output_names = output_names
+                _LOGGER.info(
+                    "Hit the cached TRT engine. It is loaded for skipping recompilation."
+                )
+
+                # refit the engine
+                from torch_tensorrt.dynamo._refit import (
+                    _refit_single_trt_engine_with_gm,
+                )
+
+                runtime = trt.Runtime(TRT_LOGGER)
+                engine = runtime.deserialize_cuda_engine(serialized_engine)
+                _refit_single_trt_engine_with_gm(
+                    self.module, engine, self.input_specs, self.compilation_settings
+                )
+                _LOGGER.info("Refitting Succeed!")
+
+                return TRTInterpreterResult(
+                    serialized_engine, self._input_names, self._output_names
+                )
+
         self._construct_trt_network_def()
 
         if self.compilation_settings.make_refitable:
             self._save_weight_mapping()
 
         build_engine_start_time = datetime.now()
+        _LOGGER.info("Not found cached TRT engines. Start building engine.")
 
         builder_config = self._populate_trt_builder_config(
             strict_type_constraints, algorithm_selector, tactic_sources
@@ -547,6 +583,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._save_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )
+        if self.compilation_settings.save_engine_cache:
+            engine_cache.save(
+                hash_val, serialized_engine, self._input_names, self._output_names
+            )
 
         with io.BytesIO() as engine_bytes:
             engine_bytes.write(serialized_engine)
