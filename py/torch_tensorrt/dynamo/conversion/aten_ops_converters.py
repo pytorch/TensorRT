@@ -315,6 +315,7 @@ def aten_ops_embedding_bag(
     )
 
 
+@dynamo_tensorrt_converter(operator.mod, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar)
 @dynamo_tensorrt_converter(torch.ops.aten.fmod.Tensor)
 def aten_ops_fmod(
@@ -1991,6 +1992,7 @@ def aten_ops_div(
         )
 
 
+@dynamo_tensorrt_converter(operator.pow, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(
     torch.ops.aten.pow.Tensor_Tensor, supports_dynamic_shapes=True
 )
@@ -2251,6 +2253,7 @@ def aten_ops_bitwise_not(
     )
 
 
+@dynamo_tensorrt_converter(operator.eq, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.eq.Tensor)
 @dynamo_tensorrt_converter(torch.ops.aten.eq.Scalar)
 @enforce_tensor_types(
