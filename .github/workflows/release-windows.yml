@@ -1,7 +1,6 @@
 name: Release Windows wheels artifacts
 
 on:
-  pull_request:
   push:
     tags:
       # NOTE: Binary build pipelines should only get triggered on release candidate builds
