@@ -39,6 +39,6 @@
 --exclude libcudart.so.12
 --exclude libnvinfer.so.10
 --exclude libnvinfer_plugin.so.10
---exclude libnvinfer-ea523553.so.10.0.1
+--exclude libnvinfer-ea523553.so.10.2.0
 --exclude libcudart-9335f6a2.so.12.1.105
---exclude libnvinfer_plugin-24528888.so.10.0.1
+--exclude libnvinfer_plugin-24528888.so.10.2.0

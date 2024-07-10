@@ -6,4 +6,4 @@ torch>=2.5.0.dev,<2.6.0
 torchvision>=0.19.0.dev,<0.20.0
 --extra-index-url https://pypi.ngc.nvidia.com
 pyyaml
-tensorrt==10.0.1
+tensorrt==10.2.0

@@ -7,7 +7,7 @@ parameterized>=0.2.0
 pytest>=8.2.1
 pytest-xdist>=3.6.1
 pyyaml
-tensorrt==10.0.1
+tensorrt==10.2.0
 timm>=1.0.3
 transformers==4.40.2
 --extra-index-url https://pypi.nvidia.com
