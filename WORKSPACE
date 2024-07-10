@@ -84,7 +84,7 @@ http_archive(
 http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    sha256 = "a5cd2863793d69187ce4c73b2fffc1f470ff28cfd91e3640017e53b8916453d5",
+    sha256 = "885ba84087d9633e07cdaf76b022a99c7460fbe42b487cabec6524409af2591b",
     strip_prefix = "TensorRT-10.2.0.19",
     urls = [
         "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.2.0/tars/TensorRT-10.2.0.19.Linux.x86_64-gnu.cuda-12.5.tar.gz",
@@ -94,7 +94,7 @@ http_archive(
 http_archive(
     name = "tensorrt_win",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    sha256 = "d667bd10b178e239b621a8929008ef3e27967d181bf07a39845a0f99edeec47a",
+    sha256 = "4a9c6e279fd36559551a6d88e37d835db5ebdc950246160257b0b538960e57fa",
     strip_prefix = "TensorRT-10.2.0.19",
     urls = [
         "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.2.0/zip/TensorRT-10.2.0.19.Windows.win10.cuda-12.5.zip",
