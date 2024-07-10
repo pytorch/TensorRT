@@ -98,7 +98,7 @@ def _pretraced_backend(
 
             logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
 
-            gm = post_lowering(gm)
+            gm = post_lowering(gm, sample_inputs)
 
             logger.debug("Lowered Input graph:\n " + str(gm.graph))
 
