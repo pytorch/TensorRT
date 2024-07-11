@@ -34,6 +34,7 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
 )
 from torch_tensorrt.dynamo.utils import (
+    flatten_dict_value,
     get_torch_inputs,
     parse_complex_tensor_structs,
     prepare_inputs,
@@ -495,6 +496,7 @@ def compile_module(
 def convert_module_to_trt_engine(
     exported_program: ExportedProgram,
     inputs: Sequence[Any],
+    kwarg_inputs: Optional[dict[str, Any]] = None,
     *,
     enabled_precisions: (
         Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
@@ -608,12 +610,15 @@ def convert_module_to_trt_engine(
             stacklevel=2,
         )
 
-    input_list = list(inputs) if inputs is not None else []
+    arg_input_list = list(inputs) if inputs is not None else []
     torch_executed_ops = torch_executed_ops if torch_executed_ops is not None else set()
+    if kwarg_inputs is None:
+        kwarg_inputs = {}
     # Prepare torch_trt inputs
-    input_list = prepare_inputs(input_list)
+    arg_input_list = prepare_inputs(arg_input_list)
+    kwarg_input_list = prepare_inputs(kwarg_inputs)
+    flattened_input_list = arg_input_list + flatten_dict_value(kwarg_input_list)
     device = to_torch_tensorrt_device(device)
-    torch_inputs = get_torch_inputs(input_list, device)
     enabled_precisions = {dtype._from(e) for e in enabled_precisions}
 
     compilation_options = {
@@ -662,8 +667,15 @@ def convert_module_to_trt_engine(
     # Assume converters support dynamic shapes and disable validation
     CONVERTERS.set_dynamic_shape_support(settings.assume_dynamic_shape_support)
 
+    interpreter_result = interpret_module_to_result(
+        gm,
+        inputs=flattened_input_list,
+        arg_inputs=arg_input_list,
+        kwarg_inputs=kwarg_input_list,
+        settings=settings,
+    )
     try:
-        interpreter_result = interpret_module_to_result(gm, input_list, settings)
+        pass
     except UnsupportedOperatorException:
         logger.error(
             f"Conversion of module {gm} not currently fully supported or convertible!",

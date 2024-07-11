@@ -1,4 +1,6 @@
 # type: ignore
+import os
+import tempfile
 import unittest
 
 import pytest
@@ -62,12 +64,15 @@ def test_custom_model():
     # trt_mod = torchtrt.compile(model, **compile_spec)
 
     exp_program = torch.export.export(model, args=tuple(args), kwargs=kwargs)
-    trt_mod = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    cos_sim = cosine_similarity(model(*args, **kwargs), trt_mod(*args, **kwargs)[0])
+    trt_gm = torchtrt.dynamo.compile(exp_program, **compile_spec)
+    cos_sim = cosine_similarity(model(*args, **kwargs), trt_gm(*args, **kwargs)[0])
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
         msg=f"CustomKwargs Module TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
 
+    # Save the module
+    trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
+    torchtrt.save(trt_gm, trt_ep_path, inputs=args, kwargs_inputs=kwargs)
     # Clean up model env
     torch._dynamo.reset()

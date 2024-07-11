@@ -147,6 +147,8 @@ def run_shape_analysis(
         sub_outputs = outputs
         return
 
+    if kwargs_inputs is None:
+        kwargs_inputs = {}
     # Iterate through submodules (both Torch and TRT) and store IO shapes
     for name, _ in parent_module.named_children():
         submodule = getattr(parent_module, name)

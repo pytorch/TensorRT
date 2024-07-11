@@ -351,7 +351,7 @@ def convert_method_to_trt_engine(
         torchtrt_inputs = prepare_inputs(inputs)
         exp_program = torch_tensorrt.dynamo.trace(module, torchtrt_inputs, **kwargs)
 
-        return dynamo_convert_module_to_trt_engine(  # type: ignore
+        return dynamo_convert_module_to_trt_engine(
             exp_program,
             inputs=tuple(inputs),
             enabled_precisions=enabled_precisions_set,
@@ -429,9 +429,10 @@ def save(
         raise ValueError(
             "Not all inputs provided are torch.tensors. Please provide torch.tensors as inputs"
         )
-    if kwargs_inputs is not None and not all(
-        value is not None for value in kwargs_inputs.values()
-    ):
+    if kwargs_inputs is None:
+        kwargs_inputs = {}
+
+    if kwargs_inputs and not all(value is not None for value in kwargs_inputs.values()):
         raise ValueError("kwargs should not include None.")
     if output_format not in accepted_formats:
         raise ValueError(
