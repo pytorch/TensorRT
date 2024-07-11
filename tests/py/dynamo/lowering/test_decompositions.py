@@ -2,7 +2,6 @@ import torch
 import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
-from parameterized import parameterized
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
@@ -963,37 +962,60 @@ class TestLowering(TestCase):
             f"The optimized model results shape and torch model results shape should be equal in empty_stride",
         )
 
-
-class TestScatterAdd(TestCase):
     @parameterized.expand(
         [
             (
                 "scatter_add_zero_dim_indexOne_constant",
                 0,
-                torch.tensor([[0, 1, 2, 0]]),
-                torch.tensor([[1, 2, 3, 4]], dtype=torch.int32),
+                torch.tensor([[0, 1, 2, 0]]).cuda(),
+                torch.tensor([[1, 2, 3, 4]], dtype=torch.int32).cuda(),
+                {torch.ops.aten.add.Tensor},
             ),
             (
                 "scatter_add_zero_dim_indexTwo_constant",
                 0,
-                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]),
-                torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32),
+                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
+                torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32).cuda(),
+                {torch.ops.aten.add.Tensor, torch.ops.aten.scatter.src},
             ),
             (
                 "scatter_add_one_dim_indexOne_constant",
                 1,
-                torch.tensor([[0, 1, 2, 0]]),
-                torch.tensor([[1, 2, 3, 1]], dtype=torch.int32),
+                torch.tensor([[0, 1, 2, 0]]).cuda(),
+                torch.tensor([[1, 2, 3, 1]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.add.Tensor,
+                    torch.ops.aten.scatter.src,
+                    torch.ops.aten.full_like.default,
+                },
             ),
             (
-                "scatter_add_one_dim_indexTwo_costant",
+                "scatter_add_one_dim_indexTwo_constant",
                 1,
-                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]),
-                torch.tensor([[1, 2, 3, 1], [5, 6, 5, 5]], dtype=torch.int32),
+                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
+                torch.tensor([[1, 2, 3, 1], [5, 6, 5, 5]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.add.Tensor,
+                    torch.ops.aten.scatter.src,
+                    torch.ops.aten.full_like.default,
+                },
+            ),
+            (
+                "scatter_add_one_dim_indexTwo_constant",
+                1,
+                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1], [3, 2, 1, 2]]).cuda(),
+                torch.tensor(
+                    [[1, 2, 3, 1], [5, 6, 5, 5], [2, 4, 3, 2]], dtype=torch.int32
+                ).cuda(),
+                {
+                    torch.ops.aten.add.Tensor,
+                    torch.ops.aten.scatter.src,
+                    torch.ops.aten.full_like.default,
+                },
             ),
         ]
     )
-    def test_scatter_add(self, _, dim, index, src):
+    def test_scatter_add(self, _, dim, index, src, expected_ops_param):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -1002,20 +1024,55 @@ class TestScatterAdd(TestCase):
                 return torch.ops.aten.scatter_add.default(input, dim, index, src)
 
         # Operations expected to be included in the traced graph after decompositions
-        expected_ops = {torch.ops.aten.scatter.src}
+        expected_ops = expected_ops_param
+        unexpected_ops = {torch.ops.aten.scatter_add.default}
 
-        input = torch.zeros(3, 5, dtype=torch.int32)
+        input = torch.zeros(3, 5, dtype=torch.int32).cuda()
         inputs = [input]
 
         fx_graph = torch.fx.symbolic_trace(TestModule())
-        _, expected_ops_unseen = lower_graph_testing(
-            fx_graph, inputs, expected_ops=expected_ops, min_block_size=2
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=2,
         )
 
         self.assertEquals(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        self.assertEquals(
+            len(unexpected_ops_seen),
+            0,
+            f"The following expected ops were not encountered: {unexpected_ops_seen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            truncate_double=True,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            f"Scatter_add TRT outputs don't match with the original model.",
         )
 
 

@@ -248,32 +248,39 @@ def empty_strided_decomposition(*args, **kwargs) -> torch.Tensor:
 )
 def scatter_add_decomposition(
     input_tensor: torch.Tensor,
-    src_tensor: torch.Tensor,
     dim: int,
     index: torch.Tensor,
+    src_tensor: torch.Tensor,
 ) -> torch.Tensor:
     scatter_add_tensor = input_tensor
-    src_copy = src_tensor
     src_shape = list(src_tensor.shape)
-    del src_shape[dim]
-    select_src_dim = src_copy.shape[dim]
-    to_stack_dummy_src = tuple(torch.empty(src_shape) for _ in range(select_src_dim))
-    for index_src_dim in range(0, select_src_dim, 1):
-        select_tensor_dim = torch.select(src_copy, dim, index_src_dim)
-        to_stack_src = to_stack_dummy_src
-        if(index_src_dim == 0):
-            to_stack_src = (select_tensor_dim.cpu(),) + to_stack_dummy_src[index_src_dim+1:] 
-        elif(index_src_dim == select_src_dim - 1 ):
-            to_stack_src = to_stack_dummy_src[:index_src_dim] + (select_tensor_dim.cpu(),)
-        else:
-            to_stack_src = to_stack_dummy_src[:index_src_dim] + (select_tensor_dim.cpu(),) + to_stack_dummy_src[index_src_dim+1:]
+    src_dim = src_shape[dim]
+    for i in range(0, src_dim):
+        to_scatter_tensor = torch.zeros_like(input_tensor)
 
-        stacked_src = torch.stack(to_stack_src, dim)
-        input_tensor_to_add = torch.scatter(torch.empty_like(input_tensor, dtype= torch.float32), dim, index, stacked_src.cuda())
-        scatter_add_tensor = torch.add(scatter_add_tensor, input_tensor_to_add)
+        # index and src slice
+        src_slice = torch.select(src_tensor, dim, i)
+        index_slice = torch.select(index, dim, i)
+
+        # unsqueeze src and index in dim
+        src_slice = torch.unsqueeze(src_slice, dim)
+        index_slice = torch.unsqueeze(index_slice, dim)
+
+        # moving tensor to default device
+        device = to_torch_device(default_device())
+        scatter_add_tensor = scatter_add_tensor.to(device)
+        to_scatter_tensor = to_scatter_tensor.to(device)
+        index_slice = index_slice.to(device)
+        src_slice = src_slice.to(device)
+
+        scatter_add_tensor = torch.add(
+            scatter_add_tensor,
+            torch.scatter(to_scatter_tensor, dim, index_slice, src_slice),
+        )
+
     return scatter_add_tensor
 
-    
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
