@@ -70,7 +70,7 @@ def get_node_io(
             return formatted_str[:-2] + ")"
         else:
             _LOGGER.warning(
-                f"Detected unparseable type in node formatting: {type(metadata)}"
+                f"Detected unparsable type in node formatting: {type(metadata)}"
             )
             return ""
 
@@ -181,7 +181,7 @@ def cast_int_int_div_trt_tensor(
         rhs_val (TRTTensor): A TRT Tensor numerator
         name (str): Name of calling layer
     Returns:
-        A list of lhs_val and rhs_val casted to the approriate datatype
+        A list of lhs_val and rhs_val casted to the appropriate datatype
     """
     if lhs_val.dtype == trt.int32 and rhs_val.dtype == trt.int32:
         lhs_val = cast_trt_tensor(ctx, lhs_val, trt.float32, name)
@@ -343,9 +343,7 @@ def create_constant(
     # Rank 0 constant is required in IFillLayer inputs.
     if min_rank == 0:
         shape = trt.Dims()
-    numpy_value = to_numpy(
-        value, _enums.dtype._from(dtype).to(np.dtype) if dtype is not None else None
-    )
+    numpy_value = to_numpy(value, dtype)
     constant = ctx.net.add_constant(
         shape if isinstance(value, (int, float, bool)) else value.shape,
         numpy_value.copy() if isinstance(numpy_value, np.ndarray) else numpy_value,
@@ -575,7 +573,7 @@ def to_numpy(
         return (
             output
             if (dtype is None or output is None)
-            else output.astype(_enums.dtype._from(dtype).to(np.dtype))
+            else output.astype(_enums.dtype._from(dtype).to(np.dtype, use_default=True))
         )
     else:
         raise AssertionError(
@@ -636,7 +634,7 @@ def append(
         name (str): Name of the calling layer
         original_tensor (TRTTensor): A TRTTensor to append the new value to
         new_value (Union[TRTTensor, int, float, torch.Tensor, np.ndarray]): A new value to append
-        dim (int, optional): Dimention to append the new value. Defaults to 0.
+        dim (int, optional): Dimension to append the new value. Defaults to 0.
 
     Returns:
         TRTTensor: A new TRTTensor that is the result of appending the new value to the original tensor

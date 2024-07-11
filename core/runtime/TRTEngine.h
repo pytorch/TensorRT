@@ -7,7 +7,9 @@
 #include <utility>
 
 #include "ATen/core/function_schema.h"
+#include "ATen/cuda/CUDAGraph.h"
 #include "NvInfer.h"
+#include "c10/cuda/CUDAStream.h"
 #include "torch/custom_class.h"
 
 #include "core/runtime/TRTEngineProfiler.h"
@@ -35,6 +37,8 @@ struct TRTEngine : torch::CustomClassHolder {
   std::vector<std::string> out_binding_names = {}; // ITO: PYT IDX
 
   bool hardware_compatible = false; // Whether the engine was compiled in hardware compatible mode
+  std::string serialized_metadata; // This is a base64 encoded pkl object used to store metadata such as settings used
+                                   // in compilation
 
   ~TRTEngine();
   TRTEngine(
@@ -42,7 +46,8 @@ struct TRTEngine : torch::CustomClassHolder {
       const RTDevice& cuda_device,
       const std::vector<std::string>& in_binding_names,
       const std::vector<std::string>& out_binding_names,
-      bool hardware_compatible = false);
+      bool hardware_compatible = false,
+      const std::string& serialized_metadata = "");
   TRTEngine(std::vector<std::string> serialized_info);
   TRTEngine(
       const std::string& mod_name,
@@ -50,7 +55,8 @@ struct TRTEngine : torch::CustomClassHolder {
       const RTDevice& cuda_device,
       const std::vector<std::string>& in_binding_names,
       const std::vector<std::string>& out_binding_names,
-      bool hardware_compatible = false);
+      bool hardware_compatible = false,
+      const std::string& serialized_metadata = "");
   TRTEngine& operator=(const TRTEngine& other);
   std::string to_str() const;
   static void verify_serialization_fmt(const std::vector<std::string>& serialized_info);
@@ -61,6 +67,14 @@ struct TRTEngine : torch::CustomClassHolder {
   void dump_engine_layer_info();
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
   static const char BINDING_DELIM = '%';
+
+  // CUDAGraph-Related Functionality
+  at::cuda::CUDAGraph cudagraph = {};
+  at::cuda::CUDAStream active_stream = c10::cuda::getDefaultCUDAStream();
+  std::vector<at::Tensor> input_buffers = {};
+  std::vector<at::Tensor> output_buffers = {};
+  std::string shape_key;
+
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);
 

@@ -34,7 +34,7 @@ def replace_max_pool_with_indices(
         ):
             modified_graph = True
 
-            # Replace all uses of the clone with the placholder, delete the clone
+            # Replace all uses of the clone with the placeholder, delete the clone
             getitem_node = list(node.users)[0]
 
             with gm.graph.inserting_after(getitem_node):

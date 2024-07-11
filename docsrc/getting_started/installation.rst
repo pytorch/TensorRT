@@ -1,15 +1,15 @@
 .. _installation:
 
 Installation
-=============
+##################
 
 Precompiled Binaries
-*********************
+---------------------
 
-Torch-TensorRT 2.x is centered primarily around Python. As such, precompiled releases can be found on pypi.org
+Torch-TensorRT 2.x is centered primarily around Python. As such, precompiled releases can be found on `pypi.org <https://pypi.org/project/torch-tensorrt/>`_
 
 Dependencies
----------------
+~~~~~~~~~~~~~~
 
 You need to have CUDA, PyTorch, and TensorRT (python package is sufficient) installed to use Torch-TensorRT
 
@@ -18,7 +18,7 @@ You need to have CUDA, PyTorch, and TensorRT (python package is sufficient) inst
 
 
 Installing Torch-TensorRT
----------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can install the python package using
 
@@ -26,8 +26,10 @@ You can install the python package using
 
     python -m pip install torch torch-tensorrt tensorrt
 
+Packages are uploaded for Linux on x86 and Windows
+
 Installing Torch-TensorRT for a specific CUDA version
---------------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Similar to PyTorch, Torch-TensorRT has builds compiled for different versions of CUDA. These are distributed on PyTorch's package index
 
@@ -38,7 +40,7 @@ For example CUDA 11.8
     python -m pip install torch torch-tensorrt tensorrt --extra-index-url https://download.pytorch.org/whl/cu118
 
 Installing Nightly Builds
----------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Torch-TensorRT distributed nightlies targeting the PyTorch nightly. These can be installed from the PyTorch nightly package index (separated by CUDA version)
 
@@ -51,19 +53,22 @@ Torch-TensorRT distributed nightlies targeting the PyTorch nightly. These can be
 .. _bin-dist:
 
 C++ Precompiled Binaries (TorchScript Only)
---------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Precompiled tarballs for releases are provided here: https://github.com/pytorch/TensorRT/releases
 
 .. _compile-from-source:
 
 Compiling From Source
-******************************************
+------------------------
+
+Building on Linux
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. _installing-deps:
 
-Dependencies for Compilation
--------------------------------
+Dependencies
+^^^^^^^^^^^^^^
 
 * Torch-TensorRT is built with **Bazel**, so begin by installing it.
 
@@ -95,7 +100,7 @@ Dependencies for Compilation
     * https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L53C1-L53C1
 
 
-* **TensorRT** is not required to be installed on the system to build Torch-TensorRT, in fact this is preferable to ensure reproducable builds. If versions other than the default are needed
+* **TensorRT** is not required to be installed on the system to build Torch-TensorRT, in fact this is preferable to ensure reproducible builds. If versions other than the default are needed
   point the WORKSPACE file to the URL of the tarball or download the tarball for TensorRT from https://developer.nvidia.com and update the paths in the WORKSPACE file here https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L71
 
     For example:
@@ -114,13 +119,13 @@ Dependencies for Compilation
             ],
         )
 
-    Remember at runtime, these libraries must be added to your ``LD_LIBRARY_PATH`` explicity
+    Remember at runtime, these libraries must be added to your ``LD_LIBRARY_PATH`` explicitly
 
 If you have a local version of TensorRT installed, this can be used as well by commenting out the above lines and uncommenting the following lines https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L114C1-L124C3
 
 
 Building the Package
----------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Once the WORKSPACE has been configured properly, all that is required to build torch-tensorrt is the following command
 
@@ -135,12 +140,41 @@ To build the wheel file
 
         python -m pip wheel --no-deps --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu124 -w dist
 
+Additional Build Options
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Building the C++ Library (TorchScript Only)
-------------------------------
+Some features in the library are optional and allow builds to be lighter or more portable.
+
+Python Only Distribution
+............................
+
+There are multiple features of the library which require C++ components to be enabled. This includes both the TorchScript frontend which accepts TorchScript modules for compilation
+and the Torch-TensorRT runtime, the default executor for modules compiled with Torch-TensorRT, be it with the TorchScript or Dynamo frontend.
+
+In the case you may want a build which does not require C++ you can disable these features and avoid building these components. As a result, the only available runtime will be the Python based on
+which has implications for features like serialization.
+
+.. code-block:: sh
+
+    PYTHON_ONLY=1 python -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu124
+
+
+No TorchScript Frontend
+............................
+
+The TorchScript frontend is a legacy feature of Torch-TensorRT which is now in maintenance as TorchDynamo has become the preferred compiler technology for this project. It contains quite a bit
+of C++ code that is no longer necessary for most users. Therefore you can exclude this component from your build to speed up build times. The C++ based runtime will still be available to use.
+
+.. code-block:: sh
+
+    NO_TORCHSCRIPT=1 python -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu124
+
+
+Building the C++ Library Standalone (TorchScript Only)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Release Build
-^^^^^^^^^^^^^^^^^^^^^^^^
+............................
 
 .. code-block:: shell
 
@@ -151,7 +185,7 @@ A tarball with the include files and library can then be found in ``bazel-bin``
 .. _build-from-archive-debug:
 
 Debug Build
-^^^^^^^^^^^^^^^^^^^^^^^^
+............................
 
 To build with debug symbols use the following command
 
@@ -162,7 +196,7 @@ To build with debug symbols use the following command
 A tarball with the include files and library can then be found in ``bazel-bin``
 
 Pre CXX11 ABI Build
-^^^^^^^^^^^^^^^^^^^^^^^^
+............................
 
 To build using the pre-CXX11 ABI use the ``pre_cxx11_abi`` config
 
@@ -204,8 +238,45 @@ recommended commands:
 
     NOTE: For all of the above cases you must correctly declare the source of PyTorch you intend to use in your WORKSPACE file for both Python and C++ builds. See below for more information
 
-**Building with CMake** (TorchScript Only)
--------------------------------------------
+
+
+Building on Windows
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+* Microsoft VS 2022 Tools
+* Bazelisk
+* CUDA
+
+
+Build steps
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Open the app "x64 Native Tools Command Prompt for VS 2022" - note that Admin privileges may be necessary
+* Ensure Bazelisk (Bazel launcher) is installed on your machine and available from the command line. Package installers such as Chocolatey can be used to install Bazelisk
+* Install latest version of Torch (i.e. with ``pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu124``)
+* Clone the Torch-TensorRT repository and navigate to its root directory
+* Run ``pip install ninja wheel setuptools``
+* Run ``pip install --pre -r py/requirements.txt``
+* Run ``set DISTUTILS_USE_SDK=1``
+* Run ``python setup.py bdist_wheel``
+* Run ``pip install dist/*.whl``
+
+Advanced setup and Troubleshooting
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In the ``WORKSPACE`` file, the ``cuda_win``, ``libtorch_win``, and ``tensorrt_win`` are Windows-specific modules which can be customized. For instance, if you would like to build with a different version of CUDA, or your CUDA installation is in a non-standard location, update the `path` in the `cuda_win` module.
+
+Similarly, if you would like to use a different version of pytorch or tensorrt, customize the `urls` in the ``libtorch_win`` and ``tensorrt_win`` modules, respectively.
+
+Local versions of these packages can also be used on Windows. See ``toolchains\\ci_workspaces\\WORKSPACE.win.release.tmpl`` for an example of using a local version of TensorRT on Windows.
+
+
+Alternative Build Systems
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Building with CMake (TorchScript Only)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 It is possible to build the API libraries (in cpp/) and the torchtrtc executable using CMake instead of Bazel.
 Currently, the python API and the tests cannot be built with CMake.
@@ -233,11 +304,12 @@ A few useful CMake options include:
             [-DCMAKE_BUILD_TYPE=Debug|Release]
         cmake --build <build directory>
 
-**Building Natively on aarch64 (Jetson)**
--------------------------------------------
+
+Building Natively on aarch64 (Jetson)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Prerequisites
-^^^^^^^^^^^^^^
+............................
 
 Install or compile a build of PyTorch/LibTorch for aarch64
 
@@ -246,8 +318,8 @@ NVIDIA hosts builds the latest release branch for Jetson here:
     https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-10-now-available/72048
 
 
-Enviorment Setup
-^^^^^^^^^^^^^^^^^
+Environment Setup
+............................
 
 To build natively on aarch64-linux-gnu platform, configure the ``WORKSPACE`` with local available dependencies.
 
@@ -279,7 +351,7 @@ use that library, set the paths to the same path but when you compile make sure 
 
 
 Compile C++ Library and Compiler CLI
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+........................................................
 
     NOTE: Due to shifting dependency locations between Jetpack 4.5 and 4.6 there is a now a flag to inform bazel of the Jetpack version
 
@@ -295,9 +367,9 @@ Compile Torch-TensorRT library using bazel command:
    bazel build //:libtorchtrt --platforms //toolchains:jetpack_5.0
 
 Compile Python API
-^^^^^^^^^^^^^^^^^^^^
+............................
 
-    NOTE: Due to shifting dependencies locations between Jetpack 4.5 and newer Jetpack verisons there is now a flag for ``setup.py`` which sets the jetpack version (default: 5.0)
+    NOTE: Due to shifting dependencies locations between Jetpack 4.5 and newer Jetpack versions there is now a flag for ``setup.py`` which sets the jetpack version (default: 5.0)
 
 Compile the Python API using the following command from the ``//py`` directory:
 

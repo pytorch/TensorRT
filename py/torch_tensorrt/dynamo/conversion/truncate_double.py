@@ -118,7 +118,7 @@ def _repair_64bit_input(
     # Only enter this code block if there exists a 64-bit output
     # This implies a cast is needed, since TRT cannot output 64-bit tensors
     if output_positions_64bit:
-        # Determine whther the outputs of the module are tuple-type or not
+        # Determine whether the outputs of the module are tuple-type or not
         is_collection_output = False
         if isinstance(submodule_outputs, tuple):
             is_collection_output = True

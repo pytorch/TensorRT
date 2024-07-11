@@ -17,6 +17,8 @@ namespace runtime {
 using EngineID = int64_t;
 const std::string ABI_VERSION = "5";
 extern bool MULTI_DEVICE_SAFE_MODE;
+extern bool CUDAGRAPHS_MODE;
+
 typedef enum {
   ABI_TARGET_IDX = 0,
   NAME_IDX,
@@ -25,6 +27,7 @@ typedef enum {
   INPUT_BINDING_NAMES_IDX,
   OUTPUT_BINDING_NAMES_IDX,
   HW_COMPATIBLE_IDX,
+  SERIALIZED_METADATA_IDX,
   SERIALIZATION_LEN, // NEVER USED FOR DATA, USED TO DETERMINE LENGTH OF SERIALIZED INFO
 } SerializedInfoIndex;
 
@@ -41,6 +44,10 @@ void multi_gpu_device_check();
 bool get_multi_device_safe_mode();
 
 void set_multi_device_safe_mode(bool multi_device_safe_mode);
+
+bool get_cudagraphs_mode();
+
+void set_cudagraphs_mode(bool multi_device_safe_mode);
 
 class DeviceList {
   using DeviceMap = std::unordered_map<int, RTDevice>;

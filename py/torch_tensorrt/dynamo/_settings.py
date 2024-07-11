@@ -16,12 +16,12 @@ from torch_tensorrt.dynamo._defaults import (
     ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
+    MAKE_REFITABLE,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
-    REFIT,
     REQUIRE_FULL_COMPILATION,
     SPARSE_WEIGHTS,
     TIMING_CACHE_PATH,
@@ -70,7 +70,7 @@ class CompilationSettings:
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         dryrun (Union[bool, str]): Toggle "Dryrun" mode, which runs everything through partitioning, short of conversion to
             TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the
-            ouptut to a file if a string path is specified
+            output to a file if a string path is specified
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
     """
@@ -93,7 +93,7 @@ class CompilationSettings:
     disable_tf32: bool = DISABLE_TF32
     assume_dynamic_shape_support: bool = ASSUME_DYNAMIC_SHAPE_SUPPORT
     sparse_weights: bool = SPARSE_WEIGHTS
-    refit: bool = REFIT
+    make_refitable: bool = MAKE_REFITABLE
     engine_capability: EngineCapability = field(
         default_factory=lambda: ENGINE_CAPABILITY
     )

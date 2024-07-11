@@ -6,7 +6,7 @@ Post Training Quantization (PTQ) is a technique to reduce the required computati
 
 Users writing TensorRT applications are required to setup a calibrator class which will provide sample data to the TensorRT calibrator. With Torch-TensorRT we look to leverage existing infrastructure in PyTorch to make implementing calibrators easier.
 
-LibTorch provides a `Dataloader` and `Dataset` API which steamlines preprocessing and batching input data. Torch-TensorRT uses Dataloaders as the base of a generic calibrator implementation. So you will be able to reuse or quickly implement a `torch::Dataset` for your target domain, place it in a Dataloader and create a INT8 Calibrator from it which you can provide to Torch-TensorRT to run INT8 Calibration during compliation of your module.
+LibTorch provides a `Dataloader` and `Dataset` API which steamlines preprocessing and batching input data. Torch-TensorRT uses Dataloaders as the base of a generic calibrator implementation. So you will be able to reuse or quickly implement a `torch::Dataset` for your target domain, place it in a Dataloader and create a INT8 Calibrator from it which you can provide to Torch-TensorRT to run INT8 Calibration during compilation of your module.
 
 ### Code
 
@@ -92,7 +92,7 @@ The calibrator factories create a calibrator that inherits from a `nvinfer1::IIn
 auto calibrator = torch_tensorrt::ptq::make_int8_calibrator<nvinfer1::IInt8MinMaxCalibrator>(std::move(calibration_dataloader), calibration_cache_file, true);
 ```
 
-Then all thats required to setup the module for INT8 calibration is to set the following compile settings in the `torch_tensorrt::CompileSpec` struct and compiling the module:
+Then all that's required to setup the module for INT8 calibration is to set the following compile settings in the `torch_tensorrt::CompileSpec` struct and compiling the module:
 
 ```C++
     std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
@@ -102,7 +102,7 @@ Then all thats required to setup the module for INT8 calibration is to set the f
     compile_spec.enabled_precisions.insert(torch::kI8);
     /// Use the TensorRT Entropy Calibrator
     compile_spec.ptq_calibrator = calibrator;
-    /// Set a larger workspace (you may get better performace from doing so)
+    /// Set a larger workspace (you may get better performance from doing so)
     compile_spec.workspace_size = 1 << 28;
 
     auto trt_mod = torch_tensorrt::CompileGraph(mod, compile_spec);

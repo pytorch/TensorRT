@@ -25,7 +25,7 @@ from docutils.statemachine import StringList
 # -- Project information -----------------------------------------------------
 
 project = "Torch-TensorRT"
-copyright = "2022, NVIDIA Corporation"
+copyright = "2024, NVIDIA Corporation"
 author = "NVIDIA Corporation"
 
 version = f"v{torch_tensorrt.__version__}"
@@ -151,6 +151,9 @@ html_theme_options = {
     "master_doc": True,
     "version_info": {
         "main": "https://pytorch.org/TensorRT/",
+        "v2.3.0": "https://pytorch.org/TensorRT/v2.3.0",
+        "v2.2.0": "https://pytorch.org/TensorRT/v2.2.0",
+        "v2.1.0": "https://pytorch.org/TensorRT/v2.1.0",
         "v1.4.0": "https://pytorch.org/TensorRT/v1.4.0",
         "v1.3.0": "https://pytorch.org/TensorRT/v1.3.0",
         "v1.2.0": "https://pytorch.org/TensorRT/v1.2.0",
@@ -185,6 +188,8 @@ autodoc_type_aliases = {
 }
 
 nbsphinx_execute = "never"
+
+autodoc_member_order = "groupwise"
 
 # -- A patch that prevents Sphinx from cross-referencing ivar tags -------
 # See http://stackoverflow.com/a/41184353/3343043

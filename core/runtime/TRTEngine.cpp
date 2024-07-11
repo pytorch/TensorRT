@@ -2,6 +2,7 @@
 
 #include <cuda_runtime.h>
 #include "NvInfer.h"
+#include "c10/cuda/CUDAStream.h"
 #include "torch/csrc/jit/frontend/function_schema_parser.h"
 #include "torch/cuda.h"
 
@@ -33,14 +34,16 @@ TRTEngine::TRTEngine(
     const RTDevice& cuda_device,
     const std::vector<std::string>& _in_binding_names,
     const std::vector<std::string>& _out_binding_names,
-    bool hardware_compatible)
+    bool hardware_compatible,
+    const std::string& serialized_metadata)
     : TRTEngine(
           "deserialized_trt",
           serialized_engine,
           cuda_device,
           _in_binding_names,
           _out_binding_names,
-          hardware_compatible) {}
+          hardware_compatible,
+          serialized_metadata) {}
 
 TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
     : TRTEngine(
@@ -49,7 +52,8 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           RTDevice(serialized_info[DEVICE_IDX]),
           split(serialized_info[INPUT_BINDING_NAMES_IDX], BINDING_DELIM),
           split(serialized_info[OUTPUT_BINDING_NAMES_IDX], BINDING_DELIM),
-          static_cast<bool>(std::stoi(serialized_info[HW_COMPATIBLE_IDX]))) {}
+          static_cast<bool>(std::stoi(serialized_info[HW_COMPATIBLE_IDX])),
+          serialized_info[SERIALIZED_METADATA_IDX]) {}
 
 TRTEngine::TRTEngine(
     const std::string& mod_name,
@@ -57,14 +61,24 @@ TRTEngine::TRTEngine(
     const RTDevice& cuda_device,
     const std::vector<std::string>& _in_binding_names,
     const std::vector<std::string>& _out_binding_names,
-    bool hardware_compatible) {
+    bool hardware_compatible,
+    const std::string& serialized_metadata) {
   this->hardware_compatible = hardware_compatible;
-
+  this->serialized_metadata = serialized_metadata;
   auto most_compatible_device = get_most_compatible_device(cuda_device, RTDevice(), hardware_compatible);
   TORCHTRT_CHECK(most_compatible_device, "No compatible device was found for instantiating TensorRT engine");
   device_info = most_compatible_device.value();
   multi_gpu_device_check();
   set_rt_device(device_info);
+
+  // Set active stream to non-default stream
+  auto current_stream = c10::cuda::getCurrentCUDAStream(device_info.id);
+  if (current_stream == c10::cuda::getDefaultCUDAStream(device_info.id)) {
+    active_stream = c10::cuda::getStreamFromPool(false, device_info.id);
+    c10::cuda::setCurrentCUDAStream(active_stream);
+  } else {
+    active_stream = current_stream;
+  }
 
   rt = make_trt(nvinfer1::createInferRuntime(util::logging::get_logger()));
 
@@ -108,7 +122,9 @@ TRTEngine::TRTEngine(
 
     num_io = std::make_pair(inputs, outputs);
     in_binding_names.resize(inputs);
+    input_buffers.resize(inputs);
     out_binding_names.resize(outputs);
+    output_buffers.resize(outputs);
     for (int64_t x = 0; x < cuda_engine->getNbIOTensors(); x++) {
       std::string bind_name = cuda_engine->getIOTensorName(x);
       if (cuda_engine->getTensorIOMode(bind_name.c_str()) == nvinfer1::TensorIOMode::kINPUT) {
@@ -120,6 +136,7 @@ TRTEngine::TRTEngine(
   } else {
     uint64_t inputs_size = _in_binding_names.size();
     in_binding_names.resize(inputs_size);
+    input_buffers.resize(inputs_size);
     for (uint64_t pyt_idx = 0; pyt_idx < inputs_size; pyt_idx++) {
       auto binding_name = _in_binding_names[pyt_idx];
       // Check if the binding name provided is in the list of engine's bindings
@@ -149,6 +166,7 @@ TRTEngine::TRTEngine(
 
     uint64_t outputs = _out_binding_names.size();
     out_binding_names.resize(outputs);
+    output_buffers.resize(outputs);
     for (size_t pyt_idx = 0; pyt_idx < outputs; pyt_idx++) {
       auto binding_name = _out_binding_names[pyt_idx];
       // Check if the binding name provided is in the list of engine's bindings

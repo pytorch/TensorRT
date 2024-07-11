@@ -2,7 +2,7 @@
 
 > Ahead of Time (AOT) compiling for PyTorch JIT
 
-Torch-TensorRT is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime. Unlike PyTorch's Just-In-Time (JIT) compiler, Torch-TensorRT is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your TorchScript code, you go through an explicit compile step to convert a standard TorchScript program into an module targeting a TensorRT engine. Torch-TensorRT operates as a PyTorch extention and compiles modules that integrate into the JIT runtime seamlessly. After compilation using the optimized graph should feel no different than running a TorchScript module. You also have access to TensorRT's suite of configurations at compile time, so you are able to specify operating precision (FP32/FP16/INT8) and other settings for your module.
+Torch-TensorRT is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime. Unlike PyTorch's Just-In-Time (JIT) compiler, Torch-TensorRT is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your TorchScript code, you go through an explicit compile step to convert a standard TorchScript program into an module targeting a TensorRT engine. Torch-TensorRT operates as a PyTorch extension and compiles modules that integrate into the JIT runtime seamlessly. After compilation using the optimized graph should feel no different than running a TorchScript module. You also have access to TensorRT's suite of configurations at compile time, so you are able to specify operating precision (FP32/FP16/INT8) and other settings for your module.
 
 ## Example Usage
 
@@ -57,9 +57,9 @@ graph(%input.2 : Tensor):
     %10 : bool = prim::Constant[value=1]() # ~/.local/lib/python3.6/site-packages/torch/nn/modules/conv.py:346:0
     %11 : int = prim::Constant[value=1]() # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:539:0
     %12 : bool = prim::Constant[value=0]() # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:539:0
-    %self.classifer.fc3.bias : Float(10) = prim::Constant[value= 0.0464  0.0383  0.0678  0.0932  0.1045 -0.0805 -0.0435 -0.0818  0.0208 -0.0358 [ CUDAFloatType{10} ]]()
-    %self.classifer.fc2.bias : Float(84) = prim::Constant[value=<Tensor>]()
-    %self.classifer.fc1.bias : Float(120) = prim::Constant[value=<Tensor>]()
+    %self.classifier.fc3.bias : Float(10) = prim::Constant[value= 0.0464  0.0383  0.0678  0.0932  0.1045 -0.0805 -0.0435 -0.0818  0.0208 -0.0358 [ CUDAFloatType{10} ]]()
+    %self.classifier.fc2.bias : Float(84) = prim::Constant[value=<Tensor>]()
+    %self.classifier.fc1.bias : Float(120) = prim::Constant[value=<Tensor>]()
     %self.feat.conv2.weight : Float(16, 6, 3, 3) = prim::Constant[value=<Tensor>]()
     %self.feat.conv2.bias : Float(16) = prim::Constant[value=<Tensor>]()
     %self.feat.conv1.weight : Float(6, 1, 3, 3) = prim::Constant[value=<Tensor>]()
@@ -72,15 +72,15 @@ graph(%input.2 : Tensor):
     %x.1 : Tensor = aten::max_pool2d(%input2.1, %7, %6, %8, %9, %12) # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:539:0
     %input.1 : Tensor = aten::flatten(%x.1, %11, %5) # x.py:25:0
     %27 : Tensor = aten::matmul(%input.1, %4)
-    %28 : Tensor = trt::const(%self.classifer.fc1.bias)
+    %28 : Tensor = trt::const(%self.classifier.fc1.bias)
     %29 : Tensor = aten::add_(%28, %27, %11)
     %input0.2 : Tensor = aten::relu(%29) # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:1063:0
     %31 : Tensor = aten::matmul(%input0.2, %3)
-    %32 : Tensor = trt::const(%self.classifer.fc2.bias)
+    %32 : Tensor = trt::const(%self.classifier.fc2.bias)
     %33 : Tensor = aten::add_(%32, %31, %11)
     %input1.1 : Tensor = aten::relu(%33) # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:1063:0
     %35 : Tensor = aten::matmul(%input1.1, %2)
-    %36 : Tensor = trt::const(%self.classifer.fc3.bias)
+    %36 : Tensor = trt::const(%self.classifier.fc3.bias)
     %37 : Tensor = aten::add_(%36, %35, %11)
     return (%37)
 (CompileGraph)
@@ -107,7 +107,7 @@ graph(%self.1 : __torch__.___torch_mangle_10.LeNet_trt,
 You can see the call where the engine is executed, based on a constant which is the ID of the engine, telling JIT how to find the engine and the input tensor which will be fed to TensorRT.
 The engine represents the exact same calculations as what is done by running a normal PyTorch module but optimized to run on your GPU.
 
-Torch-TensorRT converts from TorchScript by generating layers or subgraphs in correspondance with instructions seen in the graph. Converters are small modules of code used to map one specific
+Torch-TensorRT converts from TorchScript by generating layers or subgraphs in correspondence with instructions seen in the graph. Converters are small modules of code used to map one specific
 operation to a layer or subgraph in TensorRT. Not all operations are support, but if you need to implement one, you can in C++.
 
 ## Registering Custom Converters
@@ -166,7 +166,7 @@ static auto flatten_converter = torch_tensorrt::core::conversion::converters::Re
     });
 ```
 
-To use this converter in Python, it is recommended to use PyTorch’s [C++ / CUDA Extention](https://pytorch.org/tutorials/advanced/cpp_extension.html#custom-c-and-cuda-extensions) template to wrap
+To use this converter in Python, it is recommended to use PyTorch’s [C++ / CUDA Extension](https://pytorch.org/tutorials/advanced/cpp_extension.html#custom-c-and-cuda-extensions) template to wrap
 your library of converters into a `.so` that you can load with `ctypes.CDLL()` in your Python application.
 
 You can find more information on all the details of writing converters in the contributors documentation ([Writing Converters](https://nvidia.github.io/Torch-TensorRT/contributors/writing_converters.html#writing-converters)). If you

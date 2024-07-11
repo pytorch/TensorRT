@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Torch-TensorRT Tutorials &mdash; Torch-TensorRT v2.5.0.dev0+caf3a92 documentation</title>
+  <title>Torch-TensorRT Tutorials &mdash; Torch-TensorRT v2.5.0.dev0+33d2c36 documentation</title>
   
 
   
@@ -273,7 +273,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+caf3a92
+                  v2.5.0.dev0+33d2c36
                 </div>
               
             
@@ -304,7 +304,17 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/quick_start.html">Quick Start</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -318,18 +328,11 @@
 <li class="toctree-l1"><a class="reference internal" href="../../ts/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../ts/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../ts/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ts/ptq.html">Post Training Quantization (PTQ)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">FX Frontend</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../fx/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/using_dla.html">DLA</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
@@ -339,21 +342,20 @@
 <li class="toctree-l1"><a class="reference internal" href="dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="dynamo/custom_kernel_plugins.html#wrapping-custom-kernels-to-use-in-tensorrt">Wrapping Custom Kernels to use in TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="dynamo/custom_kernel_plugins.html#using-torch-tensorrt-to-insert-the-kernel">Using Torch-TensorRT to Insert the Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../py_api/logging.html">torch_tensorrt.logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../py_api/ptq.html">torch_tensorrt.ptq</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../py_api/dynamo.html">torch_tensorrt.dynamo</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../py_api/logging.html">torch_tensorrt.logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../py_api/fx.html">torch_tensorrt.fx</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../py_api/ptq.html">torch_tensorrt.ts.ptq</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
@@ -361,7 +363,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">CLI Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../cli/torchtrtc.html">torchtrtc</a></li>
 </ul>
@@ -465,15 +467,23 @@ a number of ways you can leverage this backend to accelerate inference.</p>
 <li><p><a class="reference internal" href="dynamo/torch_compile_transformers_example.html#torch-compile-transformer"><span class="std std-ref">Compiling a Transformer using torch.compile and TensorRT</span></a>: Compiling a Transformer model using <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></p></li>
 <li><p><a class="reference internal" href="dynamo/torch_compile_advanced_usage.html#torch-compile-advanced-usage"><span class="std std-ref">Torch Compile Advanced Usage</span></a>: Advanced usage including making a custom backend to use directly with the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> API</p></li>
 <li><p><a class="reference internal" href="dynamo/torch_compile_stable_diffusion.html#torch-compile-stable-diffusion"><span class="std std-ref">Torch Compile Stable Diffusion</span></a>: Compiling a Stable Diffusion model using <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></p></li>
+<li><p><a class="reference internal" href="dynamo/torch_export_cudagraphs.html#torch-export-cudagraphs"><span class="std std-ref">Torch Export with Cudagraphs</span></a>: Using the Cudagraphs integration with <cite>ir=”dynamo”</cite></p></li>
 <li><p><a class="reference internal" href="dynamo/custom_kernel_plugins.html#custom-kernel-plugins"><span class="std std-ref">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</span></a>: Creating a plugin to use a custom kernel inside TensorRT engines</p></li>
+<li><p><a class="reference internal" href="dynamo/refit_engine_example.html#refit-engine-example"><span class="std std-ref">Refit  TenorRT Graph Module with Torch-TensorRT</span></a>: Refitting a compiled TensorRT Graph Module with updated weights</p></li>
 <li><p><a class="reference internal" href="dynamo/vgg16_fp8_ptq.html#vgg16-fp8-ptq"><span class="std std-ref">Deploy Quantized Models using Torch-TensorRT</span></a>: Compiling a VGG16 model with FP8 and PTQ using <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></p></li>
 </ul>
 <div class="sphx-glr-thumbnails"><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi..."><img alt="" src="../../_images/sphx_glr_torch_compile_stable_diffusion_thumb.png" />
 <p><a class="reference internal" href="dynamo/torch_compile_stable_diffusion.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-stable-diffusion-py"><span class="std std-ref">Torch Compile Stable Diffusion</span></a></p>
   <div class="sphx-glr-thumbnail-title">Torch Compile Stable Diffusion</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as an overview of the process by which the Torch-TensorRT C..."><img alt="" src="../../_images/sphx_glr_torch_export_cudagraphs_thumb.png" />
+<p><a class="reference internal" href="dynamo/torch_export_cudagraphs.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-export-cudagraphs-py"><span class="std std-ref">Torch Export with Cudagraphs</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Torch Export with Cudagraphs</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi..."><img alt="" src="../../_images/sphx_glr_torch_compile_transformers_example_thumb.png" />
 <p><a class="reference internal" href="dynamo/torch_compile_transformers_example.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-transformers-example-py"><span class="std std-ref">Compiling a Transformer using torch.compile and TensorRT</span></a></p>
   <div class="sphx-glr-thumbnail-title">Compiling a Transformer using torch.compile and TensorRT</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how a compiled TensorRT Graph Module can be refitted with updated w..."><img alt="" src="../../_images/sphx_glr_refit_engine_example_thumb.png" />
+<p><a class="reference internal" href="dynamo/refit_engine_example.html#sphx-glr-tutorials-rendered-examples-dynamo-refit-engine-example-py"><span class="std std-ref">Refit  TenorRT Graph Module with Torch-TensorRT</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Refit  TenorRT Graph Module with Torch-TensorRT</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as an overview of the process by which torch_tensorrt.compi..."><img alt="" src="../../_images/sphx_glr_torch_compile_advanced_usage_thumb.png" />
 <p><a class="reference internal" href="dynamo/torch_compile_advanced_usage.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-advanced-usage-py"><span class="std std-ref">Torch Compile Advanced Usage</span></a></p>
   <div class="sphx-glr-thumbnail-title">Torch Compile Advanced Usage</div>
@@ -515,7 +525,7 @@ a number of ways you can leverage this backend to accelerate inference.</p>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2022, NVIDIA Corporation.
+        &copy; Copyright 2024, NVIDIA Corporation.
 
     </p>
   </div>

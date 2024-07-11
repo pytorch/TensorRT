@@ -1,27 +1,27 @@
 .. _torch_tensorrt_ptq_py:
 
-torch_tensorrt.ptq
-===================
+torch_tensorrt.ts.ptq
+======================
 
-.. currentmodule:: torch_tensorrt.ptq
+These components are legacy quantization utilities designed to work with the TorchScript Frontend. They have been replaced by the `TensorRT Model Optimizer <https://nvidia.github.io/TensorRT-Model-Optimizer/>`_ toolkit
+which can be used with the dynamo frontend:
 
-.. automodule:: torch_tensorrt.ptq
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. currentmodule:: torch_tensorrt.ts.ptq
+
+.. automodule:: torch_tensorrt.ts.ptq
 
 Classes
 ---------
 
 .. autoclass:: DataLoaderCalibrator
    :members:
-   :special-members: __init__
 
 .. autoclass:: CacheCalibrator
    :members:
-   :special-members: __init__
 
 Enums
 -------
 
 .. autoclass:: CalibrationAlgo
+   :members:
+   :undoc-members:

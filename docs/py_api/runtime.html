@@ -1,0 +1,1039 @@
+
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>torch_tensorrt.runtime &mdash; Torch-TensorRT v2.5.0.dev0+33d2c36 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!-- <link rel="stylesheet" href="../_static/pygments.css" type="text/css" /> -->
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery-binder.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery-dataframe.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery-rendered-html.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/collapsible-lists/css/tree_view.css" type="text/css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Torch-TensorRT C++ API" href="../_cpp_api/torch_tensort_cpp.html" />
+    <link rel="prev" title="torch_tensorrt.dynamo" href="dynamo.html" />
+  <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','');</script>
+    <!-- End Google Tag Manager -->
+  
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+  <!-- Preload the theme fonts -->
+
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-book.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-Medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium-italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-SemiBold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+
+<!-- Preload the katex fonts -->
+
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Math-Italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size1-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size4-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size2-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size3-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Caligraphic-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css" integrity="sha384-vSIIfh2YWi9wW0r9iZe7RJPrKwp6bG+s9QZMoITbCckVJqGCCRhc+ccxNcdpHuYu" crossorigin="anonymous">
+</head>
+
+<div class="container-fluid header-holder tutorials-header" id="header-holder">
+  <div class="container">
+    <div class="header-container">
+      <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+
+      <div class="main-menu">
+        <ul>
+
+          <li class="main-menu-item">
+          <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Learn
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/get-started">
+                  <span class=dropdown-title>Get Started</span>
+                  <p>Run PyTorch locally or get started quickly with one of the supported cloud platforms</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials">
+                  <span class="dropdown-title">Tutorials</span>
+                  <p>Whats new in PyTorch tutorials</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials/beginner/basics/intro.html">
+                  <span class="dropdown-title">Learn the Basics</span>
+                  <p>Familiarize yourself with PyTorch concepts and modules</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials/recipes/recipes_index.html">
+                  <span class="dropdown-title">PyTorch Recipes</span>
+                  <p>Bite-size, ready-to-deploy PyTorch code examples</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials/beginner/introyt.html">
+                  <span class="dropdown-title">Intro to PyTorch - YouTube Series</span>
+                  <p>Master PyTorch basics with our engaging YouTube tutorial series</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+          <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Ecosystem
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem">
+                  <span class="dropdown-title">Tools</span>
+                  <p>Learn about the tools and frameworks in the PyTorch Ecosystem</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/#community-module">
+                  <span class=dropdown-title>Community</span>
+                  <p>Join the PyTorch developer community to contribute, learn, and get your questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://discuss.pytorch.org/" target="_blank">
+                  <span class=dropdown-title>Forums</span>
+                  <p>A place to discuss PyTorch code, issues, install, research</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/resources">
+                  <span class=dropdown-title>Developer Resources</span>
+                  <p>Find resources and get questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2023">
+                  <span class="dropdown-title">Contributor Awards - 2023</span>
+                  <p>Award winners announced at this year's PyTorch Conference</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+          <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Edge
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/edge">
+                  <span class="dropdown-title">About PyTorch Edge</span>
+                  <p>Build innovative and privacy-aware AI experiences for edge devices</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch-overview">
+                  <span class="dropdown-title">ExecuTorch</span>
+                  <p>End-to-end solution for enabling on-device inference capabilities across mobile and edge devices</p>
+                </a>
+              </div>
+            </div>  
+          </li>
+
+          <li class="main-menu-item">
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Docs
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/docs/stable/index.html">
+                  <span class="dropdown-title">PyTorch</span>
+                  <p>Explore the documentation for comprehensive guidance on how to use PyTorch</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/pytorch-domains">
+                  <span class="dropdown-title">PyTorch Domains</span>
+                  <p>Read the PyTorch Domains documentation to learn more about domain-specific libraries</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Blogs & News 
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/blog/">
+                  <span class="dropdown-title">PyTorch Blog</span>
+                  <p>Catch up on the latest technical news and happenings</p>
+                </a>
+                 <a class="nav-dropdown-item" href="https://pytorch.org/community-blog">
+                  <span class="dropdown-title">Community Blog</span>
+                  <p>Stories from the PyTorch ecosystem</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/videos">
+                  <span class="dropdown-title">Videos</span>
+                  <p>Learn about the latest PyTorch tutorials, new, and more </p>
+                <a class="nav-dropdown-item" href="https://pytorch.org/community-stories">
+                  <span class="dropdown-title">Community Stories</span>
+                  <p>Learn how our community solves real, everyday machine learning problems with PyTorch</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/events">
+                  <span class="dropdown-title">Events</span>
+                  <p>Find events, webinars, and podcasts</p>
+                </a>
+            </div>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                About
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/foundation">
+                  <span class="dropdown-title">PyTorch Foundation</span>
+                  <p>Learn more about the PyTorch Foundation</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/governing-board">
+                  <span class="dropdown-title">Governing Board</span>
+                  <p></p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li class="main-menu-item">
+            <div class="no-dropdown">
+              <a href="https://pytorch.org/join" data-cta="join">
+                Become a Member
+              </a>
+            </div>
+          </li>
+          <li>
+           <div class="main-menu-item">
+             <a href="https://github.com/pytorch/pytorch" class="github-icon">
+             </a>
+           </div>
+          </li>
+          <!--- TODO: This block adds the search icon to the nav bar. We will enable it later. 
+          <li>
+            <div class="main-menu-item">
+             <a href="https://github.com/pytorch/pytorch" class="search-icon">
+             </a>
+            </div>
+          </li>
+          --->
+        </ul>
+      </div>
+
+      <a class="main-menu-open-button" href="#" data-behavior="open-mobile-menu"></a>
+    </div>
+  </div>
+</div>
+
+<body class="pytorch-body">
+
+   
+
+    
+
+    <div class="table-of-contents-link-wrapper">
+      <span>Table of Contents</span>
+      <a href="#" class="toggle-table-of-contents" data-behavior="toggle-table-of-contents"></a>
+    </div>
+
+    <nav data-toggle="wy-nav-shift" class="pytorch-left-menu" id="pytorch-left-menu">
+      <div class="pytorch-side-scroll">
+        <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          <div class="pytorch-left-menu-search">
+            
+
+            
+              
+              
+                <div class="version">
+                  v2.5.0.dev0+33d2c36
+                </div>
+              
+            
+
+            
+
+
+  
+
+
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search Docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+            
+          </div>
+
+          
+            
+            
+              
+            
+            
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/quick_start.html">Quick Start</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/torch_compile.html">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">TorchScript Frontend</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../ts/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ts/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ts/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ts/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ts/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ts/ptq.html">Post Training Quantization (PTQ)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">FX Frontend</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../fx/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Example notebooks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="torch_tensorrt.html">torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamo.html">torch_tensorrt.dynamo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="logging.html">torch_tensorrt.logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fx.html">torch_tensorrt.fx</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ptq.html">torch_tensorrt.ts.ptq</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/system_overview.html">System Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/dynamo_converters.html">Writing Dynamo Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/ts_converters.html">Writing TorchScript Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Indices</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <div class="pytorch-container">
+      <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
+        <div class="pytorch-breadcrumbs-wrapper">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="pytorch-breadcrumbs">
+    
+      <li>
+        <a href="../index.html">
+          
+            Docs
+          
+        </a> &gt;
+      </li>
+
+        
+          <li><a href="torch_tensorrt.html">torch_tensorrt</a> &gt;</li>
+        
+      <li>torch_tensorrt.runtime</li>
+    
+    
+      <li class="pytorch-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/py_api/runtime.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+</div>
+        </div>
+
+        <div class="pytorch-shortcuts-wrapper" id="pytorch-shortcuts-wrapper">
+          Shortcuts
+        </div>
+      </div>
+
+      <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
+        <div class="pytorch-content-left">
+
+        
+          <!-- Google Tag Manager (noscript) -->
+          <noscript><iframe src="https://www.googletagmanager.com/ns.html?id="
+          height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+          <!-- End Google Tag Manager (noscript) -->
+          
+          <div class="rst-content">
+          
+            <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
+             <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
+              
+  <section id="module-torch_tensorrt.runtime">
+<span id="torch-tensorrt-runtime"></span><span id="torch-tensorrt-py"></span><h1>torch_tensorrt.runtime<a class="headerlink" href="#module-torch_tensorrt.runtime" title="Permalink to this heading">¶</a></h1>
+<section id="functions">
+<h2>Functions<a class="headerlink" href="#functions" title="Permalink to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.set_multi_device_safe_mode">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.runtime.</span></span><span class="sig-name descname"><span class="pre">set_multi_device_safe_mode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">_MultiDeviceSafeModeContextManager</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/runtime/multi_device_safe_mode.html#set_multi_device_safe_mode"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.set_multi_device_safe_mode" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sets the runtime (Python-only and default) into multi-device safe mode</p>
+<p>In the case that multiple devices are available on the system, in order for the
+runtime to execute safely, additional device checks are necessary. These checks
+can have a performance impact so they are therefore opt-in. Used to suppress
+the warning about running unsafely in a multi-device context.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>mode</strong> (<em>bool</em>) – Enable (<code class="docutils literal notranslate"><span class="pre">True</span></code>) or disable (<code class="docutils literal notranslate"><span class="pre">False</span></code>) multi-device checks</p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_multi_device_safe_mode</span><span class="p">(</span><span class="kc">True</span><span class="p">):</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="n">trt_compiled_module</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Permalink to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.TorchTensorRTModule">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.runtime.</span></span><span class="sig-name descname"><span class="pre">TorchTensorRTModule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">serialized_engine:</span> <span class="pre">~typing.Optional[bytes]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_binding_names:</span> <span class="pre">~typing.Optional[~typing.List[str]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_binding_names:</span> <span class="pre">~typing.Optional[~typing.List[str]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">settings:</span> <span class="pre">~torch_tensorrt.dynamo._settings.CompilationSettings</span> <span class="pre">=</span> <span class="pre">CompilationSettings(enabled_precisions={&lt;dtype.f32:</span> <span class="pre">7&gt;}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workspace_size=0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_block_size=5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">torch_executed_ops=set()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pass_through_build_failures=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_aux_streams=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">version_compatible=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimization_level=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_python_runtime=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truncate_double=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_fast_partitioner=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enable_experimental_decompositions=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device=Device(type=DeviceType.GPU</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gpu_id=0)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">require_full_compilation=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">disable_tf32=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">assume_dynamic_shape_support=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparse_weights=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">make_refitable=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">engine_capability=&lt;EngineCapability.STANDARD:</span> <span class="pre">1&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_avg_timing_iters=1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_sram_size=1048576</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_local_dram_size=1073741824</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_global_dram_size=536870912</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dryrun=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hardware_compatible=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timing_cache_path='/tmp/timing_cache.bin')</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule" title="Permalink to this definition">¶</a></dt>
+<dd><p>TorchTensorRTModule is a PyTorch module which encompasses an arbitrary TensorRT Engine.</p>
+<p>This module is backed by the Torch-TensorRT runtime and is fully compatible with both
+FX / Python deployments (just <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">torch_tensorrt</span></code> as part of the application) as
+well as TorchScript / C++ deployments since TorchTensorRTModule can be passed to <code class="docutils literal notranslate"><span class="pre">torch.jit.trace</span></code>
+and then saved.</p>
+<p>The forward function is simpily forward(<a href="#id1"><span class="problematic" id="id2">*</span></a>args: torch.Tensor) -&gt; Tuple[torch.Tensor] where
+the internal implementation is <code class="docutils literal notranslate"><span class="pre">return</span> <span class="pre">Tuple(torch.ops.tensorrt.execute_engine(list(inputs),</span> <span class="pre">self.engine))</span></code></p>
+<p>&gt; Note: TorchTensorRTModule only supports engines built with explicit batch</p>
+<dl class="field-list simple">
+<dt class="field-odd">Variables</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>) – Name of module (for easier debugging)</p></li>
+<li><p><strong>engine</strong> (<em>torch.classes.tensorrt.Engine</em>) – Torch-TensorRT TensorRT Engine instance, manages [de]serialization, device configuration, profiling</p></li>
+<li><p><strong>input_binding_names</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – List of input TensorRT engine binding names in the order they would be passed to the TRT modules</p></li>
+<li><p><strong>output_binding_names</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – List of output TensorRT engine binding names in the order they should be returned</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.TorchTensorRTModule.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">serialized_engine:</span> <span class="pre">~typing.Optional[bytes]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_binding_names:</span> <span class="pre">~typing.Optional[~typing.List[str]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_binding_names:</span> <span class="pre">~typing.Optional[~typing.List[str]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">settings:</span> <span class="pre">~torch_tensorrt.dynamo._settings.CompilationSettings</span> <span class="pre">=</span> <span class="pre">CompilationSettings(enabled_precisions={&lt;dtype.f32:</span> <span class="pre">7&gt;}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workspace_size=0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_block_size=5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">torch_executed_ops=set()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pass_through_build_failures=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_aux_streams=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">version_compatible=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimization_level=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_python_runtime=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truncate_double=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_fast_partitioner=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enable_experimental_decompositions=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device=Device(type=DeviceType.GPU</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gpu_id=0)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">require_full_compilation=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">disable_tf32=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">assume_dynamic_shape_support=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparse_weights=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">make_refitable=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">engine_capability=&lt;EngineCapability.STANDARD:</span> <span class="pre">1&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_avg_timing_iters=1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_sram_size=1048576</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_local_dram_size=1073741824</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_global_dram_size=536870912</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dryrun=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hardware_compatible=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timing_cache_path='/tmp/timing_cache.bin')</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
+a PyTorch <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code> around it.</p>
+<p>If binding names are not provided, it is assumed that the engine binding names follow the following convention:</p>
+<blockquote>
+<div><ul class="simple">
+<li><dl class="simple">
+<dt>[symbol].[index in input / output array]</dt><dd><ul>
+<li><p>ex. [x.0, x.1, x.2] -&gt; [y.0]</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>) – Name for module</p></li>
+<li><p><strong>serialized_engine</strong> (<em>bytearray</em>) – Serialized TensorRT engine in the form of a bytearray</p></li>
+<li><p><strong>input_binding_names</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – List of input TensorRT engine binding names in the order they would be passed to the TRT modules</p></li>
+<li><p><strong>output_binding_names</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – List of output TensorRT engine binding names in the order they should be returned</p></li>
+<li><p><strong>target_device</strong> (<a class="reference internal" href="torch_tensorrt.html#torch_tensorrt.Device" title="torch_tensorrt.Device"><em>Device</em></a>) – Device to instantiate TensorRT engine on. Must be a compatible device i.e. same GPU model / compute capability as was used to build the engine</p></li>
+<li><p><strong>hardware_compatible</strong> (<em>bool</em>) – If the engine has be built with the hardware compatibility feature enabled</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span> <span class="k">as</span> <span class="n">engine_bytes</span><span class="p">:</span>
+    <span class="n">engine_bytes</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">trt_engine</span><span class="o">.</span><span class="n">serialize</span><span class="p">())</span>
+    <span class="n">engine_str</span> <span class="o">=</span> <span class="n">engine_bytes</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+
+<span class="n">trt_module</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="p">(</span>
+    <span class="n">engine_str</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;my_module&quot;</span><span class="p">,</span>
+    <span class="n">input_binding_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">],</span>
+    <span class="n">output_binding_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;output&quot;</span><span class="p">],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.TorchTensorRTModule.disable_profiling">
+<span class="sig-name descname"><span class="pre">disable_profiling</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule.disable_profiling"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule.disable_profiling" title="Permalink to this definition">¶</a></dt>
+<dd><p>Disable the profiler</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.TorchTensorRTModule.dump_layer_info">
+<span class="sig-name descname"><span class="pre">dump_layer_info</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule.dump_layer_info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule.dump_layer_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Dump layer information encoded by the TensorRT engine in this module to STDOUT</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.TorchTensorRTModule.enable_profiling">
+<span class="sig-name descname"><span class="pre">enable_profiling</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">profiling_results_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule.enable_profiling"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule.enable_profiling" title="Permalink to this definition">¶</a></dt>
+<dd><p>Enable the profiler to collect latency information about the execution of the engine</p>
+<p>Traces can be visualized using <a class="reference external" href="https://ui.perfetto.dev/">https://ui.perfetto.dev/</a> or compatible alternatives</p>
+<dl class="field-list simple">
+<dt class="field-odd">Keyword Arguments</dt>
+<dd class="field-odd"><p><strong>profiling_results_dir</strong> (<em>str</em>) – Absolute path to the directory to sort results of profiling.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.TorchTensorRTModule.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Implementation of the forward pass for a TensorRT engine</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>*inputs</strong> (<em>Union</em><em>[</em><em>torch.Tensor</em><em>, </em><em>python:int</em><em>]</em>) – Inputs to the forward function</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Result of the engine computation</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>torch.Tensor or <em>Tuple</em>(torch.Tensor)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.TorchTensorRTModule.get_extra_state">
+<span class="sig-name descname"><span class="pre">get_extra_state</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule.get_extra_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule.get_extra_state" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return any extra state to include in the module’s state_dict.</p>
+<p>Implement this and a corresponding <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">set_extra_state()</span></code> for your module
+if you need to store extra state. This function is called when building the
+module’s <cite>state_dict()</cite>.</p>
+<p>Note that extra state should be picklable to ensure working serialization
+of the state_dict. We only provide provide backwards compatibility guarantees
+for serializing Tensors; other objects may break backwards compatibility if
+their serialized pickled form changes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Any extra state to store in the module’s state_dict</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p><em>object</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.TorchTensorRTModule.get_layer_info">
+<span class="sig-name descname"><span class="pre">get_layer_info</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule.get_layer_info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule.get_layer_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get a JSON string containing the layer information encoded by the TensorRT engine in this module</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>A JSON string which contains the layer information of the engine incapsulated in this module</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p><em>str</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.TorchTensorRTModule.set_extra_state">
+<span class="sig-name descname"><span class="pre">set_extra_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_TorchTensorRTModule.html#TorchTensorRTModule.set_extra_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.TorchTensorRTModule.set_extra_state" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set extra state contained in the loaded <cite>state_dict</cite>.</p>
+<p>This function is called from <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">load_state_dict()</span></code> to handle any extra state
+found within the <cite>state_dict</cite>. Implement this function and a corresponding
+<code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">get_extra_state()</span></code> for your module if you need to store extra state within its
+<cite>state_dict</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>state</strong> (<em>dict</em>) – Extra state from the <cite>state_dict</cite></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.PythonTorchTensorRTModule">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.runtime.</span></span><span class="sig-name descname"><span class="pre">PythonTorchTensorRTModule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">engine:</span> <span class="pre">bytes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_names:</span> <span class="pre">~typing.Optional[~typing.List[str]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_names:</span> <span class="pre">~typing.Optional[~typing.List[str]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">settings:</span> <span class="pre">~torch_tensorrt.dynamo._settings.CompilationSettings</span> <span class="pre">=</span> <span class="pre">CompilationSettings(enabled_precisions={&lt;dtype.f32:</span> <span class="pre">7&gt;}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workspace_size=0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_block_size=5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">torch_executed_ops=set()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pass_through_build_failures=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_aux_streams=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">version_compatible=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimization_level=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_python_runtime=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truncate_double=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_fast_partitioner=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enable_experimental_decompositions=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device=Device(type=DeviceType.GPU</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gpu_id=0)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">require_full_compilation=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">disable_tf32=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">assume_dynamic_shape_support=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparse_weights=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">make_refitable=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">engine_capability=&lt;EngineCapability.STANDARD:</span> <span class="pre">1&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_avg_timing_iters=1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_sram_size=1048576</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_local_dram_size=1073741824</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_global_dram_size=536870912</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dryrun=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hardware_compatible=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timing_cache_path='/tmp/timing_cache.bin')</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_PythonTorchTensorRTModule.html#PythonTorchTensorRTModule"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.PythonTorchTensorRTModule" title="Permalink to this definition">¶</a></dt>
+<dd><p>PythonTorchTensorRTModule is a PyTorch module which encompasses an arbitrary TensorRT Engine.</p>
+<p>This module is backed by the Torch-TensorRT runtime and is only compatible with
+FX / Dynamo / Python deployments. This module cannot be serialized to torchscript via torch.jit.trace for C++ deployment.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.PythonTorchTensorRTModule.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">engine:</span> <span class="pre">bytes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_names:</span> <span class="pre">~typing.Optional[~typing.List[str]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_names:</span> <span class="pre">~typing.Optional[~typing.List[str]]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">settings:</span> <span class="pre">~torch_tensorrt.dynamo._settings.CompilationSettings</span> <span class="pre">=</span> <span class="pre">CompilationSettings(enabled_precisions={&lt;dtype.f32:</span> <span class="pre">7&gt;}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">workspace_size=0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_block_size=5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">torch_executed_ops=set()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pass_through_build_failures=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_aux_streams=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">version_compatible=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimization_level=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_python_runtime=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truncate_double=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_fast_partitioner=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enable_experimental_decompositions=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device=Device(type=DeviceType.GPU</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gpu_id=0)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">require_full_compilation=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">disable_tf32=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">assume_dynamic_shape_support=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparse_weights=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">make_refitable=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">engine_capability=&lt;EngineCapability.STANDARD:</span> <span class="pre">1&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_avg_timing_iters=1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_sram_size=1048576</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_local_dram_size=1073741824</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dla_global_dram_size=536870912</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dryrun=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hardware_compatible=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timing_cache_path='/tmp/timing_cache.bin')</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_PythonTorchTensorRTModule.html#PythonTorchTensorRTModule.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.PythonTorchTensorRTModule.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize internal Module state, shared by both nn.Module and ScriptModule.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.PythonTorchTensorRTModule.cudagraphs_validate_shapes">
+<span class="sig-name descname"><span class="pre">cudagraphs_validate_shapes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_PythonTorchTensorRTModule.html#PythonTorchTensorRTModule.cudagraphs_validate_shapes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.PythonTorchTensorRTModule.cudagraphs_validate_shapes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Validates the input shapes of the forward function
+versus the version currently active for the</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.PythonTorchTensorRTModule.disable_profiling">
+<span class="sig-name descname"><span class="pre">disable_profiling</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_PythonTorchTensorRTModule.html#PythonTorchTensorRTModule.disable_profiling"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.PythonTorchTensorRTModule.disable_profiling" title="Permalink to this definition">¶</a></dt>
+<dd><p>Disable TensorRT profiling.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.PythonTorchTensorRTModule.enable_profiling">
+<span class="sig-name descname"><span class="pre">enable_profiling</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">profiler</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">IProfiler</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_PythonTorchTensorRTModule.html#PythonTorchTensorRTModule.enable_profiling"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.PythonTorchTensorRTModule.enable_profiling" title="Permalink to this definition">¶</a></dt>
+<dd><p>Enable TensorRT profiling. After calling this function, TensorRT will report
+time spent on each layer in stdout for each forward run.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.PythonTorchTensorRTModule.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_PythonTorchTensorRTModule.html#PythonTorchTensorRTModule.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.PythonTorchTensorRTModule.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Define the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.PythonTorchTensorRTModule.get_layer_info">
+<span class="sig-name descname"><span class="pre">get_layer_info</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_PythonTorchTensorRTModule.html#PythonTorchTensorRTModule.get_layer_info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.PythonTorchTensorRTModule.get_layer_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get layer info of the engine. Only support for TRT &gt; 8.2.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+             </article>
+             
+            </div>
+            <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../_cpp_api/torch_tensort_cpp.html" class="btn btn-neutral float-right" title="Torch-TensorRT C++ API" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+      
+      
+        <a href="dynamo.html" class="btn btn-neutral" title="torch_tensorrt.dynamo" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+      
+    </div>
+  
+
+  
+
+    <hr>
+
+  
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2024, NVIDIA Corporation.
+
+    </p>
+  </div>
+    
+      <div>
+        Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+      </div>
+     
+
+</footer>
+
+          </div>
+        </div>
+
+        <div class="pytorch-content-right" id="pytorch-content-right">
+          <div class="pytorch-right-menu" id="pytorch-right-menu">
+            <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
+              <ul>
+<li><a class="reference internal" href="#">torch_tensorrt.runtime</a><ul>
+<li><a class="reference internal" href="#functions">Functions</a></li>
+<li><a class="reference internal" href="#classes">Classes</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+  
+
+
+  
+
+     
+       <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+         <script src="../_static/jquery.js"></script>
+         <script src="../_static/underscore.js"></script>
+         <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+         <script src="../_static/doctools.js"></script>
+         <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
+         <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
+         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+     
+
+  
+
+  <script type="text/javascript" src="../_static/js/vendor/popper.min.js"></script>
+  <script type="text/javascript" src="../_static/js/vendor/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/1.5.0/list.min.js"></script>
+  <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+  <!-- Begin Footer -->
+
+  <div class="container-fluid docs-tutorials-resources" id="docs-tutorials-resources">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-4 text-center">
+          <h2>Docs</h2>
+          <p>Access comprehensive developer documentation for PyTorch</p>
+          <a class="with-right-arrow" href="https://pytorch.org/docs/stable/index.html">View Docs</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Tutorials</h2>
+          <p>Get in-depth tutorials for beginners and advanced developers</p>
+          <a class="with-right-arrow" href="https://pytorch.org/tutorials">View Tutorials</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Resources</h2>
+          <p>Find development resources and get your questions answered</p>
+          <a class="with-right-arrow" href="https://pytorch.org/resources">View Resources</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container footer-container">
+      <div class="footer-logo-wrapper">
+        <a href="https://pytorch.org/" class="footer-logo"></a>
+      </div>
+
+      <div class="footer-links-wrapper">
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/">PyTorch</a></li>
+            <li><a href="https://pytorch.org/get-started">Get Started</a></li>
+            <li><a href="https://pytorch.org/features">Features</a></li>
+            <li><a href="https://pytorch.org/ecosystem">Ecosystem</a></li>
+            <li><a href="https://pytorch.org/blog/">Blog</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/blob/master/CONTRIBUTING.md">Contributing</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/resources">Resources</a></li>
+            <li><a href="https://pytorch.org/tutorials">Tutorials</a></li>
+            <li><a href="https://pytorch.org/docs/stable/index.html">Docs</a></li>
+            <li><a href="https://discuss.pytorch.org" target="_blank">Discuss</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/issues" target="_blank">Github Issues</a></li>
+            <li><a href="https://pytorch.org/assets/brand-guidelines/PyTorch-Brand-Guidelines.pdf" target="_blank">Brand Guidelines</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title">Stay up to date</li>
+            <li><a href="https://www.facebook.com/pytorch" target="_blank">Facebook</a></li>
+            <li><a href="https://twitter.com/pytorch" target="_blank">Twitter</a></li>
+            <li><a href="https://www.youtube.com/pytorch" target="_blank">YouTube</a></li>
+            <li><a href="https://www.linkedin.com/company/pytorch" target="_blank">LinkedIn</a></li>
+          </ul>  
+          </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title">PyTorch Podcasts</li>
+            <li><a href="https://open.spotify.com/show/6UzHKeiy368jKfQMKKvJY5" target="_blank">Spotify</a></li>
+            <li><a href="https://podcasts.apple.com/us/podcast/pytorch-developer-podcast/id1566080008" target="_blank">Apple</a></li>
+            <li><a href="https://www.google.com/podcasts?feed=aHR0cHM6Ly9mZWVkcy5zaW1wbGVjYXN0LmNvbS9PQjVGa0lsOA%3D%3D" target="_blank">Google</a></li>
+            <li><a href="https://music.amazon.com/podcasts/7a4e6f0e-26c2-49e9-a478-41bd244197d0/PyTorch-Developer-Podcast?" target="_blank">Amazon</a></li>
+          </ul>
+         </div>
+        </div>
+        
+        <div class="privacy-policy">
+          <ul>
+            <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/terms/" target="_blank">Terms</a></li>
+            <li class="privacy-policy-links">|</li>
+            <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/privacy-policy/" target="_blank">Privacy</a></li>
+          </ul>
+        </div>
+        <div class="copyright">
+        <p>© Copyright The Linux Foundation. The PyTorch Foundation is a project of The Linux Foundation.
+          For web site terms of use, trademark policy and other policies applicable to The PyTorch Foundation please see
+          <a href="https://www.linuxfoundation.org/policies/">www.linuxfoundation.org/policies/</a>. The PyTorch Foundation supports the PyTorch open source
+          project, which has been established as PyTorch Project a Series of LF Projects, LLC. For policies applicable to the PyTorch Project a Series of LF Projects, LLC,
+          please see <a href="https://www.lfprojects.org/policies/">www.lfprojects.org/policies/</a>.</p>
+      </div>
+     </div>
+
+  </footer>
+
+  <div class="cookie-banner-wrapper">
+  <div class="container">
+    <p class="gdpr-notice">To analyze traffic and optimize your experience, we serve cookies on this site. By clicking or navigating, you agree to allow our usage of cookies. As the current maintainers of this site, Facebook’s Cookies Policy applies. Learn more, including about available controls: <a href="https://www.facebook.com/policies/cookies/">Cookies Policy</a>.</p>
+    <img class="close-button" src="../_static/images/pytorch-x.svg">
+  </div>
+</div>
+
+  <!-- End Footer -->
+
+  <!-- Begin Mobile Menu -->
+
+  <div class="mobile-main-menu">
+    <div class="container-fluid">
+      <div class="container">
+        <div class="mobile-main-menu-header-container">
+          <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+          <a class="main-menu-close-button" href="#" data-behavior="close-mobile-menu"></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-main-menu-links-container">
+      <div class="main-menu">
+        <ul>
+           <li class="resources-mobile-menu-title">
+             <a>Learn</a>
+           </li>
+           <ul class="resources-mobile-menu-items">
+             <li>
+               <a href="https://pytorch.org/get-started">Get Started</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials">Tutorials</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials/beginner/basics/intro.html">Learn the Basics</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials/recipes/recipes_index.html">PyTorch Recipes</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials/beginner/introyt.html">Introduction to PyTorch - YouTube Series</a>
+             </li>
+           </ul>
+           <li class="resources-mobile-menu-title">
+             <a>Ecosystem</a>
+           </li>
+           <ul class="resources-mobile-menu-items">
+             <li>
+               <a href="https://pytorch.org/ecosystem">Tools</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/#community-module">Community</a>
+             </li>
+             <li>
+               <a href="https://discuss.pytorch.org/">Forums</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/resources">Developer Resources</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2023</a>
+             </li>
+           </ul>
+
+           <li class="resources-mobile-menu-title">
+             <a>Edge</a>
+           </li>
+
+           <ul class="resources-mobile-menu-items">
+             <li>
+               <a href="https://pytorch.org/edge">About PyTorch Edge</a>
+             </li>
+             
+             <li>
+               <a href="https://pytorch.org/executorch-overview">ExecuTorch</a>
+             </li>
+           </ul>
+
+           <li class="resources-mobile-menu-title">
+             <a>Docs</a>
+           </li>
+
+           <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/docs/stable/index.html">PyTorch</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/pytorch-domains">PyTorch Domains</a>
+            </li>
+          </ul>
+
+          <li class="resources-mobile-menu-title">
+            <a>Blog & News</a>
+          </li>
+            
+           <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/blog/">PyTorch Blog</a>
+            </li>
+            <li>
+              <a href="https://pytorch.org/community-blog">Community Blog</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/videos">Videos</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/community-stories">Community Stories</a>
+            </li>
+            <li>
+              <a href="https://pytorch.org/events">Events</a>
+            </li>
+          </ul>
+          
+          <li class="resources-mobile-menu-title">
+            <a>About</a>
+          </li>
+
+          <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/foundation">PyTorch Foundation</a>
+            </li>
+            <li>
+              <a href="https://pytorch.org/governing-board">Governing Board</a>
+            </li>
+          </ul>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- End Mobile Menu -->
+
+  <script type="text/javascript" src="../_static/js/vendor/anchor.min.js"></script>
+
+  <script type="text/javascript">
+    $(document).ready(function() {
+      mobileMenu.bind();
+      mobileTOC.bind();
+      pytorchAnchors.bind();
+      sideMenus.bind();
+      scrollToAnchor.bind();
+      highlightNavigation.bind();
+      mainMenuDropdown.bind();
+      filterTags.bind();
+
+      // Add class to links that have code blocks, since we cannot create links in code blocks
+      $("article.pytorch-article a span.pre").each(function(e) {
+        $(this).closest("a").addClass("has-code");
+      });
+    })
+  </script>
+</body>
+</html>

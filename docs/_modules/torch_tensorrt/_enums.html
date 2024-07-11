@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._enums &mdash; Torch-TensorRT v2.5.0.dev0+caf3a92 documentation</title>
+  <title>torch_tensorrt._enums &mdash; Torch-TensorRT v2.5.0.dev0+33d2c36 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+caf3a92
+                  v2.5.0.dev0+33d2c36
                 </div>
               
             
@@ -303,7 +303,17 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/quick_start.html">Quick Start</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -317,18 +327,11 @@
 <li class="toctree-l1"><a class="reference internal" href="../../ts/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../ts/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../ts/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../ts/ptq.html">Post Training Quantization (PTQ)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">FX Frontend</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../fx/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/using_dla.html">DLA</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
@@ -338,21 +341,20 @@
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#wrapping-custom-kernels-to-use-in-tensorrt">Wrapping Custom Kernels to use in TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#using-torch-tensorrt-to-insert-the-kernel">Using Torch-TensorRT to Insert the Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../py_api/logging.html">torch_tensorrt.logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../py_api/ptq.html">torch_tensorrt.ptq</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../py_api/dynamo.html">torch_tensorrt.dynamo</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../py_api/logging.html">torch_tensorrt.logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../py_api/fx.html">torch_tensorrt.fx</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../py_api/ptq.html">torch_tensorrt.ts.ptq</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
@@ -360,7 +362,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">CLI Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../cli/torchtrtc.html">torchtrtc</a></li>
 </ul>
@@ -457,27 +459,81 @@
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Type</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt._features</span> <span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
 
+<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
+
 
 <div class="viewcode-block" id="dtype"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.dtype">[docs]</a><span class="k">class</span> <span class="nc">dtype</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enum to set supported dtypes in the compiler&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enum to describe data types to Torch-TensorRT, has compatibility with torch, tensorrt and numpy dtypes&quot;&quot;&quot;</span>
 
     <span class="c1"># Supported types in Torch-TensorRT</span>
     <span class="n">unknown</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sentinel value</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">u8</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Unsigned 8 bit integer, equivalent to ``dtype.uint8``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">i8</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Signed 8 bit integer, equivalent to ``dtype.int8``, when enabled as a kernel precision typically requires the model to support quantization</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">i32</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Signed 32 bit integer, equivalent to ``dtype.int32`` and ``dtype.int``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">i64</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Signed 64 bit integer, equivalent to ``dtype.int64`` and ``dtype.long``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">f16</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;16 bit floating-point number, equivalent to ``dtype.half``, ``dtype.fp16`` and ``dtype.float16``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">f32</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;32 bit floating-point number, equivalent to ``dtype.float``, ``dtype.fp32`` and ``dtype.float32``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">f64</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;64 bit floating-point number, equivalent to ``dtype.double``, ``dtype.fp64`` and ``dtype.float64``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">b</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Boolean value, equivalent to ``dtype.bool``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">bf16</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;16 bit &quot;Brain&quot; floating-point number, equivalent to ``dtype.bfloat16``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">f8</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;8 bit floating-point number, equivalent to ``dtype.fp8`` and ``dtype.float8``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">uint8</span> <span class="o">=</span> <span class="n">u8</span>
     <span class="n">int8</span> <span class="o">=</span> <span class="n">i8</span>
@@ -519,6 +575,36 @@
         <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">,</span> <span class="nb">type</span><span class="p">],</span>
         <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">dtype</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT dtype from another library&#39;s dtype system.</span>
+
+<span class="sd">        Takes a dtype enum from one of numpy, torch, and tensorrt and create a ``torch_tensorrt.dtype``.</span>
+<span class="sd">        If the source dtype system is not supported or the type is not supported in Torch-TensorRT,</span>
+<span class="sd">        then an exception will be raised. As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.dtype.try_from()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(torch.dtype, tensorrt.DataType, numpy.dtype, dtype)): Data type enum from another library</span>
+<span class="sd">            use_default (bool): In some cases a catch all type (such as ``torch_tensorrt.dtype.f32``) is sufficient, so instead of throwing an exception, return default value.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dtype: Equivalent ``torch_tensorrt.dtype`` to ``t``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: Unsupported data type or unknown source</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                float_dtype = torch_tensorrt.dtype._from(torch.float) # Returns torch_tensorrt.dtype.f32</span>
+
+<span class="sd">                # Throws exception</span>
+<span class="sd">                float_dtype = torch_tensorrt.dtype._from(torch.complex128)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
         <span class="c1"># TODO: Ideally implemented with match statement but need to wait for Py39 EoL</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">:</span>
@@ -591,6 +677,10 @@
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f64</span>
             <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">bool</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">b</span>
+            <span class="c1"># TODO: Consider using ml_dtypes when issues like this are resolved:</span>
+            <span class="c1"># https://github.com/pytorch/pytorch/issues/109873</span>
+            <span class="c1"># elif t == ml_dtypes.bfloat16:</span>
+            <span class="c1">#    return dtype.bf16</span>
             <span class="k">elif</span> <span class="n">use_default</span><span class="p">:</span>
                 <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                     <span class="sa">f</span><span class="s2">&quot;Given dtype that does not have direct mapping to Torch-TensorRT supported types (</span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">), defaulting to torch_tensorrt.dtype.float&quot;</span>
@@ -634,12 +724,38 @@
             <span class="sa">f</span><span class="s2">&quot;Provided unsupported source type for dtype conversion (got: </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">)&quot;</span>
         <span class="p">)</span>
 
-    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="dtype.try_from"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.dtype.try_from">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">try_from</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">],</span>
         <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">dtype</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT dtype from another library&#39;s dtype system.</span>
+
+<span class="sd">        Takes a dtype enum from one of numpy, torch, and tensorrt and create a ``torch_tensorrt.dtype``.</span>
+<span class="sd">        If the source dtype system is not supported or the type is not supported in Torch-TensorRT,</span>
+<span class="sd">        then returns ``None``.</span>
+
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(torch.dtype, tensorrt.DataType, numpy.dtype, dtype)): Data type enum from another library</span>
+<span class="sd">            use_default (bool): In some cases a catch all type (such as ``torch_tensorrt.dtype.f32``) is sufficient, so instead of throwing an exception, return default value.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Optional(dtype): Equivalent ``torch_tensorrt.dtype`` to ``t`` or ``None``</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                float_dtype = torch_tensorrt.dtype.try_from(torch.float) # Returns torch_tensorrt.dtype.f32</span>
+
+<span class="sd">                # Unsupported type</span>
+<span class="sd">                float_dtype = torch_tensorrt.dtype.try_from(torch.complex128) # Returns None</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
         <span class="k">try</span><span class="p">:</span>
             <span class="n">casted_format</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">use_default</span><span class="o">=</span><span class="n">use_default</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">casted_format</span>
@@ -647,13 +763,43 @@
             <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">&quot;Conversion from </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2"> to torch_tensorrt.dtype failed&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span>
             <span class="p">)</span>
-            <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
 
-    <span class="k">def</span> <span class="nf">to</span><span class="p">(</span>
+<div class="viewcode-block" id="dtype.to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.dtype.to">[docs]</a>    <span class="k">def</span> <span class="nf">to</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">dtype</span><span class="p">]],</span>
         <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert dtype into the equivalent type in [torch, numpy, tensorrt]</span>
+
+<span class="sd">        Converts ``self`` into one of numpy, torch, and tensorrt equivalent dtypes.</span>
+<span class="sd">        If  ``self`` is not supported in the target library, then an exception will be raised.</span>
+<span class="sd">        As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.dtype.try_to()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(Type(torch.dtype), Type(tensorrt.DataType), Type(numpy.dtype), Type(dtype))): Data type enum from another library to convert to</span>
+<span class="sd">            use_default (bool): In some cases a catch all type (such as ``torch.float``) is sufficient, so instead of throwing an exception, return default value.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Union(torch.dtype, tensorrt.DataType, numpy.dtype, dtype): dtype equivalent ``torch_tensorrt.dtype`` from library enum ``t``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: Unsupported data type or unknown target</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                float_dtype = torch_tensorrt.dtype.f32.to(torch.dtype) # Returns torch.float</span>
+
+<span class="sd">                # Failure</span>
+<span class="sd">                float_dtype = torch_tensorrt.dtype.bf16.to(numpy.dtype) # Throws exception</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
         <span class="c1"># TODO: Ideally implemented with match statement but need to wait for Py39 EoL</span>
         <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">:</span>
             <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">u8</span><span class="p">:</span>
@@ -725,10 +871,14 @@
                 <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span>
             <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">b</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">bool_</span>
+            <span class="c1"># TODO: Consider using ml_dtypes when issues like this are resolved:</span>
+            <span class="c1"># https://github.com/pytorch/pytorch/issues/109873</span>
+            <span class="c1"># elif self == dtype.bf16:</span>
+            <span class="c1">#    return ml_dtypes.bfloat16</span>
             <span class="k">elif</span> <span class="n">use_default</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">float32</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Unspported numpy dtype&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Unsupported numpy dtype&quot;</span><span class="p">)</span>
 
         <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">dtype</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span>
@@ -760,13 +910,37 @@
         <span class="c1"># else: # commented out for mypy</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Provided unsupported destination type for dtype conversion </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">&quot;</span>
-        <span class="p">)</span>
+        <span class="p">)</span></div>
 
-    <span class="k">def</span> <span class="nf">try_to</span><span class="p">(</span>
+<div class="viewcode-block" id="dtype.try_to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.dtype.try_to">[docs]</a>    <span class="k">def</span> <span class="nf">try_to</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">dtype</span><span class="p">]],</span>
         <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert dtype into the equivalent type in [torch, numpy, tensorrt]</span>
+
+<span class="sd">        Converts ``self`` into one of numpy, torch, and tensorrt equivalent dtypes.</span>
+<span class="sd">        If  ``self`` is not supported in the target library, then returns ``None``.</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(Type(torch.dtype), Type(tensorrt.DataType), Type(numpy.dtype), Type(dtype))): Data type enum from another library to convert to</span>
+<span class="sd">            use_default (bool): In some cases a catch all type (such as ``torch.float``) is sufficient, so instead of throwing an exception, return default value.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Optional(Union(torch.dtype, tensorrt.DataType, numpy.dtype, dtype)): dtype equivalent ``torch_tensorrt.dtype`` from library enum ``t``</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                float_dtype = torch_tensorrt.dtype.f32.to(torch.dtype) # Returns torch.float</span>
+
+<span class="sd">                # Failure</span>
+<span class="sd">                float_dtype = torch_tensorrt.dtype.bf16.to(numpy.dtype) # Returns None</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
         <span class="k">try</span><span class="p">:</span>
             <span class="n">casted_format</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">use_default</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">casted_format</span>
@@ -775,7 +949,7 @@
                 <span class="sa">f</span><span class="s2">&quot;torch_tensorrt.dtype conversion to target type </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2"> failed&quot;</span><span class="p">,</span>
                 <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
             <span class="p">)</span>
-            <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
 
     <span class="k">def</span> <span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="n">other_</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
@@ -790,21 +964,130 @@
 
 
 <div class="viewcode-block" id="memory_format"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.memory_format">[docs]</a><span class="k">class</span> <span class="nc">memory_format</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;&quot;&quot;&quot;</span>
 
     <span class="c1"># TensorRT supported memory layouts</span>
     <span class="n">linear</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Row major linear format.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, the W axis always has unit stride, and the stride of every other axis is at least the product of the next dimension times the next stride. the strides are the same as for a C array with dimensions [N][C][H][W].</span>
+
+<span class="sd">    Equivient to ``memory_format.contiguous``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">chw2</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Two wide channel vectorized row major format.</span>
+
+<span class="sd">    This format is bound to FP16 in TensorRT. It is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+1)/2][H][W][2], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c/2][h][w][c%2].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">hwc8</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Eight channel format where C is padded to a multiple of 8.</span>
+
+<span class="sd">    This format is bound to FP16. It is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to the array with dimensions [N][H][W][(C+7)/8*8], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][h][w][c].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">chw4</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Four wide channel vectorized row major format. This format is bound to INT8. It is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+3)/4][H][W][4], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c/4][h][w][c%4].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">chw16</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sixteen wide channel vectorized row major format.</span>
+
+<span class="sd">    This format is bound to FP16. It is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+15)/16][H][W][16], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c/16][h][w][c%16].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">chw32</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Thirty-two wide channel vectorized row major format.</span>
+
+<span class="sd">    This format is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+31)/32][H][W][32], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c/32][h][w][c%32].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">dhwc8</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Eight channel format where C is padded to a multiple of 8.</span>
+
+<span class="sd">    This format is bound to FP16, and it is only available for dimensions &gt;= 4.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, D, H, W}, the memory layout is equivalent to an array with dimensions [N][D][H][W][(C+7)/8*8], with the tensor coordinates (n, c, d, h, w) mapping to array subscript [n][d][h][w][c].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">cdhw32</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Thirty-two wide channel vectorized row major format with 3 spatial dimensions.</span>
+
+<span class="sd">    This format is bound to FP16 and INT8. It is only available for dimensions &gt;= 4.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, D, H, W}, the memory layout is equivalent to a C array with dimensions [N][(C+31)/32][D][H][W][32], with the tensor coordinates (n, d, c, h, w) mapping to array subscript [n][c/32][d][h][w][c%32].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">hwc</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Non-vectorized channel-last format. This format is bound to FP32 and is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    Equivient to ``memory_format.channels_last``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">dla_linear</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; DLA planar format. Row major format. The stride for stepping along the H axis is rounded up to 64 bytes.</span>
+
+<span class="sd">    This format is bound to FP16/Int8 and is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to a C array with dimensions [N][C][H][roundUp(W, 64/elementSize)] where elementSize is 2 for FP16 and 1 for Int8, with the tensor coordinates (n, c, h, w) mapping to array subscript [n][c][h][w].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">dla_hwc4</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;DLA image format. channel-last format. C can only be 1, 3, 4. If C == 3 it will be rounded to 4. The stride for stepping along the H axis is rounded up to 32 bytes.</span>
+
+<span class="sd">    This format is bound to FP16/Int8 and is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, with C’ is 1, 4, 4 when C is 1, 3, 4 respectively, the memory layout is equivalent to a C array with dimensions [N][H][roundUp(W, 32/C’/elementSize)][C’] where elementSize is 2 for FP16 and 1 for Int8, C’ is the rounded C. The tensor coordinates (n, c, h, w) maps to array subscript [n][h][w][c].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">hwc16</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sixteen channel format where C is padded to a multiple of 16. This format is bound to FP16. It is only available for dimensions &gt;= 3.</span>
+
+<span class="sd">    For a tensor with dimensions {N, C, H, W}, the memory layout is equivalent to the array with dimensions [N][H][W][(C+15)/16*16], with the tensor coordinates (n, c, h, w) mapping to array subscript [n][h][w][c].</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">dhwc</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Non-vectorized channel-last format. This format is bound to FP32. It is only available for dimensions &gt;= 4.</span>
+
+<span class="sd">    Equivient to ``memory_format.channels_last_3d``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="c1"># PyTorch aliases for TRT layouts</span>
     <span class="n">contiguous</span> <span class="o">=</span> <span class="n">linear</span>
@@ -815,6 +1098,30 @@
     <span class="k">def</span> <span class="nf">_from</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">,</span> <span class="n">memory_format</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">memory_format</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT memory format enum from another library memory format enum.</span>
+
+<span class="sd">        Takes a memory format enum from one of torch, and tensorrt and create a ``torch_tensorrt.memory_format``.</span>
+<span class="sd">        If the source is not supported or the memory format is not supported in Torch-TensorRT,</span>
+<span class="sd">        then an exception will be raised. As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.memory_format.try_from()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            f (Union(torch.memory_format, tensorrt.TensorFormat, memory_format)): Memory format enum from another library</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            memory_format: Equivalent ``torch_tensorrt.memory_format`` to ``f``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: Unsupported memory format or unknown source</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                torchtrt_linear = torch_tensorrt.memory_format._from(torch.contiguous)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># TODO: Ideally implemented with match statement but need to wait for Py39 EoL</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">f</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">contiguous_format</span><span class="p">:</span>
@@ -878,10 +1185,30 @@
         <span class="c1"># else: # commented out for mypy</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Provided unsupported source type for memory_format conversion&quot;</span><span class="p">)</span>
 
-    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="memory_format.try_from"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.memory_format.try_from">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">try_from</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">,</span> <span class="n">memory_format</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">memory_format</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT memory format enum from another library memory format enum.</span>
+
+<span class="sd">        Takes a memory format enum from one of torch, and tensorrt and create a ``torch_tensorrt.memory_format``.</span>
+<span class="sd">        If the source is not supported or the memory format is not supported in Torch-TensorRT,</span>
+<span class="sd">        then ``None`` will be returned.</span>
+
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            f (Union(torch.memory_format, tensorrt.TensorFormat, memory_format)): Memory format enum from another library</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Optional(memory_format): Equivalent ``torch_tensorrt.memory_format`` to ``f``</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                torchtrt_linear = torch_tensorrt.memory_format.try_from(torch.contiguous)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">casted_format</span> <span class="o">=</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">casted_format</span>
@@ -890,14 +1217,39 @@
                 <span class="sa">f</span><span class="s2">&quot;Conversion from </span><span class="si">{</span><span class="n">f</span><span class="si">}</span><span class="s2"> to torch_tensorrt.memory_format failed&quot;</span><span class="p">,</span>
                 <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
             <span class="p">)</span>
-            <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
 
-    <span class="k">def</span> <span class="nf">to</span><span class="p">(</span>
+<div class="viewcode-block" id="memory_format.to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.memory_format.to">[docs]</a>    <span class="k">def</span> <span class="nf">to</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
             <span class="n">Type</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">memory_format</span><span class="p">]</span>
         <span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">,</span> <span class="n">memory_format</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert ``memory_format`` into the equivalent type in torch or tensorrt</span>
+
+<span class="sd">        Converts ``self`` into one of torch or tensorrt equivalent memory format.</span>
+<span class="sd">        If  ``self`` is not supported in the target library, then an exception will be raised.</span>
+<span class="sd">        As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.memory_format.try_to()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(Type(torch.memory_format), Type(tensorrt.TensorFormat), Type(memory_format))): Memory format type enum from another library to convert to</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Union(torch.memory_format, tensorrt.TensorFormat, memory_format): Memory format equivalent ``torch_tensorrt.memory_format`` in enum ``t``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: Unknown target type or unsupported memory format</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                tf = torch_tensorrt.memory_format.linear.to(torch.dtype) # Returns torch.contiguous</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
         <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">:</span>
             <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">contiguous</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">contiguous_format</span>
@@ -956,14 +1308,33 @@
         <span class="c1"># else: # commented out for mypy</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
             <span class="s2">&quot;Provided unsupported destination type for memory format conversion&quot;</span>
-        <span class="p">)</span>
+        <span class="p">)</span></div>
 
-    <span class="k">def</span> <span class="nf">try_to</span><span class="p">(</span>
+<div class="viewcode-block" id="memory_format.try_to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.memory_format.try_to">[docs]</a>    <span class="k">def</span> <span class="nf">try_to</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
             <span class="n">Type</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">memory_format</span><span class="p">]</span>
         <span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">,</span> <span class="n">memory_format</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert ``memory_format`` into the equivalent type in torch or tensorrt</span>
+
+<span class="sd">        Converts ``self`` into one of torch or tensorrt equivalent memory format.</span>
+<span class="sd">        If  ``self`` is not supported in the target library, then ``None`` will be returned</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(Type(torch.memory_format), Type(tensorrt.TensorFormat), Type(memory_format))): Memory format type enum from another library to convert to</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Optional(Union(torch.memory_format, tensorrt.TensorFormat, memory_format)): Memory format equivalent ``torch_tensorrt.memory_format`` in enum ``t``</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                tf = torch_tensorrt.memory_format.linear.to(torch.dtype) # Returns torch.contiguous</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
         <span class="k">try</span><span class="p">:</span>
             <span class="n">casted_format</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">casted_format</span>
@@ -972,7 +1343,7 @@
                 <span class="sa">f</span><span class="s2">&quot;torch_tensorrt.memory_format conversion to target type </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2"> failed&quot;</span><span class="p">,</span>
                 <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
             <span class="p">)</span>
-            <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
 
     <span class="k">def</span> <span class="fm">__eq__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">,</span> <span class="n">memory_format</span><span class="p">]</span>
@@ -985,12 +1356,55 @@
 
 
 <div class="viewcode-block" id="DeviceType"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.DeviceType">[docs]</a><span class="k">class</span> <span class="nc">DeviceType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Type of device TensorRT will target&quot;&quot;&quot;</span>
+
     <span class="n">UNKNOWN</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Sentinel value</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">GPU</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Target is a GPU</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">DLA</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Target is a DLA core</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">_from</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">DeviceType</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT device type enum from a TensorRT device type enum.</span>
+
+<span class="sd">        Takes a device type enum from tensorrt and create a ``torch_tensorrt.DeviceType``.</span>
+<span class="sd">        If the source is not supported or the device type is not supported in Torch-TensorRT,</span>
+<span class="sd">        then an exception will be raised. As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.DeviceType.try_from()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            d (Union(tensorrt.DeviceType, DeviceType)): Device type enum from another library</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            DeviceType: Equivalent ``torch_tensorrt.DeviceType`` to ``d``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: Unknown source type or unsupported device type</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                torchtrt_dla = torch_tensorrt.DeviceType._from(tensorrt.DeviceType.DLA)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">d</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span>
@@ -1019,8 +1433,29 @@
         <span class="c1"># else: # commented out for mypy</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Provided unsupported source type for DeviceType conversion&quot;</span><span class="p">)</span>
 
-    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="DeviceType.try_from"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.try_from">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">try_from</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DeviceType</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT device type enum from a TensorRT device type enum.</span>
+
+<span class="sd">        Takes a device type enum from tensorrt and create a ``torch_tensorrt.DeviceType``.</span>
+<span class="sd">        If the source is not supported or the device type is not supported in Torch-TensorRT,</span>
+<span class="sd">        then an exception will be raised. As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.DeviceType.try_from()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            d (Union(tensorrt.DeviceType, DeviceType)): Device type enum from another library</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            DeviceType: Equivalent ``torch_tensorrt.DeviceType`` to ``d``</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                torchtrt_dla = torch_tensorrt.DeviceType._from(tensorrt.DeviceType.DLA)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">casted_format</span> <span class="o">=</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">casted_format</span>
@@ -1029,13 +1464,38 @@
                 <span class="sa">f</span><span class="s2">&quot;Conversion from </span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2"> to torch_tensorrt.DeviceType failed&quot;</span><span class="p">,</span>
                 <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
             <span class="p">)</span>
-            <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
 
-    <span class="k">def</span> <span class="nf">to</span><span class="p">(</span>
+<div class="viewcode-block" id="DeviceType.to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.to">[docs]</a>    <span class="k">def</span> <span class="nf">to</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">DeviceType</span><span class="p">]],</span>
         <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert ``DeviceType`` into the equivalent type in tensorrt</span>
+
+<span class="sd">        Converts ``self`` into one of torch or tensorrt equivalent device type.</span>
+<span class="sd">        If  ``self`` is not supported in the target library, then an exception will be raised.</span>
+<span class="sd">        As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.DeviceType.try_to()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(Type(tensorrt.DeviceType), Type(DeviceType))): Device type enum from another library to convert to</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Union(tensorrt.DeviceType, DeviceType): Device type equivalent ``torch_tensorrt.DeviceType`` in enum ``t``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: Unknown target type or unsupported device type</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                trt_dla = torch_tensorrt.DeviceType.DLA.to(tensorrt.DeviceType) # Returns tensorrt.DeviceType.DLA</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
         <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">:</span>
             <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span>
@@ -1066,13 +1526,31 @@
         <span class="c1"># else: # commented out for mypy</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
             <span class="s2">&quot;Provided unsupported destination type for device type conversion&quot;</span>
-        <span class="p">)</span>
+        <span class="p">)</span></div>
 
-    <span class="k">def</span> <span class="nf">try_to</span><span class="p">(</span>
+<div class="viewcode-block" id="DeviceType.try_to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.try_to">[docs]</a>    <span class="k">def</span> <span class="nf">try_to</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">DeviceType</span><span class="p">]],</span>
         <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert ``DeviceType`` into the equivalent type in tensorrt</span>
+
+<span class="sd">        Converts ``self`` into one of torch or tensorrt equivalent memory format.</span>
+<span class="sd">        If  ``self`` is not supported in the target library, then ``None`` will be returned.</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(Type(tensorrt.DeviceType), Type(DeviceType))): Device type enum from another library to convert to</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Optional(Union(tensorrt.DeviceType, DeviceType)): Device type equivalent ``torch_tensorrt.DeviceType`` in enum ``t``</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                trt_dla = torch_tensorrt.DeviceType.DLA.to(tensorrt.DeviceType) # Returns tensorrt.DeviceType.DLA</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">casted_format</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">use_default</span><span class="o">=</span><span class="n">use_default</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">casted_format</span>
@@ -1081,7 +1559,7 @@
                 <span class="sa">f</span><span class="s2">&quot;torch_tensorrt.DeviceType conversion to target type </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2"> failed&quot;</span><span class="p">,</span>
                 <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
             <span class="p">)</span>
-            <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
 
     <span class="k">def</span> <span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="n">other_</span> <span class="o">=</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
@@ -1092,14 +1570,59 @@
 
 
 <div class="viewcode-block" id="EngineCapability"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability">[docs]</a><span class="k">class</span> <span class="nc">EngineCapability</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    EngineCapability determines the restrictions of a network during build time and what runtime it targets.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">STANDARD</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    EngineCapability.STANDARD does not provide any restrictions on functionality and the resulting serialized engine can be executed with TensorRT’s standard runtime APIs.</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">SAFETY</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    EngineCapability.SAFETY provides a restricted subset of network operations that are safety certified and the resulting serialized engine can be executed with TensorRT’s safe runtime APIs in the tensorrt.safe namespace.</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">DLA_STANDALONE</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    ``EngineCapability.DLA_STANDALONE`` provides a restricted subset of network operations that are DLA compatible and the resulting serialized engine can be executed using standalone DLA runtime APIs.</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">_from</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span> <span class="n">c</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EngineCapability</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT Engine capability enum from a TensorRT Engine capability enum.</span>
+
+<span class="sd">        Takes a device type enum from tensorrt and create a ``torch_tensorrt.EngineCapability``.</span>
+<span class="sd">        If the source is not supported or the engine capability is not supported in Torch-TensorRT,</span>
+<span class="sd">        then an exception will be raised. As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.EngineCapability.try_from()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            c (Union(tensorrt.EngineCapability, EngineCapability)): Engine capability enum from another library</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            EngineCapability: Equivalent ``torch_tensorrt.EngineCapability`` to ``c``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: Unknown source type or unsupported engine capability</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                torchtrt_ec = torch_tensorrt.EngineCapability._from(tensorrt.EngineCapability.SAFETY)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">c</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">STANDARD</span>
@@ -1130,10 +1653,31 @@
             <span class="s2">&quot;Provided unsupported source type for EngineCapability conversion&quot;</span>
         <span class="p">)</span>
 
-    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="EngineCapability.try_from"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.try_from">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">try_from</span><span class="p">(</span>
         <span class="n">c</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">EngineCapability</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT engine capability enum from a TensorRT engine capability enum.</span>
+
+<span class="sd">        Takes a device type enum from tensorrt and create a ``torch_tensorrt.EngineCapability``.</span>
+<span class="sd">        If the source is not supported or the engine capability level is not supported in Torch-TensorRT,</span>
+<span class="sd">        then an exception will be raised. As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.EngineCapability.try_from()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            c (Union(tensorrt.EngineCapability, EngineCapability)): Engine capability enum from another library</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            EngineCapability: Equivalent ``torch_tensorrt.EngineCapability`` to ``c``</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                torchtrt_safety_ec = torch_tensorrt.EngineCapability._from(tensorrt.EngineCapability.SAEFTY)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">casted_format</span> <span class="o">=</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">casted_format</span>
@@ -1142,11 +1686,35 @@
                 <span class="sa">f</span><span class="s2">&quot;Conversion from </span><span class="si">{</span><span class="n">c</span><span class="si">}</span><span class="s2"> to torch_tensorrt.EngineCapablity failed&quot;</span><span class="p">,</span>
                 <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
             <span class="p">)</span>
-            <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
 
-    <span class="k">def</span> <span class="nf">to</span><span class="p">(</span>
+<div class="viewcode-block" id="EngineCapability.to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.to">[docs]</a>    <span class="k">def</span> <span class="nf">to</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">EngineCapability</span><span class="p">]]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert ``EngineCapability`` into the equivalent type in tensorrt</span>
+
+<span class="sd">        Converts ``self`` into one of torch or tensorrt equivalent engine capability.</span>
+<span class="sd">        If  ``self`` is not supported in the target library, then an exception will be raised.</span>
+<span class="sd">        As such it is not recommended to use this method directly.</span>
+
+<span class="sd">        Alternatively use ``torch_tensorrt.EngineCapability.try_to()``</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(Type(tensorrt.EngineCapability), Type(EngineCapability))): Engine capability enum from another library to convert to</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Union(tensorrt.EngineCapability, EngineCapability): Engine capability equivalent ``torch_tensorrt.EngineCapability`` in enum ``t``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: Unknown target type or unsupported engine capability</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                torchtrt_dla_ec = torch_tensorrt.EngineCapability.DLA_STANDALONE.to(tensorrt.EngineCapability) # Returns tensorrt.EngineCapability.DLA</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">:</span>
             <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">STANDARD</span>
@@ -1174,12 +1742,30 @@
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Provided an unsupported engine capability&quot;</span><span class="p">)</span>
         <span class="c1"># else: # commented out for mypy</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-            <span class="s2">&quot;Provided unsupported destination type for engine capablity type conversion&quot;</span>
-        <span class="p">)</span>
+            <span class="s2">&quot;Provided unsupported destination type for engine capability type conversion&quot;</span>
+        <span class="p">)</span></div>
 
-    <span class="k">def</span> <span class="nf">try_to</span><span class="p">(</span>
+<div class="viewcode-block" id="EngineCapability.try_to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.try_to">[docs]</a>    <span class="k">def</span> <span class="nf">try_to</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">EngineCapability</span><span class="p">]]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert ``EngineCapability`` into the equivalent type in tensorrt</span>
+
+<span class="sd">        Converts ``self`` into one of torch or tensorrt equivalent engine capability.</span>
+<span class="sd">        If  ``self`` is not supported in the target library, then ``None`` will be returned.</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            t (Union(Type(tensorrt.EngineCapability), Type(EngineCapability))): Engine capability enum from another library to convert to</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Optional(Union(tensorrt.EngineCapability, EngineCapability)): Engine capability equivalent ``torch_tensorrt.EngineCapability`` in enum ``t``</span>
+
+<span class="sd">        Examples:</span>
+
+<span class="sd">            .. code:: py</span>
+
+<span class="sd">                # Succeeds</span>
+<span class="sd">                trt_dla_ec = torch_tensorrt.EngineCapability.DLA.to(tensorrt.EngineCapability) # Returns tensorrt.EngineCapability.DLA_STANDALONE</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">casted_format</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">casted_format</span>
@@ -1188,7 +1774,7 @@
                 <span class="sa">f</span><span class="s2">&quot;torch_tensorrt.EngineCapablity conversion to target type </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2"> failed&quot;</span><span class="p">,</span>
                 <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
             <span class="p">)</span>
-            <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
 
     <span class="k">def</span> <span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="n">other_</span> <span class="o">=</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
@@ -1212,7 +1798,7 @@
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2022, NVIDIA Corporation.
+        &copy; Copyright 2024, NVIDIA Corporation.
 
     </p>
   </div>
