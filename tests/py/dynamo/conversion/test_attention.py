@@ -30,12 +30,21 @@ class TestScaledDotProductAttention(DispatchTestCase):
         [
             (
                 "4d-2d",
-                (4, 2, 128, 64),
-                (6, 3, 128, 64),
-                (32, 8, 128, 64),
+                (4, 2, 16, 32),
+                (6, 3, 32, 64),
+                (32, 8, 64, 128),
+                (4, 32),
                 (4, 64),
-                (4, 64),
-                (16, 64),
+                (16, 128),
+            ),
+            (
+                "4d-3d",
+                (2, 2, 2, 2),
+                (3, 3, 3, 4),
+                (3, 4, 4, 5),
+                (2, 3, 2),
+                (3, 3, 4),
+                (4, 5, 5),
             ),
             (
                 "4d-4d",
@@ -170,21 +179,33 @@ class TestScaledDotProductAttention(DispatchTestCase):
         [
             (
                 "4d-2d",
-                (4, 2, 128, 64),
-                (6, 3, 128, 64),
-                (32, 8, 128, 64),
-                (4, 64),
-                (4, 64),
-                (4, 64),
+                (2, 2, 3, 2),
+                (3, 3, 4, 2),
+                (4, 4, 5, 3),
+                (2, 2),
+                (3, 2),
+                (4, 3),
+                None,
+            ),
+            (
+                "4d-3d",
+                (4, 2, 2, 16),
+                (6, 3, 3, 32),
+                (32, 4, 5, 64),
+                (2, 2, 16),
+                (3, 3, 32),
+                (4, 4, 64),
+                0.1,
             ),
             (
                 "4d-4d",
-                (4, 2, 12, 16),
-                (6, 3, 12, 16),
-                (32, 8, 12, 16),
-                (4, 2, 4, 16),
-                (6, 3, 4, 16),
+                (4, 2, 2, 4),
+                (6, 3, 3, 8),
+                (32, 8, 6, 16),
+                (4, 2, 3, 4),
+                (6, 3, 4, 8),
                 (32, 8, 4, 16),
+                0.01,
             ),
         ]
     )
@@ -197,11 +218,12 @@ class TestScaledDotProductAttention(DispatchTestCase):
         key_min_shape,
         key_opt_shape,
         key_max_shape,
+        scale,
     ):
         class SDPA(nn.Module):
             def forward(self, query, key, value):
                 return torch.nn.functional.scaled_dot_product_attention(
-                    query, key, value, None, 0.0, True, scale=None
+                    query, key, value, None, 0.0, True, scale=scale
                 )
 
         inputs = [

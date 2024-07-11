@@ -3374,3 +3374,24 @@ def aten_ops_native_dropout(
         args[1],
         args_bounds_check(args, 2, None),
     )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.arange.start_step, supports_dynamic_shapes=True
+)
+def aten_ops_arange_start_step(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.arange.arange(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        start=args[0],
+        end=args[1],
+        step=args_bounds_check(args, 2, 1),
+    )
