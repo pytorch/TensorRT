@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import tensorrt as trt
 import torch
+import torch_tensorrt
 from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
@@ -17,8 +18,6 @@ from torch_tensorrt.dynamo.runtime.tools import (
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
-
-import torch_tensorrt
 
 logger = logging.getLogger(__name__)
 
@@ -103,11 +102,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
         # Set the active stream using the current device
         current_stream = torch.cuda.current_stream()
-        if current_stream == torch.cuda.default_stream():
-            self.active_stream = torch.cuda.Stream()
-            torch.cuda.set_stream(self.active_stream)
-        else:
-            self.active_stream = current_stream
+        # if current_stream == torch.cuda.default_stream():
+        #     self.active_stream = torch.cuda.Stream()
+        #     torch.cuda.set_stream(self.active_stream)
+        # else:
+        self.active_stream = current_stream
 
     def _check_initialized(self) -> None:
         if not self.initialized:
@@ -210,12 +209,12 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         torch.cuda.set_device(device_id)
 
                         # Update current stream
-                        current_stream = torch.cuda.current_stream(device)
-                        if current_stream == torch.cuda.default_stream(device):
-                            self.active_stream = torch.cuda.Stream(device)
-                            torch.cuda.set_stream(self.active_stream)
-                        else:
-                            self.active_stream = current_stream
+                        # current_stream = torch.cuda.current_stream(device)
+                        # if current_stream == torch.cuda.default_stream(device):
+                        #     self.active_stream = torch.cuda.Stream(device)
+                        #     torch.cuda.set_stream(self.active_stream)
+                        # else:
+                        #     self.active_stream = current_stream
 
                         contiguous_inputs = [
                             tensor.to(device) for tensor in contiguous_inputs
