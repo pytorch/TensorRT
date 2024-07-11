@@ -13,7 +13,11 @@ from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo._refit import refit_module_weights
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._tracer import trace as dynamo_trace
-from torch_tensorrt.dynamo.utils import prepare_inputs, to_torch_tensorrt_device
+from torch_tensorrt.dynamo.utils import (
+    prepare_inputs,
+    to_torch_device,
+    to_torch_tensorrt_device,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +136,7 @@ class MutableTorchTensorRTModule(object):
         self.pytorch_model.load_state_dict(state_dict)
 
     def _refit_gm(self) -> None:
+        self.original_model.to(to_torch_device(self.settings.device))
         if self.exp_program is None:
             self.exp_program = torch.export.export(
                 self.pytorch_model, self.args_inputs, **self.settings.__dict__
@@ -149,10 +154,12 @@ class MutableTorchTensorRTModule(object):
             self.pytorch_model.state_dict()
         )
         self.gm = refit_module_weights(self.gm, self.exp_program, self.args_inputs)
+        self.original_model.cpu()
 
     def _compile(self) -> None:
 
         # Export the module
+        self.original_model.to(to_torch_device(self.settings.device))
         self.exp_program = dynamo_trace(
             self.original_model, self.torchtrt_inputs, **self.settings.__dict__
         )
@@ -161,6 +168,7 @@ class MutableTorchTensorRTModule(object):
             inputs=self.torchtrt_inputs,
             **self.settings.__dict__,
         )
+        self.original_model.cpu()
 
     @staticmethod
     def _transform_state_dict(sd: Dict[str, Any]) -> Dict[str, torch.nn.Parameter]:
