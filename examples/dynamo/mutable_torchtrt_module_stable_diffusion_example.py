@@ -38,7 +38,7 @@ torch.manual_seed(1)
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 kwargs = {
     "use_python": False,
-    "enabled_precisions": {torch.float32},
+    "enabled_precisions": {torch.float16},
     "make_refitable": True,
 }
 
@@ -50,7 +50,7 @@ prompt = "portrait of a woman standing, shuimobysim, wuchangshuo, best quality"
 negative = "(worst quality:2), (low quality:2), (normal quality:2), lowres, normal quality, skin spots, acnes, skin blemishes, age spot, glans, (watermark:2),"
 
 pipe = DiffusionPipeline.from_pretrained(
-    model_id, revision="fp16", torch_dtype=torch.float16, safety_checker=None
+    model_id, revision="fp16", torch_dtype=torch.float16
 )
 pipe.to(device)
 backend = "torch_tensorrt"
