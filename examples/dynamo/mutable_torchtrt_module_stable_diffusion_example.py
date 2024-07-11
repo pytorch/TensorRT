@@ -27,7 +27,6 @@ In this tutorial, we are going to walk through
 import numpy as np
 import torch
 import torch_tensorrt as torch_trt
-import torchvision.models as models
 from diffusers import DiffusionPipeline
 
 np.random.seed(0)
@@ -54,21 +53,19 @@ pipe = DiffusionPipeline.from_pretrained(
     model_id, revision="fp16", torch_dtype=torch.float16, safety_checker=None
 )
 pipe.to(device)
-backend = "torch_tensorrt" 
+backend = "torch_tensorrt"
 
 pipe.unet = torch_trt.MutableTorchTensorRTModule(pipe.unet, **kwargs)
 image = pipe(prompt, negative_prompt=negative, num_inference_steps=30).images[0]
-image.save('./without_LoRA.jpg')
+image.save("./without_LoRA.jpg")
 
 
 pipe.load_lora_weights("/opt/torch_tensorrt/moxin.safetensors", adapter_name="lora1")
 pipe.set_adapters(["lora1"], adapter_weights=[1])
-pipe.fuse_lora(['lora1'], 1)
+pipe.fuse_lora(["lora1"], 1)
 pipe.unload_lora_weights()
 
 
 # Check the output
 image = pipe(prompt, negative_prompt=negative, num_inference_steps=30).images[0]
-image.save('./with_LoRA.jpg')
-
-
+image.save("./with_LoRA.jpg")
