@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import fields, replace
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Sequence, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Union
 
 import numpy as np
 import torch
@@ -411,3 +411,31 @@ def check_output(
                 return False
 
     return True
+
+
+def flatten_dict_value(d: dict[Any, Any]) -> List[Any]:
+    """
+    Flatten the values of a dictionary to a single list.
+
+    Args:
+    d (dict): The dictionary to flatten.
+
+    Returns:
+    list: A list of all values flattened.
+    """
+
+    def flatten(value: Any) -> Generator[Any, Any, Any]:
+        if isinstance(value, dict):
+            for v in value.values():
+                yield from flatten(v)
+        elif isinstance(value, list):
+            for item in value:
+                yield from flatten(item)
+        else:
+            yield value
+
+    flat_list: List[Any] = []
+    for v in d.values():
+        flat_list.extend(flatten(v))
+
+    return flat_list
