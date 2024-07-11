@@ -1,3 +1,4 @@
+import copy
 import logging
 import operator
 from typing import Callable, Sequence, Tuple
@@ -23,7 +24,6 @@ def lower_scaled_dot_product_attention(
     """
     original_fns, replacement = scaled_dot_product_attention_replacement()
     replaced_nodes = []
-
     # For each original function, search for it in the graph and replace
     for original in original_fns:
         replaced_nodes += torch.fx.subgraph_rewriter.replace_pattern_with_filters(
@@ -53,6 +53,9 @@ def lower_scaled_dot_product_attention(
                 new_attention_node.target
                 == torch.nn.functional.scaled_dot_product_attention
             )
+
+            # Copy the metadata of the replaced attention node to the new node
+            new_attention_node.meta = copy.copy(attention_node_replaced.meta)
 
             # If the attention operator had keyword-args, copy them to the new node
             if attention_node_replaced.kwargs:

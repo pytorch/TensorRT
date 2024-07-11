@@ -276,21 +276,6 @@ def compile_module(
             "for the most thorough analysis"
         )
 
-    def _update_sdpa_meta(gm: torch.fx.GraphModule) -> bool:
-        for node in gm.graph.nodes:
-            if node.target == torch._C._nn.scaled_dot_product_attention:
-                # We are using the "value" vector metadata
-                node.meta["val"] = node.args[2].meta["val"]
-
-        return True
-
-    # Update SDPA op meta since it is empty.
-    # TODO: Remove this once Pytorch fixes this.
-    if _update_sdpa_meta(gm):
-        logger.debug(
-            "Found torch._C._nn.scaled_dot_product_attention operator in subgraph. Updating its metadata manually as PyTorch doesn't provide it."
-        )
-
     # If the number of supported operations is 0 or less than the block size, skip the subgraph
     # TODO: Add condition to second expression below when require_full_compilation is added
     if num_supported_ops == 0 or (
