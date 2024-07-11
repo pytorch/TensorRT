@@ -351,7 +351,7 @@ def convert_method_to_trt_engine(
         torchtrt_inputs = prepare_inputs(inputs)
         exp_program = torch_tensorrt.dynamo.trace(module, torchtrt_inputs, **kwargs)
 
-        return dynamo_convert_module_to_trt_engine(
+        return dynamo_convert_module_to_trt_engine(  # type: ignore
             exp_program,
             inputs=tuple(inputs),
             enabled_precisions=enabled_precisions_set,
@@ -408,6 +408,7 @@ def save(
     *,
     output_format: str = "exported_program",
     inputs: Optional[Sequence[torch.Tensor]] = None,
+    kwargs_inputs: Optional[dict[str, Any]] = None,
     retrace: bool = False,
 ) -> None:
     """
@@ -428,6 +429,10 @@ def save(
         raise ValueError(
             "Not all inputs provided are torch.tensors. Please provide torch.tensors as inputs"
         )
+    if kwargs_inputs is not None and not all(
+        value is not None for value in kwargs_inputs.values()
+    ):
+        raise ValueError("kwargs should not include None.")
     if output_format not in accepted_formats:
         raise ValueError(
             f"Provided output_format {output_format} is not supported. Supported options are exported_program | torchscript"
@@ -460,19 +465,21 @@ def save(
             )
         # The module type is torch.fx.GraphModule
         if output_format == "torchscript":
-            module_ts = torch.jit.trace(module, inputs)
+            module_ts = torch.jit.trace(
+                module, inputs, example_kwarg_inputs=kwargs_inputs
+            )
             torch.jit.save(module_ts, file_path)
         else:
             if not retrace:
                 from torch_tensorrt.dynamo._exporter import export
 
-                exp_program = export(module, inputs)
+                exp_program = export(module, inputs, kwargs_inputs)
                 torch.export.save(exp_program, file_path)
             else:
                 from torch._higher_order_ops.torchbind import enable_torchbind_tracing
 
                 with enable_torchbind_tracing():
                     exp_program = torch.export.export(
-                        module, tuple(inputs), strict=False
+                        module, tuple(inputs), kwargs=kwargs_inputs, strict=False
                     )
                     torch.export.save(exp_program, file_path)
