@@ -33,7 +33,6 @@ np.random.seed(0)
 torch.manual_seed(0)
 inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 
-
 # %%
 # Compile the module for the first time and save it.
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -62,6 +61,3 @@ for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
 print("Refit successfully!")
 torch_trt.MutableTorchTensorRTModule.save(mutable_module, "mutable_module.pkl")
 reload = torch_trt.MutableTorchTensorRTModule.load("mutable_module.pkl")
-
-
-print()
