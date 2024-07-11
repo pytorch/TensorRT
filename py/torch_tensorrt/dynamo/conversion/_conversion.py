@@ -4,7 +4,6 @@ import io
 import logging
 from typing import List, Sequence
 
-import tensorrt as trt
 import torch
 from torch.fx.experimental.proxy_tensor import maybe_disable_fake_tensor_mode
 from torch_tensorrt._Device import Device
@@ -18,6 +17,8 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import get_torch_inputs
+
+import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ def infer_module_output_dtypes(
         if not isinstance(output, torch.Tensor):
             if isinstance(output, str):
                 raise ValueError(
-                    f"Receieved an output type {type(output)} that's not in the acceptable datatypes (https://pytorch.org/docs/stable/tensor_attributes.html#torch.dtype)"
+                    f"Received an output type {type(output)} that's not in the acceptable datatypes (https://pytorch.org/docs/stable/tensor_attributes.html#torch.dtype)"
                 )
             else:
                 output_ = torch.tensor(output)
@@ -114,8 +115,7 @@ def convert_module(
             engine=interpreter_result.engine,
             input_names=list(interpreter_result.input_names),
             output_names=list(interpreter_result.output_names),
-            target_device=settings.device,
-            profiling_enabled=settings.debug,
+            settings=settings,
         )
 
     else:
@@ -130,6 +130,5 @@ def convert_module(
             name=name,
             input_binding_names=list(interpreter_result.input_names),
             output_binding_names=list(interpreter_result.output_names),
-            target_device=settings.device,
-            hardware_compatible=settings.hardware_compatible,
+            settings=settings,
         )

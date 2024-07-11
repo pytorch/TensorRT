@@ -43,8 +43,8 @@ This way, the model learns an inner representation of the English language that 
 features useful for downstream tasks: if you have a dataset of labeled sentences for instance, you can train
 a standard classifier using the features produced by the BERT model as inputs." (https://huggingface.co/bert-base-uncased)
 
-This notebook demonstrates the steps for optimizing a pretrained EfficientNet model with Torch-TensorRT,
-and running it to test the speedup obtained.
+This notebook demonstrates the steps for compiling a TorchScript module with Torch-TensorRT on a
+pretrained BERT transformer from Hugging Face, and running it to test the speedup obtained.
 
 * `Masked Language Modeling (MLM) with Hugging Face BERT Transformer <https://github.com/pytorch/TensorRT/blob/master/notebooks/Hugging-Face-BERT.ipynb>`_
 

@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Index &mdash; Torch-TensorRT v2.5.0.dev0+caf3a92 documentation</title>
+  <title>Index &mdash; Torch-TensorRT v2.5.0.dev0+0ef880d documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+caf3a92
+                  v2.5.0.dev0+0ef880d
                 </div>
               
             
@@ -303,7 +303,17 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started/quick_start.html">Quick Start</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -317,18 +327,11 @@
 <li class="toctree-l1"><a class="reference internal" href="ts/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ts/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ts/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts/ptq.html">Post Training Quantization (PTQ)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">FX Frontend</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="fx/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/using_dla.html">DLA</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
@@ -338,21 +341,20 @@
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#wrapping-custom-kernels-to-use-in-tensorrt">Wrapping Custom Kernels to use in TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#using-torch-tensorrt-to-insert-the-kernel">Using Torch-TensorRT to Insert the Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="py_api/torch_tensorrt.html">torch_tensorrt</a></li>
-<li class="toctree-l1"><a class="reference internal" href="py_api/logging.html">torch_tensorrt.logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="py_api/ptq.html">torch_tensorrt.ptq</a></li>
 <li class="toctree-l1"><a class="reference internal" href="py_api/dynamo.html">torch_tensorrt.dynamo</a></li>
-<li class="toctree-l1"><a class="reference internal" href="py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="py_api/logging.html">torch_tensorrt.logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="py_api/fx.html">torch_tensorrt.fx</a></li>
+<li class="toctree-l1"><a class="reference internal" href="py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="py_api/ptq.html">torch_tensorrt.ts.ptq</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
@@ -360,7 +362,7 @@
 <li class="toctree-l1"><a class="reference internal" href="_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">CLI Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="cli/torchtrtc.html">torchtrtc</a></li>
 </ul>
@@ -454,17 +456,21 @@
 
 <div class="genindex-jumpbox">
  <a href="#_"><strong>_</strong></a>
+ | <a href="#B"><strong>B</strong></a>
  | <a href="#C"><strong>C</strong></a>
  | <a href="#D"><strong>D</strong></a>
  | <a href="#E"><strong>E</strong></a>
  | <a href="#F"><strong>F</strong></a>
  | <a href="#G"><strong>G</strong></a>
+ | <a href="#H"><strong>H</strong></a>
  | <a href="#I"><strong>I</strong></a>
+ | <a href="#L"><strong>L</strong></a>
  | <a href="#M"><strong>M</strong></a>
  | <a href="#P"><strong>P</strong></a>
  | <a href="#R"><strong>R</strong></a>
  | <a href="#S"><strong>S</strong></a>
  | <a href="#T"><strong>T</strong></a>
+ | <a href="#U"><strong>U</strong></a>
  | <a href="#W"><strong>W</strong></a>
  | <a href="#X"><strong>X</strong></a>
  
@@ -477,15 +483,47 @@
       <ul>
         <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input.__init__">(torch_tensorrt.Input method)</a>
 </li>
+        <li><a href="py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.__init__">(torch_tensorrt.runtime.PythonTorchTensorRTModule method)</a>
+</li>
+        <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.__init__">(torch_tensorrt.runtime.TorchTensorRTModule method)</a>
+</li>
       </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="B">B</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.b">b (torch_tensorrt.dtype attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.bf16">bf16 (torch_tensorrt.dtype attribute)</a>
+</li>
   </ul></td>
 </tr></table>
 
 <h2 id="C">C</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/ptq.html#torch_tensorrt.ts.ptq.CacheCalibrator">CacheCalibrator (class in torch_tensorrt.ts.ptq)</a>
+</li>
+      <li><a href="py_api/ptq.html#torch_tensorrt.ts.ptq.CalibrationAlgo">CalibrationAlgo (class in torch_tensorrt.ts.ptq)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.cdhw32">cdhw32 (torch_tensorrt.memory_format attribute)</a>
+</li>
       <li><a href="py_api/ts.html#torch_tensorrt.ts.check_method_op_support">check_method_op_support() (in module torch_tensorrt.ts)</a>
 </li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.chw16">chw16 (torch_tensorrt.memory_format attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.chw2">chw2 (torch_tensorrt.memory_format attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.chw32">chw32 (torch_tensorrt.memory_format attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.chw4">chw4 (torch_tensorrt.memory_format attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="dynamo/torch_compile.html#torch_tensorrt.dynamo.CompilationSettings">CompilationSettings (class in torch_tensorrt.dynamo)</a>, <a href="py_api/dynamo.html#torch_tensorrt.dynamo.CompilationSettings">[1]</a>
 </li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.compile">compile() (in module torch_tensorrt)</a>
@@ -498,8 +536,6 @@
         <li><a href="py_api/ts.html#torch_tensorrt.ts.compile">(in module torch_tensorrt.ts)</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.convert_method_to_trt_engine">convert_method_to_trt_engine() (in module torch_tensorrt)</a>
 
       <ul>
@@ -508,12 +544,16 @@
       </ul></li>
       <li><a href="py_api/dynamo.html#torch_tensorrt.dynamo.convert_module_to_trt_engine">convert_module_to_trt_engine() (in module torch_tensorrt.dynamo)</a>
 </li>
+      <li><a href="py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.cudagraphs_validate_shapes">cudagraphs_validate_shapes() (torch_tensorrt.runtime.PythonTorchTensorRTModule method)</a>
+</li>
   </ul></td>
 </tr></table>
 
 <h2 id="D">D</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/ptq.html#torch_tensorrt.ts.ptq.DataLoaderCalibrator">DataLoaderCalibrator (class in torch_tensorrt.ts.ptq)</a>
+</li>
       <li><a href="py_api/logging.html#torch_tensorrt.logging.debug">debug (class in torch_tensorrt.logging)</a>
 </li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Device">Device (class in torch_tensorrt)</a>
@@ -522,9 +562,27 @@
 </li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.DeviceType">DeviceType (class in torch_tensorrt)</a>
 </li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.dhwc">dhwc (torch_tensorrt.memory_format attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.dhwc8">dhwc8 (torch_tensorrt.memory_format attribute)</a>
+</li>
+      <li><a href="py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.disable_profiling">disable_profiling() (torch_tensorrt.runtime.PythonTorchTensorRTModule method)</a>
+
+      <ul>
+        <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.disable_profiling">(torch_tensorrt.runtime.TorchTensorRTModule method)</a>
+</li>
+      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.DLA">DLA (torch_tensorrt.DeviceType attribute)</a>
+</li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Device.dla_core">dla_core (torch_tensorrt.Device attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.dla_hwc4">dla_hwc4 (torch_tensorrt.memory_format attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.dla_linear">dla_linear (torch_tensorrt.memory_format attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.DLA_STANDALONE">DLA_STANDALONE (torch_tensorrt.EngineCapability attribute)</a>
 </li>
       <li><a href="src/pytorch-sphinx-theme/docs/demo/demo.html#term-Documentation"><strong>Documentation</strong></a>
 </li>
@@ -534,6 +592,8 @@
         <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input.dtype">(torch_tensorrt.Input attribute)</a>
 </li>
       </ul></li>
+      <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.dump_layer_info">dump_layer_info() (torch_tensorrt.runtime.TorchTensorRTModule method)</a>
+</li>
   </ul></td>
 </tr></table>
 
@@ -542,10 +602,20 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/ts.html#torch_tensorrt.ts.embed_engine_in_new_module">embed_engine_in_new_module() (in module torch_tensorrt.ts)</a>
 </li>
+      <li><a href="py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.enable_profiling">enable_profiling() (torch_tensorrt.runtime.PythonTorchTensorRTModule method)</a>
+
+      <ul>
+        <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.enable_profiling">(torch_tensorrt.runtime.TorchTensorRTModule method)</a>
+</li>
+      </ul></li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability">EngineCapability (class in torch_tensorrt)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/ptq.html#torch_tensorrt.ts.ptq.CalibrationAlgo.ENTROPY_CALIBRATION">ENTROPY_CALIBRATION (torch_tensorrt.ts.ptq.CalibrationAlgo attribute)</a>
+</li>
+      <li><a href="py_api/ptq.html#torch_tensorrt.ts.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2">ENTROPY_CALIBRATION_2 (torch_tensorrt.ts.ptq.CalibrationAlgo attribute)</a>
+</li>
       <li><a href="py_api/logging.html#torch_tensorrt.logging.errors">errors (class in torch_tensorrt.logging)</a>
 </li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input.example_tensor">example_tensor() (torch_tensorrt.Input method)</a>
@@ -558,10 +628,24 @@
 <h2 id="F">F</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input.format">format (torch_tensorrt.Input attribute)</a>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.f16">f16 (torch_tensorrt.dtype attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.f32">f32 (torch_tensorrt.dtype attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.f64">f64 (torch_tensorrt.dtype attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.f8">f8 (torch_tensorrt.dtype attribute)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input.format">format (torch_tensorrt.Input attribute)</a>
+</li>
+      <li><a href="py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.forward">forward() (torch_tensorrt.runtime.PythonTorchTensorRTModule method)</a>
+
+      <ul>
+        <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.forward">(torch_tensorrt.runtime.TorchTensorRTModule method)</a>
+</li>
+      </ul></li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input.from_tensor">from_tensor() (torch_tensorrt.Input class method)</a>
 </li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input.from_tensors">from_tensors() (torch_tensorrt.Input class method)</a>
@@ -572,11 +656,35 @@
 <h2 id="G">G</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.get_extra_state">get_extra_state() (torch_tensorrt.runtime.TorchTensorRTModule method)</a>
+</li>
+      <li><a href="py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.get_layer_info">get_layer_info() (torch_tensorrt.runtime.PythonTorchTensorRTModule method)</a>
+
+      <ul>
+        <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.get_layer_info">(torch_tensorrt.runtime.TorchTensorRTModule method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.GPU">GPU (torch_tensorrt.DeviceType attribute)</a>
+</li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Device.gpu_id">gpu_id (torch_tensorrt.Device attribute)</a>
+</li>
+      <li><a href="py_api/logging.html#torch_tensorrt.logging.graphs">graphs (class in torch_tensorrt.logging)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="H">H</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.hwc">hwc (torch_tensorrt.memory_format attribute)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="py_api/logging.html#torch_tensorrt.logging.graphs">graphs (class in torch_tensorrt.logging)</a>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.hwc16">hwc16 (torch_tensorrt.memory_format attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.hwc8">hwc8 (torch_tensorrt.memory_format attribute)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -584,15 +692,35 @@
 <h2 id="I">I</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.i32">i32 (torch_tensorrt.dtype attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.i64">i64 (torch_tensorrt.dtype attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.i8">i8 (torch_tensorrt.dtype attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/logging.html#torch_tensorrt.logging.info">info (class in torch_tensorrt.logging)</a>
 </li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input">Input (class in torch_tensorrt)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/fx.html#torch_tensorrt.fx.InputTensorSpec">InputTensorSpec (class in torch_tensorrt.fx)</a>
 </li>
       <li><a href="py_api/logging.html#torch_tensorrt.logging.internal_errors">internal_errors (class in torch_tensorrt.logging)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="L">L</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/ptq.html#torch_tensorrt.ts.ptq.CalibrationAlgo.LEGACY_CALIBRATION">LEGACY_CALIBRATION (torch_tensorrt.ts.ptq.CalibrationAlgo attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.linear">linear (torch_tensorrt.memory_format attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.load">load() (in module torch_tensorrt)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -601,6 +729,8 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format">memory_format (class in torch_tensorrt)</a>
+</li>
+      <li><a href="py_api/ptq.html#torch_tensorrt.ts.ptq.CalibrationAlgo.MINMAX_CALIBRATION">MINMAX_CALIBRATION (torch_tensorrt.ts.ptq.CalibrationAlgo attribute)</a>
 </li>
       <li>
     module
@@ -614,7 +744,11 @@
 </li>
         <li><a href="py_api/logging.html#module-torch_tensorrt.logging">torch_tensorrt.logging</a>
 </li>
+        <li><a href="py_api/runtime.html#module-torch_tensorrt.runtime">torch_tensorrt.runtime</a>
+</li>
         <li><a href="py_api/ts.html#module-torch_tensorrt.ts">torch_tensorrt.ts</a>
+</li>
+        <li><a href="py_api/ptq.html#module-torch_tensorrt.ts.ptq">torch_tensorrt.ts.ptq</a>
 </li>
       </ul></li>
   </ul></td>
@@ -631,12 +765,18 @@
 </li>
       </ul></li>
   </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule">PythonTorchTensorRTModule (class in torch_tensorrt.runtime)</a>
+</li>
+  </ul></td>
 </tr></table>
 
 <h2 id="R">R</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="src/pytorch-sphinx-theme/docs/demo/demo.html#term-Reading"><strong>Reading</strong></a>
+</li>
+      <li><a href="py_api/dynamo.html#torch_tensorrt.dynamo.refit_module_weights">refit_module_weights() (in module torch_tensorrt.dynamo)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
@@ -653,10 +793,18 @@
 <h2 id="S">S</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="py_api/dynamo.html#torch_tensorrt.dynamo.SourceIR">SourceIR (class in torch_tensorrt.dynamo)</a>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.SAFETY">SAFETY (torch_tensorrt.EngineCapability attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.save">save() (in module torch_tensorrt)</a>
+</li>
+      <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.set_extra_state">set_extra_state() (torch_tensorrt.runtime.TorchTensorRTModule method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/runtime.html#torch_tensorrt.runtime.set_multi_device_safe_mode">set_multi_device_safe_mode() (in module torch_tensorrt.runtime)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.STANDARD">STANDARD (torch_tensorrt.EngineCapability attribute)</a>
+</li>
       <li><a href="_cpp_api/define_macros_8h_1a18d295a837ac71add5578860b55e5502.html#c.STR">STR (C macro)</a>
 </li>
   </ul></td>
@@ -667,6 +815,16 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/ts.html#torch_tensorrt.ts.TensorRTCompileSpec">TensorRTCompileSpec() (in module torch_tensorrt.ts)</a>
 </li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.to">to() (torch_tensorrt.DeviceType method)</a>
+
+      <ul>
+        <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.to">(torch_tensorrt.dtype method)</a>
+</li>
+        <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.to">(torch_tensorrt.EngineCapability method)</a>
+</li>
+        <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.to">(torch_tensorrt.memory_format method)</a>
+</li>
+      </ul></li>
       <li>
     torch_tensorrt
 
@@ -696,10 +854,24 @@
 </li>
       </ul></li>
       <li>
+    torch_tensorrt.runtime
+
+      <ul>
+        <li><a href="py_api/runtime.html#module-torch_tensorrt.runtime">module</a>
+</li>
+      </ul></li>
+      <li>
     torch_tensorrt.ts
 
       <ul>
         <li><a href="py_api/ts.html#module-torch_tensorrt.ts">module</a>
+</li>
+      </ul></li>
+      <li>
+    torch_tensorrt.ts.ptq
+
+      <ul>
+        <li><a href="py_api/ptq.html#module-torch_tensorrt.ts.ptq">module</a>
 </li>
       </ul></li>
       <li><a href="_cpp_api/classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE">torch_tensorrt::DataType (C++ class)</a>
@@ -926,6 +1098,8 @@
 </li>
       <li><a href="_cpp_api/define_macros_8h_1adad592a7b1b7eed529cdf6acd584c883.html#c.TORCH_TENSORRT_VERSION">TORCH_TENSORRT_VERSION (C macro)</a>
 </li>
+      <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule">TorchTensorRTModule (class in torch_tensorrt.runtime)</a>
+</li>
       <li><a href="_cpp_api/define_macros_8h_1abd1465eb38256d3f22cc1426b23d516b.html#c.TORCHTRT_API">TORCHTRT_API (C macro)</a>
 </li>
       <li><a href="_cpp_api/define_macros_8h_1ad19939408f7be171a74a89928b36eb59.html#c.TORCHTRT_HIDDEN">TORCHTRT_HIDDEN (C macro)</a>
@@ -937,6 +1111,40 @@
       <li><a href="py_api/fx.html#torch_tensorrt.fx.TRTInterpreterResult">TRTInterpreterResult (class in torch_tensorrt.fx)</a>
 </li>
       <li><a href="py_api/fx.html#torch_tensorrt.fx.TRTModule">TRTModule (class in torch_tensorrt.fx)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.try_from">try_from() (torch_tensorrt.DeviceType class method)</a>
+
+      <ul>
+        <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.try_from">(torch_tensorrt.dtype class method)</a>
+</li>
+        <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.try_from">(torch_tensorrt.EngineCapability class method)</a>
+</li>
+        <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.try_from">(torch_tensorrt.memory_format class method)</a>
+</li>
+      </ul></li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.try_to">try_to() (torch_tensorrt.DeviceType method)</a>
+
+      <ul>
+        <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.try_to">(torch_tensorrt.dtype method)</a>
+</li>
+        <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.try_to">(torch_tensorrt.EngineCapability method)</a>
+</li>
+        <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.try_to">(torch_tensorrt.memory_format method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="U">U</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.u8">u8 (torch_tensorrt.dtype attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.UNKNOWN">UNKNOWN (torch_tensorrt.DeviceType attribute)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.unknown">unknown (torch_tensorrt.dtype attribute)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -977,7 +1185,7 @@
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2022, NVIDIA Corporation.
+        &copy; Copyright 2024, NVIDIA Corporation.
 
     </p>
   </div>

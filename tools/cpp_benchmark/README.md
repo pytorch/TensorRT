@@ -30,4 +30,4 @@ You can run a module with JIT or TRT via Torch-TensorRT in either FP32 or FP16. 
 
 - To also save the TRT engine, add the argument `--cxxopt="-DSAVE_ENGINE"`
 
-> It's suggested to also define `--cxxopt="-DNDEBUG"` to supress debug information
+> It's suggested to also define `--cxxopt="-DNDEBUG"` to suppress debug information

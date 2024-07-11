@@ -100,7 +100,7 @@ As you can see it is pretty similar to the Python API. When you call the ``forwa
 
 Compiling with Torch-TensorRT in C++
 -------------------------------------
-We are also at the point were we can compile and optimize our module with Torch-TensorRT, but instead of in a JIT fashion we must do it ahead-of-time (AOT) i.e. before we start doing actual inference work
+We are also at the point where we can compile and optimize our module with Torch-TensorRT, but instead of in a JIT fashion we must do it ahead-of-time (AOT) i.e. before we start doing actual inference work
 since it takes a bit of time to optimize the module, it would not make sense to do this every time you run the module or even the first time you run it.
 
 With our module loaded, we can feed it into the Torch-TensorRT compiler. When we do so we must provide some information on the expected input size and also configure any additional settings.
@@ -113,12 +113,13 @@ With our module loaded, we can feed it into the Torch-TensorRT compiler. When we
 
         mod.to(at::kCUDA);
         mod.eval();
-
-        auto in = torch::randn({1, 1, 32, 32}, {torch::kCUDA});
-        auto trt_mod = torch_tensorrt::CompileGraph(mod, std::vector<torch_tensorrt::CompileSpec::InputRange>{{in.sizes()}});
+        std::vector<torch_tensorrt::core::ir::Input> inputs{torch_tensorrt::core::ir::Input({1, 3, 224, 224})};
+        torch_tensorrt::ts::CompileSpec cfg(inputs);
+        auto trt_mod = torch_tensorrt::ts::compile(mod, cfg);
+        auto in = torch::randn({1, 3, 224, 224}, {torch::kCUDA});
         auto out = trt_mod.forward({in});
 
-Thats it! Now the graph runs primarily not with the JIT compiler but using TensorRT (though we execute the graph using the JIT runtime).
+That's it! Now the graph runs primarily not with the JIT compiler but using TensorRT (though we execute the graph using the JIT runtime).
 
 We can also set settings like operating precision to run in FP16.
 
@@ -131,11 +132,11 @@ We can also set settings like operating precision to run in FP16.
         mod.to(at::kCUDA);
         mod.eval();
 
-        auto in = torch::randn({1, 1, 32, 32}, {torch::kCUDA}).to(torch::kHALF);
-        auto input_sizes = std::vector<torch_tensorrt::CompileSpec::InputRange>({in.sizes()});
-        torch_tensorrt::CompileSpec info(input_sizes);
-        info.enable_precisions.insert(torch::kHALF);
-        auto trt_mod = torch_tensorrt::CompileGraph(mod, info);
+        auto in = torch::randn({1, 3, 224, 224}, {torch::kCUDA}).to(torch::kHALF);
+        std::vector<torch_tensorrt::core::ir::Input> inputs{torch_tensorrt::core::ir::Input({1, 3, 224, 224})};
+        torch_tensorrt::ts::CompileSpec cfg(inputs);
+        cfg.enable_precisions.insert(torch::kHALF);
+        auto trt_mod = torch_tensorrt::ts::compile(mod, cfg);
         auto out = trt_mod.forward({in});
 
 And now we are running the module in FP16 precision. You can then save the module to load later.
@@ -179,11 +180,12 @@ If you want to save the engine produced by Torch-TensorRT to use in a TensorRT a
         mod.to(at::kCUDA);
         mod.eval();
 
-        auto in = torch::randn({1, 1, 32, 32}, {torch::kCUDA}).to(torch::kHALF);
-        auto input_sizes = std::vector<torch_tensorrt::CompileSpec::InputRange>({in.sizes()});
-        torch_tensorrt::CompileSpec info(input_sizes);
-        info.enabled_precisions.insert(torch::kHALF);
-        auto trt_mod = torch_tensorrt::ConvertGraphToTRTEngine(mod, "forward", info);
+        auto in = torch::randn({1, 3, 224, 224}, {torch::kCUDA}).to(torch::kHALF);
+
+        std::vector<torch_tensorrt::core::ir::Input> inputs{torch_tensorrt::core::ir::Input({1, 3, 224, 224})};
+        torch_tensorrt::ts::CompileSpec cfg(inputs);
+        cfg.enabled_precisions.insert(torch::kHALF);
+        auto trt_mod = torch_tensorrt::ts::convert_method_to_trt_engine(mod, "forward", cfg);
         std::ofstream out("/tmp/engine_converted_from_jit.trt");
         out << engine;
         out.close();
@@ -209,9 +211,9 @@ When a module is provided to Torch-TensorRT, the compiler starts by mapping a gr
         %10 : bool = prim::Constant[value=1]() # ~/.local/lib/python3.6/site-packages/torch/nn/modules/conv.py:346:0
         %11 : int = prim::Constant[value=1]() # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:539:0
         %12 : bool = prim::Constant[value=0]() # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:539:0
-        %self.classifer.fc3.bias : Float(10) = prim::Constant[value= 0.0464  0.0383  0.0678  0.0932  0.1045 -0.0805 -0.0435 -0.0818  0.0208 -0.0358 [ CUDAFloatType{10} ]]()
-        %self.classifer.fc2.bias : Float(84) = prim::Constant[value=<Tensor>]()
-        %self.classifer.fc1.bias : Float(120) = prim::Constant[value=<Tensor>]()
+        %self.classifier.fc3.bias : Float(10) = prim::Constant[value= 0.0464  0.0383  0.0678  0.0932  0.1045 -0.0805 -0.0435 -0.0818  0.0208 -0.0358 [ CUDAFloatType{10} ]]()
+        %self.classifier.fc2.bias : Float(84) = prim::Constant[value=<Tensor>]()
+        %self.classifier.fc1.bias : Float(120) = prim::Constant[value=<Tensor>]()
         %self.feat.conv2.weight : Float(16, 6, 3, 3) = prim::Constant[value=<Tensor>]()
         %self.feat.conv2.bias : Float(16) = prim::Constant[value=<Tensor>]()
         %self.feat.conv1.weight : Float(6, 1, 3, 3) = prim::Constant[value=<Tensor>]()
@@ -224,15 +226,15 @@ When a module is provided to Torch-TensorRT, the compiler starts by mapping a gr
         %x.1 : Tensor = aten::max_pool2d(%input2.1, %7, %6, %8, %9, %12) # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:539:0
         %input.1 : Tensor = aten::flatten(%x.1, %11, %5) # x.py:25:0
         %27 : Tensor = aten::matmul(%input.1, %4)
-        %28 : Tensor = trt::const(%self.classifer.fc1.bias)
+        %28 : Tensor = trt::const(%self.classifier.fc1.bias)
         %29 : Tensor = aten::add_(%28, %27, %11)
         %input0.2 : Tensor = aten::relu(%29) # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:1063:0
         %31 : Tensor = aten::matmul(%input0.2, %3)
-        %32 : Tensor = trt::const(%self.classifer.fc2.bias)
+        %32 : Tensor = trt::const(%self.classifier.fc2.bias)
         %33 : Tensor = aten::add_(%32, %31, %11)
         %input1.1 : Tensor = aten::relu(%33) # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:1063:0
         %35 : Tensor = aten::matmul(%input1.1, %2)
-        %36 : Tensor = trt::const(%self.classifer.fc3.bias)
+        %36 : Tensor = trt::const(%self.classifier.fc3.bias)
         %37 : Tensor = aten::add_(%36, %35, %11)
         return (%37)
     (CompileGraph)
@@ -264,10 +266,10 @@ You can see the call where the engine is executed, after extracting the attribut
 Working with Unsupported Operators
 -----------------------------------
 
-Torch-TensorRT is a new library and the PyTorch operator library is quite large, so there will be ops that aren't supported natively by the compiler. You can either use the composition techinques
+Torch-TensorRT is a new library and the PyTorch operator library is quite large, so there will be ops that aren't supported natively by the compiler. You can either use the composition techniques
 shown above to make modules are fully Torch-TensorRT supported and ones that are not and stitch the modules together in the deployment application or you can register converters for missing ops.
 
-    You can check support without going through the full compilation pipleine using the ``torch_tensorrt::CheckMethodOperatorSupport(const torch::jit::Module& module, std::string method_name)`` api
+    You can check support without going through the full compilation pipeline using the ``torch_tensorrt::CheckMethodOperatorSupport(const torch::jit::Module& module, std::string method_name)`` api
     to see what operators are not supported. ``torchtrtc`` automatically checks modules with this method before starting compilation and will print out a list of operators that are not supported.
 
 .. _custom_converters:
@@ -333,7 +335,7 @@ for example we can quickly get the output size by just running the operation in 
     int main() {
         ...
 
-To use this converter in Python, it is recommended to use PyTorch's `C++ / CUDA Extention <https://pytorch.org/tutorials/advanced/cpp_extension.html#custom-c-and-cuda-extensions>`_
+To use this converter in Python, it is recommended to use PyTorch's `C++ / CUDA Extension <https://pytorch.org/tutorials/advanced/cpp_extension.html#custom-c-and-cuda-extensions>`_
 template to wrap your library of converters into a ``.so`` that you can load with ``ctypes.CDLL()`` in your Python application.
 
 You can find more information on all the details of writing converters in the contributors documentation (:ref:`writing_converters`).

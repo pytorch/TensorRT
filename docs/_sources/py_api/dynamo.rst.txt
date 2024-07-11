@@ -24,15 +24,10 @@ Functions
 
 .. autofunction:: convert_module_to_trt_engine
 
+.. autofunction:: refit_module_weights
 
 
 Classes
 --------
 
 .. autoclass:: CompilationSettings
-
-.. autoclass:: SourceIR
-
-.. autoclass:: runtime.TorchTensorRTModule
-
-.. autoclass:: runtime.PythonTorchTensorRTModule

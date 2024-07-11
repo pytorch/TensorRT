@@ -57,7 +57,7 @@ def compile(
         Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
     ) = _defaults.ENABLED_PRECISIONS,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-    refit: bool = _defaults.REFIT,
+    make_refitable: bool = _defaults.MAKE_REFITABLE,
     debug: bool = _defaults.DEBUG,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
@@ -92,19 +92,21 @@ def compile(
         exported_program (torch.export.ExportedProgram): Source module, running torch.export on a ``torch.nn.Module``
         inputs (Tuple[Any, ...]): List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
             torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
-            to select device type. ::
+            to select device type.
 
-                input=[
-                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
-                    torch_tensorrt.Input(
-                        min_shape=(1, 224, 224, 3),
-                        opt_shape=(1, 512, 512, 3),
-                        max_shape=(1, 1024, 1024, 3),
-                        dtype=torch.int32
-                        format=torch.channel_last
-                    ), # Dynamic input shape for input #2
-                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
-                ]
+                .. code-block:: py
+
+                    inputs=[
+                        torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                        torch_tensorrt.Input(
+                            min_shape=(1, 224, 224, 3),
+                            opt_shape=(1, 512, 512, 3),
+                            max_shape=(1, 1024, 1024, 3),
+                            dtype=torch.int32
+                            format=torch.channel_last
+                        ), # Dynamic input shape for input #2
+                        torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+                    ]
 
     Keyword Arguments:
         device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
@@ -126,7 +128,7 @@ def compile(
         truncate_double (bool): Truncate weights provided in double (float64) to float32
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
-        min_block_size (int): The minimum number of contiguous TensorRT convertable operations in order to run a set of operations in TensorRT
+        min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
         torch_executed_ops (Collection[Target]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
         torch_executed_modules (List[str]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
         pass_through_build_failures (bool): Error out if there are issues during compilation (only applicable to torch.compile workflows)
@@ -134,8 +136,8 @@ def compile(
         version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
         optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
         use_python_runtime: (bool): Return a graph using a pure Python runtime, reduces options for serialization
-        use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optiminal. Use the global paritioner (``False``) if looking for best performance
-        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the grap easier to covert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
+        use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
+        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
@@ -159,6 +161,17 @@ def compile(
                 DeprecationWarning,
                 stacklevel=2,
             )
+
+    if "refit" in kwargs.keys():
+        warnings.warn(
+            "Refit is deprecated. Please use make_refitable=True if you want to enable refitting of the engine.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if make_refitable:
+            raise ValueError("Use flag make_refitable only. Flag refit is deprecated.")
+        else:
+            make_refitable = kwargs["refit"]
 
     engine_capability = EngineCapability._from(engine_capability)
 
@@ -215,7 +228,7 @@ def compile(
         "require_full_compilation": require_full_compilation,
         "disable_tf32": disable_tf32,
         "sparse_weights": sparse_weights,
-        "refit": refit,
+        "make_refitable": make_refitable,
         "engine_capability": engine_capability,
         "dla_sram_size": dla_sram_size,
         "dla_local_dram_size": dla_local_dram_size,
@@ -453,7 +466,7 @@ def compile_module(
 
 def convert_module_to_trt_engine(
     exported_program: ExportedProgram,
-    inputs: Tuple[Any, ...],
+    inputs: Sequence[Any],
     *,
     enabled_precisions: (
         Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
@@ -475,7 +488,7 @@ def convert_module_to_trt_engine(
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     disable_tf32: bool = _defaults.DISABLE_TF32,
     sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
-    refit: bool = _defaults.REFIT,
+    make_refitable: bool = _defaults.MAKE_REFITABLE,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
@@ -496,19 +509,21 @@ def convert_module_to_trt_engine(
     Keyword Args:
         inputs (Optional[Sequence[torch_tensorrt.Input | torch.Tensor]]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
             torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
-            to select device type. ::
+            to select device type.
 
-                input=[
-                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
-                    torch_tensorrt.Input(
-                        min_shape=(1, 224, 224, 3),
-                        opt_shape=(1, 512, 512, 3),
-                        max_shape=(1, 1024, 1024, 3),
-                        dtype=torch.int32
-                        format=torch.channel_last
-                    ), # Dynamic input shape for input #2
-                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
-                ]
+                .. code-block:: py
+
+                  inputs=[
+                        torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                        torch_tensorrt.Input(
+                            min_shape=(1, 224, 224, 3),
+                            opt_shape=(1, 512, 512, 3),
+                            max_shape=(1, 1024, 1024, 3),
+                            dtype=torch.int32
+                            format=torch.channel_last
+                        ), # Dynamic input shape for input #2
+                        torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+                    ]
         enabled_precisions (Optional[Set[torch.dtype | _enums.dtype]]): The set of datatypes that TensorRT can use
         debug (bool): Whether to print out verbose debugging information
         workspace_size (int): Workspace TRT is allowed to use for the module (0 is default)
@@ -558,6 +573,12 @@ def convert_module_to_trt_engine(
                 DeprecationWarning,
                 stacklevel=2,
             )
+    if "refit" in kwargs.keys():
+        warnings.warn(
+            "Refit is deprecated. Please use make_refitable=True if you want to enable refitting of the engine.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     input_list = list(inputs) if inputs is not None else []
     torch_executed_ops = torch_executed_ops if torch_executed_ops is not None else set()
@@ -586,7 +607,7 @@ def convert_module_to_trt_engine(
         "require_full_compilation": require_full_compilation,
         "disable_tf32": disable_tf32,
         "sparse_weights": sparse_weights,
-        "refit": refit,
+        "make_refitable": make_refitable,
         "engine_capability": engine_capability,
         "num_avg_timing_iters": num_avg_timing_iters,
         "dla_sram_size": dla_sram_size,

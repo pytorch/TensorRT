@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Torch-TensorRT &mdash; Torch-TensorRT v2.5.0.dev0+caf3a92 documentation</title>
+  <title>Torch-TensorRT &mdash; Torch-TensorRT v2.5.0.dev0+0ef880d documentation</title>
   
 
   
@@ -274,7 +274,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+caf3a92
+                  v2.5.0.dev0+0ef880d
                 </div>
               
             
@@ -305,7 +305,17 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started/quick_start.html">Quick Start</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -319,18 +329,11 @@
 <li class="toctree-l1"><a class="reference internal" href="ts/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ts/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ts/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts/ptq.html">Post Training Quantization (PTQ)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">FX Frontend</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="fx/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/using_dla.html">DLA</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
@@ -340,21 +343,20 @@
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#wrapping-custom-kernels-to-use-in-tensorrt">Wrapping Custom Kernels to use in TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#using-torch-tensorrt-to-insert-the-kernel">Using Torch-TensorRT to Insert the Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="py_api/torch_tensorrt.html">torch_tensorrt</a></li>
-<li class="toctree-l1"><a class="reference internal" href="py_api/logging.html">torch_tensorrt.logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="py_api/ptq.html">torch_tensorrt.ptq</a></li>
 <li class="toctree-l1"><a class="reference internal" href="py_api/dynamo.html">torch_tensorrt.dynamo</a></li>
-<li class="toctree-l1"><a class="reference internal" href="py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="py_api/logging.html">torch_tensorrt.logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="py_api/fx.html">torch_tensorrt.fx</a></li>
+<li class="toctree-l1"><a class="reference internal" href="py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="py_api/ptq.html">torch_tensorrt.ts.ptq</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
@@ -362,7 +364,7 @@
 <li class="toctree-l1"><a class="reference internal" href="_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
 <li class="toctree-l1"><a class="reference internal" href="_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">CLI Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="cli/torchtrtc.html">torchtrtc</a></li>
 </ul>
@@ -473,6 +475,19 @@ Torch-TensorRT integrates seamlessly into the PyTorch ecosystem supporting hybri
 <div class="toctree-wrapper compound">
 </div>
 </section>
+<section id="user-guide">
+<h2>User Guide<a class="headerlink" href="#user-guide" title="Permalink to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="user_guide/torch_tensorrt_explained.html#torch-tensorrt-explained"><span class="std std-ref">Torch-TensorRT Explained</span></a></p></li>
+<li><p><a class="reference internal" href="user_guide/dynamic_shapes.html#dynamic-shapes"><span class="std std-ref">Dynamic shapes with Torch-TensorRT</span></a></p></li>
+<li><p><a class="reference internal" href="ts/ptq.html#ptq"><span class="std std-ref">Post Training Quantization (PTQ)</span></a></p></li>
+<li><p><a class="reference internal" href="user_guide/saving_models.html#saving-models"><span class="std std-ref">Saving models compiled with Torch-TensorRT</span></a></p></li>
+<li><p><a class="reference internal" href="user_guide/runtime.html#runtime"><span class="std std-ref">Deploying Torch-TensorRT Programs</span></a></p></li>
+<li><p><a class="reference internal" href="user_guide/using_dla.html#using-dla"><span class="std std-ref">DLA</span></a></p></li>
+</ul>
+<div class="toctree-wrapper compound">
+</div>
+</section>
 <section id="dynamo-frontend">
 <h2>Dynamo Frontend<a class="headerlink" href="#dynamo-frontend" title="Permalink to this heading">¶</a></h2>
 <ul class="simple">
@@ -501,18 +516,6 @@ Torch-TensorRT integrates seamlessly into the PyTorch ecosystem supporting hybri
 <div class="toctree-wrapper compound">
 </div>
 </section>
-<section id="user-guide">
-<h2>User Guide<a class="headerlink" href="#user-guide" title="Permalink to this heading">¶</a></h2>
-<ul class="simple">
-<li><p><a class="reference internal" href="user_guide/dynamic_shapes.html#dynamic-shapes"><span class="std std-ref">Dynamic shapes with Torch-TensorRT</span></a></p></li>
-<li><p><a class="reference internal" href="user_guide/ptq.html#ptq"><span class="std std-ref">Post Training Quantization (PTQ)</span></a></p></li>
-<li><p><a class="reference internal" href="user_guide/saving_models.html#saving-models"><span class="std std-ref">Saving models compiled with Torch-TensorRT</span></a></p></li>
-<li><p><a class="reference internal" href="user_guide/runtime.html#runtime"><span class="std std-ref">Deploying Torch-TensorRT Programs</span></a></p></li>
-<li><p><a class="reference internal" href="user_guide/using_dla.html#using-dla"><span class="std std-ref">DLA</span></a></p></li>
-</ul>
-<div class="toctree-wrapper compound">
-</div>
-</section>
 <section id="tutorials">
 <h2>Tutorials<a class="headerlink" href="#tutorials" title="Permalink to this heading">¶</a></h2>
 <ul class="simple">
@@ -523,21 +526,21 @@ Torch-TensorRT integrates seamlessly into the PyTorch ecosystem supporting hybri
 <div class="toctree-wrapper compound">
 </div>
 </section>
-<section id="python-api-documenation">
-<h2>Python API Documenation<a class="headerlink" href="#python-api-documenation" title="Permalink to this heading">¶</a></h2>
+<section id="python-api-documentation">
+<h2>Python API Documentation<a class="headerlink" href="#python-api-documentation" title="Permalink to this heading">¶</a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="py_api/torch_tensorrt.html#torch-tensorrt-py"><span class="std std-ref">torch_tensorrt</span></a></p></li>
-<li><p><a class="reference internal" href="py_api/logging.html#torch-tensorrt-logging-py"><span class="std std-ref">torch_tensorrt.logging</span></a></p></li>
-<li><p><a class="reference internal" href="py_api/ptq.html#torch-tensorrt-ptq-py"><span class="std std-ref">torch_tensorrt.ptq</span></a></p></li>
 <li><p><a class="reference internal" href="py_api/dynamo.html#torch-tensorrt-dynamo-py"><span class="std std-ref">torch_tensorrt.dynamo</span></a></p></li>
-<li><p><a class="reference internal" href="py_api/ts.html#torch-tensorrt-ts-py"><span class="std std-ref">torch_tensorrt.ts</span></a></p></li>
+<li><p><a class="reference internal" href="py_api/logging.html#torch-tensorrt-logging-py"><span class="std std-ref">torch_tensorrt.logging</span></a></p></li>
 <li><p><a class="reference internal" href="py_api/fx.html#torch-tensorrt-fx-py"><span class="std std-ref">torch_tensorrt.fx</span></a></p></li>
+<li><p><a class="reference internal" href="py_api/ts.html#torch-tensorrt-ts-py"><span class="std std-ref">torch_tensorrt.ts</span></a></p></li>
+<li><p><a class="reference internal" href="py_api/ptq.html#torch-tensorrt-ptq-py"><span class="std std-ref">torch_tensorrt.ts.ptq</span></a></p></li>
 </ul>
 <div class="toctree-wrapper compound">
 </div>
 </section>
-<section id="c-api-documenation">
-<h2>C++ API Documenation<a class="headerlink" href="#c-api-documenation" title="Permalink to this heading">¶</a></h2>
+<section id="c-api-documentation">
+<h2>C++ API Documentation<a class="headerlink" href="#c-api-documentation" title="Permalink to this heading">¶</a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="_cpp_api/namespace_torch_tensorrt.html#namespace-torch-tensorrt"><span class="std std-ref">Namespace torch_tensorrt</span></a></p></li>
 <li><p><a class="reference internal" href="_cpp_api/namespace_torch_tensorrt__logging.html#namespace-torch-tensorrt-logging"><span class="std std-ref">Namespace torch_tensorrt::logging</span></a></p></li>
@@ -614,7 +617,7 @@ Torch-TensorRT integrates seamlessly into the PyTorch ecosystem supporting hybri
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2022, NVIDIA Corporation.
+        &copy; Copyright 2024, NVIDIA Corporation.
 
     </p>
   </div>
@@ -636,13 +639,13 @@ Torch-TensorRT integrates seamlessly into the PyTorch ecosystem supporting hybri
 <li><a class="reference internal" href="#">Torch-TensorRT</a><ul>
 <li><a class="reference internal" href="#in-framework-compilation-of-pytorch-inference-code-for-nvidia-gpus">In-framework compilation of PyTorch inference code for NVIDIA GPUs</a></li>
 <li><a class="reference internal" href="#getting-started">Getting Started</a></li>
+<li><a class="reference internal" href="#user-guide">User Guide</a></li>
 <li><a class="reference internal" href="#dynamo-frontend">Dynamo Frontend</a></li>
 <li><a class="reference internal" href="#torchscript-frontend">TorchScript Frontend</a></li>
 <li><a class="reference internal" href="#fx-frontend">FX Frontend</a></li>
-<li><a class="reference internal" href="#user-guide">User Guide</a></li>
 <li><a class="reference internal" href="#tutorials">Tutorials</a></li>
-<li><a class="reference internal" href="#python-api-documenation">Python API Documenation</a></li>
-<li><a class="reference internal" href="#c-api-documenation">C++ API Documenation</a></li>
+<li><a class="reference internal" href="#python-api-documentation">Python API Documentation</a></li>
+<li><a class="reference internal" href="#c-api-documentation">C++ API Documentation</a></li>
 <li><a class="reference internal" href="#cli-documentation">CLI Documentation</a></li>
 <li><a class="reference internal" href="#contributor-documentation">Contributor Documentation</a></li>
 <li><a class="reference internal" href="#indices">Indices</a></li>

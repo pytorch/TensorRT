@@ -169,7 +169,7 @@ def compile(
             torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
             to select device type. ::
 
-                input=[
+                inputs=[
                     torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
                     torch_tensorrt.Input(
                         min_shape=(1, 224, 224, 3),
@@ -351,9 +351,9 @@ def convert_method_to_trt_engine(
         torchtrt_inputs = prepare_inputs(inputs)
         exp_program = torch_tensorrt.dynamo.trace(module, torchtrt_inputs, **kwargs)
 
-        return dynamo_convert_module_to_trt_engine(  # type: ignore[no-any-return]
+        return dynamo_convert_module_to_trt_engine(
             exp_program,
-            inputs=inputs,
+            inputs=tuple(inputs),
             enabled_precisions=enabled_precisions_set,
             **kwargs,
         )
@@ -367,8 +367,15 @@ def convert_method_to_trt_engine(
 
 def load(file_path: str = "") -> Any:
     """
-    Load either a Torchscript model or ExportedProgram. Autodetect the type using
-    try, except
+    Load either a Torchscript model or ExportedProgram.
+
+    Loads a TorchScript or ExportedProgram file from disk. File type will be detect the type using try, except.
+
+    Arguments:
+        file_path (str): Path to file on the disk
+
+    Raises:
+        ValueError: If there is no file or the file is not either a TorchScript file or ExportedProgram file
     """
     try:
         logger.debug(f"Loading the provided file {file_path} using torch.jit.load()")
@@ -405,11 +412,12 @@ def save(
 ) -> None:
     """
     Save the model to disk in the specified output format.
+
     Arguments:
-        module : Compiled Torch-TensorRT module (Options include torch.jit.ScriptModule | torch.export.ExportedProgram | torch.fx.GraphModule)
+        module (Optional(torch.jit.ScriptModule | torch.export.ExportedProgram | torch.fx.GraphModule)): Compiled Torch-TensorRT module
         inputs (torch.Tensor): Torch input tensors
-        output_format: Format to save the model. Options include exported_program | torchscript.
-        retrace: When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
+        output_format (str): Format to save the model. Options include exported_program | torchscript.
+        retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
                 This flag is experimental for now.
     """
     module_type = _parse_module_type(module)

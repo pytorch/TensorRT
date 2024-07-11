@@ -242,7 +242,7 @@ PYBIND11_MODULE(_C, m) {
       .def("__str__", &InputSignature::to_str)
       .def_readwrite("_signature_ivalue", &InputSignature::signature_ivalue);
 
-  py::enum_<DataType>(m, "dtype", "Enum to specifiy operating precision for engine execution")
+  py::enum_<DataType>(m, "dtype", "Enum to specify operating precision for engine execution")
       .value("float", DataType::kFloat, "32 bit floating point number")
       .value("float32", DataType::kFloat, "32 bit floating point number")
       .value("half", DataType::kHalf, "16 bit floating point number")
@@ -270,7 +270,7 @@ PYBIND11_MODULE(_C, m) {
       .value("DLA_STANDALONE", EngineCapability::kDLA_STANDALONE, "Use DLA kernels only")
       .value("STANDARD", EngineCapability::kSTANDARD, "Use default behavior");
 
-  py::enum_<TensorFormat>(m, "TensorFormat", "Enum to specifiy the memory layout of tensors")
+  py::enum_<TensorFormat>(m, "TensorFormat", "Enum to specify the memory layout of tensors")
       .value("contiguous", TensorFormat::kContiguous, "Contiguous memory layout (NCHW / Linear)")
       .value("channels_last", TensorFormat::kChannelsLast, "Channels last memory layout (NHWC)")
       .export_values();
@@ -401,7 +401,7 @@ PYBIND11_MODULE(_C, m) {
   ts_sub_mod.def(
       "check_method_op_support",
       &torch_tensorrt::pyapi::CheckMethodOperatorSupport,
-      "Takes a module and a method name and checks if the method graph contains purely convertable operators");
+      "Takes a module and a method name and checks if the method graph contains purely convertible operators");
   ts_sub_mod.def(
       "embed_engine_in_new_module",
       &torch_tensorrt::pyapi::EmbedEngineInNewModule,

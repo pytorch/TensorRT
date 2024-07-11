@@ -38,7 +38,7 @@ class TorchScriptDevice(Device):
             spec (str): String with device spec e.g. "dla:0" for dla, core_id 0
 
         Keyword Arguments:
-            gpu_id (int): ID of target GPU (will get overrided if dla_core is specified to the GPU managing DLA). If specified, no positional arguments should be provided
+            gpu_id (int): ID of target GPU (will get overridden if dla_core is specified to the GPU managing DLA). If specified, no positional arguments should be provided
             dla_core (int): ID of target DLA core. If specified, no positional arguments should be provided.
             allow_gpu_fallback (bool): Allow TensorRT to schedule operations on GPU if they are not supported on DLA (ignored if device type is not DLA)
 

@@ -20,7 +20,7 @@ def cal_max_diff(pytorch_out, torch_tensorrt_out):
     diff = torch.sub(pytorch_out, torch_tensorrt_out)
     abs_diff = torch.abs(diff)
     max_diff = torch.max(abs_diff)
-    print("Maximum differnce between Torch-TensorRT and PyTorch: \n", max_diff)
+    print("Maximum difference between Torch-TensorRT and PyTorch: \n", max_diff)
 
 
 def main():

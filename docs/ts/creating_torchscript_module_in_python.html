@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Creating a TorchScript Module &mdash; Torch-TensorRT v2.5.0.dev0+caf3a92 documentation</title>
+  <title>Creating a TorchScript Module &mdash; Torch-TensorRT v2.5.0.dev0+0ef880d documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+caf3a92
+                  v2.5.0.dev0+0ef880d
                 </div>
               
             
@@ -306,7 +306,17 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/quick_start.html">Quick Start</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -320,18 +330,11 @@
 <li class="toctree-l1"><a class="reference internal" href="#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
 <li class="toctree-l1"><a class="reference internal" href="getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
 <li class="toctree-l1"><a class="reference internal" href="getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ptq.html">Post Training Quantization (PTQ)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">FX Frontend</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../fx/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/using_dla.html">DLA</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
@@ -341,21 +344,20 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#wrapping-custom-kernels-to-use-in-tensorrt">Wrapping Custom Kernels to use in TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#using-torch-tensorrt-to-insert-the-kernel">Using Torch-TensorRT to Insert the Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../py_api/logging.html">torch_tensorrt.logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../py_api/ptq.html">torch_tensorrt.ptq</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../py_api/dynamo.html">torch_tensorrt.dynamo</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/logging.html">torch_tensorrt.logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../py_api/fx.html">torch_tensorrt.fx</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ptq.html">torch_tensorrt.ts.ptq</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
@@ -363,7 +365,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">CLI Documenation</span></p>
+<p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
 </ul>
@@ -497,11 +499,11 @@ and a forward function which describes how to use the parameters and submodules 
 <span class="linenos">33</span>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="linenos">34</span>        <span class="nb">super</span><span class="p">(</span><span class="n">LeNet</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
 <span class="linenos">35</span>        <span class="bp">self</span><span class="o">.</span><span class="n">feat</span> <span class="o">=</span> <span class="n">LeNetFeatExtractor</span><span class="p">()</span>
-<span class="linenos">36</span>        <span class="bp">self</span><span class="o">.</span><span class="n">classifer</span> <span class="o">=</span> <span class="n">LeNetClassifier</span><span class="p">()</span>
+<span class="linenos">36</span>        <span class="bp">self</span><span class="o">.</span><span class="n">classifier</span> <span class="o">=</span> <span class="n">LeNetClassifier</span><span class="p">()</span>
 <span class="linenos">37</span>
 <span class="linenos">38</span>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
 <span class="linenos">39</span>        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">feat</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-<span class="linenos">40</span>        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">classifer</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="linenos">40</span>        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">classifier</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
 <span class="linenos">41</span>        <span class="k">return</span> <span class="n">x</span>
 </pre></div>
 </div>
@@ -528,7 +530,7 @@ include these components. We can run the script compiler on our LeNet module by 
 <span class="n">script_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">script</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>There are reasons to use one path or another, the PyTorch documentation has information on how to choose. From a Torch-TensorRT prespective, there is
+<p>There are reasons to use one path or another, the PyTorch documentation has information on how to choose. From a Torch-TensorRT perspective, there is
 better support (i.e your module is more likely to compile) for traced modules because it doesn’t include all the complexities of a complete
 programming language, though both paths supported.</p>
 <p>After scripting or tracing your module, you are given back a TorchScript Module. This contains the code and parameters used to run the module stored
@@ -536,7 +538,7 @@ in a intermediate representation that Torch-TensorRT can consume.</p>
 <p>Here is what the LeNet traced module IR looks like:</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>graph(%self.1 : __torch__.___torch_mangle_10.LeNet,
     %input.1 : Float(1, 1, 32, 32)):
-    %129 : __torch__.___torch_mangle_9.LeNetClassifier = prim::GetAttr[name=&quot;classifer&quot;](%self.1)
+    %129 : __torch__.___torch_mangle_9.LeNetClassifier = prim::GetAttr[name=&quot;classifier&quot;](%self.1)
     %119 : __torch__.___torch_mangle_5.LeNetFeatExtractor = prim::GetAttr[name=&quot;feat&quot;](%self.1)
     %137 : Tensor = prim::CallMethod[name=&quot;forward&quot;](%119, %input.1)
     %138 : Tensor = prim::CallMethod[name=&quot;forward&quot;](%129, %137)
@@ -548,7 +550,7 @@ in a intermediate representation that Torch-TensorRT can consume.</p>
     %x.1 : Tensor):
     %2 : __torch__.LeNetFeatExtractor = prim::GetAttr[name=&quot;feat&quot;](%self)
     %x.3 : Tensor = prim::CallMethod[name=&quot;forward&quot;](%2, %x.1) # x.py:38:12
-    %5 : __torch__.LeNetClassifier = prim::GetAttr[name=&quot;classifer&quot;](%self)
+    %5 : __torch__.LeNetClassifier = prim::GetAttr[name=&quot;classifier&quot;](%self)
     %x.5 : Tensor = prim::CallMethod[name=&quot;forward&quot;](%5, %x.3) # x.py:39:12
     return (%x.5)
 </pre></div>
@@ -558,7 +560,7 @@ in a intermediate representation that Torch-TensorRT can consume.</p>
 <section id="working-with-torchscript-in-python">
 <span id="ts-in-py"></span><h1>Working with TorchScript in Python<a class="headerlink" href="#working-with-torchscript-in-python" title="Permalink to this heading">¶</a></h1>
 <p>TorchScript Modules are run the same way you run normal PyTorch modules. You can run the forward pass using the
-<code class="docutils literal notranslate"><span class="pre">forward</span></code> method or just calling the module <code class="docutils literal notranslate"><span class="pre">torch_scirpt_module(in_tensor)</span></code> The JIT compiler will compile
+<code class="docutils literal notranslate"><span class="pre">forward</span></code> method or just calling the module <code class="docutils literal notranslate"><span class="pre">torch_script_module(in_tensor)</span></code> The JIT compiler will compile
 and optimize the module on the fly and then returns the results.</p>
 </section>
 <section id="saving-torchscript-module-to-disk">
@@ -597,7 +599,7 @@ and optimize the module on the fly and then returns the results.</p>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2022, NVIDIA Corporation.
+        &copy; Copyright 2024, NVIDIA Corporation.
 
     </p>
   </div>
