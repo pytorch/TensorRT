@@ -315,8 +315,8 @@ def aten_ops_embedding_bag(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar)
-@dynamo_tensorrt_converter(torch.ops.aten.fmod.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.fmod.Tensor, supports_dynamic_shapes=True)
 def aten_ops_fmod(
     ctx: ConversionContext,
     target: Target,
