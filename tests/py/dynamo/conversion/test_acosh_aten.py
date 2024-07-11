@@ -53,14 +53,12 @@ class TestAcoshConverter(DispatchTestCase):
                 (2, 2),
                 (4, 4),
                 torch.half,
-                torch.half,
             ),
             (
                 "3d_dim_dtype_float",
                 (1, 1, 1),
                 (1, 2, 3),
                 (3, 3, 3),
-                torch.float,
                 torch.float,
             ),
             (
@@ -69,13 +67,10 @@ class TestAcoshConverter(DispatchTestCase):
                 (1, 2, 4),
                 (2, 3, 5),
                 torch.int32,
-                torch.float,
             ),
         ]
     )
-    def test_dynamic_shape_acosh(
-        self, _, min_shape, opt_shape, max_shape, type, output_type
-    ):
+    def test_dynamic_shape_acosh(self, _, min_shape, opt_shape, max_shape, type):
         class acosh(nn.Module):
             def forward(self, input):
                 return torch.ops.aten.acosh.default(input)
@@ -88,9 +83,7 @@ class TestAcoshConverter(DispatchTestCase):
                 dtype=type,
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            acosh(), input_specs, output_dtypes=[output_type]
-        )
+        self.run_test_with_dynamic_shape(acosh(), input_specs)
 
 
 if __name__ == "__main__":

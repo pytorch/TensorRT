@@ -338,6 +338,7 @@ class Input(object):
     ) -> torch.Tensor:
         """
         Get an example tensor of the shape specified by the Input object
+        Limit the range of random integer to 8bit range to handle casted input
 
         Args:
             optimization_profile_field (Optional(str)): Name of the field to use for shape in the case the Input is dynamically shaped
@@ -355,8 +356,8 @@ class Input(object):
                     if self.dtype in [dtype.u8, dtype.i8, dtype.i32, dtype.i64]:
                         type = self.dtype.to(torch.dtype, use_default=True)
                         return torch.randint(
-                            torch.iinfo(type).min,
-                            torch.iinfo(type).max,
+                            max(torch.iinfo(torch.int8).min, torch.iinfo(type).min),
+                            torch.iinfo(torch.int8).max,
                             self.shape,
                             dtype=type,
                         )
@@ -386,8 +387,8 @@ class Input(object):
                     if self.dtype in [dtype.u8, dtype.i8, dtype.i32, dtype.i64]:
                         type = self.dtype.to(torch.dtype, use_default=True)
                         return torch.randint(
-                            torch.iinfo(type).min,
-                            torch.iinfo(type).max,
+                            max(torch.iinfo(torch.int8).min, torch.iinfo(type).min),
+                            torch.iinfo(torch.int8).max,
                             self.shape[optimization_profile_field],
                             dtype=type,
                         )

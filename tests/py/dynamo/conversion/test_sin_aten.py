@@ -53,7 +53,6 @@ class TestSinConverter(DispatchTestCase):
                 (3, 2, 3),
                 (3, 3, 4),
                 torch.int32,
-                torch.randint(-128, 127, (3, 3, 4), dtype=torch.int32),
             ),
             (
                 "2d_dim_dtype_float16",
@@ -61,7 +60,6 @@ class TestSinConverter(DispatchTestCase):
                 (2, 2),
                 (4, 4),
                 torch.float16,
-                torch.randn((4, 4), dtype=torch.float16),
             ),
             (
                 "3d_dim_dtype_float",
@@ -69,11 +67,10 @@ class TestSinConverter(DispatchTestCase):
                 (1, 2, 3),
                 (3, 3, 3),
                 torch.float,
-                torch.randn((3, 3, 3), dtype=torch.float32),
             ),
         ]
     )
-    def test_dynamic_shape_sin(self, _, min_shape, opt_shape, max_shape, type, tensor):
+    def test_dynamic_shape_sin(self, _, min_shape, opt_shape, max_shape, type):
         class sin(nn.Module):
             def forward(self, input):
                 return torch.ops.aten.sin.default(input)
@@ -84,7 +81,6 @@ class TestSinConverter(DispatchTestCase):
                 opt_shape=opt_shape,
                 max_shape=max_shape,
                 dtype=type,
-                torch_tensor=tensor,
             ),
         ]
 
@@ -92,7 +88,6 @@ class TestSinConverter(DispatchTestCase):
             sin(),
             input_specs,
             check_dtype=False,
-            use_example_tensors=False,
         )
 
 

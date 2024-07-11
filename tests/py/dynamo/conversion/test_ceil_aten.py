@@ -54,7 +54,6 @@ class TestCeilConverter(DispatchTestCase):
                 (2, 2),
                 (4, 4),
                 torch.half,
-                torch.half,
             ),
             (
                 "3d_dim_dtype_float",
@@ -62,13 +61,10 @@ class TestCeilConverter(DispatchTestCase):
                 (1, 2, 3),
                 (3, 3, 3),
                 torch.float,
-                torch.float,
             ),
         ]
     )
-    def test_dynamic_shape_ceil(
-        self, _, min_shape, opt_shape, max_shape, type, output_type
-    ):
+    def test_dynamic_shape_ceil(self, _, min_shape, opt_shape, max_shape, type):
         class ceil(nn.Module):
             def forward(self, input):
                 return torch.ops.aten.ceil.default(input)
@@ -81,9 +77,7 @@ class TestCeilConverter(DispatchTestCase):
                 dtype=type,
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            ceil(), input_specs, output_dtypes=[output_type]
-        )
+        self.run_test_with_dynamic_shape(ceil(), input_specs)
 
 
 if __name__ == "__main__":
