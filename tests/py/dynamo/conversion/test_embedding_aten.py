@@ -75,22 +75,28 @@ class TestEmbeddingConverter(DispatchTestCase):
                     sparse,
                 )
 
+        index_input = torch.randint(0, 8, (3, 3, 4, 10), dtype=torch.int32)
         input_specs = [
             Input(
-                shape=(-1, -1, -1, -1),
                 dtype=torch.int32,
-                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+                min_shape=(1, 1, 1, 1),
+                opt_shape=(2, 3, 4, 5),
+                max_shape=(3, 3, 4, 10),
+                torch_tensor=torch.tensor(index_input, dtype=torch.int32).cuda(),
             ),
             Input(
-                shape=(-1, -1),
                 dtype=torch.float32,
-                shape_ranges=[((1, 1), (2, 3), (2, 3))],
+                min_shape=(1, 1),
+                opt_shape=(2, 2),
+                max_shape=(8, 10),
+                torch_tensor=torch.randn((8, 10), dtype=torch.float32).cuda(),
             ),
         ]
 
         self.run_test_with_dynamic_shape(
             TestEmbedding(),
             input_specs,
+            use_example_tensors=False,
         )
 
 
