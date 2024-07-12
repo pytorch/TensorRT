@@ -1,8 +1,7 @@
 import logging
-import pickle
 from copy import deepcopy
 from enum import Enum, auto
-from typing import Any, Collection, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Collection, Dict, Iterator, List, Optional, Set, Tuple, Union
 
 import torch
 from torch.fx.node import Target
@@ -12,7 +11,6 @@ from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo._refit import refit_module_weights
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo._tracer import trace as dynamo_trace
 from torch_tensorrt.dynamo.utils import (
     prepare_inputs,
     to_torch_device,
@@ -85,7 +83,8 @@ class MutableTorchTensorRTModule(object):
         # Process settings
         self.gm: Any = None
         self.exp_program: Any = None
-        self.args_inputs: tuple[Any, ...] = tuple()
+        self.arg_inputs: tuple[Any, ...] = tuple()
+        self.kwarg_inputs: dict[str, Any] = {}
         device = to_torch_tensorrt_device(device)
         enabled_precisions = {dtype._from(p) for p in enabled_precisions}
         if not make_refitable:
@@ -133,35 +132,55 @@ class MutableTorchTensorRTModule(object):
 
     def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
         self.refit_state.set_state(RefitFlag.NEEDS_REFIT)
-        self.pytorch_model.load_state_dict(state_dict)
+        self.original_model.load_state_dict(state_dict)
 
     def _refit_gm(self) -> None:
         self.original_model.to(to_torch_device(self.settings.device))
         if self.exp_program is None:
             self.exp_program = torch.export.export(
-                self.pytorch_model, self.args_inputs, **self.settings.__dict__
+                self.pytorch_model, self.arg_inputs, **self.settings.__dict__
             )
 
-        if (
-            self.pytorch_model.state_dict().keys()
-            != self.exp_program._state_dict.keys()
-        ):
+        self.update_refit_condition()
+        if self.refit_state.get_state() == RefitFlag.NEEDS_RECOMPILE:
             logger.info("state_dict does not match. Recompiling the module")
             self._compile()
-            return
 
-        self.exp_program._state_dict = MutableTorchTensorRTModule._transform_state_dict(
-            self.pytorch_model.state_dict()
-        )
-        self.gm = refit_module_weights(self.gm, self.exp_program, self.args_inputs)
+        elif self.refit_state.get_state() == RefitFlag.NEEDS_REFIT:
+            self.exp_program._state_dict = (
+                MutableTorchTensorRTModule._transform_state_dict(
+                    self.pytorch_model.state_dict()
+                )
+            )
+            self.gm = refit_module_weights(self.gm, self.exp_program, self.arg_inputs)
+
         self.original_model.cpu()
+
+    def update_refit_condition(self) -> None:
+        # If all good, set the Flag to LIVE
+        self.refit_state.set_state(RefitFlag.LIVE)
+        s1, s2 = self.original_model.state_dict(), self.exp_program._state_dict
+        if s1.keys() != s2.keys():
+            # If keys are not identical, recompile.
+            self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
+            return
+        for k in s1.keys():
+            if s1[k].shape != s2[k].shape:
+                # If weight shapes are not identical, recompile.
+                self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
+                return
+            if not torch.all(torch.eq(s1[k], s2[k])):
+                # Refit is enough
+                self.refit_state.set_state(RefitFlag.NEEDS_REFIT)
+
+        return
 
     def _compile(self) -> None:
 
         # Export the module
         self.original_model.to(to_torch_device(self.settings.device))
-        self.exp_program = dynamo_trace(
-            self.original_model, self.torchtrt_inputs, **self.settings.__dict__
+        self.exp_program = torch.export.export(
+            self.original_model, self.arg_inputs, **self.settings.__dict__
         )
         self.gm = dynamo_compile(
             self.exp_program,
@@ -192,13 +211,18 @@ class MutableTorchTensorRTModule(object):
         return self.forward(*args, **kwargs)
 
     def _validate_inputs(self, *args: Any, **kwargs: Any) -> None:
-        if not self.args_inputs or not MutableTorchTensorRTModule.check_inputs_equal(
-            self.args_inputs, args
+        if (
+            not self.arg_inputs
+            or not MutableTorchTensorRTModule.check_inputs_equal(self.arg_inputs, args)
+            or not MutableTorchTensorRTModule.check_inputs_equal(
+                self.kwarg_inputs, kwargs
+            )
         ):
             logger.info("Input change detected.")
             self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
-            self.args_inputs = args
-            self.torchtrt_inputs = prepare_inputs(self.args_inputs)
+            self.arg_inputs = args
+            self.kwarg_inputs = kwargs
+            self.torchtrt_inputs = prepare_inputs(self.arg_inputs)
 
     def forward(self, *args: Any, **kwargs: Any) -> Any:
         # TODO: Add support for kwargs
@@ -213,6 +237,10 @@ class MutableTorchTensorRTModule(object):
             self._refit_gm()
             self.refit_state.set_state(RefitFlag.LIVE)
 
+        elif self.refit_state.get_state() == RefitFlag.UNKNOWN:
+            # Update the flag and forward again
+            self.update_refit_condition()
+            return self.forward(*args, **kwargs)
         return self.gm(*args, **kwargs)
 
     def __deepcopy__(self, memo: Any) -> Any:
@@ -229,17 +257,15 @@ class MutableTorchTensorRTModule(object):
 
     @staticmethod
     def save(module: Any, path: str) -> None:
+        # Try torch.save and torchtrt.save with a zip format
         if module.settings.use_python_runtime:
             logger.warning(
                 "Python runtime does not support serialization. Save failed."
             )
-        exp_file_name = f"{path.split('.')[0]}_exp_program.ep"
-        torch.export.save(module.exp_program, exp_file_name)
         exp_program = module.exp_program
         module.pytorch_model = None
         module.exp_program = None
-        with open(path, "wb") as f:
-            pickle.dump(module, f)
+        torch.save(module, path)
         module.exp_program = exp_program
         module.pytorch_model = _make_refit_change_trigger(
             module.original_model, module.refit_state
@@ -247,13 +273,15 @@ class MutableTorchTensorRTModule(object):
 
     @staticmethod
     def load(path: str) -> Any:
-        with open(path, "rb") as f:
-            module = pickle.load(f)
+        module = torch.load(path)
         module.pytorch_model = _make_refit_change_trigger(
             module.original_model, module.refit_state
         )
-        exp_file_name = f"{path.split('.')[0]}_exp_program.ep"
-        module.exp_program = torch.export.load(exp_file_name)
+        module.original_model.to(to_torch_device(module.settings.device))
+        module.exp_program = torch.export.export(
+            module.original_model, module.args_inputs
+        )
+        module.original_model.to("cpu")
         return module
 
     @staticmethod
@@ -298,12 +326,12 @@ def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
             object.__setattr__(self, "instance", obj)
 
         def __getattr__(self, name: str) -> Any:
-            # This will cause infinte loop if there is a cycle
             obj = getattr(self.instance, name)
-            if not hasattr(obj, "__dict__"):
-                return obj
-            else:
+            if hasattr(obj, "__dict__") or isinstance(
+                obj, (torch.nn.ModuleList, list)
+            ):  #
                 return _make_refit_change_trigger(obj, refit_state)
+            return obj
 
         def __setattr__(self, name: str, value: Any) -> None:
             self._on_change()
@@ -323,5 +351,21 @@ def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
         def __call__(self, *args: Any, **kwargs: Any) -> Any:
             print("Warning: uncatched change in function!")
             return self.instance(*args, **kwargs)
+
+        def __setitem__(self, item: str, value: Any) -> None:
+            print("Not sure!")
+            refit_state.set_state(RefitFlag.UNKNOWN)
+            self.instance.__setitem__(item, value)
+
+        def __getitem__(self, items: str) -> Any:
+            return _make_refit_change_trigger(
+                self.instance.__getitem__(items), refit_state
+            )
+
+        def __len__(self) -> int:
+            return len(self.instance)
+
+        def __iter__(self) -> Iterator[Any]:
+            return iter(self.instance)
 
     return ChangeTriggerWrapper(obj)
