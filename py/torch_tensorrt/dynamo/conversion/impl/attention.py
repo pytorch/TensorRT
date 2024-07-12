@@ -56,7 +56,7 @@ def scaled_dot_product_attention(
     is_causal: bool,
     scale: Optional[float],
 ) -> TRTTensor:
-    # implementation as deescribed here: https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
+    # implementation as described here: https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
     mm = impl.matmul.matrix_multiply(
         ctx,
         target,
