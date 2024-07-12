@@ -63,6 +63,7 @@ class TestRemainderConverter(DispatchTestCase):
                 (2, 2),
                 (4, 4),
                 torch.half,
+                torch.half,
             ),
             (
                 "3d_dim_dtype_float",
@@ -70,10 +71,13 @@ class TestRemainderConverter(DispatchTestCase):
                 (1, 2, 3),
                 (3, 3, 3),
                 torch.float,
+                torch.float,
             ),
         ]
     )
-    def test_remainder_dynamic_shape(self, _, min_shape, opt_shape, max_shape, type):
+    def test_remainder_dynamic_shape(
+        self, _, min_shape, opt_shape, max_shape, type, output_type
+    ):
         class remainder(nn.Module):
             def forward(self, lhs_val, rhs_val):
                 return torch.ops.aten.remainder.Tensor(lhs_val, rhs_val)
@@ -100,9 +104,15 @@ class TestRemainderConverter(DispatchTestCase):
                 dtype=type,
             ),
         ]
-        self.run_test_with_dynamic_shape(remainder(), input_specs)
-        self.run_test_with_dynamic_shape(remainder_scalar(), input_specs)
-        self.run_test_with_dynamic_shape(mod_operator(), input_specs)
+        self.run_test_with_dynamic_shape(
+            remainder(), input_specs, output_dtypes=[output_type]
+        )
+        self.run_test_with_dynamic_shape(
+            remainder_scalar(), input_specs, output_dtypes=[output_type]
+        )
+        self.run_test_with_dynamic_shape(
+            mod_operator(), input_specs, output_dtypes=[output_type]
+        )
 
 
 if __name__ == "__main__":

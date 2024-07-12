@@ -49,12 +49,14 @@ class TestErfConverter(DispatchTestCase):
                 (2, 2),
                 (4, 4),
                 torch.half,
+                torch.half,
             ),
             (
                 "3d_dim_dtype_float",
                 (1, 1, 1),
                 (1, 2, 3),
                 (3, 3, 3),
+                torch.float,
                 torch.float,
             ),
             (
@@ -63,10 +65,13 @@ class TestErfConverter(DispatchTestCase):
                 (2, 2, 4),
                 (2, 3, 5),
                 torch.int32,
+                torch.float,
             ),
         ]
     )
-    def test_dynamic_shape_erf(self, _, min_shape, opt_shape, max_shape, type):
+    def test_dynamic_shape_erf(
+        self, _, min_shape, opt_shape, max_shape, type, output_type
+    ):
         class erf(nn.Module):
             def forward(self, input):
                 return torch.ops.aten.erf.default(input)
@@ -80,7 +85,9 @@ class TestErfConverter(DispatchTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(erf(), input_specs)
+        self.run_test_with_dynamic_shape(
+            erf(), input_specs, output_dtypes=[output_type]
+        )
 
 
 if __name__ == "__main__":

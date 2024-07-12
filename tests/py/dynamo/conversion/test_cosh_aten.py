@@ -53,12 +53,14 @@ class TestCoshConverter(DispatchTestCase):
                 (3, 2, 3),
                 (3, 3, 4),
                 torch.int32,
+                torch.float32,
             ),
             (
                 "2d_dim_dtype_float16",
                 (1, 1),
                 (2, 2),
                 (4, 4),
+                torch.float16,
                 torch.float16,
             ),
             (
@@ -67,10 +69,13 @@ class TestCoshConverter(DispatchTestCase):
                 (1, 2, 3),
                 (3, 3, 3),
                 torch.float,
+                torch.float,
             ),
         ]
     )
-    def test_cosh_dynamic_shape(self, _, min_shape, opt_shape, max_shape, type):
+    def test_cosh_dynamic_shape(
+        self, _, min_shape, opt_shape, max_shape, type, output_type
+    ):
         class cosh(nn.Module):
             def forward(self, input):
                 return torch.ops.aten.cosh.default(input)
@@ -86,6 +91,7 @@ class TestCoshConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             cosh(),
             input_specs,
+            output_dtypes=[output_type],
         )
 
 

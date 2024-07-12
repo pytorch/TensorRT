@@ -92,6 +92,7 @@ class TestAcosConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             acos(),
             input_specs,
+            output_dtypes=[output_type],
         )
 
 

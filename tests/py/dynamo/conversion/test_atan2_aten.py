@@ -136,12 +136,14 @@ class TestAtan2Converter(DispatchTestCase):
                 (2, 2),
                 (4, 4),
                 torch.half,
+                torch.half,
             ),
             (
                 "3d_dim_dtype_float",
                 (1, 1, 1),
                 (1, 2, 3),
                 (3, 3, 3),
+                torch.float,
                 torch.float,
             ),
             (
@@ -150,10 +152,13 @@ class TestAtan2Converter(DispatchTestCase):
                 (1, 2, 4),
                 (2, 3, 5),
                 torch.int32,
+                torch.float,
             ),
         ]
     )
-    def test_dynamic_shape_atan2(self, _, min_shape, opt_shape, max_shape, type):
+    def test_dynamic_shape_atan2(
+        self, _, min_shape, opt_shape, max_shape, type, output_type
+    ):
         class atan2(nn.Module):
             def forward(self, lhs_val, rhs_val):
                 return torch.ops.aten.atan2.default(lhs_val, rhs_val)
@@ -173,8 +178,7 @@ class TestAtan2Converter(DispatchTestCase):
             ),
         ]
         self.run_test_with_dynamic_shape(
-            atan2(),
-            input_specs,
+            atan2(), input_specs, output_dtypes=[output_type]
         )
 
 
@@ -211,6 +215,7 @@ class TestAtan2OutConverter(DispatchTestCase):
                 (2, 2),
                 (4, 4),
                 torch.half,
+                torch.half,
             ),
             (
                 "3d_dim_dtype_float",
@@ -218,10 +223,13 @@ class TestAtan2OutConverter(DispatchTestCase):
                 (1, 2, 3),
                 (3, 3, 3),
                 torch.float,
+                torch.float,
             ),
         ]
     )
-    def test_dynamic_shape_atan2_out(self, _, min_shape, opt_shape, max_shape, type):
+    def test_dynamic_shape_atan2_out(
+        self, _, min_shape, opt_shape, max_shape, type, output_type
+    ):
         class atan2(nn.Module):
             def forward(self, lhs_val, rhs_val, out):
                 return torch.ops.aten.atan2.out(lhs_val, rhs_val, out=out)
@@ -246,7 +254,9 @@ class TestAtan2OutConverter(DispatchTestCase):
                 dtype=type,
             ),
         ]
-        self.run_test_with_dynamic_shape(atan2(), input_specs)
+        self.run_test_with_dynamic_shape(
+            atan2(), input_specs, output_dtypes=[output_type]
+        )
 
 
 if __name__ == "__main__":
