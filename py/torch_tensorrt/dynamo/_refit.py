@@ -94,7 +94,7 @@ def construct_refit_mapping(
         layer_type: str = layer.type.name
         if layer_type in MODULE_MAP:
             # Cast the parent class to child class to access attributes
-            # For example: ILayer does not have ILayer.kernal/ILayer.bias
+            # For example: ILayer does not have ILayer.kernel/ILayer.bias
             # So we cast it to IConvolutionLayer and access the attributes
             layer.__class__ = MODULE_MAP[layer_type][0]
             for weight_type, weight_name in MODULE_MAP[layer_type][1]:

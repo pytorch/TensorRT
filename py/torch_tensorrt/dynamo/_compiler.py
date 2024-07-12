@@ -174,20 +174,6 @@ def compile(
         else:
             make_refitable = kwargs["refit"]
 
-    if kwarg_inputs is None:
-        kwarg_inputs = {}
-
-    if "refit" in kwargs.keys():
-        warnings.warn(
-            "Refit is deprecated. Please use make_refitable=True if you want to enable refitting of the engine.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if make_refitable:
-            raise ValueError("Use flag make_refitable only. Flag refit is deprecated.")
-        else:
-            make_refitable = kwargs["refit"]
-
     engine_capability = EngineCapability._from(engine_capability)
 
     if torch_executed_modules is not None and torch_executed_modules:
@@ -667,15 +653,14 @@ def convert_module_to_trt_engine(
     # Assume converters support dynamic shapes and disable validation
     CONVERTERS.set_dynamic_shape_support(settings.assume_dynamic_shape_support)
 
-    interpreter_result = interpret_module_to_result(
-        gm,
-        inputs=flattened_input_list,
-        arg_inputs=arg_input_list,
-        kwarg_inputs=kwarg_input_list,
-        settings=settings,
-    )
     try:
-        pass
+        interpreter_result = interpret_module_to_result(
+            gm,
+            inputs=flattened_input_list,
+            arg_inputs=arg_input_list,
+            kwarg_inputs=kwarg_input_list,
+            settings=settings,
+        )
     except UnsupportedOperatorException:
         logger.error(
             f"Conversion of module {gm} not currently fully supported or convertible!",

@@ -432,7 +432,7 @@ def save(
     if kwargs_inputs is None:
         kwargs_inputs = {}
 
-    if kwargs_inputs and not all(value is not None for value in kwargs_inputs.values()):
+    if kwargs_inputs and any(value is None for value in kwargs_inputs.values()):
         raise ValueError("kwargs should not include None.")
     if output_format not in accepted_formats:
         raise ValueError(
