@@ -18,7 +18,10 @@ def contains_sym_int(tensor: torch.Tensor) -> bool:
 
 
 def construct_dynamic_input(
-    input_shape: torch.Size, input_dtype: torch.dtype, is_shape_tensor: bool = False
+    input_shape: torch.Size,
+    input_dtype: torch.dtype,
+    is_shape_tensor: bool = False,
+    is_fake_tensor: bool = False,
 ) -> Input:
     """
     Constructs a torch_tensorrt.Input based on a symbolic input
@@ -64,21 +67,33 @@ def construct_dynamic_input(
         max_shape=max_shape,
         dtype=input_dtype,
         is_shape_tensor=is_shape_tensor,
+        is_fake_tensor=is_fake_tensor,
     )
 
 
 def get_input(
-    input_shape: torch.Size, dtype: torch.dtype, is_shape_tensor: bool = False
+    input_shape: torch.Size,
+    dtype: torch.dtype,
+    is_shape_tensor: bool = False,
+    is_fake_tensor: bool = False,
 ) -> Input:
     """
     Based on type of dimensions in the input_shape, construct regular or dynamic shaped inputs
     """
     if contains_sym_int(input_shape):
         return construct_dynamic_input(
-            input_shape, dtype, is_shape_tensor=is_shape_tensor
+            input_shape,
+            dtype,
+            is_shape_tensor=is_shape_tensor,
+            is_fake_tensor=is_fake_tensor,
         )
     else:
-        return Input(shape=input_shape, dtype=dtype, is_shape_tensor=is_shape_tensor)
+        return Input(
+            shape=input_shape,
+            dtype=dtype,
+            is_shape_tensor=is_shape_tensor,
+            is_fake_tensor=is_fake_tensor,
+        )
 
 
 def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
@@ -101,7 +116,11 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
                     input_meta = input.meta["val"]
                     if isinstance(input_meta, (FakeTensor, torch.Tensor)):
                         input_shape = input_meta.size()
-                        torchtrt_inputs.append(get_input(input_shape, input_meta.dtype))
+                        torchtrt_inputs.append(
+                            get_input(
+                                input_shape, input_meta.dtype, is_fake_tensor=True
+                            )
+                        )
                     elif isinstance(input_meta, torch.SymInt):
                         # Assuming sym_integers | shape inputs always have torch.int64 dtype
                         torchtrt_inputs.append(

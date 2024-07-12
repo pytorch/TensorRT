@@ -120,11 +120,13 @@ def test_bert_base_uncased(ir):
                 input.shape,
                 dtype=input.dtype,
                 format=torch.contiguous_format,
+                torch_tensor=input,
             ),
             torchtrt.Input(
                 input.shape,
                 dtype=input.dtype,
                 format=torch.contiguous_format,
+                torch_tensor=input2,
             ),
         ],
         "device": torchtrt.Device("cuda:0"),

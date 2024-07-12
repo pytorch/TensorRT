@@ -48,6 +48,7 @@ class Input(object):
     torch_tensor: torch.Tensor = None
     name: str = ""
     is_shape_tensor: bool = False
+    is_fake_tensor: bool = False
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """__init__ Method for torch_tensorrt.Input
@@ -164,6 +165,9 @@ class Input(object):
 
         if "is_shape_tensor" in kwargs:
             self.is_shape_tensor = kwargs["is_shape_tensor"]
+
+        if "is_fake_tensor" in kwargs:
+            self.is_fake_tensor = kwargs["is_fake_tensor"]
 
         if "format" in kwargs:
             self.format = memory_format._from(kwargs["format"])
@@ -337,8 +341,9 @@ class Input(object):
         self, optimization_profile_field: Optional[str] = None
     ) -> torch.Tensor:
         """
-        Get an example tensor of the shape specified by the Input object
-        Limit the range of random integer to 8bit range to handle casted input
+        Get an example tensor of the shape specified by the Input object.
+        When int input is used in fake tensor, generate zero-filled tensors in case they are used as index data.
+        Limit the size of random integer to a range of 8 bits considering casted input.
 
         Args:
             optimization_profile_field (Optional(str)): Name of the field to use for shape in the case the Input is dynamically shaped
@@ -353,20 +358,7 @@ class Input(object):
                 )
             else:
                 if isinstance(self.shape, tuple):
-                    if self.dtype in [dtype.u8, dtype.i8, dtype.i32, dtype.i64]:
-                        type = self.dtype.to(torch.dtype, use_default=True)
-                        return torch.randint(
-                            max(torch.iinfo(torch.int8).min, torch.iinfo(type).min),
-                            torch.iinfo(torch.int8).max,
-                            self.shape,
-                            dtype=type,
-                        )
-                    elif self.dtype == dtype.b:
-                        return torch.rand(self.shape) < 0.5
-                    else:
-                        return torch.rand(self.shape).to(
-                            dtype=self.dtype.to(torch.dtype, use_default=True)
-                        )
+                    shape = self.shape
                 else:
                     RuntimeError(
                         f"Input shape is dynamic but shapes are not provided as sequence (found: {self.shape})"
@@ -384,20 +376,7 @@ class Input(object):
                     )
 
                 if isinstance(self.shape, dict):
-                    if self.dtype in [dtype.u8, dtype.i8, dtype.i32, dtype.i64]:
-                        type = self.dtype.to(torch.dtype, use_default=True)
-                        return torch.randint(
-                            max(torch.iinfo(torch.int8).min, torch.iinfo(type).min),
-                            torch.iinfo(torch.int8).max,
-                            self.shape[optimization_profile_field],
-                            dtype=type,
-                        )
-                    elif self.dtype == dtype.b:
-                        return torch.rand(self.shape[optimization_profile_field]) < 0.5
-                    else:
-                        return torch.rand(self.shape[optimization_profile_field]).to(
-                            dtype=self.dtype.to(torch.dtype, use_default=True)
-                        )
+                    shape = self.shape[optimization_profile_field]
                 else:
                     raise RuntimeError(
                         f"Input shape is dynamic but shapes are not provided as dictionary (found: {self.shape})"
@@ -407,4 +386,22 @@ class Input(object):
                 raise ValueError(
                     "Requested an example tensor from a dynamic shaped input but did not specific which profile field to use."
                 )
+
+        if self.dtype in [dtype.u8, dtype.i8, dtype.i32, dtype.i64]:
+            type = self.dtype.to(torch.dtype, use_default=True)
+            if self.is_fake_tensor:
+                return torch.zeros(shape, dtype=type)
+            else:
+                return torch.randint(
+                    max(torch.iinfo(torch.int8).min, torch.iinfo(type).min),
+                    torch.iinfo(torch.int8).max,
+                    shape,
+                    dtype=type,
+                )
+        elif self.dtype == dtype.b:
+            return torch.rand(shape) < 0.5
+        else:
+            return torch.rand(shape).to(
+                dtype=self.dtype.to(torch.dtype, use_default=True)
+            )
         raise
