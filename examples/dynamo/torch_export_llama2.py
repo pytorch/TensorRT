@@ -9,7 +9,7 @@ from utils import export_llm, generate
 llama_path = "meta-llama/Llama-2-7b-chat-hf"
 model = (
     AutoModelForCausalLM.from_pretrained(
-        llama_path, use_cache=False, attn_implementation="sdpa"
+        llama_path, use_cache=False, attn_implementation="eager"
     )
     .eval()
     .cuda()
@@ -20,13 +20,13 @@ base_prompt = "What is dynamic programming?"
 base_inputs = tokenizer(base_prompt, return_tensors="pt").to("cuda:0")
 input_ids = base_inputs.input_ids
 
-max_tokens = 16
+max_tokens = 32
 pyt_out = model(input_ids)
 
 # Auto-regressive generation loop for greedy search using PyTorch model
 pyt_gen_tokens = generate(model, input_ids, max_tokens, tokenizer.eos_token_id)
 
-llama2_ep = export_llm(model, input_ids, max_seq_len=32)
+llama2_ep = export_llm(model, input_ids, max_seq_len=64)
 trt_model = torch_tensorrt.dynamo.compile(
     llama2_ep,
     inputs=[input_ids],
