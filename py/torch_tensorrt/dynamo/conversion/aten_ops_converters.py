@@ -315,8 +315,8 @@ def aten_ops_embedding_bag(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar)
-@dynamo_tensorrt_converter(torch.ops.aten.fmod.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.fmod.Tensor, supports_dynamic_shapes=True)
 def aten_ops_fmod(
     ctx: ConversionContext,
     target: Target,
@@ -3434,4 +3434,25 @@ def aten_ops_prelu(
         name,
         args[0],
         args[1],
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.arange.start_step, supports_dynamic_shapes=True
+)
+def aten_ops_arange_start_step(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.arange.arange(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        start=args[0],
+        end=args[1],
+        step=args_bounds_check(args, 2, 1),
     )
