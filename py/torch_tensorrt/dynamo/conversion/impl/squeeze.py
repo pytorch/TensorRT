@@ -26,8 +26,8 @@ def squeeze(
     if isinstance(dim, int):
         dims.append(dim)
     else:
-        for dim in dim:
-            dims.append(dim)
+        for d in dim:
+            dims.append(d)
 
     new_dims = []
     for dim in dims:
