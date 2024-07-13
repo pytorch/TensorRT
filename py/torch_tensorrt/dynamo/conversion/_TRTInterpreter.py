@@ -323,6 +323,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         )
 
     def _save_weight_mapping(self) -> None:
+        """
+        Construct the weight name mapping from engine weight name to state_dict weight name.
+        Cache the weight name for future refitting usecases.
+        Two-stage weight name tracing:
+        1. Name transformation from engine weight name to state_dict weight name
+        2. Value mapping that, for each weight in INetworkDefinition search for identical weight in state_dict
+        """
 
         def find_weight(
             weight_name: str, np_map: dict[str, Any], sd: dict[str, Any]
@@ -386,7 +393,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             )
         }
         """
-
+        # Stage 1: Name mapping
         sd = self.module.state_dict()
         weight_name_map: dict[str, Any] = {}
         np_map = {}
@@ -413,6 +420,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                         [i for i in sd_weight_name_list[:-1] if i]
                     )
                     suffix = sd_weight_name_list[-1]
+                    # Retrieve each weight name(s) in state_dict
                     if layer_type == "CONSTANT":
                         if "embedding" in suffix:
                             sd_weight_name = f"{sd_weight_name}.{torch_attr[0]}"
@@ -430,7 +438,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     weight_name_map[engine_weight_name] = sd_weight_name
                     np_map[engine_weight_name] = weight
 
-        # Value mapping
+        # Stage 2: Value mapping
         for engine_weight_name, sd_weight_name in weight_name_map.items():
             if "SCALE" in engine_weight_name:
                 # There is no direct connection in batch_norm layer. So skip it
@@ -448,7 +456,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             ]
 
         self.weight_name_map = weight_name_map
-        # check = {k:(weight_name_map[k], np_map[k]) for k, v in np_map.items()}
 
     def run(
         self,

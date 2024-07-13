@@ -127,7 +127,7 @@ def test_fast_refit_one_engine():
 
 
 @pytest.mark.unit
-def test_fast_refit_one_engin_no_map():
+def test_fast_refit_one_engine_no_map():
 
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
@@ -174,7 +174,7 @@ def test_fast_refit_one_engin_no_map():
 
 
 @pytest.mark.unit
-def test_fast_refit_one_engin_wrong_map():
+def test_fast_refit_one_engine_wrong_map():
 
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
