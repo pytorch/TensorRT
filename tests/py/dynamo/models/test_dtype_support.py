@@ -310,7 +310,9 @@ class TestTorchHalf(TestCase):
         with torch.inference_mode():
             device = torch.device("cuda", 0)
             model = MyModule().eval().to(device)
-
+            print(
+                f"lan added torch_tensorrt.ENABLED_FEATURES={torch_tensorrt.ENABLED_FEATURES}"
+            )
             for dtype in (torch.half, torch.float32):
                 inputs = [torch_tensorrt.Input(shape=(1, 3, 5), dtype=dtype)]
                 optimized_model = torch_tensorrt.compile(
