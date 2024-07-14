@@ -295,3 +295,48 @@ class TestBF16Support(TestCase):
                 DECIMALS_OF_AGREEMENT,
                 msg=f"Torch outputs and TRT outputs don't match close enough.",
             )
+
+
+class TestTorchHalf(TestCase):
+    def test_torch_half(self):
+        class MyModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.relu = nn.ReLU()
+
+            def forward(self, x):
+                return self.relu(x)
+
+        with torch.inference_mode():
+            device = torch.device("cuda", 0)
+            model = MyModule().eval().to(device)
+
+            for dtype in (torch.half, torch.float32):
+                inputs = [torch_tensorrt.Input(shape=(1, 3, 5), dtype=dtype)]
+                optimized_model = torch_tensorrt.compile(
+                    model,
+                    ir="dynamo",
+                    inputs=inputs,
+                    enabled_precisions={dtype},
+                    min_block_size=1,
+                    device=device,
+                )
+
+                for _ in range(10):
+                    new_input = torch.randn((1, 3, 5), dtype=dtype, device=device)
+
+                    eager_output = model(new_input)
+
+                    stream = torch.cuda.Stream(device=device)
+                    stream.wait_stream(torch.cuda.current_stream(device=device))
+                    with torch.cuda.stream(stream):
+                        trt_output_with_stream = optimized_model(new_input)
+                    torch.cuda.current_stream(device=device).wait_stream(stream)
+
+                    trt_output_without_stream = optimized_model(new_input)
+
+                    print(f"lan added dtype={dtype}")
+                    print(f"{torch.allclose(eager_output, trt_output_with_stream)=}")
+                    print(f"{torch.allclose(eager_output, trt_output_without_stream)=}")
+                    print(f"{trt_output_with_stream=}")
+                    print(f"{trt_output_without_stream=}")
