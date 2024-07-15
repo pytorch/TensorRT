@@ -315,7 +315,6 @@ class TestTorchHalf(TestCase):
             )
             for dtype in (torch.half, torch.float32):
                 inputs = [torch_tensorrt.Input(shape=(1, 3, 5), dtype=dtype)]
-                breakpoint()
                 optimized_model = torch_tensorrt.compile(
                     model,
                     ir="dynamo",
@@ -323,6 +322,7 @@ class TestTorchHalf(TestCase):
                     enabled_precisions={dtype},
                     min_block_size=1,
                     device=device,
+                    debug=True,
                     use_python_runtime=False,
                 )
 
@@ -344,3 +344,9 @@ class TestTorchHalf(TestCase):
                     print(f"{torch.allclose(eager_output, trt_output_without_stream)=}")
                     print(f"{trt_output_with_stream=}")
                     print(f"{trt_output_without_stream=}")
+                    torch.testing.assert_close(
+                        eager_output, trt_output_with_stream, rtol=0.001, atol=0.001
+                    )
+                    torch.testing.assert_close(
+                        eager_output, trt_output_without_stream, rtol=0.001, atol=0.001
+                    )
