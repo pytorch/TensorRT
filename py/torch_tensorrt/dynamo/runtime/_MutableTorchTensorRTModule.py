@@ -299,10 +299,10 @@ class MutableTorchTensorRTModule(object):
                     return False
                 if isinstance(a, torch.Tensor) and a.shape != b.shape:
                     return False
-                if isinstance(a, bool) and a != b:
+                elif isinstance(a, bool) and a != b:
                     return False
 
-        if isinstance(input1, dict):
+        elif isinstance(input1, dict):
             if input1.keys() != input2.keys():
                 return False
             for a, b in zip(input1.items(), input2.items()):
@@ -310,11 +310,11 @@ class MutableTorchTensorRTModule(object):
                     return False
                 if isinstance(a, torch.tensor) and a.shape != b.shape:
                     return False
-                if isinstance(a, bool) and a != b:
+                elif isinstance(a, bool) and a != b:
                     return False
-                if isinstance(
+                elif isinstance(
                     a, (list, tuple, dict)
-                ) and not MutableTorchTensorRTModule.check_inputs_equal(input1, input2):
+                ) and not MutableTorchTensorRTModule.check_inputs_equal(a, b):
                     return False
         return True
 
