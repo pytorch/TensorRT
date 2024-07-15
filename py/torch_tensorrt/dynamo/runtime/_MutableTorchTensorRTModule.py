@@ -241,6 +241,7 @@ class MutableTorchTensorRTModule(object):
             # Update the flag and forward again
             self.update_refit_condition()
             return self.forward(*args, **kwargs)
+
         return self.gm(*args, **kwargs)
 
     def __deepcopy__(self, memo: Any) -> Any:
