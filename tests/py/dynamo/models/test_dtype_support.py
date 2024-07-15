@@ -315,6 +315,7 @@ class TestTorchHalf(TestCase):
             )
             for dtype in (torch.half, torch.float32):
                 inputs = [torch_tensorrt.Input(shape=(1, 3, 5), dtype=dtype)]
+                breakpoint()
                 optimized_model = torch_tensorrt.compile(
                     model,
                     ir="dynamo",
@@ -322,6 +323,7 @@ class TestTorchHalf(TestCase):
                     enabled_precisions={dtype},
                     min_block_size=1,
                     device=device,
+                    use_python_runtime=False,
                 )
 
                 for _ in range(10):
