@@ -329,7 +329,7 @@ def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
             obj = getattr(self.instance, name)
             if hasattr(obj, "__dict__") or isinstance(
                 obj, (torch.nn.ModuleList, list)
-            ):  #
+            ):  # nn.Moduledict does not support automatic update. Please use manually refit/recompile
                 return _make_refit_change_trigger(obj, refit_state)
             return obj
 
@@ -345,7 +345,7 @@ def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
             )
 
         def _on_change(self) -> None:
-            refit_state.set_state(RefitFlag.NEEDS_REFIT)
+            refit_state.set_state(RefitFlag.UNKNOWN)
             print("Change!")
 
         def __call__(self, *args: Any, **kwargs: Any) -> Any:
@@ -353,8 +353,7 @@ def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
             return self.instance(*args, **kwargs)
 
         def __setitem__(self, item: str, value: Any) -> None:
-            print("Not sure!")
-            refit_state.set_state(RefitFlag.UNKNOWN)
+            self._on_change()
             self.instance.__setitem__(item, value)
 
         def __getitem__(self, items: str) -> Any:
