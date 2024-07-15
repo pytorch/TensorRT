@@ -622,8 +622,8 @@ else:
         )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim)
-@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims)
+@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims, supports_dynamic_shapes=True)
 def aten_ops_squeeze(
     ctx: ConversionContext,
     target: Target,
