@@ -12,6 +12,7 @@ from . import (
     deconv,
     elementwise,
     embedding,
+    full,
     grid,
     linear,
     matmul,

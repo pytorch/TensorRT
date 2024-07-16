@@ -418,6 +418,47 @@ def logical_not(
     )
 
 
+# Notes: this sym_not output is slightly different than the torch.sym_not
+# torch.sym_not always returns a scaler value: torch.sym_not(torch.tensor([True])) ---> False
+# our sym_not cannot return a scaler value, it always return a tensor: sym_not(torch.tensor([True])) ---> torch.tensor(False)
+def sym_not(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: Union[TRTTensor, bool, torch.SymBool, torch.Tensor],
+) -> TRTTensor:
+    # TODO: not sure when the torch.SymBool cases arises, will add the support in future
+    if isinstance(input_val, torch.SymBool):
+        raise NotImplementedError(
+            "Torch-TensorRT support for sym_not operator when type is torch.SymBool is not available, Need to Implement"
+        )
+    elif isinstance(input_val, (TRTTensor, torch.Tensor)):
+        if input_val.dtype != trt.bool and input_val.dtype != torch.bool:
+            raise RuntimeError(
+                f"Only Boolean value of ITensor/Tensor is allowed for sym_not, got {input_val.dtype=}"
+            )
+        # torch.sym_not only allows 1 Boolean value of Tensor, otherwise pytorch will throw the following error
+        # RuntimeError: Boolean value of Tensor with more than one value is ambiguous
+        rank = len(input_val.shape)
+        if rank >= 1:
+            for index in range(rank):
+                dim = input_val.shape[index]
+                if dim != 1:
+                    raise RuntimeError(
+                        f"Boolean value of Tensor with more than one value is not allowed for sym_not, got input_val.shape[{index}]={input_val.shape[index]}"
+                    )
+            input_val = impl.shuffle.reshape(
+                ctx, target, source_ir, name + "_reshpaed", input_val, (1,)
+            )
+    elif isinstance(input_val, bool):
+        input_val = get_trt_tensor(ctx, input_val, name + "_casted", dtype=trt.bool)
+
+    return convert_unary(
+        ctx, target, source_ir, name, trt.UnaryOperation.NOT, input_val
+    )
+
+
 def bitwise_not(
     ctx: ConversionContext,
     target: Target,

@@ -1759,6 +1759,30 @@ def aten_ops_logical_not(
     )
 
 
+# TODO: confirm with Dheeraj, whether it requires supports_dynamic_shapes=True
+# according to https://pytorch.org/docs/stable/generated/torch.sym_not.html
+# Boolean value of Tensor with more than one value is not allowed, so it must be static_shaped
+# eg. allowed: True or torch.tensor(True) or torch.tensor([False]) or torch.tensor([[False]])
+# eg. not allowed: torch.tensor([True, False]) or torch.tensor([[True], [False]])
+@dynamo_tensorrt_converter(
+    torch.sym_not,
+)
+def aten_ops_sym_not(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.sym_not(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.sign.default, supports_dynamic_shapes=True)
 def aten_ops_sign(
     ctx: ConversionContext,
@@ -3455,4 +3479,22 @@ def aten_ops_arange_start_step(
         start=args[0],
         end=args[1],
         step=args_bounds_check(args, 2, 1),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.full.default, supports_dynamic_shapes=True)
+def aten_ops_full(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.full.full(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        shape=args[0],
+        fill_value=args[1],
     )
