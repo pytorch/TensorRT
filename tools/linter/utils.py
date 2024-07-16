@@ -1,7 +1,7 @@
-import os
-import sys
 import glob
+import os
 import subprocess
+import sys
 
 BLACKLISTED_BAZEL_TARGETS = [
     "//experiments",
@@ -45,7 +45,7 @@ def find_bazel_root():
     """
     curdir = os.path.dirname(os.path.realpath(__file__))
     while 1:
-        if os.path.exists(curdir + "/WORKSPACE"):
+        if os.path.exists(curdir + "/MODULE.bazel"):
             return curdir
         if curdir == "/":
             sys.exit("Error: was unable to find a bazel workspace")
