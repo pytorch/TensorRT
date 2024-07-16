@@ -106,22 +106,30 @@ class TestPoolConverter(DispatchTestCase):
         inputs = [torch.randn(1, 3, 32, 32, 32)]
         self.run_test(TestModule(), inputs, use_dynamo_tracer=True)
 
-
     @parameterized.expand(
         [
             (
-                (1,1,1),
-                (2,2,2),
-                (3,3,3),
+                (1, 1, 1),
+                (2, 2, 2),
+                (3, 3, 3),
                 torch.float,
-                (3,), 
-                (1,), 
+                (3,),
+                (1,),
                 (1,),
             ),
         ]
     )
     def test_dynamic_shape_pool1d(
-        self, min_shape, opt_shape, max_shape, type, kernel_size, stride=1, padding=0, ceil_mode=False, count_include_pad=True,
+        self,
+        min_shape,
+        opt_shape,
+        max_shape,
+        type,
+        kernel_size,
+        stride=1,
+        padding=0,
+        ceil_mode=False,
+        count_include_pad=True,
     ):
         class pool1d(torch.nn.Module):
             def forward(self, x):
@@ -143,27 +151,36 @@ class TestPoolConverter(DispatchTestCase):
     @parameterized.expand(
         [
             (
-                (1,1,1,1),
-                (2,2,2,2),
-                (3,3,3,3),
+                (1, 1, 1, 1),
+                (2, 2, 2, 2),
+                (3, 3, 3, 3),
                 torch.float,
-                3, 
-                1, 
+                3,
+                1,
                 1,
             ),
             (
-                (1,1,1,1),
-                (2,2,2,2),
-                (3,3,3,3),
+                (1, 1, 1, 1),
+                (2, 2, 2, 2),
+                (3, 3, 3, 3),
                 torch.float,
-                (3, 3), 
-                (1, 1), 
+                (3, 3),
+                (1, 1),
                 (1, 1),
             ),
         ]
     )
     def test_dynamic_shape_pool2d(
-        self, min_shape, opt_shape, max_shape, type, kernel_size, stride=1, padding=0, ceil_mode=False, count_include_pad=True,
+        self,
+        min_shape,
+        opt_shape,
+        max_shape,
+        type,
+        kernel_size,
+        stride=1,
+        padding=0,
+        ceil_mode=False,
+        count_include_pad=True,
     ):
         class pool2d(torch.nn.Module):
             def forward(self, x):
@@ -185,28 +202,36 @@ class TestPoolConverter(DispatchTestCase):
     @parameterized.expand(
         [
             (
-                (1,1,1,1,1),
-                (2,2,2,2,2),
-                (3,3,3,3,3),
+                (1, 1, 1, 1, 1),
+                (2, 2, 2, 2, 2),
+                (3, 3, 3, 3, 3),
                 torch.float,
-                2, 
-                1, 
+                2,
+                1,
                 1,
             ),
             (
-                (1,1,1,1,1),
-                (2,2,2,2,2),
-                (3,3,3,3,3),
+                (1, 1, 1, 1, 1),
+                (2, 2, 2, 2, 2),
+                (3, 3, 3, 3, 3),
                 torch.float,
-                (2, 2, 2), 
-                (1, 1, 1), 
+                (2, 2, 2),
+                (1, 1, 1),
                 (1, 1, 1),
             ),
-            
         ]
     )
     def test_dynamic_shape_pool3d(
-        self, min_shape, opt_shape, max_shape, type, kernel_size, stride=1, padding=0, ceil_mode=False, count_include_pad=True,
+        self,
+        min_shape,
+        opt_shape,
+        max_shape,
+        type,
+        kernel_size,
+        stride=1,
+        padding=0,
+        ceil_mode=False,
+        count_include_pad=True,
     ):
         class pool3d(torch.nn.Module):
             def forward(self, x):
@@ -224,7 +249,6 @@ class TestPoolConverter(DispatchTestCase):
         ]
 
         self.run_test_with_dynamic_shape(pool3d(), input_specs, use_dynamo_tracer=True)
-    
 
     @parameterized.expand(
         [
