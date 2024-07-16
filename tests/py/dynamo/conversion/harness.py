@@ -382,6 +382,7 @@ class DispatchTestCase(TRTTestCase):
         use_example_tensors=True,
         pyt_inputs=None,
         propagate_shapes=False,
+        check_dtype=True,
     ):
         mod = self.generate_graph(
             mod,
@@ -394,6 +395,14 @@ class DispatchTestCase(TRTTestCase):
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
         compilation_settings = CompilationSettings(truncate_double=True)
+
+        if check_dtype:
+            output_dtypes = infer_module_output_dtypes(
+                mod,
+                input_specs,
+                compilation_settings.device,
+                truncate_double=compilation_settings.truncate_double,
+            )
 
         interp = TRTInterpreter(
             mod,
