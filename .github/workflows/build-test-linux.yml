@@ -329,7 +329,7 @@ jobs:
         location=$(python -m pip show torch_tensorrt | grep Location | sed "s/Location: //g")
         ls -lart $location | grep torch_tensorrt
         bazel test //tests/core/conversion:conversion_tests --compilation_mode=opt \
-        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures
+        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures --cxxopt='-std=c++17'
 
   tests-cpp-core-lowering:
     name: Test core lowering[CPP]
@@ -357,7 +357,7 @@ jobs:
         set -x
         export USE_HOST_DEPS=1
         bazel test //tests/core/lowering:lowering_tests --compilation_mode=opt \
-        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures
+        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures --cxxopt='-std=c++17'
 
   tests-cpp-core-partitioning:
     name: Test core partitioning[CPP]
@@ -385,7 +385,7 @@ jobs:
         set -x
         export USE_HOST_DEPS=1
         bazel test //tests/core/partitioning:partitioning_tests --compilation_mode=opt \
-        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures
+        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures --cxxopt='-std=c++17'
 
   tests-cpp-core-runtime:
     name: Test core runtime[CPP]
@@ -413,7 +413,7 @@ jobs:
         set -x
         export USE_HOST_DEPS=1
         bazel test //tests/core/runtime:runtime_tests --compilation_mode=opt \
-        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures
+        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures --cxxopt='-std=c++17'
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
   cancel-in-progress: true
