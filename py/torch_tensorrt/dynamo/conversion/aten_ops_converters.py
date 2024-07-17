@@ -3013,8 +3013,12 @@ def aten_ops_pad(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.upsample_nearest2d.default)
-@dynamo_tensorrt_converter(torch.ops.aten.upsample_nearest2d.vec)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.upsample_nearest2d.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.upsample_nearest2d.vec, supports_dynamic_shapes=True
+)
 def upsample_nearest2d(
     ctx: ConversionContext,
     target: Target,
@@ -3035,8 +3039,12 @@ def upsample_nearest2d(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.upsample_bilinear2d.default)
-@dynamo_tensorrt_converter(torch.ops.aten.upsample_bilinear2d.vec)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.upsample_bilinear2d.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.upsample_bilinear2d.vec, supports_dynamic_shapes=True
+)
 def upsample_bilinear2d(
     ctx: ConversionContext,
     target: Target,
