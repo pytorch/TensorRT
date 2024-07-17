@@ -24,7 +24,7 @@ if ENABLED_FEATURES.torchscript_frontend:
     )
 
 if ENABLED_FEATURES.dynamo_frontend:
-    from torch._export import ExportedProgram
+    from torch.export import ExportedProgram
     from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
     from torch_tensorrt.dynamo._compiler import (
         convert_module_to_trt_engine as dynamo_convert_module_to_trt_engine,
