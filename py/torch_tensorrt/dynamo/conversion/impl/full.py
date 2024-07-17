@@ -8,7 +8,7 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     SourceIR,
     cast_trt_tensor,
-    set_layer_name,
+    get_trt_tensor,
 )
 from torch_tensorrt.fx.types import TRTTensor
 
@@ -25,31 +25,36 @@ def full(
     if isinstance(shape, List):
         return np.full(shape, fill_value)
 
-    # in dynamic shape scenario, shape is a shape tensor
-    # TODO: investigate how to use IFillLayer to directly fill a shape tensor
-    # currently we use the IFillLayer to fill a 1 dimensional tensor and then reshape to the shape tensor
-    end = impl.reduce.prod(
-        ctx, target, source_ir, name + "_prod", shape, dim=None, keepdim=False
-    )
-    tensor = impl.arange.arange(ctx, target, source_ir, name + "_arange", 0, end, 1)
-    tensor = impl.elementwise.mul(ctx, target, source_ir, name + "_mul", tensor, 0)
+    # in dynamic shape scenario, shape is a shap tensor
+    # use IFillLayer to fill the shape tensor with LINSPACE value
+    layer = ctx.net.add_fill(shape.shape, trt.FillOperation.LINSPACE, shape.dtype)
+    layer.set_input(0, shape)
+    layer.set_input(1, get_trt_tensor(ctx, 0, name + "_start", min_rank=0))
+    delta = get_trt_tensor(ctx, 1, name + "_delta")
+    input = []
+    for _ in range(shape.shape[0]):
+        input.append(delta)
+    delta = impl.cat.cat(ctx, target, source_ir, name + "_cat", input, dim=0)
+    layer.set_input(2, delta)
+    output = layer.get_output(0)
+
+    # fill the output tensor with the actual fill_value
+    output = impl.elementwise.mul(ctx, target, source_ir, name + "_mul", output, 0)
     if isinstance(fill_value, (int, float)):
         if isinstance(fill_value, float):
-            tensor = cast_trt_tensor(
-                ctx, tensor, trt.float32, name + "_casted", target, source_ir
+            output = cast_trt_tensor(
+                ctx, output, trt.float32, name + "_casted", target, source_ir
             )
-        tensor = impl.elementwise.add(
-            ctx, target, source_ir, name + "_add", tensor, fill_value
+        output = impl.elementwise.add(
+            ctx, target, source_ir, name + "_add", output, fill_value
         )
 
     if isinstance(fill_value, bool):
-        tensor = cast_trt_tensor(
-            ctx, tensor, trt.bool, name + "_casted", target, source_ir
+        output = cast_trt_tensor(
+            ctx, output, trt.bool, name + "_casted", target, source_ir
         )
-        tensor = impl.elementwise.logical_or(
-            ctx, target, source_ir, name + "_add", tensor, fill_value
+        output = impl.elementwise.logical_or(
+            ctx, target, source_ir, name + "_add", output, fill_value
         )
-    layer = ctx.net.add_shuffle(tensor)
-    layer.set_input(1, shape)
-    set_layer_name(layer, target, name + "_reshape", source_ir)
-    return layer.get_output(0)
+
+    return output

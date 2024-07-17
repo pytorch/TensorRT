@@ -110,10 +110,7 @@ class TRTTestCase(TestCase):
                 ref_outputs = [ref_outputs]
             for out, ref in zip(outputs, ref_outputs):
                 if not isinstance(ref, torch.Tensor):
-                    if len(out.shape) == 0:
-                        ref = torch.tensor(ref)
-                    else:
-                        ref = torch.tensor([ref])
+                    ref = torch.tensor([ref])
                 ref = ref.cpu()  # to_dtype test has cases with gpu output
                 torch.testing.assert_close(
                     out.cpu(),
