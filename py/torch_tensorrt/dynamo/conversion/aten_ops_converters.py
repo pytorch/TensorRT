@@ -1759,6 +1759,23 @@ def aten_ops_logical_not(
     )
 
 
+@dynamo_tensorrt_converter(torch.sym_not, supports_dynamic_shapes=True)
+def aten_ops_sym_not(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.sym_not(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.sign.default, supports_dynamic_shapes=True)
 def aten_ops_sign(
     ctx: ConversionContext,
@@ -3455,4 +3472,22 @@ def aten_ops_arange_start_step(
         start=args[0],
         end=args[1],
         step=args_bounds_check(args, 2, 1),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.full.default, supports_dynamic_shapes=True)
+def aten_ops_full(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.full.full(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        shape=args[0],
+        fill_value=args[1],
     )
