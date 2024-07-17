@@ -4,9 +4,9 @@
 
 Do try to fill an issue with your feature or bug before filling a PR (op support is generally an exception as long as you provide tests to prove functionality). There is also a backlog (https://github.com/pytorch/TensorRT/issues) of issues which are tagged with the area of focus, a coarse priority level and whether the issue may be accessible to new contributors. Let us know if you are interested in working on a issue. We are happy to provide guidance and mentorship for new contributors. Though note, there is no claiming of issues, we prefer getting working code quickly vs. addressing concerns about "wasted work".
 
-#### Development enviornment
+#### Development environment
 
-Our build system relies on `bazel` (https://bazel.build/). Though there are many ways to install `bazel`, the prefered method is to use `bazelisk` (https://github.com/bazelbuild/bazelisk) which makes it simple to set up the correct version of bazel on the fly. Additional developement dependencies can be installed via the `requirements-dev.txt` file.
+Our build system relies on `bazel` (https://bazel.build/). Though there are many ways to install `bazel`, the preferred method is to use `bazelisk` (https://github.com/bazelbuild/bazelisk) which makes it simple to set up the correct version of bazel on the fly. Additional development dependencies can be installed via the `requirements-dev.txt` file.
 
 #### Communication
 
@@ -27,7 +27,7 @@ We use the PyTorch Slack for communication about core development, integration w
 
 - Avoid introducing unnecessary complexity into existing code so that maintainability and readability are preserved
 
-- Try to avoid commiting commented out code
+- Try to avoid committing commented out code
 
 - Minimize warnings (and no errors) from the compiler
 

@@ -315,8 +315,8 @@ def aten_ops_embedding_bag(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar)
-@dynamo_tensorrt_converter(torch.ops.aten.fmod.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.fmod.Tensor, supports_dynamic_shapes=True)
 def aten_ops_fmod(
     ctx: ConversionContext,
     target: Target,
@@ -622,8 +622,8 @@ else:
         )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim)
-@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims)
+@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims, supports_dynamic_shapes=True)
 def aten_ops_squeeze(
     ctx: ConversionContext,
     target: Target,
@@ -733,10 +733,10 @@ def aten_ops_where(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.clamp.default)
-@dynamo_tensorrt_converter(torch.ops.aten.clamp.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.clip.default)
-@dynamo_tensorrt_converter(torch.ops.aten.clip.Tensor)
+@dynamo_tensorrt_converter(torch.ops.aten.clamp.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.clamp.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.clip.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.clip.Tensor, supports_dynamic_shapes=True)
 def aten_ops_clamp(
     ctx: ConversionContext,
     target: Target,
@@ -1880,7 +1880,7 @@ def aten_ops_mul(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.maximum.default)
+@dynamo_tensorrt_converter(torch.ops.aten.maximum.default, supports_dynamic_shapes=True)
 def aten_ops_maximum(
     ctx: ConversionContext,
     target: Target,
@@ -1898,7 +1898,7 @@ def aten_ops_maximum(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.minimum.default)
+@dynamo_tensorrt_converter(torch.ops.aten.minimum.default, supports_dynamic_shapes=True)
 def aten_ops_minimum(
     ctx: ConversionContext,
     target: Target,
@@ -2002,6 +2002,7 @@ def aten_ops_div(
 @dynamo_tensorrt_converter(
     torch.ops.aten.pow.Tensor_Scalar, supports_dynamic_shapes=True
 )
+@dynamo_tensorrt_converter(operator.pow, supports_dynamic_shapes=True)
 def aten_ops_pow(
     ctx: ConversionContext,
     target: Target,
@@ -2019,8 +2020,13 @@ def aten_ops_pow(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.floor_divide.default)
-@dynamo_tensorrt_converter(torch.ops.aten.floor_divide.Scalar)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.floor_divide.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.floor_divide.Scalar, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(operator.floordiv, supports_dynamic_shapes=True)
 def aten_ops_floor_div(
     ctx: ConversionContext,
     target: Target,
@@ -2038,7 +2044,9 @@ def aten_ops_floor_div(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.logical_and.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.logical_and.default, supports_dynamic_shapes=True
+)
 def aten_ops_logical_and(
     ctx: ConversionContext,
     target: Target,
@@ -2276,8 +2284,9 @@ def aten_ops_bitwise_not(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.eq.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.eq.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.eq.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.eq.Scalar, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(operator.eq, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2300,8 +2309,8 @@ def aten_ops_eq(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.ne.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.ne.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.ne.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.ne.Scalar, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2372,8 +2381,8 @@ def aten_ops_ge(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.lt.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.lt.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.lt.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.lt.Scalar, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2396,8 +2405,8 @@ def aten_ops_lt(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.le.Tensor)
-@dynamo_tensorrt_converter(torch.ops.aten.le.Scalar)
+@dynamo_tensorrt_converter(torch.ops.aten.le.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.le.Scalar, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -3149,8 +3158,13 @@ def aten_ops_copy(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.remainder.Scalar)
-@dynamo_tensorrt_converter(torch.ops.aten.remainder.Tensor)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.remainder.Scalar, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.remainder.Tensor, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(operator.mod, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -3394,4 +3408,51 @@ def aten_ops_native_dropout(
         args[0],
         args[1],
         args_bounds_check(args, 2, None),
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._prelu_kernel.default, supports_dynamic_shapes=True
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        1: (TRTTensor,),
+    }
+)
+def aten_ops_prelu(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.prelu.prelu(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.arange.start_step, supports_dynamic_shapes=True
+)
+def aten_ops_arange_start_step(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.arange.arange(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        start=args[0],
+        end=args[1],
+        step=args_bounds_check(args, 2, 1),
     )

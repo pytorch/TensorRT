@@ -3,7 +3,7 @@
 Conversion Phase
 ==================
 
-Once the graph has be simplified to a form thats easy to convert, we then set up a conversion context
+Once the graph has be simplified to a form that's easy to convert, we then set up a conversion context
 to manage the construction of a TensorRT ``INetworkDefinition`` from the blocks nodes. The conversion context
 records the set of converted nodes, block inputs and outputs and other information about the conversion
 of the graph. This data is then used to help converters link together layers and also hold build time

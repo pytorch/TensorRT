@@ -27,7 +27,7 @@ usage of the dynamo frontend
 
 .. note::  ``torch_tensorrt.dynamo.compile`` is the main API for users to interact with Torch-TensorRT dynamo frontend. The input type of the model should be ``ExportedProgram`` (ideally the output of ``torch.export.export`` or ``torch_tensorrt.dynamo.trace`` (discussed in the section below)) and output type is a ``torch.fx.GraphModule`` object.
 
-Customizeable Settings
+Customizable Settings
 ----------------------
 
 There are lot of options for users to customize their settings for optimizing with TensorRT.

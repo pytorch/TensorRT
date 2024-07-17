@@ -73,14 +73,15 @@ def __reduce__(self: object) -> str:
 
 class DataLoaderCalibrator(object):
     """
-    Constructs a calibrator class in TensorRT and uses pytorch dataloader to load/preproces
+    Constructs a calibrator class in TensorRT and uses pytorch dataloader to load/preprocess
     data which is passed during calibration.
-    Args:
-        dataloader: an instance of pytorch dataloader which iterates through a given dataset.
-        algo_type: choice of calibration algorithm.
-        cache_file: path to cache file.
-        use_cache: flag which enables usage of pre-existing cache.
-        device: device on which calibration data is copied to.
+
+    Arguments:
+        dataloader (torch.utils.data.DataLoader): an instance of pytorch dataloader which iterates through a given dataset.
+        algo_type (CalibrationAlgo): choice of calibration algorithm.
+        cache_file (str): path to cache file.
+        use_cache (bool): flag which enables usage of pre-existing cache.
+        device (Device): device on which calibration data is copied to.
     """
 
     def __init__(self, **kwargs: Any):
@@ -164,9 +165,10 @@ class DataLoaderCalibrator(object):
 class CacheCalibrator(object):
     """
     Constructs a calibrator class in TensorRT which directly uses pre-existing cache file for calibration.
-    Args:
-        cache_file: path to cache file.
-        algo_type: choice of calibration algorithm.
+
+    Arguments:
+        cache_file (str): path to cache file.
+        algo_type (CalibrationAlgo): choice of calibration algorithm.
     """
 
     def __init__(self, **kwargs: Any):

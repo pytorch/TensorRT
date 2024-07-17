@@ -69,7 +69,7 @@ class TestLinearConverter(DispatchTestCase):
     #     )
 
     ## Testing with (-1, -1, 512) results into following error:
-    ## AssertionError: Currently we only support one dynmaic dim for linear and it can't be the last dim.
+    ## AssertionError: Currently we only support one dynamic dim for linear and it can't be the last dim.
 
 
 if __name__ == "__main__":

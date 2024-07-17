@@ -8,17 +8,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data as data
-import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-
-from torch.utils.tensorboard import SummaryWriter
-
+import torchvision.transforms as transforms
+from pytorch_quantization import calib
 from pytorch_quantization import nn as quant_nn
 from pytorch_quantization import quant_modules
 from pytorch_quantization.tensor_quant import QuantDescriptor
-from pytorch_quantization import calib
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-
 from vgg16 import vgg16
 
 PARSER = argparse.ArgumentParser(
@@ -49,7 +46,7 @@ PARSER.add_argument(
     "--start-from",
     default=0,
     type=int,
-    help="Epoch to resume from (requires a checkpoin in the providied checkpoi",
+    help="Epoch to resume from (requires a checkpoint in the providied checkpoi",
 )
 PARSER.add_argument("--seed", type=int, help="Seed value for rng")
 PARSER.add_argument(
@@ -147,7 +144,7 @@ def calibrate_model(
         data_loader: calibration data set
         num_calib_batch: amount of calibration passes to perform
         calibrator: type of calibration to use (max/histogram)
-        hist_percentile: percentiles to be used for historgram calibration
+        hist_percentile: percentiles to be used for histogram calibration
         out_dir: dir to save state files in
     """
 

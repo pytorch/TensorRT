@@ -95,7 +95,7 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
     Args:
         module: FX GraphModule to partition
         operator_support: OperatorSupport class describing allowed operators
-        allowed_single_node_partition_ops: Nodes which can be included in single-node partitons.
+        allowed_single_node_partition_ops: Nodes which can be included in single-node partitions.
             Generally useful for module-level exclusion ops which are intensive despite being single functions
         min_block_size: Minimum number of computational operators per block
         require_full_compilation: Require that all computational operators be run in TRT

@@ -37,7 +37,7 @@ classifiers = [
     "Topic :: Software Development",
     "Topic :: Software Development :: Libraries",
 ]
-readme = {file = "py/README.md", content-type = "text/markdown"}
+readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.8"
 keywords = ["pytorch", "torch", "tensorrt", "trt", "ai", "artificial intelligence", "ml", "machine learning", "dl", "deep learning", "compiler", "dynamo", "torchscript", "inference"]
 dependencies = [
@@ -218,3 +218,27 @@ disallow_untyped_calls = false
 module = "torch_tensorrt.fx.*"
 ignore_errors = true
 follow_imports = "skip"
+
+[tool.typos]
+files.extend-exclude = [
+    "docs/**/*",
+    "*/fx/*",
+    "docsrc/_rendered_examples/",
+    "core/*",
+    "!core/runtime/",
+    "third_party/",
+    "CHANGELOG.md",
+    "*.ipynb",
+    "cpp/",
+    "py/torch_tensorrt/fx/"
+]
+
+[tool.typos.default]
+extend-ignore-identifiers-re = [
+    "^([A-z]|[a-z])*Nd*",
+    "^([A-z]|[a-z])*nd*",
+    "activ*([A-z]|[a-z]|[0-9])*,"
+]
+
+[tool.typos.default.extend-words]
+arange = "arange"

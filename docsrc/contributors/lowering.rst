@@ -30,12 +30,12 @@ Eliminate Dead Code
 
 Dead code elimination will check if a node has side effects and not delete it if it does.
 
-Eliminate Exeception Or Pass Pattern
+Eliminate Exception Or Pass Pattern
 ***************************************
 
     `Torch-TensorRT/core/lowering/passes/exception_elimination.cpp <https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/exception_elimination.cpp>`_
 
-A common pattern in scripted modules are dimension gaurds which will throw execptions if
+A common pattern in scripted modules are dimension guards which will throw exceptions if
 the input dimension is not what was expected.
 
 .. code-block:: none
@@ -48,9 +48,9 @@ the input dimension is not what was expected.
         block1():
         -> ()
 
-Since we are resolving all of this at compile time and there are no execptions in the TensorRT graph, we just remove it.
+Since we are resolving all of this at compile time and there are no exceptions in the TensorRT graph, we just remove it.
 
-Eliminate Redundant Gaurds
+Eliminate Redundant Guards
 ***************************************
 
     `torch/csrc/jit/passes/guard_elimination.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/guard_elimination.h>`_
@@ -63,7 +63,7 @@ Freeze Module
 
     `torch/csrc/jit/passes/freeze_module.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/freeze_module.h>`_
 
-Freeze attributes and inline constants and modules. Propogates constants in the graph.
+Freeze attributes and inline constants and modules. Propagates constants in the graph.
 
 Fuse AddMM Branches
 ***************************************
@@ -71,7 +71,7 @@ Fuse AddMM Branches
     `Torch-TensorRT/core/lowering/passes/fuse_addmm_branches.cpp <https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/fuse_addmm_branches.cpp>`_
 
 A common pattern in scripted modules is tensors of different dimensions use different constructions for implementing linear layers. We fuse these
-different varients into a single one that will get caught by the Unpack AddMM pass.
+different variants into a single one that will get caught by the Unpack AddMM pass.
 
 .. code-block:: none
 
@@ -103,7 +103,7 @@ Fuse Flatten Linear
 
     `Torch-TensorRT/core/lowering/passes/fuse_flatten_linear.cpp <https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/fuse_flatten_linear.cpp>`_
 
-TensorRT implicity flattens input layers into fully connected layers when they are higher than 1D. So when there is a
+TensorRT implicitly flattens input layers into fully connected layers when they are higher than 1D. So when there is a
 ``aten::flatten`` -> ``aten::linear`` pattern we remove the ``aten::flatten``.
 
 Lower Graph
@@ -147,7 +147,7 @@ Places delimiting nodes around module calls pre freezing to signify where in the
 
 Looks for delimiters then marks all nodes between the delimiters to tell partitioning to run them in PyTorch
 
-Peephole Optimze
+Peephole Optimize
 ***************************************
 
     `torch/csrc/jit/passes/peephole_optimze.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/ppeephole_optimze.h>`_
@@ -179,7 +179,7 @@ Remove To
 
     `Torch-TensorRT/core/lowering/passes/remove_to.cpp <https://github.com/pytorch/TensorRT/blob/master/core/lowering/passes/remove_to.cpp>`_
 
-Removes ``aten::to`` operators that do casting, since TensorRT mangages it itself. It is important that this is one of the last passes run so that
+Removes ``aten::to`` operators that do casting, since TensorRT manages it itself. It is important that this is one of the last passes run so that
 other passes have a change to move required cast operators out of the main namespace.
 
 Unpack AddMM
@@ -204,7 +204,7 @@ Unroll Loops
 
     `torch/csrc/jit/passes/loop_unrolling.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/loop_unrolling.h>`_
 
-Unrolls the operations of compatable loops (e.g. sufficently short) so that you only have to go through the loop once.
+Unrolls the operations of compatible loops (e.g. sufficiently short) so that you only have to go through the loop once.
 
 Replace Tile with Repeat
 ***************************************

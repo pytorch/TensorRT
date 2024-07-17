@@ -3,6 +3,7 @@ from torch_tensorrt.fx.converters.impl import convolution
 from . import (
     activation,
     addmm,
+    arange,
     attention,
     cast,
     cat,
@@ -18,6 +19,7 @@ from . import (
     pad,
     permutation,
     pool,
+    prelu,
     quantize,
     reduce,
     select,

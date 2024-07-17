@@ -70,7 +70,7 @@ class CompilationSettings:
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         dryrun (Union[bool, str]): Toggle "Dryrun" mode, which runs everything through partitioning, short of conversion to
             TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the
-            ouptut to a file if a string path is specified
+            output to a file if a string path is specified
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
     """

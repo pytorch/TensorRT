@@ -2,7 +2,7 @@
 
 This is a recipe to train a VGG network on CIFAR10 to use with the Torch-TensorRT PTQ example.
 
-## Prequisites
+## Prerequisites
 
 ```
 pip3 install -r requirements.txt --user
