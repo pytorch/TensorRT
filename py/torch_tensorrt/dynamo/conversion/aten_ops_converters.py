@@ -1759,14 +1759,7 @@ def aten_ops_logical_not(
     )
 
 
-# TODO: confirm with Dheeraj, whether it requires supports_dynamic_shapes=True
-# according to https://pytorch.org/docs/stable/generated/torch.sym_not.html
-# Boolean value of Tensor with more than one value is not allowed, so it must be static_shaped
-# eg. allowed: True or torch.tensor(True) or torch.tensor([False]) or torch.tensor([[False]])
-# eg. not allowed: torch.tensor([True, False]) or torch.tensor([[True], [False]])
-@dynamo_tensorrt_converter(
-    torch.sym_not,
-)
+@dynamo_tensorrt_converter(torch.sym_not, supports_dynamic_shapes=True)
 def aten_ops_sym_not(
     ctx: ConversionContext,
     target: Target,
