@@ -2728,6 +2728,7 @@ def attention_validator(node: Node) -> bool:
 @dynamo_tensorrt_converter(
     torch.nn.functional.scaled_dot_product_attention,
     capability_validator=attention_validator,
+    supports_dynamic_shapes=True,
 )
 def tensorrt_scaled_dot_product_attention(
     ctx: ConversionContext,
