@@ -623,8 +623,8 @@ else:
         )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim)
-@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims)
+@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims, supports_dynamic_shapes=True)
 def aten_ops_squeeze(
     ctx: ConversionContext,
     target: Target,
@@ -1752,6 +1752,23 @@ def aten_ops_logical_not(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.unary.logical_not(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.sym_not, supports_dynamic_shapes=True)
+def aten_ops_sym_not(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.sym_not(
         ctx,
         target,
         SourceIR.ATEN,
@@ -3436,4 +3453,43 @@ def aten_ops_prelu(
         name,
         args[0],
         args[1],
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.arange.start_step, supports_dynamic_shapes=True
+)
+def aten_ops_arange_start_step(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.arange.arange(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        start=args[0],
+        end=args[1],
+        step=args_bounds_check(args, 2, 1),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.full.default, supports_dynamic_shapes=True)
+def aten_ops_full(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.full.full(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        shape=args[0],
+        fill_value=args[1],
     )
