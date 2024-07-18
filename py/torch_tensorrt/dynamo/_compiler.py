@@ -48,8 +48,9 @@ logger = logging.getLogger(__name__)
 
 def compile(
     exported_program: ExportedProgram,
-    inputs: Sequence[Any],
+    inputs: Optional[Sequence[Sequence[Any]]] = None,
     *,
+    arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
     kwarg_inputs: Optional[dict[Any, Any]] = None,
     device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
     disable_tf32: bool = _defaults.DISABLE_TF32,
@@ -111,6 +112,8 @@ def compile(
                     ]
 
     Keyword Arguments:
+        arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
+        kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
         device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
 
             device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
@@ -183,13 +186,21 @@ def compile(
         )
 
     # Aliasing inputs to arg_inputs for better understanding
-    arg_inputs = inputs
+    if not arg_inputs and not inputs:
+        raise AssertionError("'arg_input' and 'input' should not both be None.")
+
+    elif arg_inputs and inputs:
+        raise AssertionError(
+            "'arg_input' and 'input' should not be used at the same time."
+        )
+
+    arg_inputs = inputs or arg_inputs
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
 
     if not isinstance(arg_inputs, collections.abc.Sequence):
-        arg_inputs = [arg_inputs]
+        arg_inputs = [arg_inputs]  # type: ignore
 
     # Prepare torch_trt inputs
     trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
@@ -263,7 +274,8 @@ def compile_module(
 
     Args:
         module: FX GraphModule to convert
-        inputs: Inputs to the module
+        arg_inputs: Inputs to the module
+        kwarg_inputs: kwargs to the module
         settings: Compilation settings
     Returns:
         Compiled FX GraphModule
@@ -481,9 +493,10 @@ def compile_module(
 
 def convert_module_to_trt_engine(
     exported_program: ExportedProgram,
-    inputs: Sequence[Any],
-    kwarg_inputs: Optional[dict[str, Any]] = None,
+    inputs: Optional[Sequence[Sequence[Any]]] = None,
     *,
+    arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
+    kwarg_inputs: Optional[dict[Any, Any]] = None,
     enabled_precisions: (
         Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
     ) = _defaults.ENABLED_PRECISIONS,
@@ -595,8 +608,17 @@ def convert_module_to_trt_engine(
             DeprecationWarning,
             stacklevel=2,
         )
+    if not arg_inputs and not inputs:
+        raise AssertionError("'arg_input' and 'input' should not both be None.")
 
-    arg_input_list = list(inputs) if inputs is not None else []
+    elif arg_inputs and inputs:
+        raise AssertionError(
+            "'arg_input' and 'input' should not be used at the same time."
+        )
+
+    arg_inputs = inputs or arg_inputs
+
+    arg_input_list = list(arg_inputs) if arg_inputs is not None else []
     torch_executed_ops = torch_executed_ops if torch_executed_ops is not None else set()
     if kwarg_inputs is None:
         kwarg_inputs = {}

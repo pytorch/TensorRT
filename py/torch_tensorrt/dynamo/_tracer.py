@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
 import torch
 from torch.export import Dim, export
@@ -14,7 +14,10 @@ logger = logging.getLogger(__name__)
 
 def trace(
     mod: torch.nn.Module | torch.fx.GraphModule,
-    inputs: Tuple[Any, ...],
+    inputs: Optional[Tuple[Any, ...]] = None,
+    *,
+    arg_inputs: Optional[Tuple[Any, ...]] = None,
+    kwarg_inputs: Optional[dict[Any, Any]] = None,
     **kwargs: Any,
 ) -> torch.export.ExportedProgram:
     """Exports a ``torch.export.ExportedProgram`` from a ``torch.nn.Module`` or ``torch.fx.GraphModule`` specifically targeting being compiled with Torch-TensorRT
@@ -40,6 +43,8 @@ def trace(
                     torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
                 ]
     Keyword Arguments:
+        arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
+        kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
         device (Union(torch.device, dict)): Target device for TensorRT engines to run on ::
 
             device=torch.device("cuda:0")
@@ -52,14 +57,27 @@ def trace(
     """
 
     # Set log level at the top of compilation (torch_tensorrt.dynamo)
+    if not arg_inputs and not inputs:
+        raise AssertionError("'arg_input' and 'input' should not both be None.")
+
+    elif arg_inputs and inputs:
+        raise AssertionError(
+            "'arg_input' and 'input' should not be used at the same time."
+        )
+    arg_inputs = inputs or arg_inputs
+
+    if kwarg_inputs is None:
+        kwarg_inputs = {}
+
     debug = kwargs.get("debug", DEBUG)
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
 
     device = to_torch_device(kwargs.get("device", default_device()))
-    torch_inputs = get_torch_inputs(inputs, device)
+    torch_arg_inputs = get_torch_inputs(arg_inputs, device)
+    torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
     dynamic_shapes = []
-    for input in inputs:
+    for input in arg_inputs:  # type: ignore
         if isinstance(input, Input) and input.shape_mode == Input._ShapeMode.DYNAMIC:
             min_shape = input.shape["min_shape"]
             opt_shape = input.shape["opt_shape"]
@@ -78,6 +96,11 @@ def trace(
 
             dynamic_shapes.append(dynamic_dims)
 
-    exp_program = export(mod, tuple(torch_inputs), dynamic_shapes=tuple(dynamic_shapes))
+    exp_program = export(
+        mod,
+        tuple(torch_arg_inputs),
+        kwargs=torch_kwarg_inputs,
+        dynamic_shapes=tuple(dynamic_shapes),
+    )
 
     return exp_program
