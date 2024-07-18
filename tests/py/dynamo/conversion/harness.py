@@ -399,7 +399,14 @@ class DispatchTestCase(TRTTestCase):
         )
         # Since the lowering is based on optimal shape. We need to test with
         # different shape(for ex. max shape) for testing dynamic shape
-        inputs_max = [spec.example_tensor("max_shape") for spec in input_specs]
+        inputs_max = [
+            (
+                spec.example_tensor("max_shape")
+                if spec.shape_mode == Input._ShapeMode.DYNAMIC
+                else spec.example_tensor()
+            )
+            for spec in input_specs
+        ]
         if not use_example_tensors:
             inputs_max = [spec.torch_tensor for spec in input_specs]
         super().run_test(mod, inputs_max, interp, rtol, atol, pyt_inputs=pyt_inputs)
