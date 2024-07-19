@@ -28,15 +28,46 @@ class TestRollConverter(DispatchTestCase):
                 ],
                 [],
             ),
+            ((2, 3), [1], [1]),
         ]
     )
-    def test_roll(self, shape, shifts, dims):
+    def test_roll_static(self, shape, shifts, dims):
         class Roll(nn.Module):
             def forward(self, x):
                 return torch.ops.aten.roll.default(x, shifts, dims)
 
         inputs = [torch.randn(shape)]
         self.run_test(Roll(), inputs)
+
+    @parameterized.expand(
+        [
+            # dim is empty
+            ((2,), (3,), (4,), [1], []),
+            ((2, 3), (3, 4), (4, 5), [1], []),
+            ((2, 3), (3, 4), (4, 5), [2], []),
+            ((2, 3), (3, 4), (4, 5), [-15], []),
+            ((2, 3, 3), (3, 4, 3), (4, 5, 4), [1], []),
+            # dim is not empty
+            ((2,), (3,), (4,), [1], [0]),
+            ((2, 3), (3, 4), (4, 5), [1], [1]),
+            ((2, 3), (3, 4), (4, 5), [2, 0], [0, 1]),
+            ((2, 3, 4), (3, 4, 5), (4, 5, 6), [-15, -2, 1], [0, 0, 1]),
+            ((2, 3, 3, 5), (3, 4, 3, 5), (4, 5, 4, 6), [11, -23], [0, 1]),
+        ]
+    )
+    def test_roll_dynamic(self, min_shape, opt_shape, max_shape, shifts, dims):
+        class Roll(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.roll.default(x, shifts, dims)
+
+        inputs = [
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+            )
+        ]
+        self.run_test_with_dynamic_shape(Roll(), inputs)
 
 
 if __name__ == "__main__":
