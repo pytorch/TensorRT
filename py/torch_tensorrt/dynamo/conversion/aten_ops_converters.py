@@ -2593,7 +2593,7 @@ def aten_ops_avg_pool(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool1d.default)
+@dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool1d.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2616,10 +2616,14 @@ def aten_ops_adaptive_avg_pool1d(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool2d.default)
-@dynamo_tensorrt_converter(torch.ops.aten._adaptive_avg_pool2d.default)
-@dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool3d.default)
-@dynamo_tensorrt_converter(torch.ops.aten._adaptive_avg_pool3d.default)
+# @dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool2d.default, supports_dynamic_shapes=True)
+# @dynamo_tensorrt_converter(torch.ops.aten._adaptive_avg_pool2d.default, supports_dynamic_shapes=True)
+# @dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool3d.default, supports_dynamic_shapes=True)
+# @dynamo_tensorrt_converter(torch.ops.aten._adaptive_avg_pool3d.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool2d.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten._adaptive_avg_pool2d.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.adaptive_avg_pool3d.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten._adaptive_avg_pool3d.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),

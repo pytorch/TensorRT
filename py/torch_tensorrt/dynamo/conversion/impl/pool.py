@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import math
 from typing import Dict, Optional, Sequence, Union
 
@@ -9,12 +11,38 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     extend_attr_to_tuple,
     get_positive_dim,
+    get_trt_tensor,
+    cast_trt_tensor
 )
 from torch_tensorrt.fx.converters.converter_utils import (
     has_dynamic_shape,
     set_layer_name,
 )
 from torch_tensorrt.fx.types import TRTTensor
+
+from typing import List, Optional, Tuple
+
+import numpy as np
+import torch
+from torch.fx.node import Target
+from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_trt_tensor,
+    get_positive_dim,
+    get_trt_tensor,
+)
+from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
+    convert_binary_elementwise,
+)
+from torch_tensorrt.fx.converters.converter_utils import (
+    Frameworks,
+    set_layer_name,
+    unified_dtype_converter,
+)
+from torch_tensorrt.fx.types import TRTTensor
+
+import tensorrt as trt
 
 
 def avg_poolNd(
@@ -111,6 +139,69 @@ def max_poolNd(
     return pool_layer.get_output(0)
 
 
+# def adaptive_avg_pool1d(
+#     ctx: ConversionContext,
+#     target: Union[Target, str],
+#     source_ir: Optional[SourceIR],
+#     name: str,
+#     input: TRTTensor,
+#     output_size: Union[int, Sequence[int]],
+# ) -> TRTTensor:
+#     def start_index(idx: int, out_dim: int, in_dim: int) -> int:
+#         """Calculate the start index of each pooling window"""
+#         return math.floor((float(idx) * float(in_dim)) / out_dim)
+
+#     def end_index(idx: int, out_dim: int, in_dim: int) -> int:
+#         """Calculate the end index of each pooling window"""
+#         return math.ceil((float(idx + 1) * float(in_dim)) / out_dim)
+
+#     in_dim = input.shape[-1]
+#     out_dim = output_size if isinstance(output_size, int) else output_size[0]
+#     output_list = []
+
+#     # store {index: slice} for reducing repeated slice ops
+#     idx_slice_map: Dict[int, TRTTensor] = {}
+#     # iterate over each output dimension
+#     for i in range(out_dim):
+#         # calculate the start and end index of each pooling window
+#         start = start_index(i, out_dim, in_dim)
+#         end = end_index(i, out_dim, in_dim)
+
+#         # slice the input tensor from start to end index, the result of which is the window waiting for pooling
+#         slices = []
+#         for j in range(start, end):
+#             if j in idx_slice_map:
+#                 slice = idx_slice_map[j]
+#             else:
+#                 slice = impl.select.select(
+#                     ctx, target, source_ir, f"{name}_select_{j}", input, -1, j
+#                 )
+#                 slice = impl.shuffle.reshape(
+#                     ctx,
+#                     target,
+#                     source_ir,
+#                     f"{name}_reshape_{i}_{j}",
+#                     slice,
+#                     (*slice.shape, 1),
+#                 )
+#                 idx_slice_map[j] = slice
+
+#             slices.append(slice)
+
+#         slices = impl.cat.cat(
+#             ctx, target, source_ir, f"{name}_slices_cat_{i}", slices, dim=-1
+#         )
+#         # calculate the mean of the slices (average pooling output) and append to the output list
+#         output_list.append(
+#             impl.reduce.mean(
+#                 ctx, target, source_ir, f"{name}_sum_{i}", slices, dim=-1, keepdim=True
+#             )
+#         )
+
+#     output = impl.cat.cat(ctx, target, source_ir, f"{name}_cat", output_list, dim=-1)
+#     return output
+
+
 def adaptive_avg_pool1d(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -119,56 +210,87 @@ def adaptive_avg_pool1d(
     input: TRTTensor,
     output_size: Union[int, Sequence[int]],
 ) -> TRTTensor:
-    def start_index(idx: int, out_dim: int, in_dim: int) -> int:
-        """Calculate the start index of each pooling window"""
-        return math.floor((float(idx) * float(in_dim)) / out_dim)
+    import numpy as np
 
-    def end_index(idx: int, out_dim: int, in_dim: int) -> int:
-        """Calculate the end index of each pooling window"""
-        return math.ceil((float(idx + 1) * float(in_dim)) / out_dim)
+    def start_index(idx: int, out_dim: int, in_dim: TRTTensor) -> TRTTensor:
+        idx_tensor = ctx.net.add_constant((1,), np.array([idx], dtype=np.float32)).get_output(0)
+        out_dim_tensor = ctx.net.add_constant((1,), np.array([out_dim], dtype=np.float32)).get_output(0)
+        in_dim_float = cast_trt_tensor(ctx, in_dim, trt.float32, f"{name}_in_dim_float_{idx}")
 
-    in_dim = input.shape[-1]
+        prod = impl.elementwise.mul(ctx, target, source_ir, f"{name}_mul_{idx}", idx_tensor, in_dim_float)
+        div = impl.elementwise.div(ctx, target, source_ir, f"{name}_div_{idx}", prod, out_dim_tensor)
+
+        return impl.unary.floor(ctx, target, source_ir, f"{name}_start_index_{idx}", div)
+
+    def end_index(idx: int, out_dim: int, in_dim: TRTTensor) -> TRTTensor:
+        idx_tensor_end_index = ctx.net.add_constant((1,), np.array([idx + 1], dtype=np.float32)).get_output(0)
+        out_dim_tensor_end_index = ctx.net.add_constant((1,), np.array([out_dim], dtype=np.float32)).get_output(0)
+        in_dim_float = cast_trt_tensor(ctx, in_dim, trt.float32, f"{name}_in_dim_float_end_index_{idx}")
+        
+        prod = impl.elementwise.mul(ctx, target, source_ir, f"{name}_mul_end_index_{idx}", idx_tensor_end_index, in_dim_float)
+        div = impl.elementwise.div(ctx, target, source_ir, f"{name}_div_end_index_{idx}", prod, out_dim_tensor_end_index)
+
+        # prod = ctx.net.add_elementwise(idx_tensor, in_dim_float, trt.ElementWiseOperation.PROD).get_output(0)
+        # div = ctx.net.add_elementwise(prod, out_dim_tensor, trt.ElementWiseOperation.DIV).get_output(0)
+        return impl.unary.ceil(ctx, target, source_ir, f"{name}_end_index_{idx}", div)
+
+    in_dim = impl.shape.shape(ctx, target, source_ir, f"{name}_in_dim", input, -1)
     out_dim = output_size if isinstance(output_size, int) else output_size[0]
     output_list = []
 
     # store {index: slice} for reducing repeated slice ops
     idx_slice_map: Dict[int, TRTTensor] = {}
-    # iterate over each output dimension
+
     for i in range(out_dim):
-        # calculate the start and end index of each pooling window
         start = start_index(i, out_dim, in_dim)
         end = end_index(i, out_dim, in_dim)
 
-        # slice the input tensor from start to end index, the result of which is the window waiting for pooling
         slices = []
-        for j in range(start, end):
-            if j in idx_slice_map:
-                slice = idx_slice_map[j]
-            else:
-                slice = impl.select.select(
-                    ctx, target, source_ir, f"{name}_select_{j}", input, -1, j
-                )
-                slice = impl.shuffle.reshape(
-                    ctx,
-                    target,
-                    source_ir,
-                    f"{name}_reshape_{i}_{j}",
-                    slice,
-                    (*slice.shape, 1),
-                )
-                idx_slice_map[j] = slice
+        # start_idx = ctx.net.add_constant((1,), np.array([0], dtype=np.int32))
+        # set_layer_name(start_idx, target, f"{name}_start_idx_{i}")
+        # start_idx = start_idx.get_output(0)
 
-            slices.append(slice)
+        # end_idx = ctx.net.add_constant((1,), np.array([0], dtype=np.int32))
+        # set_layer_name(end_idx, target, f"{name}_end_idx_{i}")
+        # end_idx = end_idx.get_output(0)
 
-        slices = impl.cat.cat(
-            ctx, target, source_ir, f"{name}_slices_cat_{i}", slices, dim=-1
-        )
-        # calculate the mean of the slices (average pooling output) and append to the output list
-        output_list.append(
-            impl.reduce.mean(
-                ctx, target, source_ir, f"{name}_sum_{i}", slices, dim=-1, keepdim=True
+        start_idx = cast_trt_tensor(ctx, start, trt.int32, f"{name}_start_idx_trt_{i}")
+        end_idx = cast_trt_tensor(ctx, end, trt.int32, f"{name}_end_idx_trt_{i}")
+
+        for j in range(out_dim):
+            j_tensor = ctx.net.add_constant((1,), np.array([j], dtype=np.int32)).get_output(0)
+            cond1 = impl.elementwise.le(ctx, target, source_ir, name + f"_cond1_{i}_{j}", start_idx, j_tensor)
+            cond2 = impl.elementwise.gt(ctx, target, source_ir, name + f"_cond2_{i}_{j}", end_idx, j_tensor)
+            cond = impl.elementwise.logical_and(ctx, target, source_ir, name + f"_and_{i}_{j}", cond1, cond2)
+            
+            if isinstance(cond, TRTTensor) and cond.shape == (1,):
+                if j in idx_slice_map:
+                    slice = idx_slice_map[j]
+                else:
+                    slice = impl.select.select(
+                        ctx, target, source_ir, f"{name}_select_{j}", input, -1, j
+                    )
+                    slice = impl.shuffle.reshape(
+                        ctx,
+                        target,
+                        source_ir,
+                        f"{name}_reshape_{i}_{j}",
+                        slice,
+                        (*slice.shape, 1),
+                    )
+                    idx_slice_map[j] = slice
+
+                slices.append(slice)
+
+        if slices:
+            slices = impl.cat.cat(
+                ctx, target, source_ir, f"{name}_slices_cat_{i}", slices, dim=-1
             )
-        )
+            output_list.append(
+                impl.reduce.mean(
+                    ctx, target, source_ir, f"{name}_sum_{i}", slices, dim=-1, keepdim=True
+                )
+            )
 
     output = impl.cat.cat(ctx, target, source_ir, f"{name}_cat", output_list, dim=-1)
     return output
