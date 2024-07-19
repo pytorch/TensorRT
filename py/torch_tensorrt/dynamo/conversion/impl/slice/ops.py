@@ -254,7 +254,7 @@ def expand(
     input_tensor_shape = tuple(input_t.shape)
     for i, o in zip(input_tensor_shape, shape):
         # If input dim and target shape dim are static, broadcast if they are not equal
-        # If a dimension of target shape has ITensor, we treat it as a broadcasted dim
+        # If input dim is known and target shape dim is dynamic we treat it as a broadcasted dim
         if (
             isinstance(i, int)
             and i != DYNAMIC_DIM
@@ -262,7 +262,7 @@ def expand(
             and o != DYNAMIC_DIM
         ):
             stride.append(int(i == o))
-        elif isinstance(o, TRTTensor):
+        elif isinstance(i, int) and i != DYNAMIC_DIM and isinstance(o, TRTTensor):
             stride.append(0)
         else:
             # No broadcasting is happening. The output should have the same size as input at this dimension.
