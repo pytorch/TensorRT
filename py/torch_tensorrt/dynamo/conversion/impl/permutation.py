@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Sequence, Union
+from typing import Optional, Sequence, Union
 
 import tensorrt as trt
 from torch.fx.node import Target
@@ -38,57 +38,9 @@ def permute(
 
 def calc_start_by_static_shape(
     input: TRTTensor,
-    shift_dict: Dict[int, int],
+    shifts: Sequence[int],
+    dims: Sequence[int],
 ) -> Sequence[int]:
-    start = [0] * len(input.shape)
-    for d, s in shift_dict.items():
-        start[d] = get_positive_dim(-s, input.shape[d])
-    return start
-
-
-def calc_start_by_dynamic_shape(
-    ctx: ConversionContext,
-    target: Target,
-    source_ir: Optional[SourceIR],
-    name: str,
-    input: TRTTensor,
-    shift_dict: Dict[int, int],
-) -> TRTTensor:
-    start = []
-    default_tensor = get_trt_tensor(ctx, 0, name + "_get_0")
-    for i in range(len(input.shape)):
-        start.append(default_tensor)
-    for d, s in shift_dict.items():
-        dim_length = impl.shape.shape(ctx, target, source_ir, name + "_shape", input, d)
-        start[d] = impl.elementwise.sub(
-            ctx, target, source_ir, name + "_sub", dim_length, s
-        )
-    concat_layer = ctx.net.add_concatenation(start)
-    concat_layer.axis = 0
-    set_layer_name(concat_layer, target, f"{name}_gather", source_ir)
-    return concat_layer.get_output(0)
-
-
-def roll(
-    ctx: ConversionContext,
-    target: Target,
-    source_ir: Optional[SourceIR],
-    name: str,
-    input: TRTTensor,
-    shifts: Union[int, Sequence[int]],
-    dims: Union[int, Sequence[int]],
-) -> TRTTensor:
-    if isinstance(shifts, int):
-        shifts = [shifts]
-    if isinstance(dims, int):
-        dims = [dims]
-
-    is_dynamic_shape = has_dynamic_shape(input.shape)
-    if all(isinstance(shift, TRTTensor) for shift in shifts):
-        is_dynamic_shift = False
-    else:
-        is_dynamic_shift = True
-
     shift_dict = {}
     if dims == []:
         shift_dict[1] = shifts[0]
@@ -101,6 +53,72 @@ def roll(
                 shift_dict[dim] += shift
             else:
                 shift_dict[dim] = shift
+    start = [0] * len(input.shape)
+    for d, s in shift_dict.items():
+        start[d] = get_positive_dim(-s, input.shape[d])
+    return start
+
+
+def calc_start_by_dynamic_shape(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    shifts: Sequence[Union[int, TRTTensor]],
+    dims: Sequence[int],
+) -> TRTTensor:
+    start = [0] * len(input.shape)
+    default_tensor = get_trt_tensor(ctx, 0, name + "_get_0")
+
+    if dims == []:
+        dim_length = impl.shape.shape(ctx, target, source_ir, name + "_shape", input, 1)
+        start[1] = impl.elementwise.sub(
+            ctx, target, source_ir, name + "_sub", dim_length, shifts[0]
+        )
+    else:
+        for d, s in zip(dims, shifts):
+            if isinstance(start[d], TRTTensor):
+                start[d] = impl.elementwise.sub(
+                    ctx, target, source_ir, name + "_sub", start[d], s
+                )
+            else:
+                dim_length = impl.shape.shape(
+                    ctx, target, source_ir, name + "_shape", input, d
+                )
+                start[d] = impl.elementwise.sub(
+                    ctx, target, source_ir, name + "_sub", dim_length, s
+                )
+
+    for idx in range(len(start)):
+        if start[idx] == 0:
+            start[idx] = default_tensor
+    concat_layer = ctx.net.add_concatenation(start)
+    concat_layer.axis = 0
+    set_layer_name(concat_layer, target, f"{name}_gather", source_ir)
+    return concat_layer.get_output(0)
+
+
+def roll(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    shifts: Union[int, Sequence[Union[int, TRTTensor]]],
+    dims: Union[int, Sequence[int]],
+) -> TRTTensor:
+    print(f"lan added {shifts=} {dims=}")
+    if isinstance(shifts, int):
+        shifts = [shifts]
+    if isinstance(dims, int):
+        dims = [dims]
+
+    is_dynamic_shape = has_dynamic_shape(input.shape)
+    if all(isinstance(shift, TRTTensor) for shift in shifts):
+        is_dynamic_shift = False
+    else:
+        is_dynamic_shift = True
 
     # handle static shape for the input tensor and shifts:
     if not is_dynamic_shape and not is_dynamic_shift:
@@ -110,7 +128,7 @@ def roll(
             input = impl.shuffle.reshape(
                 ctx, target, source_ir, name + "_reshape", input, (1, -1)
             )
-        start = calc_start_by_static_shape(input, shift_dict)
+        start = calc_start_by_static_shape(input, shifts, dims)
         stride = [1] * len(input.shape)
         slice_layer = ctx.net.add_slice(
             input,
@@ -135,7 +153,13 @@ def roll(
                 ctx, target, source_ir, f"{name}_reshape", input, (1, -1)
             )
         start = calc_start_by_dynamic_shape(
-            ctx, target, source_ir, name + "_calc", input, shift_dict
+            ctx,
+            target,
+            source_ir,
+            name + "_calc",
+            input,
+            shifts,
+            dims,
         )
         stride = [1] * len(input.shape)
         slice_layer = ctx.net.add_slice(

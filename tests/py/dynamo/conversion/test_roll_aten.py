@@ -55,7 +55,9 @@ class TestRollConverter(DispatchTestCase):
             ((2, 3, 3, 5), (3, 4, 3, 5), (4, 5, 4, 6), [11, -23], [0, 1]),
         ]
     )
-    def test_roll_dynamic(self, min_shape, opt_shape, max_shape, shifts, dims):
+    def test_roll_dynamic_input_static_shifts(
+        self, min_shape, opt_shape, max_shape, shifts, dims
+    ):
         class Roll(nn.Module):
             def forward(self, x):
                 return torch.ops.aten.roll.default(x, shifts, dims)
@@ -68,6 +70,34 @@ class TestRollConverter(DispatchTestCase):
             )
         ]
         self.run_test_with_dynamic_shape(Roll(), inputs)
+
+    @parameterized.expand(
+        [
+            ((2, 3), (3, 4), (4, 5)),
+            ((2, 3, 4), (3, 4, 5), (3, 5, 5)),
+        ]
+    )
+    def test_roll_dynamic_input_dynamic_shifts(self, min_shape, opt_shape, max_shape):
+        class Roll(nn.Module):
+            def forward(self, x):
+                dims = [0, 1]
+                shifts = [x.shape[d] // 2 for d in dims]
+                return torch.ops.aten.roll.default(x, shifts, dims)
+
+        inputs = [
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+            )
+        ]
+        # TODO: Confirm with Dheeraj:
+        # this test is to test the torch.roll(input, shifts, dims) operator
+        # when only input is dynamic shape, both fx symbolic and dynamo tracer works as expected
+        # when both input and shifts are dynamic shape, I have to set use_dynamo_tracer=True
+        # otherwise this particular test will fail as follows:
+        # py/torch_tensorrt/dynamo/conversion/_TRTInterpreter.py:480: UnsupportedOperatorException
+        self.run_test_with_dynamic_shape(Roll(), inputs, use_dynamo_tracer=True)
 
 
 if __name__ == "__main__":
