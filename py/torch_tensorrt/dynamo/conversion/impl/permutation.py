@@ -108,7 +108,6 @@ def roll(
     shifts: Union[int, Sequence[Union[int, TRTTensor]]],
     dims: Union[int, Sequence[int]],
 ) -> TRTTensor:
-    print(f"lan added {shifts=} {dims=}")
     if isinstance(shifts, int):
         shifts = [shifts]
     if isinstance(dims, int):
