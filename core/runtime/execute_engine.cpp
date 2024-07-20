@@ -114,6 +114,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   // Whether cudagraphs needs to record the graph on this pass
   bool need_cudagraphs_record = (CUDAGRAPHS_MODE && !_cudagraphs_validate_shapes(inputs, compiled_engine));
 
+  // this is a buffer to store shape tensor input addresses throughout the runtime scope
+  std::list<std::vector<int64_t>> inputShapeTensorValues;
+
   // Intialize outputs to be available throughout the succeeding scopes
   std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
 
@@ -177,8 +180,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       }
     }
 
-    // this is a buffer to store shape tensor input addresses throughout the runtime scope
-    std::list<std::vector<int32_t>> inputShapeTensorValues;
     {
       std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
       if (compiled_engine->profile_execution) {
@@ -200,12 +201,12 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         at::Tensor contig_input;
 
         if (compiled_engine->cuda_engine->isShapeInferenceIO(name.c_str())) {
-          // Shape tensor inputs are casted to int32 explicitly.
+          // Shape tensor inputs are casted to int64 explicitly
           // Refer to
           // https://github.com/NVIDIA/TensorRT/blob/d2f4ef789a9a6ffdf37b55c3f81b486225f6b380/samples/common/sampleInference.cpp#L435
-          auto input_cpu = inputs[i].clone().contiguous().cpu().to(torch::kInt32);
-          std::vector<int32_t> inputs_cpu_vec(
-              input_cpu.data_ptr<int32_t>(), input_cpu.data_ptr<int32_t>() + input_cpu.numel());
+          auto input_cpu = inputs[i].clone().contiguous().cpu().to(torch::kInt64);
+          std::vector<int64_t> inputs_cpu_vec(
+              input_cpu.data_ptr<int64_t>(), input_cpu.data_ptr<int64_t>() + input_cpu.numel());
           inputShapeTensorValues.emplace_back(inputs_cpu_vec);
           TORCHTRT_CHECK(
               compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputShapeTensorValues.back().data()),
@@ -273,6 +274,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
   if (!CUDAGRAPHS_MODE) {
     // If not in cudagraphs mode, proceed with enqueueV3 as normal
+    c10::cuda::CUDAStream stream = c10::cuda::getCurrentCUDAStream(inputs[0].device().index());
     compiled_engine->exec_ctx->enqueueV3(compiled_engine->active_stream);
   } else if (need_cudagraphs_record) {
     // If cudagraphs needs to record a graph, capture the enqueueV3 call in a graph
