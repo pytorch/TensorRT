@@ -10,10 +10,10 @@ from .harness import DispatchTestCase
 class TestSelectConverterOne(DispatchTestCase):
     @parameterized.expand(
         [
-            ("select_dim_index", 1, 0),
+            ("dim_index", 1, 0),
         ]
     )
-    def test_select(self, _, dim, index):
+    def test_select_2d(self, _, dim, index):
         class select(nn.Module):
             def __init__(self):
                 super().__init__()
@@ -27,14 +27,12 @@ class TestSelectConverterOne(DispatchTestCase):
             input,
         )
 
-
-class TestSelectConverterTwo(DispatchTestCase):
     @parameterized.expand(
         [
-            ("select_dim_index", 1, 0),
+            ("dim_index", 1, 0),
         ]
     )
-    def test_select(self, _, dim, index):
+    def test_select_4d(self, _, dim, index):
         class select(nn.Module):
             def __init__(self):
                 super().__init__()
@@ -48,21 +46,10 @@ class TestSelectConverterTwo(DispatchTestCase):
             input,
         )
 
-
-class TestSelectConverterDynamicShape(DispatchTestCase):
     @parameterized.expand(
         [
             (
-                "select_dim_index",
-                (1, 3, 3),
-                (2, 3, 3),
-                (3, 3, 3),
-                torch.int32,
-                1,
-                0,
-            ),
-            (
-                "select_dim_index",
+                "partial_dynamic_static_dim",
                 (1, 1, 3),
                 (2, 2, 3),
                 (3, 3, 3),
@@ -71,13 +58,31 @@ class TestSelectConverterDynamicShape(DispatchTestCase):
                 0,
             ),
             (
-                "select_dim_index",
-                (3, 1, 1),
-                (3, 2, 2),
+                "partial_dynamic_dynamic_dim",
+                (1, 1, 3),
+                (2, 2, 3),
                 (3, 3, 3),
                 torch.float,
-                0,
-                2,
+                1,
+                1,
+            ),
+            (
+                "fully_dynamic",
+                (1, 1, 1),
+                (2, 2, 2),
+                (3, 3, 3),
+                torch.float,
+                1,
+                1,
+            ),
+            (
+                "fully_dynamic_neg_dim",
+                (1, 1, 1),
+                (2, 2, 2),
+                (3, 3, 3),
+                torch.float,
+                -1,
+                1,
             ),
         ]
     )
