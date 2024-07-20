@@ -104,12 +104,6 @@ class TestLinearConverter(DispatchTestCase):
             def __init__(self):
                 super().__init__()
                 self.weight = torch.rand(weight_shape)
-                # self.weight = torch.randn(weight_shape)
-                # # Note: When using torch.randn for weight initialization, the following assertion error occurs:
-                # AssertionError: Tensor-likes are not close!
-                # Mismatched elements: 323 / 2304 (14.0%)
-                # Greatest absolute difference: 0.015128374099731445 at index (1, 1, 139) (up to 0.001 allowed)
-                # Greatest relative difference: 3.242828845977783 at index (1, 1, 154) (up to 0.001 allowed)
 
                 if bias_shape:
                     self.bias = torch.randn(bias_shape)
