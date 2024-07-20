@@ -2563,13 +2563,19 @@ def avg_pool_param_validator(pool_node: Node) -> bool:
 
 # Note: AvgPool1d uses avg_pool2d as it converts to 2D first.
 @dynamo_tensorrt_converter(
-    torch.ops.aten.avg_pool1d.default, capability_validator=avg_pool_param_validator
+    torch.ops.aten.avg_pool1d.default,
+    capability_validator=avg_pool_param_validator,
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
-    torch.ops.aten.avg_pool2d.default, capability_validator=avg_pool_param_validator
+    torch.ops.aten.avg_pool2d.default,
+    capability_validator=avg_pool_param_validator,
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
-    torch.ops.aten.avg_pool3d.default, capability_validator=avg_pool_param_validator
+    torch.ops.aten.avg_pool3d.default,
+    capability_validator=avg_pool_param_validator,
+    supports_dynamic_shapes=True,
 )
 def aten_ops_avg_pool(
     ctx: ConversionContext,
