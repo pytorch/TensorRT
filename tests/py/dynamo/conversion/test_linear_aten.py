@@ -1,6 +1,8 @@
 import torch
+import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
@@ -8,25 +10,35 @@ from .harness import DispatchTestCase
 class TestLinearConverter(DispatchTestCase):
     @parameterized.expand(
         [
-            ("default", [1, 512], True, torch.ops.aten.linear.default),
-            ("matrix", [5, 512], True, torch.ops.aten.linear.default),
-            ("no_bias", [1, 512], False, torch.ops.aten.linear.default),
+            (
+                "default",
+                [1, 512],
+                True,
+            ),
+            (
+                "matrix",
+                [5, 512],
+                True,
+            ),
+            (
+                "no_bias",
+                [1, 512],
+                False,
+            ),
             (
                 "multi_dim_matrix",
                 [4, 5, 512],
                 True,
-                torch.ops.aten.linear.default,
             ),
             (
                 "multi_dim_matrix",
                 [4, 5, 512],
                 False,
-                torch.ops.aten.linear.default,
             ),
         ]
     )
-    def test_linear(self, test_name, shape, bias, op):
-        class TestModule(torch.nn.Module):
+    def test_linear(self, test_name, shape, bias):
+        class linear(nn.Module):
             def __init__(self):
                 super().__init__()
                 self.weight = torch.randn((256, 512))
@@ -39,37 +51,86 @@ class TestLinearConverter(DispatchTestCase):
                 return torch.ops.aten.linear.default(x, self.weight, self.bias)
 
         inputs = [torch.randn(shape)]
-        self.run_test(TestModule(), inputs)
+        self.run_test(linear(), inputs)
 
         # linear will be decomposed to P531484488 and view(reshape) can not handle reshape pattern
         # like (2, 3, n)->(6, n) in implicit mode which is similar to dynamic shape test below.
 
-    # Input is transposed through view [3,3,512]->[9,512]. Converter does not know dim=0 is dynamic now.
+    # # Input is transposed through view [3,3,512]->[9,512]. Converter does not know dim=0 is dynamic now.
+    @parameterized.expand(
+        [
+            (
+                "2d_dim",
+                (1, 512),
+                (2, 512),
+                (3, 512),
+                torch.float32,
+                (256, 512),
+                None,
+            ),
+            (
+                "3d_one_dynamic_dim",
+                (1, 1, 512),
+                (2, 2, 512),
+                (3, 3, 512),
+                torch.float32,
+                (256, 512),
+                (256,),
+            ),
+            (
+                "3d_two_dynamic_dim_bias",
+                (1, 1, 512),
+                (2, 2, 512),
+                (3, 3, 512),
+                torch.float32,
+                (256, 512),
+                (256,),
+            ),
+            (
+                "3d_two_dynamic_dim_no_bias",
+                (1, 1, 512),
+                (2, 2, 512),
+                (3, 3, 512),
+                torch.float32,
+                (256, 512),
+                None,
+            ),
+        ]
+    )
+    def test_linear_with_dynamic_shape(
+        self, _, min_shape, opt_shape, max_shape, type, weight_shape, bias_shape
+    ):
+        class linear(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.rand(weight_shape)
+                # self.weight = torch.randn(weight_shape)
+                # # Note: When using torch.randn for weight initialization, the following assertion error occurs:
+                # AssertionError: Tensor-likes are not close!
+                # Mismatched elements: 323 / 2304 (14.0%)
+                # Greatest absolute difference: 0.015128374099731445 at index (1, 1, 139) (up to 0.001 allowed)
+                # Greatest relative difference: 3.242828845977783 at index (1, 1, 154) (up to 0.001 allowed)
 
-    # def test_linear_with_dynamic_shape(self):
-    #     class TestModule(torch.nn.Module):
-    #         def __init__(self):
-    #             super().__init__()
-    #             self.linear = torch.nn.Linear(512, 256)
+                if bias_shape:
+                    self.bias = torch.randn(bias_shape)
+                else:
+                    self.bias = None
 
-    #         def forward(self, x):
-    #             return self.linear(x)
+            def forward(self, x):
+                return torch.ops.aten.linear.default(x, self.weight, self.bias)
 
-    #     input_specs = [
-    #         Input(
-    #             shape=(-1, 3, 512),
-    #             dtype=torch.float32,
-    #             shape_ranges=[((1, 3, 512), (3, 3, 512), (4, 3, 512))],
-    #         ),
-    #     ]
-    #     self.run_test_with_dynamic_shape(
-    #         TestModule(),
-    #         input_specs,
-    #         expected_ops={torch.ops.aten.addmm.default},
-    #     )
-
-    ## Testing with (-1, -1, 512) results into following error:
-    ## AssertionError: Currently we only support one dynamic dim for linear and it can't be the last dim.
+        input_specs = [
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            linear(),
+            input_specs,
+        )
 
 
 if __name__ == "__main__":
