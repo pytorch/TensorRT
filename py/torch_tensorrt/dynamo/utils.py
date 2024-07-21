@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
@@ -13,7 +14,6 @@ from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
-import tensorrt as trt
 from packaging import version
 
 from .types import TRTDataType
@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 COSINE_THRESHOLD = 0.99
 DYNAMIC_DIM = -1
+TRT_TOPK_MAX_ELEMENT = 3840
 
 
 class Frameworks(Enum):

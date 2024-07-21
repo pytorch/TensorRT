@@ -19,6 +19,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     is_only_operator_on_placeholder,
 )
+from torch_tensorrt.dynamo.utils import TRT_TOPK_MAX_ELEMENT
 from torch_tensorrt.fx.types import TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -2648,6 +2649,10 @@ def topk_validator(node: Node) -> bool:
 
 
 def sort_validator(node: Node) -> bool:
+    # if meta data is not available(e.g. dynamic shape), validate k value during runtime.
+    if not node.args[0].meta:
+        return True
+
     shape = node.args[0].meta.get("tensor_meta").shape
     dim = node.args[1]
     dim = get_positive_dim(dim, len(shape))
@@ -2656,9 +2661,9 @@ def sort_validator(node: Node) -> bool:
 
 
 def topk_sort_validator(k: int) -> bool:
-    if k > 3840:
+    if k > TRT_TOPK_MAX_ELEMENT:
         _LOGGER.debug(
-            f"Currently only topk values up to 3840 are supported, got k={k}."
+            f"Currently only topk values up to {TRT_TOPK_MAX_ELEMENT} are supported, got k={k}."
         )
         return False
     return True
@@ -3103,7 +3108,9 @@ def aten_ops_topk(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.sort.default, capability_validator=sort_validator
+    torch.ops.aten.sort.default,
+    capability_validator=sort_validator,
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
     {
@@ -3128,7 +3135,7 @@ def aten_ops_sort(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.trunc.default)
+@dynamo_tensorrt_converter(torch.ops.aten.trunc.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -3204,9 +3211,9 @@ def aten_ops_remainder(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.any.default)
-@dynamo_tensorrt_converter(torch.ops.aten.any.dim)
-@dynamo_tensorrt_converter(torch.ops.aten.any.dims)
+@dynamo_tensorrt_converter(torch.ops.aten.any.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.any.dim, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.any.dims, supports_dynamic_shapes=True)
 def aten_ops_any(
     ctx: ConversionContext,
     target: Target,
