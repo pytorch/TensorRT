@@ -10,12 +10,55 @@ from torch_tensorrt.fx.converters.converter_utils import (
     set_layer_name,
 )
 from torch_tensorrt.fx.types import TRTTensor
+import numpy as np
+from torch_tensorrt.dynamo.conversion import impl
 
 """
 Note: IPaddingLayer is deprecated in TensorRT 8.2 and will be removed in TensorRT 10.0.
 Use ISliceLayer to pad the tensor, which supports new non-constant, reflects padding
 mode and clamp, and supports padding output with dynamic shape.
 """
+
+
+# def constant_padNd(
+#     ctx: ConversionContext,
+#     target: Union[Target, str],
+#     source_ir: Optional[SourceIR],
+#     name: str,
+#     input: TRTTensor,
+#     pad: Sequence[int],
+#     value: Union[int, float] = 0,
+# ) -> TRTTensor:
+#     if has_dynamic_shape(input.shape):
+#         assert input.shape[1] != -1, "Channel dim can't be dynamic for padding."
+
+#     rank = len(input.shape)
+
+#     if len(pad) // 2 > rank:
+#         raise RuntimeError(
+#             f"Trying to pad last {len(pad) // 2} dimension but the input only has {rank} dimension."
+#         )
+
+#     start_list = [0] * rank
+#     new_shape = list(input.shape)
+
+#     for i in range(0, len(pad) // 2):
+#         start_list[-i - 1] = -pad[i * 2]
+#         new_shape[-i - 1] += pad[i * 2] + pad[i * 2 + 1]
+
+#     stride_list = [1] * rank
+#     layer = ctx.net.add_slice(
+#         input,
+#         start=tuple(start_list),
+#         shape=tuple(new_shape),
+#         stride=tuple(stride_list),
+#     )
+#     value_const = get_trt_tensor(ctx, value, f"{name}_value", input.dtype)
+#     layer.set_input(4, value_const)
+#     layer.mode = trt.SampleMode.FILL
+
+#     set_layer_name(layer, target, name, source_ir)
+#     return layer.get_output(0)
 
 
 def constant_padNd(
@@ -27,30 +70,58 @@ def constant_padNd(
     pad: Sequence[int],
     value: Union[int, float] = 0,
 ) -> TRTTensor:
-    if has_dynamic_shape(input.shape):
-        assert input.shape[1] != -1, "Channel dim can't be dynamic for padding."
 
     rank = len(input.shape)
-
     if len(pad) // 2 > rank:
         raise RuntimeError(
-            f"Trying to pad last {len(pad) // 2} dimension but the input only has {rank} dimension."
+            f"Trying to pad last {len(pad) // 2} dimensions but the input only has {rank} dimensions."
         )
 
-    start_list = [0] * rank
-    new_shape = list(input.shape)
+    stride_list = [1] * rank
 
-    for i in range(0, len(pad) // 2):
-        start_list[-i - 1] = -pad[i * 2]
-        new_shape[-i - 1] += pad[i * 2] + pad[i * 2 + 1]
+    input_shape_tensor = ctx.net.add_shape(input).get_output(0)
+    new_shape_tensor = input_shape_tensor
+
+    start_list = [0] * rank
+    for i in range(len(pad) // 2):
+        dim_index = rank - (i + 1)
+        pad_before = pad[i * 2]
+        pad_after = pad[i * 2 + 1]
+
+        pad_sum = get_trt_tensor(ctx, pad_before + pad_after, f"{name}_pad_sum_{i}", dtype=np.int64)
+        dim_shape = ctx.net.add_slice(
+            input_shape_tensor,
+            start=tuple([dim_index]),
+            shape=tuple([1]),
+            stride=tuple([1])
+        ).get_output(0)
+
+        new_dim_shape = impl.elementwise.add(ctx, target, source_ir, f"{name}_shape_dim_{i}", dim_shape, pad_sum)
+        start_list[dim_index] = -pad_before
+
+        slices = []
+        for j in range(rank):
+            if j == dim_index:
+                slices.append(new_dim_shape)
+            else:
+                slices.append(ctx.net.add_slice(new_shape_tensor, start=tuple([j]), shape=tuple([1]), stride=tuple([1])).get_output(0))
+        new_shape_tensor = ctx.net.add_concatenation(slices).get_output(0)
+
+    start_tensor = get_trt_tensor(ctx, np.array(start_list, dtype=np.int64), f"{name}_start_tensor", dtype=np.int64)
 
     stride_list = [1] * rank
+    stride_tensor = get_trt_tensor(ctx, np.array(stride_list, dtype=np.int64), f"{name}_stride_tensor", dtype=np.int64)
+
     layer = ctx.net.add_slice(
-        input,
-        start=tuple(start_list),
-        shape=tuple(new_shape),
-        stride=tuple(stride_list),
+        input, 
+        start=trt.Dims(), 
+        shape=trt.Dims(), 
+        stride=trt.Dims()
     )
+    layer.set_input(1, start_tensor)
+    layer.set_input(2, new_shape_tensor)
+    layer.set_input(3, stride_tensor)
+
     value_const = get_trt_tensor(ctx, value, f"{name}_value", input.dtype)
     layer.set_input(4, value_const)
     layer.mode = trt.SampleMode.FILL

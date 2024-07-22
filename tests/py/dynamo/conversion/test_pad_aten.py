@@ -2,6 +2,7 @@
 import torch
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
@@ -11,6 +12,8 @@ class TestConstantPadConverter(DispatchTestCase):
         [
             ((1, 2), (1, 1), 0),
             ((2, 1), (2, 1), 1),
+            ((2, 2), (1, 1), 0),
+            ((1, 2), (1, 1, 2, 0), 0),
             ((3, 4, 2), (1, 2), 2),
             ((3, 4, 2), (1, 2, 3, 1, 2, 3), 0),
             ((3, 3, 4, 2), (1, 2, 3, 4), 0),
@@ -29,6 +32,41 @@ class TestConstantPadConverter(DispatchTestCase):
             TestModule(),
             input,
         )
+
+
+    @parameterized.expand(
+        [
+            (
+                "3d",
+                (1, 1, 1),
+                (2, 2, 2),
+                (3, 3, 3),
+                torch.float,
+                (1,1,1,1,1,1),
+                0,
+            ),
+        ]
+    )
+    def test_dynamic_shape_constant_pad(
+        self, _, min_shape, opt_shape, max_shape, type, pad, value
+    ):
+        class constant_pad(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, input):
+                return torch.ops.aten.constant_pad_nd.default(input, pad, value)
+
+        input_specs = [
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(constant_pad(), input_specs)
 
 
 class TestReflectionPadConverter(DispatchTestCase):
