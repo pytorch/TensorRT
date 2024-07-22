@@ -33,7 +33,6 @@ class TestConstantPadConverter(DispatchTestCase):
             input,
         )
 
-
     @parameterized.expand(
         [
             (
@@ -42,7 +41,7 @@ class TestConstantPadConverter(DispatchTestCase):
                 (2, 2, 2),
                 (3, 3, 3),
                 torch.float,
-                (1,1,1,1,1,1),
+                (1, 1, 1, 1, 1, 1),
                 0,
             ),
         ]

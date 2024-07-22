@@ -1,8 +1,10 @@
 from typing import Optional, Sequence, Union
 
+import numpy as np
 import tensorrt as trt
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
 from torch_tensorrt.fx.converters.converter_utils import (
@@ -10,8 +12,6 @@ from torch_tensorrt.fx.converters.converter_utils import (
     set_layer_name,
 )
 from torch_tensorrt.fx.types import TRTTensor
-import numpy as np
-from torch_tensorrt.dynamo.conversion import impl
 
 """
 Note: IPaddingLayer is deprecated in TensorRT 8.2 and will be removed in TensorRT 10.0.
@@ -88,15 +88,19 @@ def constant_padNd(
         pad_before = pad[i * 2]
         pad_after = pad[i * 2 + 1]
 
-        pad_sum = get_trt_tensor(ctx, pad_before + pad_after, f"{name}_pad_sum_{i}", dtype=np.int64)
+        pad_sum = get_trt_tensor(
+            ctx, pad_before + pad_after, f"{name}_pad_sum_{i}", dtype=np.int64
+        )
         dim_shape = ctx.net.add_slice(
             input_shape_tensor,
-            start=tuple([dim_index]),
-            shape=tuple([1]),
-            stride=tuple([1])
+            start=(dim_index,),
+            shape=(1,),
+            stride=(1,),
         ).get_output(0)
 
-        new_dim_shape = impl.elementwise.add(ctx, target, source_ir, f"{name}_shape_dim_{i}", dim_shape, pad_sum)
+        new_dim_shape = impl.elementwise.add(
+            ctx, target, source_ir, f"{name}_shape_dim_{i}", dim_shape, pad_sum
+        )
         start_list[dim_index] = -pad_before
 
         slices = []
@@ -104,19 +108,33 @@ def constant_padNd(
             if j == dim_index:
                 slices.append(new_dim_shape)
             else:
-                slices.append(ctx.net.add_slice(new_shape_tensor, start=tuple([j]), shape=tuple([1]), stride=tuple([1])).get_output(0))
+                slices.append(
+                    ctx.net.add_slice(
+                        new_shape_tensor,
+                        start=(j,),
+                        shape=(1,),
+                        stride=(1,),
+                    ).get_output(0)
+                )
         new_shape_tensor = ctx.net.add_concatenation(slices).get_output(0)
 
-    start_tensor = get_trt_tensor(ctx, np.array(start_list, dtype=np.int64), f"{name}_start_tensor", dtype=np.int64)
+    start_tensor = get_trt_tensor(
+        ctx,
+        np.array(start_list, dtype=np.int64),
+        f"{name}_start_tensor",
+        dtype=np.int64,
+    )
 
     stride_list = [1] * rank
-    stride_tensor = get_trt_tensor(ctx, np.array(stride_list, dtype=np.int64), f"{name}_stride_tensor", dtype=np.int64)
+    stride_tensor = get_trt_tensor(
+        ctx,
+        np.array(stride_list, dtype=np.int64),
+        f"{name}_stride_tensor",
+        dtype=np.int64,
+    )
 
     layer = ctx.net.add_slice(
-        input, 
-        start=trt.Dims(), 
-        shape=trt.Dims(), 
-        stride=trt.Dims()
+        input, start=trt.Dims(), shape=trt.Dims(), stride=trt.Dims()
     )
     layer.set_input(1, start_tensor)
     layer.set_input(2, new_shape_tensor)
