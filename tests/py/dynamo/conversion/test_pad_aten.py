@@ -2,6 +2,7 @@
 import torch
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
@@ -116,6 +117,39 @@ class TestReplicationPadConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
+            (
+                "3d",
+                (1, 1, 1),
+                (2, 2, 2),
+                (3, 3, 3),
+                torch.float,
+                (1, 1),
+            ),
+        ]
+    )
+    def test_dynamic_shape_replication_pad1d(
+        self, _, min_shape, opt_shape, max_shape, type, padding
+    ):
+        class replication_pad1d(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, input):
+                return torch.ops.aten.replication_pad1d.default(input, padding)
+
+        input_specs = [
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(replication_pad1d(), input_specs)
+
+    @parameterized.expand(
+        [
             # Per pytorch doc, the input should be 3D or 4D
             ((2, 2, 2), (1, 1, 1, 1)),
             ((1, 2, 4), (2, 2, 1, 1)),
@@ -136,6 +170,39 @@ class TestReplicationPadConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
+            (
+                "4d",
+                (1, 1, 1, 1),
+                (2, 2, 2, 2),
+                (3, 3, 3, 3),
+                torch.float,
+                (1, 1, 2, 2),
+            ),
+        ]
+    )
+    def test_dynamic_shape_replication_pad2d(
+        self, _, min_shape, opt_shape, max_shape, type, padding
+    ):
+        class replication_pad2d(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, input):
+                return torch.ops.aten.replication_pad2d.default(input, padding)
+
+        input_specs = [
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(replication_pad2d(), input_specs)
+
+    @parameterized.expand(
+        [
             # Per pytorch doc, the input should be 4D or 5D
             ((2, 2, 2, 2), (1, 1, 1, 1, 1, 1)),
             ((1, 2, 3, 4), (3, 2, 2, 1, 1, 1)),
@@ -153,6 +220,39 @@ class TestReplicationPadConverter(DispatchTestCase):
             TestModule(),
             input,
         )
+
+    @parameterized.expand(
+        [
+            (
+                "5d",
+                (1, 1, 1, 1, 1),
+                (2, 2, 2, 2, 2),
+                (3, 3, 3, 3, 3),
+                torch.float,
+                (1, 1, 2, 2, 1, 2),
+            ),
+        ]
+    )
+    def test_dynamic_shape_replication_pad3d(
+        self, _, min_shape, opt_shape, max_shape, type, padding
+    ):
+        class replication_pad3d(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, input):
+                return torch.ops.aten.replication_pad3d.default(input, padding)
+
+        input_specs = [
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(replication_pad3d(), input_specs)
 
 
 class TestCircularPadConverter(DispatchTestCase):
@@ -215,6 +315,55 @@ class TestCircularPadConverter(DispatchTestCase):
             TestModule(),
             input,
         )
+
+    @parameterized.expand(
+        [
+            (
+                "circular_pad_1d",
+                (1, 1, 1),
+                (2, 2, 2),
+                (3, 3, 3),
+                torch.float,
+                (1, 1),
+            ),
+            (
+                "circular_pad_2d",
+                (1, 1, 1, 1),
+                (2, 2, 2, 2),
+                (3, 3, 3, 3),
+                torch.float,
+                (1, 1, 2, 2),
+            ),
+            (
+                "circular_pad_3d",
+                (1, 1, 1, 1, 1),
+                (2, 2, 2, 2, 2),
+                (3, 3, 3, 3, 3),
+                torch.float,
+                (1, 1, 2, 2, 1, 2),
+            ),
+        ]
+    )
+    def test_dynamic_shape_circular_pad(
+        self, _, min_shape, opt_shape, max_shape, type, padding
+    ):
+        class circular_pad(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, input):
+                return torch.ops.aten._pad_circular.default(input, padding)
+
+        input_specs = [
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(circular_pad(), input_specs)
 
 
 class TestPadConverter(DispatchTestCase):
