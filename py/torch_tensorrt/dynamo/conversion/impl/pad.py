@@ -20,47 +20,6 @@ mode and clamp, and supports padding output with dynamic shape.
 """
 
 
-# def constant_padNd(
-#     ctx: ConversionContext,
-#     target: Union[Target, str],
-#     source_ir: Optional[SourceIR],
-#     name: str,
-#     input: TRTTensor,
-#     pad: Sequence[int],
-#     value: Union[int, float] = 0,
-# ) -> TRTTensor:
-#     if has_dynamic_shape(input.shape):
-#         assert input.shape[1] != -1, "Channel dim can't be dynamic for padding."
-
-#     rank = len(input.shape)
-
-#     if len(pad) // 2 > rank:
-#         raise RuntimeError(
-#             f"Trying to pad last {len(pad) // 2} dimension but the input only has {rank} dimension."
-#         )
-
-#     start_list = [0] * rank
-#     new_shape = list(input.shape)
-
-#     for i in range(0, len(pad) // 2):
-#         start_list[-i - 1] = -pad[i * 2]
-#         new_shape[-i - 1] += pad[i * 2] + pad[i * 2 + 1]
-
-#     stride_list = [1] * rank
-#     layer = ctx.net.add_slice(
-#         input,
-#         start=tuple(start_list),
-#         shape=tuple(new_shape),
-#         stride=tuple(stride_list),
-#     )
-#     value_const = get_trt_tensor(ctx, value, f"{name}_value", input.dtype)
-#     layer.set_input(4, value_const)
-#     layer.mode = trt.SampleMode.FILL
-
-#     set_layer_name(layer, target, name, source_ir)
-#     return layer.get_output(0)
-
-
 def constant_padNd(
     ctx: ConversionContext,
     target: Union[Target, str],
