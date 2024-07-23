@@ -2938,9 +2938,15 @@ def aten_ops_constant_pad(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.reflection_pad1d.default)
-@dynamo_tensorrt_converter(torch.ops.aten.reflection_pad2d.default)
-@dynamo_tensorrt_converter(torch.ops.aten.reflection_pad3d.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.reflection_pad1d.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.reflection_pad2d.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.reflection_pad3d.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
