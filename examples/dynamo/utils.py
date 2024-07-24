@@ -31,7 +31,7 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
                 (inputs,),
                 dynamic_shapes=({1: seq_len},),
                 strict=False,
-                _allow_complex_guards_as_runtime_asserts=True,
+                allow_complex_guards_as_runtime_asserts=True,
             )
 
     return ep
@@ -50,7 +50,7 @@ def generate(model, input_seq, max_tokens, eos_token_id):
     )
     token_id = 0
     while token_id < max_tokens:
-        print("Generating token: ", token_id)
+        # print("Generating token: ", token_id)
         outputs = model(input_seq)
         logits = outputs.logits
         next_token_logits = logits[:, -1, :]
@@ -60,4 +60,4 @@ def generate(model, input_seq, max_tokens, eos_token_id):
             break
         token_id += 1
 
-    return input_seq
+    return input_seq, token_id
