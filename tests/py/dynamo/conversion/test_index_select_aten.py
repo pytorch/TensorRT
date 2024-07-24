@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
-from parameterized import parameterized
+import torch_tensorrt
+from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
@@ -35,6 +37,86 @@ class TestIndexSelectConverter(DispatchTestCase):
             TestIndexSelect(),
             input,
         )
+
+    @parameterized.expand(
+        [
+            param(
+                # 1d_source_tensor
+                source_tensor=torch.randn((3,), dtype=torch.float32),
+                dynamic_shapes={
+                    "source_tensor": {0: torch.export.Dim("dyn_dim", min=3, max=6)},
+                    "indice_tensor": {},
+                },
+                dim=0,
+                indice_tensor=torch.tensor(
+                    [
+                        1,
+                    ],
+                    dtype=torch.int32,
+                ),
+            ),
+            param(
+                # 2d_source_tensor
+                source_tensor=torch.randn((3, 3), dtype=torch.float32),
+                dynamic_shapes={
+                    "source_tensor": {
+                        0: torch.export.Dim("dyn_dim1", min=3, max=6),
+                        1: torch.export.Dim("dyn_dim2", min=2, max=7),
+                    },
+                    "indice_tensor": {},
+                },
+                dim=-1,
+                indice_tensor=torch.tensor([0, 2], dtype=torch.int32),
+            ),
+            param(
+                # 3d_source_tensor
+                source_tensor=torch.randn((3, 4, 2), dtype=torch.float32),
+                dynamic_shapes={
+                    "source_tensor": {
+                        0: torch.export.Dim("dyn_dim1", min=3, max=6),
+                        1: torch.export.Dim("dyn_dim2", min=2, max=7),
+                    },
+                    "indice_tensor": {},
+                },
+                dim=-2,
+                indice_tensor=torch.tensor([0, 0, 2], dtype=torch.int32),
+            ),
+        ]
+    )
+    def test_index_select_dynamic_shape(
+        self, source_tensor, dynamic_shapes, dim, indice_tensor
+    ):
+        class IndexSelect(torch.nn.Module):
+            def forward(self, source_tensor, indice_tensor):
+                return torch.ops.aten.index_select.default(
+                    source_tensor,
+                    dim,
+                    indice_tensor,
+                )
+
+        inputs = (source_tensor, indice_tensor)
+        mod = IndexSelect()
+
+        fx_mod = torch.export.export(mod, inputs, dynamic_shapes=dynamic_shapes)
+        trt_mod = torch_tensorrt.dynamo.compile(
+            fx_mod, inputs=inputs, enable_precisions=torch.float32, min_block_size=1
+        )
+
+        with torch.no_grad():
+            cuda_inputs = []
+            for i in inputs:
+                cuda_inputs.append(i.cuda())
+            ref_outputs = mod(*cuda_inputs)
+            outputs = trt_mod(*cuda_inputs)
+            for out, ref in zip(outputs, ref_outputs):
+                torch.testing.assert_close(
+                    out,
+                    ref,
+                    rtol=0.001,
+                    atol=0.001,
+                    equal_nan=True,
+                    check_dtype=True,
+                )
 
 
 if __name__ == "__main__":

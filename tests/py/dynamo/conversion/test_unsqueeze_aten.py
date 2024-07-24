@@ -4,7 +4,7 @@ import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
-from torch_tensorrt.dynamo.conversion import UnsupportedOperatorException, impl
+from torch_tensorrt.dynamo.conversion import UnsupportedOperatorException
 
 from .harness import DispatchTestCase
 
@@ -87,46 +87,6 @@ class TestBroadcastInDim(DispatchTestCase):
         self.run_test(
             Unsqueeze(),
             inputs,
-        )
-
-
-class TestBroadcastInDim(DispatchTestCase):
-    def test_broadcast_in_dim_supported_1(
-        self,
-    ):
-        class Unsqueeze(nn.Module):
-            def forward(self, x):
-                return torch.ops.prims.broadcast_in_dim.default(x, [3, 4, 1], [0, 1])
-
-        inputs = [torch.arange(0, 12).reshape(3, 4)]
-        self.run_test(
-            Unsqueeze(),
-            inputs,
-        )
-
-    # TODO: need help from Dheeraj to figure out why this test is failed
-    def test_broadcast_in_dim_with_dynamic_shape(
-        self,
-    ):
-        class BroadcastInDim(nn.Module):
-            def forward(self, x):
-                dims = [0, 1]
-                shape = [x.shape[d] for d in dims]
-                shape.append(1)
-                return torch.ops.prims.broadcast_in_dim.default(x, shape, dims)
-
-        input_specs = [
-            Input(
-                dtype=torch.float32,
-                min_shape=(2, 3),
-                opt_shape=(3, 4),
-                max_shape=(4, 5),
-            ),
-        ]
-        self.run_test_with_dynamic_shape(
-            BroadcastInDim(),
-            input_specs,
-            use_dynamo_tracer=True,
         )
 
     def test_broadcast_in_dim_supported_singleton(
