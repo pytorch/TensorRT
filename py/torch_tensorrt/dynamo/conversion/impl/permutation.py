@@ -35,7 +35,9 @@ def permute(
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
 
-
+# for the Tensorrt Slice layer: 
+# we need calculate the start offset that the slice layer uses to create the output slice.
+# in this static shape scenario, the start returned is the sequence of int(constant)
 def calc_start_by_static_shape(
     input: TRTTensor,
     shifts: Sequence[int],
@@ -58,7 +60,9 @@ def calc_start_by_static_shape(
         start[d] = get_positive_dim(-s, input.shape[d])
     return start
 
-
+# for the Tensorrt Slice layer: 
+# we need calculate the start offset that the slice layer uses to create the output slice.
+# in this dynamic shape scenario, the start returned is the tensor
 def calc_start_by_dynamic_shape(
     ctx: ConversionContext,
     target: Target,
