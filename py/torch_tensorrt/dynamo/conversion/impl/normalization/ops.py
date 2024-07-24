@@ -189,6 +189,12 @@ def native_group_norm(
         shape,
     )
 
+    if weight is None:
+        weight = to_numpy(1.0)
+
+    if bias is None:
+        bias = to_numpy(0.0)
+
     weight = get_trt_tensor(ctx, weight, f"{name}_weight")
     bias = get_trt_tensor(ctx, bias, f"{name}_bias")
     weight_bias_shape = (1, C) + (1,) * (len(input.shape) - 2)
