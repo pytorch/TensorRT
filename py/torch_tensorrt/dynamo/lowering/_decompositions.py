@@ -243,6 +243,44 @@ def empty_strided_decomposition(*args, **kwargs) -> torch.Tensor:
     )
 
 
+@register_torch_trt_decomposition(
+    torch.ops.aten.scatter_add.default, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def scatter_add_decomposition(
+    input_tensor: torch.Tensor,
+    dim: int,
+    index: torch.Tensor,
+    src_tensor: torch.Tensor,
+) -> torch.Tensor:
+    scatter_add_tensor = input_tensor
+    src_shape = list(src_tensor.shape)
+    src_dim = src_shape[dim]
+    for i in range(0, src_dim):
+        to_scatter_tensor = torch.zeros_like(input_tensor)
+
+        # index and src slice
+        src_slice = torch.select(src_tensor, dim, i)
+        index_slice = torch.select(index, dim, i)
+
+        # unsqueeze src and index in dim
+        src_slice = torch.unsqueeze(src_slice, dim)
+        index_slice = torch.unsqueeze(index_slice, dim)
+
+        # moving tensor to default device
+        device = to_torch_device(default_device())
+        scatter_add_tensor = scatter_add_tensor.to(device)
+        to_scatter_tensor = to_scatter_tensor.to(device)
+        index_slice = index_slice.to(device)
+        src_slice = src_slice.to(device)
+
+        scatter_add_tensor = torch.add(
+            scatter_add_tensor,
+            torch.scatter(to_scatter_tensor, dim, index_slice, src_slice),
+        )
+
+    return scatter_add_tensor
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
