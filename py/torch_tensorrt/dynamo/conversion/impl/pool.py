@@ -30,9 +30,6 @@ def avg_poolNd(
     count_include_pad: bool = True,
     divisor_override: Optional[int] = None,
 ) -> TRTTensor:
-    if has_dynamic_shape(input.shape):
-        assert input.shape[1] != -1, "Channel dim can't be dynamic for pooling."
-
     if ceil_mode is not False:
         raise RuntimeError("ceil_mode is not yet supported!")
 

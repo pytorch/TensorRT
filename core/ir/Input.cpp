@@ -15,6 +15,14 @@ bool valid_dtype_format_combo(nvinfer1::DataType dtype, nvinfer1::TensorFormat f
         default:
           return false;
       }
+    case nvinfer1::DataType::kINT64: // Supports just Linear (NCHW)
+      switch (format) {
+        case nvinfer1::TensorFormat::kLINEAR:
+          return true;
+        case nvinfer1::TensorFormat::kHWC:
+        default:
+          return false;
+      }
     case nvinfer1::DataType::kINT32: // Supports just Linear (NCHW)
       switch (format) {
         case nvinfer1::TensorFormat::kLINEAR:
@@ -63,6 +71,8 @@ bool valid_input_dtype(nvinfer1::DataType dtype) {
     case nvinfer1::DataType::kINT8:
       return true;
     case nvinfer1::DataType::kINT32:
+      return true;
+    case nvinfer1::DataType::kINT64:
       return true;
     default:
       return false;

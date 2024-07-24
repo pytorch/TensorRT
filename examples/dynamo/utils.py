@@ -50,7 +50,7 @@ def generate(model, input_seq, max_tokens, eos_token_id):
     )
     token_id = 0
     while token_id < max_tokens:
-        print("Generating token: ", token_id)
+        # print("Generating token: ", token_id)
         outputs = model(input_seq)
         logits = outputs.logits
         next_token_logits = logits[:, -1, :]
@@ -60,4 +60,4 @@ def generate(model, input_seq, max_tokens, eos_token_id):
             break
         token_id += 1
 
-    return input_seq
+    return input_seq, token_id
