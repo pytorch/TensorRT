@@ -199,18 +199,17 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
     return ep
 
 
-def generate(model, input_seq, max_tokens):
+def generate(model, input_seq, output_seq_length):
     """
     Greedy decoding of the model. This generates up to max_tokens.
     """
-    max_length = len(input_seq) + max_tokens
     stopping_criteria = StoppingCriteriaList(
         [
-            MaxLengthCriteria(max_length=max_length),
+            MaxLengthCriteria(max_length=output_seq_length),
         ]
     )
-    token_id = 0
-    while token_id < max_tokens:
+
+    while True:
         outputs = model(input_seq)
         logits = outputs.logits
         next_token_logits = logits[:, -1, :]
@@ -218,17 +217,19 @@ def generate(model, input_seq, max_tokens):
         input_seq = torch.cat([input_seq, next_tokens[:, None]], dim=-1)
         if stopping_criteria(input_seq, logits).item():
             break
-        token_id += 1
 
     return input_seq
 
 
-def time_generate(model, inputs, max_tokens, iterations=10):
+def time_generate(model, inputs, output_seq_length, iterations=10):
+    """
+    Measure the time for generating a sentence over certain number of iterations
+    """
     timings = []
     for _ in range(iterations):
         start_time = time.time()
         inputs_copy = copy.copy(inputs)
-        generate(model, inputs_copy, max_tokens)
+        _ = generate(model, inputs_copy, output_seq_length)
         timings.append(time.time() - start_time)
 
     return timings

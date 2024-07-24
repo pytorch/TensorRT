@@ -141,6 +141,10 @@ def run_hf_dynamo(model, input_tensors, params, precision, batch_size):
     # We only support single input (B x seq_len) for LLMs now
     input_seq = input_tensors[0]
     with torch.no_grad():
+        # Warm up
+        _ = time_generate(trt_model, input_seq, osl, iterations=10)
+
+        # Actual perf measurement
         timings = time_generate(trt_model, input_seq, osl, iterations=iters)
 
     recordStats(
@@ -253,18 +257,53 @@ def run_torch_compile(model, input_tensors, params, precision, batch_size):
 
 
 @run_with_try_except
+def run_hf_inductor(model, input_tensors, params, precision, batch_size):
+    """
+    Compile the huggingface model using torch inductor and record performance stats
+    """
+    osl = params["output_sequence_length"]
+    # Mark dynamic shapes for input sequence
+    input_seq = input_tensors[0]
+    torch._dynamo.mark_dynamic(input_seq, 1, min=1, max=osl)
+    start_compile = time.time_ns()
+    # Compile the model
+    model = torch.compile(model, backend="inductor", dynamic=None, mode="max-autotune")
+    model(input_seq)
+    end_compile = time.time_ns()
+    compile_time_s = (end_compile - start_compile) / 1e9
+    iters = params.get("iterations", 20)
+
+    # We only support single input (B x seq_len) for LLMs now
+    with torch.no_grad():
+        # Warm up
+        _ = time_generate(model, input_seq, osl, iterations=iters)
+
+        # Actual perf measurement
+        timings = time_generate(model, input_seq, osl, iterations=iters)
+
+    recordStats(
+        "Torch [inductor HF]",
+        timings,
+        precision,
+        batch_size,
+        compile_time_s,
+    )
+
+
+@run_with_try_except
 def run_inductor(model, input_tensors, params, precision, batch_size):
     """
     Compile the given model using torch inductor and record performance stats
     """
     torch._dynamo.reset()
-
     print(
         "Running Torch [inductor] for precision: ",
         precision,
         " batch_size : ",
         batch_size,
     )
+    if params["is_hf"]:
+        return run_hf_inductor(model, input_tensors, params, precision, batch_size)
 
     start_compile = time.time_ns()
     model = torch.compile(model, backend="inductor", dynamic=False, mode="max-autotune")
