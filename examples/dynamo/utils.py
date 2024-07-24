@@ -31,7 +31,7 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
                 (inputs,),
                 dynamic_shapes=({1: seq_len},),
                 strict=False,
-                _allow_complex_guards_as_runtime_asserts=True,
+                allow_complex_guards_as_runtime_asserts=True,
             )
 
     return ep

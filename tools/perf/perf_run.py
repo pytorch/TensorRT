@@ -18,10 +18,12 @@ import torch
 import torch_tensorrt as torchtrt
 from utils import (
     BENCHMARK_MODELS,
+    export_llm,
     parse_backends,
     parse_inputs,
     parse_precisions,
     precision_to_dtype,
+    time_generate,
 )
 
 WARMUP_ITER = 10
@@ -115,6 +117,38 @@ def run_ts_trt(model, input_tensors, params, precision, batch_size):
 
 
 @run_with_try_except
+def run_hf_dynamo(model, input_tensors, params, precision, batch_size):
+    """
+    Compile the huggingface model using Torch-TensorRT dynamo frontend and record performance stats
+    """
+
+    osl = params["output_sequence_length"]
+    iters = params.get("iterations", 20)
+
+    exp_program = export_llm(model, input_tensors, min_seq_len=1, max_seq_len=osl)
+    start_compile = time.time_ns()
+
+    trt_model = torchtrt.dynamo.compile(
+        exp_program,
+        inputs=input_tensors,
+        enabled_precisions={precision_to_dtype(precision)},
+        truncate_double=params.get("truncate", False),
+    )
+
+    end_compile = time.time_ns()
+    compile_time_s = (end_compile - start_compile) / 1e9
+
+    # We only support single input (B x seq_len) for LLMs now
+    input_seq = input_tensors[0]
+    with torch.no_grad():
+        timings = time_generate(trt_model, input_seq, osl, iterations=iters)
+
+    recordStats(
+        "Torch-TensorRT [Dynamo HF]", timings, precision, batch_size, compile_time_s
+    )
+
+
+@run_with_try_except
 def run_dynamo(model, input_tensors, params, precision, batch_size):
     """
     Compile the given model using Torch-TensorRT dynamo frontend and record performance stats
@@ -125,6 +159,9 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
         " batch_size : ",
         batch_size,
     )
+    if params["is_hf"]:
+        return run_hf_dynamo(model, input_tensors, params, precision, batch_size)
+
     start_compile = time.time_ns()
     model = torchtrt.compile(
         model,
@@ -494,6 +531,18 @@ if __name__ == "__main__":
         help="List of input shapes. Eg: (1, 3, 224, 224)@fp32 for Resnet or (1, 128)@int32;(1, 128)@int32 for BERT",
     )
     arg_parser.add_argument(
+        "--is_hf",
+        action="store_true",
+        help="Boolean flag to determine if model is a huggingface model",
+    )
+    arg_parser.add_argument(
+        "-osl",
+        "--output_sequence_length",
+        type=int,
+        help="Length of output sequence to HF model",
+        default=128,
+    )
+    arg_parser.add_argument(
         "--batch_size", type=int, default=1, help="Batch size to build and run"
     )
     arg_parser.add_argument(
@@ -549,9 +598,7 @@ if __name__ == "__main__":
     # If neither model type was provided
     if (model is None) and (model_torch is None):
         raise ValueError(
-            "No valid models specified. Please provide a torchscript model file or model name "
-            + "(among the following options vgg16|resnet50|efficientnet_b0|vit) "
-            + "or provide a torch model file"
+            "No valid models specified. Please provide a torchscript model file or model name (defined in hub.py) or model_hf name in huggingface models "
         )
 
     backends = parse_backends(params["backends"])
