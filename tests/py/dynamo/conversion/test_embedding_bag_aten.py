@@ -414,13 +414,15 @@ class TestEmbeddingBagConverter(DispatchTestCase):
         [
             param(
                 # 1d_indices_mode_0_with_per_sample_weights
+                # weights is for compile
                 weights=torch.randn((5, 2), dtype=torch.float32),
+                # weights_1 is for inference
+                weights_1=torch.randn((6, 2), dtype=torch.float32),
                 dynamic_shapes={
                     "weights": {0: torch.export.Dim("dyn_dim", min=2, max=6)},
                     "indices": {},
                     "offsets": {},
                 },
-                # weights_max_dim=6,
                 indices=torch.tensor([1, 2, 4], dtype=torch.int32),
                 offsets=torch.tensor([0, 2, 3], dtype=torch.int32),
                 mode=0,
@@ -428,7 +430,10 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             ),
             param(
                 # 1d_indices_mode_1_without_per_sample_weights
+                # weights is for compile
                 weights=torch.randn((5, 2), dtype=torch.float32),
+                # weights_1 is for inference
+                weights_1=torch.randn((6, 3), dtype=torch.float32),
                 dynamic_shapes={
                     "weights": {
                         0: torch.export.Dim("dyn_dim", min=2, max=8),
@@ -445,7 +450,14 @@ class TestEmbeddingBagConverter(DispatchTestCase):
         ]
     )
     def test_embedding_bag_with_weights_dynamic_shape(
-        self, weights, dynamic_shapes, indices, offsets, mode, per_sample_weights
+        self,
+        weights,
+        weights_1,
+        dynamic_shapes,
+        indices,
+        offsets,
+        mode,
+        per_sample_weights,
     ):
         class EmbeddingBag(torch.nn.Module):
             def forward(self, weights, indices, offsets, per_sample_weights=None):
@@ -473,6 +485,11 @@ class TestEmbeddingBagConverter(DispatchTestCase):
         trt_mod = torch_tensorrt.dynamo.compile(
             fx_mod, inputs=inputs, enable_precisions=torch.float32, min_block_size=1
         )
+        # use the inputs with different shape to inference:
+        if per_sample_weights is None:
+            inputs = (weights_1, indices, offsets)
+        else:
+            inputs = (weights_1, indices, offsets, per_sample_weights)
 
         with torch.no_grad():
             cuda_inputs = []

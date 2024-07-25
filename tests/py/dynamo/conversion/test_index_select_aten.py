@@ -42,7 +42,10 @@ class TestIndexSelectConverter(DispatchTestCase):
         [
             param(
                 # 1d_source_tensor
+                # source_tensor is for compile
                 source_tensor=torch.randn((3,), dtype=torch.float32),
+                # source_tensor_1 is for inference
+                source_tensor_1=torch.randn((5,), dtype=torch.float32),
                 dynamic_shapes={
                     "source_tensor": {0: torch.export.Dim("dyn_dim", min=3, max=6)},
                     "indice_tensor": {},
@@ -57,7 +60,10 @@ class TestIndexSelectConverter(DispatchTestCase):
             ),
             param(
                 # 2d_source_tensor
+                # source_tensor is for compile
                 source_tensor=torch.randn((3, 3), dtype=torch.float32),
+                # source_tensor_1 is for inference
+                source_tensor_1=torch.randn((4, 6), dtype=torch.float32),
                 dynamic_shapes={
                     "source_tensor": {
                         0: torch.export.Dim("dyn_dim1", min=3, max=6),
@@ -70,7 +76,10 @@ class TestIndexSelectConverter(DispatchTestCase):
             ),
             param(
                 # 3d_source_tensor
+                # source_tensor is for compile
                 source_tensor=torch.randn((3, 4, 2), dtype=torch.float32),
+                # source_tensor_1 is for inference
+                source_tensor_1=torch.randn((6, 7, 2), dtype=torch.float32),
                 dynamic_shapes={
                     "source_tensor": {
                         0: torch.export.Dim("dyn_dim1", min=3, max=6),
@@ -84,7 +93,7 @@ class TestIndexSelectConverter(DispatchTestCase):
         ]
     )
     def test_index_select_dynamic_shape(
-        self, source_tensor, dynamic_shapes, dim, indice_tensor
+        self, source_tensor, source_tensor_1, dynamic_shapes, dim, indice_tensor
     ):
         class IndexSelect(torch.nn.Module):
             def forward(self, source_tensor, indice_tensor):
@@ -101,7 +110,8 @@ class TestIndexSelectConverter(DispatchTestCase):
         trt_mod = torch_tensorrt.dynamo.compile(
             fx_mod, inputs=inputs, enable_precisions=torch.float32, min_block_size=1
         )
-
+        # use different shape of inputs for inference:
+        inputs = (source_tensor_1, indice_tensor)
         with torch.no_grad():
             cuda_inputs = []
             for i in inputs:
