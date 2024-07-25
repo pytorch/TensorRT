@@ -118,10 +118,10 @@ def roll(
         dims = [dims]
 
     is_input_dynamic_shape = has_dynamic_shape(input.shape)
-    if all(isinstance(shift, TRTTensor) for shift in shifts):
-        is_shifts_dynamic_shape = False
-    else:
+    if any(isinstance(shift, TRTTensor) for shift in shifts):
         is_shifts_dynamic_shape = True
+    else:
+        is_shifts_dynamic_shape = False
 
     # handle static shape for the input tensor and shifts:
     if not is_input_dynamic_shape and not is_shifts_dynamic_shape:
