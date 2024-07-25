@@ -7,8 +7,7 @@ import tensorrt as trt
 import timm
 import torch
 import torchvision.models as models
-from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteriaList
-from transformers.generation.stopping_criteria import MaxLengthCriteria
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 BENCHMARK_MODEL_NAMES = {
     "vgg16",
@@ -225,20 +224,13 @@ def generate(model, input_seq, output_seq_length):
     """
     Greedy decoding of the model. This generates up to max_tokens.
     """
-    stopping_criteria = StoppingCriteriaList(
-        [
-            MaxLengthCriteria(max_length=output_seq_length),
-        ]
-    )
 
-    while True:
+    while input_seq.shape[1] <= output_seq_length:
         outputs = model(input_seq)
         logits = outputs.logits
         next_token_logits = logits[:, -1, :]
         next_tokens = torch.argmax(next_token_logits, dim=-1)
         input_seq = torch.cat([input_seq, next_tokens[:, None]], dim=-1)
-        if stopping_criteria(input_seq, logits).item():
-            break
 
     return input_seq
 
