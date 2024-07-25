@@ -1,4 +1,5 @@
 import logging
+from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional
 
 import torch
@@ -236,6 +237,99 @@ def empty_strided_decomposition(*args: Any, **kwargs: Any) -> torch.Tensor:
     empty_size = args[0]
     empty_stride = args[1]
     return torch.as_strided(torch.empty(empty_size), empty_size, empty_stride)
+
+
+# enum class for reduce operation of scatter_reduce
+class ReduceOperation(Enum):
+    SUM = ("Sum reduce operation", lambda x, y: torch.add(x, y))
+    PROD = ("Product reduce operation", lambda x, y: torch.mul(x, y))
+    MEAN = ("Mean reduce operation", lambda x, y: torch.add(x, y))
+    AMAX = ("Amax reduce operation", lambda x, y: torch.max(x, y))
+    AMIN = ("Amin reduce operation", lambda x, y: torch.min(x, y))
+
+    def __new__(cls, description, func):
+        obj = object.__new__(cls)
+        obj._value_ = auto()
+        obj.description = description
+        obj.func = func
+        return obj
+
+    def reduce_operation_with_scatter(
+        self, operation_lhs, initial_tensor, dim, index_tensor, src_tensor
+    ):
+        scatter_tensor = None
+        if self == ReduceOperation.SUM or self == ReduceOperation.MEAN:
+            scatter_tensor = torch.zeros_like(initial_tensor)
+        elif self == ReduceOperation.PROD:
+            scatter_tensor = torch.ones_like(initial_tensor)
+        elif self == ReduceOperation.AMIN or self == ReduceOperation.AMAX:
+            scatter_tensor = initial_tensor
+        else:
+            # This case would not be encountered from torch itself
+            print("Invalid Operation for Reduce op!!")
+
+        operation_rhs = torch.scatter(scatter_tensor, dim, index_tensor, src_tensor)
+        device = to_torch_device(default_device())
+        operation_lhs = operation_lhs.to(device)
+        operation_rhs = operation_rhs.to(device)
+        return self.func(operation_lhs, operation_rhs)
+
+
+@register_torch_trt_decomposition(
+    torch.ops.aten.scatter_reduce.two, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def scatter_reduce_decomposition(
+    input_tensor: torch.Tensor,
+    dim: int,
+    index: torch.Tensor,
+    src_tensor: torch.Tensor,
+    reduce: str,
+) -> torch.Tensor:
+    scatter_loop_tensor = input_tensor
+    # required for mean reduce operation
+    scatter_count_tensor = torch.zeros_like(input_tensor)
+    src_shape = list(src_tensor.shape)
+    src_dim = src_shape[dim]
+
+    for i in range(0, src_dim):
+        src_slice = torch.select(src_tensor, dim, i)
+        index_slice = torch.select(index, dim, i)
+        # unsqueeze src and index in dim
+        src_slice = torch.unsqueeze(src_slice, dim)
+        index_slice = torch.unsqueeze(index_slice, dim)
+        device = to_torch_device(default_device())
+
+        # moving tensor to default device
+        scatter_loop_tensor = scatter_loop_tensor.to(device)
+        index_slice = index_slice.to(device)
+        src_slice = src_slice.to(device)
+        if reduce == "sum":
+            reduceOp = ReduceOperation.SUM
+        elif reduce == "prod":
+            reduceOp = ReduceOperation.PROD
+        elif reduce == "mean":
+            reduceOp = ReduceOperation.MEAN
+            scatter_count_tensor = reduceOp.reduce_operation_with_scatter(
+                scatter_count_tensor,
+                input_tensor,
+                dim,
+                index_slice,
+                torch.ones_like(src_slice),
+            )
+        elif reduce == "amax":
+            reduceOp = ReduceOperation.AMAX
+        elif reduce == "amin":
+            reduceOp = ReduceOperation.AMIN
+        scatter_loop_tensor = reduceOp.reduce_operation_with_scatter(
+            scatter_loop_tensor, input_tensor, dim, index_slice, src_slice
+        )
+    if reduce == "mean":
+        scatter_loop_tensor = torch.div(
+            scatter_loop_tensor,
+            torch.add(scatter_count_tensor, torch.ones_like(scatter_count_tensor)),
+            rounding_mode="trunc",
+        )
+    return scatter_loop_tensor
 
 
 @register_torch_trt_decomposition(
