@@ -1,16 +1,14 @@
 import copy
-import time
+import timeit
 
 import custom_models as cm
 import numpy as np
+import tensorrt as trt
 import timm
 import torch
 import torchvision.models as models
 from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteriaList
-from transformers.generation.stopping_criteria import (
-    EosTokenCriteria,
-    MaxLengthCriteria,
-)
+from transformers.generation.stopping_criteria import MaxLengthCriteria
 
 BENCHMARK_MODEL_NAMES = {
     "vgg16",
@@ -166,6 +164,30 @@ def parse_precisions(precisions):
     return precisions.split(",")
 
 
+def torch_dtype_from_trt(dtype):
+    if dtype == trt.int8:
+        return torch.int8
+    elif dtype == trt.bool:
+        return torch.bool
+    elif dtype == trt.int32:
+        return torch.int32
+    elif dtype == trt.float16:
+        return torch.float16
+    elif dtype == trt.float32:
+        return torch.float32
+    else:
+        raise TypeError("%s is not supported by torch" % dtype)
+
+
+def torch_device_from_trt(device):
+    if device == trt.TensorLocation.DEVICE:
+        return torch.device("cuda")
+    elif device == trt.TensorLocation.HOST:
+        return torch.device("cpu")
+    else:
+        return TypeError("%s is not supported by torch" % device)
+
+
 def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
     """
     Exports the LLM model into an ExportedProgram with dynamic shapes.
@@ -227,9 +249,11 @@ def time_generate(model, inputs, output_seq_length, iterations=10):
     """
     timings = []
     for _ in range(iterations):
-        start_time = time.time()
+        start_time = timeit.default_timer()
         inputs_copy = copy.copy(inputs)
         _ = generate(model, inputs_copy, output_seq_length)
-        timings.append(time.time() - start_time)
+        torch.cuda.synchronize()
+        end_time = timeit.default_timer()
+        timings.append(end_time - start_time)
 
     return timings
