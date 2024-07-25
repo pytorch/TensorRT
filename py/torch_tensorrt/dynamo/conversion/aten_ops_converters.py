@@ -283,10 +283,14 @@ def embedding_bag_validator(node: Node) -> bool:
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.embedding_bag.default, capability_validator=embedding_bag_validator
+    torch.ops.aten.embedding_bag.default,
+    capability_validator=embedding_bag_validator,
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
-    torch.ops.aten._embedding_bag.default, capability_validator=embedding_bag_validator
+    torch.ops.aten._embedding_bag.default,
+    capability_validator=embedding_bag_validator,
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
     {
@@ -2732,6 +2736,7 @@ def attention_validator(node: Node) -> bool:
 @dynamo_tensorrt_converter(
     torch.nn.functional.scaled_dot_product_attention,
     capability_validator=attention_validator,
+    supports_dynamic_shapes=True,
 )
 def tensorrt_scaled_dot_product_attention(
     ctx: ConversionContext,
@@ -3339,7 +3344,9 @@ def aten_ops_diagonal(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.scalar_tensor.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.scalar_tensor.default, supports_dynamic_shapes=True
+)
 def aten_ops_scalar_tensor(
     ctx: ConversionContext,
     target: Target,
@@ -3352,7 +3359,7 @@ def aten_ops_scalar_tensor(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.roll.default)
+@dynamo_tensorrt_converter(torch.ops.aten.roll.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -3376,7 +3383,9 @@ def aten_ops_roll(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.index_select.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.index_select.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
