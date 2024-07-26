@@ -1,7 +1,7 @@
 #!/bin/bash
 
 batch_sizes=(1 16 64 256)
-backends=("torch")
+backends=("torch" "dynamo" "inductor")
 models=(
   "gpt2"
   # "meta-llama/Meta-Llama-3-8B"
@@ -26,16 +26,16 @@ for bs in ${batch_sizes[@]}
         do
         for i in ${!isl[@]};
           do
-          echo "Benchmarking GPT2 model for bs ${bs} with ISL ${isl}, OSL ${osl} and backend ${backend}"
+          echo "Benchmarking GPT2 model for bs ${bs} with ISL ${isl[i]}, OSL ${osl[i]} and backend ${backend}"
           python perf_run.py --model_torch "gpt2" \
                             --is_text_llm \
                             --precision fp16 \
-                            --inputs "(${bs}, ${isl})@int64" \
-                            --output_sequence_length ${osl} \
+                            --inputs "(${bs}, ${isl[i]})@int64" \
+                            --output_sequence_length ${osl[i]} \
                             --batch_size ${bs} \
                             --truncate \
                             --backends ${backend} \
-                            --report "gpt2_perf_bs${bs}_backend_${backend}_isl${isl}_osl${osl}.csv"
+                            --report "gpt2_perf_bs${bs}_backend_${backend}_isl${isl[i]}_osl${osl[i]}.csv"
           done
         done
   done
