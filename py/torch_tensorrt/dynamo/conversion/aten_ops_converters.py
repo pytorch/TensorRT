@@ -3259,7 +3259,7 @@ def aten_ops_pdist(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.flip.default)
+@dynamo_tensorrt_converter(torch.ops.aten.flip.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),

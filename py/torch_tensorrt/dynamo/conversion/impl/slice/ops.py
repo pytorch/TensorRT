@@ -446,13 +446,22 @@ def flip(
     output_shape = list(input.shape)
     stride_slice = []
 
+    dynamic_shape = has_dynamic_shape(input.shape)
+
     shape = input.shape
     rank = len(shape)
     dims = get_positive_dim(dims, rank)
 
     for i in range(rank):
         if i in dims:
-            start_slice.append(shape[i] - 1)
+            if shape[i] == DYNAMIC_DIM:
+                dim = get_shape(ctx, target, source_ir, f"{name}_shape_dim", input, i)
+                last_element_index = impl.elementwise.sub(
+                    ctx, target, source_ir, f"{name}_sub", dim, 1
+                )
+                start_slice.append(last_element_index)
+            else:
+                start_slice.append(shape[i] - 1)
             stride_slice.append(-1)
         else:
             start_slice.append(0)
@@ -460,10 +469,26 @@ def flip(
 
     layer = ctx.net.add_slice(
         input,
-        start=start_slice,
-        shape=output_shape,
+        start=[] if dynamic_shape else start_slice,
+        shape=[] if dynamic_shape else output_shape,
         stride=stride_slice,
     )
+    if dynamic_shape:
+        output_shape = get_shape_with_dynamic_shape(
+            ctx, target, source_ir, f"{name}_shape", output_shape, input
+        )
+
+        start_slice_tensor = cat(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_start_slice_concat",
+            start_slice,
+            0,
+        )
+        layer.set_input(1, start_slice_tensor)
+        layer.set_input(2, output_shape)
+
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
 
