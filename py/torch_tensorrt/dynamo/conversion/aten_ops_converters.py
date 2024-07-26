@@ -548,6 +548,7 @@ def aten_ops_hard_sigmoid(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.matmul, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.dot.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mm.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mv.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.bmm.default, supports_dynamic_shapes=True)
