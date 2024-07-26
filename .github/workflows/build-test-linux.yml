@@ -54,9 +54,38 @@ jobs:
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
 
+  check:
+    needs: build
+    name: Check files
+    outputs:
+      test_modules: ${{ steps.check_files.outputs.test_modules }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout torch-tensorrt repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+      - name: Check modified files
+        id: check_files
+        run: |
+          set -euxo pipefail
+          if [ ${{ github.event_name }} == 'pull_request' ]; then
+            base=${{ github.event.pull_request.base.sha }}
+            head=${{ github.event.pull_request.head.sha }}
+            python -m pip install regex
+            files=$(git diff --name-only "${base}" "${head}")
+            test_modules="$(python .github/scripts/generate_test_module.py --event-name 'pull_request' --files '${files}')"
+          else
+            test_modules="$(python .github/scripts/generate_test_module.py --event-name ${{ github.event_name }})"
+          fi
+          echo "test_modules=${test_modules}" >> "${GITHUB_OUTPUT}"
+
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
-    needs: [generate-matrix, build]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'ts_frontend') }}
     strategy:
       fail-fast: false
       matrix:
@@ -91,7 +120,8 @@ jobs:
 
   tests-py-dynamo-converters:
     name: Test dynamo converters [Python]
-    needs: [generate-matrix, build]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'dynamo_converter') }}
     strategy:
       fail-fast: false
       matrix:
@@ -120,6 +150,7 @@ jobs:
   tests-py-dynamo-fe:
     name: Test dynamo frontend [Python]
     needs: [generate-matrix, build]
+    if: ${{ contains(needs.check.outputs.test_modules, 'dynamo_frontend') }}
     strategy:
       fail-fast: false
       matrix:
@@ -139,6 +170,8 @@ jobs:
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
+        set -x
+        echo "needs.check.outputs.test_modules: ${{ needs.check.outputs.test_modules }}"
         export USE_HOST_DEPS=1
         pushd .
         cd tests/py/dynamo
@@ -148,7 +181,8 @@ jobs:
 
   tests-py-dynamo-serde:
     name: Test dynamo export serde [Python]
-    needs: [generate-matrix, build]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'dynamo_serde') }}
     strategy:
       fail-fast: false
       matrix:
@@ -176,7 +210,8 @@ jobs:
 
   tests-py-torch-compile-be:
     name: Test torch compile backend [Python]
-    needs: [generate-matrix, build]
+    needs: [generate-matrix, build ,check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'torch_compile_backend') }}
     strategy:
       fail-fast: false
       matrix:
@@ -206,7 +241,8 @@ jobs:
 
   tests-py-dynamo-core:
     name: Test dynamo core [Python]
-    needs: [generate-matrix, build]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'dynamo_core') }}
     strategy:
       fail-fast: false
       matrix:
@@ -236,7 +272,8 @@ jobs:
 
   tests-py-core:
     name: Test core [Python]
-    needs: [generate-matrix, build]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'py_core') }}
     strategy:
       fail-fast: false
       matrix:
@@ -256,12 +293,127 @@ jobs:
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
+        set -x
         export USE_HOST_DEPS=1
         pushd .
         cd tests/py/core
         python -m pytest -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_core_test_results.xml .
         popd
 
+  tests-cpp-core-conversion:
+    name: Test core conversion[CPP]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'cpp_core_conversion') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-cpp-core-conversion
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      script: |
+        set -x
+        export USE_HOST_DEPS=1
+        python -m pip show torch_tensorrt
+        location=$(python -m pip show torch_tensorrt | grep Location | sed "s/Location: //g")
+        ls -lart $location | grep torch_tensorrt
+        bazel test //tests/core/conversion:conversion_tests --compilation_mode=opt \
+        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures --cxxopt='-std=c++17'
+
+  tests-cpp-core-lowering:
+    name: Test core lowering[CPP]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'cpp_core_lowering') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-cpp-core-lowering
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      script: |
+        set -x
+        export USE_HOST_DEPS=1
+        bazel test //tests/core/lowering:lowering_tests --compilation_mode=opt \
+        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures --cxxopt='-std=c++17'
+
+  tests-cpp-core-partitioning:
+    name: Test core partitioning[CPP]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'cpp_core_partitioning') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-cpp-core-partitioning
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      script: |
+        set -x
+        export USE_HOST_DEPS=1
+        bazel test //tests/core/partitioning:partitioning_tests --compilation_mode=opt \
+        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures --cxxopt='-std=c++17'
+
+  tests-cpp-core-runtime:
+    name: Test core runtime[CPP]
+    needs: [generate-matrix, build, check]
+    if: ${{ contains(needs.check.outputs.test_modules, 'cpp_core_runtime') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-cpp-core-runtime
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      script: |
+        set -x
+        export USE_HOST_DEPS=1
+        bazel test //tests/core/runtime:runtime_tests --compilation_mode=opt \
+        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures --cxxopt='-std=c++17'
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
   cancel-in-progress: true
