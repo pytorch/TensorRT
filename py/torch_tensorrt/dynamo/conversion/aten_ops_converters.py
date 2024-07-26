@@ -2782,7 +2782,9 @@ def aten_ops_reshape(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.pixel_shuffle.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.pixel_shuffle.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2805,7 +2807,9 @@ def aten_ops_pixel_shuffle(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.pixel_unshuffle.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.pixel_unshuffle.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),

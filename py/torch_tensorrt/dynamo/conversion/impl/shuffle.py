@@ -1,6 +1,7 @@
 from typing import Optional, Sequence, Union
 
 import numpy as np
+import tensorrt as trt
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
 from torch_tensorrt import _enums
@@ -13,8 +14,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     set_layer_name,
 )
 from torch_tensorrt.fx.types import TRTTensor
-
-import tensorrt as trt
 
 
 def reshape(
@@ -61,36 +60,112 @@ def pixel_shuffle(
     input: TRTTensor,
     upscale_factor: int,
 ) -> TRTTensor:
-    shape = input.shape
-    in_channels, in_height, in_width = shape[-3:]
-    out_channels = in_channels // (upscale_factor**2)
-    out_height = in_height * upscale_factor
-    out_width = in_width * upscale_factor
-    new_shape = shape[:-3] + (
-        out_channels,
-        upscale_factor,
-        upscale_factor,
-        in_height,
-        in_width,
+    # Get input shape tensor
+    input_shape_tensor = ctx.net.add_shape(input).get_output(0)
+
+    # Extract in_channels, in_height, and in_width from the input shape tensor
+    in_channels_tensor = ctx.net.add_slice(
+        input_shape_tensor, start=(len(input.shape) - 3,), shape=(1,), stride=(1,)
+    ).get_output(0)
+    in_height_tensor = ctx.net.add_slice(
+        input_shape_tensor, start=(len(input.shape) - 2,), shape=(1,), stride=(1,)
+    ).get_output(0)
+    in_width_tensor = ctx.net.add_slice(
+        input_shape_tensor, start=(len(input.shape) - 1,), shape=(1,), stride=(1,)
+    ).get_output(0)
+
+    # Calculate out_channels, out_height, and out_width as tensors
+    upscale_factor_sq = upscale_factor * upscale_factor
+    upscale_factor_sq_tensor = get_trt_tensor(
+        ctx, upscale_factor_sq, f"{name}_upscale_factor_sq"
     )
-    reshaped_tensor = reshape(
-        ctx, target, source_ir, f"{name}_reshape1", input, new_shape
+
+    out_channels_tensor = impl.elementwise.div(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_out_channels_tensor",
+        in_channels_tensor,
+        upscale_factor_sq_tensor,
     )
-    rank = len(shape)
+    out_height_tensor = impl.elementwise.mul(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_out_height_tensor",
+        in_height_tensor,
+        upscale_factor,
+    )
+    out_width_tensor = impl.elementwise.mul(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_out_width_tensor",
+        in_width_tensor,
+        upscale_factor,
+    )
+
+    # Construct new shape tensor
+    new_shape_tensors = [
+        ctx.net.add_slice(
+            input_shape_tensor, start=(i,), shape=(1,), stride=(1,)
+        ).get_output(0)
+        for i in range(len(input.shape) - 3)
+    ]
+    new_shape_tensors += [
+        out_channels_tensor,
+        get_trt_tensor(ctx, upscale_factor, f"{name}_upscale_factor_1"),
+        get_trt_tensor(ctx, upscale_factor, f"{name}_upscale_factor_2"),
+        in_height_tensor,
+        in_width_tensor,
+    ]
+
+    new_shape_tensor = impl.cat.cat(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_new_shape_tensor",
+        new_shape_tensors,
+        0,
+        np.int32,
+    )
+
+    # Reshape tensor
+    reshape_layer = ctx.net.add_shuffle(input)
+    reshape_layer.set_input(1, new_shape_tensor)
+    reshaped_tensor = reshape_layer.get_output(0)
+
+    # Permute shape
+    rank = len(input.shape)
     permute_shape = list(range(rank))
     permute_shape.insert(-2, rank)
     permute_shape.insert(-1, rank + 1)
     permuted_tensor = impl.permutation.permute(
         ctx, target, source_ir, f"{name}_permute", reshaped_tensor, permute_shape
     )
-    return reshape(
+
+    # Construct output shape tensor
+    out_shape_tensors = [
+        ctx.net.add_slice(
+            input_shape_tensor, start=(i,), shape=(1,), stride=(1,)
+        ).get_output(0)
+        for i in range(len(input.shape) - 3)
+    ]
+    out_shape_tensors += [out_channels_tensor, out_height_tensor, out_width_tensor]
+    out_shape_tensor = impl.cat.cat(
         ctx,
         target,
         source_ir,
-        f"{name}_reshape2",
-        permuted_tensor,
-        shape[:-3] + (out_channels, out_height, out_width),
+        f"{name}_new_shape_tensor",
+        out_shape_tensors,
+        0,
+        np.int32,
     )
+
+    # Reshape tensor
+    reshape_layer_out = ctx.net.add_shuffle(permuted_tensor)
+    reshape_layer_out.set_input(1, out_shape_tensor)
+    return reshape_layer_out.get_output(0)
 
 
 def pixel_unshuffle(
@@ -101,40 +176,119 @@ def pixel_unshuffle(
     input: TRTTensor,
     downscale_factor: int,
 ) -> TRTTensor:
-    shape = input.shape
-    in_channels, in_height, in_width = shape[-3:]
-    out_channels = in_channels * (downscale_factor**2)
-    out_height = in_height // downscale_factor
-    out_width = in_width // downscale_factor
-    new_shape = shape[:-3] + (
-        in_channels,
-        out_height,
-        downscale_factor,
-        out_width,
-        downscale_factor,
+    # Get input shape tensor
+    input_shape_tensor = ctx.net.add_shape(input).get_output(0)
+
+    # Extract in_channels, in_height, and in_width from the input shape tensor
+    in_channels_tensor = ctx.net.add_slice(
+        input_shape_tensor, start=(len(input.shape) - 3,), shape=(1,), stride=(1,)
+    ).get_output(0)
+    in_height_tensor = ctx.net.add_slice(
+        input_shape_tensor, start=(len(input.shape) - 2,), shape=(1,), stride=(1,)
+    ).get_output(0)
+    in_width_tensor = ctx.net.add_slice(
+        input_shape_tensor, start=(len(input.shape) - 1,), shape=(1,), stride=(1,)
+    ).get_output(0)
+
+    # Calculate out_channels, out_height, and out_width as tensors
+    downscale_factor_sq = downscale_factor * downscale_factor
+    downscale_factor_tensor = get_trt_tensor(
+        ctx, downscale_factor, f"{name}_downscale_factor"
     )
-    reshaped_tensor = reshape(
-        ctx, target, source_ir, f"{name}_reshape1", input, new_shape
+    downscale_factor_sq_tensor = get_trt_tensor(
+        ctx, downscale_factor_sq, f"{name}_downscale_factor_sq"
     )
-    rank = len(new_shape)
-    permute_shape = tuple(range(rank - 5)) + (
+
+    out_channels_tensor = impl.elementwise.mul(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_out_channels_tensor",
+        in_channels_tensor,
+        downscale_factor_sq_tensor,
+    )
+    out_height_tensor = impl.elementwise.div(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_out_height_tensor",
+        in_height_tensor,
+        downscale_factor_tensor,
+    )
+    out_width_tensor = impl.elementwise.div(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_out_width_tensor",
+        in_width_tensor,
+        downscale_factor_tensor,
+    )
+
+    # Construct new shape tensor
+    new_shape_tensors = [
+        ctx.net.add_slice(
+            input_shape_tensor, start=(i,), shape=(1,), stride=(1,)
+        ).get_output(0)
+        for i in range(len(input.shape) - 3)
+    ]
+    new_shape_tensors += [
+        in_channels_tensor,
+        out_height_tensor,
+        get_trt_tensor(ctx, downscale_factor, f"{name}_downscale_factor_1"),
+        out_width_tensor,
+        get_trt_tensor(ctx, downscale_factor, f"{name}_downscale_factor_2"),
+    ]
+
+    new_shape_tensor = impl.cat.cat(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_new_shape_tensor",
+        new_shape_tensors,
+        0,
+        np.int32,
+    )
+
+    # Reshape tensor
+    reshape_layer = ctx.net.add_shuffle(input)
+    reshape_layer.set_input(1, new_shape_tensor)
+    reshaped_tensor = reshape_layer.get_output(0)
+
+    # Permute shape
+    rank = len(new_shape_tensors)
+    permute_shape = list(range(rank - 5)) + [
         rank - 5,  # in_channels
         rank - 3,  # downscale_factor
         rank - 1,  # downscale_factor
         rank - 4,  # out_height
         rank - 2,  # out_width
-    )
+    ]
     permuted_tensor = impl.permutation.permute(
         ctx, target, source_ir, f"{name}_permute", reshaped_tensor, permute_shape
     )
-    return reshape(
+
+    # Construct output shape tensor
+    out_shape_tensors = [
+        ctx.net.add_slice(
+            input_shape_tensor, start=(i,), shape=(1,), stride=(1,)
+        ).get_output(0)
+        for i in range(len(input.shape) - 3)
+    ]
+    out_shape_tensors += [out_channels_tensor, out_height_tensor, out_width_tensor]
+    out_shape_tensor = impl.cat.cat(
         ctx,
         target,
         source_ir,
-        f"{name}_reshape2",
-        permuted_tensor,
-        shape[:-3] + (out_channels, out_height, out_width),
+        f"{name}_out_shape_tensor",
+        out_shape_tensors,
+        0,
+        np.int32,
     )
+
+    # Reshape tensor
+    reshape_layer_out = ctx.net.add_shuffle(permuted_tensor)
+    reshape_layer_out.set_input(1, out_shape_tensor)
+    return reshape_layer_out.get_output(0)
 
 
 def resize(
