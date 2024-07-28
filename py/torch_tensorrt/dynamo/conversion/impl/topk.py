@@ -12,10 +12,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     set_layer_name,
 )
-from torch_tensorrt.dynamo.conversion.impl.elementwise.ops import le
-from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
 from torch_tensorrt.dynamo.types import TRTTensor
-from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, TRT_TOPK_MAX_ELEMENT
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 
 
 def argmax_argmin(
@@ -158,40 +156,14 @@ def topk(
             k,
             get_axes_for_reduce_op(get_positive_dim(dim, len(input.shape))),
         )
-    if k == DYNAMIC_DIM:
-        output_shape = get_shape_with_dynamic_shape(
-            ctx, target, source_ir, name, input.shape, input
-        )
-        layer = ctx.net.add_slice(
-            output_shape,
-            start=[dim],
-            shape=[1],
-            stride=[1],
-        )
-        set_layer_name(layer, target, name)
 
-        # Get scalar tensor from 1d tensor
-        shuffle_layer = ctx.net.add_shuffle(layer.get_output(0))
-        shuffle_layer.reshape_dims = trt.Dims()
-        set_layer_name(shuffle_layer, target, name, source_ir)
+    # topk layer supports dynamic k value but we cannot dertermin supported dynamic topk value at
+    # compile time.
+    assert k != DYNAMIC_DIM, "k value cannot be dynamic!"
 
-        cond = le(
-            ctx,
-            target,
-            source_ir,
-            f"{name}_k_cond",
-            shuffle_layer.get_output(0),
-            TRT_TOPK_MAX_ELEMENT,
-        )
-        ctx.net.add_assertion(
-            cond,
-            message=f"Currently only topk values up to {TRT_TOPK_MAX_ELEMENT} are supported",
-        )
-
-        topk_layer.set_input(1, shuffle_layer.get_output(0))
     # TensorRT ITopKLayer does not have a sorted flag, it is always returning the sorted topk elements
     # so here no matter sorted is True or False the returned the topk Tensor object is always sorted
-    set_layer_name(topk_layer, target, name, source_ir)
+    set_layer_name(topk_layer, target, f"{name}_topk", source_ir)
 
     if return_indices:
         return topk_layer.get_output(0), topk_layer.get_output(1)

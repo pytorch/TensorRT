@@ -19,7 +19,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     is_only_operator_on_placeholder,
 )
-from torch_tensorrt.dynamo.utils import TRT_TOPK_MAX_ELEMENT
 from torch_tensorrt.fx.types import TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -2649,21 +2648,22 @@ def topk_validator(node: Node) -> bool:
 
 
 def sort_validator(node: Node) -> bool:
-    # if meta data is not available(e.g. dynamic shape), validate k value during runtime.
-    if not node.args[0].meta:
-        return True
-
-    shape = node.args[0].meta.get("tensor_meta").shape
+    meta_data = node.args[0].meta.get("tensor_meta")
+    if meta_data is None:
+        return False
+    shape = meta_data.shape
     dim = node.args[1]
     dim = get_positive_dim(dim, len(shape))
     k = shape[dim]
+    if not isinstance(k, int):
+        return False
     return topk_sort_validator(k)
 
 
 def topk_sort_validator(k: int) -> bool:
-    if k > TRT_TOPK_MAX_ELEMENT:
+    if k > 3840:
         _LOGGER.debug(
-            f"Currently only topk values up to {TRT_TOPK_MAX_ELEMENT} are supported, got k={k}."
+            f"Currently only topk values up to 3840 are supported, got k={k}."
         )
         return False
     return True

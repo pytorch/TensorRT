@@ -38,24 +38,24 @@ class TestSortConverterDynamic(DispatchTestCase):
         [
             (
                 "3d_dynamic_descending",
-                (2, 2, 1),
-                (2, 2, 1),
+                (2, 1, 4),
                 (3, 2, 4),
-                0,
+                (3, 3, 4),
+                2,
                 True,
             ),
             (
                 "4d_dynamic_ascending",
-                (2, 2, 1, 1),
-                (2, 2, 1, 2),
+                (2, 2, 1, 4),
+                (2, 2, 2, 4),
                 (3, 3, 2, 4),
                 3,
                 False,
             ),
             (
                 "4d_dynamic_descending_neg_dim",
-                (2, 2, 1, 1),
-                (2, 2, 1, 2),
+                (1, 3, 1, 1),
+                (2, 3, 2, 2),
                 (3, 3, 2, 4),
                 -3,
                 True,
@@ -79,6 +79,7 @@ class TestSortConverterDynamic(DispatchTestCase):
             Sort(),
             input_specs,
             output_dtypes=[torch.float, torch.int64],
+            use_dynamo_tracer=True,
         )
 
 
