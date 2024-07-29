@@ -1,6 +1,8 @@
 import torch
+import torch_tensorrt
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
@@ -407,6 +409,103 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             enable_passes=True,
             propagate_shapes=True,
         )
+
+    @parameterized.expand(
+        [
+            param(
+                # 1d_indices_mode_0_with_per_sample_weights
+                # weights is for compile
+                weights=torch.randn((5, 2), dtype=torch.float32),
+                # weights_1 is for inference
+                weights_1=torch.randn((6, 2), dtype=torch.float32),
+                dynamic_shapes={
+                    "weights": {0: torch.export.Dim("dyn_dim", min=2, max=6)},
+                    "indices": {},
+                    "offsets": {},
+                },
+                indices=torch.tensor([1, 2, 4], dtype=torch.int32),
+                offsets=torch.tensor([0, 2, 3], dtype=torch.int32),
+                mode=0,
+                per_sample_weights=torch.randn((3,), dtype=torch.float32),
+            ),
+            param(
+                # 1d_indices_mode_1_without_per_sample_weights
+                # weights is for compile
+                weights=torch.randn((5, 2), dtype=torch.float32),
+                # weights_1 is for inference
+                weights_1=torch.randn((6, 3), dtype=torch.float32),
+                dynamic_shapes={
+                    "weights": {
+                        0: torch.export.Dim("dyn_dim", min=2, max=8),
+                        1: torch.export.Dim("dyn_dim_1", min=1, max=3),
+                    },
+                    "indices": {},
+                    "offsets": {},
+                },
+                indices=torch.tensor([1, 2, 4, 2, 3, 4], dtype=torch.int32),
+                offsets=torch.tensor([0, 2, 4], dtype=torch.int32),
+                mode=1,
+                per_sample_weights=None,
+            ),
+        ]
+    )
+    def test_embedding_bag_with_weights_dynamic_shape(
+        self,
+        weights,
+        weights_1,
+        dynamic_shapes,
+        indices,
+        offsets,
+        mode,
+        per_sample_weights,
+    ):
+        class EmbeddingBag(torch.nn.Module):
+            def forward(self, weights, indices, offsets, per_sample_weights=None):
+                return torch.ops.aten._embedding_bag.default(
+                    weight=weights,
+                    indices=indices,
+                    offsets=offsets,
+                    per_sample_weights=per_sample_weights,
+                    scale_grad_by_freq=False,
+                    mode=mode,
+                    sparse=False,
+                    include_last_offset=False,
+                    padding_idx=-1,
+                )
+
+        if per_sample_weights is None:
+            inputs = (weights, indices, offsets)
+        else:
+            inputs = (weights, indices, offsets, per_sample_weights)
+        mod = EmbeddingBag()
+
+        if per_sample_weights is not None:
+            dynamic_shapes["per_sample_weights"] = {}
+        fx_mod = torch.export.export(mod, inputs, dynamic_shapes=dynamic_shapes)
+        trt_mod = torch_tensorrt.dynamo.compile(
+            fx_mod, inputs=inputs, enable_precisions=torch.float32, min_block_size=1
+        )
+        # use the inputs with different shape to inference:
+        if per_sample_weights is None:
+            inputs = (weights_1, indices, offsets)
+        else:
+            inputs = (weights_1, indices, offsets, per_sample_weights)
+
+        with torch.no_grad():
+            cuda_inputs = []
+            for i in inputs:
+                cuda_inputs.append(i.cuda())
+            ref_outputs = mod(*cuda_inputs)
+            outputs = trt_mod(*cuda_inputs)
+            for out, ref in zip(outputs, ref_outputs):
+                torch.testing.assert_close(
+                    out,
+                    ref,
+                    rtol=0.001,
+                    atol=0.001,
+                    equal_nan=True,
+                    check_dtype=True,
+                )
 
 
 if __name__ == "__main__":
