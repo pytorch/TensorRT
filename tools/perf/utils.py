@@ -20,6 +20,11 @@ BENCHMARK_MODEL_NAMES = {
     "sd_unet",
     "meta-llama/Llama-2-7b-chat-hf",
     "gpt2",
+    "meta-llama/Meta-Llama-3-8B",
+    "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "apple/DCLM-7B",
+    "mistralai/Mistral-7B-Instruct-v0.3",
+    "microsoft/Phi-3-mini-4k-instruct",
 }
 
 
@@ -88,14 +93,15 @@ class ModelStorage:
                 "model": cm.StableDiffusionUnet(),
                 "path": "pytorch",
             }
-        elif name == "meta-llama/Llama-2-7b-chat-hf":
-            hf_artifact = load_hf_model(name)
-            return {
-                "model": hf_artifact["model"],
-                "path": "pytorch",
-                "tokenizer": hf_artifact["tokenizer"],
-            }
-        elif name == "gpt2":
+        elif name in [
+            "gpt2",
+            "meta-llama/Meta-Llama-3-8B",
+            "meta-llama/Llama-2-7b-chat-hf",
+            "meta-llama/Meta-Llama-3.1-8B-Instruct",
+            "apple/DCLM-7B",
+            "mistralai/Mistral-7B-Instruct-v0.3",
+            "microsoft/Phi-3-mini-4k-instruct",
+        ]:
             hf_artifact = load_hf_model(name)
             return {
                 "model": hf_artifact["model"],
