@@ -74,9 +74,9 @@ Here's a simple example that exports a matmul layer with some restrictions on dy
     dynamic_shapes=({2: seq_len}, {2: seq_len})
     # Export the model first with custom dynamic shape constraints
     exp_program = torch.export.export(model, tuple(inputs), dynamic_shapes=dynamic_shapes)
-    trt_gm = torch_tensorrt.dynamo.compile(exp_program, [inputs])
+    trt_gm = torch_tensorrt.dynamo.compile(exp_program, inputs)
     # Run inference
-    trt_gm(inputs)
+    trt_gm(*inputs)
 
 
 Dynamic shapes using torch.compile (JIT)
