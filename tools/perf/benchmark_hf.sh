@@ -32,8 +32,8 @@ rm -rf ~/.cache/huggingface/hub/
 
 # "meta-llama/Llama-2-7b-chat-hf" model, context length = 4K
 echo "Benchmarking Llama2-7B model"
-isl=(128 2048)
-osl=(256 4096)
+isl=(128 128 2048 2048)
+osl=(256 2176 2176 4096)
 for bs in ${batch_sizes[@]}
   do
     for backend in ${backends[@]}
@@ -58,8 +58,8 @@ rm -rf ~/.cache/huggingface/hub/
 
 # "meta-llama/Meta-Llama-3-8B" model, context length = 8K
 echo "Benchmarking Llama3 model"
-isl=(128 2048)
-osl=(256 4096)
+isl=(128 128 2048 2048)
+osl=(256 2176 2176 4096)
 for bs in ${batch_sizes[@]}
   do
     for backend in ${backends[@]}
@@ -84,8 +84,8 @@ rm -rf ~/.cache/huggingface/hub/
 
 # "meta-llama/Meta-Llama-3.1-8B-Instruct" model, context length = 128K
 echo "Benchmarking Llama3.1 model"
-isl=(128 2048)
-osl=(256 4096)
+isl=(128 128 2048 2048)
+osl=(256 2176 2176 4096)
 for bs in ${batch_sizes[@]}
   do
     for backend in ${backends[@]}
@@ -110,8 +110,8 @@ rm -rf ~/.cache/huggingface/hub/
 
 # "mistralai/Mistral-7B-Instruct-v0.3" model, context length 32k
 echo "Benchmarking mistralai/Mistral-7B-Instruct-v0.3 model"
-isl=(128 2048)
-osl=(256 4096)
+isl=(128 128 2048 2048)
+osl=(256 2176 2176 4096)
 for bs in ${batch_sizes[@]}
   do
     for backend in ${backends[@]}
