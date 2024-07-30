@@ -4,6 +4,7 @@ import io
 import logging
 from typing import Any, List, Optional, Sequence
 
+import tensorrt as trt
 import torch
 from torch.fx.experimental.proxy_tensor import maybe_disable_fake_tensor_mode
 from torch_tensorrt._Device import Device
@@ -18,8 +19,6 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import get_torch_inputs
 
-import tensorrt as trt
-
 logger = logging.getLogger(__name__)
 
 
@@ -30,6 +29,10 @@ def infer_module_output_dtypes(
     kwarg_inputs: Optional[dict[str, Any]] = None,
     truncate_double: bool = False,
 ) -> List[dtype]:
+    """
+    inputs can be either arg_inputs or flattened input list. If it is flattened list, kwarg_inputs
+    should be None, as it is already included in the flattened input.
+    """
     with maybe_disable_fake_tensor_mode():
         torch_inputs = get_torch_inputs(inputs, device)
         if kwarg_inputs is None:
@@ -72,7 +75,10 @@ def interpret_module_to_result(
     """Interpret an FX module to a TRTInterpreterResult
     Args:
         module: FX GraphModule to interpret
-        inputs: Sequence of Tensors representing inputs to the module
+        inputs: Sequence of FLATTENED Tensors representing inputs to the module. It should include both
+                arg_inputs and kwarg_inputs, if applicable.
+        arg_inputs: Sequence of Tensors representing inputs to the module.
+        kwarg_inputs: A dictionary of Tensors representing inputs to the module.
         settings: Compilation settings
     Returns:
         TRTInterpreterResult

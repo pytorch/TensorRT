@@ -622,9 +622,9 @@ def convert_module_to_trt_engine(
     if kwarg_inputs is None:
         kwarg_inputs = {}
     # Prepare torch_trt inputs
-    arg_inputs = prepare_inputs(arg_inputs)
+    arg_input_list = list(prepare_inputs(arg_inputs))
     kwarg_input_list = prepare_inputs(kwarg_inputs)
-    flattened_input_list = arg_inputs + flatten_dict_value(kwarg_input_list)
+    flattened_input_list = arg_input_list + flatten_dict_value(kwarg_input_list)
     device = to_torch_tensorrt_device(device)
     enabled_precisions = {dtype._from(e) for e in enabled_precisions}
 
@@ -678,7 +678,7 @@ def convert_module_to_trt_engine(
         interpreter_result = interpret_module_to_result(
             gm,
             inputs=flattened_input_list,
-            arg_inputs=arg_inputs,
+            arg_inputs=arg_input_list,
             kwarg_inputs=kwarg_input_list,
             settings=settings,
         )

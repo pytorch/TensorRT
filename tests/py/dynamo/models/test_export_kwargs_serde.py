@@ -453,7 +453,7 @@ def test_custom_model_with_dynamo_trace_kwarg_list_dynamic():
         msg=f"CustomKwargs Module TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
     # Change the input shape
-    kwargs["d"][1] = torch.randn([10, 2])
+    kwargs["e"][1] = torch.randn([10, 2]).to("cuda")
     cos_sim = cosine_similarity(model(*args, **kwargs), trt_gm(*args, **kwargs)[0])
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,

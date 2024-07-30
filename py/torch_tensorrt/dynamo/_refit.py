@@ -157,7 +157,8 @@ def refit_module_weights(
                         This compiled_module should be compmiled by torch_tensorrt.dynamo.compile
                         or load it from disk using trt.load.
         new_weight_module: exported program with the updated weights. This one should have the same model architecture as the compiled module.
-        inputs: sample inputs
+        arg_inputs: sample arg inputs. Optional, needed if output check
+        kwarg_inputs: sample kwarg inputs. Optional, needed if output check
         verify_output: whether to verify output of refitted module
     Returns:
         A new compiled TensorRT module that has the updated weights.
