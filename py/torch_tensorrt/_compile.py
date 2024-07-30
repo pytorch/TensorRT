@@ -243,11 +243,11 @@ def compile(
     elif target_ir == _IRType.dynamo:
         # Prepare torch and torchtrt inputs
         if not arg_inputs and not inputs:
-            raise AssertionError("'arg_input' and 'input' should not both be None.")
+            raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
         elif arg_inputs and inputs:
             raise AssertionError(
-                "'arg_input' and 'input' should not be used at the same time."
+                "'arg_inputs' and 'inputs' should not be used at the same time."
             )
         arg_inputs = inputs or arg_inputs
 
@@ -367,11 +367,11 @@ def convert_method_to_trt_engine(
     elif target_ir == _IRType.dynamo:
         # Prepare torch and torchtrt inputs
         if not arg_inputs and not inputs:
-            raise AssertionError("'arg_input' and 'input' should not both be None.")
+            raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
         elif arg_inputs and inputs:
             raise AssertionError(
-                "'arg_input' and 'input' should not be used at the same time."
+                "'arg_inputs' and 'inputs' should not be used at the same time."
             )
         arg_inputs = arg_inputs or inputs
 
@@ -450,7 +450,7 @@ def save(
     output_format: str = "exported_program",
     inputs: Optional[Sequence[torch.Tensor]] = None,
     arg_inputs: Optional[Sequence[torch.Tensor]] = None,
-    kwargs_inputs: Optional[dict[str, Any]] = None,
+    kwarg_inputs: Optional[dict[str, Any]] = None,
     retrace: bool = False,
 ) -> None:
     """
@@ -475,15 +475,15 @@ def save(
         )
     if arg_inputs and inputs:
         raise AssertionError(
-            "'arg_input' and 'input' should not be used at the same time."
+            "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
     arg_inputs = inputs or arg_inputs
 
-    if kwargs_inputs is None:
-        kwargs_inputs = {}
+    if kwarg_inputs is None:
+        kwarg_inputs = {}
 
-    if kwargs_inputs and any(value is None for value in kwargs_inputs.values()):
+    if kwarg_inputs and any(value is None for value in kwarg_inputs.values()):
         raise ValueError("kwargs should not include None.")
     if output_format not in accepted_formats:
         raise ValueError(
@@ -518,20 +518,20 @@ def save(
         # The module type is torch.fx.GraphModule
         if output_format == "torchscript":
             module_ts = torch.jit.trace(
-                module, arg_inputs, example_kwarg_inputs=kwargs_inputs
+                module, arg_inputs, example_kwarg_inputs=kwarg_inputs
             )
             torch.jit.save(module_ts, file_path)
         else:
             if not retrace:
                 from torch_tensorrt.dynamo._exporter import export
 
-                exp_program = export(module, arg_inputs, kwargs_inputs)
+                exp_program = export(module, arg_inputs, kwarg_inputs)
                 torch.export.save(exp_program, file_path)
             else:
                 from torch._higher_order_ops.torchbind import enable_torchbind_tracing
 
                 with enable_torchbind_tracing():
                     exp_program = torch.export.export(
-                        module, tuple(arg_inputs), kwargs=kwargs_inputs, strict=False
+                        module, tuple(arg_inputs), kwargs=kwarg_inputs, strict=False
                     )
                     torch.export.save(exp_program, file_path)

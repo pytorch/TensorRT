@@ -74,7 +74,7 @@ def test_custom_model():
 
     # Save the module
     trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
-    torchtrt.save(trt_gm, trt_ep_path, inputs=args, kwargs_inputs=kwargs)
+    torchtrt.save(trt_gm, trt_ep_path, inputs=args, kwarg_inputs=kwargs)
     # Clean up model env
     torch._dynamo.reset()
 
@@ -133,7 +133,7 @@ def test_custom_model_with_dynamo_trace():
 
     # Save the module
     trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
-    torchtrt.save(trt_gm, trt_ep_path, inputs=args, kwargs_inputs=kwargs)
+    torchtrt.save(trt_gm, trt_ep_path, inputs=args, kwarg_inputs=kwargs)
     # Clean up model env
     torch._dynamo.reset()
 
@@ -201,7 +201,7 @@ def test_custom_model_with_dynamo_trace_dynamic():
 
     # Save the module
     trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
-    torchtrt.save(trt_gm, trt_ep_path, inputs=args, kwargs_inputs=kwargs)
+    torchtrt.save(trt_gm, trt_ep_path, inputs=args, kwarg_inputs=kwargs)
     # Clean up model env
     torch._dynamo.reset()
 
@@ -288,7 +288,7 @@ def test_custom_model_with_dynamo_trace_kwarg_dynamic():
     )
     # Save the module
     trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
-    torchtrt.save(trt_gm, trt_ep_path, inputs=args, kwargs_inputs=kwargs)
+    torchtrt.save(trt_gm, trt_ep_path, inputs=args, kwarg_inputs=kwargs)
     # Clean up model env
     torch._dynamo.reset()
 
@@ -375,7 +375,7 @@ def test_custom_model_with_dynamo_trace_kwarg_dynamic():
     )
     # Save the module
     trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
-    torchtrt.save(trt_gm, trt_ep_path, inputs=args, kwargs_inputs=kwargs)
+    torchtrt.save(trt_gm, trt_ep_path, inputs=args, kwarg_inputs=kwargs)
     # Clean up model env
     torch._dynamo.reset()
 

@@ -187,11 +187,11 @@ def compile(
 
     # Aliasing inputs to arg_inputs for better understanding
     if not arg_inputs and not inputs:
-        raise AssertionError("'arg_input' and 'input' should not both be None.")
+        raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
     elif arg_inputs and inputs:
         raise AssertionError(
-            "'arg_input' and 'input' should not be used at the same time."
+            "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
     arg_inputs = inputs or arg_inputs
@@ -460,13 +460,13 @@ def compile_module(
 
             trt_modules[name] = trt_module
 
-    torch_sample_inputs = get_torch_inputs(
+    torch_sample_arg_inputs = get_torch_inputs(
         sample_arg_inputs, to_torch_device(settings.device)
     )
     torch_sample_kwarg_inputs = get_torch_inputs(
         sample_kwarg_inputs, to_torch_device(settings.device)
     )
-    sample_outputs = gm(*torch_sample_inputs, **torch_sample_kwarg_inputs)
+    sample_outputs = gm(*torch_sample_arg_inputs, **torch_sample_kwarg_inputs)
 
     if not isinstance(sample_outputs, (list, tuple)):
         sample_outputs = [sample_outputs]
@@ -609,23 +609,22 @@ def convert_module_to_trt_engine(
             stacklevel=2,
         )
     if not arg_inputs and not inputs:
-        raise AssertionError("'arg_input' and 'input' should not both be None.")
+        raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
     elif arg_inputs and inputs:
         raise AssertionError(
-            "'arg_input' and 'input' should not be used at the same time."
+            "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
     arg_inputs = inputs or arg_inputs
 
-    arg_input_list = list(arg_inputs) if arg_inputs is not None else []
     torch_executed_ops = torch_executed_ops if torch_executed_ops is not None else set()
     if kwarg_inputs is None:
         kwarg_inputs = {}
     # Prepare torch_trt inputs
-    arg_input_list = prepare_inputs(arg_input_list)
+    arg_inputs = prepare_inputs(arg_inputs)
     kwarg_input_list = prepare_inputs(kwarg_inputs)
-    flattened_input_list = arg_input_list + flatten_dict_value(kwarg_input_list)
+    flattened_input_list = arg_inputs + flatten_dict_value(kwarg_input_list)
     device = to_torch_tensorrt_device(device)
     enabled_precisions = {dtype._from(e) for e in enabled_precisions}
 
@@ -679,7 +678,7 @@ def convert_module_to_trt_engine(
         interpreter_result = interpret_module_to_result(
             gm,
             inputs=flattened_input_list,
-            arg_inputs=arg_input_list,
+            arg_inputs=arg_inputs,
             kwarg_inputs=kwarg_input_list,
             settings=settings,
         )

@@ -84,7 +84,7 @@ def _pretraced_backend(
             ]
 
             # Remove detach nodes
-            remove_detach(gm, torch_inputs)
+            remove_detach(gm)
 
             # Invoke AOTAutograd to translate operators to aten
             gm = aot_export_joint_simple(

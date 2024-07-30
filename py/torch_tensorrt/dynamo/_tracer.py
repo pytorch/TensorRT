@@ -59,11 +59,11 @@ def trace(
 
     # Set log level at the top of compilation (torch_tensorrt.dynamo)
     if not arg_inputs and not inputs:
-        raise AssertionError("'arg_input' and 'input' should not both be None.")
+        raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
     elif arg_inputs and inputs:
         raise AssertionError(
-            "'arg_input' and 'input' should not be used at the same time."
+            "'arg_inputs' and 'inputs' should not be used at the same time."
         )
     arg_inputs = inputs or arg_inputs
 
@@ -79,7 +79,6 @@ def trace(
     torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
     dynamic_shapes = get_dynamic_shapes_args(mod, arg_inputs)
     dynamic_shapes.update(get_dynamic_shapes_kwargs(kwarg_inputs))
-    # breakpoint()
     exp_program = export(
         mod,
         tuple(torch_arg_inputs),
