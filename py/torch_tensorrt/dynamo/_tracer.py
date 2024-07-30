@@ -77,6 +77,7 @@ def trace(
     device = to_torch_device(kwargs.get("device", default_device()))
     torch_arg_inputs = get_torch_inputs(arg_inputs, device)
     torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
+    # Constructing dynamic shape list as a nested dict
     dynamic_shapes = get_dynamic_shapes_args(mod, arg_inputs)
     dynamic_shapes.update(get_dynamic_shapes_kwargs(kwarg_inputs))
     exp_program = export(
@@ -120,7 +121,8 @@ def get_dynamic_shapes_args(mod: torch.nn.Module, inputs: Any) -> dict[str, Any]
 
 def get_dynamic_shapes(input: Input) -> dict[Any, Any]:
     if not isinstance(input, Input):
-        raise TypeError(f"Expected type torch_trt.Input, but got {type(input)}")
+        # If the input is torch.Tensor, no dynamic is needed. Return empty dict
+        return {}
     else:
         dynamic_dims = {}
         if input.shape_mode == Input._ShapeMode.DYNAMIC:
