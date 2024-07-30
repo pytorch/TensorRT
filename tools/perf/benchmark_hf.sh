@@ -109,30 +109,31 @@ for bs in ${batch_sizes[@]}
 rm -rf ~/.cache/huggingface/hub/
 
 # "apple/DCLM-7B" model, context length = 2K
-echo "Benchmarking apple/DCLM-7B model"
-isl=(128 256)
-osl=(256 512)
-for bs in ${batch_sizes[@]}
-  do
-    for backend in ${backends[@]}
-        do
-        for i in ${!isl[@]};
-          do
-          echo "Benchmarking apple/DCLM-7B model for bs ${bs} with ISL ${isl[i]}, OSL ${osl[i]} and backend ${backend}"
-          python perf_run.py --model_torch "apple/DCLM-7B" \
-                            --is_text_llm \
-                            --precision fp16 \
-                            --inputs "(${bs}, ${isl[i]})@int64" \
-                            --output_sequence_length ${osl[i]} \
-                            --batch_size ${bs} \
-                            --truncate \
-                            --backends ${backend} \
-                            --report "apple_dclm_7b_perf_bs${bs}_backend_${backend}_isl${isl[i]}_osl${osl[i]}.csv"
-          done
-        done
-  done
-# Clear HF cache
-rm -rf ~/.cache/huggingface/hub/
+# Commented for now since it has KeyError: openlm bug
+# echo "Benchmarking apple/DCLM-7B model"
+# isl=(128 256)
+# osl=(256 512)
+# for bs in ${batch_sizes[@]}
+#   do
+#     for backend in ${backends[@]}
+#         do
+#         for i in ${!isl[@]};
+#           do
+#           echo "Benchmarking apple/DCLM-7B model for bs ${bs} with ISL ${isl[i]}, OSL ${osl[i]} and backend ${backend}"
+#           python perf_run.py --model_torch "apple/DCLM-7B" \
+#                             --is_text_llm \
+#                             --precision fp16 \
+#                             --inputs "(${bs}, ${isl[i]})@int64" \
+#                             --output_sequence_length ${osl[i]} \
+#                             --batch_size ${bs} \
+#                             --truncate \
+#                             --backends ${backend} \
+#                             --report "apple_dclm_7b_perf_bs${bs}_backend_${backend}_isl${isl[i]}_osl${osl[i]}.csv"
+#           done
+#         done
+#   done
+# # Clear HF cache
+# rm -rf ~/.cache/huggingface/hub/
 
 # "mistralai/Mistral-7B-Instruct-v0.3" model, context length 32k
 echo "Benchmarking mistralai/Mistral-7B-Instruct-v0.3 model"
@@ -161,30 +162,30 @@ for bs in ${batch_sizes[@]}
 rm -rf ~/.cache/huggingface/hub/
 
 # "microsoft/Phi-3-mini-4k-instruct" model, context length = 4K
-echo "Benchmarking microsoft/Phi-3-mini-4k-instruct model"
-isl=(128 256)
-osl=(256 512)
-for bs in ${batch_sizes[@]}
-  do
-    for backend in ${backends[@]}
-        do
-        for i in ${!isl[@]};
-          do
-          echo "Benchmarking microsoft/Phi-3-mini-4k-instruct model for bs ${bs} with ISL ${isl[i]}, OSL ${osl[i]} and backend ${backend}"
-          python perf_run.py --model_torch "microsoft/Phi-3-mini-4k-instruct" \
-                            --is_text_llm \
-                            --precision fp16 \
-                            --inputs "(${bs}, ${isl[i]})@int64" \
-                            --output_sequence_length ${osl[i]} \
-                            --batch_size ${bs} \
-                            --truncate \
-                            --backends ${backend} \
-                            --report "phi3_mini_4k_perf_bs${bs}_backend_${backend}_isl${isl[i]}_osl${osl[i]}.csv"
-          done
-        done
-  done
-# Clear HF cache
-rm -rf ~/.cache/huggingface/hub/
+# echo "Benchmarking microsoft/Phi-3-mini-4k-instruct model"
+# isl=(128 256)
+# osl=(256 512)
+# for bs in ${batch_sizes[@]}
+#   do
+#     for backend in ${backends[@]}
+#         do
+#         for i in ${!isl[@]};
+#           do
+#           echo "Benchmarking microsoft/Phi-3-mini-4k-instruct model for bs ${bs} with ISL ${isl[i]}, OSL ${osl[i]} and backend ${backend}"
+#           python perf_run.py --model_torch "microsoft/Phi-3-mini-4k-instruct" \
+#                             --is_text_llm \
+#                             --precision fp16 \
+#                             --inputs "(${bs}, ${isl[i]})@int64" \
+#                             --output_sequence_length ${osl[i]} \
+#                             --batch_size ${bs} \
+#                             --truncate \
+#                             --backends ${backend} \
+#                             --report "phi3_mini_4k_perf_bs${bs}_backend_${backend}_isl${isl[i]}_osl${osl[i]}.csv"
+#           done
+#         done
+#   done
+# # Clear HF cache
+# rm -rf ~/.cache/huggingface/hub/
 
 # Collect and concatenate all results
 echo "Concatenating all results"

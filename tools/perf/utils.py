@@ -7,7 +7,7 @@ import tensorrt as trt
 import timm
 import torch
 import torchvision.models as models
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModel, AutoModelForCausalLM
 
 BENCHMARK_MODEL_NAMES = {
     "vgg16",
@@ -40,9 +40,8 @@ def load_hf_model(model_name_hf):
         .eval()
         .cuda()
     )
-    tokenizer_hf = AutoTokenizer.from_pretrained(model_name_hf, padding_side="left")
 
-    return {"model": model_hf, "tokenizer": tokenizer_hf}
+    return {"model": model_hf}
 
 
 class ModelStorage:
@@ -98,7 +97,6 @@ class ModelStorage:
             "meta-llama/Meta-Llama-3-8B",
             "meta-llama/Llama-2-7b-chat-hf",
             "meta-llama/Meta-Llama-3.1-8B-Instruct",
-            "apple/DCLM-7B",
             "mistralai/Mistral-7B-Instruct-v0.3",
             "microsoft/Phi-3-mini-4k-instruct",
         ]:
@@ -106,7 +104,13 @@ class ModelStorage:
             return {
                 "model": hf_artifact["model"],
                 "path": "pytorch",
-                "tokenizer": hf_artifact["tokenizer"],
+            }
+        elif name == "apple/DCLM-7B":
+            # Load model directly
+            hf_artifact = AutoModel.from_pretrained("apple/DCLM-7B")
+            return {
+                "model": hf_artifact["model"],
+                "path": "pytorch",
             }
         else:
             raise AssertionError(f"Invalid model name {name}")
