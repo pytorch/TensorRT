@@ -381,29 +381,32 @@ def cumsum(
         trip_limit = impl.shape.shape(
             ctx, target, source_ir, name + "_shape", input, dim
         )
+        # the trip_limit has to be a 0D shape tensor, however this impl.shape.shape gives a 1D shape
+        # for example if the trip limit is 3, it wants a tensor(3), not a tensor([3])
+        # in order to reduce it from 1D to 0D, i have to use this impl.reduce.sum
+        trip_limit = impl.reduce.sum(ctx, target, source_ir, name, trip_limit, 0, keepdim=False)
     else:
         axis = np.array(input_shape[dim])
         trip_limit = get_trt_tensor(ctx, axis, f"{name}_trip_limit")
-    print(f"lan added {trip_limit.shape=}")
-    data_shape = []
-    for i in range(len(input_shape)):
-        if i != dim:
-            if input_shape[i] < 0:
-                data_shape.append(impl.shape.shape(ctx, target, source_ir, name + f"_{i=}_shape", input, i))
-            else:
-                data_shape.append(input_shape[i])
-    data_shape = impl.cat.cat(ctx, target, source_ir, name+"_data_shape", data_shape, 0)
-    zero_trttensor = impl.full.full(
-        ctx, target, source_ir, name + "_full", data_shape, 0.0
-    )
     
     loop = ctx.net.add_loop()
     loop.add_trip_limit(trip_limit, trt.TripLimit.COUNT)
     iterator = loop.add_iterator(input, dim, reverse=False)
     data = iterator.get_output(0)
-    if not has_dynamic_shape(data.shape):
+    if has_dynamic_shape(data.shape):
+        data_shape = []
+        for i in range(len(input_shape)):
+            if i != dim:
+                if input_shape[i] < 0:
+                    data_shape.append(impl.shape.shape(ctx, target, source_ir, name + f"_{i=}_shape", input, i))
+                else:
+                    data_shape.append(input_shape[i])
+        data_shape = impl.cat.cat(ctx, target, source_ir, name+"_data_shape", data_shape, 0)
+        zero_trttensor = impl.full.full(
+            ctx, target, source_ir, name + "_full", data_shape, 0.0
+        )
+    else:
         new_dims = tuple(data.shape)
-        print(f"lan added {new_dims=}")
         zeros = np.zeros(new_dims)
         zero_trttensor = get_trt_tensor(ctx, zeros, f"{name}_initial_value")
 
