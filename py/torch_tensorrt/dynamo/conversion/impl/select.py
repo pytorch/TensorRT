@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Sequence, Union, cast
+from typing import Optional, Sequence, Union
 
 import numpy as np
 import tensorrt as trt
@@ -21,7 +21,7 @@ from torch_tensorrt.fx.converters.converter_utils import (
     has_dynamic_shape,
     set_layer_name,
 )
-from torch_tensorrt.fx.types import Shape, TRTTensor
+from torch_tensorrt.fx.types import TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -32,8 +32,8 @@ def select(
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    dim: Shape,
-    index: Shape,
+    dim: int,
+    index: int,
 ) -> TRTTensor:
     if not isinstance(input, TRTTensor):
         raise RuntimeError(
@@ -42,31 +42,13 @@ def select(
         )
 
     ranks = len(input.shape)
-    dim = get_positive_dim(cast(int, dim), ranks)
-    dynamic_shape = has_dynamic_shape(input.shape)
-    if dynamic_shape:
-        # Check whether slice target dim is dynamic shape dim
-        assert input.shape[dim] != -1, "Can't select on negative shape dimension!"
-    index = index
+    dim = get_positive_dim(dim, ranks)
 
-    if index >= input.shape[dim]:
-        raise RuntimeError(
-            f"cannot have index greater than the dimension length! {input.shape[dim]}"
-        )
-    output_shape = list(input.shape)
-    output_shape[dim] = 1
-    if dynamic_shape > 0:
-        output_shape = get_shape_with_dynamic_shape(
-            ctx, target, source_ir, name, output_shape, input
-        )
-    index_value = np.array(index, dtype=np.int32)
-    indices_tensor = ctx.net.add_constant(
-        index_value.shape, to_numpy(index_value)
-    ).get_output(0)
+    indices_tensor = get_trt_tensor(
+        ctx, np.array(index, dtype=np.int32), f"{name}_indices_tensor"
+    )
     layer = ctx.net.add_gather(input, indices_tensor, dim)
-    out = layer.get_output(0)
-    if len(out.shape) != 1:
-        layer = ctx.net.add_shuffle(out)
+
     return layer.get_output(0)
 
 
