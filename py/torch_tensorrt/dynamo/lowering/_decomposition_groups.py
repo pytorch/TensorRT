@@ -151,8 +151,6 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.unfold_backward,
     aten.unfold_copy,
     aten._unsafe_index,
-    aten.upsample_bilinear2d,
-    aten.upsample_bilinear2d.vec,
     aten.upsample_nearest2d_backward,
     aten.var,
     aten.var_mean,
