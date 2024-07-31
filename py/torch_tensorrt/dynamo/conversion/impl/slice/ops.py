@@ -420,9 +420,6 @@ def cumsum(
                     )
                 else:
                     data_shape.append(input_shape[i])
-        data_shape = impl.cat.cat(
-            ctx, target, source_ir, name + "_data_shape", data_shape, 0
-        )
         zero_trttensor = impl.full.full(
             ctx, target, source_ir, name + "_full", data_shape, 0.0
         )
