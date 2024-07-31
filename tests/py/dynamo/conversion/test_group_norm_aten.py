@@ -31,8 +31,8 @@ class TestGroupNormConverter(DispatchTestCase):
                 return torch.ops.aten.group_norm.default(
                     x,
                     2,
-                    torch.ones((6,)),
-                    torch.zeros((6,)),
+                    torch.randn((6,)),
+                    torch.randn((6,)),
                     1e-05,
                     True,
                 )
@@ -50,8 +50,8 @@ class TestGroupNormConverter(DispatchTestCase):
                 return torch.ops.aten.group_norm.default(
                     x,
                     2,
-                    torch.ones((6,)),
-                    torch.zeros((6,)),
+                    torch.randn((6,)),
+                    torch.randn((6,)),
                     1e-05,
                     True,
                 )
@@ -106,6 +106,27 @@ class TestNativeGroupNormConverter(DispatchTestCase):
                 )[0]
 
         inputs = [torch.randn(3, 6, 224, 224)]
+        with torch.no_grad():
+            self.run_test(
+                GroupNorm(),
+                inputs,
+            )
+
+    def test_groupnorm_sd(self):
+        class GroupNorm(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.native_group_norm.default(
+                    x,
+                    torch.randn((320,)).half(),
+                    torch.randn((320,)).half(),
+                    2,
+                    320,
+                    4096,
+                    32,
+                    1e-05,
+                )[0]
+
+        inputs = [torch.randn(2, 320, 64, 64).half()]
         with torch.no_grad():
             self.run_test(
                 GroupNorm(),

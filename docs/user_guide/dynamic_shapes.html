@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Dynamic shapes with Torch-TensorRT &mdash; Torch-TensorRT v2.5.0.dev0+225fe3b documentation</title>
+  <title>Dynamic shapes with Torch-TensorRT &mdash; Torch-TensorRT v2.5.0.dev0+bda5978 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+225fe3b
+                  v2.5.0.dev0+bda5978
                 </div>
               
             
@@ -520,9 +520,9 @@ Here’s a simple example that exports a matmul layer with some restrictions on 
 <span class="n">dynamic_shapes</span><span class="o">=</span><span class="p">({</span><span class="mi">2</span><span class="p">:</span> <span class="n">seq_len</span><span class="p">},</span> <span class="p">{</span><span class="mi">2</span><span class="p">:</span> <span class="n">seq_len</span><span class="p">})</span>
 <span class="c1"># Export the model first with custom dynamic shape constraints</span>
 <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">),</span> <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">)</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="p">[</span><span class="n">inputs</span><span class="p">])</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
 <span class="c1"># Run inference</span>
-<span class="n">trt_gm</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">trt_gm</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>

@@ -124,6 +124,11 @@ def adaptive_avg_pool1d(
         """Calculate the end index of each pooling window"""
         return math.ceil((float(idx + 1) * float(in_dim)) / out_dim)
 
+    if has_dynamic_shape(input.shape):
+        assert (
+            input.shape[-1] != -1 and input.shape[-2] != -1
+        ), "Last 2 dimensions can't be dynamic for adaptive_avg_pool1d."
+
     in_dim = input.shape[-1]
     out_dim = output_size if isinstance(output_size, int) else output_size[0]
     output_list = []
@@ -179,6 +184,18 @@ def adaptive_avg_poolNd(
     input: TRTTensor,
     output_size: Sequence[int],
 ) -> TRTTensor:
+    if has_dynamic_shape(input.shape):
+        if len(output_size) == 2:  # adaptive_avg_pool2d
+            assert (
+                input.shape[-1] != -1 and input.shape[-2] != -1
+            ), "Last 2 dimensions can't be dynamic for adaptive_avg_pool2d."
+        elif len(output_size) == 3:  # adaptive_avg_pool3d
+            assert (
+                input.shape[-1] != -1
+                and input.shape[-2] != -1
+                and input.shape[-3] != -1
+            ), "Last 3 dimensions can't be dynamic for adaptive_avg_pool3d."
+
     input_shape = input.shape
     input_rank = len(input_shape)
     output_rank = len(output_size)
