@@ -2668,10 +2668,15 @@ def topk_validator(node: Node) -> bool:
 
 
 def sort_validator(node: Node) -> bool:
-    shape = node.args[0].meta.get("tensor_meta").shape
+    meta_data = node.args[0].meta.get("tensor_meta")
+    if meta_data is None:
+        return False
+    shape = meta_data.shape
     dim = node.args[1]
     dim = get_positive_dim(dim, len(shape))
     k = shape[dim]
+    if not isinstance(k, int):
+        return False
     return topk_sort_validator(k)
 
 
@@ -3436,7 +3441,9 @@ def aten_ops_topk(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.sort.default, capability_validator=sort_validator
+    torch.ops.aten.sort.default,
+    capability_validator=sort_validator,
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
     {
@@ -3461,7 +3468,7 @@ def aten_ops_sort(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.trunc.default)
+@dynamo_tensorrt_converter(torch.ops.aten.trunc.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -3537,9 +3544,9 @@ def aten_ops_remainder(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.any.default)
-@dynamo_tensorrt_converter(torch.ops.aten.any.dim)
-@dynamo_tensorrt_converter(torch.ops.aten.any.dims)
+@dynamo_tensorrt_converter(torch.ops.aten.any.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.any.dim, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.any.dims, supports_dynamic_shapes=True)
 def aten_ops_any(
     ctx: ConversionContext,
     target: Target,
