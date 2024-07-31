@@ -798,7 +798,7 @@ def aten_ops_scatter(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.select.int)
+@dynamo_tensorrt_converter(torch.ops.aten.select.int, supports_dynamic_shapes=True)
 def aten_ops_select(
     ctx: ConversionContext,
     target: Target,
