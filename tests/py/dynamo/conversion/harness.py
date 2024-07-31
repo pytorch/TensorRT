@@ -69,6 +69,7 @@ class TRTTestCase(TestCase):
             cuda_inputs = []
             for i in inputs:
                 cuda_inputs.append(i.cuda())
+                print(f"lan added input={i} input.shape={i.shape}")
 
             start = time.perf_counter()
             interpreter_result = interpreter.run()
@@ -109,6 +110,8 @@ class TRTTestCase(TestCase):
             ):
                 ref_outputs = [ref_outputs]
             for out, ref in zip(outputs, ref_outputs):
+                print(f"lan added {out=} {out.shape=}")
+                print(f"lan added {ref=} {ref.shape=}")
                 if not isinstance(ref, torch.Tensor):
                     if len(out.shape) == 0:
                         ref = torch.tensor(ref)
