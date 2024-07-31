@@ -8,11 +8,11 @@ pip install tensorrt==${TRT_VERSION} tensorrt-${CU_VERSION::4}-bindings==${TRT_V
 
 choco install bazelisk -y
 
-curl -Lo TensorRT.zip https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.1.0/zip/TensorRT-10.1.0.27.Windows.win10.cuda-12.4.zip
-unzip -o TensorRT.zip -d C:/
+#curl -Lo TensorRT.zip https://developer.download.nvidia.com/compute/machine-learning/tensorrt/10.0.1/zip/TensorRT-10.0.1.6.Windows10.win10.cuda-12.4.zip
+#unzip -o TensorRT.zip -d C:/
 
 export CUDA_HOME="$(echo ${CUDA_PATH} | sed -e 's#\\#\/#g')"
 
-cat toolchains/ci_workspaces/WORKSPACE.win.release.tmpl | envsubst > WORKSPACE
+cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
 
 echo "RELEASE=1" >> ${GITHUB_ENV}
