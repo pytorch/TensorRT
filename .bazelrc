@@ -21,6 +21,7 @@
 # | Build Configurations                                       |
 # +------------------------------------------------------------+
 # Enable colorful output of GCC
+build --cxxopt='-std=c++17'
 build:default --cxxopt="-fdiagnostics-color=always"
 build:default --cxxopt='-std=c++17'
 #build:default --linkopt="-Wl,--no-as-needed"
