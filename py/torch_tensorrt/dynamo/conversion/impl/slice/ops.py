@@ -377,7 +377,6 @@ def cumsum(
 
     input_shape = input.shape
     dim = get_positive_dim(dim, len(input_shape))
-    loop = ctx.net.add_loop()
     if input_shape[dim] < 0:
         trip_limit = impl.shape.shape(
             ctx, target, source_ir, name + "_shape", input, dim
@@ -385,22 +384,26 @@ def cumsum(
     else:
         axis = np.array(input_shape[dim])
         trip_limit = get_trt_tensor(ctx, axis, f"{name}_trip_limit")
-
+    print(f"lan added {trip_limit.shape=}")
+    data_shape = []
+    for i in range(len(input_shape)):
+        if i != dim:
+            if input_shape[i] < 0:
+                data_shape.append(impl.shape.shape(ctx, target, source_ir, name + f"_{i=}_shape", input, i))
+            else:
+                data_shape.append(input_shape[i])
+    data_shape = impl.cat.cat(ctx, target, source_ir, name+"_data_shape", data_shape, 0)
+    zero_trttensor = impl.full.full(
+        ctx, target, source_ir, name + "_full", data_shape, 0.0
+    )
+    
+    loop = ctx.net.add_loop()
     loop.add_trip_limit(trip_limit, trt.TripLimit.COUNT)
     iterator = loop.add_iterator(input, dim, reverse=False)
     data = iterator.get_output(0)
-    if has_dynamic_shape(data.shape):
-        # data_shape = get_shape_with_dynamic_shape(
-        #     ctx, target, source_ir, name + "_dynamic_shape", data.shape, data
-        # )
-        # zero_trttensor = impl.full.full(
-        #     ctx, target, source_ir, name + "_full", data_shape, 0.0
-        # )
-        zero_trttensor = impl.elementwise.mul(
-            ctx, target, source_ir, name + "_mul", data, 0.0
-        )
-    else:
+    if not has_dynamic_shape(data.shape):
         new_dims = tuple(data.shape)
+        print(f"lan added {new_dims=}")
         zeros = np.zeros(new_dims)
         zero_trttensor = get_trt_tensor(ctx, zeros, f"{name}_initial_value")
 

@@ -67,7 +67,7 @@ class TestCumsumConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
-            ((2, 2, 2), (2, 2, 3), (2, 3, 3), 0),
+            ((1, 2, 2), (2, 2, 3), (3, 3, 3), 0),
         ]
     )
     def test_cumsum_dynamic_shape(self, min_shape, opt_shape, max_shape, dims):
