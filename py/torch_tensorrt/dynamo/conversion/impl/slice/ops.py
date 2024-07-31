@@ -423,37 +423,6 @@ def cumsum(
     loop_output.set_input(1, trip_limit)
     return loop_output.get_output(0)
 
-    # input_shape = input.shape
-    # dim = get_positive_dim(dim, len(input_shape))
-    # loop = ctx.net.add_loop()
-    # axis = np.array(input_shape[dim])
-    # trip_limit = get_trt_tensor(ctx, axis, f"{name}_trip_limit")
-    # loop.add_trip_limit(trip_limit, trt.TripLimit.COUNT)
-    # iterator = loop.add_iterator(input, dim, reverse=False)
-    # data = iterator.get_output(0)
-    # new_dims = tuple(data.shape)
-    # zeros = np.zeros(new_dims)
-    # zero_trttensor = get_trt_tensor(ctx, zeros, f"{name}_initial_value")
-
-    # running_sum = loop.add_recurrence(zero_trttensor)
-    # set_layer_name(running_sum, target, f"{name}_running_sum", source_ir)
-    # running_sum_tensor = running_sum.get_output(0)
-
-    # current_sum = impl.elementwise.add(
-    #     ctx,
-    #     target,
-    #     source_ir,
-    #     f"{name}_elementwise_add",
-    #     data,
-    #     running_sum_tensor,
-    # )
-    # running_sum.set_input(1, current_sum)
-
-    # loop_output = loop.add_loop_output(current_sum, trt.LoopOutput.CONCATENATE, dim)
-    # set_layer_name(loop_output, target, f"{name}_loop_output", source_ir)
-    # loop_output.set_input(1, trip_limit)
-    # return loop_output.get_output(0)
-
 
 def tile(
     ctx: ConversionContext,
