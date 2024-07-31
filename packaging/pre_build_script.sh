@@ -8,6 +8,7 @@ wget https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-l
     && chmod +x /usr/bin/bazel
 
 export TORCH_BUILD_NUMBER=$(python -c "import torch, urllib.parse as ul; print(ul.quote_plus(torch.__version__))")
+export TORCH_INSTALL_PATH=$(python -c "import torch, os; print(os.path.dirname(torch.__file__))")
 
-cat toolchains/ci_workspaces/WORKSPACE.x86_64.release.rhel.tmpl | envsubst > WORKSPACE
+cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
 export CI_BUILD=1
