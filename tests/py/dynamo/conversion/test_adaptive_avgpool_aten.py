@@ -81,6 +81,40 @@ class TestAdaptiveAvgPoolConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
+            (
+                (1, 3, 3),
+                (2, 3, 3),
+                (3, 3, 3),
+                torch.float,
+                (2,),
+            ),
+        ]
+    )
+    def test_dynamic_shape_adaptive_pool1d(
+        self,
+        min_shape,
+        opt_shape,
+        max_shape,
+        type,
+        output_size,
+    ):
+        class adaptive_pool1d(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.adaptive_avg_pool1d.default(x, output_size)
+
+        input_specs = [
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(adaptive_pool1d(), input_specs)
+
+    @parameterized.expand(
+        [
             # 3d input
             (
                 (1, 2, 3),
@@ -159,29 +193,37 @@ class TestAdaptiveAvgPoolConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
-            ((1, 2),),
+            (
+                (1, 1, 3, 3),
+                (2, 2, 3, 3),
+                (3, 3, 3, 3),
+                torch.float,
+                (2, 2),
+            ),
         ]
     )
-    def test_adaptive_avg_pool2d_dynamic(self, output_size):
-        class TestModule(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-
+    def test_dynamic_shape_adaptive_pool2d(
+        self,
+        min_shape,
+        opt_shape,
+        max_shape,
+        type,
+        output_size,
+    ):
+        class adaptive_pool2d(torch.nn.Module):
             def forward(self, x):
-                out = torch.ops.aten.adaptive_avg_pool2d.default(x, output_size)
-                return out
+                return torch.ops.aten.adaptive_avg_pool2d.default(x, output_size)
 
         input_specs = [
             Input(
-                shape=(-1, 2, 3, 2),
-                dtype=torch.float32,
-                shape_ranges=[((1, 2, 3, 2), (3, 2, 3, 2), (10, 2, 3, 2))],
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            TestModule(),
-            input_specs,
-        )
+
+        self.run_test_with_dynamic_shape(adaptive_pool2d(), input_specs)
 
     @parameterized.expand(
         [
@@ -271,29 +313,37 @@ class TestAdaptiveAvgPoolConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
-            ((1, 2, 3),),
+            (
+                (1, 1, 3, 3, 3),
+                (2, 2, 3, 3, 3),
+                (3, 3, 3, 3, 3),
+                torch.float,
+                (2, 2, 2),
+            ),
         ]
     )
-    def test_adaptive_avg_pool3d_dynamic(self, output_size):
-        class TestModule(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-
+    def test_dynamic_shape_adaptive_pool3d(
+        self,
+        min_shape,
+        opt_shape,
+        max_shape,
+        type,
+        output_size,
+    ):
+        class adaptive_pool3d(torch.nn.Module):
             def forward(self, x):
-                out = torch.ops.aten.adaptive_avg_pool3d.default(x, output_size)
-                return out
+                return torch.ops.aten.adaptive_avg_pool3d.default(x, output_size)
 
         input_specs = [
             Input(
-                shape=(-1, 2, 3, 1, 4),
-                dtype=torch.float32,
-                shape_ranges=[((1, 2, 3, 1, 4), (3, 2, 3, 1, 4), (10, 2, 3, 1, 4))],
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=type,
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            TestModule(),
-            input_specs,
-        )
+
+        self.run_test_with_dynamic_shape(adaptive_pool3d(), input_specs)
 
 
 if __name__ == "__main__":
