@@ -455,9 +455,11 @@ def flip(
     for i in range(rank):
         if i in dims:
             if shape[i] == DYNAMIC_DIM:
-                dim = get_shape(ctx, target, source_ir, f"{name}_shape_dim", input, i)
+                dim = get_shape(
+                    ctx, target, source_ir, f"{name}_shape_dim_{i}", input, i
+                )
                 last_element_index = impl.elementwise.sub(
-                    ctx, target, source_ir, f"{name}_sub", dim, 1
+                    ctx, target, source_ir, f"{name}_sub_{i}", dim, 1
                 )
                 start_slice.append(last_element_index)
             else:
