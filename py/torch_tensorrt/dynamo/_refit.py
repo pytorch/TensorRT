@@ -207,7 +207,7 @@ def refit_module_weights(
     arg_inputs: Optional[Tuple[Any, ...]] = None,
     kwarg_inputs: Optional[dict[str, Any]] = None,
     verify_output: bool = False,
-    fast_refit: bool = True,
+    use_weight_map_cache: bool = True,
     in_place: bool = False,
 ) -> torch.fx.GraphModule:
     """
@@ -232,11 +232,11 @@ def refit_module_weights(
         inline_module = True
 
     if not in_place:
-        if inline_module:
-            logger.warning(
-                "Inplace has no effect on exported program. Please use the returned module as the updated module."
-            )
         compiled_module = copy.deepcopy(compiled_module)
+    elif inline_module:
+        raise AssertionError(
+            "Exported program does not support modifying in place. Please set inplace to false and use the returned graph module."
+        )
 
     # Get the settings and check the setting to be uniform
     settings: CompilationSettings = None
@@ -254,7 +254,7 @@ def refit_module_weights(
         ]
         assert (
             encoded_metadata != ""
-        ), "Settings are not saved in the engine. Please recompile the engine with make_refitable=True."
+        ), "The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version with make_refitable=True"
         settings = TorchTensorRTModule.decode_metadata(encoded_metadata)["settings"]
         # Handle torch modules
         compiled_submodules_map = dict(compiled_submodules)
@@ -365,36 +365,32 @@ def refit_module_weights(
                     engine = get_engine_from_encoded_engine(
                         engine_info[ENGINE_IDX], runtime
                     )
-                    if fast_refit:
+                    if use_weight_map_cache:
                         encoded_metadata = compiled_submodule.__getstate__()[0][
                             SERIALIZED_METADATA_IDX
                         ]
-                        assert (
-                            encoded_metadata != ""
-                        ), "Metadata are not saved in the engine. Please recompile the engine with make_refitable=True."
                         weight_name_map = TorchTensorRTModule.decode_metadata(
                             encoded_metadata
                         )["weight_name_map"]
                         if not weight_name_map:
-                            fast_refit = False
+                            use_weight_map_cache = False
                             logger.warning(
                                 "Fast refitting is not supported in this module. Use regular refitting."
                             )
             else:
                 compiled_submodule = getattr(compiled_module, name)
                 weight_name_map = None
-                if fast_refit:
+                if use_weight_map_cache:
                     try:
                         weight_name_map = compiled_submodule.weight_name_map
                     except AttributeError:
-                        fast_refit = False
                         logger.warning(
-                            "You are using a old version of Torch-TensorRT. Please re-compile the engine to avoid failures."
+                            "The module was compiled wit an old version of Torch-TensorRT. Rebuilding the weight map."
                         )
                     if not weight_name_map:
-                        fast_refit = False
+                        use_weight_map_cache = False
                         logger.warning(
-                            "Fast refitting is not supported in this module. Use regular refitting."
+                            "This engine does not have a weight map cache. Rebuilding the weight map"
                         )
                 if isinstance(compiled_submodule, PythonTorchTensorRTModule):
                     engine = compiled_submodule.engine
@@ -443,7 +439,7 @@ def refit_module_weights(
         except AssertionError as e:
             # If fast_refit is used and failed, we fall back to regular refit
             logger.warning(e)
-            if fast_refit and weight_name_map:
+            if use_weight_map_cache and weight_name_map:
                 _refit_single_trt_engine_with_gm(
                     new_gm=new_submodule,
                     old_engine=engine,

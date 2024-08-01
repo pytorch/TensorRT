@@ -109,7 +109,7 @@ def test_fast_refit_one_engine():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         inputs=inputs,
-        fast_refit=True,
+        use_weight_map_cache=True,
     )
 
     # Check the output
@@ -156,7 +156,7 @@ def test_fast_refit_one_engine_no_map():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         inputs=inputs,
-        fast_refit=True,
+        use_weight_map_cache=True,
     )
 
     # Check the output
@@ -207,7 +207,7 @@ def test_fast_refit_one_engine_wrong_map():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         inputs=inputs,
-        fast_refit=True,
+        use_weight_map_cache=True,
     )
 
     # Check the output
@@ -254,7 +254,7 @@ def test_fast_refit_one_engine_bert():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         inputs=inputs,
-        fast_refit=True,
+        use_weight_map_cache=True,
     )
 
     # Check the output
@@ -304,7 +304,7 @@ def test_fast_refit_one_engine_inline_runtime():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         inputs=inputs,
-        fast_refit=True,
+        use_weight_map_cache=True,
     )
 
     # Check the output
@@ -349,7 +349,7 @@ def test_fast_refit_one_engine_python_runtime():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         inputs=inputs,
-        fast_refit=True,
+        use_weight_map_cache=True,
     )
 
     # Check the output
@@ -416,7 +416,7 @@ def test_fast_refit_multiple_engine():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         inputs=inputs,
-        fast_refit=True,
+        use_weight_map_cache=True,
     )
 
     # Check the output
@@ -461,7 +461,7 @@ def test_refit_one_engine():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         inputs=inputs,
-        fast_refit=False,
+        use_weight_map_cache=False,
     )
 
     # Check the output
@@ -508,7 +508,7 @@ def test_refit_one_engine_bert():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         inputs=inputs,
-        fast_refit=False,
+        use_weight_map_cache=False,
     )
 
     # Check the output
@@ -558,7 +558,7 @@ def test_refit_one_engine_inline_runtime():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         inputs=inputs,
-        fast_refit=False,
+        use_weight_map_cache=False,
     )
 
     # Check the output
@@ -603,7 +603,7 @@ def test_refit_one_engine_python_runtime():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         inputs=inputs,
-        fast_refit=False,
+        use_weight_map_cache=False,
     )
 
     # Check the output
@@ -670,7 +670,7 @@ def test_refit_multiple_engine():
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
         inputs=inputs,
-        fast_refit=False,
+        use_weight_map_cache=False,
     )
 
     # Check the output
