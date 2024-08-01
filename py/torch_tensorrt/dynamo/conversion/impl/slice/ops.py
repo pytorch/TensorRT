@@ -226,6 +226,7 @@ def expand(
 ) -> TRTTensor:
     shape_rank = len(shape)
     initial_tensor_rank = len(input_t.shape)
+
     # If the rank of the input tensor is less than the shape's rank, pad with ones
     if initial_tensor_rank < shape_rank:
         input_t = prepend_ones(
@@ -244,39 +245,49 @@ def expand(
     # After the above padding, the shape and tensor rank must be equal
     assert len(input_t.shape) == shape_rank
 
-    shape_t = []
+    # Configure the start, strides and output shape tensors
+    start = tuple([0] * shape_rank)
+
+    # stride[dim]=0 implies that dimension is being broadcasted.
+    # stride should be 1 for all non-broadcasted dims
+    stride = []
+    input_tensor_shape = tuple(input_t.shape)
+    for i, o in zip(input_tensor_shape, shape):
+        # If input dim and target shape dim are static, broadcast if they are not equal
+        # If input dim is known and target shape dim is dynamic we treat it as a broadcasted dim
+        if (
+            isinstance(i, int)
+            and i != DYNAMIC_DIM
+            and isinstance(o, int)
+            and o != DYNAMIC_DIM
+        ):
+            stride.append(int(i == o))
+        elif isinstance(i, int) and i != DYNAMIC_DIM and isinstance(o, TRTTensor):
+            stride.append(0)
+        else:
+            # No broadcasting is happening. The output should have the same size as input at this dimension.
+            stride.append(1)
+
+    # Resolve dynamic dimensions in the target shape. These are not broadcasted dims.
+    # The value at this dimension should be same as input.
+    target_shape = []
     for i in range(shape_rank):
-        if shape[i] == -1:
-            shape_t.append(
+        if shape[i] == DYNAMIC_DIM:
+            target_shape.append(
                 get_shape(ctx, target, source_ir, name + f"_shape_dim{i}", input_t, i)
             )
         else:
-            shape_t.append(shape[i])
+            target_shape.append(shape[i])
 
-    # Establish the desired output shape, strides, and starting indices
-    input_tensor_shape = tuple(input_t.shape)
-    start = tuple([0] * shape_rank)
-
-    # TODO: Revisit stride calculation. stride[dim]=0 implies that dimension is being broadcasted.
-    # stride should be 1 for all non-broadcasted dims
-    stride = []
-    for i, o in zip(input_tensor_shape, shape_t):
-        # If the shape has ITensor, we treat it as a reshape dim instead of a broadcasted dim
-        # shape_t cannot have -1. If the input at this dimension has a shape of -1, set the stride to 1. This indicates that the input is dynamic and does not imply broadcasting at that specific dimension.
-        if isinstance(i, int) and isinstance(o, int) and i != DYNAMIC_DIM:
-            stride.append(int(i == o))
-        else:
-            stride.append(1)
-
-    shape_ = shape_t
+    target_shape_t = target_shape
     # Handle dynamic shapes case where shape has dynamic dimension
-    if any(isinstance(ele, TRTTensor) for ele in shape_t):
-        shape_ = cat(
+    if any(isinstance(ele, TRTTensor) for ele in target_shape_t):
+        target_shape_t = cat(
             ctx,
             target,
             source_ir,
             name + "_shape_concat",
-            shape_t,
+            target_shape_t,
             0,
             cast_dtype=trt.int32,
         )
@@ -302,10 +313,12 @@ def expand(
             input_t, start=trt.Dims(), shape=trt.Dims(), stride=trt.Dims()
         )
         layer.set_input(1, start_tensor)
-        layer.set_input(2, shape_)
+        layer.set_input(2, target_shape_t)
         layer.set_input(3, stride_tensor)
     else:
-        layer = ctx.net.add_slice(input_t, start=start, shape=shape_, stride=stride)
+        layer = ctx.net.add_slice(
+            input_t, start=start, shape=target_shape_t, stride=stride
+        )
 
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
@@ -446,13 +459,24 @@ def flip(
     output_shape = list(input.shape)
     stride_slice = []
 
+    dynamic_shape = has_dynamic_shape(input.shape)
+
     shape = input.shape
     rank = len(shape)
     dims = get_positive_dim(dims, rank)
 
     for i in range(rank):
         if i in dims:
-            start_slice.append(shape[i] - 1)
+            if shape[i] == DYNAMIC_DIM:
+                dim = get_shape(
+                    ctx, target, source_ir, f"{name}_shape_dim_{i}", input, i
+                )
+                last_element_index = impl.elementwise.sub(
+                    ctx, target, source_ir, f"{name}_sub_{i}", dim, 1
+                )
+                start_slice.append(last_element_index)
+            else:
+                start_slice.append(shape[i] - 1)
             stride_slice.append(-1)
         else:
             start_slice.append(0)
@@ -460,10 +484,26 @@ def flip(
 
     layer = ctx.net.add_slice(
         input,
-        start=start_slice,
-        shape=output_shape,
+        start=[] if dynamic_shape else start_slice,
+        shape=[] if dynamic_shape else output_shape,
         stride=stride_slice,
     )
+    if dynamic_shape:
+        output_shape = get_shape_with_dynamic_shape(
+            ctx, target, source_ir, f"{name}_shape", output_shape, input
+        )
+
+        start_slice_tensor = cat(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_start_slice_concat",
+            start_slice,
+            0,
+        )
+        layer.set_input(1, start_slice_tensor)
+        layer.set_input(2, output_shape)
+
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
 

@@ -37,8 +37,10 @@ class TestExpandConverter(DispatchTestCase):
             ("different_ranks", (1, 2, 1), (1, 2, 1), (2, 2, 1), (2, -1, -1, -1)),
         ]
     )
-    def test_expand_dynamic(self, _, min_shape, opt_shape, max_shape, expanded_shape):
-        class ExpandDynamic(nn.Module):
+    def test_expand_dynamic_input(
+        self, _, min_shape, opt_shape, max_shape, expanded_shape
+    ):
+        class ExpandInputDynamic(nn.Module):
             def forward(self, x):
                 return torch.ops.aten.expand.default(x, expanded_shape)
 
@@ -51,8 +53,32 @@ class TestExpandConverter(DispatchTestCase):
             ),
         ]
         self.run_test_with_dynamic_shape(
-            ExpandDynamic(),
+            ExpandInputDynamic(),
             input_specs,
+        )
+
+    @parameterized.expand(
+        [
+            ("3d_dim", (4, 1, 768), (1, 1, 768)),
+        ]
+    )
+    def test_expand_dynamic_target_shape(self, _, input_shape, weight_shape):
+        class ExpandTargetDynamic(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+                self.cls_token = torch.nn.Parameter(torch.randn(weight_shape).cuda())
+
+            def forward(self, x):
+                batch_size = x.shape[0]
+                cls_tokens = self.cls_token.expand(batch_size, -1, -1)
+                embeddings = torch.cat((cls_tokens, x), dim=0)
+                return embeddings
+
+        input_specs = [
+            Input(dtype=torch.float32, shape=input_shape),
+        ]
+        self.run_test_with_dynamic_shape(
+            ExpandTargetDynamic(), input_specs, use_dynamo_tracer=True
         )
 
 

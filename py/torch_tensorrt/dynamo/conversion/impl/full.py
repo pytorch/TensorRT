@@ -23,7 +23,13 @@ def full(
 ) -> TRTTensor:
     # in static shape scenario, shape is a list of int
     if isinstance(shape, List):
-        return np.full(shape, fill_value)
+        # in static shape scenario, shape is a list of int
+        if all(isinstance(dim, int) for dim in shape):
+            return np.full(shape, fill_value)
+        else:
+            shape = impl.cat.cat(
+                ctx, target, source_ir, name + "_concat_shape", shape, 0
+            )
 
     # in dynamic shape scenario, shape is a shap tensor
     # use IFillLayer to fill the shape tensor with LINSPACE value

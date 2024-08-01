@@ -10,9 +10,10 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     flatten_dims,
     get_axes_for_reduce_op,
     get_positive_dim,
+    set_layer_name,
 )
-from torch_tensorrt.fx.converters.converter_utils import set_layer_name
-from torch_tensorrt.fx.types import TRTTensor
+from torch_tensorrt.dynamo.types import TRTTensor
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 
 
 def argmax_argmin(
@@ -155,9 +156,14 @@ def topk(
             k,
             get_axes_for_reduce_op(get_positive_dim(dim, len(input.shape))),
         )
+
+    # topk layer supports dynamic k value but we cannot dertermin supported dynamic topk value at
+    # compile time.
+    assert k != DYNAMIC_DIM, "k value cannot be dynamic!"
+
     # TensorRT ITopKLayer does not have a sorted flag, it is always returning the sorted topk elements
     # so here no matter sorted is True or False the returned the topk Tensor object is always sorted
-    set_layer_name(topk_layer, target, name, source_ir)
+    set_layer_name(topk_layer, target, f"{name}_topk", source_ir)
 
     if return_indices:
         return topk_layer.get_output(0), topk_layer.get_output(1)
