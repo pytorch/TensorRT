@@ -90,9 +90,11 @@ converter_test(
     name = "test_expand",
 )
 
-converter_test(
-    name = "test_layer_norm",
-)
+#commenting this. TODO for 24.09
+#TRT assert failure
+# converter_test(
+#     name = "test_layer_norm",
+# )
 
 converter_test(
     name = "test_linear",

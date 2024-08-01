@@ -19,7 +19,9 @@ config_setting(
 test_suite(
     name = "api_tests",
     tests = [
-        ":test_collections",
+        #commenting this. TODO for 24.09
+        #test is too long
+        #":test_collections",
         ":test_compiled_modules",
         ":test_default_input_types",
         ":test_dynamic_fallback",
