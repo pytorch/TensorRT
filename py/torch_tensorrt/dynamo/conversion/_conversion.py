@@ -132,18 +132,20 @@ def convert_module(
 
     runtime = trt.Runtime(TRT_LOGGER)
     refit_test_engine = runtime.deserialize_cuda_engine(interpreter_result.engine)
-    weight_name_map: Any = interpreter_result.weight_name_map
-    try:
-        _refit_single_trt_engine_with_gm(
-            new_gm=module,
-            old_engine=refit_test_engine,
-            input_list=inputs,
-            settings=settings,
-            weight_name_map=weight_name_map,
-        )
-    except AssertionError:
-        logger.warning("Fast refit test failed. Removing the weight map caching.")
-        weight_name_map = None
+    weight_name_map: Any = None
+    # Do the test refit with cached map if make_refitable is enabled
+    if settings.make_refitable:
+        weight_name_map = interpreter_result.weight_name_map
+        try:
+            _refit_single_trt_engine_with_gm(
+                new_gm=module,
+                old_engine=refit_test_engine,
+                input_list=inputs,
+                settings=settings,
+                weight_name_map=interpreter_result.weight_name_map,
+            )
+        except AssertionError:
+            logger.warning("Fast refit test failed. Removing the weight map caching.")
 
     rt_cls = PythonTorchTensorRTModule
 
