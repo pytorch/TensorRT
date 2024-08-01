@@ -1,5 +1,6 @@
 import math
 import sys
+import time
 from typing import Optional, Sequence
 
 import numpy as np
@@ -10,12 +11,15 @@ from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     calculate_strides,
+    ceil_divide,
     flatten_dims,
     get_positive_dim,
     get_trt_tensor,
 )
 from torch_tensorrt.dynamo.conversion.impl.cat import cat
-from torch_tensorrt.dynamo.conversion.impl.elementwise import floor_divide
+from torch_tensorrt.dynamo.conversion.impl.elementwise import add, floor_divide
+from torch_tensorrt.dynamo.conversion.impl.elementwise import min as torch_trt_min
+from torch_tensorrt.dynamo.conversion.impl.elementwise import sub
 from torch_tensorrt.dynamo.conversion.impl.elementwise.ops import (
     convert_binary_elementwise,
 )
@@ -346,35 +350,189 @@ def chunk(
             f"chunk expects `dim` to be less than the length of input shape, got: {dim}"
         )
 
-    dynamic_shape = has_dynamic_shape(input.shape)
-    if dynamic_shape > 0:
-        # Check whether slice target dim is dynamic shape dim
-        assert input.shape[dim] != -1, "Can't chunk on dynamic shape dimension!"
+    if shape[dim] == DYNAMIC_DIM:
+        # case when chunk dimension is dynamic
+        size_dim = get_shape(
+            ctx, target, source_ir, name + f"_shape_dim_to_chunk", input, dim
+        )
+        # implementing ceil operation to give us the chunk size
+        chunk_size_num = convert_binary_elementwise(
+            ctx,
+            target,
+            source_ir,
+            name + "_sub_num_chunk",
+            trt.ElementWiseOperation.SUB,
+            size_dim,
+            0,
+        )
+        chunk_size = ceil_divide(
+            ctx,
+            target,
+            source_ir,
+            name + "_div_chunk",
+            chunk_size_num,
+            chunks,
+        )
+        # implementing the ceil operation to give the chunk cnt
+        # note that this can be 1 greater than the chunks
+        # this is required to reduce it from 1D to 0D
+        chunk_cnt = impl.reduce.sum(
+            ctx, target, source_ir, name + "_chunk_cnt", chunks, 0, keepdim=False
+        )
 
-    size_dim = shape[dim]
-    chunk_size = math.ceil(size_dim / chunks)
-    result = []
-    start = 0
-    end = min(start + chunk_size, size_dim)
-    cnt = 0
-
-    while start < end:
-        result.append(
-            slice_op(
+        ###################################outer loop, traverse start and end############################
+        loop_one = ctx.net.add_loop()
+        loop_one.add_trip_limit(chunk_cnt, trt.TripLimit.COUNT)
+        start_tensor_i = get_trt_tensor(ctx, 0, f"{name}_initial_start")
+        end_tensor_i = torch_trt_min(
+            ctx,
+            target,
+            source_ir,
+            name + "_initial_end",
+            add(
                 ctx,
                 target,
                 source_ir,
-                f"{name}_slice_{cnt}",
-                input,
-                dim,
-                start,
-                end,
-                1,
-            )
+                name + "_chunk_end_initial_tensor",
+                start_tensor,
+                chunk_size,
+            ),
+            size_dim,
         )
-        start = end
+
+        running_start_i = loop_one.add_recurrence(start_tensor_i)
+        set_layer_name(running_start_i, target, f"{name}_running_start_i", source_ir)
+        running_start_tensor_i = running_start_i.get_output(0)
+
+        running_end_i = loop_one.add_recurrence(end_tensor_i)
+        set_layer_name(running_end_i, target, f"{name}_running_end_i", source_ir)
+        running_end_tensor_i = running_end_i.get_output(0)
+
+        #####################################Method 1#######################################################
+        # loop_two_output = slice_op(
+        #     ctx,
+        #     target,
+        #     source_ir,
+        #     f"{name}_slice",
+        #     input,
+        #     dim,
+        #     running_start_tensor,
+        #     running_end_tensor,
+        #     1,
+        # )
+
+        ###################################Method 2#######################################################
+        ###################################inner loop, traverse j between start and end############################
+
+        loop_two = ctx.net.add_loop()
+        loop_two.add_trip_limit(chunk_size_inner_loop, trt.TripLimit.COUNT)
+        chunk_size_inner_loop = sub(
+            ctx,
+            target,
+            source_ir,
+            name + "_chunk_size_inner_loop",
+            running_end_tensor_i,
+            running_start_tensor_i,
+        )
+
+        running_start_j = loop_one.add_recurrence(running_start_tensor_i)
+        set_layer_name(running_start_j, target, f"{name}_running_start_j", source_ir)
+        running_start_tensor_i = running_start_j.get_output(0)
+
+        iterator = loop_two.add_iterator(input, dim, reverse=False)
+        sliced_input = iterator.get_output(0)
+
+        loop_two_output = loop_two.add_loop_output(
+            sliced_input, trt.LoopOutput.CONCATENATE, dim
+        )
+        set_layer_name(loop_two_output, target, f"{name}_loop_two_output", source_ir)
+        loop_two_output.set_input(1, chunk_size_inner_loop)
+        ###################################inner loop end##############################
+
+        #####################################Method 3#############################################
+        # constant_0 = get_trt_tensor(ctx, 0, f"{name}_constant_tensor_0")
+        # size_dim = impl.reduce.sum(
+        #      ctx, target, source_ir, name + "_inner_loop_chunk_cnt", size_dim, 0, keepdim=False
+        # )
+        # loop_two.add_trip_limit(size_dim, trt.TripLimit.COUNT)
+        # rec2_j_tensor = loop_two.add_recurrence(constant_0)
+        # set_layer_name(rec2_j_tensor, target, f"{name}_rec2_j_tensor", source_ir)
+        # j_tensor = rec2_j_tensor.get_output(0)
+
+        # # create a TRT Select layer
+        # cond1 = impl.elementwise.ge(
+        #     ctx, target, source_ir, f"{name}_ge_{time.time()}", j_tensor, running_start_tensor_i
+        # )
+        # cond2 = impl.elementwise.lt(
+        #     ctx, target, source_ir, f"{name}_lt_{time.time()}", j_tensor, running_end_tensor_i
+        # )
+        # condition1 = impl.elementwise.logical_and(
+        #     ctx, target, source_ir, f"{name}_and_{time.time()}", cond1, cond2
+        # )
+        # next_j = impl.elementwise.add(
+        #     ctx, target, source_ir, f"{name}_j_tensor_add_1_{time.time()}", j_tensor, 1
+        # )
+        # rec2_j_tensor.set_input(1, next_j)
+        # loop_out2 = loop_two.add_loop_output(condition1, trt.LoopOutput.CONCATENATE)
+        # loop_out2.set_input(1, size_dim)
+        # layer_non_zero = ctx.net.add_non_zero(loop_out2.get_output(0))
+        # loop_two_output = ctx.net.add_gather(input, layer_non_zero.get_output(0), dim).get_output(0)
+        ##################################inner loop end###########################################
+
+        next_start_tensor_i = end_tensor_i
+        next_end_tensor_i = torch_trt_min(
+            ctx,
+            target,
+            source_ir,
+            name + "_chunk_end_tensor_loop_assignment",
+            add(
+                ctx,
+                target,
+                source_ir,
+                name + "_chunk_end_update_tensor",
+                current_start_tensor,
+                chunk_size,
+            ),
+            size_dim,
+        )
+        # current_bool_check = (current_start_tensor != size_dim)
+        running_start_i.set_input(1, next_start_tensor_i)
+        running_end_i.set_input(1, next_end_tensor_i)
+
+        loop_one_output = loop_one.add_loop_output(
+            loop_two_output.get_output(0), trt.LoopOutput.CONCATENATE, 0
+        )
+        set_layer_name(loop_one_output, target, f"{name}_loop_output", source_ir)
+        loop_one_output.set_input(1, chunk_cnt)
+        return loop_one_output.get_output(0)
+        ##################################outer loop end#################################
+
+    else:
+        # case when chunk dimension is not dynamic
+        size_dim = shape[dim]
+        chunk_size = math.ceil(size_dim / chunks)
+        result = []
+        start = 0
         end = min(start + chunk_size, size_dim)
-        cnt += 1
+        cnt = 0
+
+        while start < end:
+            result.append(
+                slice_op(
+                    ctx,
+                    target,
+                    source_ir,
+                    f"{name}_slice_{cnt}",
+                    input,
+                    dim,
+                    start,
+                    end,
+                    1,
+                )
+            )
+            start = end
+            end = min(start + chunk_size, size_dim)
+            cnt += 1
 
     return result
 

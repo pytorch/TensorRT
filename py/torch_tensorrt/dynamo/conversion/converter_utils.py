@@ -4,6 +4,7 @@ import logging
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Argument, Target
@@ -15,8 +16,6 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
     DynamoConverterImplSignature,
 )
-
-import tensorrt as trt
 
 from ..types import Shape, TRTDataType, TRTLayer, TRTTensor
 
@@ -905,3 +904,40 @@ def set_layer_name(
         else f"{source_ir}_ops.{target.__name__}"
     )
     layer.name = f"[{layer.type.name}]-[{target_name}]-[{name}]"
+
+
+def ceil_divide(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    numerator: TRTTensor,
+    denominator:TRTTensor,
+)->TRTTensor
+        numerator_neg = impl.elementwise.convert_binary_elementwise(
+            ctx,
+            target,
+            source_ir,
+            name + "_neg_numerator",
+            trt.ElementWiseOperation.SUB,
+            0,
+            numerator,
+        )
+        numerator_neg_div = impl.elementwise.floor_divide(
+            ctx,
+            target,
+            source_ir,
+            name + "_neg_div",
+            numerator_neg,
+            denominator,
+        )
+        ceil_div = impl.elementwise.convert_binary_elementwise(
+            ctx,
+            target,
+            source_ir,
+            name + "_ceil_div",
+            trt.ElementWiseOperation.PROD,
+            numerator_neg_div,
+            -1,
+        )
+        return ceil_div
