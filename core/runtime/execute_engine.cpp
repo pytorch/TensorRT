@@ -115,7 +115,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   bool need_cudagraphs_record = (CUDAGRAPHS_MODE && !_cudagraphs_validate_shapes(inputs, compiled_engine));
 
   // this is a buffer to store shape tensor input addresses throughout the runtime scope
-  std::list<std::vector<int32_t>> inputShapeTensorValues;
+  std::list<std::vector<int64_t>> inputShapeTensorValues;
 
   // Intialize outputs to be available throughout the succeeding scopes
   std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
