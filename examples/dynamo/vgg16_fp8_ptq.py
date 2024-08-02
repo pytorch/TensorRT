@@ -192,7 +192,7 @@ def calibrate_loop(model):
 # Tune the pre-trained model with FP8 and PTQ
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-quant_cfg = mtq.FP8_DEFAULT_CFG
+quant_cfg = mtq.INT8_DEFAULT_CFG
 # PTQ with in-place replacement to quantized modules
 mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
 # model has FP8 qdq nodes at this point
@@ -230,7 +230,7 @@ with torch.no_grad():
         trt_model = torchtrt.dynamo.compile(
             exp_program,
             inputs=[input_tensor],
-            enabled_precisions={torch.float8_e4m3fn},
+            enabled_precisions={torch.int8},
             min_block_size=1,
             debug=False,
         )
