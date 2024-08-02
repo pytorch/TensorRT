@@ -415,7 +415,7 @@ def cumsum(
                 if input_shape[i] < 0:
                     data_shape.append(
                         impl.shape.shape(
-                            ctx, target, source_ir, name + f"_{i=}_shape", input, i
+                            ctx, target, source_ir, name + f"_{i}_shape", input, i
                         )
                     )
                 else:
