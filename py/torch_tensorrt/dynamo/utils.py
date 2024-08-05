@@ -3,9 +3,10 @@ from __future__ import annotations
 import logging
 from dataclasses import fields, replace
 from enum import Enum
-from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
@@ -13,7 +14,6 @@ from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
-import tensorrt as trt
 from packaging import version
 
 from .types import TRTDataType
@@ -413,29 +413,29 @@ def check_output(
     return True
 
 
-def flatten_dict_value(d: dict[Any, Any]) -> List[Any]:
-    """
-    Flatten the values of a dictionary to a single list.
+def get_flat_args_with_check(
+    exported_program: torch.export.ExportedProgram,
+    args: list[Any],
+    kwargs: dict[str, Any],
+) -> tuple[Any, Any]:
+    """Flatten args, kwargs using pytree, then, check specs.
 
     Args:
-    d (dict): The dictionary to flatten.
+        args: List[Any] original args passed to __call__
+        kwargs: Dict[str, Any] original kwargs passed to __call
 
     Returns:
-    list: A list of all values flattened.
+        A tuple of (flat_args, received_spec)
+        flat_args is flattend args / kwargs
+        received_spec is the pytree spec produced while flattening the
+        tuple (args, kwargs)
     """
+    import torch.utils._pytree as pytree
+    from torch.export._tree_utils import reorder_kwargs
 
-    def flatten(value: Any) -> Generator[Any, Any, Any]:
-        if isinstance(value, dict):
-            for v in value.values():
-                yield from flatten(v)
-        elif isinstance(value, list):
-            for item in value:
-                yield from flatten(item)
-        else:
-            yield value
-
-    flat_list: List[Any] = []
-    for v in d.values():
-        flat_list.extend(flatten(v))
-
-    return flat_list
+    in_spec = exported_program.call_spec.in_spec
+    if in_spec is not None:
+        kwargs = reorder_kwargs(kwargs, in_spec)
+    flat_args_with_path, received_spec = pytree.tree_flatten_with_path((args, kwargs))
+    flat_args = tuple(x[1] for x in flat_args_with_path)
+    return flat_args, received_spec

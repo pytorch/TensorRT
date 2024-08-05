@@ -34,7 +34,7 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
 )
 from torch_tensorrt.dynamo.utils import (
-    flatten_dict_value,
+    get_flat_args_with_check,
     get_torch_inputs,
     parse_complex_tensor_structs,
     prepare_inputs,
@@ -617,14 +617,17 @@ def convert_module_to_trt_engine(
         )
 
     arg_inputs = inputs or arg_inputs
-
     torch_executed_ops = torch_executed_ops if torch_executed_ops is not None else set()
     if kwarg_inputs is None:
         kwarg_inputs = {}
     # Prepare torch_trt inputs
     arg_input_list = list(prepare_inputs(arg_inputs))
     kwarg_input_list = prepare_inputs(kwarg_inputs)
-    flattened_input_list = arg_input_list + flatten_dict_value(kwarg_input_list)
+
+    flattened_input_list = get_flat_args_with_check(
+        exported_program, arg_input_list, kwarg_input_list
+    )[0]
+
     device = to_torch_tensorrt_device(device)
     enabled_precisions = {dtype._from(e) for e in enabled_precisions}
 

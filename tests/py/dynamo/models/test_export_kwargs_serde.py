@@ -108,8 +108,8 @@ def test_custom_model_with_dynamo_trace():
     model = net().eval().to("cuda")
     args = [torch.rand((1, 3, 224, 224)).to("cuda")]
     kwargs = {
-        "b": torch.tensor(6).to("cuda"),
         "d": {"value": torch.tensor(8).to("cuda")},
+        "b": torch.tensor(6).to("cuda"),
     }
 
     compile_spec = {
@@ -327,8 +327,8 @@ def test_custom_model_with_dynamo_trace_kwarg_dynamic():
     args = [torch.rand((1, 3, 224, 224)).to("cuda")]
     kwargs = {
         "b": torch.tensor(1).to("cuda"),
-        "d": {"value": torch.randn((37632, 5)).to("cuda")},
         "e": [torch.tensor(8).to("cuda"), torch.tensor(10).to("cuda")],
+        "d": {"value": torch.randn((37632, 5)).to("cuda")},
     }
     model(*args, **kwargs)
     kwarg_torchtrt_input = prepare_inputs(kwargs)
@@ -412,8 +412,8 @@ def test_custom_model_with_dynamo_trace_kwarg_list_dynamic():
     model = net().eval().to("cuda")
     args = [torch.rand((1, 3, 224, 224)).to("cuda")]
     kwargs = {
-        "b": torch.rand((37632, 10)).to("cuda"),
         "d": {"value": torch.tensor(8).to("cuda")},
+        "b": torch.rand((37632, 10)).to("cuda"),
         "e": [torch.randn((10, 10)).to("cuda"), torch.randn((10, 10)).to("cuda")],
     }
     model(*args, **kwargs)
