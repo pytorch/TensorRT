@@ -88,8 +88,8 @@ def record_llm_perf(
     # We only support single input (B x seq_len) for LLMs now
     input_seq = input_tensors[0]
     with torch.no_grad():
-        # Warm up
-        _ = time_generate(model, input_seq, output_seq_length, iterations=10)
+        # Warm up for 3 iterations
+        _ = time_generate(model, input_seq, output_seq_length, iterations=3)
 
         torch.cuda.synchronize()
 
