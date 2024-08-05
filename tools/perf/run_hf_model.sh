@@ -6,7 +6,7 @@ isl=$4
 osl=$5
 precision=$6
 iterations=$7
-
+model_name=$(echo "$model_name" | sed 's/\//-/g')
 echo "Benchmarking ${model_name} model for bs ${batch_size} with ISL ${isl[i]}, OSL ${osl[i]} and backend ${backend} for ${iterations} iterations"
 python perf_run.py --model_torch ${model_name} \
                 --is_text_llm \
