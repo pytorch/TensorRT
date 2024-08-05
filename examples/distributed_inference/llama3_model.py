@@ -1,4 +1,6 @@
-# This file is copied from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/llama2_model.py
+# Taken and modified pytorch lightening
+# https://lightning.ai/lightning-ai/studios/tensor-parallelism-supercharging-large-model-training-with-pytorch-lightning
+
 
 from dataclasses import dataclass
 from typing import Optional, Tuple
@@ -18,17 +20,17 @@ class ModelArgs:
     multiple_of: int = 256  # make SwiGLU hidden layer size multiple of large power of 2
     ffn_dim_multiplier: Optional[float] = None
     norm_eps: float = 1e-5
+    rope_theta: float = 10000
 
     max_batch_size: int = 32
-    max_seq_len: int = 32768
+    max_seq_len: int = 2048
     # If `True`, then each transformer block init uses its layer ID, and if
     # `False`, each uses the total number of transformer blocks
     depth_init: bool = True
 
 
-def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0):
-    """
-    Precompute the frequency tensor for complex exponentials (cis) with given dimensions.
+def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0) -> torch.Tensor:
+    """Precompute the frequency tensor for complex exponentials (cis) with given dimensions.
 
     This function calculates a frequency tensor with complex exponentials using the given dimension 'dim'
     and the end index 'end'. The 'theta' parameter scales the frequencies.
@@ -41,20 +43,22 @@ def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0):
 
     Returns:
         torch.Tensor: Precomputed frequency tensor with complex exponentials.
+
     """
     freqs = 1.0 / (theta ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim))
-    t = torch.arange(end, device=freqs.device)  # type: ignore
-    freqs = torch.outer(t, freqs).float()  # type: ignore
-    freqs_cis = torch.polar(torch.ones_like(freqs), freqs)  # complex64
-    return freqs_cis
+    t = torch.arange(end, device=freqs.device)
+    freqs = torch.outer(t, freqs).float()
+    return torch.polar(torch.ones_like(freqs), freqs)  # complex64
 
 
-def reshape_for_broadcast(freqs_cis: torch.Tensor, x: torch.Tensor):
-    """
-    Reshape frequency tensor for broadcasting it with another tensor.
+def reshape_for_broadcast(freqs_cis: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+    """Reshape frequency tensor for broadcasting it with another tensor.
 
     This function reshapes the frequency tensor to have the same shape as the target tensor 'x'
     for the purpose of broadcasting the frequency tensor during element-wise operations.
+
+    The input freqs_cis tensor is assumed to be of shape (max_seqlen, dim),
+    and the first seqlen elements will be sliced, but dim must match x.
 
     Args:
         freqs_cis (torch.Tensor): Frequency tensor to be reshaped.
@@ -62,10 +66,13 @@ def reshape_for_broadcast(freqs_cis: torch.Tensor, x: torch.Tensor):
 
     Returns:
         torch.Tensor: Reshaped frequency tensor.
+
     """
     ndim = x.ndim
     assert 0 <= 1 < ndim
-    assert freqs_cis.shape == (x.shape[1], x.shape[-1])
+    seqlen = x.shape[1]
+    freqs_cis = freqs_cis[0:seqlen]
+    assert freqs_cis.shape == (seqlen, x.shape[-1])
     shape = [d if i == 1 or i == ndim - 1 else 1 for i, d in enumerate(x.shape)]
     return freqs_cis.view(*shape)
 
@@ -75,8 +82,7 @@ def apply_rotary_emb(
     xk: torch.Tensor,
     freqs_cis: torch.Tensor,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    """
-    Apply rotary embeddings to input tensors using the given frequency tensor.
+    """Apply rotary embeddings to input tensors using the given frequency tensor.
 
     This function applies rotary embeddings to the given query 'xq' and key 'xk' tensors using the provided
     frequency tensor 'freqs_cis'. The input tensors are reshaped as complex numbers, and the frequency tensor
@@ -90,6 +96,7 @@ def apply_rotary_emb(
 
     Returns:
         Tuple[torch.Tensor, torch.Tensor]: Tuple of modified query tensor and key tensor with rotary embeddings.
+
     """
     xq_ = torch.view_as_complex(xq.float().reshape(*xq.shape[:-1], -1, 2))
     xk_ = torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
@@ -112,8 +119,7 @@ def repeat_kv(x: torch.Tensor, n_rep: int) -> torch.Tensor:
 
 
 class RMSNorm(nn.Module):
-    """
-    Initialize the RMSNorm normalization layer.
+    """Initialize the RMSNorm normalization layer.
 
     Args:
         dim (int): The dimension of the input tensor.
@@ -142,8 +148,7 @@ class RMSNorm(nn.Module):
 
 
 class Attention(nn.Module):
-    """
-    Multi-head attention module.
+    """Multi-head attention module.
 
     Args:
         model_args (ModelArgs): Model configuration arguments.
@@ -151,7 +156,6 @@ class Attention(nn.Module):
     Attributes:
         n_kv_heads (int): Number of key and value heads.
         n_heads (int): Number of query heads.
-        n_local_kv_heads (int): Number of local key and value heads.
         n_rep (int): Number of repetitions for local heads.
         head_dim (int): Dimension size of each attention head.
         wq (Linear): Linear transformation for queries.
@@ -164,22 +168,14 @@ class Attention(nn.Module):
     def __init__(self, model_args: ModelArgs):
         super().__init__()
         self.n_heads = model_args.n_heads
-        self.n_kv_heads = (
-            model_args.n_heads
-            if model_args.n_kv_heads is None
-            else model_args.n_kv_heads
-        )
+        self.n_kv_heads = model_args.n_heads if model_args.n_kv_heads is None else model_args.n_kv_heads
         self.n_rep = self.n_heads // self.n_kv_heads
         self.head_dim = model_args.dim // model_args.n_heads
 
-        self.wq = nn.Linear(
-            model_args.dim, model_args.n_heads * self.head_dim, bias=False
-        )
+        self.wq = nn.Linear(model_args.dim, model_args.n_heads * self.head_dim, bias=False)
         self.wk = nn.Linear(model_args.dim, self.n_kv_heads * self.head_dim, bias=False)
         self.wv = nn.Linear(model_args.dim, self.n_kv_heads * self.head_dim, bias=False)
-        self.wo = nn.Linear(
-            model_args.n_heads * self.head_dim, model_args.dim, bias=False
-        )
+        self.wo = nn.Linear(model_args.n_heads * self.head_dim, model_args.dim, bias=False)
 
     def init_weights(self, init_std: float):
         for linear in (self.wq, self.wk, self.wv):
@@ -191,8 +187,7 @@ class Attention(nn.Module):
         x: torch.Tensor,
         freqs_cis: torch.Tensor,
     ):
-        """
-        Forward pass of the attention module.
+        """Forward pass of the attention module.
 
         Args:
             x (torch.Tensor): Input tensor.
@@ -202,15 +197,16 @@ class Attention(nn.Module):
             torch.Tensor: Output tensor after attention.
 
         """
-        bsz, seqlen, _ = x.shape
+        bs, seqlen, _ = x.shape
         xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
 
-        xq = xq.view(bsz, seqlen, self.n_heads, self.head_dim)
-        xk = xk.view(bsz, seqlen, self.n_kv_heads, self.head_dim)
-        xv = xv.view(bsz, seqlen, self.n_kv_heads, self.head_dim)
+        xq = xq.view(bs, seqlen, self.n_heads, self.head_dim)
+        xk = xk.view(bs, seqlen, self.n_kv_heads, self.head_dim)
+        xv = xv.view(bs, seqlen, self.n_kv_heads, self.head_dim)
 
         xq, xk = apply_rotary_emb(xq, xk, freqs_cis=freqs_cis)
 
+        # repeat k/v heads if n_kv_heads < n_heads
         keys = repeat_kv(xk, self.n_rep)  # (bs, seqlen, n_local_heads, head_dim)
         values = repeat_kv(xv, self.n_rep)  # (bs, seqlen, n_local_heads, head_dim)
 
@@ -220,16 +216,13 @@ class Attention(nn.Module):
 
         # we use casual mask for training
         output = F.scaled_dot_product_attention(xq, xk, xv, is_causal=True)
-        output = output.transpose(
-            1, 2
-        ).contiguous()  # (bs, seqlen, n_local_heads, head_dim)
-        output = output.view(bsz, seqlen, -1)
+        output = output.transpose(1, 2).contiguous()  # (bs, seqlen, n_local_heads, head_dim)
+        output = output.view(bs, seqlen, -1)
         return self.wo(output)
 
 
 class FeedForward(nn.Module):
-    """
-    FeedForward module
+    """FeedForward module.
 
     Args:
         dim (int): Input dimension.
@@ -272,8 +265,7 @@ class FeedForward(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    """
-    TransformerBlock Module
+    """TransformerBlock Module.
 
     Args:
         layer_id (int): Identifier for the layer.
@@ -318,8 +310,7 @@ class TransformerBlock(nn.Module):
         x: torch.Tensor,
         freqs_cis: torch.Tensor,
     ):
-        """
-        Perform a forward pass through the TransformerBlock.
+        """Perform a forward pass through the TransformerBlock.
 
         Args:
             x (torch.Tensor): Input tensor.
@@ -330,8 +321,7 @@ class TransformerBlock(nn.Module):
 
         """
         h = x + self.attention(self.attention_norm(x), freqs_cis)
-        out = h + self.feed_forward(self.ffn_norm(h))
-        return out
+        return h + self.feed_forward(self.ffn_norm(h))
 
     def init_weights(self):
         for norm in (self.attention_norm, self.ffn_norm):
@@ -341,8 +331,7 @@ class TransformerBlock(nn.Module):
 
 
 class Transformer(nn.Module):
-    """
-    Transformer Module
+    """Transformer Module.
 
     Args:
         model_args (ModelArgs): Model configuration arguments.
@@ -364,30 +353,35 @@ class Transformer(nn.Module):
         self.model_args = model_args
         self.vocab_size = model_args.vocab_size
         self.n_layers = model_args.n_layers
-        self.model_dim = model_args.dim
 
         self.tok_embeddings = nn.Embedding(model_args.vocab_size, model_args.dim)
-        self.register_buffer(
-            "freqs_cis",
-            precompute_freqs_cis(
-                model_args.dim // model_args.n_heads,
-                # Need to compute until at least the max token limit for generation
-                # (use 2x max sequence length to be safe)
-                model_args.max_seq_len * 2,
-            ),
-        )
-        self.layers = torch.nn.ModuleList()
+
+        # TODO persistent should be set to false, since this buffer can be recomputed.
+        # however, we set it to true for 2 reasons.  (1) due to pytorch/pytorch#123411,
+        # compile or pipeline-tracer will not correctly handle non-persistent buffers,
+        # so we need to fix that.  (2) if we initialize pipeline-parallel models from
+        # a seed checkpoint rather than calling init_weights, we need freqs_cis to be
+        # initialized by the checkpoint, or we need to add a separate initializer for
+        # just the non-persistent buffers that is called after loading checkpoints.
+        self.register_buffer("freqs_cis", self._precompute_freqs_cis(), persistent=True)
+
+        self.layers = torch.nn.ModuleDict()
         for layer_id in range(model_args.n_layers):
-            self.layers.append(TransformerBlock(layer_id, model_args))
+            self.layers[str(layer_id)] = TransformerBlock(layer_id, model_args)
 
         self.norm = RMSNorm(dim=model_args.dim, eps=model_args.norm_eps)
 
         self.output = nn.Linear(model_args.dim, model_args.vocab_size, bias=False)
         self.init_weights()
 
+    def reset_parameters(self):
+        with torch.device(self.freqs_cis.device):
+            self.freqs_cis = self._precompute_freqs_cis()
+
     def init_weights(self):
-        """
-        [Note: On ``init_weights`` vs. ``reset_parameters``]
+        """[Note: On ``init_weights`` vs.
+
+        ``reset_parameters``]
         Modules may define ``reset_parameters`` to initialize parameter values.
         ``reset_parameters`` is meant to only initialize directly owned
         parameters/buffers, not those of their child modules, and it can be
@@ -396,16 +390,12 @@ class Transformer(nn.Module):
         different from that in ``reset_parameters``. For this, we define
         ``init_weights``. We only call it in the constructor of this
         ``Transformer`` root module to avoid reinitializing tensors.
+
         """
         with torch.device(self.freqs_cis.device):
-            self.freqs_cis = precompute_freqs_cis(
-                self.model_args.dim // self.model_args.n_heads,
-                # Need to compute until at least the max token limit for generation
-                # (use 2x max sequence length to be safe)
-                self.model_args.max_seq_len * 2,
-            )
+            self.freqs_cis = self._precompute_freqs_cis()
         nn.init.normal_(self.tok_embeddings.weight)
-        for layer in self.layers:
+        for layer in self.layers.values():
             layer.init_weights()
         self.norm.reset_parameters()
         final_out_std = self.model_args.dim**-0.5
@@ -418,9 +408,17 @@ class Transformer(nn.Module):
             b=cutoff_factor * final_out_std,
         )
 
+    def _precompute_freqs_cis(self) -> torch.Tensor:
+        return precompute_freqs_cis(
+            self.model_args.dim // self.model_args.n_heads,
+            # Need to compute until at least the max token limit for generation
+            # (use 2x max sequence length to be safe)
+            self.model_args.max_seq_len * 2,
+            self.model_args.rope_theta,
+        )
+
     def forward(self, tokens: torch.Tensor):
-        """
-        Perform a forward pass through the Transformer model.
+        """Perform a forward pass through the Transformer model.
 
         Args:
             tokens (torch.Tensor): Input token indices.
@@ -429,21 +427,18 @@ class Transformer(nn.Module):
             torch.Tensor: Output logits after applying the Transformer model.
 
         """
-        _bsz, seqlen = tokens.shape
-        h = self.tok_embeddings(tokens)
-        self.freqs_cis = self.freqs_cis.to(h.device)
-        freqs_cis = self.freqs_cis[0:seqlen]
+        # passthrough for nonexistent layers, allows easy configuration of pipeline parallel stages
+        h = self.tok_embeddings(tokens) if self.tok_embeddings else tokens
 
-        for layer in self.layers:
-            h = layer(h, freqs_cis)
-        h = self.norm(h)
-        output = self.output(h).float()
-        return output
+        for layer in self.layers.values():
+            h = layer(h, self.freqs_cis)
+
+        h = self.norm(h) if self.norm else h
+        return self.output(h).float() if self.output else h
 
     @classmethod
     def from_model_args(cls, model_args: ModelArgs) -> "Transformer":
-        """
-        Initialize a Transformer model from a ModelArgs object.
+        """Initialize a Transformer model from a ModelArgs object.
 
         Args:
             model_args (ModelArgs): Model configuration arguments.
