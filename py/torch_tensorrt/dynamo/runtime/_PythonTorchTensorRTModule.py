@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import tensorrt as trt
 import torch
+import torch_tensorrt
 from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
@@ -17,8 +18,6 @@ from torch_tensorrt.dynamo.runtime.tools import (
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
-
-import torch_tensorrt
 
 logger = logging.getLogger(__name__)
 

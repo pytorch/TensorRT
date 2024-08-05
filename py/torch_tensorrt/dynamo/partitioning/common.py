@@ -18,7 +18,10 @@ def contains_sym_int(tensor: torch.Tensor) -> bool:
 
 
 def construct_dynamic_input(
-    input_shape: torch.Size, input_dtype: torch.dtype, is_shape_tensor: bool = False
+    input_shape: torch.Size,
+    input_dtype: torch.dtype,
+    name: str = "",
+    is_shape_tensor: bool = False,
 ) -> Input:
     """
     Constructs a torch_tensorrt.Input based on a symbolic input
@@ -63,22 +66,28 @@ def construct_dynamic_input(
         opt_shape=opt_shape,
         max_shape=max_shape,
         dtype=input_dtype,
+        name=name,
         is_shape_tensor=is_shape_tensor,
     )
 
 
 def get_input(
-    input_shape: torch.Size, dtype: torch.dtype, is_shape_tensor: bool = False
+    input_shape: torch.Size,
+    dtype: torch.dtype,
+    name: str = "",
+    is_shape_tensor: bool = False,
 ) -> Input:
     """
     Based on type of dimensions in the input_shape, construct regular or dynamic shaped inputs
     """
     if contains_sym_int(input_shape):
         return construct_dynamic_input(
-            input_shape, dtype, is_shape_tensor=is_shape_tensor
+            input_shape, dtype, name=name, is_shape_tensor=is_shape_tensor
         )
     else:
-        return Input(shape=input_shape, dtype=dtype, is_shape_tensor=is_shape_tensor)
+        return Input(
+            shape=input_shape, dtype=dtype, name=name, is_shape_tensor=is_shape_tensor
+        )
 
 
 def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
@@ -101,11 +110,18 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
                     input_meta = input.meta["val"]
                     if isinstance(input_meta, (FakeTensor, torch.Tensor)):
                         input_shape = input_meta.size()
-                        torchtrt_inputs.append(get_input(input_shape, input_meta.dtype))
+                        torchtrt_inputs.append(
+                            get_input(input_shape, input_meta.dtype, name=input.name)
+                        )
                     elif isinstance(input_meta, torch.SymInt):
                         # Assuming sym_integers | shape inputs always have torch.int64 dtype
                         torchtrt_inputs.append(
-                            get_input([input_meta], torch.int64, is_shape_tensor=True)
+                            get_input(
+                                [input_meta],
+                                torch.int64,
+                                name=input.name,
+                                is_shape_tensor=True,
+                            )
                         )
                     else:
                         raise ValueError(
@@ -115,7 +131,9 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
                 elif "tensor_meta" in input.meta:
                     input_meta = input.meta["tensor_meta"]
                     input_shape = input_meta.shape
-                    torchtrt_inputs.append(get_input(input_shape, input_meta.dtype))
+                    torchtrt_inputs.append(
+                        get_input(input_shape, input_meta.dtype, name=input.name)
+                    )
                 else:
                     raise AssertionError(
                         f"Input {input.name} does not contain val and tensor_meta fields in the metadata. Please ensure you have exported the graph correctly"

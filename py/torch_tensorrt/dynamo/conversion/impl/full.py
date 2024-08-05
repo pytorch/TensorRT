@@ -21,7 +21,7 @@ def full(
     shape: Union[List[int], TRTTensor],
     fill_value: Union[int, float, bool],
 ) -> TRTTensor:
-    # in static shape scenario, shape is a list of int
+
     if isinstance(shape, List):
         # in static shape scenario, shape is a list of int
         if all(isinstance(dim, int) for dim in shape):

@@ -367,6 +367,11 @@ def compile_module(
         # Criteria for a module to be convertible to TRT
         if settings.use_fast_partitioner and "_run_on_acc" not in name:
             dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(submodule))
+            logger.debug(
+                "Submodule in PyTorch: %s\n %s",
+                str(name),
+                str(submodule.graph),
+            )
             continue
 
         subgraph_data = PerSubgraphData()

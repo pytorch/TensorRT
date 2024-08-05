@@ -24,7 +24,6 @@ def lower_scaled_dot_product_attention(
     """
     original_fns, replacement = scaled_dot_product_attention_replacement()
     replaced_nodes = []
-
     # For each original function, search for it in the graph and replace
     for original in original_fns:
         replaced_nodes += torch.fx.subgraph_rewriter.replace_pattern_with_filters(
