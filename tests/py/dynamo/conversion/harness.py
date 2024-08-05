@@ -3,7 +3,7 @@
 import logging
 import time
 import unittest
-from typing import Callable, List, Optional, Set, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import torch
 import torch_tensorrt
@@ -64,6 +64,7 @@ class TRTTestCase(TestCase):
         atol,
         check_dtype=True,
         pyt_inputs=None,
+        rt_cls=PythonTorchTensorRTModule,
     ):
         with torch.no_grad():
             cuda_inputs = []
@@ -74,10 +75,11 @@ class TRTTestCase(TestCase):
             interpreter_result = interpreter.run()
             sec = time.perf_counter() - start
             _LOGGER.info(f"Interpreter run time(s): {sec}")
-            trt_mod = PythonTorchTensorRTModule(
-                interpreter_result.engine,
-                interpreter_result.input_names,
-                interpreter_result.output_names,
+            trt_mod = rt_cls(
+                serialized_engine=interpreter_result.serialized_engine,
+                input_binding_names=list(interpreter_result.input_names),
+                output_binding_names=list(interpreter_result.output_names),
+                name="test_engine",
             )
             mod = mod.cuda()
             if pyt_inputs is not None:
@@ -132,6 +134,7 @@ class TRTTestCase(TestCase):
         interpreter,
         comparators: List[Tuple[Callable, List]],
         fp16_mode=False,
+        rt_cls=PythonTorchTensorRTModule,
     ):
         """
         Runs the test and compares the result using the provided comparators.
@@ -154,10 +157,11 @@ class TRTTestCase(TestCase):
                 self.assert_has_op(mod, expected_ops)
 
             interpreter_result = interpreter.run()
-            trt_mod = PythonTorchTensorRTModule(
-                interpreter_result.engine,
-                interpreter_result.input_names,
-                interpreter_result.output_names,
+            trt_mod = rt_cls(
+                serialized_engine=interpreter_result.serialized_engine,
+                input_binding_names=list(interpreter_result.input_names),
+                output_binding_names=list(interpreter_result.output_names),
+                name="test_engine",
             )
             res_trt = trt_mod(*cuda_inputs).cpu()
             res_cpu = mod(*cuda_inputs).cpu()

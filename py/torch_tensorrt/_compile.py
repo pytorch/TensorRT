@@ -27,7 +27,7 @@ if ENABLED_FEATURES.dynamo_frontend:
     from torch.export import ExportedProgram
     from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
     from torch_tensorrt.dynamo._compiler import (
-        convert_module_to_trt_engine as dynamo_convert_module_to_trt_engine,
+        convert_exported_program_to_serialized_trt_engine as dynamo_convert_exported_program_to_serialized_trt_engine,
     )
     from torch_tensorrt.dynamo._tracer import trace as dynamo_trace
 
@@ -351,7 +351,7 @@ def convert_method_to_trt_engine(
         torchtrt_inputs = prepare_inputs(inputs)
         exp_program = torch_tensorrt.dynamo.trace(module, torchtrt_inputs, **kwargs)
 
-        return dynamo_convert_module_to_trt_engine(
+        return dynamo_convert_exported_program_to_serialized_trt_engine(
             exp_program,
             inputs=tuple(inputs),
             enabled_precisions=enabled_precisions_set,
