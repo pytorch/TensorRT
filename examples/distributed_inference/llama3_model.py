@@ -8,6 +8,15 @@ from typing import Optional, Tuple
 import torch
 import torch.nn.functional as F
 from torch import nn
+from torch.distributed._tensor import Replicate, Shard
+from torch.distributed.device_mesh import DeviceMesh
+from torch.distributed.tensor.parallel import (
+    ColwiseParallel,
+    PrepareModuleInput,
+    RowwiseParallel,
+    SequenceParallel,
+    parallelize_module,
+)
 
 
 @dataclass
@@ -27,6 +36,7 @@ class ModelArgs:
     # If `True`, then each transformer block init uses its layer ID, and if
     # `False`, each uses the total number of transformer blocks
     depth_init: bool = True
+    device: str = "cuda"
 
 
 def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0) -> torch.Tensor:
@@ -168,14 +178,22 @@ class Attention(nn.Module):
     def __init__(self, model_args: ModelArgs):
         super().__init__()
         self.n_heads = model_args.n_heads
-        self.n_kv_heads = model_args.n_heads if model_args.n_kv_heads is None else model_args.n_kv_heads
+        self.n_kv_heads = (
+            model_args.n_heads
+            if model_args.n_kv_heads is None
+            else model_args.n_kv_heads
+        )
         self.n_rep = self.n_heads // self.n_kv_heads
         self.head_dim = model_args.dim // model_args.n_heads
 
-        self.wq = nn.Linear(model_args.dim, model_args.n_heads * self.head_dim, bias=False)
+        self.wq = nn.Linear(
+            model_args.dim, model_args.n_heads * self.head_dim, bias=False
+        )
         self.wk = nn.Linear(model_args.dim, self.n_kv_heads * self.head_dim, bias=False)
         self.wv = nn.Linear(model_args.dim, self.n_kv_heads * self.head_dim, bias=False)
-        self.wo = nn.Linear(model_args.n_heads * self.head_dim, model_args.dim, bias=False)
+        self.wo = nn.Linear(
+            model_args.n_heads * self.head_dim, model_args.dim, bias=False
+        )
 
     def init_weights(self, init_std: float):
         for linear in (self.wq, self.wk, self.wv):
@@ -216,7 +234,9 @@ class Attention(nn.Module):
 
         # we use casual mask for training
         output = F.scaled_dot_product_attention(xq, xk, xv, is_causal=True)
-        output = output.transpose(1, 2).contiguous()  # (bs, seqlen, n_local_heads, head_dim)
+        output = output.transpose(
+            1, 2
+        ).contiguous()  # (bs, seqlen, n_local_heads, head_dim)
         output = output.view(bs, seqlen, -1)
         return self.wo(output)
 
@@ -330,7 +350,7 @@ class TransformerBlock(nn.Module):
         self.feed_forward.init_weights(self.weight_init_std)
 
 
-class Transformer(nn.Module):
+class ParallelTransformer(nn.Module):
     """Transformer Module.
 
     Args:
@@ -348,13 +368,16 @@ class Transformer(nn.Module):
 
     """
 
-    def __init__(self, model_args: ModelArgs):
+    def __init__(self, model_args: ModelArgs, tp_mesh: DeviceMesh):
+        # Here we use distributed model initialization to avoid memory overflow
         super().__init__()
         self.model_args = model_args
         self.vocab_size = model_args.vocab_size
         self.n_layers = model_args.n_layers
 
         self.tok_embeddings = nn.Embedding(model_args.vocab_size, model_args.dim)
+        self.tok_embeddings.to(model_args.device)
+        self.tok_embeddings = self.parallel_embeddings(self.tok_embeddings, tp_mesh)
 
         # TODO persistent should be set to false, since this buffer can be recomputed.
         # however, we set it to true for 2 reasons.  (1) due to pytorch/pytorch#123411,
@@ -363,16 +386,82 @@ class Transformer(nn.Module):
         # a seed checkpoint rather than calling init_weights, we need freqs_cis to be
         # initialized by the checkpoint, or we need to add a separate initializer for
         # just the non-persistent buffers that is called after loading checkpoints.
-        self.register_buffer("freqs_cis", self._precompute_freqs_cis(), persistent=True)
+        self.register_buffer(
+            "freqs_cis",
+            self._precompute_freqs_cis().to(model_args.device),
+            persistent=True,
+        )
 
-        self.layers = torch.nn.ModuleDict()
+        self.layers = torch.nn.ModuleDict().to(model_args.device)
         for layer_id in range(model_args.n_layers):
-            self.layers[str(layer_id)] = TransformerBlock(layer_id, model_args)
+            block = TransformerBlock(layer_id, model_args).to(model_args.device)
+            self.layers[str(layer_id)] = block
+            self.parallel_transformer_block(self.layers[str(layer_id)], tp_mesh)
+            print(layer_id)
 
-        self.norm = RMSNorm(dim=model_args.dim, eps=model_args.norm_eps)
-
-        self.output = nn.Linear(model_args.dim, model_args.vocab_size, bias=False)
+        self.norm = RMSNorm(dim=model_args.dim, eps=model_args.norm_eps).to(
+            model_args.device
+        )
+        self.norm = self.parallel_norm(self.norm, tp_mesh)
+        self.output = nn.Linear(model_args.dim, model_args.vocab_size, bias=False).to(
+            model_args.device
+        )
+        self.output = self.parallel_output(self.output, tp_mesh)
         self.init_weights()
+
+    def parallel_transformer_block(self, transformer_block, tp_mesh):
+        if tp_mesh.size() <= 1:
+            return
+        plan = {
+            "attention": PrepareModuleInput(
+                input_layouts=(Shard(1), None),
+                desired_input_layouts=(Replicate(), None),
+            ),
+            "attention.wq": ColwiseParallel(),
+            "attention.wk": ColwiseParallel(),
+            "attention.wv": ColwiseParallel(),
+            "attention.wo": RowwiseParallel(output_layouts=Shard(1)),
+            "attention_norm": SequenceParallel(),
+            "feed_forward": PrepareModuleInput(
+                input_layouts=(Shard(1),),
+                desired_input_layouts=(Replicate(),),
+            ),
+            "feed_forward.w1": ColwiseParallel(),
+            "feed_forward.w2": RowwiseParallel(output_layouts=Shard(1)),
+            "feed_forward.w3": ColwiseParallel(),
+            "ffn_norm": SequenceParallel(),
+        }
+
+        # Adjust attention module to use the local number of heads
+        attn_layer = transformer_block.attention
+        attn_layer.n_heads = attn_layer.n_heads // tp_mesh.size()
+        attn_layer.n_kv_heads = attn_layer.n_kv_heads // tp_mesh.size()
+
+        # Apply the plan for the current transformer block
+        parallelize_module(transformer_block, tp_mesh, plan)
+
+    def parallel_embeddings(self, embedding, tp_mesh):
+        plan = {
+            "tok_embeddings": RowwiseParallel(
+                input_layouts=Replicate(),
+                output_layouts=Shard(1),
+            )
+        }
+        return parallelize_module(embedding, tp_mesh, plan)
+
+    def parallel_output(self, output, tp_mesh):
+        plan = {
+            "output": ColwiseParallel(
+                input_layouts=Shard(1),
+            ),
+        }
+        return parallelize_module(output, tp_mesh, plan)
+
+    def parallel_norm(self, norm, tp_mesh):
+        plan = {
+            "norm": SequenceParallel(),
+        }
+        return parallelize_module(norm, tp_mesh, plan)
 
     def reset_parameters(self):
         with torch.device(self.freqs_cis.device):
