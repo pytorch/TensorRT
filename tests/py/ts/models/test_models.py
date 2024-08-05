@@ -92,7 +92,6 @@ class TestModels(unittest.TestCase):
             msg=f"EfficientNet-B0 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
-    @unittest.skip("Layer Norm issue needs to be addressed")
     def test_bert_base_uncased(self):
         self.model = cm.BertModule().cuda()
         self.input = torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda")
