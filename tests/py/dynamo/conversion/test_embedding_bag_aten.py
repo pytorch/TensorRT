@@ -501,8 +501,8 @@ class TestEmbeddingBagConverter(DispatchTestCase):
                 torch.testing.assert_close(
                     out,
                     ref,
-                    rtol=0.001,
-                    atol=0.001,
+                    rtol=5e-3,
+                    atol=5e-3,
                     equal_nan=True,
                     check_dtype=True,
                 )
