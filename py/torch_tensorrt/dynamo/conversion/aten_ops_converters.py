@@ -332,10 +332,14 @@ def aten_ops_fmod(
     return impl.elementwise.fmod(ctx, target, SourceIR.ATEN, name, args[0], args[1])
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler)
-@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_2d)
-@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler.default)
-@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_2d.default)
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.grid_sampler_2d, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.grid_sampler.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.grid_sampler_2d.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -923,7 +927,7 @@ def aten_ops_chunk(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.cumsum.default)
+@dynamo_tensorrt_converter(torch.ops.aten.cumsum.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
