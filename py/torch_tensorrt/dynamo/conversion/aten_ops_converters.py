@@ -7,6 +7,7 @@ from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
 import torch
 from torch.fx.node import Argument, Node, Target
+from torch_tensorrt._enums import QuantizationType
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -621,11 +622,12 @@ else:
         kwargs: Dict[str, Argument],
         name: str,
     ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-        return impl.quantize.quantize_int8(
+        return impl.quantize.quantize(
             ctx,
             target,
             SourceIR.ATEN,
             name,
+            QuantizationType.INT8,
             args[0],
             args[1],
         )
@@ -638,11 +640,12 @@ else:
         kwargs: Dict[str, Argument],
         name: str,
     ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-        return impl.quantize.quantize_fp8(
+        return impl.quantize.quantize(
             ctx,
             target,
             SourceIR.ATEN,
             name,
+            QuantizationType.FP8,
             args[0],
             args[1],
         )

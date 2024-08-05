@@ -5,10 +5,9 @@ from enum import Enum, auto
 from typing import Any, Optional, Type, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch_tensorrt._features import ENABLED_FEATURES
-
-import tensorrt as trt
 
 
 class dtype(Enum):
@@ -1328,3 +1327,13 @@ class EngineCapability(Enum):
 
     def __hash__(self) -> int:
         return hash(self.value)
+
+
+class QuantizationType(Enum):
+    """
+    Type of the Quantization
+    """
+
+    FP8 = auto()
+
+    INT8 = auto()
