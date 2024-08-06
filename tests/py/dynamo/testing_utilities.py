@@ -50,7 +50,7 @@ def fx_dynamo_testing_backend(
             decompositions=get_decompositions(),
         )
 
-        gm = post_lowering(gm, sample_inputs)
+        gm = post_lowering(gm)
 
         trt_compiled = custom_backend(
             gm,
