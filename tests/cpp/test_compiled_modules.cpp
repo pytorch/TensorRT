@@ -5,7 +5,11 @@ TEST_P(CppAPITests, CompiledModuleIsClose) {
   std::vector<torch::jit::IValue> trt_inputs_ivalues;
   std::vector<torch_tensorrt::Input> shapes;
   for (uint64_t i = 0; i < input_shapes.size(); i++) {
-    auto in = at::randint(5, input_shapes[i], {at::kCUDA}).to(input_types[i]);
+    auto in = at::randn(input_shapes[i], {at::kCUDA}).to(input_types[i]);
+    if (input_types[i] == at::kInt || input_types[i] == at::kLong) {
+      auto in = at::randint(0, 2, input_shapes[i], {at::kCUDA}).to(input_types[i]);
+    }
+
     jit_inputs_ivalues.push_back(in.clone());
     trt_inputs_ivalues.push_back(in.clone());
     auto in_spec = torch_tensorrt::Input(input_shapes[i]);

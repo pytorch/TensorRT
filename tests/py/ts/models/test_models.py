@@ -93,7 +93,7 @@ class TestModels(unittest.TestCase):
         )
 
     def test_bert_base_uncased(self):
-        self.model = cm.BertModule().cuda()
+        self.model = cm.BertModule()
         self.input = torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda")
 
         compile_spec = {
@@ -116,7 +116,7 @@ class TestModels(unittest.TestCase):
             "enabled_precisions": {torch.float},
             "truncate_long_and_double": True,
         }
-        with torchtrt.logging.errors():
+        with torchtrt.logging.debug():
             trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
 
         model_outputs = self.model(self.input, self.input)

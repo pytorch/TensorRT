@@ -1,3 +1,4 @@
+#include "ATen/cuda/CUDAEvent.h"
 #include "c10/cuda/CUDAGuard.h"
 #include "c10/cuda/CUDAStream.h"
 
@@ -70,7 +71,7 @@ bool _cudagraphs_validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_
     new_shape_key_ss << "(";
     auto sizes = input.sizes();
     auto rank = input.sizes().size();
-    for (auto i = 0; i < rank; i++) {
+    for (size_t i = 0; i < rank; i++) {
       new_shape_key_ss << sizes[i];
       // For all but the final dimension in the shape key, add comma separator
       if (i < rank - 1) {
@@ -142,13 +143,13 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             select_rt_device(compiled_engine->device_info, curr_device, compiled_engine->hardware_compatible);
         set_rt_device(device);
 
+        compiled_engine->caller_stream = c10::cuda::getCurrentCUDAStream(device.id);
         // Update active stream based on new device
-        auto current_stream = c10::cuda::getCurrentCUDAStream(device.id);
-        if (current_stream == c10::cuda::getDefaultCUDAStream(device.id)) {
-          compiled_engine->active_stream = c10::cuda::getStreamFromPool(false, device.id);
-          c10::cuda::setCurrentCUDAStream(compiled_engine->active_stream);
+        if (compiled_engine->caller_stream == c10::cuda::getDefaultCUDAStream(device.id)) {
+          compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, device.id);
+          c10::cuda::setCurrentCUDAStream(compiled_engine->engine_stream);
         } else {
-          compiled_engine->active_stream = current_stream;
+          compiled_engine->engine_stream = compiled_engine->caller_stream;
         }
 
         // Target device is new device
@@ -274,7 +275,13 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
   if (!CUDAGRAPHS_MODE) {
     // If not in cudagraphs mode, proceed with enqueueV3 as normal
-    compiled_engine->exec_ctx->enqueueV3(compiled_engine->active_stream);
+    at::cuda::CUDAEvent caller_exec_complete;
+    caller_exec_complete.record(compiled_engine->caller_stream);
+    caller_exec_complete.block(compiled_engine->engine_stream);
+    compiled_engine->exec_ctx->enqueueV3(compiled_engine->engine_stream);
+    at::cuda::CUDAEvent trt_exec_complete;
+    trt_exec_complete.record(compiled_engine->engine_stream);
+    trt_exec_complete.block(compiled_engine->caller_stream);
   } else if (need_cudagraphs_record) {
     // If cudagraphs needs to record a graph, capture the enqueueV3 call in a graph
 
@@ -282,8 +289,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     c10::cuda::CUDAStream recording_stream = c10::cuda::getStreamFromPool(false, inputs[0].device().index());
     c10::cuda::CUDAStreamGuard guard(recording_stream);
 
-    compiled_engine->exec_ctx->enqueueV3(recording_stream);
-    recording_stream.synchronize();
+    at::cuda::CUDAEvent caller_exec_complete;
+    caller_exec_complete.record(compiled_engine->caller_stream);
+    caller_exec_complete.block(recording_stream);
 
     compiled_engine->cudagraph.capture_begin();
     compiled_engine->exec_ctx->enqueueV3(recording_stream);
@@ -294,7 +302,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
   } else {
     // If the cudagraph has already been recorded, copy the input buffers and replay it
-    for (auto i = 0; i < inputs.size(); i++) {
+    for (size_t i = 0; i < inputs.size(); i++) {
       compiled_engine->input_buffers[i].copy_(inputs[i], true);
     }
     compiled_engine->cudagraph.replay();
@@ -305,7 +313,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   // In cudagraphs mode, the output buffers can be reused, so they must
   // be cloned before providing them to the user to avoid data corruption
   if (CUDAGRAPHS_MODE) {
-    for (auto i = 0; i < compiled_engine->output_buffers.size(); i++) {
+    for (size_t i = 0; i < compiled_engine->output_buffers.size(); i++) {
       model_outputs[i] = compiled_engine->output_buffers[i].clone();
     }
   } else {
