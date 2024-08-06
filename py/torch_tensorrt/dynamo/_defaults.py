@@ -32,6 +32,7 @@ DRYRUN = False
 HARDWARE_COMPATIBLE = False
 SUPPORTED_KERNEL_PRECISIONS = {dtype.f32, dtype.f16, dtype.bf16, dtype.i8, dtype.f8}
 TIMING_CACHE_PATH = os.path.join(tempfile.gettempdir(), "timing_cache.bin")
+LAZY_ENGINE_INIT = False
 
 
 def default_device() -> Device:

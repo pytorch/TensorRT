@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import io
 import logging
 from typing import List, Sequence
 
@@ -102,33 +101,30 @@ def convert_module(
         settings: Compilation settings
         name: TRT engine name
     Returns:
-        _PythonTorchTensorRTModule or TorchTensorRTModule
+        PythonTorchTensorRTModule or TorchTensorRTModule
     """
     interpreter_result = interpret_module_to_result(module, inputs, settings)
 
-    if settings.use_python_runtime or not ENABLED_FEATURES.torch_tensorrt_runtime:
-        if not settings.use_python_runtime:
-            logger.info(
-                "Since Torch-TensorRT runtime is not available, using Python Runtime, some features may not be available"
-            )
-        return PythonTorchTensorRTModule(
-            engine=interpreter_result.engine,
-            input_names=list(interpreter_result.input_names),
-            output_names=list(interpreter_result.output_names),
-            settings=settings,
-        )
+    rt_cls = PythonTorchTensorRTModule
 
-    else:
+    if ENABLED_FEATURES.torch_tensorrt_runtime and not settings.use_python_runtime:
+
         from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
-        with io.BytesIO() as engine_bytes:
-            engine_bytes.write(interpreter_result.engine)
-            engine_str = engine_bytes.getvalue()
+        rt_cls = TorchTensorRTModule
 
-        return TorchTensorRTModule(
-            serialized_engine=engine_str,
-            name=name,
-            input_binding_names=list(interpreter_result.input_names),
-            output_binding_names=list(interpreter_result.output_names),
-            settings=settings,
+    elif (
+        not ENABLED_FEATURES.torch_tensorrt_runtime and not settings.use_python_runtime
+    ):
+
+        logger.info(
+            "Since Torch-TensorRT runtime is not available, using Python Runtime, some features may not be available"
         )
+
+    return rt_cls(
+        serialized_engine=interpreter_result.serialized_engine,
+        input_binding_names=list(interpreter_result.input_names),
+        output_binding_names=list(interpreter_result.output_names),
+        name=name,
+        settings=settings,
+    )

@@ -30,7 +30,6 @@ def test_resnet18(ir):
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 8,
-        "ir": "dynamo",
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -61,7 +60,6 @@ def test_mobilenet_v2(ir):
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 8,
-        "ir": "dynamo",
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -92,7 +90,6 @@ def test_efficientnet_b0(ir):
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 8,
-        "ir": "dynamo",
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -170,7 +167,6 @@ def test_resnet18_half(ir):
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 8,
-        "ir": "dynamo",
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
