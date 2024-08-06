@@ -6,8 +6,11 @@ from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
-from torch_tensorrt.fx.converters.converter_utils import set_layer_name
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    get_trt_tensor,
+    set_layer_name,
+)
+from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
 from torch_tensorrt.fx.types import TRTTensor
 
 """
@@ -31,7 +34,14 @@ def get_padded_shape_tensors(
             f"Trying to pad last {len(pad) // 2} dimensions but the input only has {rank} dimensions."
         )
 
-    input_shape_tensor = ctx.net.add_shape(input).get_output(0)
+    input_shape_tensor = get_shape_with_dynamic_shape(
+        ctx,
+        target,
+        source_ir,
+        name + "_input_shape",
+        input.shape,
+        input,
+    )
     padded_shape_tensor = input_shape_tensor
 
     start_list = [0] * rank
@@ -41,7 +51,7 @@ def get_padded_shape_tensors(
         pad_after = pad[i * 2 + 1]
 
         pad_sum = get_trt_tensor(
-            ctx, pad_before + pad_after, f"{name}_pad_sum_{i}", dtype=np.int64
+            ctx, pad_before + pad_after, f"{name}_pad_sum_{i}", dtype=np.int32
         )
         dim_shape = ctx.net.add_slice(
             input_shape_tensor,
@@ -74,9 +84,9 @@ def get_padded_shape_tensors(
 
     start_indices_tensor = get_trt_tensor(
         ctx,
-        np.array(start_list, dtype=np.int64),
+        np.array(start_list, dtype=np.int32),
         f"{name}_start_indices_tensor",
-        dtype=np.int64,
+        dtype=np.int32,
     )
 
     return start_indices_tensor, padded_shape_tensor
@@ -101,9 +111,9 @@ def constant_padNd(
     stride_list = [1] * rank
     stride_tensor = get_trt_tensor(
         ctx,
-        np.array(stride_list, dtype=np.int64),
+        np.array(stride_list, dtype=np.int32),
         f"{name}_stride_tensor",
-        dtype=np.int64,
+        dtype=np.int32,
     )
 
     layer = ctx.net.add_slice(
@@ -138,9 +148,9 @@ def reflection_padNd(
     stride_list = [1] * rank
     stride_tensor = get_trt_tensor(
         ctx,
-        np.array(stride_list, dtype=np.int64),
+        np.array(stride_list, dtype=np.int32),
         f"{name}_stride_tensor",
-        dtype=np.int64,
+        dtype=np.int32,
     )
 
     layer = ctx.net.add_slice(
@@ -172,9 +182,9 @@ def replication_padNd(
     stride_list = [1] * rank
     stride_tensor = get_trt_tensor(
         ctx,
-        np.array(stride_list, dtype=np.int64),
+        np.array(stride_list, dtype=np.int32),
         f"{name}_stride_tensor",
-        dtype=np.int64,
+        dtype=np.int32,
     )
 
     layer = ctx.net.add_slice(
@@ -206,9 +216,9 @@ def circular_padNd(
     stride_list = [1] * rank
     stride_tensor = get_trt_tensor(
         ctx,
-        np.array(stride_list, dtype=np.int64),
+        np.array(stride_list, dtype=np.int32),
         f"{name}_stride_tensor",
-        dtype=np.int64,
+        dtype=np.int32,
     )
 
     layer = ctx.net.add_slice(
