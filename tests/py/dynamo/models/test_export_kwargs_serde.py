@@ -10,7 +10,9 @@ import torch.nn.functional as F
 import torch_tensorrt as torchtrt
 import torchvision.models as models
 from torch import nn
-from torch_tensorrt.dynamo._compiler import convert_module_to_trt_engine
+from torch_tensorrt.dynamo._compiler import (
+    convert_exported_program_to_serialized_trt_engine,
+)
 from torch_tensorrt.dynamo.utils import (
     COSINE_THRESHOLD,
     cosine_similarity,
@@ -507,4 +509,6 @@ def test_custom_model_compile_engine():
     }
 
     exp_program = torch.export.export(model, args=tuple(args), kwargs=kwargs)
-    engine = convert_module_to_trt_engine(exp_program, **compile_spec)
+    engine = convert_exported_program_to_serialized_trt_engine(
+        exp_program, **compile_spec
+    )
