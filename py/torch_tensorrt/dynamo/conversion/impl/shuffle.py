@@ -13,6 +13,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     set_layer_name,
 )
+from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
 from torch_tensorrt.fx.types import TRTTensor
 
 
@@ -61,7 +62,14 @@ def pixel_shuffle(
     upscale_factor: int,
 ) -> TRTTensor:
     # Get input shape tensor
-    input_shape_tensor = ctx.net.add_shape(input).get_output(0)
+    input_shape_tensor = get_shape_with_dynamic_shape(
+        ctx,
+        target,
+        source_ir,
+        name + "_shape",
+        input.shape,
+        input,
+    )
 
     # Extract in_channels, in_height, and in_width from the input shape tensor
     in_channels_tensor = ctx.net.add_slice(
@@ -76,11 +84,14 @@ def pixel_shuffle(
 
     # Calculate out_channels, out_height, and out_width as tensors
     upscale_factor_sq = upscale_factor * upscale_factor
+    upscale_factor_tensor = get_trt_tensor(
+        ctx, upscale_factor, f"{name}_upscale_factor"
+    )
     upscale_factor_sq_tensor = get_trt_tensor(
         ctx, upscale_factor_sq, f"{name}_upscale_factor_sq"
     )
 
-    out_channels_tensor = impl.elementwise.div(
+    out_channels_tensor = impl.elementwise.floor_divide(
         ctx,
         target,
         source_ir,
@@ -114,26 +125,16 @@ def pixel_shuffle(
     ]
     new_shape_tensors += [
         out_channels_tensor,
-        get_trt_tensor(ctx, upscale_factor, f"{name}_upscale_factor_1"),
-        get_trt_tensor(ctx, upscale_factor, f"{name}_upscale_factor_2"),
+        upscale_factor_tensor,
+        upscale_factor_tensor,
         in_height_tensor,
         in_width_tensor,
     ]
 
-    new_shape_tensor = impl.cat.cat(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_new_shape_tensor",
-        new_shape_tensors,
-        0,
-        np.int32,
-    )
-
     # Reshape tensor
-    reshape_layer = ctx.net.add_shuffle(input)
-    reshape_layer.set_input(1, new_shape_tensor)
-    reshaped_tensor = reshape_layer.get_output(0)
+    reshaped_tensor = reshape(
+        ctx, target, source_ir, f"{name}_reshape", input, new_shape_tensors
+    )
 
     # Permute shape
     rank = len(input.shape)
@@ -152,20 +153,15 @@ def pixel_shuffle(
         for i in range(len(input.shape) - 3)
     ]
     out_shape_tensors += [out_channels_tensor, out_height_tensor, out_width_tensor]
-    out_shape_tensor = impl.cat.cat(
+
+    return reshape(
         ctx,
         target,
         source_ir,
-        f"{name}_new_shape_tensor",
+        f"{name}_reshape_out",
+        permuted_tensor,
         out_shape_tensors,
-        0,
-        np.int32,
     )
-
-    # Reshape tensor
-    reshape_layer_out = ctx.net.add_shuffle(permuted_tensor)
-    reshape_layer_out.set_input(1, out_shape_tensor)
-    return reshape_layer_out.get_output(0)
 
 
 def pixel_unshuffle(
@@ -177,7 +173,14 @@ def pixel_unshuffle(
     downscale_factor: int,
 ) -> TRTTensor:
     # Get input shape tensor
-    input_shape_tensor = ctx.net.add_shape(input).get_output(0)
+    input_shape_tensor = get_shape_with_dynamic_shape(
+        ctx,
+        target,
+        source_ir,
+        name + "_shape",
+        input.shape,
+        input,
+    )
 
     # Extract in_channels, in_height, and in_width from the input shape tensor
     in_channels_tensor = ctx.net.add_slice(
@@ -207,7 +210,7 @@ def pixel_unshuffle(
         in_channels_tensor,
         downscale_factor_sq_tensor,
     )
-    out_height_tensor = impl.elementwise.div(
+    out_height_tensor = impl.elementwise.floor_divide(
         ctx,
         target,
         source_ir,
@@ -215,7 +218,7 @@ def pixel_unshuffle(
         in_height_tensor,
         downscale_factor_tensor,
     )
-    out_width_tensor = impl.elementwise.div(
+    out_width_tensor = impl.elementwise.floor_divide(
         ctx,
         target,
         source_ir,
@@ -234,25 +237,14 @@ def pixel_unshuffle(
     new_shape_tensors += [
         in_channels_tensor,
         out_height_tensor,
-        get_trt_tensor(ctx, downscale_factor, f"{name}_downscale_factor_1"),
+        downscale_factor_tensor,
         out_width_tensor,
-        get_trt_tensor(ctx, downscale_factor, f"{name}_downscale_factor_2"),
+        downscale_factor_tensor,
     ]
 
-    new_shape_tensor = impl.cat.cat(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_new_shape_tensor",
-        new_shape_tensors,
-        0,
-        np.int32,
+    reshaped_tensor = reshape(
+        ctx, target, source_ir, f"{name}_reshape", input, new_shape_tensors
     )
-
-    # Reshape tensor
-    reshape_layer = ctx.net.add_shuffle(input)
-    reshape_layer.set_input(1, new_shape_tensor)
-    reshaped_tensor = reshape_layer.get_output(0)
 
     # Permute shape
     rank = len(new_shape_tensors)
@@ -275,20 +267,15 @@ def pixel_unshuffle(
         for i in range(len(input.shape) - 3)
     ]
     out_shape_tensors += [out_channels_tensor, out_height_tensor, out_width_tensor]
-    out_shape_tensor = impl.cat.cat(
+
+    return reshape(
         ctx,
         target,
         source_ir,
-        f"{name}_out_shape_tensor",
+        f"{name}_reshape_out",
+        permuted_tensor,
         out_shape_tensors,
-        0,
-        np.int32,
     )
-
-    # Reshape tensor
-    reshape_layer_out = ctx.net.add_shuffle(permuted_tensor)
-    reshape_layer_out.set_input(1, out_shape_tensor)
-    return reshape_layer_out.get_output(0)
 
 
 def resize(
