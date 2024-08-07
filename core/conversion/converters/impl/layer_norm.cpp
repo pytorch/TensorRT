@@ -32,7 +32,6 @@ auto layer_norm_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
         gamma = tensor_to_const(ctx, gamma_torch_tensor);
       } else {
         gamma = args[2].ITensorOrFreeze(ctx);
-        // gamma = broadcast(ctx, n, gamma, input_shape_vec.size(), "gamma");
         gamma = add_expand(ctx, gamma, input_shape);
       }
 
@@ -43,7 +42,6 @@ auto layer_norm_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
         beta = tensor_to_const(ctx, beta_torch_tensor);
       } else {
         beta = args[3].ITensorOrFreeze(ctx);
-        // beta = broadcast(ctx, n, beta, input_shape_vec.size(), "beta");
         beta = add_expand(ctx, beta, input_shape);
       }
 

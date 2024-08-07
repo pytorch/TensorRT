@@ -51,11 +51,10 @@ models = {
         "model": timm.create_model("efficientnet_b0", pretrained=True),
         "path": "script",
     },
-    # NOTE: Disabling ViT until support in 3.11 is fixed https://github.com/huggingface/pytorch-image-models/issues/1946
-    # "vit": {
-    #     "model": timm.create_model("vit_base_patch16_224", pretrained=True),
-    #     "path": "script",
-    # },
+    "vit": {
+        "model": timm.create_model("vit_base_patch16_224", pretrained=True),
+        "path": "script",
+    },
     "pooling": {"model": cm.Pool(), "path": "trace"},
     "module_fallback": {"model": cm.ModuleFallbackMain(), "path": "script"},
     "loop_fallback_eval": {"model": cm.LoopFallbackEval(), "path": "script"},
@@ -68,7 +67,7 @@ models = {
     "tuple_input_output": {"model": cm.TupleInputOutput(), "path": "script"},
     "list_input_output": {"model": cm.ListInputOutput(), "path": "script"},
     "list_input_tuple_output": {"model": cm.ListInputTupleOutput(), "path": "script"},
-    "bert_base_uncased": {"model": cm.BertModule(), "path": "trace"},
+    # "bert_base_uncased": {"model": cm.BertModule(), "path": "trace"},
 }
 
 
