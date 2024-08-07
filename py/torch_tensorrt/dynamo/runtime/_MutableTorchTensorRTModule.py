@@ -138,10 +138,10 @@ class MutableTorchTensorRTModule(object):
         self.original_model.to(to_torch_device(self.settings.device))
         if self.exp_program is None:
             self.exp_program = torch.export.export(
-                self.pytorch_model, self.arg_inputs, **self.settings.__dict__
+                self.pytorch_model, self.arg_inputs, kwargs=self.kwarg_inputs
             )
 
-        self.update_refit_condition()
+        # self.update_refit_condition()
         if self.refit_state.get_state() == RefitFlag.NEEDS_RECOMPILE:
             logger.info("state_dict does not match. Recompiling the module")
             self._compile()
@@ -152,11 +152,12 @@ class MutableTorchTensorRTModule(object):
                     self.pytorch_model.state_dict()
                 )
             )
-            self.gm = refit_module_weights(self.gm, self.exp_program, self.arg_inputs)
+            self.gm = refit_module_weights(self.gm, self.exp_program)
 
         self.original_model.cpu()
 
     def update_refit_condition(self) -> None:
+        # TODO: Think about how we can check refit condition. This does not work.
         # If all good, set the Flag to LIVE
         self.refit_state.set_state(RefitFlag.LIVE)
         s1, s2 = self.original_model.state_dict(), self.exp_program._state_dict
@@ -180,11 +181,14 @@ class MutableTorchTensorRTModule(object):
         # Export the module
         self.original_model.to(to_torch_device(self.settings.device))
         self.exp_program = torch.export.export(
-            self.original_model, self.arg_inputs, **self.settings.__dict__
+            self.original_model,
+            self.arg_inputs,
+            kwargs=self.kwarg_inputs,
         )
         self.gm = dynamo_compile(
             self.exp_program,
             inputs=self.torchtrt_inputs,
+            kwarg_inputs=self.kwarg_inputs,
             **self.settings.__dict__,
         )
         self.original_model.cpu()
@@ -267,6 +271,7 @@ class MutableTorchTensorRTModule(object):
         module.pytorch_model = None
         module.exp_program = None
         torch.save(module, path)
+        # Restore deleted attributes
         module.exp_program = exp_program
         module.pytorch_model = _make_refit_change_trigger(
             module.original_model, module.refit_state
@@ -280,7 +285,7 @@ class MutableTorchTensorRTModule(object):
         )
         module.original_model.to(to_torch_device(module.settings.device))
         module.exp_program = torch.export.export(
-            module.original_model, module.args_inputs
+            module.original_model, module.arg_inputs, kwargs=module.kwarg_inputs
         )
         module.original_model.to("cpu")
         return module
@@ -308,7 +313,7 @@ class MutableTorchTensorRTModule(object):
             for a, b in zip(input1.items(), input2.items()):
                 if type(a) != type(b):
                     return False
-                if isinstance(a, torch.tensor) and a.shape != b.shape:
+                if isinstance(a, torch.Tensor) and a.shape != b.shape:
                     return False
                 elif isinstance(a, bool) and a != b:
                     return False
