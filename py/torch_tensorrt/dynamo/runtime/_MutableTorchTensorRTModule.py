@@ -3,6 +3,7 @@ from copy import deepcopy
 from enum import Enum, auto
 from typing import Any, Collection, Dict, Iterator, List, Optional, Set, Tuple, Union
 
+import numpy as np
 import torch
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
@@ -11,11 +12,7 @@ from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo._refit import refit_module_weights
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.utils import (
-    prepare_inputs,
-    to_torch_device,
-    to_torch_tensorrt_device,
-)
+from torch_tensorrt.dynamo.utils import to_torch_device, to_torch_tensorrt_device
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +74,58 @@ class MutableTorchTensorRTModule(object):
         timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
         **kwargs: Any,
     ) -> None:
+        """
+        Initialize a MutableTorchTensorRTModule. This module can be manipulated just as a normal PyTorch module
+        and all TRT compilation and refit happens underthe hood as the user is using it. Modifying its attribute or
+        loading a different state_dict can trigger refit/recompilation that will be handled in the next forward run.
+
+        MutableTorchTensorRTModule takes a PyTorch module and a set of settings to configure the compiler.
+        After compilation is finished, MutableTorchTensorRTModule maintains the connection between the TRT graph module
+        and the original PyTorch module. And modification to MutableTorchTensorRTModule will reflect in both TRT graph module
+        and original PyTorch module.
+
+
+        Arguments:
+            pytorch_model (torch.nn.module): Source module that needs to be accelerated
+
+        Keyword Arguments:
+            device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
+
+                device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
+
+            disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+            assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
+            sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
+            enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
+            refit (bool): Enable refitting
+            debug (bool): Enable debuggable engine
+            capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
+            num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
+            workspace_size (int): Maximum size of workspace given to TensorRT
+            dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
+            dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
+            dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
+            truncate_double (bool): Truncate weights provided in double (float64) to float32
+            calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
+            require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
+            min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
+            torch_executed_ops (Collection[Target]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
+            torch_executed_modules (List[str]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+            pass_through_build_failures (bool): Error out if there are issues during compilation (only applicable to torch.compile workflows)
+            max_aux_stream (Optional[int]): Maximum streams in the engine
+            version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
+            optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
+            use_python_runtime: (bool): Return a graph using a pure Python runtime, reduces options for serialization
+            use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
+            enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
+            dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
+            hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
+            timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+            lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
+            **kwargs: Any,
+        Returns:
+            MutableTorchTensorRTModule
+        """
         self.refit_state = RefitState()
         self.pytorch_model = _make_refit_change_trigger(pytorch_model, self.refit_state)
         self.original_model = pytorch_model
@@ -106,6 +155,7 @@ class MutableTorchTensorRTModule(object):
             "torch_executed_ops": (
                 torch_executed_ops if torch_executed_ops is not None else set()
             ),
+            "torch_executed_modules": torch_executed_modules,
             "pass_through_build_failures": pass_through_build_failures,
             "max_aux_streams": max_aux_streams,
             "version_compatible": version_compatible,
@@ -129,19 +179,67 @@ class MutableTorchTensorRTModule(object):
         }
 
         self.settings = CompilationSettings(**compilation_options)
+        self.run_info: Optional[tuple[Any, ...]] = None
+        self.state_dict_meta_data: dict[str, torch.Size] = {}
+        self.store_state_dict_meta_data()
+
+    def store_state_dict_meta_data(self) -> None:
+
+        for k, v in self.original_model.state_dict().items():
+            self.state_dict_meta_data[k] = v.shape
 
     def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
         self.refit_state.set_state(RefitFlag.NEEDS_REFIT)
         self.original_model.load_state_dict(state_dict)
 
-    def _refit_gm(self) -> None:
+    @staticmethod
+    def _transform_state_dict(sd: Dict[str, Any]) -> Dict[str, torch.nn.Parameter]:
+        return {k: torch.nn.Parameter(v, requires_grad=False) for k, v in sd.items()}
+
+    def update_refit_condition(self) -> None:
+        # TODO: Think about how we can check refit condition. This does not work.
+        # If all good, set the Flag to LIVE
+
+        self.refit_state.set_state(RefitFlag.NEEDS_REFIT)
+
+        # Run the same inputs through pytorch model and compare the result to previous run of graph module
+        # to determine whether refit/recompilation is needed
+        if self.run_info:
+            args, kwargs, result = self.run_info
+            self.original_model.to(to_torch_device(self.settings.device))
+            new_result = self.original_model(*args, *kwargs)
+            self.original_model.cpu()
+            if MutableTorchTensorRTModule.check_output_equal(result, new_result):
+                self.refit_state.set_state(RefitFlag.LIVE)
+                return
+
+        sd, sd_meta = self.original_model.state_dict(), self.state_dict_meta_data
+        if sd.keys() != sd_meta.keys():
+            # If keys are not identical, recompile.
+            self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
+            return
+        for k in sd.keys():
+            if sd[k].shape != sd_meta[k]:
+                # If weight shapes are not identical, recompile.
+                self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
+                return
+
+        return
+
+    def refit_gm(self) -> None:
+        """
+        Refit the TRT graph module with any updates.
+        This function should be called whenever the weight values get changed but the weight structure remains
+        the same.
+        MutableTorchTensorRTModule automatically catches weight value updates and call this function to refit the module.
+        If it fails to catch the changes, please call this function manually to update the TRT graph module.
+        """
         self.original_model.to(to_torch_device(self.settings.device))
         if self.exp_program is None:
             self.exp_program = torch.export.export(
                 self.pytorch_model, self.arg_inputs, kwargs=self.kwarg_inputs
             )
 
-        # self.update_refit_condition()
         if self.refit_state.get_state() == RefitFlag.NEEDS_RECOMPILE:
             logger.info("state_dict does not match. Recompiling the module")
             self._compile()
@@ -156,28 +254,13 @@ class MutableTorchTensorRTModule(object):
 
         self.original_model.cpu()
 
-    def update_refit_condition(self) -> None:
-        # TODO: Think about how we can check refit condition. This does not work.
-        # If all good, set the Flag to LIVE
-        self.refit_state.set_state(RefitFlag.LIVE)
-        s1, s2 = self.original_model.state_dict(), self.exp_program._state_dict
-        if s1.keys() != s2.keys():
-            # If keys are not identical, recompile.
-            self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
-            return
-        for k in s1.keys():
-            if s1[k].shape != s2[k].shape:
-                # If weight shapes are not identical, recompile.
-                self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
-                return
-            if not torch.all(torch.eq(s1[k], s2[k])):
-                # Refit is enough
-                self.refit_state.set_state(RefitFlag.NEEDS_REFIT)
-
-        return
-
     def _compile(self) -> None:
-
+        """
+        (Re)compile the TRT graph module using the PyTorch module.
+        This function should be called whenever the weight structure get changed (shape, more layers...)
+        MutableTorchTensorRTModule automatically catches weight value updates and call this function to recompile.
+        If it fails to catch the changes, please call this function manually to recompile the TRT graph module.
+        """
         # Export the module
         self.original_model.to(to_torch_device(self.settings.device))
         self.exp_program = torch.export.export(
@@ -187,15 +270,95 @@ class MutableTorchTensorRTModule(object):
         )
         self.gm = dynamo_compile(
             self.exp_program,
-            inputs=self.torchtrt_inputs,
+            arg_inputs=self.arg_inputs,
             kwarg_inputs=self.kwarg_inputs,
             **self.settings.__dict__,
         )
         self.original_model.cpu()
 
+    def _validate_inputs(self, *args: Any, **kwargs: Any) -> None:
+        if (
+            not self.arg_inputs
+            or not MutableTorchTensorRTModule.check_inputs_equal(self.arg_inputs, args)
+            or not MutableTorchTensorRTModule.check_inputs_equal(
+                self.kwarg_inputs, kwargs
+            )
+        ):
+            logger.info("Input change detected.")
+            self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
+            self.store_inputs(args, kwargs)
+
+    def store_inputs(self, arg_inputs: Any, kwarg_inputs: Any) -> None:
+        self.arg_inputs = arg_inputs
+        self.kwarg_inputs = MutableTorchTensorRTModule.process_kwarg_inputs(
+            kwarg_inputs
+        )
+
     @staticmethod
-    def _transform_state_dict(sd: Dict[str, Any]) -> Dict[str, torch.nn.Parameter]:
-        return {k: torch.nn.Parameter(v, requires_grad=False) for k, v in sd.items()}
+    def process_kwarg_inputs(inputs: Any) -> Any:
+        if isinstance(inputs, dict):
+            # None should be excluded. AOT compile also does not allow dynamic control flow, bool is also excluded.
+            return {
+                k: MutableTorchTensorRTModule.process_kwarg_inputs(v)
+                for k, v in inputs.items()
+                if (v is not None and not isinstance(v, bool))
+            }
+        elif isinstance(inputs, torch.Tensor):
+            return inputs
+        elif isinstance(inputs, (int, float, np.ndarray)):
+            return torch.tensor(inputs)
+        elif isinstance(inputs, (list, tuple)):
+            if None not in inputs:
+                return type(inputs)(
+                    [MutableTorchTensorRTModule.process_kwarg_inputs(v) for v in inputs]
+                )
+
+        raise ValueError(
+            f"Invalid input type {type(inputs)} encountered in the input. "
+            + "Allowed input types: {torch_tensorrt.Input, torch.Tensor, list, tuple, dict}"
+        )
+
+    def forward(self, *args: Any, **kwargs: Any) -> Any:
+        # Step 1: Check whether the input shape has changed
+        self._validate_inputs(*args, **kwargs)
+
+        # Step 2: If the flag is unknown, it could be a recompile or refit.
+        if self.refit_state.get_state() == RefitFlag.UNKNOWN:
+            # Update the flag
+            self.update_refit_condition()
+
+        # Step 3: Refit/recompile accordingly
+        if self.refit_state.get_state() == RefitFlag.NEEDS_RECOMPILE:
+            logger.info("(Re)Compiling the engine...")
+            self._compile()
+            self.store_state_dict_meta_data()
+            self.refit_state.set_state(RefitFlag.LIVE)
+
+        elif self.refit_state.get_state() == RefitFlag.NEEDS_REFIT:
+            logger.info("Model weight change detected. Refitting the module...")
+            self.refit_gm()
+            self.store_state_dict_meta_data()
+            self.refit_state.set_state(RefitFlag.LIVE)
+
+        result = self.gm(*args, **kwargs)
+        # Storing inputs and outputs for verification when the state is unknown
+        self.run_info = (args, kwargs, result)
+        return result
+
+    def __deepcopy__(self, memo: Any) -> Any:
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k != "pytorch_model":
+                setattr(result, k, deepcopy(v, memo))
+        result.pytorch_model = _make_refit_change_trigger(
+            result.original_model, result.refit_state
+        )
+        return result
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        return self.forward(*args, **kwargs)
 
     def __getattr__(self, name: str) -> Any:
 
@@ -210,55 +373,78 @@ class MutableTorchTensorRTModule(object):
 
         return getattr(self.pytorch_model, name)
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        # We can update this once the kwarg pull request got merged
-        return self.forward(*args, **kwargs)
-
-    def _validate_inputs(self, *args: Any, **kwargs: Any) -> None:
-        if (
-            not self.arg_inputs
-            or not MutableTorchTensorRTModule.check_inputs_equal(self.arg_inputs, args)
-            or not MutableTorchTensorRTModule.check_inputs_equal(
-                self.kwarg_inputs, kwargs
+    @staticmethod
+    def check_output_equal(
+        output1: Any,
+        output2: Any,
+    ) -> bool:
+        # TODO: Move this to utils when all PRs are merged.
+        if type(output1) != type(output2):
+            logger.warning(
+                "This module does not support using output verification to skip refit. Refit will be performed \
+                           whenever the state is UNKNOWN"
             )
-        ):
-            logger.info("Input change detected.")
-            self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
-            self.arg_inputs = args
-            self.kwarg_inputs = kwargs
-            self.torchtrt_inputs = prepare_inputs(self.arg_inputs)
+            return False
 
-    def forward(self, *args: Any, **kwargs: Any) -> Any:
-        # TODO: Add support for kwargs
-        self._validate_inputs(*args, **kwargs)
-        if self.refit_state.get_state() == RefitFlag.NEEDS_RECOMPILE:
-            logger.info("(Re)Compiling the engine.")
-            self._compile()
-            self.refit_state.set_state(RefitFlag.LIVE)
+        if isinstance(output1, torch.Tensor):
+            if output1.shape != output2.shape:
+                return False
+            return torch.allclose(output1, output2, 1e-2, 1e-2)  # type: ignore
 
-        elif self.refit_state.get_state() == RefitFlag.NEEDS_REFIT:
-            print("Model weight change detected. Refitting the module...")
-            self._refit_gm()
-            self.refit_state.set_state(RefitFlag.LIVE)
+        elif isinstance(output1, (tuple, list)):
+            if len(output1) != len(output2):
+                return False
+            for a, b in zip(output1, output2):
+                if not MutableTorchTensorRTModule.check_output_equal(a, b):
+                    return False
+                return True
 
-        elif self.refit_state.get_state() == RefitFlag.UNKNOWN:
-            # Update the flag and forward again
-            self.update_refit_condition()
-            return self.forward(*args, **kwargs)
+        elif isinstance(output1, dict):
+            if output1.keys() != output2.keys():
+                return False
+            for a, b in zip(output1.values(), output2.values()):
+                if not MutableTorchTensorRTModule.check_inputs_equal(a, b):
+                    return False
+            return True
 
-        return self.gm(*args, **kwargs)
-
-    def __deepcopy__(self, memo: Any) -> Any:
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-        for k, v in self.__dict__.items():
-            if k != "pytorch_model":
-                setattr(result, k, deepcopy(v, memo))
-        result.pytorch_model = _make_refit_change_trigger(
-            result.original_model, result.refit_state
+        logger.warning(
+            "This module does not support using output verification to skip refit. Refit will be performed \
+                        whenever the state is UNKNOWN"
         )
-        return result
+        return False
+
+    @staticmethod
+    def check_inputs_equal(
+        input1: Any,
+        input2: Any,
+    ) -> bool:
+        # TODO: Add support for dynamic shape
+        if isinstance(input1, (tuple, list)):
+            if len(input1) != len(input2):
+                return False
+            for a, b in zip(input1, input2):
+                if type(a) != type(b):
+                    return False
+                if isinstance(a, torch.Tensor) and a.shape != b.shape:
+                    return False
+                elif isinstance(a, bool) and a != b:
+                    return False
+
+        elif isinstance(input1, dict):
+            if input1.keys() != input2.keys():
+                return False
+            for a, b in zip(input1.values(), input2.values()):
+                if type(a) != type(b):
+                    return False
+                if isinstance(a, torch.Tensor) and a.shape != b.shape:
+                    return False
+                elif isinstance(a, bool) and a != b:
+                    return False
+                elif isinstance(
+                    a, (list, tuple, dict)
+                ) and not MutableTorchTensorRTModule.check_inputs_equal(a, b):
+                    return False
+        return True
 
     @staticmethod
     def save(module: Any, path: str) -> None:
@@ -290,52 +476,24 @@ class MutableTorchTensorRTModule(object):
         module.original_model.to("cpu")
         return module
 
-    @staticmethod
-    def check_inputs_equal(
-        input1: Any,
-        input2: Any,
-    ) -> bool:
-        # TODO: Add support for dynamic shape
-        if isinstance(input1, (tuple, list)):
-            if len(input1) != len(input2):
-                return False
-            for a, b in zip(input1, input2):
-                if type(a) != type(b):
-                    return False
-                if isinstance(a, torch.Tensor) and a.shape != b.shape:
-                    return False
-                elif isinstance(a, bool) and a != b:
-                    return False
-
-        elif isinstance(input1, dict):
-            if input1.keys() != input2.keys():
-                return False
-            for a, b in zip(input1.items(), input2.items()):
-                if type(a) != type(b):
-                    return False
-                if isinstance(a, torch.Tensor) and a.shape != b.shape:
-                    return False
-                elif isinstance(a, bool) and a != b:
-                    return False
-                elif isinstance(
-                    a, (list, tuple, dict)
-                ) and not MutableTorchTensorRTModule.check_inputs_equal(a, b):
-                    return False
-        return True
-
 
 def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
     subclass: type = obj.__class__
 
     class ChangeTriggerWrapper(subclass):  # type: ignore
+        # The reason why we want to inherent to the subclass is that we want the ChangeTriggerWrapper shares all functions
+        # that an ordinary object has. In this way attributes accessed inside a function will be from the __getattr__function
+        # of ChangeTriggerWrapper, instead of the object itself, thus be recursively wrapped by ChangeTriggerWrapper.
+
         def __init__(self, obj: Any):
             object.__setattr__(self, "instance", obj)
 
         def __getattr__(self, name: str) -> Any:
             obj = getattr(self.instance, name)
-            if hasattr(obj, "__dict__") or isinstance(
-                obj, (torch.nn.ModuleList, list)
-            ):  # nn.Moduledict does not support automatic update. Please use manually refit/recompile
+            if isinstance(obj, torch.nn.Parameter):
+                # Whenever the user retrieve an attribute that could be related to weights, we set the state to UNKNOWN
+                self._on_change()
+            if hasattr(obj, "__dict__") or isinstance(obj, (torch.nn.ModuleList, list)):
                 return _make_refit_change_trigger(obj, refit_state)
             return obj
 
@@ -352,10 +510,14 @@ def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
 
         def _on_change(self) -> None:
             refit_state.set_state(RefitFlag.UNKNOWN)
-            print("Change!")
+            logger.info(
+                "Attribute modification detected. The module will be refitted later."
+            )
 
         def __call__(self, *args: Any, **kwargs: Any) -> Any:
-            print("Warning: uncatched change in function!")
+            logger.warning(
+                "Uncatched change in function! Please call refit_gm if you are updating the model."
+            )
             return self.instance(*args, **kwargs)
 
         def __setitem__(self, item: str, value: Any) -> None:
