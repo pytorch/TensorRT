@@ -2,7 +2,6 @@ import copy
 import unittest
 from typing import Dict
 
-import custom_models as cm
 import timm
 import torch
 import torch_tensorrt as torchtrt
