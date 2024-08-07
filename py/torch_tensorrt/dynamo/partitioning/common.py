@@ -129,7 +129,9 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
 
 
 def run_shape_analysis(
-    parent_module: torch.fx.GraphModule, inputs: Sequence[Input]
+    parent_module: torch.fx.GraphModule,
+    inputs: Sequence[Input],
+    kwarg_inputs: Optional[dict[str, Any]] = None,
 ) -> Tuple[Dict[Any, Sequence[Any]], Dict[Any, Sequence[Any]]]:
     submod_inputs_shape_map: Dict[Any, Sequence[Any]] = {}
     submod_outputs_shape_map: Dict[Any, Sequence[Any]] = {}
@@ -145,11 +147,13 @@ def run_shape_analysis(
         sub_outputs = outputs
         return
 
+    if kwarg_inputs is None:
+        kwarg_inputs = {}
     # Iterate through submodules (both Torch and TRT) and store IO shapes
     for name, _ in parent_module.named_children():
         submodule = getattr(parent_module, name)
         handle = submodule.register_forward_hook(get_submodule_io)
-        parent_module(*inputs)
+        parent_module(*inputs, **kwarg_inputs)
         handle.remove()
         submod_inputs_shape_map[name] = (
             [input.shape for input in sub_inputs]

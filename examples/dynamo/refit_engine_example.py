@@ -78,7 +78,7 @@ compiled_trt_ep = torch_trt.load("./compiled.ep")
 new_trt_gm = refit_module_weights(
     compiled_module=compiled_trt_ep,
     new_weight_module=exp_program2,
-    inputs=inputs,
+    arg_inputs=inputs,
 )
 
 # Check the output

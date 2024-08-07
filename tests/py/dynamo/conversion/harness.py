@@ -228,7 +228,7 @@ class DispatchTestCase(TRTTestCase):
         torch_inputs = get_torch_inputs(original_inputs, _defaults.DEVICE)
         if use_dynamo_tracer:
             exported_program = torch_tensorrt.dynamo.trace(mod, tuple(original_inputs))
-            exported_program = pre_export_lowering(exported_program, torch_inputs)
+            exported_program = pre_export_lowering(exported_program)
             exported_program = exported_program.run_decompositions(
                 get_decompositions(False)
             )
@@ -237,7 +237,7 @@ class DispatchTestCase(TRTTestCase):
             fx_module = torch.fx.symbolic_trace(mod)
 
         if enable_passes:
-            fx_module = post_lowering(fx_module, original_inputs)
+            fx_module = post_lowering(fx_module)
 
         if propagate_shapes:
             # TODO: This is currently being used to test embedding_bag_aten due to https://github.com/pytorch/TensorRT/issues/2843

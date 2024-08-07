@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.5.0.dev0+e960b1f documentation</title>
+  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.5.0.dev0+648772c documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+e960b1f
+                  v2.5.0.dev0+648772c
                 </div>
               
             
@@ -602,6 +602,8 @@
     <span class="n">module</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">ir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">InputTensorSpec</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">dtype</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="p">(</span>
@@ -634,7 +636,8 @@
 <span class="sd">                    ), # Dynamic input shape for input #2</span>
 <span class="sd">                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings</span>
 <span class="sd">                ]</span>
-
+<span class="sd">        arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.</span>
+<span class="sd">        kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.</span>
 <span class="sd">        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels</span>
 <span class="sd">        ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, ts - TorchScript with scripting path)</span>
 <span class="sd">        **kwargs: Additional settings for the specific requested strategy (See submodules for more info)</span>
@@ -642,6 +645,7 @@
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.nn.Module: Compiled Module, when run it will execute via TensorRT</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">input_list</span> <span class="o">=</span> <span class="n">inputs</span> <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[]</span>
     <span class="n">enabled_precisions_set</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">enabled_precisions</span>
@@ -692,17 +696,33 @@
         <span class="k">return</span> <span class="n">compiled_fx_module</span>
     <span class="k">elif</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">dynamo</span><span class="p">:</span>
         <span class="c1"># Prepare torch and torchtrt inputs</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">arg_inputs</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">inputs</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not both be None.&quot;</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">arg_inputs</span> <span class="ow">and</span> <span class="n">inputs</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+                <span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not be used at the same time.&quot;</span>
+            <span class="p">)</span>
+        <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span> <span class="ow">or</span> <span class="n">arg_inputs</span>
+
+        <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
+
         <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="n">prepare_inputs</span>
 
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_list</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
-            <span class="n">input_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">input_list</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
+            <span class="n">arg_inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">arg_inputs</span><span class="p">]</span>  <span class="c1"># type: ignore</span>
 
         <span class="c1"># Export the module</span>
-        <span class="n">torchtrt_inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">input_list</span><span class="p">)</span>
-        <span class="n">exp_program</span> <span class="o">=</span> <span class="n">dynamo_trace</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">torchtrt_inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">torchtrt_arg_inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">)</span>
+        <span class="n">torchtrt_kwarg_inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">)</span>
+
+        <span class="n">exp_program</span> <span class="o">=</span> <span class="n">dynamo_trace</span><span class="p">(</span>
+            <span class="n">module</span><span class="p">,</span> <span class="n">torchtrt_arg_inputs</span><span class="p">,</span> <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torchtrt_kwarg_inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+        <span class="p">)</span>
         <span class="n">trt_graph_module</span> <span class="o">=</span> <span class="n">dynamo_compile</span><span class="p">(</span>
             <span class="n">exp_program</span><span class="p">,</span>
-            <span class="n">inputs</span><span class="o">=</span><span class="n">torchtrt_inputs</span><span class="p">,</span>
+            <span class="n">arg_inputs</span><span class="o">=</span><span class="n">torchtrt_arg_inputs</span><span class="p">,</span>
             <span class="n">enabled_precisions</span><span class="o">=</span><span class="n">enabled_precisions_set</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span>
@@ -734,7 +754,9 @@
 <div class="viewcode-block" id="convert_method_to_trt_engine"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.convert_method_to_trt_engine">[docs]</a><span class="k">def</span> <span class="nf">convert_method_to_trt_engine</span><span class="p">(</span>
     <span class="n">module</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">method_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;forward&quot;</span><span class="p">,</span>
-    <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">InputTensorSpec</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">ir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span>
     <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">dtype</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -763,6 +785,8 @@
 <span class="sd">                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings</span>
 <span class="sd">                ]</span>
 
+<span class="sd">        arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.</span>
+<span class="sd">        kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.</span>
 <span class="sd">        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels</span>
 <span class="sd">        ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, ts - TorchScript with scripting path)</span>
 <span class="sd">        **kwargs: Additional settings for the specific requested strategy (See submodules for more info)</span>
@@ -784,7 +808,7 @@
             <span class="n">ts_mod</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">script</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
         <span class="n">serialized_engine</span><span class="p">:</span> <span class="nb">bytes</span> <span class="o">=</span> <span class="n">ts_convert_method_to_trt_engine</span><span class="p">(</span>
             <span class="n">ts_mod</span><span class="p">,</span>
-            <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+            <span class="n">inputs</span><span class="o">=</span><span class="n">arg_inputs</span><span class="p">,</span>
             <span class="n">method_name</span><span class="o">=</span><span class="n">method_name</span><span class="p">,</span>
             <span class="n">enabled_precisions</span><span class="o">=</span><span class="n">enabled_precisions_set</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
@@ -796,18 +820,35 @@
         <span class="p">)</span>
     <span class="k">elif</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">dynamo</span><span class="p">:</span>
         <span class="c1"># Prepare torch and torchtrt inputs</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">arg_inputs</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">inputs</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not both be None.&quot;</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">arg_inputs</span> <span class="ow">and</span> <span class="n">inputs</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+                <span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not be used at the same time.&quot;</span>
+            <span class="p">)</span>
+        <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">arg_inputs</span> <span class="ow">or</span> <span class="n">inputs</span>
+
+        <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
+
         <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="n">prepare_inputs</span>
 
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
-            <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">inputs</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
+            <span class="n">arg_inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">arg_inputs</span><span class="p">]</span>  <span class="c1"># type: ignore</span>
 
         <span class="c1"># Export the module</span>
-        <span class="n">torchtrt_inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
-        <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">torchtrt_inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">torchtrt_arg_inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">)</span>
+        <span class="n">torchtrt_kwarg_inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">)</span>
+
+        <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span>
+            <span class="n">module</span><span class="p">,</span> <span class="n">torchtrt_arg_inputs</span><span class="p">,</span> <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torchtrt_kwarg_inputs</span><span class="o">**</span><span class="n">kwargs</span>
+        <span class="p">)</span>
 
         <span class="k">return</span> <span class="n">dynamo_convert_exported_program_to_serialized_trt_engine</span><span class="p">(</span>
             <span class="n">exp_program</span><span class="p">,</span>
-            <span class="n">inputs</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">),</span>
+            <span class="n">arg_inputs</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">),</span>
+            <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torchtrt_kwarg_inputs</span><span class="p">,</span>
             <span class="n">enabled_precisions</span><span class="o">=</span><span class="n">enabled_precisions_set</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span>
@@ -862,6 +903,8 @@
     <span class="o">*</span><span class="p">,</span>
     <span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;exported_program&quot;</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">retrace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -870,18 +913,32 @@
 <span class="sd">    Arguments:</span>
 <span class="sd">        module (Optional(torch.jit.ScriptModule | torch.export.ExportedProgram | torch.fx.GraphModule)): Compiled Torch-TensorRT module</span>
 <span class="sd">        inputs (torch.Tensor): Torch input tensors</span>
+<span class="sd">        arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.</span>
+<span class="sd">        kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.</span>
 <span class="sd">        output_format (str): Format to save the model. Options include exported_program | torchscript.</span>
 <span class="sd">        retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.</span>
 <span class="sd">                This flag is experimental for now.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">module_type</span> <span class="o">=</span> <span class="n">_parse_module_type</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
     <span class="n">accepted_formats</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;exported_program&quot;</span><span class="p">,</span> <span class="s2">&quot;torchscript&quot;</span><span class="p">}</span>
-    <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span>
-        <span class="nb">isinstance</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">for</span> <span class="nb">input</span> <span class="ow">in</span> <span class="n">inputs</span>
+    <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span>
+        <span class="nb">isinstance</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">for</span> <span class="nb">input</span> <span class="ow">in</span> <span class="n">arg_inputs</span>
     <span class="p">):</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
             <span class="s2">&quot;Not all inputs provided are torch.tensors. Please provide torch.tensors as inputs&quot;</span>
         <span class="p">)</span>
+    <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">and</span> <span class="n">inputs</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+            <span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not be used at the same time.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">inputs</span> <span class="ow">or</span> <span class="n">arg_inputs</span>
+
+    <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span><span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">kwarg_inputs</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;kwargs should not include None.&quot;</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">output_format</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">accepted_formats</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Provided output_format </span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2"> is not supported. Supported options are exported_program | torchscript&quot;</span>
@@ -908,26 +965,28 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
     <span class="k">elif</span> <span class="n">module_type</span> <span class="o">==</span> <span class="n">_ModuleType</span><span class="o">.</span><span class="n">fx</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="s2">&quot;Provided model is a torch.fx.GraphModule however the inputs are empty. Please provide valid torch.tensors as inputs to trace and save the model&quot;</span>
             <span class="p">)</span>
         <span class="c1"># The module type is torch.fx.GraphModule</span>
         <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;torchscript&quot;</span><span class="p">:</span>
-            <span class="n">module_ts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
+            <span class="n">module_ts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span>
+                <span class="n">module</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="p">,</span> <span class="n">example_kwarg_inputs</span><span class="o">=</span><span class="n">kwarg_inputs</span>
+            <span class="p">)</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">module_ts</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">retrace</span><span class="p">:</span>
                 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._exporter</span> <span class="kn">import</span> <span class="n">export</span>
 
-                <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
+                <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="p">,</span> <span class="n">kwarg_inputs</span><span class="p">)</span>
                 <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="kn">from</span> <span class="nn">torch._higher_order_ops.torchbind</span> <span class="kn">import</span> <span class="n">enable_torchbind_tracing</span>
 
                 <span class="k">with</span> <span class="n">enable_torchbind_tracing</span><span class="p">():</span>
                     <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span>
-                        <span class="n">module</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span>
+                        <span class="n">module</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">),</span> <span class="n">kwargs</span><span class="o">=</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span>
                     <span class="p">)</span>
                     <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span></div>
 </pre></div>
