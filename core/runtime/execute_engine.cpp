@@ -1,3 +1,4 @@
+#include "ATen/cuda/CUDAEvent.h"
 #include "c10/cuda/CUDAGuard.h"
 #include "c10/cuda/CUDAStream.h"
 
@@ -70,7 +71,7 @@ bool _cudagraphs_validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_
     new_shape_key_ss << "(";
     auto sizes = input.sizes();
     auto rank = input.sizes().size();
-    for (auto i = 0; i < rank; i++) {
+    for (size_t i = 0; i < rank; i++) {
       new_shape_key_ss << sizes[i];
       // For all but the final dimension in the shape key, add comma separator
       if (i < rank - 1) {
@@ -107,139 +108,156 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     ss << "  Output packing profile: " << compiled_engine->output_profile_path << std::endl;
     ss << "  TRT enqueue profile: " << compiled_engine->enqueue_profile_path << std::endl;
     ss << "  Engine execution profile: " << compiled_engine->trt_engine_profile_path << std::endl;
+    ss << "  CUDA Graph trace: " << compiled_engine->cuda_graph_debug_path << std::endl;
     auto log_info = ss.str();
     LOG_INFO("" << log_info);
+    compiled_engine->cudagraph.enable_debug_mode();
   }
 
   // Whether cudagraphs needs to record the graph on this pass
-  bool need_cudagraphs_record = (CUDAGRAPHS_MODE && !_cudagraphs_validate_shapes(inputs, compiled_engine));
+  bool need_cudagraphs_record = (CUDAGRAPHS_MODE && (!_cudagraphs_validate_shapes(inputs, compiled_engine)));
+
+  if (!CUDAGRAPHS_MODE) {
+    compiled_engine->cudagraph.reset();
+  }
 
   // this is a buffer to store shape tensor input addresses throughout the runtime scope
   std::list<std::vector<int64_t>> inputShapeTensorValues;
 
-  // Intialize outputs to be available throughout the succeeding scopes
+  // Intialize inputs and outputs to be available throughout the succeeding scopes
+  std::list<at::Tensor> formatted_inputs(compiled_engine->num_io.first);
   std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
 
-  // If not in cudagraphs mode or a new cudagraphs recording is needed
-  // proceed with input validation and assignment of new I/O pointers for TRT
-  if (!CUDAGRAPHS_MODE || need_cudagraphs_record) {
-    if (MULTI_DEVICE_SAFE_MODE) {
-      std::unique_ptr<torch::autograd::profiler::RecordProfile> device_profiler_guard;
-      if (compiled_engine->profile_execution) {
-        device_profiler_guard =
-            std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->device_profile_path);
-      }
-
-      RTDevice curr_device = get_current_device();
-      LOG_DEBUG("Current Device: " << curr_device);
-
-      // Generic Target Device Prefix
-      std::string target_device = "cuda:";
-
-      if (is_switch_required(curr_device, compiled_engine->device_info)) {
-        // Scan through available CUDA devices and set the CUDA device context correctly
-        RTDevice device =
-            select_rt_device(compiled_engine->device_info, curr_device, compiled_engine->hardware_compatible);
-        set_rt_device(device);
-
-        // Update active stream based on new device
-        auto current_stream = c10::cuda::getCurrentCUDAStream(device.id);
-        if (current_stream == c10::cuda::getDefaultCUDAStream(device.id)) {
-          compiled_engine->active_stream = c10::cuda::getStreamFromPool(false, device.id);
-          c10::cuda::setCurrentCUDAStream(compiled_engine->active_stream);
-        } else {
-          compiled_engine->active_stream = current_stream;
-        }
-
-        // Target device is new device
-        target_device += std::to_string(device.id);
-
-        for (auto& in : inputs) {
-          in = in.to(torch::Device(target_device));
-        }
-      } else {
-        // Target device is current device
-        target_device += std::to_string(curr_device.id);
-      }
-
-      // For each input, ensure its current device is the desired target device
-      for (size_t i = 0; i < inputs.size(); i++) {
-        at::Tensor* in = &inputs[i];
-        std::string current_tensor_device = in->device().str();
-
-        // If current device string does not match target device, display warning and move tensor accordingly
-        if (current_tensor_device != target_device) {
-          LOG_WARNING(
-              "Input " << i << " of engine " << compiled_engine->name << " was found to be on " << current_tensor_device
-                       << " but should be on " << target_device << ". This tensor is being moved by the runtime but "
-                       << "for performance considerations, ensure your inputs are all on GPU "
-                       << "and open an issue here (https://github.com/pytorch/TensorRT/issues) if this "
-                       << "warning persists.");
-          *in = in->to(torch::Device(target_device));
-        }
-      }
+  if (MULTI_DEVICE_SAFE_MODE) {
+    std::unique_ptr<torch::autograd::profiler::RecordProfile> device_profiler_guard;
+    if (compiled_engine->profile_execution) {
+      device_profiler_guard =
+          std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->device_profile_path);
     }
 
-    {
-      std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
-      if (compiled_engine->profile_execution) {
-        input_profiler_guard =
-            std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
-      }
-      for (size_t i = 0; i < inputs.size(); i++) {
-        std::string name = compiled_engine->in_binding_names[i];
-        TORCHTRT_CHECK(
-            inputs[i].is_cuda(), "Expected input tensors to have device cuda, found device " << inputs[i].device());
-        auto expected_type =
-            util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
-        TORCHTRT_CHECK(
-            inputs[i].dtype() == expected_type,
-            "Expected input tensors to have type " << expected_type << ", found type " << inputs[i].dtype());
-        auto dims = core::util::toDims(inputs[i].sizes());
-        auto shape = core::util::toVec(dims);
-        LOG_DEBUG("Input Name: " << name << " Shape: " << dims);
-        at::Tensor contig_input;
+    RTDevice curr_device = get_current_device();
+    LOG_DEBUG("Current Device: " << curr_device);
 
-        if (compiled_engine->cuda_engine->isShapeInferenceIO(name.c_str())) {
-          // Shape tensor inputs are casted to int64 explicitly.
-          // Refer to
-          // https://github.com/NVIDIA/TensorRT/blob/d2f4ef789a9a6ffdf37b55c3f81b486225f6b380/samples/common/sampleInference.cpp#L435
-          auto input_cpu = inputs[i].clone().contiguous().cpu().to(torch::kInt64);
-          std::vector<int64_t> inputs_cpu_vec(
-              input_cpu.data_ptr<int64_t>(), input_cpu.data_ptr<int64_t>() + input_cpu.numel());
-          inputShapeTensorValues.emplace_back(inputs_cpu_vec);
-          TORCHTRT_CHECK(
-              compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputShapeTensorValues.back().data()),
-              "Error while setting the tensor address for shape inputs");
+    // Generic Target Device Prefix
+    std::string target_device = "cuda:";
+
+    if (is_switch_required(curr_device, compiled_engine->device_info)) {
+      // Scan through available CUDA devices and set the CUDA device context correctly
+      RTDevice device =
+          select_rt_device(compiled_engine->device_info, curr_device, compiled_engine->hardware_compatible);
+      set_rt_device(device);
+
+      // Target device is new device
+      target_device += std::to_string(device.id);
+
+      for (auto& in : inputs) {
+        in = in.to(torch::Device(target_device));
+      }
+    } else {
+      // Target device is current device
+      target_device += std::to_string(curr_device.id);
+    }
+
+    // For each input, ensure its current device is the desired target device
+    for (size_t i = 0; i < inputs.size(); i++) {
+      at::Tensor* in = &inputs[i];
+      std::string current_tensor_device = in->device().str();
+
+      // If current device string does not match target device, display warning and move tensor accordingly
+      if (current_tensor_device != target_device) {
+        LOG_WARNING(
+            "Input " << i << " of engine " << compiled_engine->name << " was found to be on " << current_tensor_device
+                     << " but should be on " << target_device << ". This tensor is being moved by the runtime but "
+                     << "for performance considerations, ensure your inputs are all on GPU "
+                     << "and open an issue here (https://github.com/pytorch/TensorRT/issues) if this "
+                     << "warning persists.");
+        *in = in->to(torch::Device(target_device));
+      }
+    }
+  }
+
+  { // Input Setup
+    std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
+    if (compiled_engine->profile_execution) {
+      input_profiler_guard =
+          std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
+    }
+
+    for (size_t i = 0; i < inputs.size(); i++) {
+      std::string name = compiled_engine->in_binding_names[i];
+
+      TORCHTRT_CHECK(
+          inputs[i].is_cuda(), "Expected input tensors to have device cuda, found device " << inputs[i].device());
+
+      auto expected_type =
+          util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
+      TORCHTRT_CHECK(
+          inputs[i].dtype() == expected_type,
+          "Expected input tensors to have type " << expected_type << ", found type " << inputs[i].dtype());
+
+      auto dims = core::util::toDims(inputs[i].sizes());
+      auto shape = core::util::toVec(dims);
+      LOG_DEBUG("Input Name: " << name << " Shape: " << dims);
+
+      if (compiled_engine->cuda_engine->isShapeInferenceIO(name.c_str())) {
+        // Shape tensor inputs are casted to int64 explicitly.
+        // Refer to
+        // https://github.com/NVIDIA/TensorRT/blob/d2f4ef789a9a6ffdf37b55c3f81b486225f6b380/samples/common/sampleInference.cpp#L435
+        auto input_cpu = inputs[i].clone().contiguous().cpu().to(torch::kInt64);
+        std::vector<int64_t> inputs_cpu_vec(
+            input_cpu.data_ptr<int64_t>(), input_cpu.data_ptr<int64_t>() + input_cpu.numel());
+        inputShapeTensorValues.emplace_back(inputs_cpu_vec);
+        TORCHTRT_CHECK(
+            compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputShapeTensorValues.back().data()),
+            "Error while setting the tensor address for shape inputs");
+
+        if (CUDAGRAPHS_MODE) {
+          // @peri044 I dont know if this makes sense since they are supposed to be GPU buffers
           compiled_engine->input_buffers[i] = input_cpu;
+        }
+        TORCHTRT_CHECK(
+            compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputShapeTensorValues.back().data()),
+            "Error while setting the tensor address for shape inputs");
+
+      } else {
+        at::Tensor contig_input = inputs[i].view(shape).contiguous();
+        formatted_inputs.emplace_back(std::move(contig_input));
+
+        if (need_cudagraphs_record) {
+          // Create a new persistent input buffer
+          compiled_engine->input_buffers[i] = std::move(formatted_inputs.back().clone());
+        }
+
+        TORCHTRT_CHECK(
+            compiled_engine->exec_ctx->setInputShape(name.c_str(), dims), "Error while setting the input shape");
+
+        if (CUDAGRAPHS_MODE) {
+          // If using CUDAGraphs copy formatted input to the corresponding persistent input buffer
+          compiled_engine->input_buffers[i].copy_(formatted_inputs.back(), true);
+          TORCHTRT_CHECK(
+              compiled_engine->exec_ctx->setTensorAddress(name.c_str(), compiled_engine->input_buffers[i].data_ptr()),
+              "Error while setting the input tensor address for inputs");
         } else {
-          // If in cudagraphs mode, the inputs must be cloned since the memory will be reused
-          // in subsequent replays of the graph
-          if (CUDAGRAPHS_MODE) {
-            contig_input = inputs[i].view(shape).contiguous().clone();
-            compiled_engine->input_buffers[i] = contig_input;
-          } else {
-            contig_input = inputs[i].view(shape).contiguous();
-          }
+          // Otherwise use the formatted buffer directly
           TORCHTRT_CHECK(
-              compiled_engine->exec_ctx->setInputShape(name.c_str(), dims), "Error while setting the input shape");
-          TORCHTRT_CHECK(
-              compiled_engine->exec_ctx->setTensorAddress(name.c_str(), contig_input.data_ptr()),
+              compiled_engine->exec_ctx->setTensorAddress(name.c_str(), formatted_inputs.back().data_ptr()),
               "Error while setting the input tensor address for inputs");
         }
       }
-
-      // Check if input shapes can be inferred.
-      int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
-      std::vector<char const*> names(io_size);
-      int32_t const nbNames = compiled_engine->exec_ctx->inferShapes(names.size(), names.data());
-      TORCHTRT_CHECK(
-          nbNames == 0,
-          "The shapes of the inputs: "
-              << names
-              << " cannot be inferred. This could happen if the input tensor addresses/shapes haven't been configured correctly");
     }
 
+    // Check if input shapes can be inferred.
+    int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
+    std::vector<char const*> names(io_size);
+    int32_t const nbNames = compiled_engine->exec_ctx->inferShapes(names.size(), names.data());
+    TORCHTRT_CHECK(
+        nbNames == 0,
+        "The shapes of the inputs: "
+            << names
+            << " cannot be inferred. This could happen if the input tensor addresses/shapes haven't been configured correctly");
+  }
+
+  { // Output Setup
     std::unique_ptr<torch::autograd::profiler::RecordProfile> output_profiler_guard;
     if (compiled_engine->profile_execution) {
       output_profiler_guard =
@@ -253,63 +271,87 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       std::string name = compiled_engine->out_binding_names[pyt_idx];
       auto out_shape = compiled_engine->exec_ctx->getTensorShape(name.c_str());
       LOG_DEBUG("Output Name: " << name << " Shape: " << out_shape);
+
       auto dims = core::util::toVec(out_shape);
       auto type = util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
       outputs[pyt_idx] = std::move(at::empty(dims, {at::kCUDA}).to(type).contiguous());
 
-      // In cudagraphs mode, the allocated output buffers are stored for reuse
-      if (CUDAGRAPHS_MODE) {
-        compiled_engine->output_buffers[pyt_idx] = outputs[pyt_idx];
+      if (need_cudagraphs_record) {
+        // If we are recording the cuda graph then we need to update the persistent output buffer
+        compiled_engine->output_buffers[pyt_idx] = std::move(outputs[pyt_idx].clone());
       }
-      TORCHTRT_CHECK(
-          compiled_engine->exec_ctx->setTensorAddress(name.c_str(), outputs[pyt_idx].data_ptr()),
-          "Error while setting the output tensor address");
+
+      if (CUDAGRAPHS_MODE) {
+        TORCHTRT_CHECK(
+            compiled_engine->exec_ctx->setTensorAddress(
+                name.c_str(), compiled_engine->output_buffers[pyt_idx].data_ptr()),
+            "Error while setting the output tensor address");
+      } else {
+        TORCHTRT_CHECK(
+            compiled_engine->exec_ctx->setTensorAddress(name.c_str(), outputs[pyt_idx].data_ptr()),
+            "Error while setting the output tensor address");
+      }
     }
   }
 
-  std::unique_ptr<torch::autograd::profiler::RecordProfile> enqueue_profiler_guard;
+  auto current_device_id = inputs[0].device().index(); // Done this way to avoid a call to cudart
+
+  compiled_engine->caller_stream = c10::cuda::getCurrentCUDAStream(current_device_id);
+  if (compiled_engine->engine_stream == c10::cuda::getDefaultCUDAStream(current_device_id)) {
+    // Create a new stream if the engine stream is the default stream
+    compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, current_device_id);
+  } else {
+    compiled_engine->engine_stream = compiled_engine->caller_stream;
+  }
 
   // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
   std::unique_lock<std::mutex> lock(compiled_engine->mu);
 
-  if (!CUDAGRAPHS_MODE) {
-    // If not in cudagraphs mode, proceed with enqueueV3 as normal
-    compiled_engine->exec_ctx->enqueueV3(compiled_engine->active_stream);
-  } else if (need_cudagraphs_record) {
-    // If cudagraphs needs to record a graph, capture the enqueueV3 call in a graph
+  { // Engine Execution (execute on engine stream)
+    c10::cuda::CUDAStreamGuard stream_guard(compiled_engine->engine_stream);
 
-    // Cudagraphs cannot record on the current stream, so use an alternate
-    c10::cuda::CUDAStream recording_stream = c10::cuda::getStreamFromPool(false, inputs[0].device().index());
-    c10::cuda::CUDAStreamGuard guard(recording_stream);
-
-    compiled_engine->exec_ctx->enqueueV3(recording_stream);
-    recording_stream.synchronize();
-
-    compiled_engine->cudagraph.capture_begin();
-    compiled_engine->exec_ctx->enqueueV3(recording_stream);
-    compiled_engine->cudagraph.capture_end();
-
-    // Reset the stream to its original setting
-    guard.reset_stream(guard.original_stream());
-
-  } else {
-    // If the cudagraph has already been recorded, copy the input buffers and replay it
-    for (auto i = 0; i < inputs.size(); i++) {
-      compiled_engine->input_buffers[i].copy_(inputs[i], true);
+    std::unique_ptr<torch::autograd::profiler::RecordProfile> enqueue_profiler_guard;
+    if (compiled_engine->profile_execution) {
+      enqueue_profiler_guard =
+          std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->enqueue_profile_path);
     }
-    compiled_engine->cudagraph.replay();
-  }
 
-  std::vector<at::Tensor> model_outputs(compiled_engine->num_io.second);
+    // Block engine stream until results are available on caller stream
+    at::cuda::CUDAEvent caller_exec_complete;
+    caller_exec_complete.record(compiled_engine->caller_stream);
+    caller_exec_complete.block(compiled_engine->engine_stream);
 
-  // In cudagraphs mode, the output buffers can be reused, so they must
-  // be cloned before providing them to the user to avoid data corruption
+    if (!CUDAGRAPHS_MODE) {
+      // Direct execution uses the caller buffers directly
+      compiled_engine->exec_ctx->enqueueV3(compiled_engine->engine_stream);
+    } else {
+      if (need_cudagraphs_record) {
+        // If cudagraphs needs to record a graph, capture the enqueueV3 call in a graph
+        c10::cuda::CUDAStream recording_stream = compiled_engine->engine_stream;
+        compiled_engine->cudagraph.capture_begin();
+        compiled_engine->exec_ctx->enqueueV3(recording_stream);
+        compiled_engine->cudagraph.capture_end();
+
+        if (compiled_engine->profile_execution) {
+          compiled_engine->cudagraph.debug_dump(compiled_engine->cuda_graph_debug_path);
+        }
+      }
+
+      // Replay the CUDAGraph
+      compiled_engine->cudagraph.replay(); // Has a cudaDeviceSynchronize internally
+    }
+  } // End engine exeuction (resets to caller stream)
+
+  // Block caller stream until engine execution is complete
+  at::cuda::CUDAEvent trt_exec_complete;
+  trt_exec_complete.record(compiled_engine->engine_stream);
+  trt_exec_complete.block(compiled_engine->caller_stream);
+
   if (CUDAGRAPHS_MODE) {
-    for (auto i = 0; i < compiled_engine->output_buffers.size(); i++) {
-      model_outputs[i] = compiled_engine->output_buffers[i].clone();
+    // If in CUDAGraph mode, results need to be copied to the result buffers (on caller stream)
+    for (size_t o = 0; o < compiled_engine->output_buffers.size(); o++) {
+      outputs[o].copy_(compiled_engine->output_buffers[o], false);
     }
-  } else {
-    model_outputs = outputs;
   }
 
   if (compiled_engine->profile_execution) {
@@ -318,7 +360,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     compiled_engine->dump_engine_layer_info();
   }
 
-  return model_outputs;
+  return outputs;
 }
 
 } // namespace runtime

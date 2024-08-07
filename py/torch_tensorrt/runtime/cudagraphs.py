@@ -1,9 +1,7 @@
 import logging
-from importlib.util import find_spec
 from typing import Any
 
 import torch
-
 import torch_tensorrt
 
 if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
@@ -21,7 +19,7 @@ def set_cudagraphs_mode(mode: bool) -> None:
     _PY_RT_CUDAGRAPHS = mode
 
     # Set new mode for C++
-    if find_spec("torch_tensorrt._C") is not None:
+    if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
         torch.ops.tensorrt.set_cudagraphs_mode(mode)
 
     logger.info(f"Set Cudagraphs usage to {mode}")
