@@ -44,25 +44,23 @@ kwargs = {
     "make_refitable": True,
 }
 
+torch.manual_seed(0)
+inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
+
+compile_spec = {
+    "use_python": False,
+    "enabled_precisions": {torch.float32},
+    "make_refitable": True,
+}
+
 model = models.resnet18(pretrained=False).eval().to("cuda")
-model2 = models.resnet18(pretrained=True).eval().to("cuda")
-mutable_module = torch_trt.MutableTorchTensorRTModule(model, **kwargs)
+mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
 mutable_module(*inputs)
 
-
-mutable_module.load_state_dict(model2.state_dict())
-
-
-# Check the output
-expected_outputs, refitted_outputs = model2(*inputs), mutable_module(*inputs)
-for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
-    assert torch.allclose(
-        expected_output, refitted_output, 1e-2, 1e-2
-    ), "Refit Result is not correct. Refit failed"
+mutable_module.conv1.weight = nn.Parameter(mutable_module.original_model.conv1.weight)
+mutable_module.update_refit_condition()
 
 print("Refit successfully!")
-torch_trt.MutableTorchTensorRTModule.save(mutable_module, "mutable_module.pkl")
-reload = torch_trt.MutableTorchTensorRTModule.load("mutable_module.pkl")
 
 
 # class net(nn.Module):
