@@ -20,7 +20,7 @@ jobs:
     permissions:
       packages: write
 
-    runs-on: linux.4xlarge.nvidia.gpu
+    runs-on: linux.8xlarge.nvidia.gpu
 
     # Define key environment variables
     # Container name is of the form torch_tensorrt:<branch_name>
