@@ -218,7 +218,7 @@ def build_libtorchtrt_pre_cxx11_abi(
         cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
         print("CI based build")
 
-    print("building libtorchtrt")
+    print(f"lan added building libtorchtrt {cmd=}")
     status_code = subprocess.run(cmd).returncode
 
     if status_code != 0:
@@ -250,6 +250,7 @@ def copy_libtorchtrt(multilinux=False, rt_only=False):
             dir_path + "/../bazel-bin/cpp/lib/torchtrt.dll.if.lib",
             dir_path + "/torch_tensorrt/lib/torchtrt.lib",
         )
+        print(f"lan added {dir_path=}")
     elif multilinux:
         copyfile(
             dir_path + "/build/libtrtorch_build/libtrtorch.so",

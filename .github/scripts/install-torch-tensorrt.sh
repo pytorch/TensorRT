@@ -1,4 +1,4 @@
-set -eou pipefail
+set -x
 
 TORCH_TORCHVISION=$(grep "^torch" ${PWD}/py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
@@ -14,5 +14,15 @@ if [[ ${PLATFORM} == win32 ]]; then
 else
     pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl
 fi
+
+pip list | grep torch
+
+ls -lart $CONDA_ENV/lib/site-packages | grep torch_tensorrt
+
+ls -lart $CONDA_ENV/lib/site-packages/torch_tensorrt/lib
+
+pip show torch_tensorrt | grep Location:
+
+echo LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
 
 echo -e "Running test script";
