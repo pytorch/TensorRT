@@ -3573,7 +3573,9 @@ def aten_ops_any(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten._pdist_forward.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten._pdist_forward.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
