@@ -100,6 +100,7 @@ def _register_with_torch() -> None:
     )
     linked_file_full_path = os.path.join(trtorch_dir, linked_file)
     linked_file_runtime_full_path = os.path.join(trtorch_dir, linked_file_runtime)
+    print(f"lan added {linked_file_full_path=}")
 
     if os.path.isfile(linked_file_full_path):
         assert ENABLED_FEATURES.torchscript_frontend
