@@ -375,7 +375,7 @@ def refit_module_weights(
                         if not weight_name_map:
                             use_weight_map_cache = False
                             logger.warning(
-                                "Fast refitting is not supported in this module. Use regular refitting."
+                                "This engine does not have a weight map cache. Rebuilding the weight map"
                             )
             else:
                 compiled_submodule = getattr(compiled_module, name)
@@ -385,7 +385,7 @@ def refit_module_weights(
                         weight_name_map = compiled_submodule.weight_name_map
                     except AttributeError:
                         logger.warning(
-                            "The module was compiled wit an old version of Torch-TensorRT. Rebuilding the weight map."
+                            "The module was compiled with an old version of Torch-TensorRT. Rebuilding the weight map."
                         )
                     if not weight_name_map:
                         use_weight_map_cache = False
