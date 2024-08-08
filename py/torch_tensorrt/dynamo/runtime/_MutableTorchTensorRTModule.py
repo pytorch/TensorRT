@@ -155,7 +155,6 @@ class MutableTorchTensorRTModule(object):
             "torch_executed_ops": (
                 torch_executed_ops if torch_executed_ops is not None else set()
             ),
-            "torch_executed_modules": torch_executed_modules,
             "pass_through_build_failures": pass_through_build_failures,
             "max_aux_streams": max_aux_streams,
             "version_compatible": version_compatible,
@@ -290,9 +289,7 @@ class MutableTorchTensorRTModule(object):
 
     def store_inputs(self, arg_inputs: Any, kwarg_inputs: Any) -> None:
         self.arg_inputs = arg_inputs
-        self.kwarg_inputs = MutableTorchTensorRTModule.process_kwarg_inputs(
-            kwarg_inputs
-        )
+        self.kwarg_inputs = kwarg_inputs
 
     @staticmethod
     def process_kwarg_inputs(inputs: Any) -> Any:
@@ -320,6 +317,9 @@ class MutableTorchTensorRTModule(object):
 
     def forward(self, *args: Any, **kwargs: Any) -> Any:
         # Step 1: Check whether the input shape has changed
+        kwargs = MutableTorchTensorRTModule.process_kwarg_inputs(
+            kwargs
+        )
         self._validate_inputs(*args, **kwargs)
 
         # Step 2: If the flag is unknown, it could be a recompile or refit.
