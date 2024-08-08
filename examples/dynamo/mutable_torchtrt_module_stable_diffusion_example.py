@@ -39,6 +39,7 @@ torch.manual_seed(1)
 kwargs = {
     "use_python": False,
     "enabled_precisions": {torch.float16},
+    "debug": True,
     "make_refitable": True,
 }
 
@@ -57,10 +58,10 @@ backend = "torch_tensorrt"
 
 pipe.unet = torch_trt.MutableTorchTensorRTModule(pipe.unet, **kwargs)
 image = pipe(prompt, negative_prompt=negative, num_inference_steps=30).images[0]
-image.save("./without_LoRA.jpg")
+image.save("./without_LoRA_mutable.jpg")
 
 
-pipe.load_lora_weights("/opt/torch_tensorrt/moxin.safetensors", adapter_name="lora1")
+pipe.load_lora_weights("/opt/file/moxin.safetensors", adapter_name="lora1")
 pipe.set_adapters(["lora1"], adapter_weights=[1])
 pipe.fuse_lora(["lora1"], 1)
 pipe.unload_lora_weights()
@@ -68,4 +69,4 @@ pipe.unload_lora_weights()
 
 # Check the output
 image = pipe(prompt, negative_prompt=negative, num_inference_steps=30).images[0]
-image.save("./with_LoRA.jpg")
+image.save("./with_LoRA_mutable.jpg")
