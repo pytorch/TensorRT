@@ -131,7 +131,9 @@ def convert_module(
     from torch_tensorrt.logging import TRT_LOGGER
 
     runtime = trt.Runtime(TRT_LOGGER)
-    refit_test_engine = runtime.deserialize_cuda_engine(interpreter_result.engine)
+    refit_test_engine = runtime.deserialize_cuda_engine(
+        interpreter_result.serialized_engine
+    )
     weight_name_map: Any = None
     # Do the test refit with cached map if make_refitable is enabled
     if settings.make_refitable:
@@ -169,5 +171,5 @@ def convert_module(
         output_binding_names=list(interpreter_result.output_names),
         name=name,
         settings=settings,
-        weight_name_map = weight_name_map
+        weight_name_map=weight_name_map,
     )

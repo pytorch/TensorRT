@@ -145,8 +145,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 self.encode_metadata(metadata),
             ]
         )
-        
-        
+
     def encode_metadata(self, metadata: Any) -> str:
         metadata = copy.deepcopy(metadata)
         metadata["settings"].torch_executed_ops = {

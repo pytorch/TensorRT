@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set, Tuple
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
@@ -29,7 +30,6 @@ from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
-import tensorrt as trt
 from packaging import version
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -504,7 +504,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             engine_bytes.write(serialized_engine)
             engine_str = engine_bytes.getvalue()
 
-        return TRTInterpreterResult(engine_str, self._input_names, self._output_names, self.weight_name_map)
+        return TRTInterpreterResult(
+            engine_str, self._input_names, self._output_names, self.weight_name_map
+        )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
         self._cur_node_name = get_node_name(n)
