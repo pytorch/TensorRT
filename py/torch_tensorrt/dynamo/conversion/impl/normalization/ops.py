@@ -10,19 +10,18 @@ from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
+    create_constant,
     get_axes_for_reduce_op,
     get_positive_dim,
     get_trt_tensor,
+    has_dynamic_shape,
+    set_layer_name,
     to_numpy,
 )
 from torch_tensorrt.dynamo.conversion.impl.cat import cat
 from torch_tensorrt.dynamo.conversion.impl.elementwise.ops import ge
 from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
-from torch_tensorrt.fx.converters.converter_utils import (
-    has_dynamic_shape,
-    set_layer_name,
-)
 from torch_tensorrt.fx.types import TRTTensor
 from torch_tensorrt.fx.utils import get_dynamic_dims
 
@@ -491,7 +490,7 @@ def pdist(
         dim = get_shape(ctx, target, source_ir, f"{name}_get_shape", input, 0)
         shuffle_layer = ctx.net.add_shuffle(dim)
         shuffle_layer.reshape_dims = trt.Dims()
-        set_layer_name(shuffle_layer, target, f"{name}_shuffle")
+        set_layer_name(shuffle_layer, target, f"{name}_shuffle", source_ir)
         dim_tensor = shuffle_layer.get_output(0)
         indices_tensor = tri_upper_indices(
             ctx, target, source_ir, f"{name}_triu_indices", dim_tensor
@@ -537,21 +536,9 @@ def tri_upper_indices(
     Example:
         if size_tensor is 4, it will return [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]]
     """
-    zero_layer = ctx.net.add_constant(
-        shape=(), weights=trt.Weights(np.array([0], dtype=np.int32))
-    )
-    set_layer_name(zero_layer, target, f"{name}_zero")
-    constant_0 = zero_layer.get_output(0)
-    one_layer = ctx.net.add_constant(
-        shape=(), weights=trt.Weights(np.array([1], dtype=np.int32))
-    )
-    set_layer_name(one_layer, target, f"{name}_one")
-    constant_1 = one_layer.get_output(0)
-    two_layer = ctx.net.add_constant(
-        shape=(), weights=trt.Weights(np.array([2], dtype=np.int32))
-    )
-    set_layer_name(two_layer, target, f"{name}_two")
-    constant_2 = two_layer.get_output(0)
+    constant_0 = create_constant(ctx, 0, f"{name}_zero", np.int32, 0)
+    constant_1 = create_constant(ctx, 1, f"{name}_one", np.int32, 0)
+    constant_2 = create_constant(ctx, 2, f"{name}_two", np.int32, 0)
 
     size_minus_one = impl.elementwise.sub(
         ctx, target, source_ir, f"{name}_size_minus_one", size_tensor, constant_1
@@ -663,21 +650,20 @@ def tri_upper_indices(
     loop_output_x.set_input(1, num_loop)
     loop_output_y.set_input(1, num_loop)
 
-    # Cat two N tensor into 2 x N. [0, 0, 0], [1, 2, 3] -> [[0, 0, 0], [1, 2, 3]]
-    x_index = ctx.net.add_shuffle(loop_output_x.get_output(0))
-    set_layer_name(x_index, target, f"{name}_x_index", source_ir)
-    x_index.reshape_dims = (1, -1)
-
-    y_index = ctx.net.add_shuffle(loop_output_y.get_output(0))
-    set_layer_name(x_index, target, f"{name}_y_index", source_ir)
-    y_index.reshape_dims = (1, -1)
+    # Cat two N tensors into 2 x N. [0, 0, 0], [1, 2, 3] -> [[0, 0, 0], [1, 2, 3]]
+    x_index = impl.shuffle.reshape(
+        ctx, target, source_ir, f"{name}_x_index", loop_output_x.get_output(0), (1, -1)
+    )
+    y_index = impl.shuffle.reshape(
+        ctx, target, source_ir, f"{name}_y_index", loop_output_y.get_output(0), (1, -1)
+    )
 
     x_y_tensor = cat(
         ctx,
         target,
         source_ir,
         f"{name}_x_y_tensor",
-        [x_index.get_output(0), y_index.get_output(0)],
+        [x_index, y_index],
         0,
     )
 
@@ -685,7 +671,7 @@ def tri_upper_indices(
     indices_tensor = ctx.net.add_shuffle(x_y_tensor)
     set_layer_name(indices_tensor, target, f"{name}_indices_tensor", source_ir)
     indices_tensor.first_transpose = trt.Permutation([1, 0])
-    indices_tensor.reshape_dims = (0, 0)
+    indices_tensor.reshape_dims = (-1, 2)
 
     return indices_tensor.get_output(0)
 

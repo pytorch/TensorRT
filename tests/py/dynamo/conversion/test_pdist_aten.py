@@ -45,9 +45,9 @@ class TestDynamicShapePdistConverter(DispatchTestCase):
             ),
             (
                 "dim0_static_dim1_dynamic_p_1",
-                (1, 5),
-                (2, 5),
-                (6, 5),
+                (3, 1),
+                (3, 2),
+                (3, 4),
                 1,
             ),
             (
