@@ -183,9 +183,9 @@ class Input(object):
                     kwargs["opt_shape"], dtype=kwargs["dtype"]
                 )
             elif self.shape_mode == Input._ShapeMode.DYNAMIC:
-                self.torch_tensor = self.example_tensor("opt_shape")
+                self.torch_tensor = self.example_tensor("opt_shape", zero_filled=True)
             else:
-                self.torch_tensor = self.example_tensor()
+                self.torch_tensor = self.example_tensor(zero_filled=True)
 
         if "name" in kwargs:
             self.name = kwargs["name"]
@@ -334,13 +334,17 @@ class Input(object):
         ]
 
     def example_tensor(
-        self, optimization_profile_field: Optional[str] = None
+        self,
+        optimization_profile_field: Optional[str] = None,
+        zero_filled: bool = False,
     ) -> torch.Tensor:
         """
-        Get an example tensor of the shape specified by the Input object
+        Get an example tensor of the shape specified by the Input object.
+        Limit the size of random integer to a range of 8 bits considering casted input.
 
         Args:
             optimization_profile_field (Optional(str)): Name of the field to use for shape in the case the Input is dynamically shaped
+            zero_filled (bool): Generate zero-filled tensors
 
         Returns:
             A PyTorch Tensor
@@ -352,9 +356,7 @@ class Input(object):
                 )
             else:
                 if isinstance(self.shape, tuple):
-                    return torch.rand(self.shape).to(
-                        dtype=self.dtype.to(torch.dtype, use_default=True)
-                    )
+                    shape = self.shape
                 else:
                     RuntimeError(
                         f"Input shape is dynamic but shapes are not provided as sequence (found: {self.shape})"
@@ -372,9 +374,7 @@ class Input(object):
                     )
 
                 if isinstance(self.shape, dict):
-                    return torch.rand(self.shape[optimization_profile_field]).to(
-                        dtype=self.dtype.to(torch.dtype, use_default=True)
-                    )
+                    shape = self.shape[optimization_profile_field]
                 else:
                     raise RuntimeError(
                         f"Input shape is dynamic but shapes are not provided as dictionary (found: {self.shape})"
@@ -383,5 +383,22 @@ class Input(object):
             else:
                 raise ValueError(
                     "Requested an example tensor from a dynamic shaped input but did not specific which profile field to use."
+                )
+        type = self.dtype.to(torch.dtype, use_default=True)
+        if zero_filled:
+            return torch.zeros(shape, dtype=type)
+        else:
+            if self.dtype in [dtype.u8, dtype.i8, dtype.i32, dtype.i64]:
+                return torch.randint(
+                    max(torch.iinfo(torch.int8).min, torch.iinfo(type).min),
+                    torch.iinfo(torch.int8).max,
+                    shape,
+                    dtype=type,
+                )
+            elif self.dtype == dtype.b:
+                return torch.rand(shape) < 0.5
+            else:
+                return torch.rand(shape).to(
+                    dtype=self.dtype.to(torch.dtype, use_default=True)
                 )
         raise
