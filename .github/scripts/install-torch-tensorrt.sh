@@ -17,4 +17,12 @@ fi
 
 pip list | grep torch
 
+ls -lart $CONDA_ENV/lib/site-packages | grep torch_tensorrt
+
+ls -lart $CONDA_ENV/lib/site-packages/torch_tensorrt/lib
+
+pip show torch_tensorrt | grep Location:
+
+echo LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
+
 echo -e "Running test script";

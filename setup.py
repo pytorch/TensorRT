@@ -250,6 +250,7 @@ def copy_libtorchtrt(multilinux=False, rt_only=False):
             dir_path + "/../bazel-bin/cpp/lib/torchtrt.dll.if.lib",
             dir_path + "/torch_tensorrt/lib/torchtrt.lib",
         )
+        print(f"lan added {dir_path=}")
     elif multilinux:
         copyfile(
             dir_path + "/build/libtrtorch_build/libtrtorch.so",
