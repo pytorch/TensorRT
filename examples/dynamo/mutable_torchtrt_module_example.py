@@ -15,6 +15,7 @@ In this tutorial, we are going to walk through
 2. Save and load a graph module
 3. Refit the graph module
 """
+
 import numpy as np
 import torch
 import torch_tensorrt as torch_trt
@@ -37,7 +38,6 @@ model = models.resnet18(pretrained=False).eval().to("cuda")
 model2 = models.resnet18(pretrained=True).eval().to("cuda")
 mutable_module = torch_trt.MutableTorchTensorRTModule(model, **kwargs)
 mutable_module(*inputs)
-
 
 mutable_module.load_state_dict(model2.state_dict())
 

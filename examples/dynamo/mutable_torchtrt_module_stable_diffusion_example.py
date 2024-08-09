@@ -30,44 +30,45 @@ import torch_tensorrt as torch_trt
 from diffusers import DiffusionPipeline
 
 np.random.seed(0)
-torch.manual_seed(2)
+torch.manual_seed(5)
 
 
 # %%
 # Compile the module for the first time and save it.
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-kwargs = {
-    "use_python_runtime": True,
-    "enabled_precisions": {torch.float16},
-    "debug": True,
-    "make_refitable": True,
-}
+with torch.no_grad():
+    kwargs = {
+        "use_python_runtime": True,
+        "enabled_precisions": {torch.float16},
+        "debug": True,
+        "make_refitable": True,
+    }
 
-model_id = "runwayml/stable-diffusion-v1-5"
-device = "cuda:0"
+    model_id = "runwayml/stable-diffusion-v1-5"
+    device = "cuda:0"
 
-# Instantiate Stable Diffusion Pipeline with FP16 weigh ts
-prompt = "portrait of a woman standing, shuimobysim, wuchangshuo, best quality"
-negative = "(worst quality:2), (low quality:2), (normal quality:2), lowres, normal quality, skin spots, acnes, skin blemishes, age spot, glans, (watermark:2),"
+    # Instantiate Stable Diffusion Pipeline with FP16 weigh ts
+    prompt = "portrait of a woman standing, shuimobysim, wuchangshuo, best quality"
+    negative = "(worst quality:2), (low quality:2), (normal quality:2), lowres, normal quality, skin spots, acnes, skin blemishes, age spot, glans, (watermark:2),"
 
-pipe = DiffusionPipeline.from_pretrained(
-    model_id, revision="fp16", torch_dtype=torch.float16
-)
-pipe.to(device)
-backend = "torch_tensorrt"
+    pipe = DiffusionPipeline.from_pretrained(
+        model_id, revision="fp16", torch_dtype=torch.float16
+    )
+    pipe.to(device)
+    backend = "torch_tensorrt"
 
-pipe.unet = torch_trt.MutableTorchTensorRTModule(pipe.unet, **kwargs)
-image = pipe(prompt, negative_prompt=negative, num_inference_steps=30).images[0]
-image.save("./without_LoRA_mutable.jpg")
+    pipe.unet = torch_trt.MutableTorchTensorRTModule(pipe.unet, **kwargs)
+    image = pipe(prompt, negative_prompt=negative, num_inference_steps=30).images[0]
+    image.save("./without_LoRA_mutable.jpg")
 
-# torch_trt.MutableTorchTensorRTModule.save(pipe.unet, "./sd_mutable.pt")
-# pipe.unet = torch_trt.MutableTorchTensorRTModule.load("./sd_mutable")
-pipe.load_lora_weights("./moxin.safetensors", adapter_name="lora1")
-pipe.set_adapters(["lora1"], adapter_weights=[1])
-pipe.fuse_lora()
-pipe.unload_lora_weights()
+    # torch_trt.MutableTorchTensorRTModule.save(pipe.unet, "./sd_mutable.pt")
+    # pipe.unet = torch_trt.MutableTorchTensorRTModule.load("./sd_mutable")
+    pipe.load_lora_weights("./moxin.safetensors", adapter_name="lora1")
+    pipe.set_adapters(["lora1"], adapter_weights=[1])
+    pipe.fuse_lora()
+    pipe.unload_lora_weights()
+    # pipe.unet.unload_lora()
 
-
-# Check the output
-image = pipe(prompt, negative_prompt=negative, num_inference_steps=30).images[0]
-image.save("./with_LoRA_mutable.jpg")
+    # Check the output
+    image = pipe(prompt, negative_prompt=negative, num_inference_steps=30).images[0]
+    image.save("./with_LoRA_mutable.jpg")

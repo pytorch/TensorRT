@@ -254,10 +254,12 @@ class MutableTorchTensorRTModule(object):
             self.exp_program = torch.export.export(
                 self.original_model, self.arg_inputs, kwargs=self.kwarg_inputs
             )
-
-        self.exp_program._state_dict = MutableTorchTensorRTModule._transform_state_dict(
-            self.original_model.state_dict()
-        )
+        else:
+            self.exp_program._state_dict = (
+                MutableTorchTensorRTModule._transform_state_dict(
+                    self.original_model.state_dict()
+                )
+            )
         self.gm = refit_module_weights(self.gm, self.exp_program)
 
         self.original_model.cpu()
@@ -343,8 +345,12 @@ class MutableTorchTensorRTModule(object):
 
         elif self.refit_state.get_state() == RefitFlag.NEEDS_REFIT:
             logger.info("Model weight change detected. Refitting the module...")
-            self.refit_gm()
-            self.store_state_dict_meta_data()
+            try:
+                self.refit_gm()
+            except Exception:
+                logger.error("Model refit failed. Recompiling the graph module.")
+                self._compile()
+                self.store_state_dict_meta_data()
             self.refit_state.set_state(RefitFlag.LIVE)
 
         result = self.gm(*args, **kwargs)
@@ -523,6 +529,9 @@ class MutableTorchTensorRTModule(object):
         return module
 
 
+torch.nn.Module
+
+
 def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
     subclass: type = obj.__class__
 
@@ -534,7 +543,9 @@ def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
         def __init__(self, obj: Any):
             object.__setattr__(self, "instance", obj)
 
-        def __getattr__(self, name: str) -> Any:
+        def __getattr__(
+            self, name: str
+        ) -> Any:  # Called when the attribute does not exist
             obj = getattr(self.instance, name)
             if isinstance(obj, torch.nn.Parameter):
                 # Whenever the user retrieve an attribute that could be related to weights, we set the state to UNKNOWN
@@ -548,7 +559,12 @@ def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
             return obj
 
         def __setattr__(self, name: str, value: Any) -> None:
+            if name in ["__dict__", "instance"]:
+                object.__setattr__(self, name, value)
+                return
             self._on_change()
+            while isinstance(value, ChangeTriggerWrapper):
+                value = value.instance
             setattr(self.instance, name, value)
 
         def __delattr__(self, name: str) -> None:
@@ -567,14 +583,23 @@ def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
         def __call__(self, *args: Any, **kwargs: Any) -> Any:
             return self.instance(*args, **kwargs)
 
+        def _call_impl(self, *args: Any, **kwargs: Any) -> Any:
+            return self.instance._call_impl(*args, **kwargs)
+
+        def forward(self, *args: Any, **kwargs: Any) -> Any:
+            return self.instance.forward(*args, **kwargs)
+
         def __setitem__(self, item: str, value: Any) -> None:
             self._on_change()
+            while isinstance(value, ChangeTriggerWrapper):
+                value = value.instance
             self.instance.__setitem__(item, value)
 
         def __getitem__(self, items: str) -> Any:
-            return _make_refit_change_trigger(
-                self.instance.__getitem__(items), refit_state
-            )
+            obj = self.instance.__getitem__(items)
+            if isinstance(obj, ChangeTriggerWrapper):
+                return obj
+            return _make_refit_change_trigger(obj, refit_state)
 
         def __len__(self) -> int:
             return len(self.instance)

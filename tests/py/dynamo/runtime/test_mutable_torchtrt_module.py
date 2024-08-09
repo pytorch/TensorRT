@@ -15,6 +15,10 @@ from torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule import RefitFlag
 assertions = unittest.TestCase()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
 @pytest.mark.unit
 def test_resnet18():
 
@@ -50,6 +54,11 @@ def test_resnet18():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
+@pytest.mark.unit
 def test_save():
 
     torch.manual_seed(0)
@@ -84,7 +93,11 @@ def test_save():
     torch._dynamo.reset()
 
 
-# @pytest.mark.unit
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
+@pytest.mark.unit
 def test_resnet18_modify_attribute():
 
     torch.manual_seed(0)
@@ -121,7 +134,11 @@ def test_resnet18_modify_attribute():
     torch._dynamo.reset()
 
 
-# @pytest.mark.unit
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
+@pytest.mark.unit
 def test_resnet18_modify_attribute_no_refit():
 
     torch.manual_seed(0)
@@ -165,6 +182,10 @@ def test_resnet18_modify_attribute_no_refit():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
 @pytest.mark.unit
 def test_custom_model_with_kwarg():
     class net(nn.Module):
@@ -230,6 +251,10 @@ def test_custom_model_with_kwarg():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
 @pytest.mark.unit
 def test_custom_model_with_inplace_init():
     class net(nn.Module):
@@ -291,6 +316,10 @@ def test_custom_model_with_inplace_init():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
 @pytest.mark.unit
 def test_custom_model_with_init_recompile():
     class net(nn.Module):
@@ -352,6 +381,10 @@ def test_custom_model_with_init_recompile():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
 @pytest.mark.unit
 def test_custom_model_with_kwarg_different_input():
     class net(nn.Module):
@@ -428,6 +461,7 @@ def test_check_output_equal():
         "b": [torch.rand(10, 30), torch.rand(5, 5)],
         "c": {"a": torch.rand(10, 30), "b": [torch.rand(10, 30), torch.rand(5, 5)]},
     }
+    torch.manual_seed(0)
     b = {
         "a": torch.rand(10, 30),
         "b": [torch.rand(10, 30), torch.rand(5, 5)],
@@ -435,5 +469,5 @@ def test_check_output_equal():
     }
     assertions.assertTrue(
         torch_trt.MutableTorchTensorRTModule.check_output_equal(a, b),
-        msg=f"The output of saved and reloaded Mutable Module is not correct.",
+        msg=f"test_check_output_equal is not correct.",
     )
