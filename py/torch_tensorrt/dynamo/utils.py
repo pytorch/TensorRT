@@ -177,6 +177,7 @@ def get_model_device(module: torch.fx.GraphModule) -> Union[Device, torch.device
     for parameter in list(module.parameters()):
         if isinstance(parameter, (torch.nn.parameter.Parameter, torch.Tensor)):
             device = parameter.device
+            break
 
     if device is None:
         device = torch.device("cpu")
