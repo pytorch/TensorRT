@@ -201,7 +201,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         at::Tensor contig_input;
 
         if (compiled_engine->cuda_engine->isShapeInferenceIO(name.c_str())) {
-          // Shape tensor inputs are casted to int64 explicitly
+          // Shape tensor inputs are casted to int64 explicitly.
           // Refer to
           // https://github.com/NVIDIA/TensorRT/blob/d2f4ef789a9a6ffdf37b55c3f81b486225f6b380/samples/common/sampleInference.cpp#L435
           auto input_cpu = inputs[i].clone().contiguous().cpu().to(torch::kInt64);

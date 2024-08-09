@@ -3090,7 +3090,7 @@ def upsample_compute_output_size(
     input_size: torch.Size,
     output_size: Optional[Sequence[int]],
     scale_factors: Optional[Sequence[float]],
-) -> Optional[Sequence[int]]:
+) -> Sequence[int] | None:
     spatial_dimensions = len(input_size) - 2
 
     if output_size is None and scale_factors is None:
