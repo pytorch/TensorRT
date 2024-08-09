@@ -7,6 +7,7 @@ from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
 import torch
 from torch.fx.node import Argument, Node, Target
+from torch_tensorrt._enums import QuantizationType
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -606,12 +607,31 @@ def aten_ops_neg(
 try:
     import modelopt.torch.quantization as mtq  # noqa: F401
 
+    assert torch.ops.trt.quantize_int8.default
     assert torch.ops.trt.quantize_fp8.default
 except Exception as e:
     _LOGGER.warning(
         "Unable to import quantization op. Please install modelopt library (https://github.com/NVIDIA/TensorRT-Model-Optimizer?tab=readme-ov-file#installation) to add support for compiling quantized models"
     )
 else:
+
+    @dynamo_tensorrt_converter(torch.ops.trt.quantize_int8.default)
+    def aten_ops_quantize_int8(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        return impl.quantize.quantize(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            QuantizationType.INT8,
+            args[0],
+            args[1],
+        )
 
     @dynamo_tensorrt_converter(torch.ops.trt.quantize_fp8.default)
     def aten_ops_quantize_fp8(
@@ -621,11 +641,12 @@ else:
         kwargs: Dict[str, Argument],
         name: str,
     ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-        return impl.quantize.quantize_fp8(
+        return impl.quantize.quantize(
             ctx,
             target,
             SourceIR.ATEN,
             name,
+            QuantizationType.FP8,
             args[0],
             args[1],
         )
