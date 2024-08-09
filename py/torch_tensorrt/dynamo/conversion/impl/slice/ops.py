@@ -15,7 +15,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
 )
 from torch_tensorrt.dynamo.conversion.impl.cat import cat
-from torch_tensorrt.dynamo.conversion.impl.elementwise import floor_divide
+from torch_tensorrt.dynamo.conversion.impl.elementwise import floor_divide, min, add
 from torch_tensorrt.dynamo.conversion.impl.elementwise.ops import (
     convert_binary_elementwise,
 )
@@ -345,36 +345,86 @@ def chunk(
         raise RuntimeError(
             f"chunk expects `dim` to be less than the length of input shape, got: {dim}"
         )
-
-    dynamic_shape = has_dynamic_shape(input.shape)
-    if dynamic_shape > 0:
-        # Check whether slice target dim is dynamic shape dim
-        assert input.shape[dim] != -1, "Can't chunk on dynamic shape dimension!"
-
-    size_dim = shape[dim]
-    chunk_size = math.ceil(size_dim / chunks)
+    
     result = []
-    start = 0
-    end = min(start + chunk_size, size_dim)
-    cnt = 0
-
-    while start < end:
-        result.append(
-            slice_op(
+    if shape[dim] == DYNAMIC_DIM:
+        #case when chunk dimension is dynamic
+        size_dim = get_shape(
+                        ctx, target, source_ir, name + f"_shape_dim_to_chunk", input, dim
+                    )
+        #implementing ceil operation
+        chunk_size_num_neg = convert_binary_elementwise(
                 ctx,
                 target,
                 source_ir,
-                f"{name}_slice_{cnt}",
-                input,
-                dim,
-                start,
-                end,
-                1,
-            )
+                name + "_sub_num_chunk",
+                trt.ElementWiseOperation.SUB,
+                0,
+                size_dim,
         )
-        start = end
+        chunk_size_ceil_div = floor_divide(
+                ctx,
+                target,
+                source_ir,
+                name + "_div_chunk",
+                chunk_size_num_neg,
+                chunks,
+        )
+        chunk_size = convert_binary_elementwise(
+            ctx,
+            target,
+            source_ir,
+            name + "_prod_chunk",
+            trt.ElementWiseOperation.PROD,
+            chunk_size_ceil_div,
+            -1,
+        )
+        start_tensor = 0
+        end_tensor = min(add(0, chunk_size), size_dim)
+        result = []
+        cnt = 0
+        while (min(start_tensor, end_tensor) == start_tensor):
+            result.append(
+                slice_op(
+                    ctx,
+                    target,
+                    source_ir,
+                    f"{name}_slice_{cnt}",
+                    input,
+                    dim,
+                    start_tensor,
+                    end_tensor,
+                    1,
+                )
+            )
+            end_tensor = min(start_tensor + chunk_size, size_dim)
+            cnt += 1
+    else:
+        #case when chunk dimension is not dynamic
+        size_dim = shape[dim]
+        chunk_size = math.ceil(size_dim / chunks)
+        result = []
+        start = 0
         end = min(start + chunk_size, size_dim)
-        cnt += 1
+        cnt = 0
+
+        while start < end:
+            result.append(
+                slice_op(
+                    ctx,
+                    target,
+                    source_ir,
+                    f"{name}_slice_{cnt}",
+                    input,
+                    dim,
+                    start,
+                    end,
+                    1,
+                )
+            )
+            start = end
+            end = min(start + chunk_size, size_dim)
+            cnt += 1
 
     return result
 
