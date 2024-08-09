@@ -18,6 +18,7 @@ from torch_tensorrt.dynamo._DryRunTracker import (
     dryrun_stats_display,
     parse_non_trt_nodes,
 )
+from torch_tensorrt.dynamo._engine_caching import BaseEngineCache, EngineCache
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     UnsupportedOperatorException,
@@ -83,6 +84,11 @@ def compile(
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
     lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
+    save_engine_cache: bool = _defaults.SAVE_ENGINE_CACHE,
+    load_engine_cache: bool = _defaults.LOAD_ENGINE_CACHE,
+    engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
+    engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
+    engine_cache_instance: Optional[BaseEngineCache] = None,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -148,6 +154,11 @@ def compile(
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
+        save_engine_cache (bool): Whether to save the compiled TRT engines to hard disk
+        load_engine_cache (bool): Whether to load the compiled TRT engines from hard disk
+        engine_cache_dir (str): Directory to store the cached TRT engines
+        engine_cache_size (int): Maximum hard-disk space to use for the engine cache
+        engine_cache_instance (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -224,6 +235,11 @@ def compile(
     gm = post_lowering(gm)
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
+    if engine_cache_instance is None:
+        engine_cache_instance = EngineCacheInstanceCreator.get_creator(
+            engine_cache_size, engine_cache_dir
+        ).engine_cache_instance
+
     compilation_options = {
         "enabled_precisions": (
             enabled_precisions if enabled_precisions else _defaults.ENABLED_PRECISIONS
@@ -257,6 +273,11 @@ def compile(
         "hardware_compatible": hardware_compatible,
         "timing_cache_path": timing_cache_path,
         "lazy_engine_init": lazy_engine_init,
+        "save_engine_cache": save_engine_cache,
+        "load_engine_cache": load_engine_cache,
+        "engine_cache_dir": engine_cache_dir,
+        "engine_cache_size": engine_cache_size,
+        "engine_cache_instance": engine_cache_instance,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -703,3 +724,21 @@ def convert_exported_program_to_serialized_trt_engine(
 
     serialized_engine: bytes = interpreter_result.serialized_engine
     return serialized_engine
+
+
+class EngineCacheInstanceCreator:
+    engine_cache_creator = None
+
+    def __init__(self, engine_cache_size: int, engine_cache_dir: str) -> None:
+        self.engine_cache_instance = EngineCache(
+            engine_cache_size=engine_cache_size,
+            engine_cache_dir=engine_cache_dir,
+        )
+
+    @classmethod
+    def get_creator(
+        cls, engine_cache_size: int, engine_cache_dir: str
+    ) -> EngineCacheInstanceCreator:
+        if cls.engine_cache_creator is None:
+            cls.engine_cache_creator = cls(engine_cache_size, engine_cache_dir)
+        return cls.engine_cache_creator
