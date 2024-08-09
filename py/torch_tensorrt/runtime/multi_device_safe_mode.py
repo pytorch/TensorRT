@@ -1,10 +1,10 @@
 import logging
-from importlib.util import find_spec
 from typing import Any
 
 import torch
+import torch_tensorrt
 
-if find_spec("torch_tensorrt._C") is not None:
+if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
     _PY_RT_MULTI_DEVICE_SAFE_MODE = torch.ops.tensorrt.get_multi_device_safe_mode()
 else:
     _PY_RT_MULTI_DEVICE_SAFE_MODE = False
@@ -31,7 +31,7 @@ class _MultiDeviceSafeModeContextManager(object):
         _PY_RT_MULTI_DEVICE_SAFE_MODE = self.old_mode
 
         # Set multi-device safe mode back to old mode in C++
-        if find_spec("torch_tensorrt._C") is not None:
+        if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
             torch.ops.tensorrt.set_multi_device_safe_mode(self.old_mode)
 
 
@@ -60,7 +60,7 @@ def set_multi_device_safe_mode(mode: bool) -> _MultiDeviceSafeModeContextManager
     _PY_RT_MULTI_DEVICE_SAFE_MODE = mode
 
     # Set new mode for C++
-    if find_spec("torch_tensorrt._C") is not None:
+    if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
         torch.ops.tensorrt.set_multi_device_safe_mode(mode)
 
     logger.info(f"Set multi-device safe mode to {mode}")

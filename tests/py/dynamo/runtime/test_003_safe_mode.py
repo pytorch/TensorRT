@@ -7,10 +7,7 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 from ..testing_utilities import DECIMALS_OF_AGREEMENT
 
 
-@unittest.skipIf(
-    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
-    "Torch-TensorRT runtime is not available",
-)
+@unittest.skipIf(torch.cuda.device_count() == 1, "System does not have multiple GPUs")
 class TestSafeMode(TestCase):
     def test_multi_device_safe_mode_on(self):
         torch_tensorrt.runtime.set_multi_device_safe_mode(True)
@@ -65,6 +62,10 @@ class TestSafeMode(TestCase):
         )
         torch._dynamo.reset()
 
+    @unittest.skipIf(
+        not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+        "Torch-TensorRT runtime is not available",
+    )
     def test_multi_device_safe_mode_enabled_inference_cpp(self):
         torch_tensorrt.runtime.set_multi_device_safe_mode(True)
 

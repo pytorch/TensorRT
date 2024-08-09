@@ -70,7 +70,8 @@ struct TRTEngine : torch::CustomClassHolder {
 
   // CUDAGraph-Related Functionality
   at::cuda::CUDAGraph cudagraph = {};
-  at::cuda::CUDAStream active_stream = c10::cuda::getDefaultCUDAStream();
+  at::cuda::CUDAStream engine_stream = c10::cuda::getDefaultCUDAStream();
+  at::cuda::CUDAStream caller_stream = c10::cuda::getDefaultCUDAStream();
   std::vector<at::Tensor> input_buffers = {};
   std::vector<at::Tensor> output_buffers = {};
   std::string shape_key;
@@ -89,6 +90,7 @@ struct TRTEngine : torch::CustomClassHolder {
   std::string output_profile_path;
   std::string enqueue_profile_path;
   std::string trt_engine_profile_path;
+  std::string cuda_graph_debug_path;
   std::mutex mu;
   std::unique_ptr<TRTEngineProfiler> trt_engine_profiler;
 };
