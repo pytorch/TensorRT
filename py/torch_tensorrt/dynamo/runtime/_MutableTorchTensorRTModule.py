@@ -126,6 +126,14 @@ class MutableTorchTensorRTModule(object):
         Returns:
             MutableTorchTensorRTModule
         """
+        # The order to initialize this module is
+        # 1. Set init_finished to False
+        # 2. Initialize all attributes
+        # 3. Add the module base class
+        # 4. Set the init_finished to True
+        # After initialization, no new attribute should be added to the module __dict__
+        # Otherwise, it will cause undefined behavior
+
         object.__setattr__(self, "init_finished", False)
         self.refit_state = RefitState()
         self.pytorch_model = _make_refit_change_trigger(pytorch_model, self.refit_state)
@@ -137,11 +145,10 @@ class MutableTorchTensorRTModule(object):
         self.kwarg_inputs: dict[str, Any] = {}
         device = to_torch_tensorrt_device(device)
         enabled_precisions = {dtype._from(p) for p in enabled_precisions}
-        if not make_refitable:
-            logger.warning(
-                "'make_refitable' has to be True for a MutableTorchTensorRTModule."
-            )
-            make_refitable = True
+        assert (
+            make_refitable
+        ), "'make_refitable' has to be True for a MutableTorchTensorRTModule."
+        make_refitable = True
         compilation_options = {
             "enabled_precisions": (
                 enabled_precisions
@@ -183,17 +190,13 @@ class MutableTorchTensorRTModule(object):
         self.state_dict_meta_data: dict[str, torch.Size] = {}
         self.store_state_dict_meta_data()
 
-        self.init_finished = True
         cls = self.__class__
-        object.__setattr__(
-            self,
-            "__class__ ",
-            type(
-                "MutableTorchTensorRTModuleExtraBase",
-                (cls, pytorch_model.__class__),
-                {},
-            ),
+        self.__class__ = type(
+            self.original_model.__class__.__name__,
+            (cls, pytorch_model.__class__),
+            {},
         )
+        self.init_finished = True
 
     def store_state_dict_meta_data(self) -> None:
 
@@ -211,8 +214,6 @@ class MutableTorchTensorRTModule(object):
         return {k: torch.nn.Parameter(v, requires_grad=False) for k, v in sd.items()}
 
     def update_refit_condition(self) -> None:
-        # TODO: Think about how we can check refit condition. This does not work.
-        # If all good, set the Flag to LIVE
 
         self.refit_state.set_state(RefitFlag.NEEDS_REFIT)
 
@@ -476,11 +477,11 @@ class MutableTorchTensorRTModule(object):
     @staticmethod
     def save(module: Any, path: str) -> None:
         # Cast the object back to MutableTorchTensorRTModule to save
-        object.__setattr__(module, "__class__", MutableTorchTensorRTModule)
-        if module.settings.use_python_runtime:
-            logger.warning(
-                "Python runtime does not support serialization. Save failed."
-            )
+        assert (
+            not module.settings.use_python_runtime
+        ), "Python runtime does not support serialization. Save failed."
+        module.init_finished = False
+        module.__class__ = MutableTorchTensorRTModule
         exp_program = module.exp_program
         module.pytorch_model = None
         module.exp_program = None
@@ -491,21 +492,19 @@ class MutableTorchTensorRTModule(object):
             module.original_model, module.refit_state
         )
         cls = module.__class__
-        object.__setattr__(
-            module,
-            "__class__",
-            type(
-                "MutableTorchTensorRTModuleExtraBase",
-                (cls, module.original_model.__class__),
-                {},
-            ),
+        module.__class__ = type(
+            module.original_model.__class__.__name__,
+            (cls, module.original_model.__class__),
+            {},
         )
-        object.__setattr__(module, "init_finished", True)
+
+        module.init_finished = True
 
     @staticmethod
     def load(path: str) -> Any:
+        # When the model get saved, init_finished is set to False.
+        # Class is restored to MutableTorchTensorRTModule, and some attribute is deleted
         module = torch.load(path)
-        object.__setattr__(module, "init_finished", False)
         module.pytorch_model = _make_refit_change_trigger(
             module.original_model, module.refit_state
         )
@@ -515,16 +514,12 @@ class MutableTorchTensorRTModule(object):
         )
         module.original_model.to("cpu")
         cls = module.__class__
-        object.__setattr__(
-            module,
-            "__class__",
-            type(
-                "MutableTorchTensorRTModuleExtraBase",
-                (cls, module.original_model.__class__),
-                {},
-            ),
+        module.__class__ = type(
+            module.original_model.__class__.__name__,
+            (cls, module.original_model.__class__),
+            {},
         )
-        object.__setattr__(module, "init_finished", True)
+        module.init_finished = True
         return module
 
 
