@@ -2,7 +2,23 @@ numpy
 packaging
 pybind11==2.6.2
 --extra-index-url https://download.pytorch.org/whl/nightly/cu124
-torch>=2.5.0.dev,<2.6.0
+# once we are able to bump torchvision to 0.20.0, change it back
+# it is trying to download all the torch versions from 0808 back to 0617 to find the matching torchvision 0.19.0 which cause disk space to be full
+# #30 43.91 Collecting torch<2.6.0,>=2.5.0.dev
+#30 43.95   Downloading https://download.pytorch.org/whl/nightly/cu124/torch-2.5.0.dev20240808%2Bcu124-cp310-cp310-linux_x86_64.whl (992.9 MB)
+#30 53.10      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 992.9/992.9 MB 3.8 MB/s eta 0:00:00
+#30 53.70   Downloading https://download.pytorch.org/whl/nightly/cu124/torch-2.5.0.dev20240807%2Bcu124-cp310-cp310-linux_x86_64.whl (992.8 MB)
+#30 62.36      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 992.8/992.8 MB 3.9 MB/s eta 0:00:00
+#30 63.45   Downloading https://download.pytorch.org/whl/nightly/cu124/torch-2.5.0.dev20240806%2Bcu124-cp310-cp310-linux_x86_64.whl (991.8 MB)
+#30 107.3      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 991.8/991.8 MB 3.4 MB/s eta 0:00:00
+#30 107.8   Downloading https://download.pytorch.org/whl/nightly/cu124/torch-2.5.0.dev20240805%2Bcu124-cp310-cp310-linux_x86_64.whl (992.7 MB)
+#30 114.6      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 992.7/992.7 MB 3.5 MB/s eta 0:00:00
+#30 115.2   Downloading https://download.pytorch.org/whl/nightly/cu124/torch-2.5.0.dev20240804%2Bcu124-cp310-cp310-linux_x86_64.whl (992.7 MB)
+#30 121.9      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 992.7/992.7 MB 3.9 MB/s eta 0:00:00
+#30 122.4   Downloading https://download.pytorch.org/whl/nightly/cu124/torch-2.5.0.dev20240803%2Bcu124-cp310-cp310-linux_x86_64.whl (992.7 MB)
+#30 129.2      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 992.7/992.7 MB 3.9 MB/s eta 0:00:00
+#30 129.8   Downloading https://download.pytorch.org/whl/nightly/cu124/torch-2.5.0.dev20240802%2Bcu124-cp310-cp310-linux_x86_64.whl (992.7 MB)
+torch>=2.5.0.dev20240617,<2.5.0.dev20240618
 torchvision>=0.19.0.dev,<0.20.0
 --extra-index-url https://pypi.ngc.nvidia.com
 pyyaml
