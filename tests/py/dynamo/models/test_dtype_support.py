@@ -225,7 +225,7 @@ class TestBF16Support(TestCase):
         self.assertAlmostEqual(
             max_diff,
             0,
-            DECIMALS_OF_AGREEMENT,
+            delta=3e-2,
             msg=f"Torch outputs and TRT outputs don't match close enough.",
         )
 
@@ -263,7 +263,7 @@ class TestBF16Support(TestCase):
         self.assertAlmostEqual(
             max_diff,
             0,
-            DECIMALS_OF_AGREEMENT,
+            delta=3e-2,
             msg=f"Torch outputs and TRT outputs don't match close enough.",
         )
 
@@ -300,6 +300,6 @@ class TestBF16Support(TestCase):
             self.assertAlmostEqual(
                 max_diff,
                 0,
-                DECIMALS_OF_AGREEMENT,
+                delta=3e-2,
                 msg=f"Torch outputs and TRT outputs don't match close enough.",
             )

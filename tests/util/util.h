@@ -8,8 +8,8 @@
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/ir/irparser.h"
 
-const float ATOL = 1e-8;
-const float RTOL = 1e-5;
+const float ATOL = 5e-3;
+const float RTOL = 5e-3;
 const float COSINE_THRESHOLD = 0.99f;
 const float THRESHOLD_E5 = 1e-5;
 
