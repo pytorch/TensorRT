@@ -9,10 +9,9 @@ import tensorrt as trt
 import torch
 import torch.nn.functional as F
 import torch_tensorrt as torchtrt
+import torch_tensorrt as torch_trt
 import torchvision.models as models
 from torch import nn
-
-# from torch import nn
 from torch_tensorrt.dynamo import refit_module_weights
 from torch_tensorrt.dynamo._refit import (
     construct_refit_mapping,
@@ -29,6 +28,10 @@ from transformers import BertModel
 assertions = unittest.TestCase()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
 @pytest.mark.unit
 def test_mapping():
 
@@ -81,8 +84,12 @@ def test_mapping():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
 @pytest.mark.unit
-def test_fast_refit_one_engine():
+def test_refit_one_engine_with_weightmap():
 
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
@@ -126,8 +133,12 @@ def test_fast_refit_one_engine():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
 @pytest.mark.unit
-def test_fast_refit_one_engine_no_map():
+def test_refit_one_engine_no_map_with_weightmap():
 
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
@@ -173,8 +184,12 @@ def test_fast_refit_one_engine_no_map():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
 @pytest.mark.unit
-def test_fast_refit_one_engine_wrong_map():
+def test_refit_one_engine_with_wrong_weightmap():
 
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
@@ -224,8 +239,12 @@ def test_fast_refit_one_engine_wrong_map():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
 @pytest.mark.unit
-def test_fast_refit_one_engine_bert():
+def test_refit_one_engine_bert_with_weightmap():
     inputs = [
         torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
     ]
@@ -275,8 +294,12 @@ def test_fast_refit_one_engine_bert():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
 @pytest.mark.unit
-def test_fast_refit_one_engine_inline_runtime():
+def test_refit_one_engine_inline_runtime__with_weightmap():
     trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
@@ -322,7 +345,7 @@ def test_fast_refit_one_engine_inline_runtime():
 
 
 @pytest.mark.unit
-def test_fast_refit_one_engine_python_runtime():
+def test_refit_one_engine_python_runtime_with_weightmap():
 
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
@@ -366,8 +389,12 @@ def test_fast_refit_one_engine_python_runtime():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
 @pytest.mark.unit
-def test_fast_refit_multiple_engine():
+def test_refit_multiple_engine_with_weightmap():
 
     class net(nn.Module):
         def __init__(self):
@@ -433,8 +460,12 @@ def test_fast_refit_multiple_engine():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
 @pytest.mark.unit
-def test_refit_one_engine():
+def test_refit_one_engine_without_weightmap():
 
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
@@ -478,8 +509,12 @@ def test_refit_one_engine():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
 @pytest.mark.unit
-def test_refit_one_engine_bert():
+def test_refit_one_engine_bert_without_weightmap():
     inputs = [
         torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
     ]
@@ -529,8 +564,12 @@ def test_refit_one_engine_bert():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
 @pytest.mark.unit
-def test_refit_one_engine_inline_runtime():
+def test_refit_one_engine_inline_runtime_without_weightmap():
     trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
@@ -576,7 +615,7 @@ def test_refit_one_engine_inline_runtime():
 
 
 @pytest.mark.unit
-def test_refit_one_engine_python_runtime():
+def test_refit_one_engine_python_runtime_without_weightmap():
 
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
@@ -620,8 +659,12 @@ def test_refit_one_engine_python_runtime():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
 @pytest.mark.unit
-def test_refit_multiple_engine():
+def test_refit_multiple_engine_without_weightmap():
 
     class net(nn.Module):
         def __init__(self):
