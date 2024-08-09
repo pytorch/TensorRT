@@ -126,6 +126,7 @@ class MutableTorchTensorRTModule(object):
         Returns:
             MutableTorchTensorRTModule
         """
+        object.__setattr__(self, "init_finished", False)
         self.refit_state = RefitState()
         self.pytorch_model = _make_refit_change_trigger(pytorch_model, self.refit_state)
         self.original_model = pytorch_model
@@ -182,14 +183,28 @@ class MutableTorchTensorRTModule(object):
         self.state_dict_meta_data: dict[str, torch.Size] = {}
         self.store_state_dict_meta_data()
 
+        self.init_finished = True
+        cls = self.__class__
+        object.__setattr__(
+            self,
+            "__class__ ",
+            type(
+                "MutableTorchTensorRTModuleExtraBase",
+                (cls, pytorch_model.__class__),
+                {},
+            ),
+        )
+
     def store_state_dict_meta_data(self) -> None:
 
         for k, v in self.original_model.state_dict().items():
             self.state_dict_meta_data[k] = v.shape
 
-    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
+    def load_state_dict(
+        self, state_dict: Dict[str, Any], strict: bool = True, assign: bool = False
+    ) -> None:
         self.refit_state.set_state(RefitFlag.NEEDS_REFIT)
-        self.original_model.load_state_dict(state_dict)
+        self.original_model.load_state_dict(state_dict, strict=strict, assign=assign)
 
     @staticmethod
     def _transform_state_dict(sd: Dict[str, Any]) -> Dict[str, torch.nn.Parameter]:
@@ -206,7 +221,7 @@ class MutableTorchTensorRTModule(object):
         if self.run_info:
             args, kwargs, result = self.run_info
             self.original_model.to(to_torch_device(self.settings.device))
-            new_result = self.original_model(*args, *kwargs)
+            new_result = self.original_model(*args, **kwargs)
             self.original_model.cpu()
             if MutableTorchTensorRTModule.check_output_equal(result, new_result):
                 self.refit_state.set_state(RefitFlag.LIVE)
@@ -236,20 +251,13 @@ class MutableTorchTensorRTModule(object):
         self.original_model.to(to_torch_device(self.settings.device))
         if self.exp_program is None:
             self.exp_program = torch.export.export(
-                self.pytorch_model, self.arg_inputs, kwargs=self.kwarg_inputs
+                self.original_model, self.arg_inputs, kwargs=self.kwarg_inputs
             )
 
-        if self.refit_state.get_state() == RefitFlag.NEEDS_RECOMPILE:
-            logger.info("state_dict does not match. Recompiling the module")
-            self._compile()
-
-        elif self.refit_state.get_state() == RefitFlag.NEEDS_REFIT:
-            self.exp_program._state_dict = (
-                MutableTorchTensorRTModule._transform_state_dict(
-                    self.pytorch_model.state_dict()
-                )
-            )
-            self.gm = refit_module_weights(self.gm, self.exp_program)
+        self.exp_program._state_dict = MutableTorchTensorRTModule._transform_state_dict(
+            self.original_model.state_dict()
+        )
+        self.gm = refit_module_weights(self.gm, self.exp_program)
 
         self.original_model.cpu()
 
@@ -317,9 +325,7 @@ class MutableTorchTensorRTModule(object):
 
     def forward(self, *args: Any, **kwargs: Any) -> Any:
         # Step 1: Check whether the input shape has changed
-        kwargs = MutableTorchTensorRTModule.process_kwarg_inputs(
-            kwargs
-        )
+        kwargs = MutableTorchTensorRTModule.process_kwarg_inputs(kwargs)
         self._validate_inputs(*args, **kwargs)
 
         # Step 2: If the flag is unknown, it could be a recompile or refit.
@@ -373,6 +379,27 @@ class MutableTorchTensorRTModule(object):
 
         return getattr(self.pytorch_model, name)
 
+    def __delattr__(self, name: str) -> Any:
+
+        if name in self.__dict__:
+            # this object has it
+            super().__delattr__(name)
+
+        return self.pytorch_model.__delattr__(name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        # When the module finished initialization, any modification to attributes that does not exist
+        # in __dict__ will be handled in pytorch module.
+        if self.init_finished:
+            if name in self.__dict__:
+                object.__setattr__(self, name, value)
+            else:
+                # Capture attribute change
+                self.refit_state.set_state(RefitFlag.UNKNOWN)
+                setattr(self.original_model, name, value)
+        else:
+            object.__setattr__(self, name, value)
+
     @staticmethod
     def check_output_equal(
         output1: Any,
@@ -403,7 +430,7 @@ class MutableTorchTensorRTModule(object):
             if output1.keys() != output2.keys():
                 return False
             for a, b in zip(output1.values(), output2.values()):
-                if not MutableTorchTensorRTModule.check_inputs_equal(a, b):
+                if not MutableTorchTensorRTModule.check_output_equal(a, b):
                     return False
             return True
 
@@ -448,7 +475,8 @@ class MutableTorchTensorRTModule(object):
 
     @staticmethod
     def save(module: Any, path: str) -> None:
-        # Try torch.save and torchtrt.save with a zip format
+        # Cast the object back to MutableTorchTensorRTModule to save
+        object.__setattr__(module, "__class__", MutableTorchTensorRTModule)
         if module.settings.use_python_runtime:
             logger.warning(
                 "Python runtime does not support serialization. Save failed."
@@ -462,10 +490,22 @@ class MutableTorchTensorRTModule(object):
         module.pytorch_model = _make_refit_change_trigger(
             module.original_model, module.refit_state
         )
+        cls = module.__class__
+        object.__setattr__(
+            module,
+            "__class__",
+            type(
+                "MutableTorchTensorRTModuleExtraBase",
+                (cls, module.original_model.__class__),
+                {},
+            ),
+        )
+        object.__setattr__(module, "init_finished", True)
 
     @staticmethod
     def load(path: str) -> Any:
         module = torch.load(path)
+        object.__setattr__(module, "init_finished", False)
         module.pytorch_model = _make_refit_change_trigger(
             module.original_model, module.refit_state
         )
@@ -474,6 +514,17 @@ class MutableTorchTensorRTModule(object):
             module.original_model, module.arg_inputs, kwargs=module.kwarg_inputs
         )
         module.original_model.to("cpu")
+        cls = module.__class__
+        object.__setattr__(
+            module,
+            "__class__",
+            type(
+                "MutableTorchTensorRTModuleExtraBase",
+                (cls, module.original_model.__class__),
+                {},
+            ),
+        )
+        object.__setattr__(module, "init_finished", True)
         return module
 
 
@@ -493,7 +544,11 @@ def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
             if isinstance(obj, torch.nn.Parameter):
                 # Whenever the user retrieve an attribute that could be related to weights, we set the state to UNKNOWN
                 self._on_change()
-            if hasattr(obj, "__dict__") or isinstance(obj, (torch.nn.ModuleList, list)):
+            if (
+                hasattr(obj, "__dict__") or isinstance(obj, (torch.nn.ModuleList, list))
+            ) and not isinstance(
+                obj, ChangeTriggerWrapper
+            ):  # prevent multiple nesting
                 return _make_refit_change_trigger(obj, refit_state)
             return obj
 
@@ -515,9 +570,6 @@ def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
             )
 
         def __call__(self, *args: Any, **kwargs: Any) -> Any:
-            logger.warning(
-                "Uncatched change in function! Please call refit_gm if you are updating the model."
-            )
             return self.instance(*args, **kwargs)
 
         def __setitem__(self, item: str, value: Any) -> None:

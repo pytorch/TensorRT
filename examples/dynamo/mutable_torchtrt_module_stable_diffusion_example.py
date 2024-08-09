@@ -30,14 +30,14 @@ import torch_tensorrt as torch_trt
 from diffusers import DiffusionPipeline
 
 np.random.seed(0)
-torch.manual_seed(1)
+torch.manual_seed(2)
 
 
 # %%
 # Compile the module for the first time and save it.
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 kwargs = {
-    "use_python": False,
+    "use_python_runtime": True,
     "enabled_precisions": {torch.float16},
     "debug": True,
     "make_refitable": True,
@@ -60,10 +60,11 @@ pipe.unet = torch_trt.MutableTorchTensorRTModule(pipe.unet, **kwargs)
 image = pipe(prompt, negative_prompt=negative, num_inference_steps=30).images[0]
 image.save("./without_LoRA_mutable.jpg")
 
-
-pipe.load_lora_weights("/opt/file/moxin.safetensors", adapter_name="lora1")
+# torch_trt.MutableTorchTensorRTModule.save(pipe.unet, "./sd_mutable.pt")
+# pipe.unet = torch_trt.MutableTorchTensorRTModule.load("./sd_mutable")
+pipe.load_lora_weights("./moxin.safetensors", adapter_name="lora1")
 pipe.set_adapters(["lora1"], adapter_weights=[1])
-pipe.fuse_lora(["lora1"], 1)
+pipe.fuse_lora()
 pipe.unload_lora_weights()
 
 
