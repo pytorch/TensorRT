@@ -51,7 +51,6 @@ def test_custom_model():
     model = net().eval().to("cuda")
     args = [torch.rand((1, 3, 224, 224)).to("cuda")]
     kwargs = {
-        "b": torch.tensor(6).to("cuda"),
         "d": {"value": torch.tensor(8).to("cuda")},
     }
 
