@@ -59,6 +59,7 @@ jobs:
         docker container prune -f
         docker image prune -f
         docker system df
+        .github/scripts/disk_monitor.sh &
         DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=$TRT_VERSION -f docker/Dockerfile --tag $DOCKER_TAG .
 
     - name: Push Docker image
