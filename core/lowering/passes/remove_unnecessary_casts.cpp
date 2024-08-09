@@ -117,77 +117,68 @@ void RemoveSingleUse0DTensors(std::shared_ptr<torch::jit::Graph>& g) {
 
                           // Change intermediate op output type
                           LOG_GRAPH(user->schema());
-
                           torch::jit::Node* new_node;
-                          switch (user->kind()) {
-                            // Use this to handle special cases where the scalar version of the intermediate operator
-                            // has a different schema than the original
-                            case c10::aten::add:
-                              new_node = g->create(
-                                  user->kind(),
-                                  torch::jit::ArrayRef<torch::jit::Value*>({user->inputs()[0], user->inputs()[1]}),
-                                  1);
-                              new_node->insertAfter(user);
-                              new_node->outputs()[0]->setType(c10::IntType::get());
-                              user->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);
-                              user->destroy();
-                              break;
-                            case c10::aten::floor_divide:
-                              new_node = g->create(c10::aten::floordiv, user->inputs(), 1);
-                              new_node->insertAfter(user);
-                              new_node->outputs()[0]->setType(c10::IntType::get());
-                              user->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);
-                              user->destroy();
-                              break;
-                            case c10::aten::div:
-                              // If the first two entries to aten::div are non-Tensors,
-                              // there cannot be a rounding mode specified (3rd entry)
-                              if (!user->inputs()[0]->type()->isSubtypeOf(c10::TensorType::get()) &&
-                                  !user->inputs()[1]->type()->isSubtypeOf(c10::TensorType::get()) &&
-                                  user->inputs().size() == 3 &&
-                                  user->inputs()[2]->type()->isSubtypeOf(c10::StringType::get()) &&
-                                  torch::jit::toIValue(user->inputs()[2]).has_value()) {
-                                // Select the first 2 entries of the inputs, corresponding to the values
-                                auto div_args = user->inputs().slice(0, 2);
+                          // Use this to handle special cases where the scalar version of the intermediate operator
+                          // has a different schema than the original
+                          if (user->kind() == c10::Symbol::fromQualString("aten::add")) {
+                            new_node = g->create(
+                                c10::Symbol::fromQualString("aten::add"),
+                                torch::jit::ArrayRef<torch::jit::Value*>({user->inputs()[0], user->inputs()[1]}),
+                                1);
+                            new_node->insertAfter(user);
+                            new_node->outputs()[0]->setType(c10::IntType::get());
+                            user->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);
+                            user->destroy();
+                          } else if (user->kind() == c10::Symbol::fromQualString("aten::floordiv")) {
+                            new_node = g->create(c10::aten::floordiv, user->inputs(), 1);
+                            new_node->insertAfter(user);
+                            new_node->outputs()[0]->setType(c10::IntType::get());
+                            user->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);
+                            user->destroy();
+                          } else if (user->kind() == c10::Symbol::fromQualString("aten::div")) {
+                            // If the first two entries to aten::div are non-Tensors,
+                            // there cannot be a rounding mode specified (3rd entry)
+                            if (!user->inputs()[0]->type()->isSubtypeOf(c10::TensorType::get()) &&
+                                !user->inputs()[1]->type()->isSubtypeOf(c10::TensorType::get()) &&
+                                user->inputs().size() == 3 &&
+                                user->inputs()[2]->type()->isSubtypeOf(c10::StringType::get()) &&
+                                torch::jit::toIValue(user->inputs()[2]).has_value()) {
+                              // Select the first 2 entries of the inputs, corresponding to the values
+                              auto div_args = user->inputs().slice(0, 2);
 
-                                // Depending on the rounding mode, create the appropriate nodes
-                                if (torch::jit::toIValue(user->inputs()[2]).value().toStringRef() == "trunc") {
-                                  // Truncate case (round result towards 0)
-                                  torch::jit::Node* new_node_div;
-                                  // Create node which simply divides the two entries
-                                  new_node_div = g->create(c10::aten::div, div_args, 1);
-                                  new_node_div->insertAfter(user);
-                                  new_node_div->outputs()[0]->setType(c10::FloatType::get());
+                              // Depending on the rounding mode, create the appropriate nodes
+                              if (torch::jit::toIValue(user->inputs()[2]).value().toStringRef() == "trunc") {
+                                // Truncate case (round result towards 0)
+                                torch::jit::Node* new_node_div;
+                                // Create node which simply divides the two entries
+                                new_node_div = g->create(c10::aten::div, div_args, 1);
+                                new_node_div->insertAfter(user);
+                                new_node_div->outputs()[0]->setType(c10::FloatType::get());
 
-                                  // Create node which casts the result to an integer, effectively truncating
-                                  new_node = g->create(c10::aten::Int, new_node_div->outputs(), 1);
-                                  new_node->insertAfter(new_node_div);
-                                  new_node->outputs()[0]->setType(c10::IntType::get());
+                                // Create node which casts the result to an integer, effectively truncating
+                                new_node = g->create(c10::aten::Int, new_node_div->outputs(), 1);
+                                new_node->insertAfter(new_node_div);
+                                new_node->outputs()[0]->setType(c10::IntType::get());
 
-                                  user->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);
-                                  user->destroy();
-                                  break;
+                                user->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);
+                                user->destroy();
+                              } else if (torch::jit::toIValue(user->inputs()[2]).value().toStringRef() == "floor") {
+                                // Floor case (round result down)
+                                // Replace aten::div with aten::floordiv
+                                new_node = g->create(c10::aten::floordiv, div_args, 1);
+                                new_node->insertAfter(user);
+                                new_node->outputs()[0]->setType(c10::IntType::get());
 
-                                } else if (torch::jit::toIValue(user->inputs()[2]).value().toStringRef() == "floor") {
-                                  // Floor case (round result down)
-                                  // Replace aten::div with aten::floordiv
-                                  new_node = g->create(c10::aten::floordiv, div_args, 1);
-                                  new_node->insertAfter(user);
-                                  new_node->outputs()[0]->setType(c10::IntType::get());
-
-                                  user->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);
-                                  user->destroy();
-                                  break;
-                                }
+                                user->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);
+                                user->destroy();
                               }
-
-                            default:
-                              new_node = g->create(user->kind(), user->inputs(), 1);
-                              new_node->insertAfter(user);
-                              new_node->outputs()[0]->setType(c10::IntType::get());
-                              user->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);
-                              user->destroy();
-                              break;
+                            }
+                          } else {
+                            new_node = g->create(user->kind(), user->inputs(), 1);
+                            new_node->insertAfter(user);
+                            new_node->outputs()[0]->setType(c10::IntType::get());
+                            user->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);
+                            user->destroy();
                           }
 
                           LOG_GRAPH("New intermediate operation: " << *new_node);

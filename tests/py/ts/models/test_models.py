@@ -2,7 +2,6 @@ import copy
 import unittest
 from typing import Dict
 
-import custom_models as cm
 import timm
 import torch
 import torch_tensorrt as torchtrt
@@ -91,43 +90,6 @@ class TestModels(unittest.TestCase):
             cos_sim > COSINE_THRESHOLD,
             msg=f"EfficientNet-B0 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
-
-    @unittest.skip("Layer Norm issue needs to be addressed")
-    def test_bert_base_uncased(self):
-        self.model = cm.BertModule().cuda()
-        self.input = torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda")
-
-        compile_spec = {
-            "inputs": [
-                torchtrt.Input(
-                    self.input.shape,
-                    dtype=self.input.dtype,
-                    format=torch.contiguous_format,
-                ),
-                torchtrt.Input(
-                    self.input.shape,
-                    dtype=self.input.dtype,
-                    format=torch.contiguous_format,
-                ),
-            ],
-            "device": {
-                "device_type": torchtrt.DeviceType.GPU,
-                "gpu_id": 0,
-            },
-            "enabled_precisions": {torch.float},
-            "truncate_long_and_double": True,
-        }
-        with torchtrt.logging.errors():
-            trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
-
-        model_outputs = self.model(self.input, self.input)
-        trt_model_outputs = trt_mod(self.input, self.input)
-        for out, trt_out in zip(model_outputs, trt_model_outputs):
-            cos_sim = cosine_similarity(out, trt_out)
-            self.assertTrue(
-                cos_sim > COSINE_THRESHOLD,
-                msg=f"HF BERT base-uncased TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
-            )
 
     def test_resnet18_half(self):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")
