@@ -20,7 +20,7 @@ jobs:
     permissions:
       packages: write
 
-    runs-on: linux.8xlarge.nvidia.gpu
+    runs-on: linux.4xlarge.nvidia.gpu
 
     # Define key environment variables
     # Container name is of the form torch_tensorrt:<branch_name>
@@ -54,13 +54,6 @@ jobs:
         python3 -m pip install pyyaml
         TRT_VERSION=$(python3 -c "import versions; versions.tensorrt_version()")
         echo "TRT VERSION = ${TRT_VERSION}"
-        du -h --max-depth=1 .
-
-        df -kh .
-        docker system df
-        docker system prune -f
-        docker system df
-        .github/scripts/disk_monitor.sh &
         DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=$TRT_VERSION -f docker/Dockerfile --tag $DOCKER_TAG .
 
     - name: Push Docker image
