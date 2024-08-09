@@ -147,6 +147,16 @@ def get_torch_inputs(
         for input in inputs
     ]
 
+def get_model_device(module : torch.fx.GraphModule) -> Union[Device, torch.device, str]:
+    """
+    Returns the device on which the module parameters exist.
+    """
+    for node in module.graph.nodes:
+        if "device" in node.kwargs:
+            return node.kwargs["device"]
+    
+    return torch.device("cpu")
+
 
 def set_log_level(parent_logger: Any, level: Any) -> None:
     """
@@ -249,6 +259,95 @@ def parse_complex_tensor_structs(
             + "Allowed input types: {torch_tensorrt.Input, torch.Tensor, list, tuple, dict}"
         )
 
+def contains_sym_int(tensor: torch.Tensor) -> bool:
+    """
+    Returns true if the given tensor has symbolic shape.
+    """
+    return any(isinstance(dim, torch.SymInt) for dim in tensor)
+
+def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Any]:
+    """
+    This function returns the min, max, opt values of a symbolic integer.
+    """
+    node = symbolic_integer.node
+    expr = node.expr
+    shape_env = node.shape_env
+    # An expr can be a independent SymInt node (eg: s0 or s1) or a composition of them eg: (48*s0 or s0*s1).
+    # In the case of expr which has symbolic computation, bound_sympy evaluates them.
+    # https://pytorch.org/docs/stable/generated/torch.fx.experimental.symbolic_shapes.ShapeEnv.html#torch.fx.experimental.symbolic_shapes.ShapeEnv.bound_sympy
+    # expr.xreplace replaces the symbolic variables with their current values and computes the expression.
+    var_range = shape_env.var_to_range.get(expr, None) or shape_env.bound_sympy(
+        expr
+    )
+    var_val = shape_env.var_to_val.get(expr, None) or expr.xreplace(
+                shape_env.var_to_val
+            )
+    assert var_range, var_val
+    min_val, max_val, opt_val = int(var_range.lower), int(var_range.upper), int(var_val)
+    # Torchdynamo 0/1 specialization outlier
+    min_val = 1 if min_val == 2 else min_val
+    min_max_opt = {}
+    min_max_opt["min"] = min_val
+    min_max_opt["max"] = max_val
+    min_max_opt["opt"] = opt_val
+
+    return min_max_opt
+
+def unwrap_tensor_shape(tensor):
+    """
+    This is a helper function used to print/return the shape of the tensor.
+    For regular torch.tensor's, it returns the static shape.
+    For symbolic tensors, eg:(1, s0, 4), this function returns [1, [min, max], 4]. The min 
+    and max correspond to the lower and upper values of s0 symbolic dimension. 
+    """
+    tensor_shape = []
+    for dimension in tensor.shape:
+        if isinstance(dimension, int):
+            tensor_shape.append(dimension)
+        elif isinstance(dimension, torch.SymInt):
+            min_max_opt = extract_var_range_info(dimension)
+            tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
+    
+    return tuple(tensor_shape)
+
+def get_graph_io_attrs(io_nodes: Sequence[torch.fx.Node], attr_type: str) -> Sequence[Any]:
+    """
+    Returns a list of attributes (shapes or dtypes) of the I/O nodes 
+    """
+    assert attr_type in ["shape", "dtype"]
+    attr_fn = unwrap_tensor_shape if attr_type == "shape" else lambda x : x.dtype
+    graph_io_attrs = []
+    for node in io_nodes:
+        if "val" in node.meta:
+            metadata = node.meta["val"]
+            if isinstance(metadata, (tuple, list)):
+                for tensor in metadata:
+                    graph_io_attrs.append(attr_fn(tensor))
+            else:
+                graph_io_attrs.append(attr_fn(metadata))
+        
+    return graph_io_attrs
+
+def parse_graph_io(module: torch.fx.GraphModule, dryrun_tracker: Any) -> None:
+    """
+    Parse the graph I/O shape/dtype info for the whole graph and store in the dryrun tracker
+    """
+    # Parse inputs of the graph
+    input_nodes = [node for node in module.graph.nodes if node.op == "placeholder"]
+    input_shapes = get_graph_io_attrs(input_nodes, "shape")
+    input_dtypes = get_graph_io_attrs(input_nodes, "dtype")
+    dryrun_tracker.input_shapes = input_shapes
+    dryrun_tracker.input_dtypes = input_dtypes
+
+    # Parse outputs of the graph
+    mark_output_nodes = [node for node in module.graph.nodes if node.op == "output"]
+    output_nodes = []
+    for node in mark_output_nodes:
+        output_nodes.extend(node.all_input_nodes) 
+    output_shapes = get_graph_io_attrs(output_nodes, "shape")
+    output_dtypes = get_graph_io_attrs(output_nodes, "dtype")
+    dryrun_tracker.output_shapes = output_shapes
+    dryrun_tracker.output_dtypes = output_dtypes
 
 def to_torch_device(device: Optional[Union[Device, torch.device, str]]) -> torch.device:
     """Cast a device-type to torch.device

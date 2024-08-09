@@ -41,23 +41,23 @@ def generate(model, input_seq, max_tokens, eos_token_id):
     """
     Greedy decoding of the model. This generates up to max_tokens.
     """
-    max_length = len(input_seq) + max_tokens
+    # Max length of output seq = current input_seq length + max_tokens allowed to generate
+    max_output_seq_length = input_seq.shape[1] + max_tokens
     stopping_criteria = StoppingCriteriaList(
         [
-            MaxLengthCriteria(max_length=max_length),
+            MaxLengthCriteria(max_length=max_output_seq_length),
             EosTokenCriteria(eos_token_id=eos_token_id),
         ]
     )
-    token_id = 0
-    while token_id < max_tokens:
-        # print("Generating token: ", token_id)
+
+    while True:
         outputs = model(input_seq)
         logits = outputs.logits
         next_token_logits = logits[:, -1, :]
         next_tokens = torch.argmax(next_token_logits, dim=-1)
         input_seq = torch.cat([input_seq, next_tokens[:, None]], dim=-1)
+        # TODO: Handle batch in this check
         if stopping_criteria(input_seq, logits).item():
             break
-        token_id += 1
 
-    return input_seq, token_id
+    return input_seq

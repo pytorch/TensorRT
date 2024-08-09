@@ -35,7 +35,7 @@ from torch_tensorrt.dynamo.lowering import (
 )
 from torch_tensorrt.dynamo.utils import (
     get_torch_inputs,
-    parse_complex_tensor_structs,
+    parse_graph_io,
     prepare_inputs,
     set_log_level,
     to_torch_device,
@@ -194,12 +194,14 @@ def compile(
         raise AssertionError(
             f"Input graph should be an ExportedProgram but got type {type(exported_program)}"
         )
+    
     exported_program = pre_export_lowering(exported_program, torch_inputs)
     exported_program = exported_program.run_decompositions(
         get_decompositions(enable_experimental_decompositions)
     )
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
+
     # Apply lowering on the graph module
     gm = post_lowering(gm, torch_inputs)
     logger.debug("Lowered Input graph: " + str(gm.graph))
@@ -275,12 +277,6 @@ def compile_module(
 
     dryrun_tracker.total_ops_in_graph = total_ops
     dryrun_tracker.supported_ops_in_graph = num_supported_ops
-    dryrun_tracker.graph_input_shapes = parse_complex_tensor_structs(
-        sample_inputs, "shape", lambda x: dict(x) if isinstance(x, dict) else tuple(x)
-    )
-    dryrun_tracker.graph_input_dtypes = parse_complex_tensor_structs(
-        sample_inputs, "dtype", lambda t: t.to(torch.dtype, use_default=True)
-    )
     dryrun_tracker.compilation_settings = settings
 
     if settings.dryrun and settings.min_block_size > 1:
@@ -406,28 +402,8 @@ def compile_module(
                 name,
             )
 
-        subgraph_data.subgraph_input_shapes = parse_complex_tensor_structs(
-            submodule_inputs,
-            "shape",
-            lambda x: dict(x) if isinstance(x, dict) else tuple(x),
-        )
-        subgraph_data.subgraph_input_dtypes = parse_complex_tensor_structs(
-            submodule_inputs, "dtype", lambda t: t.to(torch.dtype)
-        )
-
-        submodule_outputs = submodule(
-            *get_torch_inputs(submodule_inputs, to_torch_device(settings.device))
-        )
-
-        subgraph_data.subgraph_output_shapes = parse_complex_tensor_structs(
-            submodule_outputs,
-            "shape",
-            lambda x: dict(x) if isinstance(x, dict) else tuple(x),
-        )
-        subgraph_data.subgraph_output_dtypes = parse_complex_tensor_structs(
-            submodule_outputs, "dtype"
-        )
-
+        # Parse the subgraph I/O and store it 
+        parse_graph_io(submodule, subgraph_data)
         dryrun_tracker.tensorrt_graph_count += 1
         dryrun_tracker.per_subgraph_data.append(subgraph_data)
 
@@ -441,20 +417,9 @@ def compile_module(
             )
 
             trt_modules[name] = trt_module
-
-    sample_outputs = gm(
-        *get_torch_inputs(sample_inputs, to_torch_device(settings.device))
-    )
-
-    if not isinstance(sample_outputs, (list, tuple)):
-        sample_outputs = [sample_outputs]
-
-    dryrun_tracker.graph_output_shapes = parse_complex_tensor_structs(
-        sample_outputs, "shape", lambda x: dict(x) if isinstance(x, dict) else tuple(x)
-    )
-    dryrun_tracker.graph_output_dtypes = parse_complex_tensor_structs(
-        sample_outputs, "dtype"
-    )
+    
+    # Parse the graph I/O and store it in dryrun tracker
+    parse_graph_io(gm, dryrun_tracker)
 
     # Replace all FX Modules with TRT Modules
     for name, trt_module in trt_modules.items():
