@@ -1,14 +1,11 @@
 import logging
-from typing import Sequence
 
 import torch
 
 logger = logging.getLogger(__name__)
 
 
-def remove_detach(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]
-) -> torch.fx.GraphModule:
+def remove_detach(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """Remove detach ops in the graph"""
     count = 0
     for node in gm.graph.nodes:

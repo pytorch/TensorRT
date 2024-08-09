@@ -1,5 +1,5 @@
 import logging
-from typing import Callable, Sequence, Tuple
+from typing import Callable, Tuple
 
 import torch
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
@@ -9,9 +9,7 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 logger = logging.getLogger(__name__)
 
 
-def lower_linear(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]
-) -> torch.fx.GraphModule:
+def lower_linear(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """Replace aten.linear with an equivalent implementation which can be easily converted to TRT"""
     orig, replacement = linear_replacement()
 

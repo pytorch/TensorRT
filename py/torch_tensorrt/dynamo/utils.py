@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
@@ -13,7 +14,6 @@ from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
-import tensorrt as trt
 from packaging import version
 
 from .types import TRTDataType
@@ -128,8 +128,10 @@ def input_is_dynamic(inputs: Sequence[Union[Input, torch.Tensor]]) -> bool:
 
 
 def get_torch_inputs(
-    inputs: Sequence[Input], device: Union[Device, torch.device, str], mode: str = ""
-) -> Sequence[torch.tensor]:
+    inputs: Sequence[Input] | Dict[Any, Any],
+    device: Union[Device, torch.device, str],
+    mode: str = "",
+) -> Sequence[torch.tensor] | Dict[Any, Any]:
     """
     Return the torch_tensor from the Input object. If mode is set, this implies
     user is using dynamic shaped inputs and return the corresponding input based
@@ -137,24 +139,44 @@ def get_torch_inputs(
     """
     device = to_torch_device(device)
     if mode:
-        return [
-            input.example_tensor(mode).to(device)
-            for input in inputs
-            if isinstance(input, Input)
-        ]
-    return [
-        input.torch_tensor.to(device) if isinstance(input, Input) else input
-        for input in inputs
-    ]
+        if isinstance(inputs, dict):
+            result = {}
+            for k, v in inputs.items():
+                if isinstance(v, (list, tuple, dict)):
+                    result[k] = get_torch_inputs(v, device)
+                else:
+                    result[k] = v.example_tensor(mode).to(device)
+            return result
+        else:
+            return [
+                input.example_tensor(mode).to(device)
+                for input in inputs
+                if isinstance(input, Input)
+            ]
 
-def get_model_device(module : torch.fx.GraphModule) -> Union[Device, torch.device, str]:
+    if isinstance(inputs, dict):
+        result = {}
+        for k, v in inputs.items():
+            if isinstance(v, (list, tuple, dict)):
+                result[k] = get_torch_inputs(v, device)
+            else:
+                result[k] = v.torch_tensor.to(device)
+        return result
+    else:
+        return [
+            input.torch_tensor.to(device) if isinstance(input, Input) else input
+            for input in inputs
+        ]
+
+
+def get_model_device(module: torch.fx.GraphModule) -> Union[Device, torch.device, str]:
     """
     Returns the device on which the module parameters exist.
     """
     for node in module.graph.nodes:
         if "device" in node.kwargs:
             return node.kwargs["device"]
-    
+
     return torch.device("cpu")
 
 
@@ -259,11 +281,13 @@ def parse_complex_tensor_structs(
             + "Allowed input types: {torch_tensorrt.Input, torch.Tensor, list, tuple, dict}"
         )
 
+
 def contains_sym_int(tensor: torch.Tensor) -> bool:
     """
     Returns true if the given tensor has symbolic shape.
     """
     return any(isinstance(dim, torch.SymInt) for dim in tensor)
+
 
 def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Any]:
     """
@@ -276,12 +300,10 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Any]:
     # In the case of expr which has symbolic computation, bound_sympy evaluates them.
     # https://pytorch.org/docs/stable/generated/torch.fx.experimental.symbolic_shapes.ShapeEnv.html#torch.fx.experimental.symbolic_shapes.ShapeEnv.bound_sympy
     # expr.xreplace replaces the symbolic variables with their current values and computes the expression.
-    var_range = shape_env.var_to_range.get(expr, None) or shape_env.bound_sympy(
-        expr
-    )
+    var_range = shape_env.var_to_range.get(expr, None) or shape_env.bound_sympy(expr)
     var_val = shape_env.var_to_val.get(expr, None) or expr.xreplace(
-                shape_env.var_to_val
-            )
+        shape_env.var_to_val
+    )
     assert var_range, var_val
     min_val, max_val, opt_val = int(var_range.lower), int(var_range.upper), int(var_val)
     # Torchdynamo 0/1 specialization outlier
@@ -293,29 +315,33 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Any]:
 
     return min_max_opt
 
-def unwrap_tensor_shape(tensor):
+
+def unwrap_tensor_shape(tensor: torch.Tensor) -> Sequence[Any]:
     """
     This is a helper function used to print/return the shape of the tensor.
     For regular torch.tensor's, it returns the static shape.
-    For symbolic tensors, eg:(1, s0, 4), this function returns [1, [min, max], 4]. The min 
-    and max correspond to the lower and upper values of s0 symbolic dimension. 
+    For symbolic tensors, eg:(1, s0, 4), this function returns [1, [min, max], 4]. The min
+    and max correspond to the lower and upper values of s0 symbolic dimension.
     """
-    tensor_shape = []
+    tensor_shape: Sequence[Union[int | Sequence[int]]] = []
     for dimension in tensor.shape:
         if isinstance(dimension, int):
             tensor_shape.append(dimension)
         elif isinstance(dimension, torch.SymInt):
             min_max_opt = extract_var_range_info(dimension)
             tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
-    
+
     return tuple(tensor_shape)
 
-def get_graph_io_attrs(io_nodes: Sequence[torch.fx.Node], attr_type: str) -> Sequence[Any]:
+
+def get_graph_io_attrs(
+    io_nodes: Sequence[torch.fx.Node], attr_type: str
+) -> Sequence[Any]:
     """
-    Returns a list of attributes (shapes or dtypes) of the I/O nodes 
+    Returns a list of attributes (shapes or dtypes) of the I/O nodes
     """
     assert attr_type in ["shape", "dtype"]
-    attr_fn = unwrap_tensor_shape if attr_type == "shape" else lambda x : x.dtype
+    attr_fn = unwrap_tensor_shape if attr_type == "shape" else lambda x: x.dtype
     graph_io_attrs = []
     for node in io_nodes:
         if "val" in node.meta:
@@ -325,8 +351,9 @@ def get_graph_io_attrs(io_nodes: Sequence[torch.fx.Node], attr_type: str) -> Seq
                     graph_io_attrs.append(attr_fn(tensor))
             else:
                 graph_io_attrs.append(attr_fn(metadata))
-        
+
     return graph_io_attrs
+
 
 def parse_graph_io(module: torch.fx.GraphModule, dryrun_tracker: Any) -> None:
     """
@@ -343,11 +370,12 @@ def parse_graph_io(module: torch.fx.GraphModule, dryrun_tracker: Any) -> None:
     mark_output_nodes = [node for node in module.graph.nodes if node.op == "output"]
     output_nodes = []
     for node in mark_output_nodes:
-        output_nodes.extend(node.all_input_nodes) 
+        output_nodes.extend(node.all_input_nodes)
     output_shapes = get_graph_io_attrs(output_nodes, "shape")
     output_dtypes = get_graph_io_attrs(output_nodes, "dtype")
     dryrun_tracker.output_shapes = output_shapes
     dryrun_tracker.output_dtypes = output_dtypes
+
 
 def to_torch_device(device: Optional[Union[Device, torch.device, str]]) -> torch.device:
     """Cast a device-type to torch.device
@@ -475,9 +503,12 @@ def req_torch_version(min_torch_version: str = "2.dev") -> Callable[..., Any]:
 def check_output(
     new_module: torch.fx.GraphModule,
     refitted_module: torch.fx.GraphModule,
-    inputs: tuple[Any, ...],
+    arg_inputs: Any,
+    kwarg_inputs: Any = None,
 ) -> bool:
-    old_outputs, new_outputs = refitted_module(*inputs), new_module(*inputs)
+    old_outputs, new_outputs = refitted_module(*arg_inputs), new_module(
+        *arg_inputs, **kwarg_inputs
+    )
     for old_output, new_output in zip(old_outputs, new_outputs):
         if isinstance(old_output, torch.Tensor) and isinstance(
             new_outputs, torch.Tensor
@@ -486,3 +517,31 @@ def check_output(
                 return False
 
     return True
+
+
+def get_flat_args_with_check(
+    exported_program: torch.export.ExportedProgram,
+    args: list[Any],
+    kwargs: dict[str, Any],
+) -> tuple[Any, Any]:
+    """Flatten args, kwargs using pytree, then, check specs.
+
+    Args:
+        args: List[Any] original args passed to __call__
+        kwargs: Dict[str, Any] original kwargs passed to __call
+
+    Returns:
+        A tuple of (flat_args, received_spec)
+        flat_args is flattend args / kwargs
+        received_spec is the pytree spec produced while flattening the
+        tuple (args, kwargs)
+    """
+    import torch.utils._pytree as pytree
+    from torch.export._tree_utils import reorder_kwargs
+
+    in_spec = exported_program.call_spec.in_spec
+    if in_spec is not None:
+        kwargs = reorder_kwargs(kwargs, in_spec)
+    flat_args_with_path, received_spec = pytree.tree_flatten_with_path((args, kwargs))
+    flat_args = tuple(x[1] for x in flat_args_with_path)
+    return flat_args, received_spec

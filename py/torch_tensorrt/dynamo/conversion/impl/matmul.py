@@ -1,15 +1,17 @@
 from typing import Optional
 
+import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
-from torch_tensorrt.fx.converters.converter_utils import broadcast, set_layer_name
-from torch_tensorrt.fx.types import TRTTensor
-
-import tensorrt as trt
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    broadcast,
+    get_trt_tensor,
+    set_layer_name,
+)
+from torch_tensorrt.dynamo.types import TRTTensor
 
 
 def matrix_multiply(
@@ -44,7 +46,7 @@ def matrix_multiply(
         other_matrix_op = trt.MatrixOperation.VECTOR
 
     input, other = broadcast(
-        ctx.net, input, other, f"{name}_input", f"{name}_other", preset_diff
+        ctx, input, other, f"{name}_input", f"{name}_other", preset_diff
     )
     layer = ctx.net.add_matrix_multiply(input, input_matrix_op, other, other_matrix_op)
     set_layer_name(layer, target, name, source_ir)

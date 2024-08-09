@@ -549,6 +549,7 @@ def aten_ops_hard_sigmoid(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.matmul, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.dot.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mm.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mv.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.bmm.default, supports_dynamic_shapes=True)
@@ -2803,7 +2804,9 @@ def aten_ops_reshape(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.pixel_shuffle.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.pixel_shuffle.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2826,7 +2829,9 @@ def aten_ops_pixel_shuffle(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.pixel_unshuffle.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.pixel_unshuffle.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2873,7 +2878,7 @@ def aten_ops_resize(
 
 
 @enforce_tensor_types({0: (TRTTensor,)})
-@dynamo_tensorrt_converter(torch.ops.aten.argmax.default)
+@dynamo_tensorrt_converter(torch.ops.aten.argmax.default, supports_dynamic_shapes=True)
 def aten_ops_argmax(
     ctx: ConversionContext,
     target: Target,
@@ -2893,7 +2898,7 @@ def aten_ops_argmax(
 
 
 @enforce_tensor_types({0: (TRTTensor,)})
-@dynamo_tensorrt_converter(torch.ops.aten.argmin.default)
+@dynamo_tensorrt_converter(torch.ops.aten.argmin.default, supports_dynamic_shapes=True)
 def aten_ops_argmin(
     ctx: ConversionContext,
     target: Target,
@@ -3099,7 +3104,6 @@ def upsample_compute_output_size(
             lambda: "Must specify exactly one of output_size and scale_factors",
         )
         torch._check(len(output_size) == spatial_dimensions)
-        return output_size
 
     if scale_factors is not None:
         torch._check(
@@ -3110,7 +3114,8 @@ def upsample_compute_output_size(
         output_size = []
         for i, s in enumerate(scale_factors):
             output_size.append(int(input_size[i + 2] * s))
-        return output_size
+
+    return output_size
 
 
 @torch.ops.aten.upsample_nearest1d.vec.py_impl(
@@ -3572,7 +3577,9 @@ def aten_ops_any(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten._pdist_forward.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten._pdist_forward.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),

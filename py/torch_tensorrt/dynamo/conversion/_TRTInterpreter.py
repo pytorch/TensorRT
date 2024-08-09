@@ -1,3 +1,4 @@
+import io
 import logging
 import os
 import warnings
@@ -5,7 +6,6 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set, Tuple
 
 import numpy as np
-import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
@@ -29,6 +29,7 @@ from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
+import tensorrt as trt
 from packaging import version
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ class UnsupportedOperatorException(RuntimeError):
 
 
 class TRTInterpreterResult(NamedTuple):
-    engine: Any
+    serialized_engine: bytes
     input_names: Sequence[str]
     output_names: Sequence[str]
 
@@ -358,9 +359,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             builder_config, self.compilation_settings.timing_cache_path
         )
 
-        return TRTInterpreterResult(
-            serialized_engine, self._input_names, self._output_names
-        )
+        with io.BytesIO() as engine_bytes:
+            engine_bytes.write(serialized_engine)
+            engine_str = engine_bytes.getvalue()
+
+        return TRTInterpreterResult(engine_str, self._input_names, self._output_names)
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
         self._cur_node_name = get_node_name(n)
