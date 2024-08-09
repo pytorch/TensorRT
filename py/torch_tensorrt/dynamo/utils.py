@@ -173,11 +173,17 @@ def get_model_device(module: torch.fx.GraphModule) -> Union[Device, torch.device
     """
     Returns the device on which the module parameters exist.
     """
-    for node in module.graph.nodes:
-        if "device" in node.kwargs:
-            return node.kwargs["device"]
+    device = None
+    for parameter in list(module.parameters()):
+        if isinstance(parameter, (torch.nn.parameter.Parameter, torch.Tensor)):
+            device = parameter.device
 
-    return torch.device("cpu")
+    if device is None:
+        device = torch.device("cpu")
+        logger.warning(
+            "Could not detect the device on which the model exists. Assuming the model is on CPU"
+        )
+    return device
 
 
 def set_log_level(parent_logger: Any, level: Any) -> None:
