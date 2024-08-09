@@ -41,6 +41,10 @@ def dynamo_path(iterations=3):
         model, args=example_inputs, dynamic_shapes={"x": {0: batch}}
     )
 
+    # The 1st iteration is to measure the compilation time without engine caching
+    # The 2nd and 3rd iterations are to measure the compilation time with engine caching.
+    # Since the 2nd iteration needs to compile and save the engine, it will be slower than the 1st iteration.
+    # The 3rd iteration should be faster than the 1st iteration because it loads the cached engine.
     for i in range(iterations):
         inputs = [torch.rand((100 + i, 3, 224, 224)).to("cuda")]
         remove_timing_cache()  # remove timing cache for engine caching messurement
@@ -133,6 +137,10 @@ def compile_path(iterations=3):
     start = torch.cuda.Event(enable_timing=True)
     end = torch.cuda.Event(enable_timing=True)
 
+    # The 1st iteration is to measure the compilation time without engine caching
+    # The 2nd and 3rd iterations are to measure the compilation time with engine caching.
+    # Since the 2nd iteration needs to compile and save the engine, it will be slower than the 1st iteration.
+    # The 3rd iteration should be faster than the 1st iteration because it loads the cached engine.
     for i in range(iterations):
         inputs = [torch.rand(size).to("cuda")]
         # remove timing cache and reset dynamo for engine caching messurement
