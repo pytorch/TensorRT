@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def replace_full_like_with_full(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]
+    gm: torch.fx.GraphModule,
 ) -> torch.fx.GraphModule:
     """Replace full_like nodes with equivalent full nodes"""
     modified_graph = False
