@@ -421,6 +421,66 @@ class TestLowering(TestCase):
             f"MaxPool3d TRT outputs don't match with the original model.",
         )
 
+    def test_lowering_full_like_module(self):
+        class FullLike(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+
+            def forward(self, x):
+                y = torch.full_like(x, 2.0)
+                return y
+
+        # Operations expected to be removed in the traced graph after decompositions
+        expected_ops = {torch.ops.aten.full.default}
+        unexpected_ops = {torch.ops.aten.full_like.default}
+
+        inputs = [torch.randn(3, 3, dtype=torch.float32).cuda()]
+
+        fx_graph = torch.fx.symbolic_trace(FullLike())
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            truncate_double=True,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            f"FullLike TRT outputs don't match with the original model.",
+        )
+
     def test_lowering_empty_like_module(self):
         class emptyLike(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:
@@ -976,7 +1036,7 @@ class TestLowering(TestCase):
                 0,
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
                 torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32).cuda(),
-                {torch.ops.aten.add.Tensor, torch.ops.aten.scatter.src},
+                {torch.ops.aten.add.Tensor},
             ),
             (
                 "scatter_add_one_dim_indexOne_constant",
@@ -985,8 +1045,6 @@ class TestLowering(TestCase):
                 torch.tensor([[1, 2, 3, 1]], dtype=torch.int32).cuda(),
                 {
                     torch.ops.aten.add.Tensor,
-                    torch.ops.aten.scatter.src,
-                    torch.ops.aten.full_like.default,
                 },
             ),
             (
@@ -996,8 +1054,6 @@ class TestLowering(TestCase):
                 torch.tensor([[1, 2, 3, 1], [5, 6, 5, 5]], dtype=torch.int32).cuda(),
                 {
                     torch.ops.aten.add.Tensor,
-                    torch.ops.aten.scatter.src,
-                    torch.ops.aten.full_like.default,
                 },
             ),
             (
@@ -1009,8 +1065,6 @@ class TestLowering(TestCase):
                 ).cuda(),
                 {
                     torch.ops.aten.add.Tensor,
-                    torch.ops.aten.scatter.src,
-                    torch.ops.aten.full_like.default,
                 },
             ),
         ]
