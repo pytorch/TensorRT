@@ -1,4 +1,4 @@
-set -eou pipefail
+set -exou pipefail
 
 pip install -U numpy packaging pyyaml setuptools wheel
 
@@ -14,5 +14,7 @@ choco install bazelisk -y
 export CUDA_HOME="$(echo ${CUDA_PATH} | sed -e 's#\\#\/#g')"
 
 cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
+
+cat MODULE.bazel
 
 echo "RELEASE=1" >> ${GITHUB_ENV}
