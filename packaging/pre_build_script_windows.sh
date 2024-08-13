@@ -15,4 +15,6 @@ export CUDA_HOME="$(echo ${CUDA_PATH} | sed -e 's#\\#\/#g')"
 
 cat toolchains/ci_workspaces/WORKSPACE.win.release.tmpl | envsubst > WORKSPACE
 
+cat WORKSPACE
+
 echo "RELEASE=1" >> ${GITHUB_ENV}
