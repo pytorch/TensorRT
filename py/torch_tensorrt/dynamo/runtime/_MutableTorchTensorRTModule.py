@@ -38,6 +38,17 @@ class RefitState:
 
 
 class MutableTorchTensorRTModule(object):
+    """
+    Initialize a MutableTorchTensorRTModule to seamlessly manipulate it like a regular PyTorch module.
+    All TensorRT compilation and refitting processes are handled automatically as you work with the module.
+    Any changes to its attributes or loading a different state_dict will trigger refitting or recompilation,
+    which will be managed during the next forward pass.
+
+    The MutableTorchTensorRTModule takes a PyTorch module and a set of configuration settings for the compiler.
+    Once compilation is complete, the module maintains the connection between the TensorRT graph module and the original PyTorch module.
+    Any modifications made to the MutableTorchTensorRTModule will be reflected in both the TensorRT graph module and the original PyTorch module.
+    """
+
     def __init__(
         self,
         pytorch_model: torch.nn.Module,
@@ -75,15 +86,6 @@ class MutableTorchTensorRTModule(object):
         **kwargs: Any,
     ) -> None:
         """
-        Initialize a MutableTorchTensorRTModule. This module can be manipulated just as a normal PyTorch module
-        and all TRT compilation and refit happens underthe hood as the user is using it. Modifying its attribute or
-        loading a different state_dict can trigger refit/recompilation that will be handled in the next forward run.
-
-        MutableTorchTensorRTModule takes a PyTorch module and a set of settings to configure the compiler.
-        After compilation is finished, MutableTorchTensorRTModule maintains the connection between the TRT graph module
-        and the original PyTorch module. And modification to MutableTorchTensorRTModule will reflect in both TRT graph module
-        and original PyTorch module.
-
 
         Arguments:
             pytorch_model (torch.nn.module): Source module that needs to be accelerated
@@ -148,7 +150,6 @@ class MutableTorchTensorRTModule(object):
         assert (
             make_refitable
         ), "'make_refitable' has to be True for a MutableTorchTensorRTModule."
-        make_refitable = True
         compilation_options = {
             "enabled_precisions": (
                 enabled_precisions
@@ -309,6 +310,7 @@ class MutableTorchTensorRTModule(object):
 
     @staticmethod
     def process_kwarg_inputs(inputs: Any) -> Any:
+        # Process kwarg inputs to be acceptable for Torch-TensorRT
         if isinstance(inputs, dict):
             # None should be excluded. AOT compile also does not allow dynamic control flow, bool is also excluded.
             return {
@@ -537,7 +539,7 @@ class MutableTorchTensorRTModule(object):
 
 
 def recursively_remove_trigger(obj: Any) -> Any:
-    # Not save: If the object has a loop (such as a doubly linkded list), this will cause infinite recursion
+    # Not safe: If the object has a circular reference (such as a doubly linkded list), this will cause infinite recursion
     if obj.__class__.__name__ == "ChangeTriggerWrapper":
         obj = obj.instance
 

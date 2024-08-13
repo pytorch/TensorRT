@@ -32,6 +32,9 @@ Functions
 
 Classes
 ---------
+.. autoclass:: MutableTorchTensorRTModule
+   :members:
+   :special-members: __init__
 
 .. autoclass:: Input
    :members:
