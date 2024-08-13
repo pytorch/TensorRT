@@ -63,6 +63,31 @@ jobs:
       package-name: ${{ matrix.package-name }}
       trigger-event: ${{ github.event_name }}
 
+  tests-py-dynamo-converters:
+    name: Test dynamo converters [Python]
+    needs: [generate-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: ./.github/workflows/windows-test.yml
+    with:
+      job-name: tests-py-dynamo-converters
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        export USE_HOST_DEPS=1
+        pushd .
+        cd tests/py/dynamo
+        python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 10 conversion/
+        popd
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
   cancel-in-progress: true
