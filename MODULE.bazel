@@ -1,43 +1,36 @@
-workspace(name = "Torch-TensorRT")
-
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
-http_archive(
-    name = "rules_python",
-    sha256 = "863ba0fa944319f7e3d695711427d9ad80ba92c6edd0b7c7443b84e904689539",
-    strip_prefix = "rules_python-0.22.0",
-    url = "https://github.com/bazelbuild/rules_python/releases/download/0.22.0/rules_python-0.22.0.tar.gz",
+module(
+    name = "torch_tensorrt",
+    version = "2.5.0a0",
+    repo_name = "org_pytorch_tensorrt",
 )
 
-load("@rules_python//python:repositories.bzl", "py_repositories")
+bazel_dep(name = "googletest", version = "1.14.0")
+bazel_dep(name = "platforms", version = "0.0.10")
+bazel_dep(name = "rules_cc", version = "0.0.9")
+bazel_dep(name = "rules_python", version = "0.34.0")
 
-py_repositories()
-
-http_archive(
-    name = "rules_pkg",
-    sha256 = "8f9ee2dc10c1ae514ee599a8b42ed99fa262b757058f65ad3c384289ff70c4b8",
-    urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.9.1/rules_pkg-0.9.1.tar.gz",
-        "https://github.com/bazelbuild/rules_pkg/releases/download/0.9.1/rules_pkg-0.9.1.tar.gz",
-    ],
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    ignore_root_user_error = True,
+    python_version = "3.11",
 )
 
-load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
-
-rules_pkg_dependencies()
-
-http_archive(
-    name = "googletest",
-    sha256 = "755f9a39bc7205f5a0c428e920ddad092c33c8a1b46997def3f1d4a82aded6e1",
-    strip_prefix = "googletest-5ab508a01f9eb089207ee87fd547d290da39d015",
-    urls = ["https://github.com/google/googletest/archive/5ab508a01f9eb089207ee87fd547d290da39d015.zip"],
+bazel_dep(name = "rules_pkg", version = "1.0.1")
+git_override(
+    module_name = "rules_pkg",
+    commit = "17c57f4",
+    remote = "https://github.com/narendasan/rules_pkg",
 )
+
+local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
 
 # External dependency for torch_tensorrt if you already have precompiled binaries.
 local_repository(
     name = "torch_tensorrt",
     path = "/opt/conda/lib/python3.8/site-packages/torch_tensorrt",
 )
+
+new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
 
 # CUDA should be installed on the system locally
 new_local_repository(
@@ -52,23 +45,25 @@ new_local_repository(
     path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.4/",
 )
 
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
 #############################################################################################################
 # Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
 #############################################################################################################
 
-# http_archive(
-#     name = "libtorch",
-#     build_file = "@//third_party/libtorch:BUILD",
-#     strip_prefix = "libtorch",
-#     urls = ["https://download.pytorch.org/libtorch/nightly/cu124/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
-# )
+http_archive(
+    name = "libtorch",
+    build_file = "@//third_party/libtorch:BUILD",
+    strip_prefix = "libtorch",
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu124/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
+)
 
-# http_archive(
-#     name = "libtorch_pre_cxx11_abi",
-#     build_file = "@//third_party/libtorch:BUILD",
-#     strip_prefix = "libtorch",
-#     urls = ["https://download.pytorch.org/libtorch/nightly/cu124/libtorch-shared-with-deps-latest.zip"],
-# )
+http_archive(
+    name = "libtorch_pre_cxx11_abi",
+    build_file = "@//third_party/libtorch:BUILD",
+    strip_prefix = "libtorch",
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu124/libtorch-shared-with-deps-latest.zip"],
+)
 
 http_archive(
     name = "libtorch_win",
@@ -112,35 +107,20 @@ http_archive(
 # x86_64 python distribution. If using NVIDIA's version just point to the root of the package
 # for both versions here and do not use --config=pre-cxx11-abi
 
-new_local_repository(
-    name = "libtorch",
-    build_file = "third_party/libtorch/BUILD",
-    path = "/usr/local/lib/python3.6/dist-packages/torch",
-)
+#new_local_repository(
+#    name = "libtorch",
+#    path = "/usr/local/lib/python3.6/dist-packages/torch",
+#    build_file = "third_party/libtorch/BUILD"
+#)
 
-new_local_repository(
-    name = "libtorch_pre_cxx11_abi",
-    build_file = "third_party/libtorch/BUILD",
-    path = "/usr/local/lib/python3.6/dist-packages/torch",
-)
+#new_local_repository(
+#    name = "libtorch_pre_cxx11_abi",
+#    path = "/usr/local/lib/python3.6/dist-packages/torch",
+#    build_file = "third_party/libtorch/BUILD"
+#)
 
 #new_local_repository(
 #   name = "tensorrt",
 #   path = "/usr/",
 #   build_file = "@//third_party/tensorrt/local:BUILD"
 #)
-
-#########################################################################
-# Development Dependencies (optional - comment out on aarch64)
-#########################################################################
-
-load("@rules_python//python:pip.bzl", "pip_parse")
-
-pip_parse(
-    name = "devtools_deps",
-    requirements = "//:requirements-dev.txt",
-)
-
-load("@devtools_deps//:requirements.bzl", "install_deps")
-
-install_deps()

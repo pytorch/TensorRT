@@ -17,7 +17,7 @@ REPLACEABLE_ATEN_OPS = {
 
 
 def lower_scaled_dot_product_attention(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]
+    gm: torch.fx.GraphModule,
 ) -> torch.fx.GraphModule:
     """Replace specific versions of scaled_dot_product_attention with an equivalent
     implementation which can be easily converted to TRT
@@ -57,9 +57,10 @@ def lower_scaled_dot_product_attention(
             # Copy the metadata of the replaced attention node to the new node
             # TODO: Investigate why there are multiple FakeTensors in the metadata.
             # We only use the first one as it contains the output shape information for this node.
-            new_attention_node.meta["val"] = copy.copy(
-                attention_node_replaced.meta["val"][0]
-            )
+            if "val" in attention_node_replaced.meta:
+                new_attention_node.meta["val"] = copy.copy(
+                    attention_node_replaced.meta["val"][0]
+                )
 
             # If the attention operator had keyword-args, copy them to the new node
             if attention_node_replaced.kwargs:

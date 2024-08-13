@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Tuple
+from inspect import signature
+from typing import Any, Optional, Tuple, Union
 
 import torch
 from torch.export import Dim, export
@@ -14,7 +15,10 @@ logger = logging.getLogger(__name__)
 
 def trace(
     mod: torch.nn.Module | torch.fx.GraphModule,
-    inputs: Tuple[Any, ...],
+    inputs: Optional[Tuple[Any, ...]] = None,
+    *,
+    arg_inputs: Optional[Tuple[Any, ...]] = None,
+    kwarg_inputs: Optional[dict[Any, Any]] = None,
     **kwargs: Any,
 ) -> torch.export.ExportedProgram:
     """Exports a ``torch.export.ExportedProgram`` from a ``torch.nn.Module`` or ``torch.fx.GraphModule`` specifically targeting being compiled with Torch-TensorRT
@@ -40,6 +44,8 @@ def trace(
                     torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
                 ]
     Keyword Arguments:
+        arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
+        kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
         device (Union(torch.device, dict)): Target device for TensorRT engines to run on ::
 
             device=torch.device("cuda:0")
@@ -52,20 +58,78 @@ def trace(
     """
 
     # Set log level at the top of compilation (torch_tensorrt.dynamo)
+    if not arg_inputs and not inputs:
+        raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
+
+    elif arg_inputs and inputs:
+        raise AssertionError(
+            "'arg_inputs' and 'inputs' should not be used at the same time."
+        )
+    arg_inputs = inputs or arg_inputs
+
+    if kwarg_inputs is None:
+        kwarg_inputs = {}
+
     debug = kwargs.get("debug", DEBUG)
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
 
     device = to_torch_device(kwargs.get("device", default_device()))
-    torch_inputs = get_torch_inputs(inputs, device)
-    dynamic_shapes = []
-    for input in inputs:
-        if isinstance(input, Input) and input.shape_mode == Input._ShapeMode.DYNAMIC:
+    torch_arg_inputs = get_torch_inputs(arg_inputs, device)
+    torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
+    # Constructing dynamic shape list as a nested dict
+    dynamic_shapes = get_dynamic_shapes_args(mod, arg_inputs)
+    dynamic_shapes.update(get_dynamic_shapes_kwargs(kwarg_inputs))
+    exp_program = export(
+        mod,
+        tuple(torch_arg_inputs),
+        kwargs=torch_kwarg_inputs,
+        dynamic_shapes=dynamic_shapes,
+    )
+
+    return exp_program
+
+
+def get_dynamic_shapes_kwargs(inputs: Any) -> Union[dict[str, Any], list[Any]]:
+    if isinstance(inputs, dict):
+        dynamic_shapes_kwarg = {}
+        for k, v in inputs.items():
+            dynamic_shapes_kwarg[k] = get_dynamic_shapes_kwargs(v)
+        return dynamic_shapes_kwarg
+
+    elif isinstance(inputs, Input):
+        return get_dynamic_shapes(inputs)
+
+    elif isinstance(inputs, (list, tuple)):
+        dynamic_shapes = []
+        for input in inputs:
+            dynamic_shapes.append(get_dynamic_shapes(input))
+        return dynamic_shapes
+
+    raise TypeError(f"Unknown type {type(inputs)}.")
+
+
+def get_dynamic_shapes_args(mod: torch.nn.Module, inputs: Any) -> dict[str, Any]:
+    # dynamic_shape is a dict and cannot work without keys. Here we use position argument name
+    # in forward function as the name
+    args = list(signature(mod.forward).parameters.keys())
+    dynamic_shapes = {}
+    for input, input_name in zip(inputs, args[: len(inputs)]):
+        dynamic_shapes[input_name] = get_dynamic_shapes(input)
+    return dynamic_shapes
+
+
+def get_dynamic_shapes(input: Input) -> dict[Any, Any]:
+    if not isinstance(input, Input):
+        # If the input is torch.Tensor, no dynamic is needed. Return empty dict
+        return {}
+    else:
+        dynamic_dims = {}
+        if input.shape_mode == Input._ShapeMode.DYNAMIC:
             min_shape = input.shape["min_shape"]
             opt_shape = input.shape["opt_shape"]
             max_shape = input.shape["max_shape"]
             assert len(min_shape) == len(opt_shape) == len(max_shape)
-            dynamic_dims = {}
             for dim in range(len(min_shape)):
                 if min_shape[dim] == opt_shape[dim] == max_shape[dim]:
                     continue
@@ -75,9 +139,4 @@ def trace(
                         min=min_shape[dim],
                         max=max_shape[dim],
                     )
-
-            dynamic_shapes.append(dynamic_dims)
-
-    exp_program = export(mod, tuple(torch_inputs), dynamic_shapes=tuple(dynamic_shapes))
-
-    return exp_program
+        return dynamic_dims

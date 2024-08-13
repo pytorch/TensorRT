@@ -62,12 +62,12 @@ def test_mapping():
     engine_info = trt_gm._run_on_acc_0.engine.__getstate__()[0]
     engine = get_engine_from_encoded_engine(engine_info[3], runtime)
 
-    exp_program2 = pre_export_lowering(exp_program2, inputs)
+    exp_program2 = pre_export_lowering(exp_program2)
     exp_program2 = exp_program2.run_decompositions(
         get_decompositions(settings.enable_experimental_decompositions)
     )
     new_gm = exp_program2.module()
-    new_gm = post_lowering(new_gm, inputs)
+    new_gm = post_lowering(new_gm)
     mapping = construct_refit_mapping(new_gm, trt_input, settings)
 
     refitter = trt.Refitter(engine, TRT_LOGGER)
@@ -108,7 +108,7 @@ def test_refit_one_engine():
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
-        inputs=inputs,
+        arg_inputs=inputs,
     )
 
     # Check the output
@@ -154,7 +154,7 @@ def test_refit_one_engine_bert():
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
-        inputs=inputs,
+        arg_inputs=inputs,
     )
 
     # Check the output
@@ -203,7 +203,7 @@ def test_refit_one_engine_inline_runtime():
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
-        inputs=inputs,
+        arg_inputs=inputs,
     )
 
     # Check the output
@@ -247,7 +247,7 @@ def test_refit_one_engine_python_runtime():
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
-        inputs=inputs,
+        arg_inputs=inputs,
     )
 
     # Check the output
@@ -313,7 +313,7 @@ def test_refit_multiple_engine():
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
-        inputs=inputs,
+        arg_inputs=inputs,
     )
 
     # Check the output

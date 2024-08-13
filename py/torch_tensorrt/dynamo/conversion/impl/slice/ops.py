@@ -387,17 +387,46 @@ def cumsum(
     input: TRTTensor,
     dim: int,
 ) -> TRTTensor:
+
     input_shape = input.shape
     dim = get_positive_dim(dim, len(input_shape))
+    if input_shape[dim] < 0:
+        trip_limit = impl.shape.shape(
+            ctx, target, source_ir, name + "_shape", input, dim
+        )
+        # the trip_limit has to be a 0D shape tensor, however this impl.shape.shape gives a 1D shape
+        # for example if the trip limit is 3, it wants a tensor(3), not a tensor([3])
+        # in order to reduce it from 1D to 0D, i have to use this impl.reduce.sum
+        trip_limit = impl.reduce.sum(
+            ctx, target, source_ir, name, trip_limit, 0, keepdim=False
+        )
+    else:
+        axis = np.array(input_shape[dim])
+        trip_limit = get_trt_tensor(ctx, axis, f"{name}_trip_limit")
+
     loop = ctx.net.add_loop()
-    axis = np.array(input_shape[dim])
-    trip_limit = get_trt_tensor(ctx, axis, f"{name}_trip_limit")
     loop.add_trip_limit(trip_limit, trt.TripLimit.COUNT)
     iterator = loop.add_iterator(input, dim, reverse=False)
     data = iterator.get_output(0)
-    new_dims = tuple(data.shape)
-    zeros = np.zeros(new_dims)
-    zero_trttensor = get_trt_tensor(ctx, zeros, f"{name}_initial_value")
+    if has_dynamic_shape(data.shape):
+        data_shape = []
+        for i in range(len(input_shape)):
+            if i != dim:
+                if input_shape[i] < 0:
+                    data_shape.append(
+                        impl.shape.shape(
+                            ctx, target, source_ir, name + f"_{i}_shape", input, i
+                        )
+                    )
+                else:
+                    data_shape.append(input_shape[i])
+        zero_trttensor = impl.full.full(
+            ctx, target, source_ir, name + "_full", data_shape, 0.0
+        )
+    else:
+        new_dims = tuple(data.shape)
+        zeros = np.zeros(new_dims)
+        zero_trttensor = get_trt_tensor(ctx, zeros, f"{name}_initial_value")
 
     running_sum = loop.add_recurrence(zero_trttensor)
     set_layer_name(running_sum, target, f"{name}_running_sum", source_ir)
@@ -459,13 +488,24 @@ def flip(
     output_shape = list(input.shape)
     stride_slice = []
 
+    dynamic_shape = has_dynamic_shape(input.shape)
+
     shape = input.shape
     rank = len(shape)
     dims = get_positive_dim(dims, rank)
 
     for i in range(rank):
         if i in dims:
-            start_slice.append(shape[i] - 1)
+            if shape[i] == DYNAMIC_DIM:
+                dim = get_shape(
+                    ctx, target, source_ir, f"{name}_shape_dim_{i}", input, i
+                )
+                last_element_index = impl.elementwise.sub(
+                    ctx, target, source_ir, f"{name}_sub_{i}", dim, 1
+                )
+                start_slice.append(last_element_index)
+            else:
+                start_slice.append(shape[i] - 1)
             stride_slice.append(-1)
         else:
             start_slice.append(0)
@@ -473,10 +513,26 @@ def flip(
 
     layer = ctx.net.add_slice(
         input,
-        start=start_slice,
-        shape=output_shape,
+        start=[] if dynamic_shape else start_slice,
+        shape=[] if dynamic_shape else output_shape,
         stride=stride_slice,
     )
+    if dynamic_shape:
+        output_shape = get_shape_with_dynamic_shape(
+            ctx, target, source_ir, f"{name}_shape", output_shape, input
+        )
+
+        start_slice_tensor = cat(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_start_slice_concat",
+            start_slice,
+            0,
+        )
+        layer.set_input(1, start_slice_tensor)
+        layer.set_input(2, output_shape)
+
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
 

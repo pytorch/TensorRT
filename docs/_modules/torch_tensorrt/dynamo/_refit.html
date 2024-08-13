@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.5.0.dev0+279b2b4 documentation</title>
+  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.5.0.dev0+baa2eb1 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+279b2b4
+                  v2.5.0.dev0+baa2eb1
                 </div>
               
             
@@ -457,9 +457,10 @@
 <span class="kn">import</span> <span class="nn">collections.abc</span>
 <span class="kn">import</span> <span class="nn">copy</span>
 <span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
 
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">torch.export</span> <span class="kn">import</span> <span class="n">ExportedProgram</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt._enums</span> <span class="kn">import</span> <span class="n">dtype</span>
@@ -489,14 +490,11 @@
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">check_output</span><span class="p">,</span>
     <span class="n">get_torch_inputs</span><span class="p">,</span>
-    <span class="n">prepare_inputs</span><span class="p">,</span>
     <span class="n">set_log_level</span><span class="p">,</span>
     <span class="n">to_torch_device</span><span class="p">,</span>
     <span class="n">to_torch_tensorrt_device</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.logging</span> <span class="kn">import</span> <span class="n">TRT_LOGGER</span>
-
-<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -555,11 +553,7 @@
             <span class="n">layer</span><span class="o">.</span><span class="vm">__class__</span> <span class="o">=</span> <span class="n">MODULE_MAP</span><span class="p">[</span><span class="n">layer_type</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
             <span class="k">for</span> <span class="n">weight_type</span><span class="p">,</span> <span class="n">weight_name</span> <span class="ow">in</span> <span class="n">MODULE_MAP</span><span class="p">[</span><span class="n">layer_type</span><span class="p">][</span><span class="mi">1</span><span class="p">]:</span>
                 <span class="n">weight</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="fm">__getattribute__</span><span class="p">(</span><span class="n">weight_type</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-                <span class="n">weight_dtype_opt</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">weight</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
-                <span class="k">assert</span> <span class="p">(</span>
-                    <span class="n">weight_dtype_opt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-                <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;Weights </span><span class="si">{</span><span class="n">weight_name</span><span class="si">}</span><span class="s2"> has unsupported dtype </span><span class="si">{</span><span class="n">weight</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">&quot;</span>
-                <span class="n">weight_dtype</span> <span class="o">=</span> <span class="n">weight_dtype_opt</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">)</span>
+                <span class="n">weight_dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">weight</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">)</span>
                 <span class="n">weight_map</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">weight_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
                     <span class="n">weight</span><span class="p">,</span>
                     <span class="n">weight_dtype</span><span class="p">,</span>
@@ -605,7 +599,8 @@
 <div class="viewcode-block" id="refit_module_weights"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.refit_module_weights">[docs]</a><span class="k">def</span> <span class="nf">refit_module_weights</span><span class="p">(</span>
     <span class="n">compiled_module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span> <span class="o">|</span> <span class="n">ExportedProgram</span><span class="p">,</span>
     <span class="n">new_weight_module</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
-    <span class="n">inputs</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">verify_output</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -616,7 +611,8 @@
 <span class="sd">                        This compiled_module should be compmiled by torch_tensorrt.dynamo.compile</span>
 <span class="sd">                        or load it from disk using trt.load.</span>
 <span class="sd">        new_weight_module: exported program with the updated weights. This one should have the same model architecture as the compiled module.</span>
-<span class="sd">        inputs: sample inputs</span>
+<span class="sd">        arg_inputs: sample arg inputs. Optional, needed if output check</span>
+<span class="sd">        kwarg_inputs: sample kwarg inputs. Optional, needed if output check</span>
 <span class="sd">        verify_output: whether to verify output of refitted module</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        A new compiled TensorRT module that has the updated weights.</span>
@@ -667,19 +663,21 @@
     <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">debug</span><span class="p">:</span>
         <span class="n">set_log_level</span><span class="p">(</span><span class="n">logger</span><span class="o">.</span><span class="n">parent</span><span class="p">,</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
 
-    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
-        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">inputs</span><span class="p">]</span>
-
-    <span class="c1"># Prepare torch_trt inputs</span>
-    <span class="n">inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
     <span class="n">device</span> <span class="o">=</span> <span class="n">to_torch_tensorrt_device</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
-    <span class="n">torch_inputs</span> <span class="o">=</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">arg_inputs</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
+            <span class="c1"># Prepare torch_trt inputs</span>
+            <span class="n">arg_inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">arg_inputs</span><span class="p">]</span>
+        <span class="n">torch_inputs</span> <span class="o">=</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">kwarg_inputs</span><span class="p">:</span>
+        <span class="n">torch_kwarg_inputs</span> <span class="o">=</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
     <span class="n">runtime</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Runtime</span><span class="p">(</span><span class="n">TRT_LOGGER</span><span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">new_weight_module</span><span class="p">,</span> <span class="n">ExportedProgram</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Input graph should be an ExportedProgram but got type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">new_weight_module</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
         <span class="p">)</span>
-    <span class="n">new_weight_module</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">new_weight_module</span><span class="p">,</span> <span class="n">torch_inputs</span><span class="p">)</span>
+    <span class="n">new_weight_module</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">new_weight_module</span><span class="p">)</span>
     <span class="n">new_weight_module</span> <span class="o">=</span> <span class="n">new_weight_module</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
         <span class="n">get_decompositions</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">enable_experimental_decompositions</span><span class="p">)</span>
     <span class="p">)</span>
@@ -687,7 +685,7 @@
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">new_gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
     <span class="c1"># Apply lowering on the graph module</span>
 
-    <span class="n">new_gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">new_gm</span><span class="p">,</span> <span class="n">torch_inputs</span><span class="p">)</span>
+    <span class="n">new_gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">new_gm</span><span class="p">)</span>
 
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
 
@@ -813,11 +811,12 @@
             <span class="n">refitted_engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">new_engine_info</span><span class="p">))</span>
             <span class="nb">setattr</span><span class="p">(</span><span class="n">compiled_module</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_engine&quot;</span><span class="p">,</span> <span class="n">refitted_engine</span><span class="p">)</span>
 
-    <span class="k">if</span> <span class="n">verify_output</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">verify_output</span> <span class="ow">and</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">check_output</span><span class="p">(</span>
             <span class="n">new_module</span><span class="o">=</span><span class="n">new_gm</span><span class="p">,</span>
             <span class="n">refitted_module</span><span class="o">=</span><span class="n">compiled_module</span><span class="p">,</span>
-            <span class="n">inputs</span><span class="o">=</span><span class="n">torch_inputs</span><span class="p">,</span>
+            <span class="n">arg_inputs</span><span class="o">=</span><span class="n">torch_inputs</span><span class="p">,</span>
+            <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torch_kwarg_inputs</span><span class="p">,</span>
         <span class="p">):</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Refitting Succeed!&quot;</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>

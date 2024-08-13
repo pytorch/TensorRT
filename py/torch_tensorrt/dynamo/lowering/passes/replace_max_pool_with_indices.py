@@ -1,6 +1,5 @@
 import logging
 import operator
-from typing import Sequence
 
 import torch
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
@@ -11,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def replace_max_pool_with_indices(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]
+    gm: torch.fx.GraphModule,
 ) -> torch.fx.GraphModule:
     """Replace MaxPool nodes which return unused indices"""
     replacement_dict = {
@@ -44,7 +43,8 @@ def replace_max_pool_with_indices(
                     kwargs=node.kwargs,
                 )
                 maxpool_fused.meta = node.meta
-
+                # The metadata for this node should exclude the indices metadata
+                maxpool_fused.meta["val"] = maxpool_fused.meta["val"][0]
             logger.debug(
                 f"Replacing all uses of nodes {node}, {getitem_node} with fused maxpool node {maxpool_fused} "
                 f"is the only user of placeholder {node} and was inserted by the compiler."

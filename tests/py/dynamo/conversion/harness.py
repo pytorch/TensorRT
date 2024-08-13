@@ -3,7 +3,7 @@
 import logging
 import time
 import unittest
-from typing import Callable, List, Optional, Set, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import torch
 import torch_tensorrt
@@ -64,6 +64,7 @@ class TRTTestCase(TestCase):
         atol,
         check_dtype=True,
         pyt_inputs=None,
+        rt_cls=PythonTorchTensorRTModule,
     ):
         with torch.no_grad():
             cuda_inputs = []
@@ -74,10 +75,11 @@ class TRTTestCase(TestCase):
             interpreter_result = interpreter.run()
             sec = time.perf_counter() - start
             _LOGGER.info(f"Interpreter run time(s): {sec}")
-            trt_mod = PythonTorchTensorRTModule(
-                interpreter_result.engine,
-                interpreter_result.input_names,
-                interpreter_result.output_names,
+            trt_mod = rt_cls(
+                serialized_engine=interpreter_result.serialized_engine,
+                input_binding_names=list(interpreter_result.input_names),
+                output_binding_names=list(interpreter_result.output_names),
+                name="test_engine",
             )
             mod = mod.cuda()
             if pyt_inputs is not None:
@@ -132,6 +134,7 @@ class TRTTestCase(TestCase):
         interpreter,
         comparators: List[Tuple[Callable, List]],
         fp16_mode=False,
+        rt_cls=PythonTorchTensorRTModule,
     ):
         """
         Runs the test and compares the result using the provided comparators.
@@ -154,10 +157,11 @@ class TRTTestCase(TestCase):
                 self.assert_has_op(mod, expected_ops)
 
             interpreter_result = interpreter.run()
-            trt_mod = PythonTorchTensorRTModule(
-                interpreter_result.engine,
-                interpreter_result.input_names,
-                interpreter_result.output_names,
+            trt_mod = rt_cls(
+                serialized_engine=interpreter_result.serialized_engine,
+                input_binding_names=list(interpreter_result.input_names),
+                output_binding_names=list(interpreter_result.output_names),
+                name="test_engine",
             )
             res_trt = trt_mod(*cuda_inputs).cpu()
             res_cpu = mod(*cuda_inputs).cpu()
@@ -224,7 +228,7 @@ class DispatchTestCase(TRTTestCase):
         torch_inputs = get_torch_inputs(original_inputs, _defaults.DEVICE)
         if use_dynamo_tracer:
             exported_program = torch_tensorrt.dynamo.trace(mod, tuple(original_inputs))
-            exported_program = pre_export_lowering(exported_program, torch_inputs)
+            exported_program = pre_export_lowering(exported_program)
             exported_program = exported_program.run_decompositions(
                 get_decompositions(False)
             )
@@ -233,7 +237,7 @@ class DispatchTestCase(TRTTestCase):
             fx_module = torch.fx.symbolic_trace(mod)
 
         if enable_passes:
-            fx_module = post_lowering(fx_module, original_inputs)
+            fx_module = post_lowering(fx_module)
 
         if propagate_shapes:
             # TODO: This is currently being used to test embedding_bag_aten due to https://github.com/pytorch/TensorRT/issues/2843
@@ -378,6 +382,7 @@ class DispatchTestCase(TRTTestCase):
         use_example_tensors=True,
         pyt_inputs=None,
         propagate_shapes=False,
+        check_dtype=True,
     ):
         mod = self.generate_graph(
             mod,
@@ -391,6 +396,14 @@ class DispatchTestCase(TRTTestCase):
         # We replicate this behavior here
         compilation_settings = CompilationSettings(truncate_double=True)
 
+        if check_dtype:
+            output_dtypes = infer_module_output_dtypes(
+                mod,
+                input_specs,
+                compilation_settings.device,
+                truncate_double=compilation_settings.truncate_double,
+            )
+
         interp = TRTInterpreter(
             mod,
             input_specs,
@@ -399,7 +412,14 @@ class DispatchTestCase(TRTTestCase):
         )
         # Since the lowering is based on optimal shape. We need to test with
         # different shape(for ex. max shape) for testing dynamic shape
-        inputs_max = [spec.example_tensor("max_shape") for spec in input_specs]
+        inputs_max = [
+            (
+                spec.example_tensor("max_shape")
+                if spec.shape_mode == Input._ShapeMode.DYNAMIC
+                else spec.example_tensor()
+            )
+            for spec in input_specs
+        ]
         if not use_example_tensors:
             inputs_max = [spec.torch_tensor for spec in input_specs]
         super().run_test(mod, inputs_max, interp, rtol, atol, pyt_inputs=pyt_inputs)

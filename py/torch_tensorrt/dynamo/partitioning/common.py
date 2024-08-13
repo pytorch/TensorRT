@@ -6,15 +6,9 @@ from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import maybe_disable_fake_tensor_mode
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import DEBUG
+from torch_tensorrt.dynamo.utils import contains_sym_int, extract_var_range_info
 
 logger = logging.getLogger(__name__)
-
-
-def contains_sym_int(tensor: torch.Tensor) -> bool:
-    """
-    Returns true if the given tensor has symbolic shape.
-    """
-    return any(isinstance(dim, torch.SymInt) for dim in tensor)
 
 
 def construct_dynamic_input(
@@ -35,27 +29,10 @@ def construct_dynamic_input(
     max_shape = []
     for dim in input_shape:
         if isinstance(dim, torch.SymInt):
-            node = dim.node
-            expr = node.expr
-            shape_env = node.shape_env
-            # An expr can be a independent SymInt node (eg: s0 or s1) or a composition of them eg: (48*s0 or s0*s1).
-            # In the case of expr which has symbolic computation, bound_sympy evaluates them.
-            # https://pytorch.org/docs/stable/generated/torch.fx.experimental.symbolic_shapes.ShapeEnv.html#torch.fx.experimental.symbolic_shapes.ShapeEnv.bound_sympy
-            # expr.xreplace replaces the symbolic variables with their current values and computes the expression.
-            var_range = shape_env.var_to_range.get(expr, None) or shape_env.bound_sympy(
-                expr
-            )
-            var_val = shape_env.var_to_val.get(expr, None) or expr.xreplace(
-                shape_env.var_to_val
-            )
-            assert var_range, var_val
-            # Torchdynamo 0/1 specialization outlier
-            if var_range.lower == 2:
-                min_shape.append(1)
-            else:
-                min_shape.append(int(var_range.lower))
-            opt_shape.append(int(var_val))
-            max_shape.append(int(var_range.upper))
+            min_max_opt = extract_var_range_info(dim)
+            min_shape.append(min_max_opt["min"])
+            opt_shape.append(min_max_opt["opt"])
+            max_shape.append(min_max_opt["max"])
         else:
             min_shape.append(dim)
             opt_shape.append(dim)
@@ -147,7 +124,9 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
 
 
 def run_shape_analysis(
-    parent_module: torch.fx.GraphModule, inputs: Sequence[Input]
+    parent_module: torch.fx.GraphModule,
+    inputs: Sequence[Input],
+    kwarg_inputs: Optional[dict[str, Any]] = None,
 ) -> Tuple[Dict[Any, Sequence[Any]], Dict[Any, Sequence[Any]]]:
     submod_inputs_shape_map: Dict[Any, Sequence[Any]] = {}
     submod_outputs_shape_map: Dict[Any, Sequence[Any]] = {}
@@ -163,11 +142,13 @@ def run_shape_analysis(
         sub_outputs = outputs
         return
 
+    if kwarg_inputs is None:
+        kwarg_inputs = {}
     # Iterate through submodules (both Torch and TRT) and store IO shapes
     for name, _ in parent_module.named_children():
         submodule = getattr(parent_module, name)
         handle = submodule.register_forward_hook(get_submodule_io)
-        parent_module(*inputs)
+        parent_module(*inputs, **kwarg_inputs)
         handle.remove()
         submod_inputs_shape_map[name] = (
             [input.shape for input in sub_inputs]

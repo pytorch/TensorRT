@@ -202,7 +202,7 @@ def build_libtorchtrt_pre_cxx11_abi(
     if IS_WINDOWS:
         cmd.append("--config=windows")
     else:
-        cmd.append("--config=default")
+        cmd.append("--config=linux")
 
     if JETPACK_VERSION == "4.5":
         cmd.append("--platforms=//toolchains:jetpack_4.5")
@@ -482,6 +482,23 @@ package_dir = {
 package_data = {}
 
 if not (PY_ONLY or NO_TS):
+    tensorrt_linux_external_dir = (
+        lambda: subprocess.check_output(
+            ["bazel", "query", "@tensorrt//:nvinfer", "--output", "location"]
+        )
+        .decode("ascii")
+        .strip()
+        .split("/BUILD.bazel")[0]
+    )
+    tensorrt_windows_external_dir = (
+        lambda: subprocess.check_output(
+            ["bazel", "query", "@tensorrt_win//:nvinfer", "--output", "location"]
+        )
+        .decode("ascii")
+        .strip()
+        .split("/BUILD.bazel")[0]
+    )
+
     ext_modules += [
         CUDAExtension(
             "torch_tensorrt._C",
@@ -513,6 +530,7 @@ if not (PY_ONLY or NO_TS):
                         + "/../bazel-Torch-TensorRT/external/tensorrt_win/include",
                         dir_path + "/../bazel-TensorRT/external/tensorrt_win/include",
                         dir_path + "/../bazel-tensorrt/external/tensorrt_win/include",
+                        f"{tensorrt_windows_external_dir()}/include",
                     ]
                     if IS_WINDOWS
                     else [
@@ -520,6 +538,7 @@ if not (PY_ONLY or NO_TS):
                         dir_path + "/../bazel-Torch-TensorRT/external/tensorrt/include",
                         dir_path + "/../bazel-TensorRT/external/tensorrt/include",
                         dir_path + "/../bazel-tensorrt/external/tensorrt/include",
+                        f"{tensorrt_linux_external_dir()}/include",
                     ]
                 )
             ),
