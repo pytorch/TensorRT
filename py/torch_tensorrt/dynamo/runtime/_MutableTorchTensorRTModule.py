@@ -227,6 +227,7 @@ class MutableTorchTensorRTModule(object):
             self.original_model.to(to_torch_device(self.settings.device))
             new_result = self.original_model(*args, **kwargs)
             self.original_model.cpu()
+            torch.cuda.empty_cache()
             if MutableTorchTensorRTModule.check_output_equal(result, new_result):
                 self.refit_state.set_state(RefitFlag.LIVE)
                 return
@@ -269,6 +270,7 @@ class MutableTorchTensorRTModule(object):
         self.gm = refit_module_weights(self.gm, self.exp_program)
 
         self.original_model.cpu()
+        torch.cuda.empty_cache()
 
     def _compile(self) -> None:
         """
@@ -291,6 +293,7 @@ class MutableTorchTensorRTModule(object):
             **self.settings.__dict__,
         )
         self.original_model.cpu()
+        torch.cuda.empty_cache()
 
     def _validate_inputs(self, *args: Any, **kwargs: Any) -> None:
         if (
@@ -354,7 +357,8 @@ class MutableTorchTensorRTModule(object):
             logger.info("Model weight change detected. Refitting the module...")
             try:
                 self.refit_gm()
-            except Exception:
+            except Exception as e:
+                logger.error(e)
                 logger.error("Model refit failed. Recompiling the graph module.")
                 self._compile()
                 self.store_state_dict_metadata()
@@ -550,10 +554,12 @@ def recursively_remove_trigger(obj: Any) -> Any:
         for i, v in enumerate(obj):
             obj[i] = recursively_remove_trigger(v)
     else:
-        if not hasattr(obj, "__dict__"):
+        if not hasattr(obj, "__dict__") or isinstance(obj, (type,)):
             return obj
         for k, v in obj.__dict__.items():
-            setattr(obj, k, recursively_remove_trigger(v))
+            if k[:2] != "__" or k[-2:] != "__":
+                # We don't want to touch some built in attribute such as __dict__
+                setattr(obj, k, recursively_remove_trigger(v))
 
     return obj
 
