@@ -1,7 +1,6 @@
 name: Build and test Linux wheels
 
 on:
-  pull_request:
   push:
     branches:
       - main

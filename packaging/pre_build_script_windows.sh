@@ -1,4 +1,4 @@
-set -eou pipefail
+set -exou pipefail
 
 pip install -U numpy packaging pyyaml setuptools wheel
 
