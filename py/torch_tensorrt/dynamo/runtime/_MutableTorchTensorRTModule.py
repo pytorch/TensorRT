@@ -25,7 +25,7 @@ class RefitFlag(Enum):
 
 
 class RefitState:
-    _state: RefitFlag = RefitFlag.UNKNOWN
+    _state: RefitFlag = RefitFlag.NEEDS_RECOMPILE
 
     def set_state(self, state: RefitFlag) -> None:
         if isinstance(state, RefitFlag):
@@ -267,12 +267,14 @@ class MutableTorchTensorRTModule(object):
                     self.original_model.state_dict()
                 )
             )
-        self.gm = refit_module_weights(self.gm, self.exp_program)
+        self.gm = refit_module_weights(
+            self.gm, self.exp_program, use_weight_map_cache=True, in_place=True
+        )
 
         self.original_model.cpu()
         torch.cuda.empty_cache()
 
-    def _compile(self) -> None:
+    def compile(self) -> None:
         """
         (Re)compile the TRT graph module using the PyTorch module.
         This function should be called whenever the weight structure get changed (shape, more layers...)
@@ -349,7 +351,7 @@ class MutableTorchTensorRTModule(object):
         # Step 3: Refit/recompile accordingly
         if self.refit_state.get_state() == RefitFlag.NEEDS_RECOMPILE:
             logger.info("(Re)Compiling the engine...")
-            self._compile()
+            self.compile()
             self.store_state_dict_metadata()
             self.refit_state.set_state(RefitFlag.LIVE)
 
@@ -360,7 +362,7 @@ class MutableTorchTensorRTModule(object):
             except Exception as e:
                 logger.error(e)
                 logger.error("Model refit failed. Recompiling the graph module.")
-                self._compile()
+                self.compile()
                 self.store_state_dict_metadata()
             self.refit_state.set_state(RefitFlag.LIVE)
 
@@ -369,6 +371,10 @@ class MutableTorchTensorRTModule(object):
         self.run_info = (args, kwargs, result)
         return result
 
+    def to(self, device: str):
+        logger.warning("Original PyTorch model is moved. CPU offload may failed.")
+        self.orignial_model.to(device)
+        
     def __deepcopy__(self, memo: Any) -> Any:
         cls = self.__class__
         result = cls.__new__(cls)

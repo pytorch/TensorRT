@@ -21,8 +21,8 @@ import torch
 import torch_tensorrt as torch_trt
 import torchvision.models as models
 
-np.random.seed(0)
-torch.manual_seed(0)
+np.random.seed(5)
+torch.manual_seed(5)
 inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 
 # %%
@@ -76,7 +76,7 @@ reload = torch_trt.MutableTorchTensorRTModule.load("mutable_module.pkl")
 from diffusers import DiffusionPipeline
 
 with torch.no_grad():
-    kwargs = {
+    settings = {
         "use_python_runtime": True,
         "enabled_precisions": {torch.float16},
         "debug": True,
@@ -86,7 +86,7 @@ with torch.no_grad():
     model_id = "runwayml/stable-diffusion-v1-5"
     device = "cuda:0"
 
-    prompt = "portrait of a woman standing, shuimobysim, wuchangshuo, best quality"
+    prompt = "house in forest, shuimobysim, wuchangshuo, best quality"
     negative = "(worst quality:2), (low quality:2), (normal quality:2), lowres, normal quality, skin spots, acnes, skin blemishes, age spot, glans, (watermark:2),"
 
     pipe = DiffusionPipeline.from_pretrained(
@@ -95,7 +95,7 @@ with torch.no_grad():
     pipe.to(device)
 
     # The only extra line you need
-    pipe.unet = torch_trt.MutableTorchTensorRTModule(pipe.unet, **kwargs)
+    pipe.unet = torch_trt.MutableTorchTensorRTModule(pipe.unet, **settings)
 
     image = pipe(prompt, negative_prompt=negative, num_inference_steps=30).images[0]
     image.save("./without_LoRA_mutable.jpg")
