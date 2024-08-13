@@ -58,6 +58,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         *,
         name: str = "",
         settings: CompilationSettings = CompilationSettings(),  # Assumes engine was built with default compilation settings if object not passed
+        weight_name_map: Optional[dict[Any, Any]] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines
@@ -107,6 +108,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.name = name
         self.hardware_compatible = settings.hardware_compatible
         self.settings = copy.deepcopy(settings)
+        self.weight_name_map = weight_name_map
         self.serialized_engine = serialized_engine
         self.engine = None
 
@@ -130,6 +132,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             if self.settings.device is not None
             else Device._current_device()
         )
+        metadata = {"settings": self.settings, "weight_name_map": self.weight_name_map}
         self.engine = torch.classes.tensorrt.Engine(
             [
                 torch.ops.tensorrt.ABI_VERSION(),
@@ -139,25 +142,28 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 TorchTensorRTModule._pack_binding_names(self.input_binding_names),
                 TorchTensorRTModule._pack_binding_names(self.output_binding_names),
                 str(int(self.hardware_compatible)),
-                self.encode_metadata(self.settings),
+                self.encode_metadata(metadata),
             ]
         )
 
-    def encode_metadata(self, settings: Any) -> str:
-        settings = copy.deepcopy(settings)
-        settings.torch_executed_ops = {
-            f"torch.ops.{op.__str__()}" for op in settings.torch_executed_ops
+    def encode_metadata(self, metadata: Any) -> str:
+        metadata = copy.deepcopy(metadata)
+        metadata["settings"].torch_executed_ops = {
+            f"torch.ops.{op.__str__()}"
+            for op in metadata["settings"].torch_executed_ops
         }
-        dumped_settings = pickle.dumps(settings)
-        encoded_settings = base64.b64encode(dumped_settings).decode("utf-8")
-        return encoded_settings
+        dumped_metadata = pickle.dumps(metadata)
+        encoded_metadata = base64.b64encode(dumped_metadata).decode("utf-8")
+        return encoded_metadata
 
     @staticmethod
-    def decode_metadata(encoded_settings: bytes) -> Any:
-        dumped_settings = base64.b64decode(encoded_settings.encode("utf-8"))
-        settings = pickle.loads(dumped_settings)
-        settings.torch_executed_ops = {eval(op) for op in settings.torch_executed_ops}
-        return settings
+    def decode_metadata(encoded_metadata: bytes) -> Any:
+        dumped_metadata = base64.b64decode(encoded_metadata.encode("utf-8"))
+        metadata = pickle.loads(dumped_metadata)
+        metadata["settings"].torch_executed_ops = {
+            eval(op) for op in metadata["settings"].torch_executed_ops
+        }
+        return metadata
 
     def get_extra_state(self) -> SerializedTorchTensorRTModuleFmt:
         if self.engine is None and self.serialized_engine is not None:

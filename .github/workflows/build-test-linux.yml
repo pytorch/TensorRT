@@ -141,8 +141,7 @@ jobs:
         export USE_HOST_DEPS=1
         pushd .
         cd tests/py/dynamo
-        python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_fe_test_results.xml --ir dynamo models/test_models_export.py
-        python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/test_dyn_models.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/
         popd
 
   tests-py-dynamo-serde:
