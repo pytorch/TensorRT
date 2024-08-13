@@ -187,8 +187,8 @@ class MutableTorchTensorRTModule(object):
 
         self.settings = CompilationSettings(**compilation_options)
         self.run_info: Optional[tuple[Any, ...]] = None
-        self.state_dict_meta_data: dict[str, torch.Size] = {}
-        self.store_state_dict_meta_data()
+        self.state_dict_metadata: dict[str, torch.Size] = {}
+        self.store_state_dict_metadata()
 
         cls = self.__class__
         self.__class__ = type(
@@ -198,10 +198,10 @@ class MutableTorchTensorRTModule(object):
         )
         self.init_finished = True
 
-    def store_state_dict_meta_data(self) -> None:
+    def store_state_dict_metadata(self) -> None:
 
         for k, v in self.original_model.state_dict().items():
-            self.state_dict_meta_data[k] = v.shape
+            self.state_dict_metadata[k] = v.shape
 
     def load_state_dict(
         self, state_dict: Dict[str, Any], strict: bool = True, assign: bool = False
@@ -230,9 +230,9 @@ class MutableTorchTensorRTModule(object):
                 self.refit_state.set_state(RefitFlag.LIVE)
                 return
 
-        # Since we do not have access to the previous state_dict, we can only use state_dict_meta_data
+        # Since we do not have access to the previous state_dict, we can only use state_dict_metadata
         # to determine whether the keys or weight shape is changed.
-        sd, sd_meta = self.original_model.state_dict(), self.state_dict_meta_data
+        sd, sd_meta = self.original_model.state_dict(), self.state_dict_metadata
         if sd.keys() != sd_meta.keys():
             # If keys are not identical, recompile.
             self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
@@ -345,7 +345,7 @@ class MutableTorchTensorRTModule(object):
         if self.refit_state.get_state() == RefitFlag.NEEDS_RECOMPILE:
             logger.info("(Re)Compiling the engine...")
             self._compile()
-            self.store_state_dict_meta_data()
+            self.store_state_dict_metadata()
             self.refit_state.set_state(RefitFlag.LIVE)
 
         elif self.refit_state.get_state() == RefitFlag.NEEDS_REFIT:
@@ -355,7 +355,7 @@ class MutableTorchTensorRTModule(object):
             except Exception:
                 logger.error("Model refit failed. Recompiling the graph module.")
                 self._compile()
-                self.store_state_dict_meta_data()
+                self.store_state_dict_metadata()
             self.refit_state.set_state(RefitFlag.LIVE)
 
         result = self.gm(*args, **kwargs)
