@@ -214,11 +214,13 @@ class MutableTorchTensorRTModule(object):
         return {k: torch.nn.Parameter(v, requires_grad=False) for k, v in sd.items()}
 
     def update_refit_condition(self) -> None:
+        # 2-stage check to determine whether the module should be intact, refitted, or recompiled.
 
+        # Default refit
         self.refit_state.set_state(RefitFlag.NEEDS_REFIT)
 
         # Run the same inputs through pytorch model and compare the result to previous run of graph module
-        # to determine whether refit/recompilation is needed
+        # to determine whether refit/recompilation is needed. If the output is the same, no further process needed.
         if self.run_info:
             args, kwargs, result = self.run_info
             self.original_model.to(to_torch_device(self.settings.device))
@@ -228,11 +230,14 @@ class MutableTorchTensorRTModule(object):
                 self.refit_state.set_state(RefitFlag.LIVE)
                 return
 
+        # Since we do not have access to the previous state_dict, we can only use state_dict_meta_data
+        # to determine whether the keys or weight shape is changed.
         sd, sd_meta = self.original_model.state_dict(), self.state_dict_meta_data
         if sd.keys() != sd_meta.keys():
             # If keys are not identical, recompile.
             self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
             return
+
         for k in sd.keys():
             if sd[k].shape != sd_meta[k]:
                 # If weight shapes are not identical, recompile.
@@ -403,6 +408,8 @@ class MutableTorchTensorRTModule(object):
             else:
                 # Capture attribute change
                 self.refit_state.set_state(RefitFlag.UNKNOWN)
+                # We want to make sure the original PyTorch model does not have a trigger wrapper
+                value = recursively_remove_trigger(value)
                 setattr(self.original_model, name, value)
         else:
             object.__setattr__(self, name, value)
@@ -412,7 +419,7 @@ class MutableTorchTensorRTModule(object):
         output1: Any,
         output2: Any,
     ) -> bool:
-        # TODO: Move this to utils when all PRs are merged.
+        # TODO: Move this to utils when all PRs are merged. This can be used by other functions.
         if type(output1) != type(output2):
             logger.warning(
                 "This module does not support using output verification to skip refit. Refit will be performed \
@@ -529,7 +536,24 @@ class MutableTorchTensorRTModule(object):
         return module
 
 
-torch.nn.Module
+def recursively_remove_trigger(obj: Any) -> Any:
+    # Not save: If the object has a loop (such as a doubly linkded list), this will cause infinite recursion
+    if obj.__class__.__name__ == "ChangeTriggerWrapper":
+        obj = obj.instance
+
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            obj[k] = recursively_remove_trigger(v)
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            obj[i] = recursively_remove_trigger(v)
+    else:
+        if not hasattr(obj, "__dict__"):
+            return obj
+        for k, v in obj.__dict__.items():
+            setattr(obj, k, recursively_remove_trigger(v))
+
+    return obj
 
 
 def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
@@ -554,17 +578,20 @@ def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
                 hasattr(obj, "__dict__") or isinstance(obj, (torch.nn.ModuleList, list))
             ) and not isinstance(
                 obj, ChangeTriggerWrapper
-            ):  # prevent multiple nesting
+            ):  # prevent nesting wrapper
                 return _make_refit_change_trigger(obj, refit_state)
             return obj
 
         def __setattr__(self, name: str, value: Any) -> None:
+            # If we need to set __dict__ or instance, we directly set it to the trigger wrapper.
+            # Enable setting __dict__ is because PyTorch proxy uses __new__ to initialize a shallow copy
+            # of a module and explicit set the __dict__. If we don't set __dict__ it will get infinite recursion.
             if name in ["__dict__", "instance"]:
                 object.__setattr__(self, name, value)
                 return
             self._on_change()
-            while isinstance(value, ChangeTriggerWrapper):
-                value = value.instance
+            # We want to make sure the original PyTorch model does not have a trigger wrapper
+            value = recursively_remove_trigger(value)
             setattr(self.instance, name, value)
 
         def __delattr__(self, name: str) -> None:
@@ -591,8 +618,8 @@ def _make_refit_change_trigger(obj: object, refit_state: RefitState) -> Any:
 
         def __setitem__(self, item: str, value: Any) -> None:
             self._on_change()
-            while isinstance(value, ChangeTriggerWrapper):
-                value = value.instance
+            # We want to make sure the original PyTorch model does not have a trigger wrapper
+            value = recursively_remove_trigger(value)
             self.instance.__setitem__(item, value)
 
         def __getitem__(self, items: str) -> Any:
