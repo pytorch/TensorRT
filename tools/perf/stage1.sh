@@ -4,7 +4,7 @@ precision="fp16"
 iterations=1
 backends=("dynamo" "inductor")
 batch_sizes=(1 16)
-hf_token="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"
+hf_token="<Enter HF token>"
 
 # Stage 1 : GPT2 experiment
 models=("gpt2")
