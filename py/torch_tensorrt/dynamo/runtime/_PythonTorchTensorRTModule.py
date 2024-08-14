@@ -176,15 +176,23 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         state = self.__dict__.copy()
         state["engine"] = bytearray(self.engine.serialize())
         state.pop("context", None)
+        state.pop("input_dtypes", None)
+        state.pop("input_shapes", None)
+        state.pop("output_dtypes", None)
+        state.pop("output_shapes", None)
+        state.pop("active_stream", None)
+        state.pop("target_device_properties", None)
         return state
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
         logger = trt.Logger()
         runtime = trt.Runtime(logger)
-        state["engine"] = runtime.deserialize_cuda_engine(state["engine"])
         self.__dict__.update(state)
+        self.target_device_properties = torch.cuda.get_device_properties(
+            self.target_device_id
+        )
         if self.engine:
-            self.context = self.engine.create_execution_context()
+            self._initialize()
 
     def __deepcopy__(self, memo: Any) -> PythonTorchTensorRTModule:
         cls = self.__class__
