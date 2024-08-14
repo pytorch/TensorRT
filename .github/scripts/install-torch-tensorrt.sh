@@ -1,4 +1,4 @@
-set -eou pipefail
+set -exou pipefail
 
 TORCH_TORCHVISION=$(grep "^torch" ${PWD}/py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
