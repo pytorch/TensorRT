@@ -40,7 +40,7 @@ def compile_bert(iterations=3):
             "use_python_runtime": False,
             "enabled_precisions": {torch.float},
             "truncate_double": True,
-            "debug": True,
+            "debug": False,
             "min_block_size": 1,
             "make_refitable": True,
             "save_engine_cache": save_engine_cache,
@@ -57,7 +57,7 @@ def compile_bert(iterations=3):
         torch.cuda.synchronize()
         times.append(start.elapsed_time(end))
 
-    print("-----compile bert-----> compilation time:", times, "milliseconds")
+    print("-----compile bert-----> compilation time:\n", times, "milliseconds")
 
 
 if __name__ == "__main__":

@@ -72,12 +72,11 @@ def dynamo_path(iterations=3):
         torch.cuda.synchronize()
         times.append(start.elapsed_time(end))
 
-    print("-----dynamo_path-----> compilation time:", times, "milliseconds")
+    print("-----dynamo_path-----> compilation time:\n", times, "milliseconds")
 
 
 # Custom Engine Cache
 class MyEngineCache(BaseEngineCache):
-
     def __init__(
         self,
         engine_cache_size: int,
@@ -174,7 +173,7 @@ def compile_path(iterations=3):
         torch.cuda.synchronize()
         times.append(start.elapsed_time(end))
 
-    print("-----compile_path-----> compilation time:", times, "milliseconds")
+    print("-----compile_path-----> compilation time:\n", times, "milliseconds")
 
 
 if __name__ == "__main__":

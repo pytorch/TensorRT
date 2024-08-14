@@ -1,8 +1,9 @@
-import ast
 import copy
 import logging
 import os
+import pickle
 import shutil
+import sys
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple, cast
 
@@ -50,6 +51,7 @@ class BaseEngineCache(ABC):
         serialized_engine: bytes,
         input_names: List[str],
         output_names: List[str],
+        weight_name_map: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """Save the serialized engine to hard disk
 
@@ -58,6 +60,7 @@ class BaseEngineCache(ABC):
             serialized_engine (bytes): serialized TRT engine
             input_names (List[str]): input names of TRT engine
             output_names (List[str]): output names of TRT engine
+            weight_name_map (Optional[Dict[str, Any]]): weight name map for refitting
 
         Returns:
             bool: whether the serialized engine is saved successfully
@@ -65,14 +68,16 @@ class BaseEngineCache(ABC):
         pass
 
     @abstractmethod
-    def load(self, hash: str) -> Tuple[Optional[bytes], List[str], List[str]]:
+    def load(
+        self, hash: str
+    ) -> Tuple[Optional[bytes], List[str], List[str], Optional[Dict[str, Any]]]:
         """Load the serialized engine from hard disk
 
         Args:
             hash (str): hash value of the GraphModule
 
         Returns:
-            Sequence[Optional[bytes], List[str], List[str]]: serialized TRT engine, input names of TRT Engine, output names of TRT Engine
+            Sequence[Optional[bytes], List[str], List[str], Optional[Dict[str, Any]]]: serialized engine, input names, output names, weight name map
         """
         pass
 
@@ -89,16 +94,16 @@ class EngineCache(BaseEngineCache):
         self.engine_cache_dir = engine_cache_dir
         self.hash2size_map: Dict[str, int] = {}
 
-    def has_available_cache_size(self, serialized_engine: bytes) -> bool:
+    def has_available_cache_size(self, needed_size: int) -> bool:
         """Check if the cache has available space for saving the serialized engine
 
         Args:
-            serialized_engine (bytes): serialized TRT engine
+            needed_size (int): needed size for erialized TRT engine and/or weight_name_map
 
         Returns:
             bool: whether the cache has available size for the serialized engine
         """
-        return int(serialized_engine.nbytes) <= self.available_engine_cache_size
+        return needed_size <= self.available_engine_cache_size
 
     def clear_cache(self, needed_min_size: int) -> bool:
         """Clear the cache to make sure at least `needed_min_size` bytes are available, if possible
@@ -154,35 +159,74 @@ class EngineCache(BaseEngineCache):
         serialized_engine: bytes,
         input_names: List[str],
         output_names: List[str],
+        weight_name_map: Optional[Dict[str, Any]] = None,
     ) -> bool:
         serialized_engine_size = int(serialized_engine.nbytes)
+        if weight_name_map is not None:
+            serialized_engine_size += sum(
+                sys.getsizeof(v) for v in weight_name_map.values()
+            )
         if serialized_engine_size > self.total_engine_cache_size:
             _LOGGER.warning(
                 f"The serialized engine cannot be saved because the size of the engine {serialized_engine_size} is larger than the total cache size {self.total_engine_cache_size}."
             )
             return False
 
-        # Check if there is enough available cache size for the serialized engine
-        if not self.has_available_cache_size(serialized_engine):
+        # Check if there is enough available cache size for the serialized engine and/or weight_name_map
+        if not self.has_available_cache_size(serialized_engine_size):
             self.clear_cache(serialized_engine_size)
 
         # Save the serialized engine to the cache directory
-        if self.has_available_cache_size(serialized_engine):
-            path = os.path.join(
-                self.engine_cache_dir,
-                f"{hash}/engine--{input_names}--{output_names}.trt",
+        if self.has_available_cache_size(serialized_engine_size):
+            self.hash2size_map[hash] = serialized_engine_size
+            self.available_engine_cache_size -= serialized_engine_size
+            directory = os.path.join(self.engine_cache_dir, hash)
+
+            engine_path = os.path.join(
+                directory,
+                "engine.trt",
+            )
+            io_names_path = os.path.join(
+                directory,
+                "io_names.pkl",
             )
             try:
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                with open(path, "wb") as f:
+                os.makedirs(os.path.dirname(engine_path), exist_ok=True)
+                with open(engine_path, "wb") as f:
                     f.write(serialized_engine)
-                self.hash2size_map[hash] = serialized_engine_size
-                self.available_engine_cache_size -= serialized_engine_size
-                _LOGGER.info(f"A TRT engine was cached to {path}")
-
+                os.makedirs(os.path.dirname(io_names_path), exist_ok=True)
+                with open(io_names_path, "wb") as f:
+                    pickle.dump(
+                        {"input_names": input_names, "output_names": output_names}, f
+                    )
+                _LOGGER.info(f"The TRT engine was saved to {engine_path}")
             except Exception as e:
-                _LOGGER.warning(f"Failed to save the TRT engine to {path}: {e}")
+                del self.hash2size_map[hash]
+                self.available_engine_cache_size += serialized_engine_size
+                shutil.rmtree(directory)
+                _LOGGER.warning(f"Failed to save the TRT engine to {engine_path}: {e}")
                 return False
+
+            if weight_name_map is not None:
+                weight_name_map_path = os.path.join(
+                    directory,
+                    "weight_name_map.pkl",
+                )
+                try:
+                    os.makedirs(os.path.dirname(weight_name_map_path), exist_ok=True)
+                    with open(weight_name_map_path, "wb") as f:
+                        pickle.dump(weight_name_map, f)
+                    _LOGGER.info(
+                        f"The weight_name_map was saved to {weight_name_map_path}"
+                    )
+                except Exception as e:
+                    del self.hash2size_map[hash]
+                    self.available_engine_cache_size += serialized_engine_size
+                    shutil.rmtree(directory)
+                    _LOGGER.warning(
+                        f"Failed to save the weight_name_map to {weight_name_map_path}: {e}"
+                    )
+                    return False
 
             return True
 
@@ -192,21 +236,33 @@ class EngineCache(BaseEngineCache):
             )
             return False
 
-    def load(self, hash: str) -> Tuple[Optional[bytes], List[str], List[str]]:
+    def load(
+        self, hash: str
+    ) -> Tuple[Optional[bytes], List[str], List[str], Optional[Dict[str, Any]]]:
         directory = os.path.join(self.engine_cache_dir, hash)
         if os.path.exists(directory):
-            engine_list = os.listdir(directory)
-            assert (
-                len(engine_list) == 1
-            ), f"There are more than one engine {engine_list} under {directory}."
-            path = os.path.join(directory, engine_list[0])
-            input_names_str, output_names_str = (
-                engine_list[0].split(".trt")[0].split("--")[1:]
-            )
-            input_names = ast.literal_eval(input_names_str)
-            output_names = ast.literal_eval(output_names_str)
-            with open(path, "rb") as f:
-                serialized_engine = f.read()
-                return serialized_engine, input_names, output_names
+            # load engine
+            serialized_engine = None
+            engine_path = os.path.join(directory, "engine.trt")
+            if os.path.exists(engine_path):
+                with open(engine_path, "rb") as f:
+                    serialized_engine = f.read()
+
+            input_names = []
+            output_names = []
+            io_names_path = os.path.join(directory, "io_names.pkl")
+            if os.path.exists(io_names_path):
+                with open(io_names_path, "rb") as f:
+                    io_names = pickle.load(f)
+                    input_names = io_names["input_names"]
+                    output_names = io_names["output_names"]
+
+            # load weight_name_map
+            weight_name_map = None
+            weight_name_map_path = os.path.join(directory, "weight_name_map.pkl")
+            if os.path.exists(weight_name_map_path):
+                with open(weight_name_map_path, "rb") as f:
+                    weight_name_map = pickle.load(f)
+            return serialized_engine, input_names, output_names, weight_name_map
         else:
-            return None, [], []
+            return None, [], [], {}

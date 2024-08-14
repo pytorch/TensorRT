@@ -530,28 +530,21 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         if self.compilation_settings.load_engine_cache:
             # query the cached TRT engine
-            serialized_engine, input_names, output_names = engine_cache.load(hash_val)
+            serialized_engine, input_names, output_names, weight_name_map = (
+                engine_cache.load(hash_val)
+            )
             if serialized_engine is not None:
                 self._input_names = input_names
                 self._output_names = output_names
+                self.weight_name_map = weight_name_map
                 _LOGGER.info(
                     "Hit the cached TRT engine. It is loaded for skipping recompilation."
                 )
-
-                # refit the engine
-                from torch_tensorrt.dynamo._refit import (
-                    _refit_single_trt_engine_with_gm,
-                )
-
-                runtime = trt.Runtime(TRT_LOGGER)
-                engine = runtime.deserialize_cuda_engine(serialized_engine)
-                _refit_single_trt_engine_with_gm(
-                    self.module, engine, self.input_specs, self.compilation_settings
-                )
-                _LOGGER.info("Refitting Succeed!")
-
                 return TRTInterpreterResult(
-                    serialized_engine, self._input_names, self._output_names
+                    serialized_engine,
+                    self._input_names,
+                    self._output_names,
+                    self.weight_name_map,
                 )
 
         self._construct_trt_network_def()
@@ -585,7 +578,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         )
         if self.compilation_settings.save_engine_cache:
             engine_cache.save(
-                hash_val, serialized_engine, self._input_names, self._output_names
+                hash_val,
+                serialized_engine,
+                self._input_names,
+                self._output_names,
+                self.weight_name_map,
             )
 
         with io.BytesIO() as engine_bytes:
