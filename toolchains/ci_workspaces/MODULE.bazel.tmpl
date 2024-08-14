@@ -54,20 +54,6 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 #############################################################################################################
 
 http_archive(
-    name = "libtorch",
-    build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/${CHANNEL}/${CU_VERSION}/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
-)
-
-http_archive(
-    name = "libtorch_pre_cxx11_abi",
-    build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/${CHANNEL}/${CU_VERSION}/libtorch-shared-with-deps-latest.zip"],
-)
-
-http_archive(
     name = "libtorch_win",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
@@ -110,17 +96,17 @@ http_archive(
 # x86_64 python distribution. If using NVIDIA's version just point to the root of the package
 # for both versions here and do not use --config=pre-cxx11-abi
 
-#new_local_repository(
-#    name = "libtorch",
-#    path = "${TORCH_INSTALL_PATH}",
-#    build_file = "third_party/libtorch/BUILD"
-#)
+new_local_repository(
+    name = "libtorch",
+    path = "${TORCH_INSTALL_PATH}",
+    build_file = "third_party/libtorch/BUILD"
+)
 
-#new_local_repository(
-#    name = "libtorch_pre_cxx11_abi",
-#    path = "${TORCH_INSTALL_PATH}",
-#    build_file = "third_party/libtorch/BUILD"
-#
+new_local_repository(
+    name = "libtorch_pre_cxx11_abi",
+    path = "${TORCH_INSTALL_PATH}",
+    build_file = "third_party/libtorch/BUILD"
+)
 
 #new_local_repository(
 #   name = "tensorrt",
