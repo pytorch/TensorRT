@@ -5,7 +5,7 @@ from typing import Any, List, Optional, Sequence
 
 import tensorrt as trt
 import torch
-from torch.fx.experimental.proxy_tensor import maybe_disable_fake_tensor_mode
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -36,7 +36,7 @@ def infer_module_output_dtypes(
     # TODO: We can also determine output dtypes from the module.graph based on node metadata.
     # However, our converter tests use fx.symbolic_trace which sometimes does not provide metadata,
     # so we stick to the model inference approach currently.
-    with maybe_disable_fake_tensor_mode():
+    with unset_fake_temporarily():
         # Get the device on which the model exists
         # For large models, this can be done on CPU to save GPU memory allocation for TRT.
         device = get_model_device(module)
