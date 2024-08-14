@@ -12,7 +12,7 @@ pip install --pre -r ${PWD}/tests/py/requirements.txt --use-deprecated legacy-re
 export CUDA_HOME="$(echo ${CUDA_PATH} | sed -e 's#\\#\/#g')"
 export TORCH_INSTALL_PATH="$(python -c "import torch, os; print(os.path.dirname(torch.__file__))" | sed -e 's#\\#\/#g')"
 
-cat ${PWD}toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > ${PWD}/MODULE.bazel
+cat ${PWD}/toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > ${PWD}/MODULE.bazel
 
 cat ${PWD}/MODULE.bazel
 
