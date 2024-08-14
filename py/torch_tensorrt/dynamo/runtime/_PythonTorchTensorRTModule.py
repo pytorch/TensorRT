@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import tensorrt as trt
 import torch
+import torch_tensorrt
 from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
@@ -17,8 +18,6 @@ from torch_tensorrt.dynamo.runtime.tools import (
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
-
-import torch_tensorrt
 
 logger = logging.getLogger(__name__)
 
@@ -32,17 +31,46 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
     def __init__(
         self,
-        engine: bytes,
-        input_names: Optional[List[str]] = None,
-        output_names: Optional[List[str]] = None,
+        serialized_engine: Optional[bytes] = None,
+        input_binding_names: Optional[List[str]] = None,
+        output_binding_names: Optional[List[str]] = None,
+        *,
+        name: str = "",
         settings: CompilationSettings = CompilationSettings(),
+        weight_name_map: Any = None,
     ):
+        """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
+        a PyTorch ``torch.nn.Module`` around it. Uses TensorRT Python APIs to run the engine
+
+        Arguments:
+            serialized_engine (bytes): Serialized TensorRT engine in the form of a bytearray
+            input_binding_names (List[str]): List of input TensorRT engine binding names in the order they would be passed to the TRT modules
+            output_binding_names (List[str]): List of output TensorRT engine binding names in the order they should be returned
+
+        Keyword Arguments:
+            name (str): Name for module
+            settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
+
+        Example:
+
+            .. code-block:: py
+
+                trt_module = PythonTorchTensorRTModule(
+                    engine_str,
+                    input_binding_names=["x"],
+                    output_binding_names=["output"],
+                    name="my_module",
+                    settings=CompilationSettings(device=torch.cuda.current_device)
+                )
+
+        """
         super(PythonTorchTensorRTModule, self).__init__()
         self._register_state_dict_hook(PythonTorchTensorRTModule._on_state_dict)
 
         # Run multi-gpu device check to validate engine instantiation
         multi_gpu_device_check()
 
+        self.name = name
         self.input_buffers: List[torch.Tensor] = []
         self.output_buffers: List[torch.Tensor] = []
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
@@ -55,9 +83,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         # Unused currently - to be used by Dynamic Shape support implementation
         self.memory_pool = None
 
-        self.engine = engine
-        self.input_names = input_names if input_names is not None else []
-        self.output_names = output_names if output_names is not None else []
+        self.serialized_engine = serialized_engine
+        self.input_names = (
+            input_binding_names if input_binding_names is not None else []
+        )
+        self.output_names = (
+            output_binding_names if output_binding_names is not None else []
+        )
         self.initialized = False
         self.target_device_id = (
             settings.device.gpu_id
@@ -69,12 +101,16 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         )
         self.profiling_enabled = settings.debug if settings.debug is not None else False
         self.settings = settings
-        self._initialize()
+        self.engine = None
+        self.weight_name_map = weight_name_map
 
-    def _initialize(self) -> None:
+        if self.serialized_engine is not None and not self.settings.lazy_engine_init:
+            self.setup_engine()
+
+    def setup_engine(self) -> None:
         self.initialized = True
         runtime = trt.Runtime(TRT_LOGGER)
-        self.engine = runtime.deserialize_cuda_engine(self.engine)
+        self.engine = runtime.deserialize_cuda_engine(self.serialized_engine)
         self.context = self.engine.create_execution_context()
 
         assert self.engine.num_io_tensors == (
@@ -114,8 +150,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             raise RuntimeError("PythonTorchTensorRTModule is not initialized.")
 
     def _on_state_dict(self, state_dict: Dict[str, Any], prefix: str, _: Any) -> None:
-        self._check_initialized()
-        state_dict[prefix + "engine"] = bytearray(self.engine.serialize())
+        state_dict[prefix + "engine"] = self.serialized_engine
         state_dict[prefix + "input_names"] = self.input_names
         state_dict[prefix + "output_names"] = self.output_names
 
@@ -129,17 +164,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         unexpected_keys: Any,
         error_msgs: Any,
     ) -> None:
-        engine_bytes = state_dict[prefix + "engine"]
+        self.serialized_engine = state_dict[prefix + "engine"]
+        self.input_names = state_dict[prefix + "input_names"]
+        self.output_names = state_dict[prefix + "output_names"]
 
         # Run multi-gpu device check to validate engine instantiation
         multi_gpu_device_check()
-
-        runtime = trt.Runtime(TRT_LOGGER)
-        self.engine = runtime.deserialize_cuda_engine(engine_bytes)
-
-        self.input_names = state_dict[prefix + "input_names"]
-        self.output_names = state_dict[prefix + "output_names"]
-        self._initialize()
+        self.setup_engine()
 
     def __getstate__(self) -> Dict[str, Any]:
         state = self.__dict__.copy()

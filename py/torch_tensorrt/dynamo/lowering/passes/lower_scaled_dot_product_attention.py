@@ -17,7 +17,7 @@ REPLACEABLE_ATEN_OPS = {
 
 
 def lower_scaled_dot_product_attention(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]
+    gm: torch.fx.GraphModule,
 ) -> torch.fx.GraphModule:
     """Replace specific versions of scaled_dot_product_attention with an equivalent
     implementation which can be easily converted to TRT

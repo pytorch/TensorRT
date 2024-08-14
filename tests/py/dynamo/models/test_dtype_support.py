@@ -178,6 +178,14 @@ class Test64BitSupport(TestCase):
         )
 
 
+@unittest.skipIf(
+    torch.cuda.get_device_properties(torch.cuda.current_device()).major < 8
+    or (
+        torch.cuda.get_device_properties(torch.cuda.current_device()).major == 8
+        and torch.cuda.get_device_properties(torch.cuda.current_device()).major == 7
+    ),
+    "Platform does not have BF16 support",
+)
 class TestBF16Support(TestCase):
     @unittest.skipIf(
         not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,

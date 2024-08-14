@@ -11,6 +11,41 @@ class TestMatMulConverter(DispatchTestCase):
     @parameterized.expand(
         [
             (
+                "1_1",
+                (1,),
+                (1,),
+            ),
+            (
+                "1_1",
+                (2,),
+                (2,),
+            ),
+            (
+                "1_1",
+                (3,),
+                (3,),
+            ),
+        ]
+    )
+    def test_matmul_dot(self, _, input_shape, other_shape):
+        class MatMul(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.other = nn.Parameter(torch.randn(*other_shape))
+
+            def forward(self, input):
+                return torch.ops.aten.dot.default(input, self.other)
+
+        inputs = [torch.randn(*input_shape)]
+
+        self.run_test(
+            MatMul(),
+            inputs,
+        )
+
+    @parameterized.expand(
+        [
+            (
                 "2_2",
                 (2, 3),
                 (3, 2),
