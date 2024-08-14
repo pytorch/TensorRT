@@ -37,6 +37,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         *,
         name: str = "",
         settings: CompilationSettings = CompilationSettings(),
+        weight_name_map: Any = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses TensorRT Python APIs to run the engine
@@ -101,6 +102,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.profiling_enabled = settings.debug if settings.debug is not None else False
         self.settings = settings
         self.engine = None
+        self.weight_name_map = weight_name_map
 
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()

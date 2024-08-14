@@ -2945,7 +2945,9 @@ def aten_ops_addmm(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.constant_pad_nd.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.constant_pad_nd.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2969,9 +2971,15 @@ def aten_ops_constant_pad(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.reflection_pad1d.default)
-@dynamo_tensorrt_converter(torch.ops.aten.reflection_pad2d.default)
-@dynamo_tensorrt_converter(torch.ops.aten.reflection_pad3d.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.reflection_pad1d.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.reflection_pad2d.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.reflection_pad3d.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2994,9 +3002,15 @@ def aten_ops_reflection_pad(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.replication_pad1d.default)
-@dynamo_tensorrt_converter(torch.ops.aten.replication_pad2d.default)
-@dynamo_tensorrt_converter(torch.ops.aten.replication_pad3d.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.replication_pad1d.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.replication_pad2d.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.replication_pad3d.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -3019,7 +3033,9 @@ def aten_ops_replication_pad(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten._pad_circular.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten._pad_circular.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -3042,7 +3058,7 @@ def aten_ops_circular_pad(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.pad.default)
+@dynamo_tensorrt_converter(torch.ops.aten.pad.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),

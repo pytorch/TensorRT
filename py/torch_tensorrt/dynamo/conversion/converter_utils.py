@@ -1,7 +1,6 @@
 import collections
 import functools
 import logging
-import re
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
@@ -33,10 +32,7 @@ def get_node_name(node: torch.fx.Node) -> str:
     mod_stack = stack_item.popitem() if stack_item else ""
     node_name = str(node)
     if mod_stack:
-        mod_name = str(mod_stack[0]).replace("___", "/")
-        # Clean up the module name
-        mod_name = re.sub("^.*__self", "", mod_name)
-        mod_name = re.sub(r"_(\d+)$", r"/\g<1>", mod_name)
+        mod_name = mod_stack[1][0]
         node_name = mod_name + "/" + node_name
     else:
         # Try an alternative way to get the module info
