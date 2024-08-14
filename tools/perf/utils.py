@@ -38,7 +38,6 @@ def load_hf_model(model_name_hf):
             attn_implementation="eager",
         )
         .eval()
-        .cuda()
     )
 
     return {"model": model_hf}

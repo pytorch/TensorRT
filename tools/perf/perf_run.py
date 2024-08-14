@@ -89,7 +89,7 @@ def record_llm_perf(
     input_seq = input_tensors[0]
     with torch.no_grad():
         # Warm up for 3 iterations
-        _ = time_generate(model, input_seq, output_seq_length, iterations=3)
+        _ = time_generate(model, input_seq, output_seq_length, iterations=iterations)
 
         torch.cuda.synchronize()
 
@@ -142,7 +142,7 @@ def record_perf(
 def run_torch(model, input_tensors, params, precision, batch_size):
     print("Running Torch for precision: ", precision, " batch_size : ", batch_size)
     iters = params.get("iterations", 20)
-
+    model = model.to("cuda:0")
     if params["is_text_llm"]:
         output_seq_length = params["output_sequence_length"]
         return record_llm_perf(
@@ -269,6 +269,8 @@ def run_torch_compile(model, input_tensors, params, precision, batch_size):
     """
     Compile the given model using Torch-TensorRT torch.compile frontend and record performance stats
     """
+    # Move the model to GPU
+    model = model.to("cuda:0")
     torch._dynamo.reset()
 
     print(
@@ -285,7 +287,7 @@ def run_torch_compile(model, input_tensors, params, precision, batch_size):
     }
     start_compile = timeit.default_timer()
     model = torch.compile(
-        model, backend="tensorrt", dynamic=False, options=compile_spec
+        model, backend="tensorrt", dynamic=None, options=compile_spec
     )
     model(*input_tensors)
     end_compile = timeit.default_timer()
@@ -338,6 +340,7 @@ def run_inductor(model, input_tensors, params, precision, batch_size):
     Compile the given model using torch inductor and record performance stats
     """
     torch._dynamo.reset()
+    model = model.to("cuda:0")
     print(
         "Running Torch [inductor] for precision: ",
         precision,
@@ -603,9 +606,9 @@ if __name__ == "__main__":
     # Load PyTorch Model, if provided
     if len(model_name_torch) > 0 and os.path.exists(model_name_torch):
         print("Loading user provided torch model: ", model_name_torch)
-        model_torch = torch.load(model_name_torch).eval().cuda()
+        model_torch = torch.load(model_name_torch).eval()
     elif model_name_torch in BENCHMARK_MODELS:
-        model_torch = BENCHMARK_MODELS[model_name_torch]["model"].eval().cuda()
+        model_torch = BENCHMARK_MODELS[model_name_torch]["model"].eval()
 
     # If neither model type was provided
     if (model is None) and (model_torch is None):
