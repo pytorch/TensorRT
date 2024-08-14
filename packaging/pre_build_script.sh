@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -exou pipefail
+
 # Install dependencies
 python3 -m pip install pyyaml
 yum install -y ninja-build gettext
