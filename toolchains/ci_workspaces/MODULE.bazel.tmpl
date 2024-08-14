@@ -53,13 +53,6 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 # Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
 #############################################################################################################
 
-http_archive(
-    name = "libtorch_win",
-    build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/test/${CU_VERSION}/libtorch-win-shared-with-deps-latest.zip"],
-)
-
 # Download these tarballs manually from the NVIDIA website
 # Either place them in the distdir directory in third_party and use the --distdir flag
 # or modify the urls to "file:///<PATH TO TARBALL>/<TARBALL NAME>.tar.gz
@@ -97,6 +90,12 @@ http_archive(
 # for both versions here and do not use --config=pre-cxx11-abi
 
 new_local_repository(
+    name = "libtorch_win",
+    path = "${TORCH_INSTALL_PATH}",
+    build_file = "third_party/libtorch/BUILD"
+)
+
+new_local_repository(
     name = "libtorch",
     path = "${TORCH_INSTALL_PATH}",
     build_file = "third_party/libtorch/BUILD"
@@ -107,6 +106,7 @@ new_local_repository(
     path = "${TORCH_INSTALL_PATH}",
     build_file = "third_party/libtorch/BUILD"
 )
+
 
 #new_local_repository(
 #   name = "tensorrt",
