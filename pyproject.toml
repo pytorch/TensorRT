@@ -17,11 +17,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "torch_tensorrt"
-authors = [
-    {name="NVIDIA Corporation", email="narens@nvidia.com"}
-]
+authors = [{ name = "NVIDIA Corporation", email = "narens@nvidia.com" }]
 description = "Torch-TensorRT is a package which allows users to automatically compile PyTorch and TorchScript modules to TensorRT while remaining in PyTorch"
-license = {file = "LICENSE"}
+license = { file = "LICENSE" }
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: GPU :: NVIDIA CUDA",
@@ -37,9 +35,24 @@ classifiers = [
     "Topic :: Software Development",
     "Topic :: Software Development :: Libraries",
 ]
-readme = {file = "README.md", content-type = "text/markdown"}
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.8"
-keywords = ["pytorch", "torch", "tensorrt", "trt", "ai", "artificial intelligence", "ml", "machine learning", "dl", "deep learning", "compiler", "dynamo", "torchscript", "inference"]
+keywords = [
+    "pytorch",
+    "torch",
+    "tensorrt",
+    "trt",
+    "ai",
+    "artificial intelligence",
+    "ml",
+    "machine learning",
+    "dl",
+    "deep learning",
+    "compiler",
+    "dynamo",
+    "torchscript",
+    "inference",
+]
 dependencies = [
     "torch >=2.5.0.dev,<2.6.0",
     "tensorrt==10.1.0",
@@ -53,6 +66,9 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 torchvision = ["torchvision >=0.20.dev,<0.21.0"]
+quantization = ["nvidia-modelopt[all]>=0.15.1"]
+monitoring-tools = ["rich >= 13.7.1"]
+jupyter = ["rich[jupyter] >= 13.7.1"]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"
@@ -61,40 +77,53 @@ Repository = "https://github.com/pytorch/tensorrt.git"
 Changelog = "https://github.com/pytorch/tensorrt/releases"
 
 [tool.setuptools]
-package-dir = {"" = "py"}
+package-dir = { "" = "py" }
 include-package-data = false
 
 [tool.ruff]
 # NOTE: Synchoronize the ignores with .flake8
 lint.ignore = [
     # these ignores are from flake8-bugbear; please fix!
-    "B007", "B008", "B017",
-    "B018", # Useless expression
-    "B019", "B020",
-    "B023", "B024", "B026",
-    "B028", # No explicit `stacklevel` keyword argument found
-    "B904", "B905",
+    "B007",
+    "B008",
+    "B017",
+    "B018",   # Useless expression
+    "B019",
+    "B020",
+    "B023",
+    "B024",
+    "B026",
+    "B028",   # No explicit `stacklevel` keyword argument found
+    "B904",
+    "B905",
     "E402",
-    "C408", # C408 ignored because we like the dict keyword argument syntax
-    "E501", # E501 is not flexible enough, we're using B950 instead
+    "C408",   # C408 ignored because we like the dict keyword argument syntax
+    "E501",   # E501 is not flexible enough, we're using B950 instead
     "E721",
-    "E731", # Assign lambda expression
+    "E731",   # Assign lambda expression
     "E741",
     "EXE001",
     "F405",
     "F821",
     "F841",
     # these ignores are from flake8-logging-format; please fix!
-    "G101", "G201", "G202", "G003", "G004",
+    "G101",
+    "G201",
+    "G202",
+    "G003",
+    "G004",
     # these ignores are from RUFF perf; please fix!
-    "PERF203", "PERF4",
-    "SIM102", "SIM103", "SIM112", # flake8-simplify code styles
-    "SIM105", # these ignores are from flake8-simplify. please fix or ignore with commented reason
+    "PERF203",
+    "PERF4",
+    "SIM102",
+    "SIM103",
+    "SIM112",  # flake8-simplify code styles
+    "SIM105",  # these ignores are from flake8-simplify. please fix or ignore with commented reason
     "SIM108",
     "SIM110",
-    "SIM114", # Combine `if` branches using logical `or` operator
+    "SIM114",  # Combine `if` branches using logical `or` operator
     "SIM115",
-    "SIM116", # Disable Use a dictionary instead of consecutive `if` statements
+    "SIM116",  # Disable Use a dictionary instead of consecutive `if` statements
     "SIM117",
     "SIM118",
 ]
@@ -119,14 +148,51 @@ target-version = "py311"
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
 lint.fixable = [
-    "A","B","C","D","E","F","G",
-    "I","N","Q","S","T","W",
-    "ANN", "ARG", "BLE", "COM", "DJ",
-    "DTZ", "EM", "ERA", "EXE", "FBT",
-    "ICN", "INP", "ISC", "NPY", "PD",
-    "PGH", "PIE", "PL", "PT", "PTH",
-    "PYI", "RET", "RSE", "RUF", "SIM",
-    "SLF", "TCH", "TID", "TRY", "UP", "YTT"]
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "I",
+    "N",
+    "Q",
+    "S",
+    "T",
+    "W",
+    "ANN",
+    "ARG",
+    "BLE",
+    "COM",
+    "DJ",
+    "DTZ",
+    "EM",
+    "ERA",
+    "EXE",
+    "FBT",
+    "ICN",
+    "INP",
+    "ISC",
+    "NPY",
+    "PD",
+    "PGH",
+    "PIE",
+    "PL",
+    "PT",
+    "PTH",
+    "PYI",
+    "RET",
+    "RSE",
+    "RUF",
+    "SIM",
+    "SLF",
+    "TCH",
+    "TID",
+    "TRY",
+    "UP",
+    "YTT",
+]
 lint.unfixable = []
 
 # Exclude a variety of commonly ignored directories.
@@ -163,7 +229,7 @@ exclude = [
     "tests",
     "setup.py",
     "noxfile.py",
-    "__init__.py"
+    "__init__.py",
 ]
 
 [tool.ruff.lint.mccabe]
@@ -173,9 +239,7 @@ max-complexity = 10
 [tool.isort]
 profile = "black"
 py_version = 311
-skip = [
-    "py/torch_tensorrt/fx",
-]
+skip = ["py/torch_tensorrt/fx"]
 
 [tool.black]
 #line-length = 120
@@ -200,7 +264,7 @@ exclude = [
     "docsrc",
     "tests",
     "setup.py",
-    "noxfile.py"
+    "noxfile.py",
 ]
 python_version = "3.11"
 
@@ -230,14 +294,14 @@ files.extend-exclude = [
     "CHANGELOG.md",
     "*.ipynb",
     "cpp/",
-    "py/torch_tensorrt/fx/"
+    "py/torch_tensorrt/fx/",
 ]
 
 [tool.typos.default]
 extend-ignore-identifiers-re = [
     "^([A-z]|[a-z])*Nd*",
     "^([A-z]|[a-z])*nd*",
-    "activ*([A-z]|[a-z]|[0-9])*,"
+    "activ*([A-z]|[a-z]|[0-9])*,",
 ]
 
 [tool.typos.default.extend-words]
