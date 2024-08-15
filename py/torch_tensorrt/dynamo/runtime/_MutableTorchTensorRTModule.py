@@ -371,10 +371,10 @@ class MutableTorchTensorRTModule(object):
         self.run_info = (args, kwargs, result)
         return result
 
-    def to(self, device: str):
+    def to(self, device: str) -> None:
         logger.warning("Original PyTorch model is moved. CPU offload may failed.")
         self.orignial_model.to(device)
-        
+
     def __deepcopy__(self, memo: Any) -> Any:
         cls = self.__class__
         result = cls.__new__(cls)
