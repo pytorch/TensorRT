@@ -101,6 +101,8 @@ nvinfer1::ITensor* scalar_to_tensor(ConversionCtx* ctx, at::Scalar s);
 
 nvinfer1::DataType promote_types(nvinfer1::DataType type_a, nvinfer1::DataType type_b);
 
+nvinfer1::ITensor* add_expand(ConversionCtx* ctx, nvinfer1::ITensor* in, nvinfer1::Dims expandedDims);
+
 } // namespace converters
 } // namespace conversion
 } // namespace core

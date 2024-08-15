@@ -3,9 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Any, List, Optional, Sequence
 
-import tensorrt as trt
 import torch
-from torch.fx.experimental.proxy_tensor import maybe_disable_fake_tensor_mode
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -17,6 +16,8 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import get_torch_inputs
+
+import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ def infer_module_output_dtypes(
     inputs can be either arg_inputs or flattened input list. If it is flattened list, kwarg_inputs
     should be None, as it is already included in the flattened input.
     """
-    with maybe_disable_fake_tensor_mode():
+    with unset_fake_temporarily():
         torch_inputs = get_torch_inputs(inputs, device)
         if kwarg_inputs is None:
             kwarg_inputs = {}

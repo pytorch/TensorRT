@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Index &mdash; Torch-TensorRT v2.5.0.dev0+baa2eb1 documentation</title>
+  <title>Index &mdash; Torch-TensorRT v2.5.0.dev0+cee4914 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+baa2eb1
+                  v2.5.0.dev0+cee4914
                 </div>
               
             
@@ -483,6 +483,8 @@
       <ul>
         <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input.__init__">(torch_tensorrt.Input method)</a>
 </li>
+        <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.MutableTorchTensorRTModule.__init__">(torch_tensorrt.MutableTorchTensorRTModule method)</a>
+</li>
         <li><a href="py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.__init__">(torch_tensorrt.runtime.PythonTorchTensorRTModule method)</a>
 </li>
         <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.__init__">(torch_tensorrt.runtime.TorchTensorRTModule method)</a>
@@ -535,6 +537,8 @@
 </li>
         <li><a href="py_api/ts.html#torch_tensorrt.ts.compile">(in module torch_tensorrt.ts)</a>
 </li>
+        <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.MutableTorchTensorRTModule.compile">(torch_tensorrt.MutableTorchTensorRTModule method)</a>
+</li>
       </ul></li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.convert_method_to_trt_engine">convert_method_to_trt_engine() (in module torch_tensorrt)</a>
 
@@ -565,11 +569,7 @@
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.memory_format.dhwc8">dhwc8 (torch_tensorrt.memory_format attribute)</a>
 </li>
       <li><a href="py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.disable_profiling">disable_profiling() (torch_tensorrt.runtime.PythonTorchTensorRTModule method)</a>
-
-      <ul>
-        <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.disable_profiling">(torch_tensorrt.runtime.TorchTensorRTModule method)</a>
 </li>
-      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.DLA">DLA (torch_tensorrt.DeviceType attribute)</a>
@@ -590,8 +590,6 @@
         <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.Input.dtype">(torch_tensorrt.Input attribute)</a>
 </li>
       </ul></li>
-      <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.dump_layer_info">dump_layer_info() (torch_tensorrt.runtime.TorchTensorRTModule method)</a>
-</li>
   </ul></td>
 </tr></table>
 
@@ -601,17 +599,13 @@
       <li><a href="py_api/ts.html#torch_tensorrt.ts.embed_engine_in_new_module">embed_engine_in_new_module() (in module torch_tensorrt.ts)</a>
 </li>
       <li><a href="py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.enable_profiling">enable_profiling() (torch_tensorrt.runtime.PythonTorchTensorRTModule method)</a>
-
-      <ul>
-        <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.enable_profiling">(torch_tensorrt.runtime.TorchTensorRTModule method)</a>
 </li>
-      </ul></li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability">EngineCapability (class in torch_tensorrt)</a>
+</li>
+      <li><a href="py_api/ptq.html#torch_tensorrt.ts.ptq.CalibrationAlgo.ENTROPY_CALIBRATION">ENTROPY_CALIBRATION (torch_tensorrt.ts.ptq.CalibrationAlgo attribute)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="py_api/ptq.html#torch_tensorrt.ts.ptq.CalibrationAlgo.ENTROPY_CALIBRATION">ENTROPY_CALIBRATION (torch_tensorrt.ts.ptq.CalibrationAlgo attribute)</a>
-</li>
       <li><a href="py_api/ptq.html#torch_tensorrt.ts.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2">ENTROPY_CALIBRATION_2 (torch_tensorrt.ts.ptq.CalibrationAlgo attribute)</a>
 </li>
       <li><a href="py_api/logging.html#torch_tensorrt.logging.errors">errors (class in torch_tensorrt.logging)</a>
@@ -657,11 +651,7 @@
       <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.get_extra_state">get_extra_state() (torch_tensorrt.runtime.TorchTensorRTModule method)</a>
 </li>
       <li><a href="py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.get_layer_info">get_layer_info() (torch_tensorrt.runtime.PythonTorchTensorRTModule method)</a>
-
-      <ul>
-        <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.get_layer_info">(torch_tensorrt.runtime.TorchTensorRTModule method)</a>
 </li>
-      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.GPU">GPU (torch_tensorrt.DeviceType attribute)</a>
@@ -750,6 +740,10 @@
 </li>
       </ul></li>
   </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.MutableTorchTensorRTModule">MutableTorchTensorRTModule (class in torch_tensorrt)</a>
+</li>
+  </ul></td>
 </tr></table>
 
 <h2 id="P">P</h2>
@@ -774,10 +768,12 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="src/pytorch-sphinx-theme/docs/demo/demo.html#term-Reading"><strong>Reading</strong></a>
 </li>
-      <li><a href="py_api/dynamo.html#torch_tensorrt.dynamo.refit_module_weights">refit_module_weights() (in module torch_tensorrt.dynamo)</a>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.MutableTorchTensorRTModule.refit_gm">refit_gm() (torch_tensorrt.MutableTorchTensorRTModule method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/dynamo.html#torch_tensorrt.dynamo.refit_module_weights">refit_module_weights() (in module torch_tensorrt.dynamo)</a>
+</li>
       <li>
     RFC
 
@@ -800,8 +796,6 @@
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/runtime.html#torch_tensorrt.runtime.set_multi_device_safe_mode">set_multi_device_safe_mode() (in module torch_tensorrt.runtime)</a>
-</li>
-      <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.setup_engine">setup_engine() (torch_tensorrt.runtime.TorchTensorRTModule method)</a>
 </li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.STANDARD">STANDARD (torch_tensorrt.EngineCapability attribute)</a>
 </li>
