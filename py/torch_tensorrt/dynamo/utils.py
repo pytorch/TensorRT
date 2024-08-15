@@ -131,42 +131,38 @@ def get_torch_inputs(
     inputs: Sequence[Input] | Dict[Any, Any],
     device: Union[Device, torch.device, str],
     mode: str = "",
-) -> Sequence[torch.tensor] | Dict[Any, Any]:
+) -> Sequence[torch.Tensor] | Dict[str, torch.Tensor]:
     """
     Return the torch_tensor from the Input object. If mode is set, this implies
     user is using dynamic shaped inputs and return the corresponding input based
     on the mode requested.
     """
     device = to_torch_device(device)
-    if mode:
-        if isinstance(inputs, dict):
-            result = {}
-            for k, v in inputs.items():
-                if isinstance(v, (list, tuple, dict)):
-                    result[k] = get_torch_inputs(v, device)
-                else:
-                    result[k] = v.example_tensor(mode).to(device)
-            return result
-        else:
-            return [
-                input.example_tensor(mode).to(device)
-                for input in inputs
-                if isinstance(input, Input)
-            ]
 
     if isinstance(inputs, dict):
         result = {}
         for k, v in inputs.items():
             if isinstance(v, (list, tuple, dict)):
                 result[k] = get_torch_inputs(v, device)
-            else:
-                result[k] = v.torch_tensor.to(device)
-        return result
+            elif isinstance(v, Input):
+                if len(mode) > 0:
+                    result[k] = v.example_tensor(mode).to(device)
+                else:
+                    result[k] = v.torch_tensor.to(device)
     else:
-        return [
-            input.torch_tensor.to(device) if isinstance(input, Input) else input
-            for input in inputs
-        ]
+        result = []
+        for input in inputs:
+            if isinstance(input, Input):
+                if len(mode) > 0:
+                    result.append(input.example_tensor(mode).to(device))
+                else:
+                    result.append(input.torch_tensor.to(device))
+            elif isinstance(input, torch.Tensor):
+                result.append(input.to(device))
+            else:
+                raise AssertionError(f"Input type {type(input)} is not a valid type")
+
+    return result
 
 
 def get_model_device(module: torch.fx.GraphModule) -> Union[Device, torch.device, str]:

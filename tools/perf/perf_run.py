@@ -206,8 +206,10 @@ def run_hf_dynamo(model, input_tensors, params, precision, batch_size):
 
     osl = params["output_sequence_length"]
     iters = params.get("iterations", 20)
-
-    exp_program = export_llm(model, input_tensors, min_seq_len=1, max_seq_len=osl)
+    # Move the model and inputs to cpu and trace it.
+    model = model.to("cpu")
+    inputs_cpu = [tensor.clone().cpu() for tensor in input_tensors]
+    exp_program = export_llm(model, inputs_cpu, min_seq_len=1, max_seq_len=osl)
     start_compile = timeit.default_timer()
 
     trt_model = torchtrt.dynamo.compile(
@@ -218,7 +220,6 @@ def run_hf_dynamo(model, input_tensors, params, precision, batch_size):
     )
     end_compile = timeit.default_timer()
     compile_time_s = end_compile - start_compile
-
     record_llm_perf(
         trt_model,
         "Dynamo",
@@ -286,9 +287,7 @@ def run_torch_compile(model, input_tensors, params, precision, batch_size):
         "min_block_size": params.get("min_block_size", 1),
     }
     start_compile = timeit.default_timer()
-    model = torch.compile(
-        model, backend="tensorrt", dynamic=None, options=compile_spec
-    )
+    model = torch.compile(model, backend="tensorrt", dynamic=None, options=compile_spec)
     model(*input_tensors)
     end_compile = timeit.default_timer()
     compile_time_s = end_compile - start_compile

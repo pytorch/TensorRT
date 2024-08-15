@@ -267,7 +267,7 @@ def scatter_add_decomposition(
         index_slice = torch.unsqueeze(index_slice, dim)
 
         # moving tensor to default device
-        device = to_torch_device(default_device())
+        device = input_tensor.device
         scatter_add_tensor = scatter_add_tensor.to(device)
         to_scatter_tensor = to_scatter_tensor.to(device)
         index_slice = index_slice.to(device)
