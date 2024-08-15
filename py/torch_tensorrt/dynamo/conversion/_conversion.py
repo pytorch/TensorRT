@@ -5,7 +5,7 @@ from typing import Any, List, Optional, Sequence
 
 import tensorrt as trt
 import torch
-from torch._subclasses.fake_tensor import unset_fake_temporarily
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES

@@ -13,4 +13,5 @@ a number of ways you can leverage this backend to accelerate inference.
 * :ref:`torch_export_cudagraphs`: Using the Cudagraphs integration with `ir="dynamo"`
 * :ref:`custom_kernel_plugins`: Creating a plugin to use a custom kernel inside TensorRT engines
 * :ref:`refit_engine_example`: Refitting a compiled TensorRT Graph Module with updated weights
+* :ref:`mutable_torchtrt_module_example`: Compile, use, and modify TensorRT Graph Module with MutableTorchTensorRTModule
 * :ref:`vgg16_fp8_ptq`: Compiling a VGG16 model with FP8 and PTQ using ``torch.compile``
