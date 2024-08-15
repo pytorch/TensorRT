@@ -157,13 +157,17 @@ def _refit_single_trt_engine_with_gm(
     """
 
     refitted = set()
-
+    torch_device = list(new_gm.state_dict().values())[0].device.type
     refitter = trt.Refitter(old_engine, TRT_LOGGER)
     weight_list = refitter.get_all_weights()
 
     if weight_name_map:
         # Get the refitting mapping
-        trt_wt_location = trt.TensorLocation.DEVICE
+        trt_wt_location = (
+            trt.TensorLocation.DEVICE
+            if torch_device == "cuda"
+            else trt.TensorLocation.HOST
+        )
         mapping = construct_refit_mapping_from_weight_name_map(
             weight_name_map, new_gm.state_dict()
         )
@@ -235,7 +239,7 @@ def refit_module_weights(
         compiled_module = copy.deepcopy(compiled_module)
     elif inline_module:
         raise AssertionError(
-            "Exported program does not support modifying in place. Please set inplace to false and use the returned graph module."
+            "Exported program does not support modifying in place. Please set in_place to false and use the returned graph module."
         )
 
     # Get the settings and check the setting to be uniform
