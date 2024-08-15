@@ -12,6 +12,7 @@ from torch_tensorrt.dynamo._defaults import (
     DLA_LOCAL_DRAM_SIZE,
     DLA_SRAM_SIZE,
     DRYRUN,
+    ENABLE_CROSS_PLATFORM_COMPATIBILITY,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
@@ -74,6 +75,8 @@ class CompilationSettings:
             output to a file if a string path is specified
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        enable_cross_platform_compatibility (bool): By default this is False means TensorRT engines can only be executed on the same platform where they were built.
+            True will enable cross-platform compatibility which allows the engine to be built on one platform and run on another platform
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -106,3 +109,4 @@ class CompilationSettings:
     hardware_compatible: bool = HARDWARE_COMPATIBLE
     timing_cache_path: str = TIMING_CACHE_PATH
     lazy_engine_init: bool = LAZY_ENGINE_INIT
+    enable_cross_platform_compatibility: bool = ENABLE_CROSS_PLATFORM_COMPATIBILITY

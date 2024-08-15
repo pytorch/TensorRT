@@ -1,6 +1,7 @@
 import io
 import logging
 import os
+import platform
 import warnings
 from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set, Tuple
@@ -180,6 +181,23 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             builder_config.set_memory_pool_limit(
                 trt.MemoryPoolType.WORKSPACE, self.compilation_settings.workspace_size
             )
+        if version.parse(trt.__version__) >= version.parse("10.2"):
+            if self.compilation_settings.enable_cross_platform_compatibility:
+                # currently this flag can only be enabled when building engines on Linux AMD64 platforms
+                # and target platform for engine execution as Windows AMD64 system.
+                # https://github.com/NVIDIA/TensorRT/blob/c5b9de37f7ef9034e2efc621c664145c7c12436e/include/NvInfer.h#L8257
+                if (
+                    platform.system() == "Linux"
+                    and platform.architecture()[0] == "64bit"
+                ):
+                    _LOGGER.info(
+                        f"Setting cross platform compatibility to {self.compilation_settings.enable_cross_platform_compatibility}"
+                    )
+                    builder_config.runtime_platform = trt.RuntimePlatform.WINDOWS_AMD64
+                else:
+                    warnings.warn(
+                        f"{platform.system()=},{platform.architecture()[0]=}, Cross platform compatibility can only be enabled when building engines on Linux AMD64 platform and running the engine on Windows AMD64 platform."
+                    )
 
         if version.parse(trt.__version__) >= version.parse("8.2"):
             builder_config.profiling_verbosity = (

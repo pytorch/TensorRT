@@ -37,6 +37,7 @@ class TestEnableTRTFlags(TestCase):
             num_avg_timing_iters=5,
             workspace_size=1 << 10,
             truncate_double=True,
+            enable_cross_platform_compatibility=True,
         )
 
         optimized_model_results = optimized_model(*inputs).detach().cpu()
