@@ -87,7 +87,7 @@ with torch.no_grad():
     device = "cuda:0"
 
     prompt = "house in forest, shuimobysim, wuchangshuo, best quality"
-    negative = "(worst quality:2), (low quality:2), (normal quality:2), lowres, normal quality, skin spots, acnes, skin blemishes, age spot, glans, (watermark:2),"
+    negative = "(worst quality:2), (low quality:2), (normal quality:2), lowres, normal quality, out of focus, cloudy, (watermark:2),"
 
     pipe = DiffusionPipeline.from_pretrained(
         model_id, revision="fp16", torch_dtype=torch.float16
@@ -101,7 +101,11 @@ with torch.no_grad():
     image.save("./without_LoRA_mutable.jpg")
 
     # Standard Huggingface LoRA loading procedure
-    pipe.load_lora_weights("./moxin.safetensors", adapter_name="lora1")
+    pipe.load_lora_weights(
+        "stablediffusionapi/load_lora_embeddings",
+        weight_name="moxin.safetensors",
+        adapter_name="lora1",
+    )
     pipe.set_adapters(["lora1"], adapter_weights=[1])
     pipe.fuse_lora()
     pipe.unload_lora_weights()
