@@ -12,7 +12,9 @@ choco install bazelisk -y
 #unzip -o TensorRT.zip -d C:/
 TORCH_TORCHVISION=$(grep "^torch" py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
+
 # Install all the dependencies required for Torch-TensorRT
+pip uninstall torch torchvision
 pip install --force-reinstall --pre ${TORCH_TORCHVISION} --index-url ${INDEX_URL}
 pip install --pre -r tests/py/requirements.txt --use-deprecated legacy-resolver
 
