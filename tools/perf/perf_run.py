@@ -350,7 +350,7 @@ def run_inductor(model, input_tensors, params, precision, batch_size):
         return run_hf_inductor(model, input_tensors, params, precision, batch_size)
 
     start_compile = timeit.default_timer()
-    model = torch.compile(model, backend="inductor", dynamic=False, mode="max-autotune")
+    model = torch.compile(model, backend="inductor", dynamic=None, mode="max-autotune")
     model(*input_tensors)
     end_compile = timeit.default_timer()
     compile_time_s = end_compile - start_compile

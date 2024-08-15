@@ -5,6 +5,7 @@ iterations=1
 backends=("dynamo" "inductor")
 batch_sizes=(1 16)
 hf_token="<Enter HF token>"
+image_name="gitlab-master.nvidia.com:5005/torch-tensorrt/tensorrt/torch_tensorrt:latest"
 
 # Stage 1 : GPT2 experiment
 models=("gpt2")
@@ -18,7 +19,7 @@ for model in ${models[@]}
                     do
                         for i in ${!isl[@]};
                             do
-                                docker run --rm -it --gpus 0 --shm-size=10.24g --ulimit stack=67108864 -v "$PWD:/work" --ipc=host torch_tensorrt:latest /bin/bash -c "cd /opt/torch_tensorrt/tools/perf; HF_TOKEN="${hf_token}" bash run_hf_model.sh "${bs}" "$backend" "$model" "${isl[i]}" "${osl[i]}" "${precision}" "${iterations}"; exit"
+                                docker run --rm -it --gpus 0 --shm-size=10.24g --ulimit stack=67108864 -v "$PWD:/work" --ipc=host ${image_name} /bin/bash -c "cd /opt/torch_tensorrt/tools/perf; HF_TOKEN="${hf_token}" bash run_hf_model.sh "${bs}" "$backend" "$model" "${isl[i]}" "${osl[i]}" "${precision}" "${iterations}"; exit"
                             done
                     done
             done
@@ -39,7 +40,7 @@ for model in ${models[@]}
                     do
                         for i in ${!isl[@]};
                             do
-                                docker run --rm -it --gpus 0 --shm-size=10.24g --ulimit stack=67108864 -v "$PWD:/work" --ipc=host torch_tensorrt:latest /bin/bash -c "cd /opt/torch_tensorrt/tools/perf; HF_TOKEN="${hf_token}" bash run_hf_model.sh "${bs}" "$backend" "$model" "${isl[i]}" "${osl[i]}" "${precision}" "${iterations}"; exit"
+                                docker run --rm -it --gpus 0 --shm-size=10.24g --ulimit stack=67108864 -v "$PWD:/work" --ipc=host ${image_name} /bin/bash -c "cd /opt/torch_tensorrt/tools/perf; HF_TOKEN="${hf_token}" bash run_hf_model.sh "${bs}" "$backend" "$model" "${isl[i]}" "${osl[i]}" "${precision}" "${iterations}"; exit"
                             done
                     done
             done
