@@ -71,15 +71,6 @@ TRTEngine::TRTEngine(
   multi_gpu_device_check();
   set_rt_device(device_info);
 
-  // Set active stream to non-default stream
-  auto current_stream = c10::cuda::getCurrentCUDAStream(device_info.id);
-  if (current_stream == c10::cuda::getDefaultCUDAStream(device_info.id)) {
-    active_stream = c10::cuda::getStreamFromPool(false, device_info.id);
-    c10::cuda::setCurrentCUDAStream(active_stream);
-  } else {
-    active_stream = current_stream;
-  }
-
   rt = make_trt(nvinfer1::createInferRuntime(util::logging::get_logger()));
 
   name = slugify(mod_name);
@@ -205,6 +196,7 @@ TRTEngine::TRTEngine(
 }
 
 TRTEngine::~TRTEngine() {
+  cudagraph.reset();
   trt_engine_profiler.reset();
   exec_ctx.reset();
   cuda_engine.reset();
@@ -253,6 +245,7 @@ void TRTEngine::set_profiling_paths() {
   enqueue_profile_path = std::filesystem::path{profile_path_prefix + "/" + name + "_enqueue_profile.trace"}.string();
   trt_engine_profile_path =
       std::filesystem::path{profile_path_prefix + "/" + name + "_engine_exectuion_profile.trace"}.string();
+  cuda_graph_debug_path = std::filesystem::path{profile_path_prefix + "/" + name + "_cudagraph.dot"}.string();
 }
 
 std::string TRTEngine::to_str() const {
