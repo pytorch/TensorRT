@@ -3,7 +3,18 @@ import logging
 import os
 import warnings
 from datetime import datetime
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set, Tuple
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+)
 
 import numpy as np
 import torch
@@ -26,9 +37,10 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_node_name,
     get_trt_tensor,
 )
-from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, to_torch_device
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
+from tqdm import tqdm
 
 import tensorrt as trt
 from packaging import version
@@ -339,18 +351,22 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         def find_weight(
             weight_name: str, np_map: dict[str, Any], sd: dict[str, Any]
         ) -> str:
-            network_weight = np_map[weight_name]
+            network_weight = torch.from_numpy(np_map[weight_name]).cuda()
             for sd_w_name, sd_weight in sd.items():
                 if check_weight_equal(sd_weight, network_weight):
+                    del sd[sd_w_name]
                     return sd_w_name
             return ""
 
         def check_weight_equal(
-            sd_weight: torch.tensor, network_weight: np.ndarray
+            sd_weight: torch.tensor, network_weight: Union[np.ndarray, torch.Tensor]
         ) -> Any:
-            sd_weight = sd_weight.reshape(-1).cpu().numpy()
-            return sd_weight.size == network_weight.size and np.allclose(
-                sd_weight, network_weight, 1e-1, 1e-1
+            sd_weight = sd_weight.reshape(-1)
+            if not isinstance(network_weight, torch.Tensor):
+                network_weight = torch.from_numpy(network_weight).cuda()
+            return (
+                sd_weight.shape == network_weight.shape
+                and torch.all(torch.abs(sd_weight - network_weight) < 0.1).cpu()
             )
 
         MODULE_MAP = {
@@ -398,7 +414,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             )
         }
         """
+        _LOGGER.info("building weight name mapping...")
         # Stage 1: Name mapping
+        sd = self.module.state_dict()
+        gm_is_on_cuda = list(sd.values())[0].device.type == "cuda"
+        # If the model original position is on CPU, move it GPU
+        if not gm_is_on_cuda:
+            self.module.to(to_torch_device(self.compilation_settings.device))
         sd = self.module.state_dict()
         weight_name_map: dict[str, Any] = {}
         np_map = {}
@@ -444,7 +466,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     np_map[engine_weight_name] = weight
 
         # Stage 2: Value mapping
-        for engine_weight_name, sd_weight_name in weight_name_map.items():
+        for engine_weight_name, sd_weight_name in tqdm(weight_name_map.items()):
             if "SCALE" in engine_weight_name:
                 # There is no direct connection in batch_norm layer. So skip it
                 pass
@@ -461,6 +483,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             ]
 
         self.weight_name_map = weight_name_map
+        # If the model original position is on CPU, set it back to CPU and save GPU memory
+        if not gm_is_on_cuda:
+            self.module.to("cpu")
+        torch.cuda.empty_cache()
 
     def run(
         self,
