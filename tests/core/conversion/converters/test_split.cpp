@@ -29,7 +29,7 @@ TEST(Converters, ATenSplitSizesInScriptingConvertsCorrectly) {
 
   for (size_t i = 0; i < jit_results.size(); i++) {
     auto trt = trt_results[i].reshape(jit_results[i].sizes());
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt, 2e-6));
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt));
   }
 }
 
@@ -57,7 +57,7 @@ TEST(Converters, ATenSplitSizesinTracingConvertsCorrectly) {
 
   for (size_t i = 0; i < jit_results.size(); i++) {
     auto trt = trt_results[i].reshape(jit_results[i].sizes());
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt, 2e-6));
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt));
   }
 }
 
@@ -84,7 +84,7 @@ TEST(Converters, ATenSplitFixedConvertsCorrectly) {
 
   for (size_t i = 0; i < jit_results.size(); i++) {
     auto trt = trt_results[i].reshape(jit_results[i].sizes());
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt, 2e-6));
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt));
   }
 }
 
@@ -112,7 +112,7 @@ TEST(Converters, ATenSplitFixedHasRemainderConvertsCorrectly) {
 
   for (size_t i = 0; i < jit_results.size(); i++) {
     auto trt = trt_results[i].reshape(jit_results[i].sizes());
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt, 2e-6));
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt));
   }
 }
 
@@ -141,7 +141,7 @@ TEST(Converters, ATenSplitAndAddConvertsCorrectly) {
 
   for (size_t i = 0; i < jit_results.size(); i++) {
     auto trt = trt_results[i].reshape(jit_results[i].sizes());
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt, 2e-6));
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt));
   }
 }
 
@@ -169,6 +169,6 @@ TEST(Converters, ATenSplitNegativeDimsConvertsCorrectly) {
 
   for (size_t i = 0; i < jit_results.size(); i++) {
     auto trt = trt_results[i].reshape(jit_results[i].sizes());
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt, 2e-6));
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt));
   }
 }

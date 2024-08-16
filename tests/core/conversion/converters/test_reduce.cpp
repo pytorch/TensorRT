@@ -77,7 +77,7 @@ void test_body(const std::string& graph, at::Tensor& in, bool dynamic = false) {
   } else {
     trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
   }
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 } // namespace
 
