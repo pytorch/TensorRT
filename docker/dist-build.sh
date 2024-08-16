@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -x
+
 TOP_DIR=$(cd $(dirname $0); pwd)/..
 
 if [[ -z "${USE_CXX11}" ]]; then
