@@ -8,7 +8,9 @@ from typing import Any, List, Optional, Tuple
 
 import torch
 from torch_tensorrt._Device import Device
+from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.runtime._utils import for_all_methods, needs_torch_tensorrt_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -19,17 +21,29 @@ SerializedTorchTensorRTModuleFmt = Tuple[
     str, Optional[SerializedTensorRTEngineFmt], List[str], List[str]
 ]
 
-ABI_TARGET_IDX = torch.ops.tensorrt.ABI_TARGET_IDX()  # 0
-NAME_IDX = torch.ops.tensorrt.NAME_IDX()  # 1
-DEVICE_IDX = torch.ops.tensorrt.DEVICE_IDX()  # 2
-ENGINE_IDX = torch.ops.tensorrt.ENGINE_IDX()  # 3
-INPUT_BINDING_NAMES_IDX = torch.ops.tensorrt.INPUT_BINDING_NAMES_IDX()  # 4
-OUTPUT_BINDING_NAMES_IDX = torch.ops.tensorrt.OUTPUT_BINDING_NAMES_IDX()  # 5
-HW_COMPATIBLE_IDX = torch.ops.tensorrt.HW_COMPATIBLE_IDX()  # 6
-SERIALIZED_METADATA_IDX = torch.ops.tensorrt.SERIALIZED_METADATA_IDX()  # 7
-SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 8
+ABI_TARGET_IDX = -1  # Not implemented
+NAME_IDX = -1  # Not implemented
+DEVICE_IDX = -1  # Not implemented
+ENGINE_IDX = -1  # Not implemented
+INPUT_BINDING_NAMES_IDX = -1  # Not implemented
+OUTPUT_BINDING_NAMES_IDX = -1  # Not implemented
+HW_COMPATIBLE_IDX = -1  # Not implemented
+SERIALIZED_METADATA_IDX = -1  # Not implemented
+SERIALIZATION_LEN = -1  # Not implemented
+
+if ENABLED_FEATURES.torch_tensorrt_runtime:
+    ABI_TARGET_IDX = torch.ops.tensorrt.ABI_TARGET_IDX()  # 0
+    NAME_IDX = torch.ops.tensorrt.NAME_IDX()  # 1
+    DEVICE_IDX = torch.ops.tensorrt.DEVICE_IDX()  # 2
+    ENGINE_IDX = torch.ops.tensorrt.ENGINE_IDX()  # 3
+    INPUT_BINDING_NAMES_IDX = torch.ops.tensorrt.INPUT_BINDING_NAMES_IDX()  # 4
+    OUTPUT_BINDING_NAMES_IDX = torch.ops.tensorrt.OUTPUT_BINDING_NAMES_IDX()  # 5
+    HW_COMPATIBLE_IDX = torch.ops.tensorrt.HW_COMPATIBLE_IDX()  # 6
+    SERIALIZED_METADATA_IDX = torch.ops.tensorrt.SERIALIZED_METADATA_IDX()  # 7
+    SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 8
 
 
+@for_all_methods(needs_torch_tensorrt_runtime)
 class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     """TorchTensorRTModule is a PyTorch module which encompasses an arbitrary TensorRT Engine.
 
