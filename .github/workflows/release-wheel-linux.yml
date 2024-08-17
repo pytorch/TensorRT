@@ -199,7 +199,7 @@ jobs:
           mkdir release/tarball
           mkdir release/wheel
           if [[ "${{ inputs.cxx11-tarball-release }}" == "true" ]]; then
-              bazel build //:libtorchtrt --compilation_mode opt --config=default
+              bazel build //:libtorchtrt --compilation_mode opt --config=linux
               cp bazel-bin/libtorchtrt.tar.gz \
               release/tarball/libtorchtrt-${BUILD_VERSION}-tensorrt${TRT_VERSION}-cuda${CU_VERSION:2}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
           else
