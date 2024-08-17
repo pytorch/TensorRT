@@ -364,9 +364,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             sd_weight = sd_weight.reshape(-1)
             if not isinstance(network_weight, torch.Tensor):
                 network_weight = torch.from_numpy(network_weight).cuda()
-            return (
-                sd_weight.shape == network_weight.shape
-                and torch.all(torch.abs(sd_weight - network_weight) < 0.1).cpu()
+            return sd_weight.shape == network_weight.shape and torch.all(
+                torch.abs(sd_weight - network_weight) < 0.1
             )
 
         MODULE_MAP = {
@@ -486,6 +485,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         # If the model original position is on CPU, set it back to CPU and save GPU memory
         if not gm_is_on_cuda:
             self.module.to("cpu")
+        del np_map, sd
         torch.cuda.empty_cache()
 
     def run(
