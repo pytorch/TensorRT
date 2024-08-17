@@ -24,13 +24,17 @@ def replace_full_like_with_full(
             input_tensor = node.args[0]
             fill_value = node.args[1]
             shape = list(input_tensor.meta["tensor_meta"].shape)
-
+ 
+            new_kwargs = {}
+            for key, val in node.kwargs.items():
+                if key != "memory_format":
+                    new_kwargs[key] = val
             # Replace full_like with full, using the shape as a list
             with gm.graph.inserting_after(node):
                 full_node = gm.graph.call_function(
                     torch.ops.aten.full.default,
                     args=(shape, fill_value),
-                    kwargs=node.kwargs,
+                    kwargs=new_kwargs,
                 )
                 full_node.meta = node.meta
 
