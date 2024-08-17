@@ -89,9 +89,9 @@ jobs:
         popd
         pushd .
         cd tests/py/ts
-        python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_api_test_results.xml api/
-        python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_models_test_results.xml models/
-        python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_integrations_test_results.xml integrations/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_api_test_results.xml api/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_models_test_results.xml models/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_integrations_test_results.xml integrations/
         popd
 
   tests-py-dynamo-converters:
@@ -116,7 +116,7 @@ jobs:
         export USE_HOST_DEPS=1
         pushd .
         cd tests/py/dynamo
-        python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 10 conversion/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 8 conversion/
         popd
 
   tests-py-dynamo-fe:
@@ -141,7 +141,7 @@ jobs:
         export USE_HOST_DEPS=1
         pushd .
         cd tests/py/dynamo
-        python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/
         popd
 
   tests-py-dynamo-serde:
@@ -166,7 +166,7 @@ jobs:
         export USE_HOST_DEPS=1
         pushd .
         cd tests/py/dynamo
-        python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/export_serde_test_results.xml --ir dynamo models/test_export_serde.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/export_serde_test_results.xml --ir dynamo models/test_export_serde.py
         popd
 
   tests-py-torch-compile-be:
@@ -193,7 +193,7 @@ jobs:
         cd tests/py/dynamo
         python -m pytest -ra -n 10 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_be_test_results.xml backend/
         python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_complete_be_e2e_test_results.xml --ir torch_compile models/test_models.py
-        python -m pytest --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_dyn_models_export.xml --ir torch_compile models/test_dyn_models.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_dyn_models_export.xml --ir torch_compile models/test_dyn_models.py
         popd
 
   tests-py-dynamo-core:
@@ -232,18 +232,15 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-    uses: ./.github/workflows/linux-test.yml
+    uses: ./.github/workflows/windows-test.yml
     with:
       job-name: tests-py-dynamo-cudagraphs
-      repository: "pytorch/tensorrt"
+      repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
+      pre-script: packaging/driver_upgrade.bat
       script: |
         export USE_HOST_DEPS=1
         pushd .
