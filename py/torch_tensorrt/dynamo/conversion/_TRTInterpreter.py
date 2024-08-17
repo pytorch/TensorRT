@@ -339,6 +339,31 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             f"TRT INetwork construction elapsed time: {datetime.now() - run_module_start_time}"
         )
 
+    @staticmethod
+    def find_weight(
+        weight_name: str, np_map: dict[str, Any], sd: dict[str, Any]
+    ) -> str:
+        network_weight = np_map[weight_name]
+        network_weight = torch.from_numpy(np_map[weight_name]).cuda()
+        for sd_w_name, sd_weight in sd.items():
+            if TRTInterpreter.check_weight_equal(sd_weight, network_weight):
+                del sd[sd_w_name]
+                return sd_w_name
+        return ""
+
+    @staticmethod
+    def check_weight_equal(
+        sd_weight: torch.tensor, network_weight: Union[torch.Tensor, np.ndarray]
+    ) -> Any:
+        if not isinstance(network_weight, torch.Tensor):
+            network_weight = torch.from_numpy(network_weight).cuda()
+        try:
+            return sd_weight.shape == network_weight.shape and torch.all(
+                torch.abs(sd_weight - network_weight) < 0.1
+            )
+        except Exception:
+            return torch.all(sd_weight == network_weight)
+
     def _save_weight_mapping(self) -> None:
         """
         Construct the weight name mapping from engine weight name to state_dict weight name.
@@ -347,26 +372,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         1. Name transformation from engine weight name to state_dict weight name
         2. Value mapping that, for each weight in INetworkDefinition search for identical weight in state_dict
         """
-
-        def find_weight(
-            weight_name: str, np_map: dict[str, Any], sd: dict[str, Any]
-        ) -> str:
-            network_weight = torch.from_numpy(np_map[weight_name]).cuda()
-            for sd_w_name, sd_weight in sd.items():
-                if check_weight_equal(sd_weight, network_weight):
-                    del sd[sd_w_name]
-                    return sd_w_name
-            return ""
-
-        def check_weight_equal(
-            sd_weight: torch.tensor, network_weight: Union[np.ndarray, torch.Tensor]
-        ) -> Any:
-            sd_weight = sd_weight.reshape(-1)
-            if not isinstance(network_weight, torch.Tensor):
-                network_weight = torch.from_numpy(network_weight).cuda()
-            return sd_weight.shape == network_weight.shape and torch.all(
-                torch.abs(sd_weight - network_weight) < 0.1
-            )
 
         MODULE_MAP = {
             "SCALE": (
@@ -416,11 +421,16 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.info("building weight name mapping...")
         # Stage 1: Name mapping
         sd = self.module.state_dict()
+        torch_device = to_torch_device(self.compilation_settings.device)
         gm_is_on_cuda = list(sd.values())[0].device.type == "cuda"
-        # If the model original position is on CPU, move it GPU
         if not gm_is_on_cuda:
-            self.module.to(to_torch_device(self.compilation_settings.device))
-        sd = self.module.state_dict()
+            # If the model original position is on CPU, move it GPU
+            sd = {
+                k: v.reshape(-1).to(torch_device)
+                for k, v in self.module.state_dict().items()
+            }
+        else:
+            sd = {k: v.reshape(-1) for k, v in self.module.state_dict().items()}
         weight_name_map: dict[str, Any] = {}
         np_map = {}
         net = self.ctx.net
@@ -469,10 +479,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             if "SCALE" in engine_weight_name:
                 # There is no direct connection in batch_norm layer. So skip it
                 pass
-            elif sd_weight_name not in sd or not check_weight_equal(
+            elif sd_weight_name not in sd or not TRTInterpreter.check_weight_equal(
                 sd[sd_weight_name], np_map[engine_weight_name]
             ):
-                weight_name_map[engine_weight_name] = find_weight(
+                weight_name_map[engine_weight_name] = TRTInterpreter.find_weight(
                     engine_weight_name, np_map, sd
                 )
 
@@ -482,9 +492,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             ]
 
         self.weight_name_map = weight_name_map
-        # If the model original position is on CPU, set it back to CPU and save GPU memory
-        if not gm_is_on_cuda:
-            self.module.to("cpu")
+
         del np_map, sd
         torch.cuda.empty_cache()
 
