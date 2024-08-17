@@ -136,16 +136,49 @@ def get_torch_inputs(
     on the mode requested.
     """
     device = to_torch_device(device)
-    if mode:
-        return [
-            input.example_tensor(mode).to(device)
-            for input in inputs
-            if isinstance(input, Input)
-        ]
-    return [
-        input.torch_tensor.to(device) if isinstance(input, Input) else input
-        for input in inputs
-    ]
+
+    if isinstance(inputs, dict):
+        result = {}
+        for k, v in inputs.items():
+            if isinstance(v, (list, tuple, dict)):
+                result[k] = get_torch_inputs(v, device)
+            elif isinstance(v, Input):
+                if len(mode) > 0:
+                    result[k] = v.example_tensor(mode).to(device)
+                else:
+                    result[k] = v.torch_tensor.to(device)
+    else:
+        result = []
+        for input in inputs:
+            if isinstance(input, Input):
+                if len(mode) > 0:
+                    result.append(input.example_tensor(mode).to(device))
+                else:
+                    result.append(input.torch_tensor.to(device))
+            elif isinstance(input, torch.Tensor):
+                result.append(input.to(device))
+            else:
+                raise AssertionError(f"Input type {type(input)} is not a valid type")
+
+    return result
+
+
+def get_model_device(module: torch.fx.GraphModule) -> Union[Device, torch.device, str]:
+    """
+    Returns the device on which the module parameters exist.
+    """
+    device = None
+    for parameter in list(module.parameters()):
+        if isinstance(parameter, (torch.nn.parameter.Parameter, torch.Tensor)):
+            device = parameter.device
+            break
+    
+    if device is None:
+        device = torch.device("cpu")
+        logger.warning(
+            "Could not detect the device on which the model exists. Assuming the model is on CPU"
+        )
+    return device
 
 
 def set_log_level(parent_logger: Any, level: Any) -> None:

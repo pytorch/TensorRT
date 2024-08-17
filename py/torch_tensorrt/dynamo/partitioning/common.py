@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional, Sequence, Set, Tuple
 
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
-from torch.fx.experimental.proxy_tensor import maybe_disable_fake_tensor_mode
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import DEBUG
 
@@ -90,7 +90,7 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
     Returns:
         Sequence of torch_tensorrt.Input's representing inputs to given module
     """
-    with maybe_disable_fake_tensor_mode():
+    with unset_fake_temporarily():
         torchtrt_inputs = []
         module_inputs = [
             node for node in module.graph.nodes if node.op == "placeholder"
