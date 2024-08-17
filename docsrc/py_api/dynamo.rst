@@ -26,7 +26,6 @@ Functions
 
 .. autofunction:: refit_module_weights
 
-
 Classes
 --------
 

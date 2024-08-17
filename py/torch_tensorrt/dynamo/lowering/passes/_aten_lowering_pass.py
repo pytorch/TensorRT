@@ -88,25 +88,21 @@ def _remove_lowering_pass(*, index: int) -> None:
     return
 
 
-def post_lowering(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[torch.Tensor]
-) -> torch.fx.GraphModule:
+def post_lowering(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """Applies the lowering passes to a graph module after torch.export/ torch.compile and their decompositions, returns the modified GraphModule"""
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_POST_LOWERING_PASSES}"
     )
-    return ATEN_POST_LOWERING_PASSES(gm, sample_inputs)
+    return ATEN_POST_LOWERING_PASSES(gm)
 
 
-def pre_export_lowering(
-    ep: torch.export.ExportedProgram, sample_inputs: Sequence[torch.Tensor]
-) -> torch.fx.GraphModule:
+def pre_export_lowering(ep: torch.export.ExportedProgram) -> torch.fx.GraphModule:
     """Applies the lowering passes to a graph module after torch.export/ torch.compile and their decompositions, returns the modified GraphModule"""
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_PRE_LOWERING_PASSES}"
     )
     gm = ep.graph_module
-    gm = ATEN_PRE_LOWERING_PASSES(gm, sample_inputs)
+    gm = ATEN_PRE_LOWERING_PASSES(gm)
     return ep
 
 

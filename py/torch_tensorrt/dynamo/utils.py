@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
@@ -13,7 +14,6 @@ from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
-import tensorrt as trt
 from packaging import version
 
 from .types import TRTDataType
@@ -128,57 +128,45 @@ def input_is_dynamic(inputs: Sequence[Union[Input, torch.Tensor]]) -> bool:
 
 
 def get_torch_inputs(
-    inputs: Sequence[Input], device: Union[Device, torch.device, str], mode: str = ""
-) -> Sequence[torch.tensor]:
+    inputs: Sequence[Input] | Dict[Any, Any],
+    device: Union[Device, torch.device, str],
+    mode: str = "",
+) -> Sequence[torch.tensor] | Dict[Any, Any]:
     """
     Return the torch_tensor from the Input object. If mode is set, this implies
     user is using dynamic shaped inputs and return the corresponding input based
     on the mode requested.
     """
     device = to_torch_device(device)
+    if mode:
+        if isinstance(inputs, dict):
+            result = {}
+            for k, v in inputs.items():
+                if isinstance(v, (list, tuple, dict)):
+                    result[k] = get_torch_inputs(v, device)
+                else:
+                    result[k] = v.example_tensor(mode).to(device)
+            return result
+        else:
+            return [
+                input.example_tensor(mode).to(device)
+                for input in inputs
+                if isinstance(input, Input)
+            ]
 
     if isinstance(inputs, dict):
         result = {}
         for k, v in inputs.items():
             if isinstance(v, (list, tuple, dict)):
                 result[k] = get_torch_inputs(v, device)
-            elif isinstance(v, Input):
-                if len(mode) > 0:
-                    result[k] = v.example_tensor(mode).to(device)
-                else:
-                    result[k] = v.torch_tensor.to(device)
-    else:
-        result = []
-        for input in inputs:
-            if isinstance(input, Input):
-                if len(mode) > 0:
-                    result.append(input.example_tensor(mode).to(device))
-                else:
-                    result.append(input.torch_tensor.to(device))
-            elif isinstance(input, torch.Tensor):
-                result.append(input.to(device))
             else:
-                raise AssertionError(f"Input type {type(input)} is not a valid type")
-
-    return result
-
-
-def get_model_device(module: torch.fx.GraphModule) -> Union[Device, torch.device, str]:
-    """
-    Returns the device on which the module parameters exist.
-    """
-    device = None
-    for parameter in list(module.parameters()):
-        if isinstance(parameter, (torch.nn.parameter.Parameter, torch.Tensor)):
-            device = parameter.device
-            break
-    
-    if device is None:
-        device = torch.device("cpu")
-        logger.warning(
-            "Could not detect the device on which the model exists. Assuming the model is on CPU"
-        )
-    return device
+                result[k] = v.torch_tensor.to(device)
+        return result
+    else:
+        return [
+            input.torch_tensor.to(device) if isinstance(input, Input) else input
+            for input in inputs
+        ]
 
 
 def set_log_level(parent_logger: Any, level: Any) -> None:
@@ -409,9 +397,12 @@ def req_torch_version(min_torch_version: str = "2.dev") -> Callable[..., Any]:
 def check_output(
     new_module: torch.fx.GraphModule,
     refitted_module: torch.fx.GraphModule,
-    inputs: tuple[Any, ...],
+    arg_inputs: Any,
+    kwarg_inputs: Any = None,
 ) -> bool:
-    old_outputs, new_outputs = refitted_module(*inputs), new_module(*inputs)
+    old_outputs, new_outputs = refitted_module(*arg_inputs), new_module(
+        *arg_inputs, **kwarg_inputs
+    )
     for old_output, new_output in zip(old_outputs, new_outputs):
         if isinstance(old_output, torch.Tensor) and isinstance(
             new_outputs, torch.Tensor
@@ -420,3 +411,31 @@ def check_output(
                 return False
 
     return True
+
+
+def get_flat_args_with_check(
+    exported_program: torch.export.ExportedProgram,
+    args: list[Any],
+    kwargs: dict[str, Any],
+) -> tuple[Any, Any]:
+    """Flatten args, kwargs using pytree, then, check specs.
+
+    Args:
+        args: List[Any] original args passed to __call__
+        kwargs: Dict[str, Any] original kwargs passed to __call
+
+    Returns:
+        A tuple of (flat_args, received_spec)
+        flat_args is flattend args / kwargs
+        received_spec is the pytree spec produced while flattening the
+        tuple (args, kwargs)
+    """
+    import torch.utils._pytree as pytree
+    from torch.export._tree_utils import reorder_kwargs
+
+    in_spec = exported_program.call_spec.in_spec
+    if in_spec is not None:
+        kwargs = reorder_kwargs(kwargs, in_spec)
+    flat_args_with_path, received_spec = pytree.tree_flatten_with_path((args, kwargs))
+    flat_args = tuple(x[1] for x in flat_args_with_path)
+    return flat_args, received_spec

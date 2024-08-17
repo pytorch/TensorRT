@@ -548,6 +548,7 @@ def aten_ops_hard_sigmoid(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.matmul, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.dot.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mm.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mv.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.bmm.default, supports_dynamic_shapes=True)
@@ -2800,7 +2801,9 @@ def aten_ops_reshape(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.pixel_shuffle.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.pixel_shuffle.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2823,7 +2826,9 @@ def aten_ops_pixel_shuffle(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.pixel_unshuffle.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.pixel_unshuffle.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2870,7 +2875,7 @@ def aten_ops_resize(
 
 
 @enforce_tensor_types({0: (TRTTensor,)})
-@dynamo_tensorrt_converter(torch.ops.aten.argmax.default)
+@dynamo_tensorrt_converter(torch.ops.aten.argmax.default, supports_dynamic_shapes=True)
 def aten_ops_argmax(
     ctx: ConversionContext,
     target: Target,
@@ -2890,7 +2895,7 @@ def aten_ops_argmax(
 
 
 @enforce_tensor_types({0: (TRTTensor,)})
-@dynamo_tensorrt_converter(torch.ops.aten.argmin.default)
+@dynamo_tensorrt_converter(torch.ops.aten.argmin.default, supports_dynamic_shapes=True)
 def aten_ops_argmin(
     ctx: ConversionContext,
     target: Target,
@@ -2937,7 +2942,9 @@ def aten_ops_addmm(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.constant_pad_nd.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.constant_pad_nd.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2961,9 +2968,15 @@ def aten_ops_constant_pad(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.reflection_pad1d.default)
-@dynamo_tensorrt_converter(torch.ops.aten.reflection_pad2d.default)
-@dynamo_tensorrt_converter(torch.ops.aten.reflection_pad3d.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.reflection_pad1d.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.reflection_pad2d.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.reflection_pad3d.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2986,9 +2999,15 @@ def aten_ops_reflection_pad(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.replication_pad1d.default)
-@dynamo_tensorrt_converter(torch.ops.aten.replication_pad2d.default)
-@dynamo_tensorrt_converter(torch.ops.aten.replication_pad3d.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.replication_pad1d.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.replication_pad2d.default, supports_dynamic_shapes=True
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.replication_pad3d.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -3011,7 +3030,9 @@ def aten_ops_replication_pad(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten._pad_circular.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten._pad_circular.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -3034,7 +3055,7 @@ def aten_ops_circular_pad(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.pad.default)
+@dynamo_tensorrt_converter(torch.ops.aten.pad.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -3568,7 +3589,9 @@ def aten_ops_any(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten._pdist_forward.default)
+@dynamo_tensorrt_converter(
+    torch.ops.aten._pdist_forward.default, supports_dynamic_shapes=True
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),

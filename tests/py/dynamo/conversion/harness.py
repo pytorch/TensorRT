@@ -228,7 +228,7 @@ class DispatchTestCase(TRTTestCase):
         torch_inputs = get_torch_inputs(original_inputs, _defaults.DEVICE)
         if use_dynamo_tracer:
             exported_program = torch_tensorrt.dynamo.trace(mod, tuple(original_inputs))
-            exported_program = pre_export_lowering(exported_program, torch_inputs)
+            exported_program = pre_export_lowering(exported_program)
             exported_program = exported_program.run_decompositions(
                 get_decompositions(False)
             )
@@ -237,7 +237,7 @@ class DispatchTestCase(TRTTestCase):
             fx_module = torch.fx.symbolic_trace(mod)
 
         if enable_passes:
-            fx_module = post_lowering(fx_module, original_inputs)
+            fx_module = post_lowering(fx_module)
 
         if propagate_shapes:
             # TODO: This is currently being used to test embedding_bag_aten due to https://github.com/pytorch/TensorRT/issues/2843
@@ -382,6 +382,7 @@ class DispatchTestCase(TRTTestCase):
         use_example_tensors=True,
         pyt_inputs=None,
         propagate_shapes=False,
+        check_dtype=True,
     ):
         mod = self.generate_graph(
             mod,
@@ -394,6 +395,14 @@ class DispatchTestCase(TRTTestCase):
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
         compilation_settings = CompilationSettings(truncate_double=True)
+
+        if check_dtype:
+            output_dtypes = infer_module_output_dtypes(
+                mod,
+                input_specs,
+                compilation_settings.device,
+                truncate_double=compilation_settings.truncate_double,
+            )
 
         interp = TRTInterpreter(
             mod,

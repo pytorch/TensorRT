@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.5.0.dev0+e960b1f documentation</title>
+  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.5.0.dev0+4d8a94a documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+e960b1f
+                  v2.5.0.dev0+4d8a94a
                 </div>
               
             
@@ -457,16 +457,17 @@
 <span class="kn">import</span> <span class="nn">collections.abc</span>
 <span class="kn">import</span> <span class="nn">copy</span>
 <span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
 
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">torch.export</span> <span class="kn">import</span> <span class="n">ExportedProgram</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt._enums</span> <span class="kn">import</span> <span class="n">dtype</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt._Input</span> <span class="kn">import</span> <span class="n">Input</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo</span> <span class="kn">import</span> <span class="n">partitioning</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._exporter</span> <span class="kn">import</span> <span class="n">inline_torch_modules</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.conversion</span> <span class="kn">import</span> <span class="n">CompilationSettings</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._settings</span> <span class="kn">import</span> <span class="n">CompilationSettings</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.conversion._conversion</span> <span class="kn">import</span> <span class="n">infer_module_output_dtypes</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">DYNAMO_CONVERTERS</span> <span class="k">as</span> <span class="n">CONVERTERS</span><span class="p">,</span>
@@ -489,14 +490,11 @@
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">check_output</span><span class="p">,</span>
     <span class="n">get_torch_inputs</span><span class="p">,</span>
-    <span class="n">prepare_inputs</span><span class="p">,</span>
     <span class="n">set_log_level</span><span class="p">,</span>
     <span class="n">to_torch_device</span><span class="p">,</span>
     <span class="n">to_torch_tensorrt_device</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.logging</span> <span class="kn">import</span> <span class="n">TRT_LOGGER</span>
-
-<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -555,11 +553,7 @@
             <span class="n">layer</span><span class="o">.</span><span class="vm">__class__</span> <span class="o">=</span> <span class="n">MODULE_MAP</span><span class="p">[</span><span class="n">layer_type</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
             <span class="k">for</span> <span class="n">weight_type</span><span class="p">,</span> <span class="n">weight_name</span> <span class="ow">in</span> <span class="n">MODULE_MAP</span><span class="p">[</span><span class="n">layer_type</span><span class="p">][</span><span class="mi">1</span><span class="p">]:</span>
                 <span class="n">weight</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="fm">__getattribute__</span><span class="p">(</span><span class="n">weight_type</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-                <span class="n">weight_dtype_opt</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">weight</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
-                <span class="k">assert</span> <span class="p">(</span>
-                    <span class="n">weight_dtype_opt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-                <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;Weights </span><span class="si">{</span><span class="n">weight_name</span><span class="si">}</span><span class="s2"> has unsupported dtype </span><span class="si">{</span><span class="n">weight</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">&quot;</span>
-                <span class="n">weight_dtype</span> <span class="o">=</span> <span class="n">weight_dtype_opt</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">)</span>
+                <span class="n">weight_dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">weight</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">)</span>
                 <span class="n">weight_map</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">weight_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
                     <span class="n">weight</span><span class="p">,</span>
                     <span class="n">weight_dtype</span><span class="p">,</span>
@@ -568,45 +562,107 @@
     <span class="k">return</span> <span class="n">weight_map</span>
 
 
+<span class="k">def</span> <span class="nf">construct_refit_mapping_from_weight_name_map</span><span class="p">(</span>
+    <span class="n">weight_name_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">state_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="n">engine_weight_map</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">engine_weight_name</span><span class="p">,</span> <span class="p">(</span><span class="n">sd_weight_name</span><span class="p">,</span> <span class="n">np_weight_type</span><span class="p">)</span> <span class="ow">in</span> <span class="n">weight_name_map</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">trt_dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">np_weight_type</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">)</span>
+        <span class="n">torch_dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">np_weight_type</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">engine_weight_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;SCALE&quot;</span><span class="p">,</span> <span class="s2">&quot;SHIFT&quot;</span><span class="p">]:</span>
+            <span class="c1"># Batch Norm Layer</span>
+            <span class="n">params</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">sd_weight_name</span><span class="p">:</span>
+                <span class="n">params</span><span class="p">[</span><span class="n">w</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span> <span class="o">=</span> <span class="n">state_dict</span><span class="p">[</span><span class="n">w</span><span class="p">]</span>
+            <span class="n">scale</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="s2">&quot;weight&quot;</span><span class="p">]</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="s2">&quot;running_var&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mf">1e-7</span><span class="p">)</span>
+            <span class="n">shift</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="s2">&quot;bias&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="n">params</span><span class="p">[</span><span class="s2">&quot;running_mean&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">scale</span>
+            <span class="c1"># Set scale to scale or shift to shift</span>
+            <span class="n">engine_weight_map</span><span class="p">[</span><span class="n">engine_weight_name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">eval</span><span class="p">(</span>
+                <span class="n">engine_weight_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">sd_weight_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">state_dict</span><span class="p">:</span>
+            <span class="c1"># If weights is not in sd, we can leave it unchanged</span>
+            <span class="k">continue</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">engine_weight_map</span><span class="p">[</span><span class="n">engine_weight_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">state_dict</span><span class="p">[</span><span class="n">sd_weight_name</span><span class="p">]</span>
+
+        <span class="n">engine_weight_map</span><span class="p">[</span><span class="n">engine_weight_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">engine_weight_map</span><span class="p">[</span><span class="n">engine_weight_name</span><span class="p">]</span>
+            <span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+            <span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+            <span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch_dtype</span><span class="p">),</span>
+            <span class="n">trt_dtype</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">engine_weight_map</span>
+
+
 <span class="k">def</span> <span class="nf">_refit_single_trt_engine_with_gm</span><span class="p">(</span>
     <span class="n">new_gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
     <span class="n">old_engine</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">ICudaEngine</span><span class="p">,</span>
-    <span class="n">input_list</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">input_list</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span>
     <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(),</span>
+    <span class="n">weight_name_map</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Refit a TensorRT Engine in place</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="c1"># Get the refitting mapping</span>
-    <span class="n">mapping</span> <span class="o">=</span> <span class="n">construct_refit_mapping</span><span class="p">(</span><span class="n">new_gm</span><span class="p">,</span> <span class="n">input_list</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+
     <span class="n">refitted</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
 
-    <span class="n">trt_wt_location</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorLocation</span><span class="o">.</span><span class="n">HOST</span>
     <span class="n">refitter</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Refitter</span><span class="p">(</span><span class="n">old_engine</span><span class="p">,</span> <span class="n">TRT_LOGGER</span><span class="p">)</span>
     <span class="n">weight_list</span> <span class="o">=</span> <span class="n">refitter</span><span class="o">.</span><span class="n">get_all_weights</span><span class="p">()</span>
 
-    <span class="k">for</span> <span class="n">layer_name</span> <span class="ow">in</span> <span class="n">weight_list</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">layer_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mapping</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2"> is not found in weight mapping&quot;</span><span class="p">)</span>
-        <span class="c1"># Use Numpy to create weights</span>
-        <span class="n">weight</span><span class="p">,</span> <span class="n">datatype</span> <span class="o">=</span> <span class="n">mapping</span><span class="p">[</span><span class="n">layer_name</span><span class="p">]</span>
-        <span class="n">trt_wt_tensor</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Weights</span><span class="p">(</span><span class="n">datatype</span><span class="p">,</span> <span class="n">weight</span><span class="o">.</span><span class="n">ctypes</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">weight</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
-        <span class="n">refitter</span><span class="o">.</span><span class="n">set_named_weights</span><span class="p">(</span><span class="n">layer_name</span><span class="p">,</span> <span class="n">trt_wt_tensor</span><span class="p">,</span> <span class="n">trt_wt_location</span><span class="p">)</span>
-        <span class="n">refitted</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">layer_name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">weight_name_map</span><span class="p">:</span>
+        <span class="c1"># Get the refitting mapping</span>
+        <span class="n">trt_wt_location</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorLocation</span><span class="o">.</span><span class="n">DEVICE</span>
+        <span class="n">mapping</span> <span class="o">=</span> <span class="n">construct_refit_mapping_from_weight_name_map</span><span class="p">(</span>
+            <span class="n">weight_name_map</span><span class="p">,</span> <span class="n">new_gm</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">layer_name</span> <span class="ow">in</span> <span class="n">weight_list</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">layer_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mapping</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2"> is not found in weight mapping.&quot;</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="c1"># Use Numpy to create weights</span>
+            <span class="n">weight</span><span class="p">,</span> <span class="n">weight_dtype</span> <span class="o">=</span> <span class="n">mapping</span><span class="p">[</span><span class="n">layer_name</span><span class="p">]</span>
+            <span class="n">trt_wt_tensor</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Weights</span><span class="p">(</span>
+                <span class="n">weight_dtype</span><span class="p">,</span> <span class="n">weight</span><span class="o">.</span><span class="n">data_ptr</span><span class="p">(),</span> <span class="n">torch</span><span class="o">.</span><span class="n">numel</span><span class="p">(</span><span class="n">weight</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">refitter</span><span class="o">.</span><span class="n">set_named_weights</span><span class="p">(</span><span class="n">layer_name</span><span class="p">,</span> <span class="n">trt_wt_tensor</span><span class="p">,</span> <span class="n">trt_wt_location</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">refitter</span><span class="o">.</span><span class="n">get_missing_weights</span><span class="p">())</span> <span class="o">==</span> <span class="mi">0</span>
+        <span class="p">),</span> <span class="s2">&quot;Fast refitting failed due to incomplete mapping&quot;</span>
 
-    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">refitted</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">weight_list</span><span class="p">):</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Not all weights have been refitted!!!&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">mapping</span> <span class="o">=</span> <span class="n">construct_refit_mapping</span><span class="p">(</span><span class="n">new_gm</span><span class="p">,</span> <span class="n">input_list</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+        <span class="n">trt_wt_location</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorLocation</span><span class="o">.</span><span class="n">HOST</span>
+        <span class="k">for</span> <span class="n">layer_name</span> <span class="ow">in</span> <span class="n">weight_list</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">layer_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mapping</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2"> is not found in weight mapping&quot;</span><span class="p">)</span>
+            <span class="c1"># Use Numpy to create weights</span>
+            <span class="n">weight</span><span class="p">,</span> <span class="n">datatype</span> <span class="o">=</span> <span class="n">mapping</span><span class="p">[</span><span class="n">layer_name</span><span class="p">]</span>
+            <span class="n">trt_wt_tensor</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Weights</span><span class="p">(</span><span class="n">datatype</span><span class="p">,</span> <span class="n">weight</span><span class="o">.</span><span class="n">ctypes</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">weight</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+            <span class="n">refitter</span><span class="o">.</span><span class="n">set_named_weights</span><span class="p">(</span><span class="n">layer_name</span><span class="p">,</span> <span class="n">trt_wt_tensor</span><span class="p">,</span> <span class="n">trt_wt_location</span><span class="p">)</span>
+            <span class="n">refitted</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">layer_name</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">refitted</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">weight_list</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Not all weights have been refitted!!!&quot;</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">refitter</span><span class="o">.</span><span class="n">refit_cuda_engine</span><span class="p">():</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error: failed to refit new weights.&quot;</span><span class="p">)</span>
-        <span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;Refitting failed.&quot;</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="refit_module_weights"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.refit_module_weights">[docs]</a><span class="k">def</span> <span class="nf">refit_module_weights</span><span class="p">(</span>
     <span class="n">compiled_module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span> <span class="o">|</span> <span class="n">ExportedProgram</span><span class="p">,</span>
     <span class="n">new_weight_module</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
-    <span class="n">inputs</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">verify_output</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">use_weight_map_cache</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">in_place</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Refit a compiled graph module with ExportedProgram. This performs weight updates in compiled_module without recompiling the engine.</span>
@@ -616,7 +672,8 @@
 <span class="sd">                        This compiled_module should be compmiled by torch_tensorrt.dynamo.compile</span>
 <span class="sd">                        or load it from disk using trt.load.</span>
 <span class="sd">        new_weight_module: exported program with the updated weights. This one should have the same model architecture as the compiled module.</span>
-<span class="sd">        inputs: sample inputs</span>
+<span class="sd">        arg_inputs: sample arg inputs. Optional, needed if output check</span>
+<span class="sd">        kwarg_inputs: sample kwarg inputs. Optional, needed if output check</span>
 <span class="sd">        verify_output: whether to verify output of refitted module</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        A new compiled TensorRT module that has the updated weights.</span>
@@ -628,7 +685,12 @@
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">compiled_module</span><span class="o">.</span><span class="n">named_children</span><span class="p">()))</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="n">inline_module</span> <span class="o">=</span> <span class="kc">True</span>
 
-    <span class="n">compiled_module</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">compiled_module</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">in_place</span><span class="p">:</span>
+        <span class="n">compiled_module</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">compiled_module</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">inline_module</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+            <span class="s2">&quot;Exported program does not support modifying in place. Please set inplace to false and use the returned graph module.&quot;</span>
+        <span class="p">)</span>
 
     <span class="c1"># Get the settings and check the setting to be uniform</span>
     <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="kc">None</span>
@@ -640,13 +702,14 @@
             <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">engine</span> <span class="ow">in</span> <span class="n">compiled_module</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
             <span class="k">if</span> <span class="s2">&quot;engine&quot;</span> <span class="ow">in</span> <span class="n">name</span>
         <span class="p">]</span>
-        <span class="n">encoded_settings</span> <span class="o">=</span> <span class="n">compiled_submodules</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">__getstate__</span><span class="p">()[</span><span class="mi">0</span><span class="p">][</span>
+        <span class="c1"># [(&#39;_run_on_acc_0&#39;, inline_module)]</span>
+        <span class="n">encoded_metadata</span> <span class="o">=</span> <span class="n">compiled_submodules</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">__getstate__</span><span class="p">()[</span><span class="mi">0</span><span class="p">][</span>
             <span class="n">SERIALIZED_METADATA_IDX</span>
         <span class="p">]</span>
         <span class="k">assert</span> <span class="p">(</span>
-            <span class="n">encoded_settings</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span>
-        <span class="p">),</span> <span class="s2">&quot;Settings are not saved in the engine. Please recompile the engine with make_refitable=True.&quot;</span>
-        <span class="n">settings</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">decode_metadata</span><span class="p">(</span><span class="n">encoded_settings</span><span class="p">)</span>
+            <span class="n">encoded_metadata</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span>
+        <span class="p">),</span> <span class="s2">&quot;The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version with make_refitable=True&quot;</span>
+        <span class="n">settings</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">decode_metadata</span><span class="p">(</span><span class="n">encoded_metadata</span><span class="p">)[</span><span class="s2">&quot;settings&quot;</span><span class="p">]</span>
         <span class="c1"># Handle torch modules</span>
         <span class="n">compiled_submodules_map</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">compiled_submodules</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">submodule</span> <span class="ow">in</span> <span class="n">compiled_module</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
@@ -667,19 +730,21 @@
     <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">debug</span><span class="p">:</span>
         <span class="n">set_log_level</span><span class="p">(</span><span class="n">logger</span><span class="o">.</span><span class="n">parent</span><span class="p">,</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
 
-    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
-        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">inputs</span><span class="p">]</span>
-
-    <span class="c1"># Prepare torch_trt inputs</span>
-    <span class="n">inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
     <span class="n">device</span> <span class="o">=</span> <span class="n">to_torch_tensorrt_device</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
-    <span class="n">torch_inputs</span> <span class="o">=</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">arg_inputs</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
+            <span class="c1"># Prepare torch_trt inputs</span>
+            <span class="n">arg_inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">arg_inputs</span><span class="p">]</span>
+        <span class="n">torch_inputs</span> <span class="o">=</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">kwarg_inputs</span><span class="p">:</span>
+        <span class="n">torch_kwarg_inputs</span> <span class="o">=</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
     <span class="n">runtime</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Runtime</span><span class="p">(</span><span class="n">TRT_LOGGER</span><span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">new_weight_module</span><span class="p">,</span> <span class="n">ExportedProgram</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Input graph should be an ExportedProgram but got type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">new_weight_module</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
         <span class="p">)</span>
-    <span class="n">new_weight_module</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">new_weight_module</span><span class="p">,</span> <span class="n">torch_inputs</span><span class="p">)</span>
+    <span class="n">new_weight_module</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">new_weight_module</span><span class="p">)</span>
     <span class="n">new_weight_module</span> <span class="o">=</span> <span class="n">new_weight_module</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
         <span class="n">get_decompositions</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">enable_experimental_decompositions</span><span class="p">)</span>
     <span class="p">)</span>
@@ -687,7 +752,7 @@
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">new_gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
     <span class="c1"># Apply lowering on the graph module</span>
 
-    <span class="n">new_gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">new_gm</span><span class="p">,</span> <span class="n">torch_inputs</span><span class="p">)</span>
+    <span class="n">new_gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">new_gm</span><span class="p">)</span>
 
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
 
@@ -743,6 +808,7 @@
         <span class="c1"># Extract engine from the submodule</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">inline_module</span><span class="p">:</span>
+                <span class="n">weight_name_map</span> <span class="o">=</span> <span class="kc">None</span>
                 <span class="n">compiled_submodule</span> <span class="o">=</span> <span class="n">compiled_submodules_map</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
                 <span class="c1"># If this is a torch module, load the old state_dict</span>
                 <span class="k">if</span> <span class="s2">&quot;_run_on_acc&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
@@ -753,8 +819,33 @@
                     <span class="n">engine</span> <span class="o">=</span> <span class="n">get_engine_from_encoded_engine</span><span class="p">(</span>
                         <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">],</span> <span class="n">runtime</span>
                     <span class="p">)</span>
+                    <span class="k">if</span> <span class="n">use_weight_map_cache</span><span class="p">:</span>
+                        <span class="n">encoded_metadata</span> <span class="o">=</span> <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">__getstate__</span><span class="p">()[</span><span class="mi">0</span><span class="p">][</span>
+                            <span class="n">SERIALIZED_METADATA_IDX</span>
+                        <span class="p">]</span>
+                        <span class="n">weight_name_map</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">decode_metadata</span><span class="p">(</span>
+                            <span class="n">encoded_metadata</span>
+                        <span class="p">)[</span><span class="s2">&quot;weight_name_map&quot;</span><span class="p">]</span>
+                        <span class="k">if</span> <span class="ow">not</span> <span class="n">weight_name_map</span><span class="p">:</span>
+                            <span class="n">use_weight_map_cache</span> <span class="o">=</span> <span class="kc">False</span>
+                            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                                <span class="s2">&quot;This engine does not have a weight map cache. Rebuilding the weight map&quot;</span>
+                            <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">compiled_submodule</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">compiled_module</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+                <span class="n">weight_name_map</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">if</span> <span class="n">use_weight_map_cache</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">weight_name_map</span> <span class="o">=</span> <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">weight_name_map</span>
+                    <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                            <span class="s2">&quot;The module was compiled with an old version of Torch-TensorRT. Rebuilding the weight map.&quot;</span>
+                        <span class="p">)</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">weight_name_map</span><span class="p">:</span>
+                        <span class="n">use_weight_map_cache</span> <span class="o">=</span> <span class="kc">False</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                            <span class="s2">&quot;This engine does not have a weight map cache. Rebuilding the weight map&quot;</span>
+                        <span class="p">)</span>
                 <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compiled_submodule</span><span class="p">,</span> <span class="n">PythonTorchTensorRTModule</span><span class="p">):</span>
                     <span class="n">engine</span> <span class="o">=</span> <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">engine</span>
                 <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compiled_submodule</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span><span class="p">):</span>
@@ -791,13 +882,25 @@
                 <span class="n">to_torch_device</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span><span class="p">),</span>
                 <span class="n">name</span><span class="p">,</span>
             <span class="p">)</span>
-
-        <span class="n">_refit_single_trt_engine_with_gm</span><span class="p">(</span>
-            <span class="n">new_gm</span><span class="o">=</span><span class="n">new_submodule</span><span class="p">,</span>
-            <span class="n">old_engine</span><span class="o">=</span><span class="n">engine</span><span class="p">,</span>
-            <span class="n">input_list</span><span class="o">=</span><span class="n">submodule_inputs</span><span class="p">,</span>
-            <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">,</span>
-        <span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">_refit_single_trt_engine_with_gm</span><span class="p">(</span>
+                <span class="n">new_gm</span><span class="o">=</span><span class="n">new_submodule</span><span class="p">,</span>
+                <span class="n">old_engine</span><span class="o">=</span><span class="n">engine</span><span class="p">,</span>
+                <span class="n">input_list</span><span class="o">=</span><span class="n">submodule_inputs</span><span class="p">,</span>
+                <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">,</span>
+                <span class="n">weight_name_map</span><span class="o">=</span><span class="n">weight_name_map</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">AssertionError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="c1"># If fast_refit is used and failed, we fall back to regular refit</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">use_weight_map_cache</span> <span class="ow">and</span> <span class="n">weight_name_map</span><span class="p">:</span>
+                <span class="n">_refit_single_trt_engine_with_gm</span><span class="p">(</span>
+                    <span class="n">new_gm</span><span class="o">=</span><span class="n">new_submodule</span><span class="p">,</span>
+                    <span class="n">old_engine</span><span class="o">=</span><span class="n">engine</span><span class="p">,</span>
+                    <span class="n">input_list</span><span class="o">=</span><span class="n">submodule_inputs</span><span class="p">,</span>
+                    <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">,</span>
+                    <span class="n">weight_name_map</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="p">)</span>
 
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compiled_submodule</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span><span class="p">):</span>
             <span class="n">serialized_engine</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">engine</span><span class="o">.</span><span class="n">serialize</span><span class="p">())</span>
@@ -813,11 +916,12 @@
             <span class="n">refitted_engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">new_engine_info</span><span class="p">))</span>
             <span class="nb">setattr</span><span class="p">(</span><span class="n">compiled_module</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_engine&quot;</span><span class="p">,</span> <span class="n">refitted_engine</span><span class="p">)</span>
 
-    <span class="k">if</span> <span class="n">verify_output</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">verify_output</span> <span class="ow">and</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">check_output</span><span class="p">(</span>
             <span class="n">new_module</span><span class="o">=</span><span class="n">new_gm</span><span class="p">,</span>
             <span class="n">refitted_module</span><span class="o">=</span><span class="n">compiled_module</span><span class="p">,</span>
-            <span class="n">inputs</span><span class="o">=</span><span class="n">torch_inputs</span><span class="p">,</span>
+            <span class="n">arg_inputs</span><span class="o">=</span><span class="n">torch_inputs</span><span class="p">,</span>
+            <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torch_kwarg_inputs</span><span class="p">,</span>
         <span class="p">):</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Refitting Succeed!&quot;</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>

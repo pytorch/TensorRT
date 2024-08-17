@@ -274,6 +274,42 @@ def test_resnet18(ir):
 
 
 @pytest.mark.unit
+def test_resnet18_dynamic(ir):
+    """
+    This tests export save and load functionality on Resnet18 model
+    """
+    model = models.resnet18().eval().cuda()
+    input = torch.randn((1, 3, 224, 224)).to("cuda")
+
+    compile_spec = {
+        "inputs": [
+            torchtrt.Input(
+                min_shape=(1, 3, 224, 224),
+                opt_shape=(4, 3, 224, 224),
+                max_shape=(8, 3, 224, 224),
+                dtype=torch.float32,
+                name="x",
+            )
+        ],
+        "ir": ir,
+        "min_block_size": 1,
+    }
+
+    exp_program = torchtrt.dynamo.trace(model, **compile_spec)
+    trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
+    torchtrt.save(trt_module, trt_ep_path, inputs=[input])
+    # TODO: Enable this serialization issues are fixed
+    # deser_trt_module = torchtrt.load(trt_ep_path).module()
+    outputs_pyt = model(input)
+    outputs_trt = trt_module(input)
+    cos_sim = cosine_similarity(outputs_pyt, outputs_trt[0])
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_resnet18 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
+
+
+@pytest.mark.unit
 def test_hybrid_conv_fallback(ir):
     """
     This tests export save and load functionality on a hybrid
