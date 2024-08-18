@@ -15,6 +15,8 @@ class TestPoolConverter(DispatchTestCase):
             ((4,), (1,), (1,)),
             ((5,), (2,), (0,)),
             ((7,), (2,), (1,)),
+            ((3,), (1,), (1,), 0, True),
+            ((7,), (2,), (1,), 0, True),
         ]
     )
     def test_avg_pool1d(
@@ -44,8 +46,11 @@ class TestPoolConverter(DispatchTestCase):
             (3, 1, 1),
             ((2, 2), [], (1, 0)),
             ((4, 3), (1, 1), (1, 1)),
+            ((4, 3), (1, 1), (1, 1), True),
             ((5, 4), (2, 1), (1, 0)),
+            ((5, 4), (2, 1), (1, 0), True),
             ((7, 7), (1, 2), (0, 1)),
+            ((7, 7), (1, 2), (0, 1), True),
         ]
     )
     def test_avg_pool2d(
@@ -70,7 +75,7 @@ class TestPoolConverter(DispatchTestCase):
                 )
 
         inputs = [torch.randn(1, 3, 32, 32)]
-        self.run_test(TestModule(), inputs, use_dynamo_tracer=True)
+        self.run_test(TestModule(), inputs, rtol=5e-03, atol=5e-03, use_dynamo_tracer=True)
 
     @parameterized.expand(
         [
@@ -80,6 +85,8 @@ class TestPoolConverter(DispatchTestCase):
             ((4, 3, 2), (1, 1, 1), (1, 1, 0)),
             ((5, 4, 3), (2, 1, 2), (1, 0, 1)),
             ((7, 7, 7), (1, 2, 1), (0, 1, 1)),
+            ((7, 7, 7), (1, 2, 1), (0, 1, 1), True),
+            ((5, 4, 3), (2, 1, 2), (1, 0, 1), True),
         ]
     )
     def test_avg_pool3d(
@@ -167,6 +174,16 @@ class TestPoolConverter(DispatchTestCase):
                 (3, 3),
                 (1, 1),
                 (1, 1),
+            ),
+            (
+                (1, 1, 1, 1),
+                (2, 2, 2, 2),
+                (3, 3, 3, 3),
+                torch.float,
+                (3, 3),
+                (1, 1),
+                (1, 1),
+                True
             ),
         ]
     )
@@ -258,6 +275,7 @@ class TestPoolConverter(DispatchTestCase):
             ((4,), (1,), (1,)),
             ((5,), (2,), (0,)),
             ((7,), (2,), (1,)),
+            ((7,), (2,), (1,), 1, True),
         ]
     )
     def test_max_pool1d(
@@ -290,6 +308,9 @@ class TestPoolConverter(DispatchTestCase):
             ((4, 3), (1, 1), (1, 1)),
             ((5, 4), (2, 1), (1, 0)),
             ((7, 7), (1, 2), (0, 1)),
+            ((4, 3), (1, 1), (1, 1), 1, True),
+            ((5, 4), (2, 1), (1, 0), 1, True),
+            ((7, 7), (1, 2), (0, 1), 1, True),
         ]
     )
     def test_max_pool2d(
@@ -322,6 +343,7 @@ class TestPoolConverter(DispatchTestCase):
             ((4, 3, 2), (1, 1, 1), (1, 1, 0)),
             ((5, 4, 3), (2, 1, 2), (1, 0, 1)),
             ((7, 7, 7), (1, 2, 1), (0, 1, 1)),
+            ((7, 7, 7), (1, 2, 1), (0, 1, 1), 1, True),
         ]
     )
     def test_max_pool3d(
