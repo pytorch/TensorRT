@@ -91,8 +91,8 @@ def test_mapping():
 @pytest.mark.unit
 def test_refit_one_engine_with_weightmap():
 
-    model = models.resnet18(pretrained=False).eval().to("cuda")
-    model2 = models.resnet18(pretrained=True).eval().to("cuda")
+    model = models.resnet152(pretrained=False).eval().to("cuda")
+    model2 = models.resnet152(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
     debug = False
