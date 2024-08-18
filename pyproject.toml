@@ -43,8 +43,8 @@ keywords = ["pytorch", "torch", "tensorrt", "trt", "ai", "artificial intelligenc
 dependencies = [
     "torch >=2.5.0.dev,<2.6.0",
     "tensorrt==10.1.0",
-    "tensorrt-cu12_bindings==10.1.0",
-    "tensorrt-cu12_libs==10.1.0",
+    #"tensorrt-cu12_bindings==10.1.0",
+    #"tensorrt-cu12_libs==10.1.0",
     "packaging>=23",
     "numpy",
     "typing-extensions>=4.7.0",

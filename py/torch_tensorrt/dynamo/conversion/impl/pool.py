@@ -30,7 +30,6 @@ def avg_poolNd(
     count_include_pad: bool = True,
     divisor_override: Optional[int] = None,
 ) -> TRTTensor:
-    
     padding_mode = trt.PaddingMode.EXPLICIT_ROUND_DOWN
     if ceil_mode:
         padding_mode = trt.PaddingMode.EXPLICIT_ROUND_UP

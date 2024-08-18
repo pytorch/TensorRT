@@ -211,9 +211,10 @@ def slice_op(  # TODO: This should be slice not whatever is in base
             return layer.get_output(0)
 
     output_shape[dim] = math.ceil((stop - start) / step)
-    return slice(
+    out = slice(
         ctx, target, source_ir, name, input, start_slice, output_shape, stride_slice
     )
+    return out
 
 
 def expand(
