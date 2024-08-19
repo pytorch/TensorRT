@@ -5,11 +5,11 @@ iterations=1
 backends=("dynamo" "inductor")
 batch_sizes=(1 16)
 hf_token="<Enter HF token>"
-image_name="gitlab-master.nvidia.com:5005/torch-tensorrt/tensorrt/torch_tensorrt:latest"
+image_name="<docker image name>"
 
 # Stage 2 : slower non-GPT2 experiments
 isl=(2048)
-osl=(2176) 
+osl=(2176)
 models=("meta-llama/Meta-Llama-3.1-8B-Instruct" "meta-llama/Llama-2-7b-chat-hf" "mistralai/Mistral-7B-Instruct-v0.3")
 backends=("dynamo" "inductor")
 for model in ${models[@]}

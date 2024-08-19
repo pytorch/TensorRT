@@ -12,9 +12,7 @@ def remove_assert_scalar(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """Remove assert_scalar ops in the graph"""
     count = 0
     for node in gm.graph.nodes:
-        # node.target = "detach" in torch.compile workflow
         if node.target == torch.ops.aten._assert_scalar.default:
-            # Detach node has only one input
             gm.graph.erase_node(node)
             count += 1
 
