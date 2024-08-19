@@ -40,7 +40,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, to_torch_device
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
-from tqdm import tqdm
 
 import tensorrt as trt
 from packaging import version
@@ -341,13 +340,21 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
     @staticmethod
     def find_weight(
-        weight_name: str, np_map: dict[str, Any], sd: dict[str, Any]
+        weight_name: str, np_map: dict[str, Any], state_dict: dict[str, Any]
     ) -> str:
+        """
+        We need to build map from engine weight name to state_dict weight name.
+        The purpose of this function is to find the corresponding weight name in module state_dict.
+
+        weight_name: the target weight name we want to search for
+        np_map: the map from weight name to np values in INetworkDefinition
+        state_dict: state of the graph module
+        """
         network_weight = np_map[weight_name]
         network_weight = torch.from_numpy(np_map[weight_name]).cuda()
-        for sd_w_name, sd_weight in sd.items():
+        for sd_w_name, sd_weight in state_dict.items():
             if TRTInterpreter.check_weight_equal(sd_weight, network_weight):
-                del sd[sd_w_name]
+                del state_dict[sd_w_name]
                 return sd_w_name
         return ""
 
@@ -475,7 +482,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     np_map[engine_weight_name] = weight
 
         # Stage 2: Value mapping
-        for engine_weight_name, sd_weight_name in tqdm(weight_name_map.items()):
+        for engine_weight_name, sd_weight_name in weight_name_map.items():
             if "SCALE" in engine_weight_name:
                 # There is no direct connection in batch_norm layer. So skip it
                 pass
