@@ -146,9 +146,9 @@ class TestReflectionPadConverter(DispatchTestCase):
         [
             (
                 "4d",
-                (1, 1, 1, 1),
                 (2, 2, 2, 2),
-                (3, 3, 3, 3),
+                (4, 4, 4, 4),
+                (6, 6, 6, 6),
                 torch.float,
                 (1, 1, 2, 2),
             ),
@@ -199,9 +199,9 @@ class TestReflectionPadConverter(DispatchTestCase):
         [
             (
                 "5d",
-                (1, 1, 1, 1, 1),
                 (2, 2, 2, 2, 2),
-                (3, 3, 3, 3, 3),
+                (4, 4, 4, 4, 4),
+                (6, 6, 6, 6, 6),
                 torch.float,
                 (1, 2, 2, 1, 1, 2),
             ),
