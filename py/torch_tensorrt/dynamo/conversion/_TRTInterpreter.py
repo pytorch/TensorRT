@@ -1,3 +1,4 @@
+import gc
 import io
 import logging
 import os
@@ -366,7 +367,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             network_weight = torch.from_numpy(network_weight).cuda()
         try:
             return sd_weight.shape == network_weight.shape and torch.all(
-                torch.abs(sd_weight - network_weight) < 0.1
+                torch.abs(sd_weight - network_weight) < 0.01
             )
         except Exception:
             return torch.all(sd_weight == network_weight)
@@ -425,7 +426,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             )
         }
         """
-        _LOGGER.info("building weight name mapping...")
+        _LOGGER.info("Building weight name mapping...")
         # Stage 1: Name mapping
         sd = self.module.state_dict()
         torch_device = to_torch_device(self.compilation_settings.device)
@@ -501,6 +502,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self.weight_name_map = weight_name_map
 
         del np_map, sd
+        gc.collect()
         torch.cuda.empty_cache()
 
     def run(
