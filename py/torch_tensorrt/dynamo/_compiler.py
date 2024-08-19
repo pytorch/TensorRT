@@ -88,6 +88,7 @@ def compile(
     engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
     engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
+    weight_streaming_setting: str = _defaults.STREAMABLE_WEIGHTS_DISABLED,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -158,6 +159,11 @@ def compile(
         engine_cache_dir (Optional[str]): Directory to store the cached TRT engines
         engine_cache_size (Optional[int]): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
+        weight_streaming_setting(str): Setting the amount of GPU memory that TensorRT can use for weights at runtime. valid setting formats are
+                                       disabled: disable weight streaming
+                                       auto: TensorRT will decide the streaming budget automatically
+                                       0% to 100%: The percentage of weights that TRT keeps on the GPU
+                                       positive integer: Streamable weights in bytes that reside on the GPU
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -281,6 +287,7 @@ def compile(
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
+        "weight_streaming_setting": weight_streaming_setting,
     }
 
     settings = CompilationSettings(**compilation_options)

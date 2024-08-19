@@ -27,6 +27,7 @@ from torch_tensorrt.dynamo._defaults import (
     REQUIRE_FULL_COMPILATION,
     REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
+    STREAMABLE_WEIGHTS_DISABLED,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
     USE_FAST_PARTITIONER,
@@ -112,6 +113,7 @@ class CompilationSettings:
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
+    weight_streaming_setting: str = STREAMABLE_WEIGHTS_DISABLED
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
