@@ -79,7 +79,7 @@ def get_padded_shape_tensors(
                     ).get_output(0)
                 )
         padded_shape_tensor = impl.cat.cat(
-            ctx, target, source_ir, f"{name}_cat", slices, 0
+            ctx, target, source_ir, f"{name}_cat_dim_{i}", slices, 0
         )
 
     start_indices_tensor = get_trt_tensor(
