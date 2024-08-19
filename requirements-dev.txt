@@ -5,8 +5,8 @@ mypy
 isort
 ruff
 pytest
-transformers
-timm
 parameterized
 expecttest==0.1.6
 pyyaml
+#transformers
+#timm
