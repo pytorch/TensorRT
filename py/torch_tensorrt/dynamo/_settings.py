@@ -27,6 +27,7 @@ from torch_tensorrt.dynamo._defaults import (
     REQUIRE_FULL_COMPILATION,
     REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
+    STREAMABLE_WEIGHTS_DISABLED,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
     USE_EXPLICIT_TYPING,
@@ -118,6 +119,7 @@ class CompilationSettings:
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
     use_explicit_typing: bool = USE_EXPLICIT_TYPING
     use_fp32_acc: bool = USE_FP32_ACC
+    weight_streaming_setting: str = STREAMABLE_WEIGHTS_DISABLED
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
