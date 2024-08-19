@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, Optional, Sequence, Union
 import numpy as np
 import tensorrt as trt
 import torch
+from torch._subclasses.fake_tensor import FakeTensor
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
@@ -319,22 +320,39 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Any]:
     return min_max_opt
 
 
-def unwrap_tensor_shape(tensor: torch.Tensor) -> Sequence[Any]:
+def unwrap_tensor_shape(
+    tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]
+) -> Sequence[Any]:
     """
     This is a helper function used to print/return the shape of the tensor.
     For regular torch.tensor's, it returns the static shape.
     For symbolic tensors, eg:(1, s0, 4), this function returns [1, [min, max], 4]. The min
     and max correspond to the lower and upper values of s0 symbolic dimension.
     """
-    tensor_shape: Sequence[Union[int | Sequence[int]]] = []
-    for dimension in tensor.shape:
-        if isinstance(dimension, int):
-            tensor_shape.append(dimension)
-        elif isinstance(dimension, torch.SymInt):
-            min_max_opt = extract_var_range_info(dimension)
-            tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
+    tensor_shape = []
+    # for dimension in tensor.shape:
+    if isinstance(tensor, int):
+        tensor_shape.append(tensor)
+    elif isinstance(tensor, torch.SymInt):
+        min_max_opt = extract_var_range_info(tensor)
+        tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
+    elif isinstance(tensor, (torch.Tensor, FakeTensor)):
+        for dimension in tensor.shape:
+            tensor_shape.extend(unwrap_tensor_shape(dimension))
 
     return tuple(tensor_shape)
+
+
+def unwrap_tensor_dtype(tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]) -> Any:
+    """
+    Returns the dtype of torch.tensor or FakeTensor. For symbolic integers, we return int64
+    """
+    if isinstance(tensor, (torch.Tensor, FakeTensor)):
+        return tensor.dtype
+    elif isinstance(tensor, torch.SymInt):
+        return torch.int64
+    else:
+        raise ValueError(f"Found invalid tensor type {type(tensor)}")
 
 
 def get_graph_io_attrs(
@@ -344,7 +362,7 @@ def get_graph_io_attrs(
     Returns a list of attributes (shapes or dtypes) of the I/O nodes
     """
     assert attr_type in ["shape", "dtype"]
-    attr_fn = unwrap_tensor_shape if attr_type == "shape" else lambda x: x.dtype
+    attr_fn = unwrap_tensor_shape if attr_type == "shape" else unwrap_tensor_dtype
     graph_io_attrs = []
     for node in io_nodes:
         if "val" in node.meta:

@@ -9,7 +9,10 @@ from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterRegistry
-from torch_tensorrt.dynamo.conversion.converter_utils import cast_trt_tensor
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_trt_tensor,
+    get_trt_tensor,
+)
 from torch_tensorrt.fx.types import TRTDataType, TRTTensor
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -20,14 +23,12 @@ def to_copy(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
+    input: Union[TRTTensor, torch.Tensor, np.ndarray],
     dtype: Union[TRTDataType, torch.dtype, np.dtype, _enums.dtype],
     force_layer: bool = False,
 ) -> TRTTensor:
     if not isinstance(input, TRTTensor):
-        raise RuntimeError(
-            f"to_copy received input {input} that is not a TensorRT ITensor"
-        )
+        input = get_trt_tensor(ctx, input, f"{name}_copy_tensor")
 
     # If cast is forced, insert identity layer regardless of whether the dtype
     # doesn't change
