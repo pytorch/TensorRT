@@ -368,7 +368,7 @@ class ParallelTransformer(nn.Module):
 
     """
 
-    def __init__(self, model_args: ModelArgs, tp_mesh: DeviceMesh):
+    def __init__(self, model_args: ModelArgs, tp_mesh: DeviceMesh = None):
         # Here we use distributed model initialization to avoid memory overflow
         super().__init__()
         self.model_args = model_args
@@ -397,7 +397,6 @@ class ParallelTransformer(nn.Module):
             block = TransformerBlock(layer_id, model_args).to(model_args.device)
             self.layers[str(layer_id)] = block
             self.parallel_transformer_block(self.layers[str(layer_id)], tp_mesh)
-            print(layer_id)
 
         self.norm = RMSNorm(dim=model_args.dim, eps=model_args.norm_eps).to(
             model_args.device

@@ -388,10 +388,21 @@ def compile_module(
     trt_modules = {}
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
+    logger.info(f"-" * 100)
+    logger.info(f"There are {len(list(partitioned_module.named_children()))} submodules in total.")
+    i = 0
+    import os
     for name, _ in partitioned_module.named_children():
+        # Benchmark log utilities
+        i += 1
+        logger.info(f"-" * 100)
+        logger.info(f"Start compiling {i}th submodule")
+        total = torch.cuda.get_device_properties(0).total_memory
+
         submodule = getattr(partitioned_module, name)
         # Criteria for a module to be convertible to TRT
         if settings.use_fast_partitioner and "_run_on_acc" not in name:
+        # if (settings.use_fast_partitioner and "_run_on_acc" not in name) or int(os.environ["RANK"]) == 1:
             dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(submodule))
             continue
 
