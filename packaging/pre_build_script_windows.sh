@@ -14,7 +14,6 @@ if [[ "${CU_VERSION::4}" < "cu12" ]]; then
          -e "s/tensorrt-cu12-bindings==/tensorrt-${CU_VERSION::4}-bindings==/g" \
          -e "s/tensorrt-cu12-libs==/tensorrt-${CU_VERSION::4}-libs==/g" \
          pyproject.toml
-  cat pyproject.toml
 fi
 
 #curl -Lo TensorRT.zip https://developer.download.nvidia.com/compute/machine-learning/tensorrt/10.0.1/zip/TensorRT-10.0.1.6.Windows10.win10.cuda-12.4.zip
