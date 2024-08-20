@@ -67,9 +67,13 @@ RUN apt-get update &&\
 
 FROM torch-tensorrt-builder-base as torch-tensorrt-builder
 
+RUN curl -L https://github.com/a8m/envsubst/releases/download/v1.2.0/envsubst-`uname -s`-`uname -m` -o envsubst &&\
+    chmod +x envsubst && mv envsubst /usr/local/bin
+
 COPY . /workspace/torch_tensorrt/src
 WORKDIR /workspace/torch_tensorrt/src
-RUN cp ./docker/WORKSPACE.docker WORKSPACE
+
+RUN cat ./docker/MODULE.bazel.docker | envsubst > MODULE.bazel
 
 # Symlink the path pyenv is using for python with the /opt directory for package sourcing
 RUN mkdir -p "/opt/python3/" &&\
@@ -99,8 +103,12 @@ RUN mkdir -p "/opt/python3/" &&\
 
 COPY --from=torch-tensorrt-builder  /workspace/torch_tensorrt/src/dist/ .
 
-RUN cp /opt/torch_tensorrt/docker/WORKSPACE.docker /opt/torch_tensorrt/WORKSPACE &&\
-    pip install -r /opt/torch_tensorrt/py/requirements.txt &&\
+RUN curl -L https://github.com/a8m/envsubst/releases/download/v1.2.0/envsubst-`uname -s`-`uname -m` -o envsubst &&\
+    chmod +x envsubst && mv envsubst /usr/local/bin
+
+RUN cat ./docker/MODULE.bazel.docker | envsubst > MODULE.bazel
+
+RUN pip install -r /opt/torch_tensorrt/py/requirements.txt &&\
     # Install all dependency wheel files and user-specified TensorRT
     pip install *.whl &&\
     pip install tensorrt==${TENSORRT_VERSION}.* &&\

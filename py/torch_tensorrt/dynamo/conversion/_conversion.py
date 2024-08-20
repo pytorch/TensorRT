@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import io
 import logging
-from typing import List, Sequence
+from typing import Any, List, Optional, Sequence
 
+import tensorrt as trt
 import torch
-from torch.fx.experimental.proxy_tensor import maybe_disable_fake_tensor_mode
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -18,8 +18,6 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import get_torch_inputs
 
-import tensorrt as trt
-
 logger = logging.getLogger(__name__)
 
 
@@ -27,12 +25,20 @@ def infer_module_output_dtypes(
     module: torch.fx.GraphModule,
     inputs: Sequence[Input],
     device: Device,
+    kwarg_inputs: Optional[dict[str, Any]] = None,
     truncate_double: bool = False,
 ) -> List[dtype]:
-    with maybe_disable_fake_tensor_mode():
+    """
+    inputs can be either arg_inputs or flattened input list. If it is flattened list, kwarg_inputs
+    should be None, as it is already included in the flattened input.
+    """
+    with unset_fake_temporarily():
         torch_inputs = get_torch_inputs(inputs, device)
+        if kwarg_inputs is None:
+            kwarg_inputs = {}
+        torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
         module = module.to(device.to(torch.device))
-        module_outputs = module(*torch_inputs)
+        module_outputs = module(*torch_inputs, **torch_kwarg_inputs)
         if not isinstance(module_outputs, (list, tuple)):
             module_outputs = [module_outputs]
 
@@ -62,21 +68,36 @@ def interpret_module_to_result(
     module: torch.fx.GraphModule,
     inputs: Sequence[Input],
     settings: CompilationSettings = CompilationSettings(),
+    arg_inputs: Optional[Sequence[Input]] = None,
+    kwarg_inputs: Optional[dict[str, Any]] = None,
 ) -> TRTInterpreterResult:
     """Interpret an FX module to a TRTInterpreterResult
     Args:
         module: FX GraphModule to interpret
-        inputs: Sequence of Tensors representing inputs to the module
+        inputs: Sequence of FLATTENED Tensors representing inputs to the module. It should include both
+                arg_inputs and kwarg_inputs, if applicable.
+        arg_inputs: Sequence of Tensors representing inputs to the module.
+        kwarg_inputs: A dictionary of Tensors representing inputs to the module.
         settings: Compilation settings
     Returns:
         TRTInterpreterResult
     """
-    output_dtypes = infer_module_output_dtypes(
-        module,
-        inputs,
-        settings.device,
-        truncate_double=settings.truncate_double,
-    )
+    if arg_inputs is not None:
+        output_dtypes = infer_module_output_dtypes(
+            module,
+            arg_inputs,
+            settings.device,
+            kwarg_inputs=kwarg_inputs,
+            truncate_double=settings.truncate_double,
+        )
+    else:
+        # args and kwargs are combined and flattened to one list
+        output_dtypes = infer_module_output_dtypes(
+            module,
+            inputs,
+            settings.device,
+            truncate_double=settings.truncate_double,
+        )
 
     interpreter = TRTInterpreter(
         module,
@@ -102,33 +123,53 @@ def convert_module(
         settings: Compilation settings
         name: TRT engine name
     Returns:
-        _PythonTorchTensorRTModule or TorchTensorRTModule
+        PythonTorchTensorRTModule or TorchTensorRTModule
     """
     interpreter_result = interpret_module_to_result(module, inputs, settings)
+    # Test fast refit:
+    from torch_tensorrt.dynamo._refit import _refit_single_trt_engine_with_gm
+    from torch_tensorrt.logging import TRT_LOGGER
 
-    if settings.use_python_runtime or not ENABLED_FEATURES.torch_tensorrt_runtime:
-        if not settings.use_python_runtime:
-            logger.info(
-                "Since Torch-TensorRT runtime is not available, using Python Runtime, some features may not be available"
+    runtime = trt.Runtime(TRT_LOGGER)
+    refit_test_engine = runtime.deserialize_cuda_engine(
+        interpreter_result.serialized_engine
+    )
+    weight_name_map: Any = None
+    # Do the test refit with cached map if make_refitable is enabled
+    if settings.make_refitable:
+        weight_name_map = interpreter_result.weight_name_map
+        try:
+            _refit_single_trt_engine_with_gm(
+                new_gm=module,
+                old_engine=refit_test_engine,
+                input_list=inputs,
+                settings=settings,
+                weight_name_map=interpreter_result.weight_name_map,
             )
-        return PythonTorchTensorRTModule(
-            engine=interpreter_result.engine,
-            input_names=list(interpreter_result.input_names),
-            output_names=list(interpreter_result.output_names),
-            settings=settings,
-        )
+        except AssertionError:
+            logger.warning("Fast refit test failed. Removing the weight map caching.")
 
-    else:
+    rt_cls = PythonTorchTensorRTModule
+
+    if ENABLED_FEATURES.torch_tensorrt_runtime and not settings.use_python_runtime:
+
         from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
-        with io.BytesIO() as engine_bytes:
-            engine_bytes.write(interpreter_result.engine)
-            engine_str = engine_bytes.getvalue()
+        rt_cls = TorchTensorRTModule
 
-        return TorchTensorRTModule(
-            serialized_engine=engine_str,
-            name=name,
-            input_binding_names=list(interpreter_result.input_names),
-            output_binding_names=list(interpreter_result.output_names),
-            settings=settings,
+    elif (
+        not ENABLED_FEATURES.torch_tensorrt_runtime and not settings.use_python_runtime
+    ):
+
+        logger.info(
+            "Since Torch-TensorRT runtime is not available, using Python Runtime, some features may not be available"
         )
+
+    return rt_cls(
+        serialized_engine=interpreter_result.serialized_engine,
+        input_binding_names=list(interpreter_result.input_names),
+        output_binding_names=list(interpreter_result.output_names),
+        name=name,
+        settings=settings,
+        weight_name_map=weight_name_map,
+    )

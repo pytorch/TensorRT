@@ -34,6 +34,7 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
 )
 from torch_tensorrt.dynamo.utils import (
+    get_flat_args_with_check,
     get_torch_inputs,
     parse_complex_tensor_structs,
     prepare_inputs,
@@ -47,8 +48,10 @@ logger = logging.getLogger(__name__)
 
 def compile(
     exported_program: ExportedProgram,
-    inputs: Tuple[Any, ...],
+    inputs: Optional[Sequence[Sequence[Any]]] = None,
     *,
+    arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
+    kwarg_inputs: Optional[dict[Any, Any]] = None,
     device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
     disable_tf32: bool = _defaults.DISABLE_TF32,
     assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
@@ -79,6 +82,7 @@ def compile(
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -109,6 +113,8 @@ def compile(
                     ]
 
     Keyword Arguments:
+        arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
+        kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
         device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
 
             device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
@@ -141,6 +147,7 @@ def compile(
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -148,7 +155,6 @@ def compile(
 
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
-
     if "truncate_long_and_double" in kwargs.keys():
         if truncate_double is not _defaults.TRUNCATE_DOUBLE:
             raise ValueError(
@@ -181,12 +187,26 @@ def compile(
             "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
         )
 
-    if not isinstance(inputs, collections.abc.Sequence):
-        inputs = [inputs]
+    # Aliasing inputs to arg_inputs for better understanding
+    if not arg_inputs and not inputs:
+        raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
+
+    elif arg_inputs and inputs:
+        raise AssertionError(
+            "'arg_inputs' and 'inputs' should not be used at the same time."
+        )
+
+    arg_inputs = inputs or arg_inputs
+
+    if kwarg_inputs is None:
+        kwarg_inputs = {}
+
+    if not isinstance(arg_inputs, collections.abc.Sequence):
+        arg_inputs = [arg_inputs]  # type: ignore
 
     # Prepare torch_trt inputs
-    inputs = prepare_inputs(inputs)
-    torch_inputs = get_torch_inputs(inputs, device)
+    trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
+    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
     device = to_torch_tensorrt_device(device)
     enabled_precisions = {dtype._from(p) for p in enabled_precisions}
 
@@ -194,14 +214,14 @@ def compile(
         raise AssertionError(
             f"Input graph should be an ExportedProgram but got type {type(exported_program)}"
         )
-    exported_program = pre_export_lowering(exported_program, torch_inputs)
+    exported_program = pre_export_lowering(exported_program)
     exported_program = exported_program.run_decompositions(
         get_decompositions(enable_experimental_decompositions)
     )
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
     # Apply lowering on the graph module
-    gm = post_lowering(gm, torch_inputs)
+    gm = post_lowering(gm)
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     compilation_options = {
@@ -236,17 +256,19 @@ def compile(
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
         "timing_cache_path": timing_cache_path,
+        "lazy_engine_init": lazy_engine_init,
     }
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-    trt_gm = compile_module(gm, inputs, settings)
+    trt_gm = compile_module(gm, trt_arg_inputs, trt_kwarg_inputs, settings)
     return trt_gm
 
 
 def compile_module(
     gm: torch.fx.GraphModule,
-    sample_inputs: Sequence[Input],
+    sample_arg_inputs: Sequence[Input],
+    sample_kwarg_inputs: Optional[dict[Any, Any]] = None,
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
@@ -255,13 +277,15 @@ def compile_module(
 
     Args:
         module: FX GraphModule to convert
-        inputs: Inputs to the module
+        arg_inputs: Inputs to the module
+        kwarg_inputs: kwargs to the module
         settings: Compilation settings
     Returns:
         Compiled FX GraphModule
     """
     dryrun_tracker = DryRunTracker()
-
+    if sample_kwarg_inputs is None:
+        sample_kwarg_inputs = {}
     # Assume converters support dynamic shapes and disable validation
     CONVERTERS.set_dynamic_shape_support(settings.assume_dynamic_shape_support)
 
@@ -276,10 +300,12 @@ def compile_module(
     dryrun_tracker.total_ops_in_graph = total_ops
     dryrun_tracker.supported_ops_in_graph = num_supported_ops
     dryrun_tracker.graph_input_shapes = parse_complex_tensor_structs(
-        sample_inputs, "shape", lambda x: dict(x) if isinstance(x, dict) else tuple(x)
+        sample_arg_inputs,
+        "shape",
+        lambda x: dict(x) if isinstance(x, dict) else tuple(x),
     )
     dryrun_tracker.graph_input_dtypes = parse_complex_tensor_structs(
-        sample_inputs, "dtype", lambda t: t.to(torch.dtype, use_default=True)
+        sample_arg_inputs, "dtype", lambda t: t.to(torch.dtype, use_default=True)
     )
     dryrun_tracker.compilation_settings = settings
 
@@ -437,9 +463,13 @@ def compile_module(
 
             trt_modules[name] = trt_module
 
-    sample_outputs = gm(
-        *get_torch_inputs(sample_inputs, to_torch_device(settings.device))
+    torch_sample_arg_inputs = get_torch_inputs(
+        sample_arg_inputs, to_torch_device(settings.device)
     )
+    torch_sample_kwarg_inputs = get_torch_inputs(
+        sample_kwarg_inputs, to_torch_device(settings.device)
+    )
+    sample_outputs = gm(*torch_sample_arg_inputs, **torch_sample_kwarg_inputs)
 
     if not isinstance(sample_outputs, (list, tuple)):
         sample_outputs = [sample_outputs]
@@ -454,6 +484,8 @@ def compile_module(
     # Replace all FX Modules with TRT Modules
     for name, trt_module in trt_modules.items():
         setattr(partitioned_module, name, trt_module)
+        if settings.lazy_engine_init:
+            getattr(partitioned_module, name).setup_engine()
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:
@@ -464,10 +496,12 @@ def compile_module(
     return partitioned_module
 
 
-def convert_module_to_trt_engine(
+def convert_exported_program_to_serialized_trt_engine(
     exported_program: ExportedProgram,
-    inputs: Sequence[Any],
+    inputs: Optional[Sequence[Sequence[Any]]] = None,
     *,
+    arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
+    kwarg_inputs: Optional[dict[Any, Any]] = None,
     enabled_precisions: (
         Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
     ) = _defaults.ENABLED_PRECISIONS,
@@ -579,13 +613,27 @@ def convert_module_to_trt_engine(
             DeprecationWarning,
             stacklevel=2,
         )
+    if not arg_inputs and not inputs:
+        raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
-    input_list = list(inputs) if inputs is not None else []
+    elif arg_inputs and inputs:
+        raise AssertionError(
+            "'arg_inputs' and 'inputs' should not be used at the same time."
+        )
+
+    arg_inputs = inputs or arg_inputs
     torch_executed_ops = torch_executed_ops if torch_executed_ops is not None else set()
+    if kwarg_inputs is None:
+        kwarg_inputs = {}
     # Prepare torch_trt inputs
-    input_list = prepare_inputs(input_list)
+    arg_input_list = list(prepare_inputs(arg_inputs))
+    kwarg_input_list = prepare_inputs(kwarg_inputs)
+
+    flattened_input_list = get_flat_args_with_check(
+        exported_program, arg_input_list, kwarg_input_list
+    )[0]
+
     device = to_torch_tensorrt_device(device)
-    torch_inputs = get_torch_inputs(input_list, device)
     enabled_precisions = {dtype._from(e) for e in enabled_precisions}
 
     compilation_options = {
@@ -616,7 +664,7 @@ def convert_module_to_trt_engine(
         "timing_cache_path": timing_cache_path,
     }
 
-    exported_program = pre_export_lowering(exported_program, torch_inputs)
+    exported_program = pre_export_lowering(exported_program)
     # Decompose the exported program
     exported_program = exported_program.run_decompositions(
         get_decompositions(enable_experimental_decompositions)
@@ -625,7 +673,7 @@ def convert_module_to_trt_engine(
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module
-    gm = post_lowering(gm, torch_inputs)
+    gm = post_lowering(gm)
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     settings = CompilationSettings(**compilation_options)
@@ -635,7 +683,13 @@ def convert_module_to_trt_engine(
     CONVERTERS.set_dynamic_shape_support(settings.assume_dynamic_shape_support)
 
     try:
-        interpreter_result = interpret_module_to_result(gm, input_list, settings)
+        interpreter_result = interpret_module_to_result(
+            gm,
+            inputs=flattened_input_list,
+            arg_inputs=arg_input_list,
+            kwarg_inputs=kwarg_input_list,
+            settings=settings,
+        )
     except UnsupportedOperatorException:
         logger.error(
             f"Conversion of module {gm} not currently fully supported or convertible!",
@@ -647,10 +701,5 @@ def convert_module_to_trt_engine(
             exc_info=True,
         )
 
-    import io
-
-    with io.BytesIO() as engine_bytes:
-        engine_bytes.write(interpreter_result.engine)
-        engine_bytearray: bytes = engine_bytes.getvalue()
-
-    return engine_bytearray
+    serialized_engine: bytes = interpreter_result.serialized_engine
+    return serialized_engine
