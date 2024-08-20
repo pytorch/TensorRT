@@ -27,7 +27,6 @@ def replace_full_like_with_full(
             input_dtype = None
             input_shape = None
             input_device = to_torch_device(default_device())
-            input_device = None
             if "val" in input_tensor.meta:
                 input_dtype = input_tensor.meta["val"].dtype
                 input_device = input_tensor.meta["val"].device
