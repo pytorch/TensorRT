@@ -1327,13 +1327,3 @@ class EngineCapability(Enum):
 
     def __hash__(self) -> int:
         return hash(self.value)
-
-
-class QuantizationType(Enum):
-    """
-    Type of the Quantization
-    """
-
-    FP8 = auto()
-
-    INT8 = auto()
