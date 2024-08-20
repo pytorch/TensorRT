@@ -103,8 +103,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._itensor_to_tensor_meta: Dict[trt.tensorrt.ITensor, TensorMetadata] = (
             dict()
         )
-        self.compilation_settings = compilation_settings
 
+        self.compilation_settings = compilation_settings
+        self.validate_compile_settings()
         # Data types for TRT Module output Tensors
         self.output_dtypes = (
             [dtype._from(o) for o in output_dtypes] if output_dtypes else None
@@ -163,6 +164,16 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         ):
             raise RuntimeError("Current platform doesn't support fast native int8!")
 
+        if self.compilation_settings.enable_cross_compile_for_windows:
+            if version.parse(trt.__version__) <= version.parse("10.2"):
+                raise RuntimeError(
+                    f"Cross compile for windows is not available in the current tensorrt version: {trt.__version__}, it can only be enabled after 10.2.0 post 1"
+                )
+            if platform.system() != "Linux" or platform.architecture()[0] != "64bit":
+                raise RuntimeError(
+                    f"Cross compile for windows is only supported on AMD 64bit Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
+                )
+
         if (
             dtype.f16 in self.compilation_settings.enabled_precisions
             and not self.builder.platform_has_fast_fp16
@@ -181,23 +192,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             builder_config.set_memory_pool_limit(
                 trt.MemoryPoolType.WORKSPACE, self.compilation_settings.workspace_size
             )
-        if version.parse(trt.__version__) >= version.parse("10.2"):
-            if self.compilation_settings.enable_cross_platform_compatibility:
-                # currently this flag can only be enabled when building engines on Linux AMD64 platforms
-                # and target platform for engine execution as Windows AMD64 system.
-                # https://github.com/NVIDIA/TensorRT/blob/c5b9de37f7ef9034e2efc621c664145c7c12436e/include/NvInfer.h#L8257
-                if (
-                    platform.system() == "Linux"
-                    and platform.architecture()[0] == "64bit"
-                ):
-                    _LOGGER.info(
-                        f"Setting cross platform compatibility to {self.compilation_settings.enable_cross_platform_compatibility}"
-                    )
-                    builder_config.runtime_platform = trt.RuntimePlatform.WINDOWS_AMD64
-                else:
-                    warnings.warn(
-                        f"{platform.system()=},{platform.architecture()[0]=}, Cross platform compatibility can only be enabled when building engines on Linux AMD64 platform and running the engine on Windows AMD64 platform."
-                    )
+
+        if self.compilation_settings.enable_cross_compile_for_windows:
+            builder_config.runtime_platform = trt.RuntimePlatform.WINDOWS_AMD64
+            _LOGGER.info(
+                "Setting runtime_platform as trt.RuntimePlatform.WINDOWS_AMD64"
+            )
 
         if version.parse(trt.__version__) >= version.parse("8.2"):
             builder_config.profiling_verbosity = (

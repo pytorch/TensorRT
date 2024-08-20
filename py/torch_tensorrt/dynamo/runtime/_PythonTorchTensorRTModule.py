@@ -106,7 +106,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.engine = None
         self.weight_name_map = weight_name_map
 
-        if self.serialized_engine is not None and not self.settings.lazy_engine_init:
+        if (
+            self.serialized_engine is not None
+            and not self.settings.lazy_engine_init
+            and not self.settings.enable_cross_compile_for_windows
+        ):
             self.setup_engine()
 
     def setup_engine(self) -> None:
