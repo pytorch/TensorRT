@@ -1,6 +1,8 @@
 #include <codecvt>
 
+#include "core/runtime/Platform.h"
 #include "core/runtime/runtime.h"
+#include "core/util/macros.h"
 
 namespace torch_tensorrt {
 namespace core {
@@ -103,11 +105,14 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
               serialize_info[OUTPUT_BINDING_NAMES_IDX] = serialize_bindings(self->out_binding_names);
               serialize_info[HW_COMPATIBLE_IDX] = self->hardware_compatible ? "1" : "0";
               serialize_info[SERIALIZED_METADATA_IDX] = self->serialized_metadata;
+              serialize_info[TARGET_PLATFORM_IDX] = self->target_platform.serialize();
               LOG_DEBUG("Serialized Hardware Compatibility: " << (self->hardware_compatible ? "Enabled" : "Disabled"));
+              LOG_DEBUG("Serialized Target Platform: " << self->target_platform);
 
               return serialize_info;
             },
             [](std::vector<std::string> serialized_info) -> c10::intrusive_ptr<TRTEngine> {
+              LOG_ERROR(serialized_info[TARGET_PLATFORM_IDX]);
               serialized_info[ENGINE_IDX] = base64_decode(serialized_info[ENGINE_IDX]);
               TRTEngine::verify_serialization_fmt(serialized_info);
               return c10::make_intrusive<TRTEngine>(serialized_info);
@@ -137,7 +142,28 @@ TORCH_LIBRARY(tensorrt, m) {
   m.def("OUTPUT_BINDING_NAMES_IDX", []() -> int64_t { return OUTPUT_BINDING_NAMES_IDX; });
   m.def("HW_COMPATIBLE_IDX", []() -> int64_t { return HW_COMPATIBLE_IDX; });
   m.def("SERIALIZED_METADATA_IDX", []() -> int64_t { return SERIALIZED_METADATA_IDX; });
+  m.def("TARGET_PLATFORM_IDX", []() -> int64_t { return TARGET_PLATFORM_IDX; });
   m.def("SERIALIZATION_LEN", []() -> int64_t { return SERIALIZATION_LEN; });
+  m.def("_platform_linux_x86_64", []() -> std::string {
+    auto it = get_platform_name_map().find(Platform::PlatformEnum::kLINUX_X86_64);
+    return it->second;
+  });
+  m.def("_platform_linux_aarch64", []() -> std::string {
+    auto it = get_platform_name_map().find(Platform::PlatformEnum::kLINUX_AARCH64);
+    return it->second;
+  });
+  m.def("_platform_win_x86_64", []() -> std::string {
+    auto it = get_platform_name_map().find(Platform::PlatformEnum::kWIN_X86_64);
+    return it->second;
+  });
+  m.def("_platform_unknown", []() -> std::string {
+    auto it = get_platform_name_map().find(Platform::PlatformEnum::kUNKNOWN);
+    return it->second;
+  });
+  m.def("get_current_platform", []() -> std::string {
+    auto it = get_platform_name_map().find(get_current_platform()._platform);
+    return it->second;
+  });
 }
 
 } // namespace

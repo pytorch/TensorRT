@@ -9,6 +9,7 @@ set(CXX_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/execute_engine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/register_jit_hooks.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/runtime.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Platform.cpp"
 )
 
 set(HEADER_FILES
@@ -16,6 +17,7 @@ set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngine.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngineProfiler.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/runtime.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Platform.h"
 )
 
 target_sources(${lib_name}

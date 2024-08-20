@@ -4,19 +4,23 @@ import base64
 import copy
 import logging
 import pickle
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Union
 
 import torch
 from torch_tensorrt._Device import Device
-from torch_tensorrt._features import ENABLED_FEATURES
+from torch_tensorrt._enums import Platform
+from torch_tensorrt._features import (
+    ENABLED_FEATURES,
+    for_all_methods,
+    needs_torch_tensorrt_runtime,
+)
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.runtime._utils import for_all_methods, needs_torch_tensorrt_runtime
 
 logger = logging.getLogger(__name__)
 
-SerializedTensorRTEngineFmt = Tuple[
-    str, str, str, bytes, str, str, str, bytes
-]  # Defined in //core/runtime/register_jit_hooks.cpp
+SerializedTensorRTEngineFmt = List[
+    Union[str, bytes]
+]  # Aligned with  //core/runtime/register_jit_hooks.cpp
 SerializedTorchTensorRTModuleFmt = Tuple[
     str, Optional[SerializedTensorRTEngineFmt], List[str], List[str]
 ]
@@ -29,6 +33,7 @@ INPUT_BINDING_NAMES_IDX = -1  # Not implemented
 OUTPUT_BINDING_NAMES_IDX = -1  # Not implemented
 HW_COMPATIBLE_IDX = -1  # Not implemented
 SERIALIZED_METADATA_IDX = -1  # Not implemented
+TARGET_PLATFORM_IDX = -1  # Not implemented
 SERIALIZATION_LEN = -1  # Not implemented
 
 if ENABLED_FEATURES.torch_tensorrt_runtime:
@@ -40,7 +45,8 @@ if ENABLED_FEATURES.torch_tensorrt_runtime:
     OUTPUT_BINDING_NAMES_IDX = torch.ops.tensorrt.OUTPUT_BINDING_NAMES_IDX()  # 5
     HW_COMPATIBLE_IDX = torch.ops.tensorrt.HW_COMPATIBLE_IDX()  # 6
     SERIALIZED_METADATA_IDX = torch.ops.tensorrt.SERIALIZED_METADATA_IDX()  # 7
-    SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 8
+    TARGET_PLATFORM_IDX = torch.ops.tensorrt.TARGET_PLATFORM_IDX()  # 8
+    SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 9
 
 
 @for_all_methods(needs_torch_tensorrt_runtime)
@@ -129,6 +135,40 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if serialized_engine and not self.settings.lazy_engine_init:
             self.setup_engine()
 
+    def _pack_engine_info(self) -> List[str | bytes]:
+        target_device = (
+            self.settings.device
+            if self.settings.device is not None
+            else Device._current_device()
+        )
+        metadata = {"settings": self.settings, "weight_name_map": self.weight_name_map}
+        target_platform = (
+            Platform.current_platform()
+        )  # Change to match target for engine
+
+        engine_info: List[str | bytes] = [""] * SERIALIZATION_LEN
+
+        engine_info[ABI_TARGET_IDX] = torch.ops.tensorrt.ABI_VERSION()
+        engine_info[NAME_IDX] = (
+            self.name + "_engine" if self.name != "" else "tensorrt_engine"
+        )
+        engine_info[DEVICE_IDX] = target_device._to_serialized_rt_device()
+
+        assert self.serialized_engine
+        engine_info[ENGINE_IDX] = self.serialized_engine
+
+        engine_info[INPUT_BINDING_NAMES_IDX] = TorchTensorRTModule._pack_binding_names(
+            self.input_binding_names
+        )
+        engine_info[OUTPUT_BINDING_NAMES_IDX] = TorchTensorRTModule._pack_binding_names(
+            self.output_binding_names
+        )
+        engine_info[HW_COMPATIBLE_IDX] = str(int(self.hardware_compatible))
+        engine_info[SERIALIZED_METADATA_IDX] = self.encode_metadata(metadata)
+        engine_info[TARGET_PLATFORM_IDX] = target_platform._to_serialized_rt_platform()
+
+        return engine_info
+
     def setup_engine(self) -> None:
         """
         Setup engine for a module which has deferred engine setup.
@@ -140,25 +180,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         """
         if self.engine is not None:
             return
-
-        target_device = (
-            self.settings.device
-            if self.settings.device is not None
-            else Device._current_device()
-        )
-        metadata = {"settings": self.settings, "weight_name_map": self.weight_name_map}
-        self.engine = torch.classes.tensorrt.Engine(
-            [
-                torch.ops.tensorrt.ABI_VERSION(),
-                self.name + "_engine" if self.name != "" else "tensorrt_engine",
-                target_device._to_serialized_rt_device(),
-                self.serialized_engine,
-                TorchTensorRTModule._pack_binding_names(self.input_binding_names),
-                TorchTensorRTModule._pack_binding_names(self.output_binding_names),
-                str(int(self.hardware_compatible)),
-                self.encode_metadata(metadata),
-            ]
-        )
+        self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
 
     def encode_metadata(self, metadata: Any) -> str:
         metadata = copy.deepcopy(metadata)
@@ -180,43 +202,53 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         return metadata
 
     def get_extra_state(self) -> SerializedTorchTensorRTModuleFmt:
-        if self.engine is None and self.serialized_engine is not None:
-            self.setup_engine()
-
-        return (
-            self.name,
-            self.engine.__getstate__() if self.engine else None,
-            self.input_binding_names,
-            self.output_binding_names,
-        )
+        if self.engine:
+            return (
+                self.name,
+                self.engine.__getstate__(),
+                self.input_binding_names,
+                self.output_binding_names,
+            )
+        elif self.serialized_engine:
+            engine_info = self._pack_engine_info()
+            assert isinstance(engine_info[3], bytes)
+            engine_info[ENGINE_IDX] = base64.b64encode(engine_info[3])
+            return (
+                self.name,
+                engine_info,
+                self.input_binding_names,
+                self.output_binding_names,
+            )
+        else:
+            return (
+                self.name,
+                None,
+                self.input_binding_names,
+                self.output_binding_names,
+            )
 
     def set_extra_state(self, state: SerializedTorchTensorRTModuleFmt) -> None:
         self.name = state[0]
+
         if state[1] is not None:
             serialized_engine_info: SerializedTensorRTEngineFmt = state[1]
-
-            self.serialized_engine = base64.b64decode(serialized_engine_info[3])
-            self.engine = torch.classes.tensorrt.Engine(
-                [
-                    serialized_engine_info[ABI_TARGET_IDX],
-                    serialized_engine_info[NAME_IDX],
-                    serialized_engine_info[DEVICE_IDX],
-                    self.serialized_engine,
-                    serialized_engine_info[INPUT_BINDING_NAMES_IDX],
-                    serialized_engine_info[OUTPUT_BINDING_NAMES_IDX],
-                    serialized_engine_info[HW_COMPATIBLE_IDX],
-                    serialized_engine_info[SERIALIZED_METADATA_IDX],
-                ]
+            serialized_engine_info[ENGINE_IDX] = base64.b64decode(
+                serialized_engine_info[ENGINE_IDX]
             )
+            self.engine = torch.classes.tensorrt.Engine(serialized_engine_info)
+            self.hardware_compatible = bool(int(state[1][HW_COMPATIBLE_IDX]))
+
+            serialized_metadata = serialized_engine_info[SERIALIZED_METADATA_IDX]
+            assert isinstance(serialized_metadata, bytes)
+            self.settings = TorchTensorRTModule.decode_metadata(serialized_metadata)
+
         else:
             self.engine = None
+            self.settings = CompilationSettings()
+            self.hardware_compatible = False
 
         self.input_binding_names = state[2]
         self.output_binding_names = state[3]
-        self.hardware_compatible = (
-            bool(int(state[1][6])) if state[1] is not None else False
-        )
-        self.settings = TorchTensorRTModule.decode_metadata(serialized_engine_info[7])
 
     def forward(self, *inputs: Any) -> torch.Tensor | Tuple[torch.Tensor, ...]:
         """Implementation of the forward pass for a TensorRT engine
