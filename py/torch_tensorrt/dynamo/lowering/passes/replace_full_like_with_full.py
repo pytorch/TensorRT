@@ -2,11 +2,13 @@ import logging
 
 import torch
 import torch.fx
-from torch_tensorrt.dynamo._defaults import default_device
+
+# from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
-from torch_tensorrt.dynamo.utils import to_torch_device
+
+# from torch_tensorrt.dynamo.utils import to_torch_device
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +28,15 @@ def replace_full_like_with_full(
             fill_value = node.args[1]
             input_dtype = None
             input_shape = None
-            input_device = to_torch_device(default_device())
+            # input_device = to_torch_device(default_device())
+            input_device = None
             if "val" in input_tensor.meta:
                 input_dtype = input_tensor.meta["val"].dtype
                 input_device = input_tensor.meta["val"].device
                 input_shape = list(input_tensor.meta["val"].shape)
             elif "tensor_meta" in input_tensor.meta:
                 input_dtype = input_tensor.meta["tensor_meta"].dtype
-                input_device = input_tensor.meta["tensor_meta"].device
+                # input_device = input_tensor.meta["tensor_meta"].device
                 input_shape = list(input_tensor.meta["tensor_meta"].shape)
 
             # There's no memory format argument for torch.full.
