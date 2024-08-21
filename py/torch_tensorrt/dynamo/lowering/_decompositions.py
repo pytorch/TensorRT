@@ -168,7 +168,7 @@ def var_decomposition(
 @register_torch_trt_decomposition(
     torch.ops.aten.empty_permuted.default, registry=TORCH_TRT_DECOMPOSITIONS
 )
-def empty_permuted_decomposition(*args, **kwargs) -> torch.Tensor:
+def empty_permuted_decomposition(*args, **kwargs) -> torch.Tensor:  # type: ignore
     empty_size = args[0]
     empty_permute = args[1]
     perm = [0] * len(empty_size)
@@ -188,7 +188,7 @@ def slice_scatter_decomposition(
     start: Optional[int] = None,
     end: Optional[int] = None,
     step: Optional[int] = None,
-):
+) -> torch.Tensor:
     dim_size = input_tensor.shape[dim]
     start = get_positive_dim(start, input_tensor.shape[dim])
     if end is None:
@@ -196,6 +196,11 @@ def slice_scatter_decomposition(
     end = get_positive_dim(end, input_tensor.shape[dim])
     if step is None:
         step = 1
+
+    # Ensure start, end, and step are all integers
+    assert isinstance(start, int), "start must be an integer"
+    assert isinstance(end, int), "end must be an integer"
+    assert isinstance(step, int), "step must be an integer"
 
     src_dim = src_tensor.shape
     # step == 0 is not a valid torch case
@@ -233,7 +238,7 @@ def select_scatter_decomposition(
 @register_torch_trt_decomposition(
     torch.ops.aten.empty_strided.default, registry=TORCH_TRT_DECOMPOSITIONS
 )
-def empty_strided_decomposition(*args, **kwargs) -> torch.Tensor:
+def empty_strided_decomposition(*args, **kwargs) -> torch.Tensor:  # type: ignore
     empty_size = args[0]
     empty_stride = args[1]
     return torch.as_strided(
@@ -256,8 +261,7 @@ def scatter_add_decomposition(
     src_shape = list(src_tensor.shape)
     src_dim = src_shape[dim]
     for i in range(0, src_dim):
-        to_scatter_tensor = torch.zeros_like(input_tensor)
-
+        to_scatter_tensor = torch.zeros(input_tensor.shape, dtype=input_tensor.dtype)
         # index and src slice
         src_slice = torch.select(src_tensor, dim, i)
         index_slice = torch.select(index, dim, i)
