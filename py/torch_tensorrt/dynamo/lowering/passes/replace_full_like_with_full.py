@@ -1,13 +1,12 @@
 import logging
-from typing import Sequence
 
 import torch
 import torch.fx
 from torch_tensorrt.dynamo._defaults import default_device
-from torch_tensorrt.dynamo.utils import to_torch_device
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
+from torch_tensorrt.dynamo.utils import to_torch_device
 
 logger = logging.getLogger(__name__)
 
@@ -26,17 +25,17 @@ def replace_full_like_with_full(
             input_tensor = node.args[0]
             fill_value = node.args[1]
             input_dtype = None
+            input_shape = None
             input_device = to_torch_device(default_device())
             if "val" in input_tensor.meta:
                 input_dtype = input_tensor.meta["val"].dtype
                 input_device = input_tensor.meta["val"].device
+                input_shape = list(input_tensor.meta["val"].shape)
             elif "tensor_meta" in input_tensor.meta:
                 input_dtype = input_tensor.meta["tensor_meta"].dtype
-                input_device = input_tensor.meta["tensor_meta"].device
+                input_shape = list(input_tensor.meta["tensor_meta"].shape)
 
-            shape = list(input_tensor.meta["tensor_meta"].shape)
-
-            # There's no memory format argument for torch.full. 
+            # There's no memory format argument for torch.full.
             # Set the input_device and dtype correspondingly.
             new_kwargs = {}
             for key, val in node.kwargs.items():
@@ -45,7 +44,7 @@ def replace_full_like_with_full(
             new_kwargs["device"] = input_device
             new_kwargs["dtype"] = input_dtype
             # Replace full_like with full, using the shape as a list
-            input_nodes = (shape, fill_value)
+            input_nodes = (input_shape, fill_value)
             with gm.graph.inserting_after(node):
                 full_node = gm.graph.call_function(
                     torch.ops.aten.full.default,
