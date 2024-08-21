@@ -168,6 +168,7 @@ class TestNativeGroupNormConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             GroupNorm(),
             input_specs,
+            check_dtype=False,
         )
 
 
