@@ -85,6 +85,7 @@ def _pretraced_backend(
 
             # Remove detach nodes
             remove_detach(gm)
+
             # Invoke AOTAutograd to translate operators to aten
             gm = aot_export_joint_simple(
                 gm,
@@ -94,6 +95,7 @@ def _pretraced_backend(
                     settings.enable_experimental_decompositions
                 ),
             )
+
             logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
 
             gm = post_lowering(gm)
