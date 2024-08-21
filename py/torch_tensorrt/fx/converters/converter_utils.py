@@ -123,6 +123,11 @@ def set_layer_name(
         else f"{source_ir}_ops.{target.__name__}"
     )
     layer.name = f"[{layer.type.name}]-[{target_name}]-[{name}]"
+    layer.metadata = f"[{layer.type.name}]-[{target_name}]-[{name}]-[#_of_outputs_{layer.num_outputs}]"
+
+    for i in range(layer.num_outputs):
+        output = layer.get_output(i)
+        output.name = f"[{output.name}]"
 
 
 def extend_attr_to_tuple(
