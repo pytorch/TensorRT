@@ -14,10 +14,6 @@ wget https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-l
 TORCH_TORCHVISION=$(grep "^torch" py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 
-TRT_VERSION=$(python -c "import yaml; print(yaml.safe_load(open('dev_dep_versions.yml', 'r'))['__tensorrt_version__'])")
-pip install --no-dependencies tensorrt==${TRT_VERSION} --extra-index-url https://pypi.nvidia.com
-pip install tensorrt-${CU_VERSION::4}==${TRT_VERSION} tensorrt-${CU_VERSION::4}-bindings==${TRT_VERSION} tensorrt-${CU_VERSION::4}-libs==${TRT_VERSION} --extra-index-url https://pypi.nvidia.com
-
 # Install all the dependencies required for Torch-TensorRT
 pip uninstall -y torch torchvision
 pip install --force-reinstall --pre ${TORCH_TORCHVISION} --index-url ${INDEX_URL}
