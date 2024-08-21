@@ -82,6 +82,8 @@ def compile(
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
     lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
+    use_strong_types: bool = _defaults.USE_STRONG_TYPES,
+    use_fp32_acc: bool = _defaults.USE_FP32_ACC,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -147,6 +149,8 @@ def compile(
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
+        use_strong_types (bool): Enable strong typing in TensorRT compilation
+        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -221,7 +225,7 @@ def compile(
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module
-    gm = post_lowering(gm)
+    gm = post_lowering(gm, use_fp32_acc=use_fp32_acc)
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     compilation_options = {
@@ -257,6 +261,8 @@ def compile(
         "hardware_compatible": hardware_compatible,
         "timing_cache_path": timing_cache_path,
         "lazy_engine_init": lazy_engine_init,
+        "use_strong_types": use_strong_types,
+        "use_fp32_acc": use_fp32_acc,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -493,6 +499,8 @@ def convert_exported_program_to_serialized_trt_engine(
     calibrator: object = None,
     allow_shape_tensors: bool = False,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    use_strong_types: bool = _defaults.USE_STRONG_TYPES,
+    use_fp32_acc: bool = _defaults.USE_FP32_ACC,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -551,6 +559,8 @@ def convert_exported_program_to_serialized_trt_engine(
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        use_strong_types (bool): Enable strong typing in TensorRT compilation
+        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
@@ -624,6 +634,8 @@ def convert_exported_program_to_serialized_trt_engine(
         "dla_local_dram_size": dla_local_dram_size,
         "dla_global_dram_size": dla_global_dram_size,
         "timing_cache_path": timing_cache_path,
+        "use_strong_types": use_strong_types,
+        "use_fp32_acc": use_fp32_acc,
     }
 
     exported_program = pre_export_lowering(exported_program)

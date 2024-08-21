@@ -28,7 +28,9 @@ from torch_tensorrt.dynamo._defaults import (
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
     USE_FAST_PARTITIONER,
+    USE_FP32_ACC,
     USE_PYTHON_RUNTIME,
+    USE_STRONG_TYPES,
     VERSION_COMPATIBLE,
     WORKSPACE_SIZE,
     default_device,
@@ -74,6 +76,8 @@ class CompilationSettings:
             output to a file if a string path is specified
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        use_strong_types (bool): Enable strong typing in TensorRT compilation
+        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -106,3 +110,5 @@ class CompilationSettings:
     hardware_compatible: bool = HARDWARE_COMPATIBLE
     timing_cache_path: str = TIMING_CACHE_PATH
     lazy_engine_init: bool = LAZY_ENGINE_INIT
+    use_strong_types: bool = USE_STRONG_TYPES
+    use_fp32_acc: bool = USE_FP32_ACC

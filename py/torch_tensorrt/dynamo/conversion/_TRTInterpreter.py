@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set, Tuple
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
@@ -30,7 +31,6 @@ from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
-import tensorrt as trt
 from packaging import version
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -66,10 +66,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self.builder = trt.Builder(self.logger)
 
         flag = 0
-
-        # It is deprecated to not use this flag
-        EXPLICIT_BATCH = 1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-        flag |= EXPLICIT_BATCH
+        if compilation_settings.use_strong_types:
+            STRONGLY_TYPED = 1 << (int)(
+                trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED
+            )
+            flag |= STRONGLY_TYPED
 
         self.ctx = ConversionContext(
             self.builder.create_network(flag), compilation_settings
@@ -103,8 +104,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._itensor_to_tensor_meta: Dict[trt.tensorrt.ITensor, TensorMetadata] = (
             dict()
         )
-        self.compilation_settings = compilation_settings
 
+        self.compilation_settings = compilation_settings
         # Data types for TRT Module output Tensors
         self.output_dtypes = (
             [dtype._from(o) for o in output_dtypes] if output_dtypes else None

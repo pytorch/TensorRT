@@ -25,12 +25,16 @@ DEVICE = torch.device("cuda:0")
 # CPU is used here so that GPU memory is reserved for TRT compilation.
 with torch.no_grad():
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    model = AutoModelForCausalLM.from_pretrained(
-        "gpt2",
-        pad_token_id=tokenizer.eos_token_id,
-        use_cache=False,
-        attn_implementation="eager",
-    ).eval()
+    model = (
+        AutoModelForCausalLM.from_pretrained(
+            "gpt2",
+            pad_token_id=tokenizer.eos_token_id,
+            use_cache=False,
+            attn_implementation="eager",
+        )
+        .eval()
+        .half()
+    )
 
 # %%
 # Tokenize a sample input prompt and get pytorch model outputs
@@ -49,14 +53,17 @@ pyt_gen_tokens = generate(model, input_ids, MAX_TOKENS, tokenizer.eos_token_id)
 
 # Export the GPT2 model into an ExportedProgram which is input of TRT compilation
 gpt2_ep = export_llm(model, input_ids, max_seq_len=1024)
-trt_model = torch_tensorrt.dynamo.compile(
-    gpt2_ep,
-    inputs=[input_ids],
-    enabled_precisions={torch.float32},
-    truncate_double=True,
-    device=DEVICE,
-    disable_tf32=True,
-)
+with torch_tensorrt.logging.debug():
+    trt_model = torch_tensorrt.dynamo.compile(
+        gpt2_ep,
+        inputs=[input_ids],
+        enabled_precisions={torch.float16},
+        truncate_double=True,
+        device=DEVICE,
+        disable_tf32=True,
+        use_strong_types=False,
+        use_fp32_acc=True,
+    )
 
 # Auto-regressive generation loop for greedy decoding using TensorRT model
 # We use a custom generate function which is very similar to the huggingface one.
