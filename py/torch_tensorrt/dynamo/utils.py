@@ -495,6 +495,22 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
         )
         settings.require_full_compilation = False
 
+    # If cache_built_engines and reuse_cached_engines are True but custom_engine_cache is not provided,
+    # then create a default disk engine cache
+    if kwargs.get("cache_built_engines") or kwargs.get("reuse_cached_engines"):
+        if settings.custom_engine_cache is None:
+            from torch_tensorrt.dynamo._engine_caching import DiskEngineCache
+
+            engine_cache_dir = kwargs.get(
+                "engine_cache_dir", _defaults.ENGINE_CACHE_DIR
+            )
+            engine_cache_size = kwargs.get(
+                "engine_cache_size", _defaults.ENGINE_CACHE_SIZE
+            )
+            settings.custom_engine_cache = DiskEngineCache(
+                engine_cache_dir, engine_cache_size
+            )
+
     logger.info("Compilation Settings: %s\n", settings)
 
     return settings

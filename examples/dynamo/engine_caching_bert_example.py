@@ -29,11 +29,11 @@ def compile_bert(iterations=3):
         torch._dynamo.reset()
 
         if i == 0:
-            save_engine_cache = False
-            load_engine_cache = False
+            cache_built_engines = False
+            reuse_cached_engines = False
         else:
-            save_engine_cache = True
-            load_engine_cache = True
+            cache_built_engines = True
+            reuse_cached_engines = True
 
         start.record()
         compilation_kwargs = {
@@ -43,8 +43,9 @@ def compile_bert(iterations=3):
             "debug": False,
             "min_block_size": 1,
             "make_refitable": True,
-            "save_engine_cache": save_engine_cache,
-            "load_engine_cache": load_engine_cache,
+            "cache_built_engines": cache_built_engines,
+            "reuse_cached_engines": reuse_cached_engines,
+            "engine_cache_dir": "/tmp/torch_trt_bert_engine_cache",
             "engine_cache_size": 1 << 30,  # 1GB
         }
         optimized_model = torch.compile(

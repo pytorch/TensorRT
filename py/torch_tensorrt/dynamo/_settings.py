@@ -6,6 +6,8 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
+    CACHE_BUILT_ENGINES,
+    CUSTOM_ENGINE_CACHE,
     DEBUG,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
@@ -14,13 +16,9 @@ from torch_tensorrt.dynamo._defaults import (
     DRYRUN,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     ENABLED_PRECISIONS,
-    ENGINE_CACHE_DIR,
-    ENGINE_CACHE_INSTANCE,
-    ENGINE_CACHE_SIZE,
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
     LAZY_ENGINE_INIT,
-    LOAD_ENGINE_CACHE,
     MAKE_REFITABLE,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
@@ -28,7 +26,7 @@ from torch_tensorrt.dynamo._defaults import (
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
     REQUIRE_FULL_COMPILATION,
-    SAVE_ENGINE_CACHE,
+    REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
@@ -80,11 +78,9 @@ class CompilationSettings:
             output to a file if a string path is specified
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
-        save_engine_cache (bool): Whether to save the compiled TRT engines to hard disk
-        load_engine_cache (bool): Whether to load the compiled TRT engines from hard disk
-        engine_cache_dir (str): Directory to store the cached TRT engines
-        engine_cache_size (int): Maximum hard-disk space to use for the engine cache
-        engine_cache_instance (BaseEngineCache): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache
+        cache_built_engines (bool): Whether to save the compiled TRT engines to storage
+        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
+        custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -117,8 +113,6 @@ class CompilationSettings:
     hardware_compatible: bool = HARDWARE_COMPATIBLE
     timing_cache_path: str = TIMING_CACHE_PATH
     lazy_engine_init: bool = LAZY_ENGINE_INIT
-    save_engine_cache: bool = SAVE_ENGINE_CACHE
-    load_engine_cache: bool = LOAD_ENGINE_CACHE
-    engine_cache_dir: str = ENGINE_CACHE_DIR
-    engine_cache_size: int = ENGINE_CACHE_SIZE
-    engine_cache_instance: BaseEngineCache = ENGINE_CACHE_INSTANCE
+    cache_built_engines: bool = CACHE_BUILT_ENGINES
+    reuse_cached_engines: bool = REUSE_CACHED_ENGINES
+    custom_engine_cache: Optional[BaseEngineCache] = CUSTOM_ENGINE_CACHE

@@ -522,30 +522,35 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             TRTInterpreterResult
         """
         if (
-            self.compilation_settings.save_engine_cache
-            or self.compilation_settings.load_engine_cache
-        ):
-            engine_cache = self.compilation_settings.engine_cache_instance
-            hash_val = engine_cache.get_hash(self.module)
+            self.compilation_settings.custom_engine_cache is not None
+        ):  # custom_engine_cache could be None if this function is called from convert_exported_program_to_serialized_trt_engine etc.
+            if (
+                self.compilation_settings.cache_built_engines
+                or self.compilation_settings.reuse_cached_engines
+            ):
+                engine_cache = self.compilation_settings.custom_engine_cache
+                hash_val = engine_cache.get_hash(self.module)
 
-        if self.compilation_settings.load_engine_cache:
-            # query the cached TRT engine
-            serialized_engine, input_names, output_names, weight_name_map = (
-                engine_cache.load(hash_val)
-            )
-            if serialized_engine is not None:
-                self._input_names = input_names
-                self._output_names = output_names
-                self.weight_name_map = weight_name_map
-                _LOGGER.info(
-                    "Hit the cached TRT engine. It is loaded for skipping recompilation."
-                )
-                return TRTInterpreterResult(
-                    serialized_engine,
-                    self._input_names,
-                    self._output_names,
-                    self.weight_name_map,
-                )
+            if self.compilation_settings.reuse_cached_engines:
+                # query the cached TRT engine
+                blob = engine_cache.load(hash_val)
+                if blob is not None:  # hit the cache
+                    serialized_engine, input_names, output_names, weight_name_map = (
+                        engine_cache.unpack(blob)
+                    )
+                    self._input_names = input_names
+                    self._output_names = output_names
+                    self.weight_name_map = weight_name_map
+                    _LOGGER.info(
+                        "Hit the cached TRT engine. It is loaded and skip recompilation."
+                    )
+                    # TODO: refit the engine here or outside (within convert_module)?
+                    return TRTInterpreterResult(
+                        serialized_engine,
+                        self._input_names,
+                        self._output_names,
+                        self.weight_name_map,
+                    )
 
         self._construct_trt_network_def()
 
@@ -576,14 +581,17 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._save_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )
-        if self.compilation_settings.save_engine_cache:
-            engine_cache.save(
-                hash_val,
+        if (
+            self.compilation_settings.custom_engine_cache is not None
+            and self.compilation_settings.cache_built_engines
+        ):
+            blob = engine_cache.pack(
                 serialized_engine,
                 self._input_names,
                 self._output_names,
                 self.weight_name_map,
             )
+            engine_cache.save(hash_val, blob)
 
         with io.BytesIO() as engine_bytes:
             engine_bytes.write(serialized_engine)

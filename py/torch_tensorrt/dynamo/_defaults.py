@@ -4,7 +4,6 @@ import tempfile
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
-from torch_tensorrt.dynamo._engine_caching import EngineCache
 
 ENABLED_PRECISIONS = {dtype.f32}
 DEBUG = False
@@ -36,13 +35,11 @@ TIMING_CACHE_PATH = os.path.join(
     tempfile.gettempdir(), "torch_tensorrt_engine_cache", "timing_cache.bin"
 )
 LAZY_ENGINE_INIT = False
-SAVE_ENGINE_CACHE = True
-LOAD_ENGINE_CACHE = True
+CACHE_BUILT_ENGINES = True
+REUSE_CACHED_ENGINES = True
 ENGINE_CACHE_DIR = os.path.join(tempfile.gettempdir(), "torch_tensorrt_engine_cache")
 ENGINE_CACHE_SIZE = 1073741824
-ENGINE_CACHE_INSTANCE = EngineCache(
-    engine_cache_size=ENGINE_CACHE_SIZE, engine_cache_dir=ENGINE_CACHE_DIR
-)
+CUSTOM_ENGINE_CACHE = None
 
 
 def default_device() -> Device:
