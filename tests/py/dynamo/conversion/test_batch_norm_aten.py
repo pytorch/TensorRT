@@ -8,12 +8,33 @@ FEATURE_NUM = 3
 
 
 class TestBatchNormConverter(DispatchTestCase):
-    def test_batchnorm(self):
+    def test_batchnorm_static_weights(self):
         class BatchNorm(torch.nn.Module):
             def forward(self, x):
                 return torch.ops.aten.batch_norm.default(
                     x,
-                    torch.ones((FEATURE_NUM,)),
+                    torch.full((FEATURE_NUM,), 3, dtype=torch.float32),
+                    torch.zeros((FEATURE_NUM,)),
+                    torch.zeros((FEATURE_NUM,)),
+                    torch.full((FEATURE_NUM,), 3, dtype=torch.float32),
+                    False,
+                    0.1,
+                    1e-05,
+                    True,
+                )
+
+        inputs = [torch.randn(1, 3, 224, 224)]
+        self.run_test(
+            BatchNorm(),
+            inputs,
+        )
+
+    def test_batchnorm_static_bias_only(self):
+        class BatchNorm(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.batch_norm.default(
+                    x,
+                    None,
                     torch.zeros((FEATURE_NUM,)),
                     torch.zeros((FEATURE_NUM,)),
                     torch.ones((FEATURE_NUM,)),
@@ -57,7 +78,7 @@ class TestBatchNormConverter(DispatchTestCase):
             input_specs,
         )
 
-    def test_batchnorm_with_dynamic_shape(self):
+    def test_batchnorm2d_with_dynamic_shape(self):
         class BatchNorm(torch.nn.Module):
             def forward(self, x):
                 return torch.ops.aten.batch_norm.default(
@@ -87,7 +108,7 @@ class TestBatchNormConverter(DispatchTestCase):
 
 
 class TestNativeBatchNormConverter(DispatchTestCase):
-    def test_batchnorm(self):
+    def test_native_batchnorm_static_weights(self):
         class BatchNorm(torch.nn.Module):
             def forward(self, x):
                 return torch.ops.aten.native_batch_norm.default(
@@ -107,7 +128,30 @@ class TestNativeBatchNormConverter(DispatchTestCase):
             inputs,
         )
 
-    def test_batchnorm_legit_no_training(self):
+    def test_native_batchnorm_legit_no_training_with_trt_tensor(self):
+        class BatchNorm(torch.nn.Module):
+            def forward(self, x, running_mean, running_var):
+                return torch.ops.aten._native_batch_norm_legit_no_training.default(
+                    x,
+                    torch.ones((FEATURE_NUM,)),
+                    torch.zeros((FEATURE_NUM,)),
+                    running_mean,
+                    running_var,
+                    0.1,
+                    1e-05,
+                )[0]
+
+        inputs = [
+            torch.randn(1, 3, 224, 224),
+            torch.zeros((FEATURE_NUM,)),
+            torch.ones((FEATURE_NUM,)),
+        ]
+        self.run_test(
+            BatchNorm(),
+            inputs,
+        )
+
+    def test_native_batchnorm_legit_no_training_with_static_means(self):
         class BatchNorm(torch.nn.Module):
             def forward(self, x):
                 return torch.ops.aten._native_batch_norm_legit_no_training.default(
@@ -126,7 +170,7 @@ class TestNativeBatchNormConverter(DispatchTestCase):
             inputs,
         )
 
-    def test_batchnorm1d_with_dynamic_shape(self):
+    def test_native_batchnorm1d_with_dynamic_shape(self):
         class BatchNorm(torch.nn.Module):
             def forward(self, x):
                 return torch.ops.aten.native_batch_norm.default(
@@ -153,7 +197,7 @@ class TestNativeBatchNormConverter(DispatchTestCase):
             input_specs,
         )
 
-    def test_batchnorm_with_dynamic_shape(self):
+    def test_native_batchnorm2d_with_dynamic_shape(self):
         class BatchNorm(torch.nn.Module):
             def forward(self, x):
                 return torch.ops.aten.native_batch_norm.default(
