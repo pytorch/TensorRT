@@ -16,9 +16,11 @@ class SimpleNetwork(torch.nn.Module):
         x = self.linear2(x)
         return x
 
+
 def calibrate_loop(model):
     """Simple calibration function for testing."""
     model(input_tensor)
+
 
 input_tensor = torch.randn(1, 6).cuda()
 model = SimpleNetwork().eval().cuda()
