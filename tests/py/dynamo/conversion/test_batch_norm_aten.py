@@ -29,6 +29,55 @@ class TestBatchNormConverter(DispatchTestCase):
             inputs,
         )
 
+    def test_batchnorm_ITensor_weights_bias(self):
+        class BatchNorm(torch.nn.Module):
+            def forward(self, x, weight, bias):
+                return torch.ops.aten.batch_norm.default(
+                    x,
+                    weight,
+                    bias,
+                    torch.zeros((FEATURE_NUM,)),
+                    torch.ones((FEATURE_NUM,)),
+                    False,
+                    0.1,
+                    1e-05,
+                    True,
+                )
+
+        inputs = [
+            torch.randn(1, 3, 224, 224),
+            torch.ones((FEATURE_NUM,)),
+            torch.zeros((FEATURE_NUM,)),
+        ]
+        self.run_test(
+            BatchNorm(),
+            inputs,
+        )
+
+    def test_batchnorm_ITensor_weights(self):
+        class BatchNorm(torch.nn.Module):
+            def forward(self, x, weight):
+                return torch.ops.aten.batch_norm.default(
+                    x,
+                    weight,
+                    None,
+                    torch.zeros((FEATURE_NUM,)),
+                    torch.ones((FEATURE_NUM,)),
+                    False,
+                    0.1,
+                    1e-05,
+                    True,
+                )
+
+        inputs = [
+            torch.randn(1, 3, 224, 224),
+            torch.ones((FEATURE_NUM,)),
+        ]
+        self.run_test(
+            BatchNorm(),
+            inputs,
+        )
+
     def test_batchnorm_static_bias_only(self):
         class BatchNorm(torch.nn.Module):
             def forward(self, x):
