@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 
 import torch
 from torch._inductor.codecache import FxGraphCachePickler
-from torch.fx.experimental.proxy_tensor import maybe_disable_fake_tensor_mode
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class BaseEngineCache(ABC):
             str: hash value of the GraphModule
         """
         # parameters are set to 0
-        with maybe_disable_fake_tensor_mode():
+        with unset_fake_temporarily():
             new_gm = copy.deepcopy(gm)
             for name, param in new_gm.named_parameters():
                 param.data.zero_()
