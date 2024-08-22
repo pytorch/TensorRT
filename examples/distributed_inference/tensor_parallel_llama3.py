@@ -1,3 +1,6 @@
+# Taken and modified pytorch lightening
+# https://lightning.ai/lightning-ai/studios/tensor-parallelism-supercharging-large-model-training-with-pytorch-lightning
+import logging
 import os
 import time
 
@@ -12,9 +15,6 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
 )
 from torch.distributed.device_mesh import DeviceMesh, init_device_mesh
 
-# Taken and modified pytorch lightening
-# https://lightning.ai/lightning-ai/studios/tensor-parallelism-supercharging-large-model-training-with-pytorch-lightning
-import logging
 _rank = int(os.environ["RANK"])
 _world_size = int(os.environ["WORLD_SIZE"])
 tp_size = 2
@@ -24,9 +24,6 @@ logger.setLevel(logging.INFO)
 fh = logging.FileHandler(f"./tensor_parallel_log_{_rank}.log", mode="w")
 fh.setLevel(logging.INFO)
 logger.addHandler(fh)
-
-# understand world topology
-
 
 tp_mesh = init_device_mesh(device_type="cuda", mesh_shape=(_world_size,))
 
@@ -56,7 +53,7 @@ with torch.no_grad():
             "use_python_runtime": True,
             "workspace_size": 1 << 33,
             "debug": False,
-            "timing_cache_path":"/opt/file/cache/timing_cache_llama.bin"
+            "timing_cache_path": "/opt/file/cache/timing_cache_llama.bin",
         },
         dynamic=False,
     )

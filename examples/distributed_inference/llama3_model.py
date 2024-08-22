@@ -3,7 +3,7 @@
 
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -195,7 +195,7 @@ class Attention(nn.Module):
             model_args.n_heads * self.head_dim, model_args.dim, bias=False
         )
 
-    def init_weights(self, init_std: float):
+    def init_weights(self, init_std: float) -> None:
         for linear in (self.wq, self.wk, self.wv):
             nn.init.trunc_normal_(linear.weight, mean=0.0, std=0.02)
         nn.init.trunc_normal_(self.wo.weight, mean=0.0, std=init_std)
@@ -204,7 +204,7 @@ class Attention(nn.Module):
         self,
         x: torch.Tensor,
         freqs_cis: torch.Tensor,
-    ):
+    ) -> Any:
         """Forward pass of the attention module.
 
         Args:
@@ -275,10 +275,10 @@ class FeedForward(nn.Module):
         self.w2 = nn.Linear(hidden_dim, dim, bias=False)
         self.w3 = nn.Linear(dim, hidden_dim, bias=False)
 
-    def forward(self, x):
+    def forward(self, x) -> Any:
         return self.w2(F.silu(self.w1(x)) * self.w3(x))
 
-    def init_weights(self, init_std: float):
+    def init_weights(self, init_std: float) -> None:
         nn.init.trunc_normal_(self.w1.weight, mean=0.0, std=0.02)
         for linear in (self.w2, self.w3):
             nn.init.trunc_normal_(linear.weight, mean=0.0, std=init_std)
