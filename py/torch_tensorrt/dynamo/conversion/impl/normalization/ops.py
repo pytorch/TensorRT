@@ -36,8 +36,8 @@ def batch_norm(
     input: TRTTensor,
     weight: Optional[Union[torch.Tensor, np.ndarray]],
     bias: Optional[Union[torch.Tensor, np.ndarray]],
-    running_mean: Union[TRTTensor, Optional[Union[torch.Tensor, np.ndarray]]],
-    running_var: Union[TRTTensor, Optional[Union[torch.Tensor, np.ndarray]]],
+    running_mean: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
+    running_var: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
     training: bool,
     momentum: float,
     eps: float,
@@ -55,13 +55,13 @@ def batch_norm(
     if isinstance(running_mean, TRTTensor) or isinstance(running_var, TRTTensor):
         # Default values if weight, bias, running_mean, running_var are None
         if weight is None:
-            weight = get_trt_tensor(ctx, 1.0, f"{name}_weight", input.dtype)
+            weight = get_trt_tensor(ctx, 1.0, f"{name}_weight")
         if bias is None:
-            bias = get_trt_tensor(ctx, 0.0, f"{name}_bias", input.dtype)
+            bias = get_trt_tensor(ctx, 0.0, f"{name}_bias")
         if running_mean is None:
-            running_mean = get_trt_tensor(ctx, 0.0, f"{name}_running_mean", input.dtype)
+            running_mean = get_trt_tensor(ctx, 0.0, f"{name}_running_mean")
         if running_var is None:
-            running_var = get_trt_tensor(ctx, 1.0, f"{name}_running_var", input.dtype)
+            running_var = get_trt_tensor(ctx, 1.0, f"{name}_running_var")
 
         # eps_tensor for numerical stability
         eps_tensor = get_trt_tensor(ctx, eps, f"{name}_eps")
