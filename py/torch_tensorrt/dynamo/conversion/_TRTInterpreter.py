@@ -18,6 +18,7 @@ from typing import (
 )
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
@@ -43,7 +44,6 @@ from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, get_model_device, to_torch_
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
-import tensorrt as trt
 from packaging import version
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -472,12 +472,18 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     # Retrieve each weight name(s) in state_dict
                     if layer_type == "CONSTANT":
                         if "embedding" in suffix:
-                            sd_weight_name = f"{sd_weight_name}.{torch_attr[0]}"
+                            sd_weight_name = f"{sd_weight_name}.weight"
                         elif "weight" in suffix or "mm_other" in suffix:
                             # Linear layer weight
-                            sd_weight_name = f"{sd_weight_name}.{torch_attr[0]}"
+                            sd_weight_name = f"{sd_weight_name}.weight"
+                        elif "running_mean" in suffix:
+                            # Linear layer weight
+                            sd_weight_name = f"{sd_weight_name}.running_mean"
+                        elif "running_var" in suffix:
+                            # Linear layer weight
+                            sd_weight_name = f"{sd_weight_name}.running_var"
                         else:
-                            sd_weight_name = f"{sd_weight_name}.{torch_attr[1]}"
+                            sd_weight_name = f"{sd_weight_name}.bias"
                     elif layer_type == "SCALE":
                         # Batch norm needs all weights to calculate scale and shift
                         sd_weight_name = [f"{sd_weight_name}.{n}" for n in torch_attr]
