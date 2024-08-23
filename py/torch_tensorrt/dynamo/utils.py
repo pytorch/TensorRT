@@ -128,6 +128,22 @@ def input_is_dynamic(inputs: Sequence[Union[Input, torch.Tensor]]) -> bool:
     )
 
 
+def get_torch_tensor(
+    input: Input,
+    device: torch.device,
+    mode: str = "",
+) -> Union[int, torch.Tensor]:
+    if input.is_shape_tensor:
+        # TODO: All the shape tensors we've encountered so far are plain integers.
+        # Validate this assumption on more models.
+        return input.shape["opt_shape"][0]
+
+    if len(mode) > 0:
+        return input.example_tensor(mode).to(device)
+    else:
+        return input.torch_tensor.to(device)
+
+
 def get_torch_inputs(
     inputs: Sequence[Input] | Dict[Any, Any],
     device: Union[Device, torch.device, str],
@@ -146,18 +162,12 @@ def get_torch_inputs(
             if isinstance(v, (list, tuple, dict)):
                 result[k] = get_torch_inputs(v, device)
             elif isinstance(v, Input):
-                if len(mode) > 0:
-                    result[k] = v.example_tensor(mode).to(device)
-                else:
-                    result[k] = v.torch_tensor.to(device)
+                result[k] = get_torch_tensor(v, device, mode)
     else:
         result = []
         for input in inputs:
             if isinstance(input, Input):
-                if len(mode) > 0:
-                    result.append(input.example_tensor(mode).to(device))
-                else:
-                    result.append(input.torch_tensor.to(device))
+                result.append(get_torch_tensor(input, device, mode))
             elif isinstance(input, torch.Tensor):
                 result.append(input.to(device))
             else:
