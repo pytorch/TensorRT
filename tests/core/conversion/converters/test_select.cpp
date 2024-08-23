@@ -29,7 +29,7 @@ TEST(Converters, ATenSelectIntConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenSelectIntDynamicConvertsCorrectly) {
@@ -55,7 +55,7 @@ TEST(Converters, ATenSelectIntDynamicConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenSelectIntDimIsOneConvertsCorrectly) {
@@ -83,7 +83,7 @@ TEST(Converters, ATenSelectIntDimIsOneConvertsCorrectly) {
   // In order to check whether shape match that we don't do reshape.
   // E.g. x = at::randint(1, 10, {4, 4, 4}, {at::kCUDA}), then aten::select(x, 1, 0). We should get a tensor y with
   // shape {4, 4} instead of a tensor with shape {4, 1, 4}.
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, ATenSelectIntDimNegativeConvertsCorrectly) {
@@ -108,7 +108,7 @@ TEST(Converters, ATenSelectIntDimNegativeConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, ATenSelectIntNegIndexConvertsCorrectly) {
@@ -135,7 +135,7 @@ TEST(Converters, ATenSelectIntNegIndexConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenSelectIntTwiceConvertsCorrectly) {
@@ -163,7 +163,7 @@ TEST(Converters, ATenSelectIntTwiceConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenSelectEmptyTensorConvertsCorrectly) {
@@ -215,7 +215,7 @@ TEST(Converters, ATenNarrowStartScalarConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenEmbeddingConvertsCorrectly) {
@@ -243,5 +243,5 @@ TEST(Converters, ATenEmbeddingConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }

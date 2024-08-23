@@ -34,7 +34,7 @@ TEST(Converters, ATenBoolToFP32DTypeConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
   ASSERT_TRUE(jit_results[0].scalar_type() == trt.scalar_type());
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenBoolToINT32DTypeConvertsCorrectly) {
@@ -65,7 +65,7 @@ TEST(Converters, ATenBoolToINT32DTypeConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
   ASSERT_TRUE(jit_results[0].scalar_type() == trt.scalar_type());
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenBoolToINT32DeviceDTypeConvertsCorrectly) {
@@ -97,7 +97,7 @@ TEST(Converters, ATenBoolToINT32DeviceDTypeConvertsCorrectly) {
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
   ASSERT_TRUE(jit_results[0].scalar_type() == trt.scalar_type());
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenBoolToINT32TensorConvertsCorrectly) {
@@ -132,7 +132,7 @@ TEST(Converters, ATenBoolToINT32TensorConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
   ASSERT_TRUE(jit_results[0].scalar_type() == trt.scalar_type());
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenToSingleConvertsCorrectly) {
@@ -160,7 +160,7 @@ TEST(Converters, ATenToSingleConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
   ASSERT_TRUE(jit_results[0].scalar_type() == trt.scalar_type());
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenToDuplicateConvertsCorrectly) {
@@ -187,7 +187,7 @@ TEST(Converters, ATenToDuplicateConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
   for (size_t i = 0UL; i < jit_results.size(); ++i) {
     ASSERT_TRUE(jit_results[i].scalar_type() == trt_results[i].scalar_type());
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt_results[i], 2e-6));
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt_results[i]));
   }
 }
 
@@ -218,6 +218,5 @@ TEST(Converters, ATenTypeAsConvertsCorrectly) {
 
   ASSERT_TRUE(jit_results[0].scalar_type() == trt_results[0].scalar_type());
   ASSERT_TRUE(trt_results[0].scalar_type() == trt_results[1].scalar_type());
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
