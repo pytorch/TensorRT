@@ -309,10 +309,8 @@ class TestTorchTensorRTModule(unittest.TestCase):
         """
         {
             "Layers": [
-                "reshape_before_%26 : Tensor = aten::matmul(%x.1, %25)",
-                "%26 : Tensor = aten::matmul(%x.1, %25) + [Freeze Tensor %27 : Tensor = trt::const(%10) ] + (Unnamed Layer* 4) [Shuffle] + unsqueeze_node_after_[Freeze Tensor %27 : Tensor = trt::const(%10) ] + (Unnamed Layer* 4) [Shuffle]_(Unnamed Layer* 4) [Shuffle]_output + %28 : Tensor = aten::add(%27, %26, %24)",
-                "%31 : Tensor = aten::matmul(%28, %30) + [Freeze Tensor %32 : Tensor = trt::const(%12) ] + (Unnamed Layer* 10) [Shuffle] + unsqueeze_node_after_[Freeze Tensor %32 : Tensor = trt::const(%12) ] + (Unnamed Layer* 10) [Shuffle]_(Unnamed Layer* 10) [Shuffle]_output + %33 : Tensor = aten::add(%32, %31, %29)",
-                "copied_squeeze_after_%33 : Tensor = aten::add(%32, %31, %29)"
+                "%26 : Tensor = aten::matmul(%x.1, %25)_myl0_0",
+                "%31 : Tensor = aten::matmul(%28, %30)_myl0_1"
             ],
             "Bindings": [
                 "input_0",
@@ -326,7 +324,7 @@ class TestTorchTensorRTModule(unittest.TestCase):
         trt_mod = TestTorchTensorRTModule._get_trt_mod()
         trt_json = json.loads(trt_mod.get_layer_info())
         [self.assertTrue(k in trt_json.keys()) for k in ["Layers", "Bindings"]]
-        self.assertTrue(len(trt_json["Layers"]) == 4)
+        self.assertTrue(len(trt_json["Layers"]) == 2)
         self.assertTrue(len(trt_json["Bindings"]) == 2)
 
 
