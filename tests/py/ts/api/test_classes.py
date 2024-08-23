@@ -324,6 +324,8 @@ class TestTorchTensorRTModule(unittest.TestCase):
         trt_mod = TestTorchTensorRTModule._get_trt_mod()
         trt_json = json.loads(trt_mod.get_layer_info())
         [self.assertTrue(k in trt_json.keys()) for k in ["Layers", "Bindings"]]
+        print(1111111111111111, trt_json["Layers"])
+        print(2222222222222222, trt_json["Bindings"])
         self.assertTrue(len(trt_json["Layers"]) == 2)
         self.assertTrue(len(trt_json["Bindings"]) == 2)
 
