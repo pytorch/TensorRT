@@ -11,8 +11,9 @@ TEST(Converters, ATenScaledDotProductAttentionConvertsCorrectly) {
         %none : NoneType = prim::Constant()
         %0 : float = prim::Constant[value=0.]()
         %scale : NoneType = prim::Constant()
+        %enable_gqa : bool = prim::Constant[value=0]()
         %false : bool = prim::Constant[value=0]()
-        %3 : Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %none, %0, %false, %scale)
+        %3 : Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %none, %0, %false, %scale, %enable_gqa)
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -38,7 +39,8 @@ TEST(Converters, ATenScaledDotProductAttnMaskFloatConvertsCorrectly) {
         %0 : float = prim::Constant[value=0.]()
         %false : bool = prim::Constant[value=0]()
         %scale : NoneType = prim::Constant()
-        %3 : Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %attn_mask, %0, %false, %scale)
+        %enable_gqa : bool = prim::Constant[value=0]()
+        %3 : Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %attn_mask, %0, %false, %scale, %enable_gqa)
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -59,13 +61,14 @@ TEST(Converters, ATenScaledDotProductAttnMaskFloatConvertsCorrectly) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
-TEST(Converters, ATenScaledDotProductAttnMaskBoolConvertsCorrectly) {
+TEST(Converters, ATenScaledDotProductAttnMaskIntConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%query : Tensor, %key : Tensor, %value : Tensor, %attn_mask : Tensor):
         %0 : float = prim::Constant[value=0.]()
         %false : bool = prim::Constant[value=0]()
         %scale : NoneType = prim::Constant()
-        %3 : Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %attn_mask, %0, %false, %scale)
+        %enable_gqa : bool = prim::Constant[value=0]()
+        %3 : Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %attn_mask, %0, %false, %scale, %enable_gqa)
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -74,7 +77,7 @@ TEST(Converters, ATenScaledDotProductAttnMaskBoolConvertsCorrectly) {
   auto query = at::rand({32, 8, 128, 64}, {at::kCUDA});
   auto key = at::rand({32, 8, 128, 64}, {at::kCUDA});
   auto value = at::rand({32, 8, 128, 64}, {at::kCUDA});
-  auto attn_mask = at::randint(0, 2, {32, 8, 128, 128}, at::kCUDA).to(at::kBool);
+  auto attn_mask = at::randint(0, 2, {32, 8, 128, 128}, {at::kCUDA});
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {query, key, value, attn_mask});
 
