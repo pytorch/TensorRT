@@ -112,7 +112,7 @@ void pointwise_test_helper(
     trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, trt_inputs);
   }
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 } // namespace util

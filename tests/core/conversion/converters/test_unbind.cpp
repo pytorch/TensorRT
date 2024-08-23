@@ -28,7 +28,7 @@ TEST(Converters, ATenUnbindConvertsCorrectly) {
 
   for (size_t i = 0; i < jit_results.size(); i++) {
     auto trt = trt_results[i];
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt, 2e-6));
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt));
   }
 }
 
@@ -55,7 +55,7 @@ TEST(Converters, ATenUnbindNegativeAxisConvertsCorrectly) {
 
   for (size_t i = 0; i < jit_results.size(); i++) {
     auto trt = trt_results[i];
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt, 2e-6));
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt));
   }
 }
 
@@ -83,6 +83,6 @@ TEST(Converters, ATenUnbindEvaluatedTensor) {
 
   for (size_t i = 0; i < jit_results.size(); i++) {
     auto trt = trt_results[i];
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i].cuda(), trt, 2e-6));
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i].cuda(), trt));
   }
 }

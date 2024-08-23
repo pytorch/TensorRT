@@ -88,5 +88,5 @@ TEST(LoweringPasses, ViewToReshapeResultsCorrectly) {
   auto jit_results = mod.forward({jit_in});
   auto trt_results = new_mod.forward({trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results.toTensor(), trt_results.toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results.toTensor(), trt_results.toTensor()));
 }

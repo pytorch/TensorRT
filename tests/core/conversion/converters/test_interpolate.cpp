@@ -21,7 +21,7 @@
                                                                                                 \
     auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});        \
     auto trt = trt_results[0].reshape(jit_results[0].sizes());                                  \
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));           \
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));                 \
   }                                                                                             \
                                                                                                 \
   TEST(Converters, name##DynamicConvertsCorrectly) {                                            \
@@ -40,7 +40,7 @@
                                                                                                 \
     auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {trt_in}); \
     auto trt = trt_results[0].reshape(jit_results[0].sizes());                                  \
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));           \
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));                 \
   }
 
 #define ATEN_INTERPOLATE_STATIC_ONLY_TEST(name, graph_src, input_shape)                  \
@@ -60,7 +60,7 @@
                                                                                          \
     auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in}); \
     auto trt = trt_results[0].reshape(jit_results[0].sizes());                           \
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));    \
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));          \
   }
 
 ATEN_INTERPOLATE_TESTS(
@@ -406,7 +406,7 @@ TEST(Converters, GridSampleConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_input, trt_grid});
 
   for (size_t i = 0; i < jit_results.size(); i++) {
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt_results[i], 2e-6));
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt_results[i]));
   }
 }
 
@@ -438,7 +438,7 @@ TEST(Converters, GridSampleOptions1ConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_input, trt_grid});
 
   for (size_t i = 0; i < jit_results.size(); i++) {
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt_results[i], 2e-6));
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt_results[i]));
   }
 }
 
@@ -470,6 +470,6 @@ TEST(Converters, GridSampleOptions2ConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_input, trt_grid});
 
   for (size_t i = 0; i < jit_results.size(); i++) {
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt_results[i], 2e-6));
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[i], trt_results[i]));
   }
 }

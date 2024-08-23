@@ -1093,13 +1093,13 @@ class TestLowering(TestCase):
             min_block_size=2,
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(expected_ops_unseen),
             0,
             f"The following expected ops were not encountered: {expected_ops_unseen}",
         )
 
-        self.assertEquals(
+        self.assertEqual(
             len(unexpected_ops_seen),
             0,
             f"The following expected ops were not encountered: {unexpected_ops_seen}",
