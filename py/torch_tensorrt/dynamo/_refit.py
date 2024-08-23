@@ -34,7 +34,7 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
     TorchTensorRTModule,
 )
 from torch_tensorrt.dynamo.utils import (
-    check_output,
+    check_module_output,
     get_torch_inputs,
     set_log_level,
     to_torch_device,
@@ -281,6 +281,7 @@ def refit_module_weights(
             arg_inputs = [arg_inputs]
         torch_inputs = get_torch_inputs(arg_inputs, device)
 
+    torch_kwarg_inputs: Any = {}
     if kwarg_inputs:
         torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
     runtime = trt.Runtime(TRT_LOGGER)
@@ -434,6 +435,7 @@ def refit_module_weights(
                 settings=settings,
                 weight_name_map=weight_name_map,
             )
+
         except AssertionError as e:
             # If fast_refit is used and failed, we fall back to regular refit
             logger.warning(e)
@@ -461,7 +463,7 @@ def refit_module_weights(
             setattr(compiled_module, f"{name}_engine", refitted_engine)
 
     if verify_output and arg_inputs is not None:
-        if check_output(
+        if check_module_output(
             new_module=new_gm,
             refitted_module=compiled_module,
             arg_inputs=torch_inputs,
@@ -469,6 +471,19 @@ def refit_module_weights(
         ):
             logger.info("Refitting Succeed!")
         else:
+            if weight_name_map:
+                logger.warning(
+                    "Refitting with weight_name_map yielded incorrect result! The outputs do not match."
+                )
+                return refit_module_weights(
+                    compiled_module,
+                    new_weight_module,
+                    arg_inputs,
+                    kwarg_inputs,
+                    verify_output,
+                    use_weight_map_cache=False,
+                    in_place=in_place,
+                )
             logger.error("Refitting Failed! The outputs do not match.")
     else:
         logger.info("Refitting Completed! Output verification skipped.")
