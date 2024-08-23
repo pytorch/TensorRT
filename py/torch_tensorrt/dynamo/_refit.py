@@ -115,25 +115,8 @@ def construct_refit_mapping_from_weight_name_map(
     for engine_weight_name, (sd_weight_name, np_weight_type) in weight_name_map.items():
         trt_dtype = dtype.try_from(np_weight_type).to(trt.DataType)
         torch_dtype = dtype.try_from(np_weight_type).to(torch.dtype)
-        if engine_weight_name.split(" ")[-1] in ["SCALE", "SHIFT"]:
-            # Batch Norm Layer
-            params = {
-                "weight": 1.0,
-                "bias": 0.0,
-                "running_mean": 0.0,
-                "running_var": 1.0,
-            }
-            for w in sd_weight_name:
-                if w in state_dict:
-                    params[w.split(".")[-1]] = state_dict[w]
-            scale = params["weight"] / torch.sqrt(params["running_var"] + 1e-5)
-            shift = params["bias"] - params["running_mean"] * scale
-            # Set scale to scale or shift to shift
-            engine_weight_map[engine_weight_name] = eval(
-                engine_weight_name.split(" ")[-1].lower()
-            )
 
-        elif sd_weight_name not in state_dict:
+        if sd_weight_name not in state_dict:
             # If weights is not in sd, we can leave it unchanged
             continue
         else:
@@ -180,7 +163,7 @@ def _refit_single_trt_engine_with_gm(
 
         # Debug Use
         # correct = construct_refit_mapping(new_gm, input_list, settings)
-        # {k: np.allclose(correct[k][0], mapping[k][0].cpu().numpy(), 1e-2, 1e-2) for k in mapping if k in correct}
+        # comparison = {k: (np.allclose(correct[k][0], mapping[k][0].cpu().numpy(), 1e-2, 1e-2), correct[k][0], mapping[k][0]) for k in mapping if k in correct}
 
         for layer_name in weight_list:
             if layer_name not in mapping:
