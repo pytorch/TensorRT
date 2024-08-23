@@ -33,7 +33,7 @@ TEST(Converters, WhereConvertsCorrectly) {
   auto trt_y = at::clone(y);
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_condition, trt_x, trt_y});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, WhereConvertsMismatchedShapesCorrectly) {
@@ -65,5 +65,5 @@ TEST(Converters, WhereConvertsMismatchedShapesCorrectly) {
   auto trt_y = at::clone(y);
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_condition, trt_x, trt_y});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
