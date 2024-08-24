@@ -544,7 +544,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     _LOGGER.info(
                         "Found the cached engine that corresponds to this graph. It is directly loaded."
                     )
-                    # TODO: refit the engine here or outside (within convert_module)?
                     return TRTInterpreterResult(
                         serialized_engine,
                         self._input_names,

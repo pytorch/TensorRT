@@ -48,7 +48,7 @@ class BaseEngineCache(ABC):
         serialized_engine: bytes,
         input_names: List[str],
         output_names: List[str],
-        weight_name_map: Optional[Dict[str, Any]],
+        weight_name_map: Optional[Dict[Any, Any]],
     ) -> bytes:
         """Pack serialized engine, input names, output names, and weight map into a single blob
 
@@ -56,7 +56,7 @@ class BaseEngineCache(ABC):
             serialized_engine (bytes): serialized TRT engine
             input_names (List[str]): input names of TRT engine
             output_names (List[str]): output names of TRT engine
-            weight_name_map (Optional[Dict[str, Any]]): weight name map for refitting
+            weight_name_map (Optional[Dict[Any, Any]]): weight name map for refitting
 
         Returns:
             bytes: packed blob
@@ -73,7 +73,7 @@ class BaseEngineCache(ABC):
     @staticmethod
     def unpack(
         packed_obj: bytes,
-    ) -> Tuple[bytes, List[str], List[str], Optional[Dict[str, Any]]]:
+    ) -> Tuple[bytes, List[str], List[str], Optional[Dict[Any, Any]]]:
         """Unpack packed blob into serialized engine, input names, output names, and weight map
 
         Args:

@@ -114,6 +114,36 @@ def interpret_module_to_result(
     )
 
     interpreter_result = interpreter.run()
+
+    if settings.make_refitable:
+        # Run fast refit even if it's the first compilation.
+        # This is to ensure that the weight name map is correct for future refits.
+        # If the fast refit fails, remove the weight name map.
+        from torch_tensorrt.dynamo._refit import _refit_single_trt_engine_with_gm
+        from torch_tensorrt.logging import TRT_LOGGER
+
+        runtime = trt.Runtime(TRT_LOGGER)
+        refit_test_engine = runtime.deserialize_cuda_engine(
+            interpreter_result.serialized_engine
+        )
+        try:
+            _refit_single_trt_engine_with_gm(
+                new_gm=module,
+                old_engine=refit_test_engine,
+                input_list=inputs,
+                settings=settings,
+                weight_name_map=interpreter_result.weight_name_map,
+            )
+        except AssertionError:
+            # TRTInterpreterResult is a tuple, so we need to create a new one
+            interpreter_result = TRTInterpreterResult(
+                interpreter_result.serialized_engine,
+                interpreter_result.input_names,
+                interpreter_result.output_names,
+                None,
+            )
+            logger.warning("Fast refit test failed. Removing the weight map caching.")
+
     return interpreter_result
 
 
@@ -133,31 +163,6 @@ def convert_module(
         PythonTorchTensorRTModule or TorchTensorRTModule
     """
     interpreter_result = interpret_module_to_result(module, inputs, settings)
-    # Test fast refit:
-    from torch_tensorrt.dynamo._refit import _refit_single_trt_engine_with_gm
-    from torch_tensorrt.logging import TRT_LOGGER
-
-    weight_name_map: Any = None
-    # Do the test refit with cached map if make_refitable is enabled
-    if settings.make_refitable:
-        runtime = trt.Runtime(TRT_LOGGER)
-        refit_test_engine = runtime.deserialize_cuda_engine(
-            interpreter_result.serialized_engine
-        )
-        try:
-            _refit_single_trt_engine_with_gm(
-                new_gm=module,
-                old_engine=refit_test_engine,
-                input_list=inputs,
-                settings=settings,
-                weight_name_map=interpreter_result.weight_name_map,
-            )
-            weight_name_map = interpreter_result.weight_name_map
-        except AssertionError:
-            logger.warning("Fast refit test failed. Removing the weight map caching.")
-
-        del refit_test_engine
-        torch.cuda.empty_cache()
 
     rt_cls = PythonTorchTensorRTModule
 
@@ -181,5 +186,5 @@ def convert_module(
         output_binding_names=list(interpreter_result.output_names),
         name=name,
         settings=settings,
-        weight_name_map=weight_name_map,
+        weight_name_map=interpreter_result.weight_name_map,
     )
