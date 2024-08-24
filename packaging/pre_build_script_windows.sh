@@ -12,7 +12,7 @@ if [[ "${CU_VERSION::4}" < "cu12" ]]; then
          pyproject.toml
 fi
 
-#curl -Lo TensorRT.zip https://developer.download.nvidia.com/compute/machine-learning/tensorrt/10.0.1/zip/TensorRT-10.0.1.6.Windows10.win10.cuda-12.4.zip
+#curl -Lo TensorRT.zip https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.3.0/zip/TensorRT-10.3.0.26.Windows.win10.cuda-12.5.zip
 #unzip -o TensorRT.zip -d C:/
 TORCH_TORCHVISION=$(grep "^torch" py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
