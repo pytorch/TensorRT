@@ -27,7 +27,7 @@ from torch_tensorrt.dynamo._defaults import (
     REQUIRE_FULL_COMPILATION,
     REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
-    STREAMABLE_WEIGHTS_DISABLED,
+    WEIGHT_STREAMING,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
     USE_FAST_PARTITIONER,
@@ -79,6 +79,7 @@ class CompilationSettings:
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
+        weight_streaming (bool): Enable weight streaming
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -113,7 +114,7 @@ class CompilationSettings:
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
-    weight_streaming_setting: str = STREAMABLE_WEIGHTS_DISABLED
+    weight_streaming: bool = WEIGHT_STREAMING
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
