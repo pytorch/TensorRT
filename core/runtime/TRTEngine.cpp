@@ -89,8 +89,7 @@ TRTEngine::TRTEngine(
   cuda_engine = make_trt(rt->deserializeCudaEngine(serialized_engine.c_str(), serialized_engine.size()));
   TORCHTRT_CHECK((cuda_engine.get() != nullptr), "Unable to deserialize the TensorRT engine");
 
-  exec_ctx = make_trt(cuda_engine->createExecutionContext());
-  TORCHTRT_CHECK((exec_ctx.get() != nullptr), "Unable to create TensorRT execution context");
+  exec_ctx = nullptr;
 
   if (_in_binding_names.size() == 0 && _out_binding_names.size() == 0) {
     uint64_t inputs = 0;
@@ -201,9 +200,10 @@ TRTEngine::TRTEngine(
   }
 
 #ifndef NDEBUG
-  this->enable_profiling();
-#endif
+  init_context();
   LOG_DEBUG(*this);
+  reset_context();
+#endif
 }
 
 TRTEngine::~TRTEngine() {
@@ -215,10 +215,8 @@ TRTEngine::~TRTEngine() {
 
 void TRTEngine::disable_profiling() {
   torch::cuda::synchronize(device_info.id);
-  profile_execution = false;
   trt_engine_profiler.reset();
-  exec_ctx = make_trt(cuda_engine->createExecutionContext());
-  TORCHTRT_CHECK((exec_ctx.get() != nullptr), "Unable to recreate TensorRT execution context");
+  reset_context();
 }
 
 void TRTEngine::dump_engine_layer_info_to_file(const std::string& path) {
@@ -237,7 +235,6 @@ void TRTEngine::dump_engine_layer_info() {
 }
 
 void TRTEngine::enable_profiling() {
-  profile_execution = true;
   trt_engine_profiler = std::make_unique<TRTEngineProfiler>(name);
   exec_ctx->setProfiler(trt_engine_profiler.get());
 }
@@ -256,6 +253,32 @@ void TRTEngine::set_profiling_paths() {
   trt_engine_profile_path =
       std::filesystem::path{profile_path_prefix + "/" + name + "_engine_exectuion_profile.trace"}.string();
   cuda_graph_debug_path = std::filesystem::path{profile_path_prefix + "/" + name + "_cudagraph.dot"}.string();
+}
+
+int64_t TRTEngine::get_weight_streaming_budget_v2() {
+  return cuda_engine->getWeightStreamingBudgetV2();
+}
+
+bool TRTEngine::set_weight_streaming_budget_v2(int64_t budget) {
+  return cuda_engine->setWeightStreamingBudgetV2(budget);
+}
+
+int64_t TRTEngine::get_streamable_weights_size() {
+  return cuda_engine->getStreamableWeightsSize();
+}
+
+void TRTEngine::reset_context() {
+  if (exec_ctx.get() != nullptr) {
+    exec_ctx.reset();
+    exec_ctx = nullptr;
+  }
+}
+
+void TRTEngine::init_context() {
+  if (exec_ctx.get() == nullptr) {
+    exec_ctx = make_trt(cuda_engine->createExecutionContext());
+    TORCHTRT_CHECK((exec_ctx.get() != nullptr), "Unable to recreate TensorRT execution context");
+  }
 }
 
 std::string TRTEngine::to_str() const {

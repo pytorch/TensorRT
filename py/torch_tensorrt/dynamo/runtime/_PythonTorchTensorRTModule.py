@@ -106,6 +106,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.profiling_enabled = settings.debug if settings.debug is not None else False
         self.settings = settings
         self.engine = None
+        self.context = None
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
 
@@ -219,6 +220,20 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     self.engine.minimum_weight_streaming_budget
                 )
 
+    def reset_context(self):
+        # Context needs to recreated in next because if modified runtime configuration
+        if self.context != None:
+            del self.context
+            self.context = None
+
+    def lazy_init_context(self):
+        # Lazy creation of context when it is actually needed at forward() or enable_profiling()
+        assert self.engine, f"Context is used before setting up the engine"
+
+        if self.context is None:
+            self.context = self.engine.create_execution_context()
+        return self.context
+    
     def setup_engine(self) -> None:
         assert (
             self.target_platform == Platform.current_platform()
@@ -227,9 +242,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.initialized = True
         runtime = trt.Runtime(TRT_LOGGER)
         self.engine = runtime.deserialize_cuda_engine(self.serialized_engine)
-        self.set_weight_streaming_budget()
-
-        self.context = self.engine.create_execution_context()
+        #self.set_weight_streaming_budget()
 
         assert self.engine.num_io_tensors == (
             len(self.input_names) + len(self.output_names)
@@ -305,6 +318,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.cudagraph.reset()
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
+        self.lazy_init_context()
         # Ensure inputs are available in all scopes and cast symbolic integers to Tensors
         contiguous_inputs: List[torch.Tensor] = [
             (i.contiguous() if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
@@ -530,6 +544,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         Enable TensorRT profiling. After calling this function, TensorRT will report
         time spent on each layer in stdout for each forward run.
         """
+        self.lazy_init_context()
         self._check_initialized()
 
         if not self.context.profiler:
@@ -543,8 +558,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         """
         self._check_initialized()
         torch.cuda.synchronize()
-        del self.context
-        self.context = self.engine.create_execution_context()
+
+        self.reset_context()
         self.profiling_enabled = False
 
     def get_layer_info(self) -> str:
