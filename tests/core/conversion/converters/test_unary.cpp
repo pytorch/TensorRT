@@ -75,8 +75,7 @@ TEST(Converters, ATenSignConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
 TEST(Converters, ATenSignConvertsZerosCorrectly) {
@@ -92,8 +91,7 @@ TEST(Converters, ATenSignConvertsZerosCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
 TEST(Converters, ATenLogicalNotBoolConvertsCorrectly) {
@@ -108,7 +106,7 @@ TEST(Converters, ATenLogicalNotBoolConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, ATenSqrtIntConvertsCorrectly) {
@@ -123,7 +121,7 @@ TEST(Converters, ATenSqrtIntConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, ATenFiniteConvertsCorrectly) {
@@ -144,28 +142,28 @@ TEST(Converters, ATenFiniteConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
-#define test_unary(unary, name)                                                                  \
-  TEST(Converters, ATen##name##ConvertsCorrectly) {                                              \
-    const auto graph = gen_test_graph(#unary);                                                   \
-                                                                                                 \
-    auto g = std::make_shared<torch::jit::Graph>();                                              \
-    torch::jit::parseIR(graph, g.get());                                                         \
-                                                                                                 \
-    float offset = 0;                                                                            \
-    if (strcmp(#name, "Acosh") == 0)                                                             \
-      offset += 1; /*input larger than 1 for acosh*/                                             \
-    auto in = at::empty({10}, {at::kCUDA}).uniform_(0 + offset, 0.5 + offset);                   \
-    auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});                  \
-    auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});                   \
-                                                                                                 \
-    in = at::clone(in);                                                                          \
-    params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});                       \
-    auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});             \
-                                                                                                 \
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6)); \
+#define test_unary(unary, name)                                                            \
+  TEST(Converters, ATen##name##ConvertsCorrectly) {                                        \
+    const auto graph = gen_test_graph(#unary);                                             \
+                                                                                           \
+    auto g = std::make_shared<torch::jit::Graph>();                                        \
+    torch::jit::parseIR(graph, g.get());                                                   \
+                                                                                           \
+    float offset = 0;                                                                      \
+    if (strcmp(#name, "Acosh") == 0)                                                       \
+      offset += 1; /*input larger than 1 for acosh*/                                       \
+    auto in = at::empty({10}, {at::kCUDA}).uniform_(0 + offset, 0.5 + offset);             \
+    auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});            \
+    auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});             \
+                                                                                           \
+    in = at::clone(in);                                                                    \
+    params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});                 \
+    auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});       \
+                                                                                           \
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0])); \
   }
 
 test_unary(cos, Cos);

@@ -30,7 +30,7 @@ TEST(Converters, UnpackVarLowersCorrectly) {
   torch::jit::EliminateCommonSubexpression(g);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, UnpackVarKeepDimsLowersCorrectly) {
@@ -56,7 +56,7 @@ TEST(Converters, UnpackVarKeepDimsLowersCorrectly) {
   torch::jit::EliminateCommonSubexpression(g);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, UnpackVarUnbiasedLowersCorrectly) {
@@ -82,7 +82,7 @@ TEST(Converters, UnpackVarUnbiasedLowersCorrectly) {
   torch::jit::EliminateCommonSubexpression(g);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, UnpackVarUnbiasedKeepDimsLowersCorrectly) {
@@ -108,7 +108,7 @@ TEST(Converters, UnpackVarUnbiasedKeepDimsLowersCorrectly) {
   torch::jit::EliminateCommonSubexpression(g);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, UnpackStdLowersCorrectly) {
@@ -134,7 +134,7 @@ TEST(Converters, UnpackStdLowersCorrectly) {
   torch_tensorrt::core::lowering::passes::UnpackVar(g);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, UnpackStdKeepDimsLowersCorrectly) {
@@ -160,7 +160,7 @@ TEST(Converters, UnpackStdKeepDimsLowersCorrectly) {
   torch_tensorrt::core::lowering::passes::UnpackVar(g);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, UnpackStdUnbiasedLowersCorrectly) {
@@ -187,7 +187,7 @@ TEST(Converters, UnpackStdUnbiasedLowersCorrectly) {
   torch::jit::EliminateCommonSubexpression(g);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, UnpackStdUnbiasedKeepDimsLowersCorrectly) {
@@ -215,7 +215,7 @@ TEST(Converters, UnpackStdUnbiasedKeepDimsLowersCorrectly) {
   torch::jit::EliminateCommonSubexpression(g);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, UnpackVarUnbiasedNegAxisLowersCorrectly) {
@@ -241,5 +241,5 @@ TEST(Converters, UnpackVarUnbiasedNegAxisLowersCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {jit_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }

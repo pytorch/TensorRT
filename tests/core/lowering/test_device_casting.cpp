@@ -27,8 +27,7 @@ TEST(LoweringPasses, UnpackAndCastMaskedFillLowersCorrectly) {
   torch::jit::EliminateCommonSubexpression(g);
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in, in2, in3});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor()));
 }
 
 TEST(LoweringPasses, UnpackAndCastNumToTensorLowersIntCorrectly) {
@@ -47,8 +46,7 @@ TEST(LoweringPasses, UnpackAndCastNumToTensorLowersIntCorrectly) {
   torch::jit::EliminateCommonSubexpression(g);
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor()));
 }
 
 TEST(LoweringPasses, UnpackAndCastNumToTensorLowersFloatCorrectly) {
@@ -67,8 +65,7 @@ TEST(LoweringPasses, UnpackAndCastNumToTensorLowersFloatCorrectly) {
   torch::jit::EliminateCommonSubexpression(g);
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor()));
 }
 
 TEST(LoweringPasses, UnpackAndCastFullIntLowersCorrectly) {
@@ -90,8 +87,8 @@ TEST(LoweringPasses, UnpackAndCastFullIntLowersCorrectly) {
   torch::jit::EliminateCommonSubexpression(g);
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
-      jit_pre_results[0].toTensor(), jit_post_results[0].toTensor().cpu(), 2e-6));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor().cpu()));
 }
 
 TEST(LoweringPasses, UnpackAndCastFullFloatLowersCorrectly) {
@@ -114,8 +111,8 @@ TEST(LoweringPasses, UnpackAndCastFullFloatLowersCorrectly) {
   torch::jit::EliminateCommonSubexpression(g);
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
-      jit_pre_results[0].toTensor(), jit_post_results[0].toTensor().cpu(), 2e-6));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor().cpu()));
 }
 
 TEST(LoweringPasses, ReplaceScalarImplicitLowersCorrectly) {
@@ -144,8 +141,7 @@ TEST(LoweringPasses, ReplaceScalarImplicitLowersCorrectly) {
   torch::jit::EliminateCommonSubexpression(g);
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor()));
 }
 
 TEST(LoweringPasses, ReplaceScalarImplicitIntNumToTensorLowersCorrectly) {
@@ -167,8 +163,7 @@ TEST(LoweringPasses, ReplaceScalarImplicitIntNumToTensorLowersCorrectly) {
   torch::jit::EliminateCommonSubexpression(g);
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor()));
 }
 
 TEST(LoweringPasses, ReplaceScalarImplicitFloatLowersCorrectly) {
@@ -189,6 +184,5 @@ TEST(LoweringPasses, ReplaceScalarImplicitFloatLowersCorrectly) {
   torch::jit::EliminateCommonSubexpression(g);
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor()));
 }

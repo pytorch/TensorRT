@@ -411,7 +411,7 @@ TEST(Evaluators, ATenArangeIntEvaluatesCorrectly) {
   auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
   auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0].toTensor(), trt_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0].toTensor(), trt_results[0].toTensor()));
 }
 
 TEST(Evaluators, ATenArangeFloatEvaluatesCorrectly) {
@@ -427,7 +427,7 @@ TEST(Evaluators, ATenArangeFloatEvaluatesCorrectly) {
 
   auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
   auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0].toTensor(), trt_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0].toTensor(), trt_results[0].toTensor()));
 }
 
 TEST(Evaluators, ATenArangeStartEndIntEvaluatesCorrectly) {
@@ -444,7 +444,7 @@ TEST(Evaluators, ATenArangeStartEndIntEvaluatesCorrectly) {
 
   auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
   auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0].toTensor(), trt_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0].toTensor(), trt_results[0].toTensor()));
 }
 
 TEST(Evaluators, ATenArangeStartEndFloatEvaluatesCorrectly) {
@@ -461,7 +461,7 @@ TEST(Evaluators, ATenArangeStartEndFloatEvaluatesCorrectly) {
 
   auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
   auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0].toTensor(), trt_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0].toTensor(), trt_results[0].toTensor()));
 }
 
 TEST(Evaluators, ATenArangeStartEndStepIntEvaluatesCorrectly) {
@@ -479,7 +479,7 @@ TEST(Evaluators, ATenArangeStartEndStepIntEvaluatesCorrectly) {
 
   auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
   auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0].toTensor(), trt_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0].toTensor(), trt_results[0].toTensor()));
 }
 
 TEST(Evaluators, ATenArangeStartEndStepFloatEvaluatesCorrectly) {
@@ -497,7 +497,7 @@ TEST(Evaluators, ATenArangeStartEndStepFloatEvaluatesCorrectly) {
 
   auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
   auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0].toTensor(), trt_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0].toTensor(), trt_results[0].toTensor()));
 }
 
 TEST(Evaluators, ATenSizeNegativeConvertsCorrectly) {
@@ -522,8 +522,7 @@ TEST(Evaluators, ATenSizeNegativeConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
 TEST(Evaluators, FloorIntIntEvaluatesCorrectly) {
@@ -580,8 +579,7 @@ TEST(Evaluators, ATenExtendEvaluatesCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in0, in1});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
 TEST(Evaluators, ATenAppendWithITensorEvaluatesCorrectly) {
@@ -605,8 +603,7 @@ TEST(Evaluators, ATenAppendWithITensorEvaluatesCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in0, in1});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
 TEST(Evaluators, ATenAppendWithTensorEvaluatesCorrectly) {
@@ -636,8 +633,7 @@ TEST(Evaluators, ATenAppendWithTensorEvaluatesCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in0});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
 TEST(Evaluators, ATenAppendWithITensorAndTensorEvaluatesCorrectly) {
@@ -664,8 +660,7 @@ TEST(Evaluators, ATenAppendWithITensorAndTensorEvaluatesCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in0});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
 TEST(Evaluators, SqrtIntEvaluatesCorrectly) {
@@ -893,8 +888,7 @@ TEST(Evaluators, AtenFormatEvaluatesCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in0, in1});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
 TEST(Evaluators, AtenFormatRaiseExceptionEvaluatesCorrectly) {

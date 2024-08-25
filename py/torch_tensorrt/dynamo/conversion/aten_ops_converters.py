@@ -3863,4 +3863,5 @@ def aten_ops_full(
         name,
         shape=args[0],
         fill_value=args[1],
+        dtype=kwargs.get("dtype", None),
     )
