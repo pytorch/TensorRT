@@ -24,13 +24,14 @@ def quantize(
     Adds quantize and dequantize ops (QDQ) which quantize to INT8 or FP8 based
     on the output_type set and dequantizes them back.
     """
-    if (isinstance(input_tensor, TRTTensor)) and not (
-        input_tensor.dtype == trt.float32 or input_tensor.dtype == trt.float16
+    if isinstance(input_tensor, TRTTensor) and input_tensor.dtype not in (
+        trt.float32,
+        trt.float16,
     ):
         raise ValueError(
             f"quantize converter received an input of {input_tensor.dtype} type. Supported types: float32 | float16"
         )
-    if num_bits != 8 or (exponent_bits != 0 and exponent_bits != 4):
+    if num_bits != 8 or exponent_bits not in (0, 4):
         raise ValueError(
             f"quantize converter currently only accept INT8 or FP8 based quantize, got {num_bits=}, {exponent_bits=}"
         )

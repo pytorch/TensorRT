@@ -227,9 +227,8 @@ def test_base_fp8(ir):
             assert torch.allclose(output_pyt, outputs_trt, rtol=1e-3, atol=1e-2)
 
 
-@unittest.skipIf(
-    torch.cuda.get_device_properties(torch.cuda.current_device()).major < 9,
-    "int8 compilation in Torch-TRT is not supported on cards older than Hopper",
+@unittest.skip(
+    "Skip this test for now, should only be enabled once modelopt has released 2.6.1 version",
 )
 @pytest.mark.unit
 def test_base_int8(ir):
@@ -262,7 +261,7 @@ def test_base_int8(ir):
 
     with torch.no_grad():
         with export_torch_mode():
-            exp_program = torch.export.export(model, (input_tensor,))
+            exp_program = torch.export._trace._export(model, (input_tensor,))
             trt_model = torchtrt.dynamo.compile(
                 exp_program,
                 inputs=[input_tensor],
