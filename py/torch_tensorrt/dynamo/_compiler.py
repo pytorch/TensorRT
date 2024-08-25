@@ -90,7 +90,7 @@ def compile(
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
     use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
     use_fp32_acc: bool = _defaults.USE_FP32_ACC,
-    weight_streaming_setting: str = _defaults.STREAMABLE_WEIGHTS_DISABLED,
+    weight_streaming: bool = _defaults.WEIGHT_STREAMING,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -163,11 +163,7 @@ def compile(
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
         use_explicit_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
         use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
-        weight_streaming_setting(str): Setting the amount of GPU memory that TensorRT can use for weights at runtime. valid setting formats are
-                                       disabled: disable weight streaming
-                                       auto: TensorRT will decide the streaming budget automatically
-                                       0% to 100%: The percentage of weights that TRT keeps on the GPU
-                                       positive integer: Streamable weights in bytes that reside on the GPU
+        weight_streaming (bool): Enable weight streaming
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -307,7 +303,7 @@ def compile(
         "reuse_cached_engines": reuse_cached_engines,
         "use_explicit_typing": use_explicit_typing,
         "use_fp32_acc": use_fp32_acc,
-        "weight_streaming_setting": weight_streaming_setting,
+        "weight_streaming": weight_streaming,
     }
 
     settings = CompilationSettings(**compilation_options)

@@ -169,6 +169,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
         return engine_info
 
+    def reset_context(self):
+        if self.engine is None:
+            return
+        self.engine.reset_context()
+
     def setup_engine(self) -> None:
         """
         Setup engine for a module which has deferred engine setup.
@@ -270,7 +275,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             (i if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
             for i in inputs
         ]
-
         outputs: List[torch.Tensor] = torch.ops.tensorrt.execute_engine(
             list(input_tensors), self.engine
         )
@@ -294,6 +298,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if profiling_results_dir is not None:
             self.engine.profile_path_prefix = profiling_results_dir
         self.engine.enable_profiling()
+        
 
     def disable_profiling(self) -> None:
         """Disable the profiler"""
