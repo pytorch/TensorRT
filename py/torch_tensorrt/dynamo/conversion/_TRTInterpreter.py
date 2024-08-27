@@ -7,7 +7,6 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set, Tuple
 
 import numpy as np
-import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
@@ -22,6 +21,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import CallingConvention
+from torch_tensorrt.dynamo.conversion._TRTBuilderMonitor import TRTBulderMonitor
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_node_io,
     get_node_name,
@@ -31,6 +31,7 @@ from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
+import tensorrt as trt
 from packaging import version
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -148,7 +149,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 else:
                     return "(...)"
             else:
-                return x
+                return f"{x} <{type(x).__name__}>"
 
         str_args = [clean_repr(a) for a in args]
         return repr(tuple(str_args))
@@ -188,6 +189,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     ) -> trt.IBuilderConfig:
 
         builder_config = self.builder.create_builder_config()
+
+        if self.compilation_settings.debug:
+            builder_config.progress_monitor = TRTBulderMonitor()
+
         if self.compilation_settings.workspace_size != 0:
             builder_config.set_memory_pool_limit(
                 trt.MemoryPoolType.WORKSPACE, self.compilation_settings.workspace_size
@@ -534,18 +539,18 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         kwargs["_itensor_to_tensor_meta"] = self._itensor_to_tensor_meta
         n.kwargs = kwargs
 
-        # run the node
-        _LOGGER.debug(
-            f"Running node {self._cur_node_name}, a {self._cur_node.op} node "
-            f"with target {self._cur_node.target} in the TensorRT Interpreter"
-        )
+        if _LOGGER.isEnabledFor(logging.DEBUG):
+            _LOGGER.debug(
+                f"Converting node {self._cur_node_name} (kind: {n.target}, args: {TRTInterpreter._args_str(n.args)})"
+            )
+
         trt_node: torch.fx.Node = super().run_node(n)
 
         if n.op == "get_attr":
             self.const_mapping[str(n)] = (tuple(trt_node.shape), str(trt_node.dtype))
 
-        _LOGGER.debug(
-            f"Ran node {self._cur_node_name} with properties: {get_node_io(n, self.const_mapping)}"
+        _LOGGER.info(
+            f"Converted node {self._cur_node_name} [{n.target}] ({get_node_io(n, self.const_mapping)})"
         )
 
         # remove "_itensor_to_tensor_meta"
@@ -629,9 +634,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         converter, calling_convention = converter_packet
 
         assert self._cur_node_name is not None
-        _LOGGER.debug(
-            f"Converting node {self._cur_node_name} (kind: {target}, args: {TRTInterpreter._args_str(args)})"
-        )
+
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, submod, args, kwargs, self._cur_node_name)
         else:
@@ -647,10 +650,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         converter, calling_convention = converter_packet
 
-        assert self._cur_node_name is not None
-        _LOGGER.debug(
-            f"Converting node {self._cur_node_name} (kind: {target}, args: {TRTInterpreter._args_str(args)})"
-        )
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
         else:
@@ -681,10 +680,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             )
         converter, calling_convention = converter_packet
 
-        assert self._cur_node_name is not None
-        _LOGGER.debug(
-            f"Converting node {self._cur_node_name} (kind: {target}, args: {TRTInterpreter._args_str(args)})"
-        )
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
         else:

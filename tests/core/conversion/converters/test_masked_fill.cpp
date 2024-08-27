@@ -39,8 +39,7 @@ TEST(Converters, ATenMaskedFillZerosConvertsCorrectly) {
   torch_tensorrt::core::lowering::passes::RemoveNOPs(g);
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
 TEST(Converters, ATenMaskedFillZerosDynamicConvertsCorrectly) {
@@ -98,8 +97,7 @@ TEST(Converters, ATenMaskedFillMixedTypesFloatIntConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 
   // Ensure data types match in outputs
   ASSERT_TRUE(jit_results[0].dtype() == trt_results[0].dtype());
@@ -126,8 +124,7 @@ TEST(Converters, ATenMaskedFillMixedTypesIntFloatConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 
   // Ensure data types match in outputs
   ASSERT_TRUE(jit_results[0].dtype() == trt_results[0].dtype());

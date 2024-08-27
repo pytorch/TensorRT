@@ -22,8 +22,7 @@ TEST(Converters, ATenSqueezeConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
 TEST(Converters, ATenSqueezeDontNeedSqueezeConvertsCorrectly) {
@@ -53,8 +52,7 @@ TEST(Converters, ATenSqueezeDontNeedSqueezeConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in, trt_in_add});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
 TEST(Converters, ATenSqueezeNoDimConvertsCorrectly) {
@@ -72,7 +70,7 @@ TEST(Converters, ATenSqueezeNoDimConvertsCorrectly) {
 
     params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
     auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
   };
 
   validate_squeeze_with_input(at::randint(1, 10, {2, 1, 3, 3}, {at::kCUDA}));

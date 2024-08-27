@@ -33,7 +33,7 @@ void conv_test_helper(std::string graph_ir) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConvolutionConvertsCorrectly) {
@@ -75,7 +75,7 @@ TEST(Converters, ATenConvolutionConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConvolution1dConvertsCorrectly) {
@@ -113,7 +113,7 @@ TEST(Converters, ATenConvolution1dConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConv1dWithWeightTensorsConvertsCorrectly) {
@@ -164,7 +164,7 @@ TEST(Converters, ATenConv1dWithWeightTensorsConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in}, nvinfer1::DataType::kINT8);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, ATenConvolutionNoBiasConvertsCorrectly) {
@@ -202,7 +202,7 @@ TEST(Converters, ATenConvolutionNoBiasConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConvolutionWithStrideConvertsCorrectly) {
@@ -245,7 +245,7 @@ TEST(Converters, ATenConvolutionWithStrideConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConvolutionWithPaddingConvertsCorrectly) {
@@ -288,7 +288,7 @@ TEST(Converters, ATenConvolutionWithPaddingConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConvolution3dConvertsCorrectly) {
@@ -330,7 +330,7 @@ TEST(Converters, ATenConvolution3dConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConvolution3dNoBiasConvertsCorrectly) {
@@ -368,7 +368,7 @@ TEST(Converters, ATenConvolution3dNoBiasConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConvolution3dWithPaddingConvertsCorrectly) {
@@ -410,7 +410,7 @@ TEST(Converters, ATenConvolution3dWithPaddingConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConvolution3dWithStrideDilationConvertsCorrectly) {
@@ -452,7 +452,7 @@ TEST(Converters, ATenConvolution3dWithStrideDilationConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConvTransposeConvertsCorrectly) {
@@ -494,7 +494,7 @@ TEST(Converters, ATenConvTransposeConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConvTranspose2dWithWeightsAsTensorsConvertsCorrectly) {
@@ -547,7 +547,7 @@ TEST(Converters, ATenConvTranspose2dWithWeightsAsTensorsConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in, trt_w}, nvinfer1::DataType::kINT8);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, ATenConvTransposeNoBiasConvertsCorrectly) {
@@ -585,7 +585,7 @@ TEST(Converters, ATenConvTransposeNoBiasConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConvTransposeWithStrideConvertsCorrectly) {
@@ -628,7 +628,7 @@ TEST(Converters, ATenConvTransposeWithStrideConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConvTransposeWithPaddingConvertsCorrectly) {
@@ -671,7 +671,7 @@ TEST(Converters, ATenConvTransposeWithPaddingConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConv1dTransposeWithPaddingOutPaddingConvertsCorrectly) {
@@ -710,7 +710,7 @@ TEST(Converters, ATenConv1dTransposeWithPaddingOutPaddingConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConv1dTransposeWithWeightTensorsConvertsCorrectly) {
@@ -761,7 +761,7 @@ TEST(Converters, ATenConv1dTransposeWithWeightTensorsConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in}, nvinfer1::DataType::kINT8);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, ATenConvTransposeWithPaddingOutPaddingConvertsCorrectly) {
@@ -804,7 +804,7 @@ TEST(Converters, ATenConvTransposeWithPaddingOutPaddingConvertsCorrectly) {
 
   auto trt = trt_results[0];
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConvTransposeOutPaddingBiggerThanPaddingConvertsCorrectly) {
@@ -847,7 +847,7 @@ TEST(Converters, ATenConvTransposeOutPaddingBiggerThanPaddingConvertsCorrectly) 
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConvolutionWithGroupConvertsCorrectly) {
@@ -890,7 +890,7 @@ TEST(Converters, ATenConvolutionWithGroupConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenConvTransposeWithGroupConvertsCorrectly) {
@@ -933,5 +933,5 @@ TEST(Converters, ATenConvTransposeWithGroupConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
