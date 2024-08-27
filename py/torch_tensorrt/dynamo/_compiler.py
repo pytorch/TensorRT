@@ -236,6 +236,9 @@ def compile(
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     if cache_built_engines or reuse_cached_engines:
+        assert (
+            make_refitable
+        ), "Engine caching requires make_refitable to be set to True"
         if custom_engine_cache is None:
             custom_engine_cache = DiskEngineCache(engine_cache_dir, engine_cache_size)
 

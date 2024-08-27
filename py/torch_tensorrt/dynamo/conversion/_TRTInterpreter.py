@@ -544,6 +544,24 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     _LOGGER.info(
                         "Found the cached engine that corresponds to this graph. It is directly loaded."
                     )
+
+                    from torch_tensorrt.dynamo._refit import (
+                        _refit_single_trt_engine_with_gm,
+                    )
+
+                    runtime = trt.Runtime(TRT_LOGGER)
+                    engine = runtime.deserialize_cuda_engine(serialized_engine)
+
+                    _refit_single_trt_engine_with_gm(
+                        new_gm=self.module,
+                        old_engine=engine,
+                        input_list=self.input_specs,
+                        settings=self.compilation_settings,
+                        weight_name_map=weight_name_map,
+                    )
+
+                    serialized_engine = bytes(engine.serialize())
+
                     return TRTInterpreterResult(
                         serialized_engine,
                         self._input_names,

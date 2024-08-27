@@ -498,6 +498,9 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
     # If cache_built_engines and reuse_cached_engines are True but custom_engine_cache is not provided,
     # then create a default disk engine cache
     if kwargs.get("cache_built_engines") or kwargs.get("reuse_cached_engines"):
+        assert kwargs.get(
+            "make_refitable"
+        ), "Engine caching requires make_refitable to be set to True"
         if settings.custom_engine_cache is None:
             from torch_tensorrt.dynamo._engine_caching import DiskEngineCache
 
