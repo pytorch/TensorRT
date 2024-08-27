@@ -109,16 +109,16 @@ Tutorials
 
    tutorials/serving_torch_tensorrt_with_triton
    tutorials/notebooks
+   tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
+   tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
+   tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
+   tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
+   tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
+   tutorials/_rendered_examples/dynamo/custom_kernel_plugins
    tutorials/_rendered_examples/distributed_inference/data_parallel_gpt2
    tutorials/_rendered_examples/distributed_inference/data_parallel_stable_diffusion
-   tutorials/_rendered_examples/dynamo/custom_kernel_plugins
-   tutorials/_rendered_examples/dynamo/mutable_torchtrt_example
-   tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
-   tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
-   tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
-   tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
-   tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
    tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq
+   tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
 
 Python API Documentation
 ------------------------
