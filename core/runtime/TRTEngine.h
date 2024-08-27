@@ -74,6 +74,7 @@ struct TRTEngine : torch::CustomClassHolder {
   int64_t get_weight_streaming_budget_v2();
   bool set_weight_streaming_budget_v2(int64_t budget);
   int64_t get_streamable_weights_size();
+  int64_t get_weight_streaming_automatic_budget();
   void reset_context();
   void init_context();
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);

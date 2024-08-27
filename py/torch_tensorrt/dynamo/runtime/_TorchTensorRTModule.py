@@ -174,6 +174,24 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             return
         self.engine.reset_context()
 
+    def get_weight_streaming_budget(self):
+        return self.engine.streamable_weights_size
+
+    def set_weight_streaming_budget(self, budget_bytes):
+        self.reset_context()
+        self.engine.weight_streaming_budget_v2 = budget_bytes
+        if self.engine.weight_streaming_budget_v2 != budget_bytes:
+            logger.error(f"Failed to set weight streaming budget to {budget_bytes}")
+            budget_bytes = self.engine.weight_streaming_budget_v2
+        if self.engine.streamable_weights_size == budget_bytes:
+            logger.warning("Weight streaming is disabled")
+
+        return budget_bytes
+
+    def set_automatic_streaming_budget(self):
+        budget_bytes = self.engine.get_weight_streaming_automatic_budget()
+        return self.set_weight_streaming_budget(budget_bytes)
+
     def setup_engine(self) -> None:
         """
         Setup engine for a module which has deferred engine setup.
@@ -298,7 +316,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if profiling_results_dir is not None:
             self.engine.profile_path_prefix = profiling_results_dir
         self.engine.enable_profiling()
-        
 
     def disable_profiling(self) -> None:
         """Disable the profiler"""
@@ -306,6 +323,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             raise RuntimeError("Engine has not been initialized yet.")
 
         self.engine.disable_profiling()
+        self.reset_context()
 
     def get_layer_info(self) -> str:
         """Get a JSON string containing the layer information encoded by the TensorRT engine in this module

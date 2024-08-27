@@ -89,6 +89,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def_property("weight_streaming_budget_v2", &TRTEngine::get_weight_streaming_budget_v2,
             &TRTEngine::set_weight_streaming_budget_v2)
         .def_property("streamable_weights_size", &TRTEngine::get_streamable_weights_size)
+        .def("get_weight_streaming_automatic_budget", &TRTEngine::get_weight_streaming_automatic_budget)
         .def("reset_context", &TRTEngine::reset_context)
         .def_pickle(
             [](const c10::intrusive_ptr<TRTEngine>& self) -> std::vector<std::string> {

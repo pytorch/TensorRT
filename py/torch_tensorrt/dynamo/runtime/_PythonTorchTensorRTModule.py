@@ -77,8 +77,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
-        self.weight_streaming_budget = 0
-        self.streamable_weights_size = 0
 
         # TODO: Make the below a Dictionary {shape: cudagraph}
         self.shape_key: Optional[str] = None
@@ -113,127 +111,35 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
 
-    def set_weight_streaming_budget(self) -> None:
-        """
-        Setup weight streaming from the setting
-        """
-        budget_bytes = None
-        weight_streaming_percent = None
-        if self.settings.weight_streaming_setting == "disabled":
-            return
-        elif self.settings.weight_streaming_setting == "auto":
-            budget_bytes = 0
-        elif self.settings.weight_streaming_setting.endswith("%"):
-            weight_streaming_percent_str = self.settings.weight_streaming_setting[:-1]
-            try:
-                weight_streaming_percent = int(weight_streaming_percent_str)
-            except Exception as e:
-                raise RuntimeError(
-                    "Invalid weight_streaming_setting format: percentage of weights should be integer"
-                )
-            if weight_streaming_percent <= 0 or weight_streaming_percent > 100:
-                raise RuntimeError(
-                    "Invalid weight_streaming_setting format: percentage of weights should be greater than 0 and less than or equal to 100"
-                )
-        elif self.settings.weight_streaming_setting.isdecimal():
-            budget_bytes = int(self.settings.weight_streaming_setting)
-        else:
-            raise RuntimeError(
-                f"Invalid weight_streaming_setting format: {self.settings.weight_streaming_setting} Valid setting formats are\n"
-                "disabled: disable weight streaming\n"
-                "auto: TensorRT will decide the streaming budget automatically\n"
-                "0% to 100%: The percentage of weights that TRT keeps on the GPU\n"
-                "positive integer: Streamable weights in bytes that reside on the GPU"
-            )
-
-        if trt.__version__ >= "10.1":
-            self.set_weight_streaming_budget_v2(budget_bytes, weight_streaming_percent)
-        else:
-            self.set_weight_streaming_budget_v1(budget_bytes, weight_streaming_percent)
-
-    def set_weight_streaming_budget_v2(
-        self,
-        budget_bytes: Union[None, int],
-        weight_streaming_percent: Union[None, int],
-    ) -> None:
-        if budget_bytes is not None:
-            if budget_bytes == 0:
-                budget_bytes_to_set = (
-                    self.engine.get_weight_streaming_automatic_budget()
-                )
-                logger.debug(
-                    "Weight streaming is enabled with TensorRT automatically determining the budget."
-                )
-        elif weight_streaming_percent is not None:
-            budget_bytes_to_set = (
-                weight_streaming_percent / 100.0 * (self.engine.streamable_weights_size)
-            )
-        else:
-            raise RuntimeError(
-                "Invalid usage. both budget_bytes and weight_streaming_percent are None"
-            )
-
-        budget_bytes = int(budget_bytes_to_set)
-        self.engine.weight_streaming_budget_v2 = budget_bytes
-        if self.engine.weight_streaming_budget_v2 != budget_bytes:
-            RuntimeError(f"Failed to set weight streaming budget to {budget_bytes}!")
-        if budget_bytes == self.engine.streamable_weights_size:
-            logger.debug("Weight streaming is disabled.")
-        else:
-            logger.debug(
-                f"Weight streaming is enabled with a memory budget of {budget_bytes} bytes."
-            )
-            self.weight_streaming_budget = budget_bytes
-            self.streamable_weights_size = self.engine.streamable_weights_size
-
-    def set_weight_streaming_budget_v1(
-        self,
-        budget_bytes: Union[None, int],
-        weight_streaming_percent: Union[None, int],
-    ) -> None:
-        if budget_bytes == 0:
-            # TRT to choose to weight stream automatically
-            budget_bytes = -1
-        elif weight_streaming_percent is not None:
-            min_budget = self.engine.minimum_weight_streaming_budget
-            max_budget = self.engine.streamable_weights_size
-            requested_budget_bytes = (1 - weight_streaming_percent / 100.0) * (
-                max_budget - min_budget
-            ) + min_budget
-            budget_bytes = int(requested_budget_bytes)
-        if budget_bytes is not None:
-            self.engine.weight_streaming_budget = budget_bytes
-            if self.engine.weight_streaming_budget != budget_bytes:
-                RuntimeError(
-                    f"Failed to set weight streaming budget to {budget_bytes}!"
-                )
-            if budget_bytes == -1:
-                logger.debug(
-                    "Weight streaming is enabled with TensorRT automatically determining the budget."
-                )
-            else:
-                logger.debug(
-                    f"Weight streaming is enabled with a memory budget of {budget_bytes} bytes."
-                )
-                self.weight_streaming_budget = budget_bytes
-                self.streamable_weights_size = (
-                    self.engine.minimum_weight_streaming_budget
-                )
-
     def reset_context(self):
-        # Context needs to recreated in next because if modified runtime configuration
-        if self.context != None:
+        # if runtime configuration has modified, the context needs to be recreated in next forward() or enable_profiling()
+        if self.context is not None:
             del self.context
             self.context = None
 
-    def lazy_init_context(self):
-        # Lazy creation of context when it is actually needed at forward() or enable_profiling()
+    def init_context(self):
         assert self.engine, f"Context is used before setting up the engine"
-
         if self.context is None:
             self.context = self.engine.create_execution_context()
-        return self.context
-    
+
+    def get_weight_streaming_budget(self):
+        return self.engine.streamable_weights_size
+
+    def set_weight_streaming_budget(self, budget_bytes):
+        self.reset_context()
+        self.engine.weight_streaming_budget_v2 = budget_bytes
+        if self.engine.weight_streaming_budget_v2 != budget_bytes:
+            logger.error(f"Failed to set weight streaming budget to {budget_bytes}")
+            budget_bytes = self.engine.weight_streaming_budget_v2
+        if self.engine.streamable_weights_size == budget_bytes:
+            logger.warning("Weight streaming is disabled")
+
+        return budget_bytes
+
+    def set_automatic_streaming_budget(self):
+        budget_bytes = self.engine.get_weight_streaming_automatic_budget()
+        return self.set_weight_streaming_budget(budget_bytes)
+
     def setup_engine(self) -> None:
         assert (
             self.target_platform == Platform.current_platform()
@@ -242,7 +148,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.initialized = True
         runtime = trt.Runtime(TRT_LOGGER)
         self.engine = runtime.deserialize_cuda_engine(self.serialized_engine)
-        #self.set_weight_streaming_budget()
+        self.init_context()
 
         assert self.engine.num_io_tensors == (
             len(self.input_names) + len(self.output_names)
@@ -318,7 +224,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.cudagraph.reset()
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
-        self.lazy_init_context()
+        self.init_context()
         # Ensure inputs are available in all scopes and cast symbolic integers to Tensors
         contiguous_inputs: List[torch.Tensor] = [
             (i.contiguous() if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
@@ -544,7 +450,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         Enable TensorRT profiling. After calling this function, TensorRT will report
         time spent on each layer in stdout for each forward run.
         """
-        self.lazy_init_context()
+        self.init_context()
         self._check_initialized()
 
         if not self.context.profiler:

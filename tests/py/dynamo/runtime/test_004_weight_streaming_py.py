@@ -38,19 +38,40 @@ class TestWeightStreamingPython(TestCase):
             inputs=input,
             ir="dynamo",
             min_block_size=1,
-            # debug=True,
+            debug=True,
             use_python_runtime=use_python_runtime,
-            weight_streaming=True,
+            enable_weight_streaming=True,
         )
 
         with torchtrt.runtime.enable_weight_streaming(optimized_model) as ws_context:
             streamable_weight_bytes = ws_context.get_streamable_weight_bytes()
-            ws_context.set_streamable_weight_bytes(int(streamable_weight_bytes * 0.7))
-            ret = optimized_model(*input)
-            print(ret)
+            ws_budget_bytes = ws_context.set_streamable_weight_bytes(
+                int(streamable_weight_bytes * 0.7)
+            )
+            assert ws_budget_bytes > 0
+            print("ws_budget1", ws_budget_bytes)
+            optimized_model(*input)
 
-        ret = optimized_model(*input)
-        print(ret)
+            streamable_weight_bytes = ws_context.get_streamable_weight_bytes()
+            ws_budget_bytes = ws_context.set_streamable_weight_bytes(
+                streamable_weight_bytes + 1
+            )
+            print("ws_budget2", ws_budget_bytes)
+            optimized_model(*input)
+
+            ws_budget_bytes = ws_context.set_streamable_weight_bytes(0)
+            print("ws_budget3", ws_budget_bytes)
+            optimized_model(*input)
+
+        with torchtrt.runtime.enable_weight_streaming(optimized_model) as ws_context:
+            ws_budget_bytes = ws_context.set_automatic_streaming_budget()
+            print("automatic ws_budget", ws_budget_bytes)
+            optimized_model(*input)
+
+        with torch.no_grad():
+            for _ in range(3):
+                optimized_model(*input)
+                torch.cuda.synchronize()
 
         torch._dynamo.reset()
 
@@ -83,10 +104,10 @@ class TestWeightStreamingPython(TestCase):
             inputs=input,
             ir="dynamo",
             min_block_size=1,
-            # debug=True,
+            debug=True,
             torch_executed_ops={"torch.ops.aten.mul.Tensor"},
             use_python_runtime=use_python_runtime,
-            weight_streaming=True,
+            enable_weight_streaming=True,
         )
 
         with torchtrt.runtime.enable_weight_streaming(optimized_model) as mod:
@@ -100,7 +121,7 @@ class TestWeightStreamingPython(TestCase):
             for pct in range(10, 100, 10):
                 bytes = int(pct * 0.01 * streamable_weight_bytes)
                 mod.set_streamable_weight_bytes(bytes)
-                ret = optimized_model(*input)
+                optimized_model(*input)
 
         torch._dynamo.reset()
 
