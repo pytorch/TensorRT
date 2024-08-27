@@ -5,12 +5,11 @@ from contextlib import nullcontext
 from tempfile import tempdir
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch.nn import Module
 from torch_tensorrt._Device import Device
-from torch_tensorrt._enums import dtype
+from torch_tensorrt._enums import Platform, dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
@@ -19,6 +18,8 @@ from torch_tensorrt.runtime._utils import (
     _select_rt_device,
     multi_gpu_device_check,
 )
+
+import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +106,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.settings = settings
         self.engine = None
         self.weight_name_map = weight_name_map
+        self.target_platform = Platform.current_platform()
 
         if (
             self.serialized_engine is not None
@@ -114,6 +116,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.setup_engine()
 
     def setup_engine(self) -> None:
+        assert (
+            self.target_platform == Platform.current_platform()
+        ), f"TensorRT engine was not built to target current platform (target: {self.target_platform}, current: {Platform.current_platform()})"
+
         self.initialized = True
         runtime = trt.Runtime(TRT_LOGGER)
         self.engine = runtime.deserialize_cuda_engine(self.serialized_engine)
@@ -150,6 +156,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         state_dict[prefix + "engine"] = self.serialized_engine
         state_dict[prefix + "input_names"] = self.input_names
         state_dict[prefix + "output_names"] = self.output_names
+        state_dict[prefix + "platform"] = self.target_platform
 
     def _load_from_state_dict(
         self,
@@ -164,6 +171,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.serialized_engine = state_dict[prefix + "engine"]
         self.input_names = state_dict[prefix + "input_names"]
         self.output_names = state_dict[prefix + "output_names"]
+        self.target_platform = state_dict[prefix + "platform"]
 
         # Run multi-gpu device check to validate engine instantiation
         multi_gpu_device_check()
@@ -171,17 +179,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
     def __getstate__(self) -> Dict[str, Any]:
         state = self.__dict__.copy()
-        state["engine"] = bytearray(self.engine.serialize())
+        state.pop("engine", None)
         state.pop("context", None)
         return state
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
-        logger = trt.Logger()
-        runtime = trt.Runtime(logger)
-        state["engine"] = runtime.deserialize_cuda_engine(state["engine"])
         self.__dict__.update(state)
-        if self.engine:
-            self.context = self.engine.create_execution_context()
+        self.setup_engine()
 
     def __deepcopy__(self, memo: Any) -> PythonTorchTensorRTModule:
         cls = self.__class__
