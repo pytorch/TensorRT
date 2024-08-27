@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule &mdash; Torch-TensorRT v2.5.0.dev0+33164c3 documentation</title>
+  <title>torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule &mdash; Torch-TensorRT v2.5.0.dev0+47ae0fa documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+33164c3
+                  v2.5.0.dev0+47ae0fa
                 </div>
               
             
@@ -459,12 +459,11 @@
 <span class="kn">from</span> <span class="nn">tempfile</span> <span class="kn">import</span> <span class="n">tempdir</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
 
-<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torch_tensorrt</span>
 <span class="kn">from</span> <span class="nn">torch.nn</span> <span class="kn">import</span> <span class="n">Module</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt._Device</span> <span class="kn">import</span> <span class="n">Device</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._enums</span> <span class="kn">import</span> <span class="n">dtype</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt._enums</span> <span class="kn">import</span> <span class="n">Platform</span><span class="p">,</span> <span class="n">dtype</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._settings</span> <span class="kn">import</span> <span class="n">CompilationSettings</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="n">DYNAMIC_DIM</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.logging</span> <span class="kn">import</span> <span class="n">TRT_LOGGER</span>
@@ -473,6 +472,8 @@
     <span class="n">_select_rt_device</span><span class="p">,</span>
     <span class="n">multi_gpu_device_check</span><span class="p">,</span>
 <span class="p">)</span>
+
+<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -559,11 +560,16 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">settings</span> <span class="o">=</span> <span class="n">settings</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">weight_name_map</span> <span class="o">=</span> <span class="n">weight_name_map</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span> <span class="o">=</span> <span class="n">Platform</span><span class="o">.</span><span class="n">current_platform</span><span class="p">()</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">lazy_engine_init</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span></div>
 
     <span class="k">def</span> <span class="nf">setup_engine</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span> <span class="o">==</span> <span class="n">Platform</span><span class="o">.</span><span class="n">current_platform</span><span class="p">()</span>
+        <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;TensorRT engine was not built to target current platform (target: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span><span class="si">}</span><span class="s2">, current: </span><span class="si">{</span><span class="n">Platform</span><span class="o">.</span><span class="n">current_platform</span><span class="p">()</span><span class="si">}</span><span class="s2">)&quot;</span>
+
         <span class="bp">self</span><span class="o">.</span><span class="n">initialized</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="n">runtime</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Runtime</span><span class="p">(</span><span class="n">TRT_LOGGER</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">runtime</span><span class="o">.</span><span class="n">deserialize_cuda_engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span><span class="p">)</span>
@@ -600,6 +606,7 @@
         <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;engine&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span>
         <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;input_names&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_names</span>
         <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;output_names&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_names</span>
+        <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;platform&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span>
 
     <span class="k">def</span> <span class="nf">_load_from_state_dict</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -614,6 +621,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="o">=</span> <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;engine&quot;</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">input_names</span> <span class="o">=</span> <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;input_names&quot;</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">output_names</span> <span class="o">=</span> <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;output_names&quot;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span> <span class="o">=</span> <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;platform&quot;</span><span class="p">]</span>
 
         <span class="c1"># Run multi-gpu device check to validate engine instantiation</span>
         <span class="n">multi_gpu_device_check</span><span class="p">()</span>
@@ -621,17 +629,13 @@
 
     <span class="k">def</span> <span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-        <span class="n">state</span><span class="p">[</span><span class="s2">&quot;engine&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">serialize</span><span class="p">())</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;engine&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;context&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">state</span>
 
     <span class="k">def</span> <span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">logger</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Logger</span><span class="p">()</span>
-        <span class="n">runtime</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Runtime</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
-        <span class="n">state</span><span class="p">[</span><span class="s2">&quot;engine&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">runtime</span><span class="o">.</span><span class="n">deserialize_cuda_engine</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s2">&quot;engine&quot;</span><span class="p">])</span>
         <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">create_execution_context</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">__deepcopy__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">memo</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PythonTorchTensorRTModule</span><span class="p">:</span>
         <span class="bp">cls</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span>
