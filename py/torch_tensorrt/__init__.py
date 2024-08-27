@@ -117,6 +117,7 @@ from torch_tensorrt._Device import Device  # noqa: F401
 from torch_tensorrt._enums import (  # noqa: F401
     DeviceType,
     EngineCapability,
+    Platform,
     dtype,
     memory_format,
 )
