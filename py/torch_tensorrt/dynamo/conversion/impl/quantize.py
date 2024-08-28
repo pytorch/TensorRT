@@ -16,7 +16,7 @@ def quantize(
     source_ir: Optional[SourceIR],
     name: str,
     input_tensor: TRTTensor,
-    scale: np.ndarray,
+    amax: np.ndarray,
     num_bits: int,
     exponent_bits: int,
 ) -> TRTTensor:
@@ -35,6 +35,11 @@ def quantize(
         raise ValueError(
             f"quantize converter currently only accept INT8 or FP8 based quantize, got {num_bits=}, {exponent_bits=}"
         )
+    if num_bits == 8 and exponent_bits == 0:
+        max_bound = 127
+    elif num_bits == 8 and exponent_bits == 4:
+        max_bound = 448
+    scale = np.divide(amax, max_bound)
     scale = get_trt_tensor(ctx, scale, name + "_scale")
     # Add Q node
     quantize_layer = ctx.net.add_quantize(input_tensor, scale)

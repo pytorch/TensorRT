@@ -1,10 +1,10 @@
 """
-.. _vgg16_fp8_ptq:
+.. _vgg16_ptq:
 
 Deploy Quantized Models using Torch-TensorRT
 ======================================================
 
-Here we demonstrate how to deploy a model quantized to FP8 using the Dynamo frontend of Torch-TensorRT
+Here we demonstrate how to deploy a model quantized to INT8 or FP8 using the Dynamo frontend of Torch-TensorRT
 """
 
 # %%
