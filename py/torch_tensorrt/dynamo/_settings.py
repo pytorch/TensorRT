@@ -7,7 +7,6 @@ from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
     CACHE_BUILT_ENGINES,
-    CUSTOM_ENGINE_CACHE,
     DEBUG,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
@@ -36,7 +35,6 @@ from torch_tensorrt.dynamo._defaults import (
     WORKSPACE_SIZE,
     default_device,
 )
-from torch_tensorrt.dynamo._engine_caching import BaseEngineCache
 
 
 @dataclass
@@ -80,7 +78,6 @@ class CompilationSettings:
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
-        custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -115,4 +112,3 @@ class CompilationSettings:
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
-    custom_engine_cache: Optional[BaseEngineCache] = CUSTOM_ENGINE_CACHE

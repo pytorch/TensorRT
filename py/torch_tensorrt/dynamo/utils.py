@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import fields, replace
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Sequence, Union
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import tensorrt as trt
@@ -13,6 +13,7 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
+from torch_tensorrt.dynamo._engine_caching import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 from packaging import version
@@ -438,7 +439,9 @@ def to_torch_tensorrt_device(
     return Device._from(device)
 
 
-def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
+def parse_dynamo_kwargs(
+    kwargs: Any,
+) -> Tuple[CompilationSettings, Optional[BaseEngineCache]]:
     """Parses the kwargs field of a Dynamo backend
 
     Args:
@@ -497,11 +500,15 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
 
     # If cache_built_engines and reuse_cached_engines are True but custom_engine_cache is not provided,
     # then create a default disk engine cache
+    engine_cache = None
     if kwargs.get("cache_built_engines") or kwargs.get("reuse_cached_engines"):
         assert kwargs.get(
             "make_refitable"
         ), "Engine caching requires make_refitable to be set to True"
-        if settings.custom_engine_cache is None:
+
+        if kwargs.get("custom_engine_cache") is not None:
+            engine_cache = kwargs.get("custom_engine_cache")
+        else:
             from torch_tensorrt.dynamo._engine_caching import DiskEngineCache
 
             engine_cache_dir = kwargs.get(
@@ -510,13 +517,11 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
             engine_cache_size = kwargs.get(
                 "engine_cache_size", _defaults.ENGINE_CACHE_SIZE
             )
-            settings.custom_engine_cache = DiskEngineCache(
-                engine_cache_dir, engine_cache_size
-            )
+            engine_cache = DiskEngineCache(engine_cache_dir, engine_cache_size)
 
     logger.info("Compilation Settings: %s\n", settings)
 
-    return settings
+    return settings, engine_cache
 
 
 def req_torch_version(min_torch_version: str = "2.dev") -> Callable[..., Any]:

@@ -27,6 +27,7 @@ from torch.utils._python_dispatch import _disable_current_modes
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
+from torch_tensorrt.dynamo._engine_caching import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -71,6 +72,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         logger_level: trt.ILogger.Severity = trt.ILogger.Severity.WARNING,
         output_dtypes: Optional[Sequence[dtype]] = None,
         compilation_settings: CompilationSettings = CompilationSettings(),
+        engine_cache: Optional[BaseEngineCache] = None,
     ):
         super().__init__(module)
 
@@ -125,6 +127,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         # Mapping of constants to shapes and dtypes
         self.const_mapping: Dict[str, Tuple[Sequence[int], str]] = {}
         self.weight_name_map: Optional[dict[str, Any]] = None
+
+        # Engine cache for storing and reusing TRT engines
+        self.engine_cache = engine_cache
 
     def validate_conversion(self) -> Set[str]:
         missing_converters: Set[str] = set()
@@ -521,22 +526,22 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         Return:
             TRTInterpreterResult
         """
-        if (
-            self.compilation_settings.custom_engine_cache is not None
-        ):  # custom_engine_cache could be None if this function is called from convert_exported_program_to_serialized_trt_engine etc.
+        # self.engine_cache could be None if:
+        # 1) engine_cache is not passed in when calling this function like convert_exported_program_to_serialized_trt_engine etc., or
+        # 2) both cache_built_engines and reuse_cached_engines are False
+        if self.engine_cache is not None:
             if (
                 self.compilation_settings.cache_built_engines
                 or self.compilation_settings.reuse_cached_engines
             ):
-                engine_cache = self.compilation_settings.custom_engine_cache
-                hash_val = engine_cache.get_hash(self.module)
+                hash_val = self.engine_cache.get_hash(self.module)
 
             if self.compilation_settings.reuse_cached_engines:
                 # query the cached TRT engine
-                blob = engine_cache.load(hash_val)
+                blob = self.engine_cache.load(hash_val)
                 if blob is not None:  # hit the cache
                     serialized_engine, input_names, output_names, weight_name_map = (
-                        engine_cache.unpack(blob)
+                        self.engine_cache.unpack(blob)
                     )
                     self._input_names = input_names
                     self._output_names = output_names
@@ -605,16 +610,16 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             builder_config, self.compilation_settings.timing_cache_path
         )
         if (
-            self.compilation_settings.custom_engine_cache is not None
+            self.engine_cache is not None
             and self.compilation_settings.cache_built_engines
         ):
-            blob = engine_cache.pack(
+            blob = self.engine_cache.pack(
                 serialized_engine,
                 self._input_names,
                 self._output_names,
                 self.weight_name_map,
             )
-            engine_cache.save(hash_val, blob)
+            self.engine_cache.save(hash_val, blob)
 
         with io.BytesIO() as engine_bytes:
             engine_bytes.write(serialized_engine)

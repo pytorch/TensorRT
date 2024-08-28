@@ -85,8 +85,8 @@ def compile(
     lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
     cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
     reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
-    engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
-    engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
+    engine_cache_dir: Optional[str] = _defaults.ENGINE_CACHE_DIR,
+    engine_cache_size: Optional[int] = _defaults.ENGINE_CACHE_SIZE,
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
@@ -155,8 +155,8 @@ def compile(
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
-        engine_cache_dir (str): Directory to store the cached TRT engines
-        engine_cache_size (int): Maximum hard-disk space to use for the engine cache
+        engine_cache_dir (Optional[str]): Directory to store the cached TRT engines
+        engine_cache_size (Optional[int]): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
         **kwargs: Any,
     Returns:
@@ -235,12 +235,16 @@ def compile(
     gm = post_lowering(gm)
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
+    engine_cache = None
     if cache_built_engines or reuse_cached_engines:
         assert (
             make_refitable
         ), "Engine caching requires make_refitable to be set to True"
-        if custom_engine_cache is None:
-            custom_engine_cache = DiskEngineCache(engine_cache_dir, engine_cache_size)
+        engine_cache = (
+            custom_engine_cache
+            if custom_engine_cache is not None
+            else DiskEngineCache(engine_cache_dir, engine_cache_size)
+        )
 
     compilation_options = {
         "enabled_precisions": (
@@ -277,12 +281,13 @@ def compile(
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
-        "custom_engine_cache": custom_engine_cache,
     }
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-    trt_gm = compile_module(gm, trt_arg_inputs, trt_kwarg_inputs, settings)
+    trt_gm = compile_module(
+        gm, trt_arg_inputs, trt_kwarg_inputs, settings, engine_cache
+    )
     return trt_gm
 
 
@@ -291,6 +296,7 @@ def compile_module(
     sample_arg_inputs: Sequence[Input],
     sample_kwarg_inputs: Optional[dict[Any, Any]] = None,
     settings: CompilationSettings = CompilationSettings(),
+    engine_cache: Optional[BaseEngineCache] = None,
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
 
@@ -301,6 +307,7 @@ def compile_module(
         arg_inputs: Inputs to the module
         kwarg_inputs: kwargs to the module
         settings: Compilation settings
+        engine_cache: Engine cache instance to store/load compiled engines
     Returns:
         Compiled FX GraphModule
     """
@@ -457,6 +464,7 @@ def compile_module(
                 submodule_inputs,
                 settings=settings,
                 name=name,
+                engine_cache=engine_cache,
             )
 
             trt_modules[name] = trt_module

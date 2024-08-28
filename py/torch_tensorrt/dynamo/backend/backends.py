@@ -48,14 +48,15 @@ def torch_tensorrt_backend(
 def aot_torch_tensorrt_aten_backend(
     gm: torch.fx.GraphModule, sample_inputs: Sequence[Any], **kwargs: Any
 ) -> torch.nn.Module:
-    settings = parse_dynamo_kwargs(kwargs)
-    return _pretraced_backend(gm, sample_inputs, settings)
+    settings, engine_cache = parse_dynamo_kwargs(kwargs)
+    return _pretraced_backend(gm, sample_inputs, settings, engine_cache)
 
 
 def _pretraced_backend(
     gm: torch.fx.GraphModule,
     sample_inputs: Sequence[Any],
     settings: CompilationSettings = CompilationSettings(),
+    engine_cache: Any = None,
 ) -> torch.fx.GraphModule | Callable[..., Any]:
     """Helper function to manage translation of traced FX module to TRT engines
 
@@ -63,6 +64,7 @@ def _pretraced_backend(
         module: FX GraphModule to convert
         inputs: Inputs to the module
         settings: Compilation settings
+        engine_cache: Engine cache instance
     Returns:
         Compiled FX GraphModule
     """
@@ -109,6 +111,7 @@ def _pretraced_backend(
                 gm,
                 torchtrt_inputs,
                 settings=settings,
+                engine_cache=engine_cache,
             )
             return trt_compiled
     except (AssertionError, RuntimeError):
