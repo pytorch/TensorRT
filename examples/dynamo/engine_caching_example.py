@@ -10,7 +10,6 @@ from torch_tensorrt.dynamo._engine_caching import BaseEngineCache
 
 np.random.seed(0)
 torch.manual_seed(0)
-size = (100, 3, 224, 224)
 
 model = models.resnet18(pretrained=True).eval().to("cuda")
 enabled_precisions = {torch.float}
@@ -24,7 +23,7 @@ def remove_timing_cache(path=TIMING_CACHE_PATH):
         os.remove(path)
 
 
-def dynamo_path(iterations=3):
+def dynamo_compile(iterations=3):
     times = []
     start = torch.cuda.Event(enable_timing=True)
     end = torch.cuda.Event(enable_timing=True)
@@ -42,7 +41,7 @@ def dynamo_path(iterations=3):
     # The 3rd iteration should be faster than the 1st iteration because it loads the cached engine.
     for i in range(iterations):
         inputs = [torch.rand((100 + i, 3, 224, 224)).to("cuda")]
-        remove_timing_cache()  # remove timing cache for engine caching messurement
+        remove_timing_cache()  # remove timing cache just for engine caching messurement
         if i == 0:
             cache_built_engines = False
             reuse_cached_engines = False
@@ -63,11 +62,15 @@ def dynamo_path(iterations=3):
             reuse_cached_engines=reuse_cached_engines,
             engine_cache_size=1 << 30,  # 1GB
         )
+        # output = trt_gm(*inputs)
         end.record()
         torch.cuda.synchronize()
         times.append(start.elapsed_time(end))
 
-    print("-----dynamo_path-----> compilation time:\n", times, "milliseconds")
+    print("----------------dynamo_compile----------------")
+    print("disable engine caching, used:", times[0], "ms")
+    print("enable engine caching to cache engines, used:", times[1], "ms")
+    print("enable engine caching to reuse engines, used:", times[2], "ms")
 
 
 # Custom Engine Cache
@@ -84,11 +87,13 @@ class MyEngineCache(BaseEngineCache):
         blob: bytes,
         prefix: str = "blob",
     ):
+        if not os.path.exists(self.engine_cache_dir):
+            os.makedirs(self.engine_cache_dir, exist_ok=True)
+
         path = os.path.join(
             self.engine_cache_dir,
             f"{prefix}_{hash}.bin",
         )
-        os.makedirs(path, exist_ok=True)
         with open(path, "wb") as f:
             f.write(blob)
 
@@ -101,7 +106,7 @@ class MyEngineCache(BaseEngineCache):
         return None
 
 
-def compile_path(iterations=3):
+def torch_compile(iterations=3):
     times = []
     engine_cache = MyEngineCache("/tmp/your_dir")
     start = torch.cuda.Event(enable_timing=True)
@@ -112,8 +117,8 @@ def compile_path(iterations=3):
     # Since the 2nd iteration needs to compile and save the engine, it will be slower than the 1st iteration.
     # The 3rd iteration should be faster than the 1st iteration because it loads the cached engine.
     for i in range(iterations):
-        inputs = [torch.rand(size).to("cuda")]
-        # remove timing cache and reset dynamo for engine caching messurement
+        inputs = [torch.rand((100, 3, 224, 224)).to("cuda")]
+        # remove timing cache and reset dynamo just for engine caching messurement
         remove_timing_cache()
         torch._dynamo.reset()
 
@@ -129,7 +134,7 @@ def compile_path(iterations=3):
             model,
             backend="tensorrt",
             options={
-                "use_python_runtime": use_python_runtime,
+                "use_python_runtime": True,
                 "enabled_precisions": enabled_precisions,
                 "debug": debug,
                 "min_block_size": min_block_size,
@@ -144,9 +149,12 @@ def compile_path(iterations=3):
         torch.cuda.synchronize()
         times.append(start.elapsed_time(end))
 
-    print("-----compile_path-----> compilation time:\n", times, "milliseconds")
+    print("----------------torch_compile----------------")
+    print("disable engine caching, used:", times[0], "ms")
+    print("enable engine caching to cache engines, used:", times[1], "ms")
+    print("enable engine caching to reuse engines, used:", times[2], "ms")
 
 
 if __name__ == "__main__":
-    dynamo_path()
-    # compile_path()
+    dynamo_compile()
+    torch_compile()
