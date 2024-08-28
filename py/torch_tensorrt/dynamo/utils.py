@@ -423,7 +423,7 @@ def check_output_equal(
     if isinstance(output1, torch.Tensor):
         if output1.shape != output2.shape:
             return False
-        return torch.allclose(output1, output2, 1e-2, 1e-2)  # type: ignore
+        return torch.allclose(output1, output2, 5e-3, 5e-3)  # type: ignore
 
     elif isinstance(output1, (tuple, list)):
         if len(output1) != len(output2):
