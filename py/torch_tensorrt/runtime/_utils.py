@@ -1,9 +1,8 @@
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar
+from typing import Optional, Tuple
 
 import torch
 import torch_tensorrt
-from torch_tensorrt._features import ENABLED_FEATURES
 
 logger = logging.getLogger(__name__)
 
@@ -129,36 +128,3 @@ def _get_most_compatible_device(
                 best_match = candidate
 
     return best_match
-
-
-def needs_torch_tensorrt_runtime(f: Callable[..., Any]) -> Callable[..., Any]:
-    def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
-        if ENABLED_FEATURES.torch_tensorrt_runtime:
-            return f(*args, **kwargs)
-        else:
-
-            def not_implemented(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
-                raise NotImplementedError("Torch-TensorRT Runtime is not available")
-
-            return not_implemented(*args, **kwargs)
-
-    return wrapper
-
-
-T = TypeVar("T")
-
-
-def for_all_methods(
-    decorator: Callable[..., Any], exclude: Optional[List[str]] = None
-) -> Callable[..., Any]:
-    exclude_list: List[str] = []
-    if exclude:
-        exclude_list = exclude
-
-    def decorate(cls: Type[T]) -> Type[T]:
-        for attr in cls.__dict__:
-            if callable(getattr(cls, attr)) and attr not in exclude_list:
-                setattr(cls, attr, decorator(getattr(cls, attr)))
-        return cls
-
-    return decorate

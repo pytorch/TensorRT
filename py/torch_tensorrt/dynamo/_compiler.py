@@ -55,9 +55,9 @@ def compile(
     disable_tf32: bool = _defaults.DISABLE_TF32,
     assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
     sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
-    enabled_precisions: (
-        Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
-    ) = _defaults.ENABLED_PRECISIONS,
+    enabled_precisions: Union[
+        Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
+    ] = _defaults.ENABLED_PRECISIONS,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
     make_refitable: bool = _defaults.MAKE_REFITABLE,
     debug: bool = _defaults.DEBUG,

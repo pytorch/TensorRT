@@ -27,8 +27,7 @@ TEST(Converters, ATenLinearNoBiasConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {w});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
 TEST(Converters, ATenLinearBiasConvertsCorrectly) {
@@ -61,6 +60,5 @@ TEST(Converters, ATenLinearBiasConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }

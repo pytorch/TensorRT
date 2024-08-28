@@ -40,7 +40,7 @@ TEST(LoweringPasses, AtenPadConstantCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(tg->inputs(), {});
   auto trt_results_tg = torch_tensorrt::tests::util::RunGraphEngine(tg, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0]));
 }
 
 TEST(LoweringPasses, AtenPadConstantNoneValueCorrectly) {
@@ -77,7 +77,7 @@ TEST(LoweringPasses, AtenPadConstantNoneValueCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(tg->inputs(), {});
   auto trt_results_tg = torch_tensorrt::tests::util::RunGraphEngine(tg, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0]));
 }
 
 TEST(LoweringPasses, AtenPadReflect1dCorrectly) {
@@ -113,7 +113,7 @@ TEST(LoweringPasses, AtenPadReflect1dCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(tg->inputs(), {});
   auto trt_results_tg = torch_tensorrt::tests::util::RunGraphEngine(tg, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0]));
 }
 
 TEST(LoweringPasses, AtenPadReflect2dCorrectly) {
@@ -149,7 +149,7 @@ TEST(LoweringPasses, AtenPadReflect2dCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(tg->inputs(), {});
   auto trt_results_tg = torch_tensorrt::tests::util::RunGraphEngine(tg, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0]));
 }
 
 TEST(LoweringPasses, AtenPadReplicate1dCorrectly) {
@@ -185,7 +185,7 @@ TEST(LoweringPasses, AtenPadReplicate1dCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(tg->inputs(), {});
   auto trt_results_tg = torch_tensorrt::tests::util::RunGraphEngine(tg, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0]));
 }
 
 TEST(LoweringPasses, AtenPadReplicate2dCorrectly) {
@@ -221,7 +221,7 @@ TEST(LoweringPasses, AtenPadReplicate2dCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(tg->inputs(), {});
   auto trt_results_tg = torch_tensorrt::tests::util::RunGraphEngine(tg, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0]));
 }
 
 TEST(LoweringPasses, AtenPadReplicate3dCorrectly) {
@@ -257,5 +257,5 @@ TEST(LoweringPasses, AtenPadReplicate3dCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(tg->inputs(), {});
   auto trt_results_tg = torch_tensorrt::tests::util::RunGraphEngine(tg, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0]));
 }

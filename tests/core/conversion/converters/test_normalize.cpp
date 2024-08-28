@@ -21,7 +21,7 @@
                                                                                                 \
     auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});        \
     auto trt = trt_results[0].reshape(jit_results[0].sizes());                                  \
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));           \
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));                 \
   }                                                                                             \
                                                                                                 \
   TEST(Converters, name##DynamicConvertsCorrectly) {                                            \
@@ -40,7 +40,7 @@
                                                                                                 \
     auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {trt_in}); \
     auto trt = trt_results[0].reshape(jit_results[0].sizes());                                  \
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));           \
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));                 \
   }
 
 ATEN_INTERPOLATE_TESTS(

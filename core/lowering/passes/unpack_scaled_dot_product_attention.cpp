@@ -12,12 +12,12 @@ namespace passes {
 // https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
 void UnpackScaledDotProductAttention(std::shared_ptr<torch::jit::Graph>& graph) {
   std::string sdpa_pattern = R"IR(
-    graph(%query, %key, %value, %attn_mask, %dropout_p, %is_causal, %scale):
-      %out: Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %attn_mask, %dropout_p, %is_causal, %scale)
+    graph(%query, %key, %value, %attn_mask, %dropout_p, %is_causal, %scale, %enable_gqa):
+      %out: Tensor = aten::scaled_dot_product_attention(%query, %key, %value, %attn_mask, %dropout_p, %is_causal, %scale, %enable_gqa)
       return (%out))IR";
 
   std::string unpacked_sdpa_pattern = R"IR(
-    graph(%query, %key, %value, %attn_mask, %dropout_p, %is_causal, %scale):
+    graph(%query, %key, %value, %attn_mask, %dropout_p, %is_causal, %scale, %enable_gqa):
       %none : NoneType = prim::Constant()
       %1 : int = prim::Constant[value=-1]()
       %2 : int = prim::Constant[value=-2]()
@@ -33,7 +33,7 @@ void UnpackScaledDotProductAttention(std::shared_ptr<torch::jit::Graph>& graph) 
       return(%out))IR";
 
   std::string unpacked_sdpa_attn_biased_pattern = R"IR(
-    graph(%query, %key, %value, %attn_mask, %dropout_p, %is_causal, %scale):
+    graph(%query, %key, %value, %attn_mask, %dropout_p, %is_causal, %scale, %enable_gqa):
       %none : NoneType = prim::Constant()
       %0 : int = prim::Constant[value=1]()
       %1 : int = prim::Constant[value=-1]()
@@ -69,6 +69,16 @@ void UnpackScaledDotProductAttention(std::shared_ptr<torch::jit::Graph>& graph) 
         if (attn_mask_node->kind() != at::prim::Constant || !attn_mask_node->mustBeNone()) {
           return false;
         }
+        auto enable_gqa_node = match.anchor->inputs().at(7)->node();
+        if (enable_gqa_node->kind() != at::prim::Constant) {
+          LOG_WARNING(
+              "Could not unpack scaled_dot_product_attention with non constant enable_gqa: " << *enable_gqa_node);
+          return false;
+        }
+        if (enable_gqa_node->i(at::attr::value) == 1) {
+          LOG_WARNING("Could not unpack scaled_dot_product_attention with enable_gqa = True: " << *enable_gqa_node);
+          return false;
+        }
         return true;
       });
 
@@ -80,6 +90,11 @@ void UnpackScaledDotProductAttention(std::shared_ptr<torch::jit::Graph>& graph) 
       graph, [](const torch::jit::Match& match, const std::unordered_map<std::string, torch::jit::Value*>&) {
         auto is_causal_node = match.anchor->inputs().at(5)->node();
         if (is_causal_node->kind() != at::prim::Constant || is_causal_node->i(at::attr::value) == 1) {
+          // messages already written in first pass, do not write again
+          return false;
+        }
+        auto enable_gqa_node = match.anchor->inputs().at(7)->node();
+        if (enable_gqa_node->kind() != at::prim::Constant || enable_gqa_node->i(at::attr::value) == 1) {
           // messages already written in first pass, do not write again
           return false;
         }

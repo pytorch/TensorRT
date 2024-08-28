@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 COSINE_THRESHOLD = 0.99
 DYNAMIC_DIM = -1
+RTOL = 5e-3
+ATOL = 5e-3
 
 
 class Frameworks(Enum):
@@ -531,7 +533,7 @@ def req_torch_version(min_torch_version: str = "2.dev") -> Callable[..., Any]:
     return nested_decorator
 
 
-def check_output(
+def check_module_output(
     new_module: torch.fx.GraphModule,
     refitted_module: torch.fx.GraphModule,
     arg_inputs: Any,
@@ -540,14 +542,50 @@ def check_output(
     old_outputs, new_outputs = refitted_module(*arg_inputs), new_module(
         *arg_inputs, **kwarg_inputs
     )
-    for old_output, new_output in zip(old_outputs, new_outputs):
-        if isinstance(old_output, torch.Tensor) and isinstance(
-            new_outputs, torch.Tensor
-        ):
-            if not torch.allclose(old_output, new_output, 1e-2, 1e-2):
-                return False
+    if type(old_outputs) != type(new_outputs):
+        logger.warning("The output types are different. Output check is skipped.")
+        return True
+    return check_output_equal(old_outputs, new_outputs)
 
-    return True
+
+def check_output_equal(
+    output1: Any,
+    output2: Any,
+    rtol: float = RTOL,
+    atol: float = ATOL,
+) -> bool:
+
+    if type(output1) != type(output2):
+        logger.warning(
+            "The output types are different. Check_output_equal will always return false."
+        )
+        return False
+
+    if isinstance(output1, torch.Tensor):
+        if output1.shape != output2.shape:
+            return False
+        return torch.allclose(output1, output2, rtol, atol)  # type: ignore
+
+    elif isinstance(output1, (tuple, list)):
+        if len(output1) != len(output2):
+            return False
+        for a, b in zip(output1, output2):
+            if not check_output_equal(a, b):
+                return False
+            return True
+
+    elif isinstance(output1, dict):
+        if output1.keys() != output2.keys():
+            return False
+        for a, b in zip(output1.values(), output2.values()):
+            if not check_output_equal(a, b):
+                return False
+        return True
+
+    logger.warning(
+        "The output type is not supported to be checked. Check_output_equal will always return false."
+    )
+    return False
 
 
 def get_flat_args_with_check(

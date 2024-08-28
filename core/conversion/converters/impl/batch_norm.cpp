@@ -123,7 +123,7 @@ auto batch_norm_registrations TORCHTRT_UNUSED =
               // track_running_stats=True
               LOG_DEBUG("Args[3] running_mean : " << args[3].isIValue() << " / " << args[3].IValue()->isNone());
               LOG_DEBUG("Args[4] running_var : " << args[4].isIValue() << " / " << args[4].IValue()->isNone());
-              LOG_DEBUG("use_input_stats, momemtum, cudnn_enabled disregarded");
+              LOG_DEBUG("use_input_stats, momemtum are disregarded");
               LOG_DEBUG("ctx->input_is_dynamic : " << ctx->input_is_dynamic);
 
               // Expand spatial dims from 1D to 2D if needed
@@ -152,6 +152,17 @@ auto batch_norm_registrations TORCHTRT_UNUSED =
                     running_var,
                     eps);
                 return true;
+              }
+
+              auto cudnn_enabled = static_cast<bool>(args[8].unwrapToBool(false));
+              if (!cudnn_enabled) {
+                LOG_DEBUG(
+                    "cuDNN is not enabled, skipping instance_norm conversion. \
+                    Since TRT 10.0, cuDNN is loaded as a dynamic dependency, \
+                    so for some functionalities, users need to install correct \
+                    cuDNN version by themselves. Please see our support matrix \
+                    here: https://docs.nvidia.com/deeplearning/tensorrt/support-matrix/index.html.");
+                return false;
               }
 
               const int relu = 0;

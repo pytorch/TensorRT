@@ -23,7 +23,7 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
-from torch_tensorrt.dynamo.utils import get_torch_inputs
+from torch_tensorrt.dynamo.utils import ATOL, RTOL, get_torch_inputs
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -60,8 +60,8 @@ class TRTTestCase(TestCase):
         mod,
         inputs,
         interpreter,
-        rtol,
-        atol,
+        rtol=RTOL,
+        atol=ATOL,
         check_dtype=True,
         pyt_inputs=None,
         rt_cls=PythonTorchTensorRTModule,
@@ -254,8 +254,8 @@ class DispatchTestCase(TRTTestCase):
         self,
         mod,
         inputs,
-        rtol=1e-03,
-        atol=1e-03,
+        rtol=RTOL,
+        atol=ATOL,
         precision=dtype.f32,
         check_dtype=True,
         use_dynamo_tracer=False,
@@ -374,8 +374,8 @@ class DispatchTestCase(TRTTestCase):
         self,
         mod,
         input_specs,
-        rtol=1e-03,
-        atol=1e-03,
+        rtol=RTOL,
+        atol=ATOL,
         output_dtypes=None,
         use_dynamo_tracer=False,
         enable_passes=False,

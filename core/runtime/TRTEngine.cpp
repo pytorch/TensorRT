@@ -34,6 +34,7 @@ TRTEngine::TRTEngine(
     const RTDevice& cuda_device,
     const std::vector<std::string>& _in_binding_names,
     const std::vector<std::string>& _out_binding_names,
+    const Platform& target_platform,
     bool hardware_compatible,
     const std::string& serialized_metadata)
     : TRTEngine(
@@ -42,6 +43,7 @@ TRTEngine::TRTEngine(
           cuda_device,
           _in_binding_names,
           _out_binding_names,
+          target_platform,
           hardware_compatible,
           serialized_metadata) {}
 
@@ -52,6 +54,7 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           RTDevice(serialized_info[DEVICE_IDX]),
           split(serialized_info[INPUT_BINDING_NAMES_IDX], BINDING_DELIM),
           split(serialized_info[OUTPUT_BINDING_NAMES_IDX], BINDING_DELIM),
+          Platform(serialized_info[TARGET_PLATFORM_IDX]),
           static_cast<bool>(std::stoi(serialized_info[HW_COMPATIBLE_IDX])),
           serialized_info[SERIALIZED_METADATA_IDX]) {}
 
@@ -61,12 +64,22 @@ TRTEngine::TRTEngine(
     const RTDevice& cuda_device,
     const std::vector<std::string>& _in_binding_names,
     const std::vector<std::string>& _out_binding_names,
+    const Platform& target_platform,
     bool hardware_compatible,
     const std::string& serialized_metadata) {
+  TORCHTRT_CHECK(
+      is_supported_on_current_platform(target_platform),
+      "This engine was not built to run on this platform (built for: " << target_platform << ", current platform: "
+                                                                       << get_current_platform() << ")");
+  this->target_platform = target_platform;
+
+  this->cudagraph_mempool_id = at::cuda::graph_pool_handle();
+
   this->hardware_compatible = hardware_compatible;
-  this->serialized_metadata = serialized_metadata;
   auto most_compatible_device = get_most_compatible_device(cuda_device, RTDevice(), hardware_compatible);
   TORCHTRT_CHECK(most_compatible_device, "No compatible device was found for instantiating TensorRT engine");
+
+  this->serialized_metadata = serialized_metadata;
   device_info = most_compatible_device.value();
   multi_gpu_device_check();
   set_rt_device(device_info);
@@ -196,7 +209,6 @@ TRTEngine::TRTEngine(
 }
 
 TRTEngine::~TRTEngine() {
-  cudagraph.reset();
   trt_engine_profiler.reset();
   exec_ctx.reset();
   cuda_engine.reset();
@@ -276,6 +288,7 @@ std::string TRTEngine::to_str() const {
   ss << "  ]" << std::endl;
   ss << "  Device: " << device_info << std::endl;
   ss << "  Hardware Compatibility: " << (hardware_compatible ? "Enabled" : "Disabled") << std::endl;
+  ss << "  Target Platform: " << target_platform << std::endl;
   // clang-format on
   return ss.str();
 }

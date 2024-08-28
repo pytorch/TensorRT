@@ -44,7 +44,7 @@ TEST(LoweringPasses, UnpackHardSwish) {
   auto tg_params = torch_tensorrt::core::ir::get_static_params(tg->inputs(), {});
   auto tg_results = torch_tensorrt::tests::util::RunGraph(tg, tg_params, {in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(sg_results[0], tg_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(sg_results[0], tg_results[0]));
 }
 
 TEST(LoweringPasses, UnpackHardInplaceSwish) {
@@ -85,5 +85,5 @@ TEST(LoweringPasses, UnpackHardInplaceSwish) {
   auto tg_params = torch_tensorrt::core::ir::get_static_params(tg->inputs(), {});
   auto tg_results = torch_tensorrt::tests::util::RunGraph(tg, tg_params, {in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(sg_results[0], tg_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(sg_results[0], tg_results[0]));
 }

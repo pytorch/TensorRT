@@ -137,14 +137,13 @@ def convert_module(
     from torch_tensorrt.dynamo._refit import _refit_single_trt_engine_with_gm
     from torch_tensorrt.logging import TRT_LOGGER
 
-    runtime = trt.Runtime(TRT_LOGGER)
-    refit_test_engine = runtime.deserialize_cuda_engine(
-        interpreter_result.serialized_engine
-    )
     weight_name_map: Any = None
     # Do the test refit with cached map if make_refitable is enabled
     if settings.make_refitable:
-        weight_name_map = interpreter_result.weight_name_map
+        runtime = trt.Runtime(TRT_LOGGER)
+        refit_test_engine = runtime.deserialize_cuda_engine(
+            interpreter_result.serialized_engine
+        )
         try:
             _refit_single_trt_engine_with_gm(
                 new_gm=module,
@@ -153,8 +152,12 @@ def convert_module(
                 settings=settings,
                 weight_name_map=interpreter_result.weight_name_map,
             )
+            weight_name_map = interpreter_result.weight_name_map
         except AssertionError:
             logger.warning("Fast refit test failed. Removing the weight map caching.")
+
+        del refit_test_engine
+        torch.cuda.empty_cache()
 
     rt_cls = PythonTorchTensorRTModule
 
