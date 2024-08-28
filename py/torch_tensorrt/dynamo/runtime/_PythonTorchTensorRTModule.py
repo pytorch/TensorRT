@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from contextlib import nullcontext
 from tempfile import tempdir
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import tensorrt as trt
 import torch
@@ -104,33 +104,37 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.profiling_enabled = settings.debug if settings.debug is not None else False
         self.settings = settings
         self.engine = None
-        self.context = None
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
 
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
 
+    def init_context(self):
+        assert self.engine, "Context is used before setting up the engine"
+        if self.context is None:
+            self.context = self.engine.create_execution_context()
+
     def reset_context(self):
-        # if runtime configuration has modified, the context needs to be recreated in next forward() or enable_profiling()
         if self.context is not None:
             del self.context
             self.context = None
 
-    def init_context(self):
-        assert self.engine, f"Context is used before setting up the engine"
-        if self.context is None:
-            self.context = self.engine.create_execution_context()
-
-    def get_weight_streaming_budget(self):
+    def get_streamable_weights_size(self):
         return self.engine.streamable_weights_size
 
+    def get_weight_streaming_budget(self):
+        return self.engine.weight_streaming_budget_v2
+
     def set_weight_streaming_budget(self, budget_bytes):
-        self.reset_context()
+        # Disable weight streaming for invalid budget size
+        if budget_bytes <= 0:
+            budget_bytes = self.get_streamable_weights_size()
+
         self.engine.weight_streaming_budget_v2 = budget_bytes
-        if self.engine.weight_streaming_budget_v2 != budget_bytes:
+        if self.get_weight_streaming_budget() != budget_bytes:
             logger.error(f"Failed to set weight streaming budget to {budget_bytes}")
-            budget_bytes = self.engine.weight_streaming_budget_v2
+            budget_bytes = self.get_weight_streaming_budget()
         if self.engine.streamable_weights_size == budget_bytes:
             logger.warning("Weight streaming is disabled")
 
@@ -148,7 +152,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.initialized = True
         runtime = trt.Runtime(TRT_LOGGER)
         self.engine = runtime.deserialize_cuda_engine(self.serialized_engine)
-        self.init_context()
+        if self.settings.enable_weight_streaming:
+            self.set_automatic_streaming_budget()
+        self.context = self.engine.create_execution_context()
 
         assert self.engine.num_io_tensors == (
             len(self.input_names) + len(self.output_names)
@@ -224,7 +230,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.cudagraph.reset()
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
-        self.init_context()
         # Ensure inputs are available in all scopes and cast symbolic integers to Tensors
         contiguous_inputs: List[torch.Tensor] = [
             (i.contiguous() if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
@@ -450,7 +455,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         Enable TensorRT profiling. After calling this function, TensorRT will report
         time spent on each layer in stdout for each forward run.
         """
-        self.init_context()
         self._check_initialized()
 
         if not self.context.profiler:
@@ -464,8 +468,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         """
         self._check_initialized()
         torch.cuda.synchronize()
-
-        self.reset_context()
+        del self.context
+        self.context = self.engine.create_execution_context()
         self.profiling_enabled = False
 
     def get_layer_info(self) -> str:

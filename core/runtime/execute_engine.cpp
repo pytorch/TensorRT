@@ -95,13 +95,11 @@ bool _cudagraphs_validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_
 }
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
-  compiled_engine->init_context();
   LOG_DEBUG(
       "Attempting to run engine (ID: " << compiled_engine->name
                                        << "); Hardware Compatible: " << compiled_engine->hardware_compatible);
 
   if (compiled_engine->profile_execution) {
-    compiled_engine->enable_profiling();
     std::stringstream ss;
     ss << "Execution profiling is enabled, find results here:" << std::endl;
     compiled_engine->set_profiling_paths();
@@ -363,7 +361,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     LOG_INFO(std::endl << *compiled_engine->trt_engine_profiler);
     dump_trace(compiled_engine->trt_engine_profile_path, *compiled_engine->trt_engine_profiler);
     compiled_engine->dump_engine_layer_info();
-    compiled_engine->disable_profiling();
   }
 
   return outputs;
