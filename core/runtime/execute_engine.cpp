@@ -333,7 +333,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       if (need_cudagraphs_record) {
         // If cudagraphs needs to record a graph, capture the enqueueV3 call in a graph
         c10::cuda::CUDAStream recording_stream = compiled_engine->engine_stream;
-        compiled_engine->cudagraph.capture_begin();
+        compiled_engine->cudagraph.capture_begin(compiled_engine->cudagraph_mempool_id);
         compiled_engine->exec_ctx->enqueueV3(recording_stream);
         compiled_engine->cudagraph.capture_end();
 

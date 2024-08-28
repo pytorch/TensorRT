@@ -434,8 +434,7 @@ TEST(LoweringPasses, RemoveSingleUse0DTensorsFloorDivFloatValuesAgree) {
   auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g_in, {});
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g_out, {});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor()));
 }
 
 TEST(LoweringPasses, RemoveAtenIntTensorValuesAgree) {
@@ -470,8 +469,7 @@ TEST(LoweringPasses, RemoveAtenIntTensorValuesAgree) {
   auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g_in, {});
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g_out, {});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor()));
 
   // Ensure the lowering pass transforms the first graph into the second
   torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(
@@ -523,8 +521,7 @@ TEST(LoweringPasses, RemoveAtenIntSizeTensorValuesAgree) {
   auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g_in, {in_0});
   auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g_out, {in_0});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor()));
 
   // Ensure the lowering pass transforms the first graph into the second
   torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(

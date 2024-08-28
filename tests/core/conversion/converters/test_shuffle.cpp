@@ -23,7 +23,7 @@ TEST(Converters, ATenFlattenConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, ATenFlattenNegDimsConvertsCorrectly) {
@@ -45,7 +45,7 @@ TEST(Converters, ATenFlattenNegDimsConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, ATenFlattenOtherDimsConvertsCorrectly) {
@@ -67,7 +67,7 @@ TEST(Converters, ATenFlattenOtherDimsConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, ATenReshapeConvertsCorrectly) {
@@ -91,7 +91,7 @@ TEST(Converters, ATenReshapeConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenViewConvertsCorrectly) {
@@ -115,7 +115,7 @@ TEST(Converters, ATenViewConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenPermuteConvertsCorrectly) {
@@ -140,7 +140,7 @@ TEST(Converters, ATenPermuteConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenPermute3DConvertsCorrectly) {
@@ -162,7 +162,7 @@ TEST(Converters, ATenPermute3DConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenPermute5DConvertsCorrectly) {
@@ -184,7 +184,7 @@ TEST(Converters, ATenPermute5DConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenFlattenConvertsCorrectlyWithDynamicInput) {
@@ -207,7 +207,7 @@ TEST(Converters, ATenFlattenConvertsCorrectlyWithDynamicInput) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in}, false);
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenFlattenConvertsCorrectlyWithDynamicBatch) {
@@ -230,7 +230,7 @@ TEST(Converters, ATenFlattenConvertsCorrectlyWithDynamicBatch) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in}, true);
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenFlattenNegDimsConvertsCorrectlyWithDynamicBatch) {
@@ -253,7 +253,7 @@ TEST(Converters, ATenFlattenNegDimsConvertsCorrectlyWithDynamicBatch) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in}, true);
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenTransposeConvertsCorrectly) {
@@ -279,7 +279,7 @@ TEST(Converters, ATenTransposeConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenTConvertsCorrectly) {
@@ -303,7 +303,7 @@ TEST(Converters, ATenTConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenTransposeNegativeConvertsCorrectly) {
@@ -329,7 +329,7 @@ TEST(Converters, ATenTransposeNegativeConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenPixelShuffleConvertsCorrectly) {
@@ -354,7 +354,7 @@ TEST(Converters, ATenPixelShuffleConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
   // auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, ATenPixelShuffle3DConvertsCorrectly) {
@@ -378,7 +378,7 @@ TEST(Converters, ATenPixelShuffle3DConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, ATenPixelShuffle5DConvertsCorrectly) {
@@ -403,7 +403,7 @@ TEST(Converters, ATenPixelShuffle5DConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
   // auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, ATenUnflattenConvertsCorrectly) {
@@ -429,7 +429,7 @@ TEST(Converters, ATenUnflattenConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
 
 TEST(Converters, ATenUnflattenNegativeDimConvertsCorrectly) {
@@ -455,5 +455,5 @@ TEST(Converters, ATenUnflattenNegativeDimConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }

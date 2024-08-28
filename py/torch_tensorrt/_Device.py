@@ -11,7 +11,7 @@ else:
 
 import torch
 from torch_tensorrt._enums import DeviceType
-from torch_tensorrt._features import ENABLED_FEATURES
+from torch_tensorrt._features import needs_torch_tensorrt_runtime
 
 import tensorrt as trt
 
@@ -169,10 +169,8 @@ class Device(object):
         else:
             raise TypeError("Unsupported target type for device conversion")
 
+    @needs_torch_tensorrt_runtime
     def _to_serialized_rt_device(self) -> str:
-        if not ENABLED_FEATURES.torch_tensorrt_runtime:
-            raise NotImplementedError("Torch-TensorRT runtime is not available")
-
         delim = torch.ops.tensorrt.SERIALIZED_RT_DEVICE_DELIM()[0]
         dev_info = torch.cuda.get_device_properties(self.gpu_id)
         rt_info = [

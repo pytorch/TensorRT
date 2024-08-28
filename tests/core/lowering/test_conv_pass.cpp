@@ -59,7 +59,7 @@ TEST(LoweringPasses, Conv1dCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(tg->inputs(), {trt_w, trt_b});
   auto trt_results_tg = torch_tensorrt::tests::util::RunGraphEngine(tg, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0]));
 }
 
 TEST(LoweringPasses, ConvTransposed1dCorrectly) {
@@ -117,7 +117,7 @@ TEST(LoweringPasses, ConvTransposed1dCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(tg->inputs(), {trt_w, trt_b});
   auto trt_results_tg = torch_tensorrt::tests::util::RunGraphEngine(tg, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0]));
 }
 
 TEST(LoweringPasses, Conv2dCorrectly) {
@@ -172,7 +172,7 @@ TEST(LoweringPasses, Conv2dCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(tg->inputs(), {trt_w, trt_b});
   auto trt_results_tg = torch_tensorrt::tests::util::RunGraphEngine(tg, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0]));
 }
 
 TEST(LoweringPasses, ConvTransposed2dCorrectly) {
@@ -227,7 +227,7 @@ TEST(LoweringPasses, ConvTransposed2dCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(tg->inputs(), {trt_w, trt_b});
   auto trt_results_tg = torch_tensorrt::tests::util::RunGraphEngine(tg, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0]));
 }
 
 TEST(LoweringPasses, Conv3dCorrectly) {
@@ -282,7 +282,7 @@ TEST(LoweringPasses, Conv3dCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(tg->inputs(), {trt_w, trt_b});
   auto trt_results_tg = torch_tensorrt::tests::util::RunGraphEngine(tg, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0]));
 }
 
 TEST(LoweringPasses, ConvTransposed3dCorrectly) {
@@ -337,7 +337,7 @@ TEST(LoweringPasses, ConvTransposed3dCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(tg->inputs(), {trt_w, trt_b});
   auto trt_results_tg = torch_tensorrt::tests::util::RunGraphEngine(tg, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0]));
 }
 
 TEST(LoweringPasses, Conv1dWithConditionalLowersCorrectly) {
@@ -418,5 +418,5 @@ TEST(LoweringPasses, Conv1dWithConditionalLowersCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(tg->inputs(), {trt_w, trt_b});
   auto trt_results_tg = torch_tensorrt::tests::util::RunGraphEngine(tg, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(trt_results_sg[0], trt_results_tg[0]));
 }

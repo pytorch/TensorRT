@@ -26,7 +26,7 @@ TEST(Converters, ATenSoftmax1DConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenSoftmaxNDConvertsCorrectlySub3DIndex) {
@@ -50,7 +50,7 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlySub3DIndex) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenSoftmaxNDConvertsCorrectlyAbove3DIndex) {
@@ -76,7 +76,7 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlyAbove3DIndex) {
 
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenSoftmaxNDConvertsCorrectlyNegtiveOneIndex) {
@@ -102,7 +102,7 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlyNegtiveOneIndex) {
 
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 
 TEST(Converters, ATenSoftmaxNDConvertsCorrectlyNegtiveIndex) {
@@ -128,6 +128,6 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlyNegtiveIndex) {
 
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt));
 }
 #endif
