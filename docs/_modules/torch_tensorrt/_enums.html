@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._enums &mdash; Torch-TensorRT v2.5.0.dev0+4cd675f documentation</title>
+  <title>torch_tensorrt._enums &mdash; Torch-TensorRT v2.5.0.dev0+60ec67b documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+4cd675f
+                  v2.5.0.dev0+60ec67b
                 </div>
               
             
@@ -344,6 +344,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
 <ul>
@@ -460,7 +461,7 @@
 
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._features</span> <span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt._features</span> <span class="kn">import</span> <span class="n">ENABLED_FEATURES</span><span class="p">,</span> <span class="n">needs_torch_tensorrt_runtime</span>
 
 <span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
 
@@ -1782,6 +1783,75 @@
 
     <span class="k">def</span> <span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
         <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">)</span></div>
+
+
+<span class="k">class</span> <span class="nc">Platform</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Specifies a target OS and CPU architecture that a Torch-TensorRT program targets</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">LINUX_X86_64</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    OS: Linux, CPU Arch: x86_64</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">LINUX_AARCH64</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    OS: Linux, CPU Arch: aarch64</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">WIN_X86_64</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    OS: Windows, CPU Arch: x86_64</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">UNKNOWN</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">current_platform</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Platform</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns an enum for the current platform Torch-TensorRT is running on</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Platform: Current platform</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">import</span> <span class="nn">platform</span>
+
+        <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;linux&quot;</span><span class="p">):</span>
+            <span class="c1"># linux</span>
+            <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">machine</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;aarch64&quot;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">Platform</span><span class="o">.</span><span class="n">LINUX_AARCH64</span>
+            <span class="k">elif</span> <span class="n">platform</span><span class="o">.</span><span class="n">machine</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;x86_64&quot;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">Platform</span><span class="o">.</span><span class="n">LINUX_X86_64</span>
+
+        <span class="k">elif</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;windows&quot;</span><span class="p">):</span>
+            <span class="c1"># Windows...</span>
+            <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">machine</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;amd64&quot;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">Platform</span><span class="o">.</span><span class="n">WIN_X86_64</span>
+
+        <span class="k">return</span> <span class="n">Platform</span><span class="o">.</span><span class="n">UNKNOWN</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+    <span class="nd">@needs_torch_tensorrt_runtime</span>
+    <span class="k">def</span> <span class="nf">_to_serialized_rt_platform</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">val</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_platform_unknown</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">Platform</span><span class="o">.</span><span class="n">LINUX_X86_64</span><span class="p">:</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_platform_linux_x86_64</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">Platform</span><span class="o">.</span><span class="n">LINUX_AARCH64</span><span class="p">:</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_platform_linux_aarch64</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">Platform</span><span class="o">.</span><span class="n">WIN_X86_64</span><span class="p">:</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_platform_win_x86_64</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">val</span>
 </pre></div>
 
              </article>

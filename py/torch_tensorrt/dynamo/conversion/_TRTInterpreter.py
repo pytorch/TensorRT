@@ -1,9 +1,21 @@
+import gc
 import io
 import logging
 import os
 import warnings
 from datetime import datetime
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set, Tuple
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+)
 
 import numpy as np
 import torch
@@ -26,7 +38,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_node_name,
     get_trt_tensor,
 )
-from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, to_torch_device
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
@@ -327,6 +339,39 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             f"TRT INetwork construction elapsed time: {datetime.now() - run_module_start_time}"
         )
 
+    @staticmethod
+    def find_weight(
+        weight_name: str, np_map: dict[str, Any], state_dict: dict[str, Any]
+    ) -> str:
+        """
+        We need to build map from engine weight name to state_dict weight name.
+        The purpose of this function is to find the corresponding weight name in module state_dict.
+
+        weight_name: the target weight name we want to search for
+        np_map: the map from weight name to np values in INetworkDefinition
+        state_dict: state of the graph module
+        """
+        network_weight = np_map[weight_name]
+        network_weight = torch.from_numpy(np_map[weight_name]).cuda()
+        for sd_w_name, sd_weight in state_dict.items():
+            if TRTInterpreter.check_weight_equal(sd_weight, network_weight):
+                del state_dict[sd_w_name]
+                return sd_w_name
+        return ""
+
+    @staticmethod
+    def check_weight_equal(
+        sd_weight: torch.tensor, network_weight: Union[torch.Tensor, np.ndarray]
+    ) -> Any:
+        if not isinstance(network_weight, torch.Tensor):
+            network_weight = torch.from_numpy(network_weight).cuda()
+        try:
+            return sd_weight.shape == network_weight.shape and torch.all(
+                torch.abs(sd_weight - network_weight) < 0.01
+            )
+        except Exception:
+            return torch.all(sd_weight == network_weight)
+
     def _save_weight_mapping(self) -> None:
         """
         Construct the weight name mapping from engine weight name to state_dict weight name.
@@ -335,23 +380,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         1. Name transformation from engine weight name to state_dict weight name
         2. Value mapping that, for each weight in INetworkDefinition search for identical weight in state_dict
         """
-
-        def find_weight(
-            weight_name: str, np_map: dict[str, Any], sd: dict[str, Any]
-        ) -> str:
-            network_weight = np_map[weight_name]
-            for sd_w_name, sd_weight in sd.items():
-                if check_weight_equal(sd_weight, network_weight):
-                    return sd_w_name
-            return ""
-
-        def check_weight_equal(
-            sd_weight: torch.tensor, network_weight: np.ndarray
-        ) -> Any:
-            sd_weight = sd_weight.reshape(-1).cpu().numpy()
-            return sd_weight.size == network_weight.size and np.allclose(
-                sd_weight, network_weight, 1e-1, 1e-1
-            )
 
         MODULE_MAP = {
             "SCALE": (
@@ -398,8 +426,19 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             )
         }
         """
+        _LOGGER.info("Building weight name mapping...")
         # Stage 1: Name mapping
         sd = self.module.state_dict()
+        torch_device = to_torch_device(self.compilation_settings.device)
+        gm_is_on_cuda = list(sd.values())[0].device.type == "cuda"
+        if not gm_is_on_cuda:
+            # If the model original position is on CPU, move it GPU
+            sd = {
+                k: v.reshape(-1).to(torch_device)
+                for k, v in self.module.state_dict().items()
+            }
+        else:
+            sd = {k: v.reshape(-1) for k, v in self.module.state_dict().items()}
         weight_name_map: dict[str, Any] = {}
         np_map = {}
         net = self.ctx.net
@@ -448,10 +487,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             if "SCALE" in engine_weight_name:
                 # There is no direct connection in batch_norm layer. So skip it
                 pass
-            elif sd_weight_name not in sd or not check_weight_equal(
+            elif sd_weight_name not in sd or not TRTInterpreter.check_weight_equal(
                 sd[sd_weight_name], np_map[engine_weight_name]
             ):
-                weight_name_map[engine_weight_name] = find_weight(
+                weight_name_map[engine_weight_name] = TRTInterpreter.find_weight(
                     engine_weight_name, np_map, sd
                 )
 
@@ -461,6 +500,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             ]
 
         self.weight_name_map = weight_name_map
+
+        del np_map, sd
+        gc.collect()
+        torch.cuda.empty_cache()
 
     def run(
         self,

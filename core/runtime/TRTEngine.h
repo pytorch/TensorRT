@@ -39,6 +39,7 @@ struct TRTEngine : torch::CustomClassHolder {
   bool hardware_compatible = false; // Whether the engine was compiled in hardware compatible mode
   std::string serialized_metadata; // This is a base64 encoded pkl object used to store metadata such as settings used
                                    // in compilation
+  Platform target_platform;
 
   ~TRTEngine();
   TRTEngine(
@@ -46,17 +47,22 @@ struct TRTEngine : torch::CustomClassHolder {
       const RTDevice& cuda_device,
       const std::vector<std::string>& in_binding_names,
       const std::vector<std::string>& out_binding_names,
+      const Platform& target_platform = get_current_platform(),
       bool hardware_compatible = false,
       const std::string& serialized_metadata = "");
+
   TRTEngine(std::vector<std::string> serialized_info);
+
   TRTEngine(
       const std::string& mod_name,
       const std::string& serialized_engine,
       const RTDevice& cuda_device,
       const std::vector<std::string>& in_binding_names,
       const std::vector<std::string>& out_binding_names,
+      const Platform& target_platform = get_current_platform(),
       bool hardware_compatible = false,
       const std::string& serialized_metadata = "");
+
   TRTEngine& operator=(const TRTEngine& other);
   std::string to_str() const;
   static void verify_serialization_fmt(const std::vector<std::string>& serialized_info);
@@ -75,6 +81,7 @@ struct TRTEngine : torch::CustomClassHolder {
   std::vector<at::Tensor> input_buffers = {};
   std::vector<at::Tensor> output_buffers = {};
   std::string shape_key;
+  at::cuda::MempoolId_t cudagraph_mempool_id;
 
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);

@@ -5,6 +5,7 @@
 #include <utility>
 #include "ATen/core/function_schema.h"
 #include "NvInfer.h"
+#include "core/runtime/Platform.h"
 #include "core/runtime/RTDevice.h"
 #include "core/runtime/TRTEngine.h"
 #include "core/util/prelude.h"
@@ -15,7 +16,7 @@ namespace core {
 namespace runtime {
 
 using EngineID = int64_t;
-const std::string ABI_VERSION = "5";
+const std::string ABI_VERSION = "6";
 extern bool MULTI_DEVICE_SAFE_MODE;
 extern bool CUDAGRAPHS_MODE;
 
@@ -28,6 +29,7 @@ typedef enum {
   OUTPUT_BINDING_NAMES_IDX,
   HW_COMPATIBLE_IDX,
   SERIALIZED_METADATA_IDX,
+  TARGET_PLATFORM_IDX,
   SERIALIZATION_LEN, // NEVER USED FOR DATA, USED TO DETERMINE LENGTH OF SERIALIZED INFO
 } SerializedInfoIndex;
 
@@ -47,7 +49,7 @@ void set_multi_device_safe_mode(bool multi_device_safe_mode);
 
 bool get_cudagraphs_mode();
 
-void set_cudagraphs_mode(bool multi_device_safe_mode);
+void set_cudagraphs_mode(bool cudagraphs_mode);
 
 class DeviceList {
   using DeviceMap = std::unordered_map<int, RTDevice>;

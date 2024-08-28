@@ -64,7 +64,7 @@ Initialize the Mutable Torch TensorRT Module with settings.
         "make_refitable": True,
     }
 
-    model = models.resnet18(pretrained=False).eval().to("cuda")
+    model = models.resnet18(pretrained=True).eval().to("cuda")
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **settings)
     # You can use the mutable module just like the original pytorch module. The compilation happens while you first call the mutable module.
     mutable_module(*inputs)
@@ -83,7 +83,7 @@ Making changes to mutable module can trigger refit or re-compilation. For exampl
 
 .. code-block:: python
 
-    model2 = models.resnet18(pretrained=True).eval().to("cuda")
+    model2 = models.resnet18(pretrained=False).eval().to("cuda")
     mutable_module.load_state_dict(model2.state_dict())
 
 

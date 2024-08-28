@@ -4,6 +4,7 @@ import torch_tensorrt
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
 from .harness import DispatchTestCase
 
@@ -122,8 +123,8 @@ class TestIndexSelectConverter(DispatchTestCase):
                 torch.testing.assert_close(
                     out,
                     ref,
-                    rtol=5e-3,
-                    atol=5e-3,
+                    rtol=RTOL,
+                    atol=ATOL,
                     equal_nan=True,
                     check_dtype=True,
                 )

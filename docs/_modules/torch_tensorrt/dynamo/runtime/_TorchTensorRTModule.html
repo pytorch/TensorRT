@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo.runtime._TorchTensorRTModule &mdash; Torch-TensorRT v2.5.0.dev0+4cd675f documentation</title>
+  <title>torch_tensorrt.dynamo.runtime._TorchTensorRTModule &mdash; Torch-TensorRT v2.5.0.dev0+60ec67b documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+4cd675f
+                  v2.5.0.dev0+60ec67b
                 </div>
               
             
@@ -344,6 +344,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
 <ul>
@@ -458,19 +459,23 @@
 <span class="kn">import</span> <span class="nn">copy</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">pickle</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt._Device</span> <span class="kn">import</span> <span class="n">Device</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._features</span> <span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt._enums</span> <span class="kn">import</span> <span class="n">Platform</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt._features</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ENABLED_FEATURES</span><span class="p">,</span>
+    <span class="n">for_all_methods</span><span class="p">,</span>
+    <span class="n">needs_torch_tensorrt_runtime</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._settings</span> <span class="kn">import</span> <span class="n">CompilationSettings</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.runtime._utils</span> <span class="kn">import</span> <span class="n">for_all_methods</span><span class="p">,</span> <span class="n">needs_torch_tensorrt_runtime</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
-<span class="n">SerializedTensorRTEngineFmt</span> <span class="o">=</span> <span class="n">Tuple</span><span class="p">[</span>
-    <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span>
-<span class="p">]</span>  <span class="c1"># Defined in //core/runtime/register_jit_hooks.cpp</span>
+<span class="n">SerializedTensorRTEngineFmt</span> <span class="o">=</span> <span class="n">List</span><span class="p">[</span>
+    <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">]</span>
+<span class="p">]</span>  <span class="c1"># Aligned with  //core/runtime/register_jit_hooks.cpp</span>
 <span class="n">SerializedTorchTensorRTModuleFmt</span> <span class="o">=</span> <span class="n">Tuple</span><span class="p">[</span>
     <span class="nb">str</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SerializedTensorRTEngineFmt</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
 <span class="p">]</span>
@@ -483,6 +488,7 @@
 <span class="n">OUTPUT_BINDING_NAMES_IDX</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Not implemented</span>
 <span class="n">HW_COMPATIBLE_IDX</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Not implemented</span>
 <span class="n">SERIALIZED_METADATA_IDX</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Not implemented</span>
+<span class="n">TARGET_PLATFORM_IDX</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Not implemented</span>
 <span class="n">SERIALIZATION_LEN</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Not implemented</span>
 
 <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
@@ -494,7 +500,8 @@
     <span class="n">OUTPUT_BINDING_NAMES_IDX</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">OUTPUT_BINDING_NAMES_IDX</span><span class="p">()</span>  <span class="c1"># 5</span>
     <span class="n">HW_COMPATIBLE_IDX</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">HW_COMPATIBLE_IDX</span><span class="p">()</span>  <span class="c1"># 6</span>
     <span class="n">SERIALIZED_METADATA_IDX</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">SERIALIZED_METADATA_IDX</span><span class="p">()</span>  <span class="c1"># 7</span>
-    <span class="n">SERIALIZATION_LEN</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">SERIALIZATION_LEN</span><span class="p">()</span>  <span class="c1"># 8</span>
+    <span class="n">TARGET_PLATFORM_IDX</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">TARGET_PLATFORM_IDX</span><span class="p">()</span>  <span class="c1"># 8</span>
+    <span class="n">SERIALIZATION_LEN</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">SERIALIZATION_LEN</span><span class="p">()</span>  <span class="c1"># 9</span>
 
 
 <div class="viewcode-block" id="TorchTensorRTModule"><a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule">[docs]</a><span class="nd">@for_all_methods</span><span class="p">(</span><span class="n">needs_torch_tensorrt_runtime</span><span class="p">)</span>
@@ -583,6 +590,40 @@
         <span class="k">if</span> <span class="n">serialized_engine</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">lazy_engine_init</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
 
+    <span class="k">def</span> <span class="nf">_pack_engine_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">]:</span>
+        <span class="n">target_device</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="n">Device</span><span class="o">.</span><span class="n">_current_device</span><span class="p">()</span>
+        <span class="p">)</span>
+        <span class="n">metadata</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;settings&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">,</span> <span class="s2">&quot;weight_name_map&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">weight_name_map</span><span class="p">}</span>
+        <span class="n">target_platform</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">Platform</span><span class="o">.</span><span class="n">current_platform</span><span class="p">()</span>
+        <span class="p">)</span>  <span class="c1"># Change to match target for engine</span>
+
+        <span class="n">engine_info</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">SERIALIZATION_LEN</span>
+
+        <span class="n">engine_info</span><span class="p">[</span><span class="n">ABI_TARGET_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">ABI_VERSION</span><span class="p">()</span>
+        <span class="n">engine_info</span><span class="p">[</span><span class="n">NAME_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s2">&quot;_engine&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span> <span class="k">else</span> <span class="s2">&quot;tensorrt_engine&quot;</span>
+        <span class="p">)</span>
+        <span class="n">engine_info</span><span class="p">[</span><span class="n">DEVICE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">target_device</span><span class="o">.</span><span class="n">_to_serialized_rt_device</span><span class="p">()</span>
+
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span>
+        <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span>
+
+        <span class="n">engine_info</span><span class="p">[</span><span class="n">INPUT_BINDING_NAMES_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">_pack_binding_names</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span>
+        <span class="p">)</span>
+        <span class="n">engine_info</span><span class="p">[</span><span class="n">OUTPUT_BINDING_NAMES_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">_pack_binding_names</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">output_binding_names</span>
+        <span class="p">)</span>
+        <span class="n">engine_info</span><span class="p">[</span><span class="n">HW_COMPATIBLE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hardware_compatible</span><span class="p">))</span>
+        <span class="n">engine_info</span><span class="p">[</span><span class="n">SERIALIZED_METADATA_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encode_metadata</span><span class="p">(</span><span class="n">metadata</span><span class="p">)</span>
+        <span class="n">engine_info</span><span class="p">[</span><span class="n">TARGET_PLATFORM_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">target_platform</span><span class="o">.</span><span class="n">_to_serialized_rt_platform</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">engine_info</span>
+
     <span class="k">def</span> <span class="nf">setup_engine</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Setup engine for a module which has deferred engine setup.</span>
@@ -594,25 +635,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span>
-
-        <span class="n">target_device</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-            <span class="k">else</span> <span class="n">Device</span><span class="o">.</span><span class="n">_current_device</span><span class="p">()</span>
-        <span class="p">)</span>
-        <span class="n">metadata</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;settings&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">,</span> <span class="s2">&quot;weight_name_map&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">weight_name_map</span><span class="p">}</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span>
-            <span class="p">[</span>
-                <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">ABI_VERSION</span><span class="p">(),</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s2">&quot;_engine&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span> <span class="k">else</span> <span class="s2">&quot;tensorrt_engine&quot;</span><span class="p">,</span>
-                <span class="n">target_device</span><span class="o">.</span><span class="n">_to_serialized_rt_device</span><span class="p">(),</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span><span class="p">,</span>
-                <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">_pack_binding_names</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span><span class="p">),</span>
-                <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">_pack_binding_names</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_binding_names</span><span class="p">),</span>
-                <span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hardware_compatible</span><span class="p">)),</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">encode_metadata</span><span class="p">(</span><span class="n">metadata</span><span class="p">),</span>
-            <span class="p">]</span>
-        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">())</span>
 
     <span class="k">def</span> <span class="nf">encode_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">metadata</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="n">metadata</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">metadata</span><span class="p">)</span>
@@ -634,43 +657,53 @@
         <span class="k">return</span> <span class="n">metadata</span>
 
     <span class="k">def</span> <span class="nf">get_extra_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SerializedTorchTensorRTModuleFmt</span><span class="p">:</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
-
-        <span class="k">return</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">__getstate__</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span><span class="p">,</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">output_binding_names</span><span class="p">,</span>
-        <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">__getstate__</span><span class="p">(),</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">output_binding_names</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span><span class="p">:</span>
+            <span class="n">engine_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">()</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">engine_info</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="nb">bytes</span><span class="p">)</span>
+            <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">engine_info</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="n">engine_info</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">output_binding_names</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="kc">None</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">output_binding_names</span><span class="p">,</span>
+            <span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">set_extra_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">SerializedTorchTensorRTModuleFmt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
         <span class="k">if</span> <span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">serialized_engine_info</span><span class="p">:</span> <span class="n">SerializedTensorRTEngineFmt</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-
-            <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">serialized_engine_info</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span>
-                <span class="p">[</span>
-                    <span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">ABI_TARGET_IDX</span><span class="p">],</span>
-                    <span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">NAME_IDX</span><span class="p">],</span>
-                    <span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">DEVICE_IDX</span><span class="p">],</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span><span class="p">,</span>
-                    <span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">INPUT_BINDING_NAMES_IDX</span><span class="p">],</span>
-                    <span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">OUTPUT_BINDING_NAMES_IDX</span><span class="p">],</span>
-                    <span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">HW_COMPATIBLE_IDX</span><span class="p">],</span>
-                    <span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">SERIALIZED_METADATA_IDX</span><span class="p">],</span>
-                <span class="p">]</span>
+            <span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span>
+                <span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span>
             <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="n">serialized_engine_info</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">hardware_compatible</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">HW_COMPATIBLE_IDX</span><span class="p">]))</span>
+
+            <span class="n">serialized_metadata</span> <span class="o">=</span> <span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">SERIALIZED_METADATA_IDX</span><span class="p">]</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">serialized_metadata</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">settings</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">decode_metadata</span><span class="p">(</span><span class="n">serialized_metadata</span><span class="p">)</span>
+
         <span class="k">else</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">hardware_compatible</span> <span class="o">=</span> <span class="kc">False</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">output_binding_names</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">hardware_compatible</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">6</span><span class="p">]))</span> <span class="k">if</span> <span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">False</span>
-        <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">settings</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">decode_metadata</span><span class="p">(</span><span class="n">serialized_engine_info</span><span class="p">[</span><span class="mi">7</span><span class="p">])</span>
 
     <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">inputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Implementation of the forward pass for a TensorRT engine</span>

@@ -11,4 +11,6 @@ See the examples started with `data_parallel` for more details.
 
 2. Tensor parallel distributed inference
 
-In development.
+Here we use torch.distributed as an example, but compilation with tensor parallelism is agnostic to the implementation framework as long as the module is properly sharded.
+
+torchrun --nproc_per_node=2 tensor_parallel_llama2.py
