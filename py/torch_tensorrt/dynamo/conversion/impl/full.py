@@ -68,7 +68,7 @@ def full(
     if type(fill_value) in (int, float):
         if isinstance(fill_value, float):
             output = cast_trt_tensor(
-                ctx, output, trt.float32, name + "_casted", target, source_ir
+                ctx, output, output_dtype, name + "_casted", target, source_ir
             )
         output = impl.elementwise.add(
             ctx, target, source_ir, name + "_add", output, fill_value
