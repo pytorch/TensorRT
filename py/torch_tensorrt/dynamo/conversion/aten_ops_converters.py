@@ -2492,14 +2492,7 @@ def aten_ops_cdist_forward(
 
 
 def avg_pool_param_validator(pool_node: Node) -> bool:
-    ceil_mode = args_bounds_check(pool_node.args, 4, False)
     divisor_override = args_bounds_check(pool_node.args, 6)
-
-    if ceil_mode is not False:
-        _LOGGER.debug(
-            f"Currently we don't support specifying ceil_mode, got ceil_mode={ceil_mode}."
-        )
-        return False
 
     if divisor_override is not None:
         _LOGGER.debug(
@@ -2615,17 +2608,13 @@ def topk_sort_validator(k: int) -> bool:
 
 def max_pool_param_validator(pool_node: Node) -> bool:
     dilation = args_bounds_check(pool_node.args, 4, 1)
-    ceil_mode = args_bounds_check(pool_node.args, 5, False)
+    if not isinstance(dilation, (list, tuple)):
+        dilation = (dilation,)
 
-    if dilation != 1:
-        _LOGGER.debug(f"Currently we don't support dilation, got dilation={dilation}.")
-        return False
-
-    if ceil_mode is not False:
-        _LOGGER.debug(
-            f"Currently we don't support specifying ceil_mode, got ceil_mode={ceil_mode}."
-        )
-        return False
+    for dil in dilation:
+        if dil != 1:
+            _LOGGER.debug("Currently we don't support dilation > 1 at any dimension.")
+            return False
 
     return True
 
@@ -3369,4 +3358,22 @@ def aten_ops_native_dropout(
         args[0],
         args[1],
         args_bounds_check(args, 2, None),
+    )
+
+@dynamo_tensorrt_converter(torch.ops.aten.full.default, supports_dynamic_shapes=True)
+def aten_ops_full(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.full.full(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        shape=args[0],
+        fill_value=args[1],
+        dtype=kwargs.get("dtype", None),
     )

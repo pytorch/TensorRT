@@ -33,8 +33,9 @@ def avg_poolNd(
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for pooling."
 
-    if ceil_mode is not False:
-        raise RuntimeError("ceil_mode is not yet supported!")
+    padding_mode = trt.PaddingMode.EXPLICIT_ROUND_DOWN
+    if ceil_mode:
+        padding_mode = trt.PaddingMode.EXPLICIT_ROUND_UP
 
     if divisor_override is not None:
         raise RuntimeError("divisor_override is not yet supported!")
@@ -60,6 +61,7 @@ def avg_poolNd(
     pool_layer.stride_nd = stride
     pool_layer.padding_nd = padding
     pool_layer.average_count_excludes_padding = not count_include_pad
+    pool_layer.padding_mode = padding_mode
 
     set_layer_name(pool_layer, target, name, source_ir)
     return pool_layer.get_output(0)
@@ -79,12 +81,9 @@ def max_poolNd(
 ) -> TRTTensor:
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for pooling."
-
-    if dilation != 1:
-        raise RuntimeError("dilation is not yet supported!")
-
-    if ceil_mode is not False:
-        raise RuntimeError("ceil_mode is not yet supported!")
+    padding_mode = trt.PaddingMode.EXPLICIT_ROUND_DOWN
+    if ceil_mode:
+        padding_mode = trt.PaddingMode.EXPLICIT_ROUND_UP
 
     dim = len(kernel_size)
 
@@ -106,6 +105,7 @@ def max_poolNd(
 
     pool_layer.stride_nd = stride
     pool_layer.padding_nd = padding
+    pool_layer.padding_mode = padding_mode
 
     set_layer_name(pool_layer, target, name, source_ir)
     return pool_layer.get_output(0)

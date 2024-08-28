@@ -211,7 +211,7 @@ def slice_scatter_decomposition(
             index_tensor_shape.append(src_each_dim)
     for index in range(start, end, step):
         cat_tensors.append(index * torch.ones(index_tensor_shape, dtype=torch.int64))
-    index_tensor = torch.stack(cat_tensors, dim).cuda()
+    index_tensor = torch.stack(cat_tensors, dim).to(input_tensor.device)
     index_tensor_64 = index_tensor.to(torch.int64)
     output_tensor = torch.scatter(input_tensor, dim, index_tensor_64, src_tensor)
     return output_tensor
@@ -345,7 +345,7 @@ def scatter_add_decomposition(
     src_shape = list(src_tensor.shape)
     src_dim = src_shape[dim]
     for i in range(0, src_dim):
-        to_scatter_tensor = torch.zeros_like(input_tensor)
+        to_scatter_tensor = torch.zeros(input_tensor.shape, dtype=input_tensor.dtype)
 
         # index and src slice
         src_slice = torch.select(src_tensor, dim, i)
@@ -356,7 +356,7 @@ def scatter_add_decomposition(
         index_slice = torch.unsqueeze(index_slice, dim)
 
         # moving tensor to default device
-        device = to_torch_device(default_device())
+        device = input_tensor.device
         scatter_add_tensor = scatter_add_tensor.to(device)
         to_scatter_tensor = to_scatter_tensor.to(device)
         index_slice = index_slice.to(device)

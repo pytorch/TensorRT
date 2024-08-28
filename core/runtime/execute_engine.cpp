@@ -205,7 +205,13 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       enqueue_profiler_guard =
           std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->enqueue_profile_path);
     }
-    c10::cuda::CUDAStream stream = c10::cuda::getCurrentCUDAStream(inputs[0].device().index());
+    auto current_device_id = -1;
+    if (inputs.size() > 0) {
+      current_device_id = inputs[0].device().index(); // Done this way to avoid a call to cudart
+    } else if (outputs.size() > 0) {
+      current_device_id = outputs[0].device().index(); // Done this way to avoid a call to cudart
+    }
+    c10::cuda::CUDAStream stream = c10::cuda::getCurrentCUDAStream(current_device_id);
     // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
     std::unique_lock<std::mutex> lock(compiled_engine->mu);
     compiled_engine->exec_ctx->enqueueV3(stream);
