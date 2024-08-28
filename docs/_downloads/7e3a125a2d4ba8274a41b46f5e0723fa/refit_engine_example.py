@@ -39,7 +39,7 @@ inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 # Compile the module for the first time and save it.
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-model = models.resnet18(pretrained=False).eval().to("cuda")
+model = models.resnet18(pretrained=True).eval().to("cuda")
 exp_program = torch.export.export(model, tuple(inputs))
 enabled_precisions = {torch.float}
 debug = False
@@ -68,7 +68,7 @@ torch_trt.save(trt_gm, "./compiled.ep", inputs=inputs)
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 # Create and compile the updated model
-model2 = models.resnet18(pretrained=True).eval().to("cuda")
+model2 = models.resnet18(pretrained=False).eval().to("cuda")
 exp_program2 = torch.export.export(model2, tuple(inputs))
 
 
