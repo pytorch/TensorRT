@@ -86,10 +86,13 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("dump_engine_layer_info_to_file", &TRTEngine::dump_engine_layer_info_to_file)
         .def("dump_engine_layer_info", &TRTEngine::dump_engine_layer_info)
         .def("get_engine_layer_info", &TRTEngine::get_engine_layer_info)
-        .def_property("weight_streaming_budget_v2", &TRTEngine::get_weight_streaming_budget_v2,
+        .def_property(
+            "weight_streaming_budget_v2",
+            &TRTEngine::get_weight_streaming_budget_v2,
             &TRTEngine::set_weight_streaming_budget_v2)
         .def_property("streamable_weights_size", &TRTEngine::get_streamable_weights_size)
         .def("get_weight_streaming_automatic_budget", &TRTEngine::get_weight_streaming_automatic_budget)
+        .def("init_context", &TRTEngine::init_context)
         .def("reset_context", &TRTEngine::reset_context)
         .def_pickle(
             [](const c10::intrusive_ptr<TRTEngine>& self) -> std::vector<std::string> {
