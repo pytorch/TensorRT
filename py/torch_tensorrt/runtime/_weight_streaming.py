@@ -1,32 +1,11 @@
 import logging
-from functools import wraps
-from typing import Any
 
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 
 logger = logging.getLogger(__name__)
 
 
-def recreate_context_decorator(method):
-    """
-    A decorator that destroys a context before a method execution and
-    creates it after the method execution within the same class instance.
-    """
-
-    @wraps(method)
-    def wrapper(self, *args, **kwargs):
-        # Destroy the context before the method execution
-        self._reset_context()
-        # Execute the method
-        result = method(self, *args, **kwargs)
-        # Re-create the context after the method execution
-        self._init_context()
-        return result
-
-    return wrapper
-
-
-class _WeightStreamingContextManager(object):
+class _WeightStreamingContext(object):
     """
     Helper class used to setup weight streaming budget
     """
@@ -43,19 +22,7 @@ class _WeightStreamingContextManager(object):
         ]
         self.rt_mods = rt_mods
 
-    def _reset_context(self):
-        for _, rt_mod in self.rt_mods:
-            rt_mod.reset_context()
-
-    def _init_context(self):
-        for _, rt_mod in self.rt_mods:
-            rt_mod.init_context()
-
-    def __enter__(self) -> "_WeightStreamingContextManager":
-        return self
-
-    @recreate_context_decorator
-    def __exit__(self, *args: Any) -> None:
+    def disable_weight_streaming(self):
         for i, (name, rt_mod) in enumerate(self.rt_mods):
             rt_mod.set_weight_streaming_budget(self.streamable_budget[i])
             logger.debug(
@@ -65,7 +32,6 @@ class _WeightStreamingContextManager(object):
     def get_streamable_weight_bytes(self):
         return sum(self.streamable_budget)
 
-    @recreate_context_decorator
     def set_streamable_weight_bytes(self, budget_bytes):
         ws_budget_bytes = 0
         total_bytes = self.get_streamable_weight_bytes()
@@ -90,14 +56,6 @@ class _WeightStreamingContextManager(object):
             logger.debug(f"Set weight streaming size {normalized_size[i]} for {name}")
         return ws_budget_bytes
 
-    @recreate_context_decorator
-    def set_automatic_streaming_budget(self):
-        total_bytes = 0
-        for _, rt_mod in self.rt_mods:
-            total_bytes += rt_mod.set_automatic_streaming_budget()
 
-        return total_bytes
-
-
-def enable_weight_streaming(module) -> _WeightStreamingContextManager:
-    return _WeightStreamingContextManager(module)
+def weight_streaming_context(module) -> _WeightStreamingContext:
+    return _WeightStreamingContext(module)
