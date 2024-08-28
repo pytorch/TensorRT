@@ -93,19 +93,19 @@ class TestWeightStreamingPython(TestCase):
             enable_weight_streaming=True,
         )
         # Weight streaming budget is applied manually.
-        with torchtrt.runtime.enable_weight_streaming(optimized_model) as ws_context:
-            streamable_weight_bytes = ws_context.get_streamable_weight_bytes()
-            ws_budget_bytes = ws_context.set_streamable_weight_bytes(
-                int(streamable_weight_bytes * 0.7)
-            )
-            assert ws_budget_bytes > 0
-            optimized_model(*input)
+        ws_context = torchtrt.runtime.weight_streaming_context(optimized_model)
+        streamable_weight_bytes = ws_context.get_streamable_weight_bytes()
+        ws_budget_bytes = ws_context.set_streamable_weight_bytes(
+            int(streamable_weight_bytes * 0.7)
+        )
+        assert ws_budget_bytes > 0
+        optimized_model(*input)
 
-            ws_budget_bytes = ws_context.set_streamable_weight_bytes(
-                int(streamable_weight_bytes * 0.5)
-            )
-            assert ws_budget_bytes > 0
-            out = optimized_model(*input)
+        ws_budget_bytes = ws_context.set_streamable_weight_bytes(
+            int(streamable_weight_bytes * 0.5)
+        )
+        assert ws_budget_bytes > 0
+        out = optimized_model(*input)
 
         ref = model(*input)
         torch.testing.assert_close(
@@ -139,23 +139,21 @@ class TestWeightStreamingPython(TestCase):
             enable_weight_streaming=True,
         )
         # Expects weight streaming is disabled if invalid budget size is set
-        with torchtrt.runtime.enable_weight_streaming(optimized_model) as ws_context:
-            streamable_weight_bytes = ws_context.get_streamable_weight_bytes()
+        ws_context = torchtrt.runtime.weight_streaming_context(optimized_model)
+        streamable_weight_bytes = ws_context.get_streamable_weight_bytes()
 
-            # Values is larger than streamable_weights_size.
-            ws_budget_bytes = ws_context.set_streamable_weight_bytes(
-                streamable_weight_bytes + 1
-            )
-            assert ws_budget_bytes == streamable_weight_bytes
-            optimized_model(*input)
+        # Values is larger than streamable_weights_size.
+        ws_budget_bytes = ws_context.set_streamable_weight_bytes(
+            streamable_weight_bytes + 1
+        )
+        assert ws_budget_bytes == streamable_weight_bytes
+        optimized_model(*input)
 
-            # zero weight budget size
-            ws_budget_bytes = ws_context.set_streamable_weight_bytes(0)
-            current_ws_budget_bytes = get_current_weight_streaming_bytes(
-                optimized_model
-            )
-            assert current_ws_budget_bytes == streamable_weight_bytes
-            optimized_model(*input)
+        # zero weight budget size
+        ws_budget_bytes = ws_context.set_streamable_weight_bytes(0)
+        current_ws_budget_bytes = get_current_weight_streaming_bytes(optimized_model)
+        assert current_ws_budget_bytes == streamable_weight_bytes
+        optimized_model(*input)
 
         torch._dynamo.reset()
 
@@ -180,14 +178,13 @@ class TestWeightStreamingPython(TestCase):
             use_python_runtime=use_python_runtime,
             enable_weight_streaming=True,
         )
-
-        with torchtrt.runtime.enable_weight_streaming(optimized_model) as ws_context:
-            streamable_weight_bytes = ws_context.get_streamable_weight_bytes()
-            for pct in [0.1, 0.5, 0.9]:
-                bytes = int(pct * streamable_weight_bytes)
-                ws_budget_bytes = ws_context.set_streamable_weight_bytes(bytes)
-                assert ws_budget_bytes > 0
-                out = optimized_model(*input)
+        ws_context = torchtrt.runtime.weight_streaming_context(optimized_model)
+        streamable_weight_bytes = ws_context.get_streamable_weight_bytes()
+        for pct in [0.1, 0.5, 0.9]:
+            bytes = int(pct * streamable_weight_bytes)
+            ws_budget_bytes = ws_context.set_streamable_weight_bytes(bytes)
+            assert ws_budget_bytes > 0
+            out = optimized_model(*input)
 
         ref = model(*input)
         torch.testing.assert_close(
