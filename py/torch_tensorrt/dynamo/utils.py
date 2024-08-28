@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 COSINE_THRESHOLD = 0.99
 DYNAMIC_DIM = -1
+RTOL = 5e-3
+ATOL = 5e-3
 
 
 class Frameworks(Enum):
@@ -412,6 +414,8 @@ def check_module_output(
 def check_output_equal(
     output1: Any,
     output2: Any,
+    rtol: float = RTOL,
+    atol: float = ATOL,
 ) -> bool:
 
     if type(output1) != type(output2):
@@ -423,7 +427,7 @@ def check_output_equal(
     if isinstance(output1, torch.Tensor):
         if output1.shape != output2.shape:
             return False
-        return torch.allclose(output1, output2, 5e-3, 5e-3)  # type: ignore
+        return torch.allclose(output1, output2, rtol, atol)  # type: ignore
 
     elif isinstance(output1, (tuple, list)):
         if len(output1) != len(output2):
