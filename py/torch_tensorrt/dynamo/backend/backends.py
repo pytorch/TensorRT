@@ -75,7 +75,6 @@ def _pretraced_backend(
         with unittest.mock.patch.object(
             fake_mode, "allow_non_fake_inputs", True
         ), fake_mode:
-
             repair_input_aliasing(gm)
 
             # Remove sym_int placeholders and inputs
@@ -90,7 +89,7 @@ def _pretraced_backend(
             # Invoke AOTAutograd to translate operators to aten
             gm = aot_export_joint_simple(
                 gm,
-                sample_inputs,
+                torch_inputs,
                 trace_joint=False,
                 decompositions=get_decompositions(
                     settings.enable_experimental_decompositions
@@ -98,6 +97,7 @@ def _pretraced_backend(
             )
 
             logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
+
             gm = post_lowering(gm)
 
             logger.debug("Lowered Input graph:\n " + str(gm.graph))
