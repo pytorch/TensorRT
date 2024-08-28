@@ -1,6 +1,7 @@
 # type: ignore
 import unittest
 
+import modelopt
 import pytest
 import timm
 import torch
@@ -227,8 +228,9 @@ def test_base_fp8(ir):
             assert torch.allclose(output_pyt, outputs_trt, rtol=1e-3, atol=1e-2)
 
 
-@unittest.skip(
-    "Skip this test for now, should only be enabled once modelopt has released 2.6.1 version",
+@unittest.skipIf(
+    modelopt.__version__ < "0.16.1",
+    "Int8 quantization is supported in modelopt since 0.16.1 or later",
 )
 @pytest.mark.unit
 def test_base_int8(ir):
@@ -261,7 +263,9 @@ def test_base_int8(ir):
 
     with torch.no_grad():
         with export_torch_mode():
-            exp_program = torch.export._trace._export(model, (input_tensor,))
+            from torch.export._trace import _export
+
+            exp_program = _export(model, (input_tensor,))
             trt_model = torchtrt.dynamo.compile(
                 exp_program,
                 inputs=[input_tensor],
