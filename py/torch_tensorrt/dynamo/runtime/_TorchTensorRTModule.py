@@ -169,20 +169,27 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
         return engine_info
 
+    def init_context(self):
+        self.engine.init_context()
+
     def reset_context(self):
-        if self.engine is None:
-            return
         self.engine.reset_context()
 
-    def get_weight_streaming_budget(self):
+    def get_streamable_weights_size(self):
         return self.engine.streamable_weights_size
 
+    def get_weight_streaming_budget(self):
+        return self.engine.weight_streaming_budget_v2
+
     def set_weight_streaming_budget(self, budget_bytes):
-        self.reset_context()
+        # Disable weight streaming for invalid budget size
+        if budget_bytes <= 0:
+            budget_bytes = self.get_streamable_weights_size()
+
         self.engine.weight_streaming_budget_v2 = budget_bytes
-        if self.engine.weight_streaming_budget_v2 != budget_bytes:
+        if self.get_weight_streaming_budget() != budget_bytes:
             logger.error(f"Failed to set weight streaming budget to {budget_bytes}")
-            budget_bytes = self.engine.weight_streaming_budget_v2
+            budget_bytes = self.get_weight_streaming_budget()
         if self.engine.streamable_weights_size == budget_bytes:
             logger.warning("Weight streaming is disabled")
 
@@ -293,6 +300,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             (i if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
             for i in inputs
         ]
+
         outputs: List[torch.Tensor] = torch.ops.tensorrt.execute_engine(
             list(input_tensors), self.engine
         )
@@ -323,7 +331,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             raise RuntimeError("Engine has not been initialized yet.")
 
         self.engine.disable_profiling()
-        self.reset_context()
 
     def get_layer_info(self) -> str:
         """Get a JSON string containing the layer information encoded by the TensorRT engine in this module
