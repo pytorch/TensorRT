@@ -244,7 +244,7 @@ class DispatchTestCase(TRTTestCase):
             try:
                 ShapeProp(fx_module).propagate(*torch_inputs)
             except (RuntimeError, AssertionError):
-                logger.warning(
+                _LOGGER.warning(
                     "Shape Propagation failed on Graph, skipping it",
                     exc_info=False,
                 )
