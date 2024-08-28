@@ -1,6 +1,7 @@
 # type: ignore
 import unittest
 
+import modelopt
 import pytest
 import timm
 import torch
@@ -220,6 +221,55 @@ def test_base_fp8(ir):
                 exp_program,
                 inputs=[input_tensor],
                 enabled_precisions={torch.float8_e4m3fn},
+                min_block_size=1,
+                debug=True,
+            )
+            outputs_trt = trt_model(input_tensor)
+            assert torch.allclose(output_pyt, outputs_trt, rtol=1e-3, atol=1e-2)
+
+
+@unittest.skipIf(
+    modelopt.__version__ < "0.16.1",
+    "Int8 quantization is supported in modelopt since 0.16.1 or later",
+)
+@pytest.mark.unit
+def test_base_int8(ir):
+    class SimpleNetwork(torch.nn.Module):
+        def __init__(self):
+            super(SimpleNetwork, self).__init__()
+            self.linear1 = torch.nn.Linear(in_features=10, out_features=5)
+            self.linear2 = torch.nn.Linear(in_features=5, out_features=1)
+
+        def forward(self, x):
+            x = self.linear1(x)
+            x = torch.nn.ReLU()(x)
+            x = self.linear2(x)
+            return x
+
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.quantization.utils import export_torch_mode
+
+    def calibrate_loop(model):
+        """Simple calibration function for testing."""
+        model(input_tensor)
+
+    input_tensor = torch.randn(1, 10).cuda()
+    model = SimpleNetwork().eval().cuda()
+
+    quant_cfg = mtq.INT8_DEFAULT_CFG
+    mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
+    # model has INT8 qdq nodes at this point
+    output_pyt = model(input_tensor)
+
+    with torch.no_grad():
+        with export_torch_mode():
+            from torch.export._trace import _export
+
+            exp_program = _export(model, (input_tensor,))
+            trt_model = torchtrt.dynamo.compile(
+                exp_program,
+                inputs=[input_tensor],
+                enabled_precisions={torch.int8},
                 min_block_size=1,
                 debug=True,
             )

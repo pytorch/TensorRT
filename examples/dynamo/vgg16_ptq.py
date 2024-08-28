@@ -1,10 +1,10 @@
 """
-.. _vgg16_fp8_ptq:
+.. _vgg16_ptq:
 
 Deploy Quantized Models using Torch-TensorRT
 ======================================================
 
-Here we demonstrate how to deploy a model quantized to FP8 using the Dynamo frontend of Torch-TensorRT
+Here we demonstrate how to deploy a model quantized to INT8 or FP8 using the Dynamo frontend of Torch-TensorRT
 """
 
 # %%
@@ -111,7 +111,12 @@ PARSER.add_argument(
     type=int,
     help="Batch size for tuning the model with PTQ and FP8",
 )
-
+PARSER.add_argument(
+    "--quantize-type",
+    default="int8",
+    type=str,
+    help="quantization type, currently supported int8 or fp8 for PTQ",
+)
 args = PARSER.parse_args()
 
 model = vgg16(num_classes=10, init_weights=False)
@@ -191,8 +196,10 @@ def calibrate_loop(model):
 # %%
 # Tune the pre-trained model with FP8 and PTQ
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-quant_cfg = mtq.FP8_DEFAULT_CFG
+if args.quantize_type == "int8":
+    quant_cfg = mtq.INT8_DEFAULT_CFG
+elif args.quantize_type == "fp8":
+    quant_cfg = mtq.FP8_DEFAULT_CFG
 # PTQ with in-place replacement to quantized modules
 mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
 # model has FP8 qdq nodes at this point
@@ -226,11 +233,18 @@ with torch.no_grad():
     with export_torch_mode():
         # Compile the model with Torch-TensorRT Dynamo backend
         input_tensor = images.cuda()
-        exp_program = torch.export.export(model, (input_tensor,))
+        # torch.export.export() failed due to RuntimeError: Attempting to use FunctionalTensor on its own. Instead, please use it with a corresponding FunctionalTensorMode()
+        from torch.export._trace import _export
+
+        exp_program = _export(model, (input_tensor,))
+        if args.quantize_type == "int8":
+            enabled_precisions = {torch.int8}
+        elif args.quantize_type == "fp8":
+            enabled_precisions = {torch.float8_e4m3fn}
         trt_model = torchtrt.dynamo.compile(
             exp_program,
             inputs=[input_tensor],
-            enabled_precisions={torch.float8_e4m3fn},
+            enabled_precisions=enabled_precisions,
             min_block_size=1,
             debug=False,
         )

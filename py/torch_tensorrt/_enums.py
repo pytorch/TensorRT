@@ -5,10 +5,9 @@ from enum import Enum, auto
 from typing import Any, Optional, Type, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch_tensorrt._features import ENABLED_FEATURES, needs_torch_tensorrt_runtime
-
-import tensorrt as trt
 
 
 class dtype(Enum):
